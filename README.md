@@ -5,7 +5,7 @@
 
 > ⚠️ **Dữ liệu mô phỏng.** Trạm quan trắc, ngưỡng báo động, hồ chứa, lực lượng, kho, danh bạ và số điện thoại
 > (đầu số `0999` không cấp phát) đều là **minh hoạ**. Ranh giới 56 xã/phường được **sinh xấp xỉ bằng Voronoi** từ toạ độ
-> tâm và cắt theo ranh giới tỉnh (geoBoundaries). Khi triển khai thật cần thay bằng dữ liệu chính thức của
+> tâm và cắt theo ranh giới tỉnh. Khi triển khai thật cần thay bằng dữ liệu chính thức của
 > Sở NN&MT, Đài KTTV, BCH PCTT & TKCN tỉnh.
 
 ## Phân hệ
@@ -187,4 +187,9 @@ cd frontend && npm run build                  # build production
 | Nút gọi `tel:` | Tổng đài WebRTC/SIP có ghi âm |
 | Ranh giới Voronoi | Shapefile ranh giới xã chính thức (Sở NN&MT) |
 
-Nguồn danh sách 56 xã/phường: Nghị quyết 1657/NQ-UBTVQH15 (hiệu lực 01/07/2025).
+## Nguồn dữ liệu địa giới
+
+- **Ranh giới tỉnh:** OpenStreetMap relation [1844412](https://www.openstreetmap.org/relation/1844412) (© OpenStreetMap contributors, ODbL),
+  diện tích tính được **6.694 km²**. Cao Bằng là 1 trong 11 tỉnh, thành **không sáp nhập** theo Nghị quyết 202/2025/QH15
+  nên ranh giới cấp tỉnh giữ nguyên sau 12/6/2025. File: [backend/seed/caobang_province.geojson](backend/seed/caobang_province.geojson).
+- **56 xã/phường** (53 xã, 3 phường): Nghị quyết 1657/NQ-UBTVQH15 (hiệu lực 01/07/2025). Ranh giới xã là xấp xỉ (Voronoi).

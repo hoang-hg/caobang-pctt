@@ -19,7 +19,7 @@ from app.db import engine, execute, fetch_all, fetch_one
 from app.services import scenario
 from app.services.safe_routing import haversine_km
 
-PROVINCE_FILE = Path(__file__).resolve().parents[1] / "seed" / "caobang_province.geojson"
+PROVINCE_FILE = Path(__file__).resolve().parents[1] / "seed" / "caobang_province.geojson"  # OSM relation 1844412
 rng = random.Random(2025)
 PRESET_TAGS = {"LV_BANG_GIANG": "vung_trung", "VUNG_NUI_CAO": "vung_nui", "BIEN_GIOI": "bien_gioi"}
 
