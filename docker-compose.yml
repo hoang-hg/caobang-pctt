@@ -1,6 +1,41 @@
 # Hệ thống Điều hành PCTT & TKCN tỉnh Cao Bằng
-#   docker compose up -d --build        → db + backend + frontend (nginx)
+#   docker compose up -d --build
+#     db       PostgreSQL 16 + PostGIS + TimescaleDB
+#     redis    cache, giới hạn tần suất, phát sự kiện WebSocket & đồng bộ quyền giữa các tiến trình
+#     minio    lưu ảnh phản ánh người dân (bucket riêng tư)            — console http://localhost:9001
+#     mailpit  hộp thư thử nghiệm (email quên mật khẩu)                — http://localhost:8025
+#     mqtt     broker Mosquitto cho thiết bị IoT (dev: cho phép ẩn danh)
+#     backend  API (gunicorn nhiều worker) — tự migrate + seed khi khởi động
+#     worker   tác vụ nền chạy 1 bản: mô phỏng, đồng bộ dự báo, cầu nối MQTT, phát hiện mất tín hiệu
+#     frontend nginx phục vụ giao diện + proxy /api, /ws
 #   Frontend dev: cd frontend && npm run dev (proxy /api, /ws → localhost:8000)
+
+x-backend-env: &backend-env
+  DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-pctt}:${POSTGRES_PASSWORD:-pctt_dev_password}@db:5432/${POSTGRES_DB:-caobang_pctt}
+  REDIS_URL: redis://redis:6379/0
+  JWT_SECRET: ${JWT_SECRET:-doi-khoa-bi-mat-nay-khi-trien-khai-that}
+  SECRET_KEY: ${SECRET_KEY:-}
+  SIMULATOR: ${SIMULATOR:-true}
+  DEMO_MODE: ${DEMO_MODE:-true}
+  OPEN_METEO_ENABLED: ${OPEN_METEO_ENABLED:-true}
+  MQTT_URL: ${MQTT_URL:-mqtt://mqtt:1883}
+  CORS_ORIGINS: http://localhost:5173,http://localhost:8080
+  PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8080}
+  RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+  MINIO_ENDPOINT: minio:9000
+  MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-pctt_minio}
+  MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-pctt_minio_dev_password}
+  MINIO_BUCKET: caobang-pctt
+  SMTP_HOST: ${SMTP_HOST:-mailpit}
+  SMTP_PORT: ${SMTP_PORT:-1025}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  SMTP_STARTTLS: ${SMTP_STARTTLS:-false}
+  TURNSTILE_SECRET: ${TURNSTILE_SECRET:-}
+  LLM_API_URL: ${LLM_API_URL:-}
+  LLM_API_KEY: ${LLM_API_KEY:-}
+  LLM_MODEL: ${LLM_MODEL:-}
+
 services:
   db:
     image: timescale/timescaledb-ha:pg16
@@ -20,28 +55,33 @@ services:
       timeout: 5s
       retries: 20
 
-  backend:
-    build: ./backend
-    container_name: caobang-pctt-backend
+  redis:
+    image: redis:7-alpine
+    container_name: caobang-pctt-redis
+    command: redis-server --appendonly no --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  minio:
+    image: minio/minio:latest
+    container_name: caobang-pctt-minio
+    command: server /data --console-address ":9001"
     environment:
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-pctt}:${POSTGRES_PASSWORD:-pctt_dev_password}@db:5432/${POSTGRES_DB:-caobang_pctt}
-      JWT_SECRET: ${JWT_SECRET:-doi-khoa-bi-mat-nay-khi-trien-khai-that}
-      SIMULATOR: ${SIMULATOR:-true}
-      DEMO_MODE: ${DEMO_MODE:-true}
-      SECRET_KEY: ${SECRET_KEY:-}
-      OPEN_METEO_ENABLED: ${OPEN_METEO_ENABLED:-true}
-      MQTT_URL: ${MQTT_URL:-mqtt://mqtt:1883}
-      CORS_ORIGINS: http://localhost:5173,http://localhost:8080
-      LLM_API_URL: ${LLM_API_URL:-}
-      LLM_API_KEY: ${LLM_API_KEY:-}
-      LLM_MODEL: ${LLM_MODEL:-}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-pctt_minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-pctt_minio_dev_password}
     ports:
-      - "8000:8000"
-    depends_on:
-      db:
-        condition: service_healthy
-      mqtt:
-        condition: service_started
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: caobang-pctt-mailpit
+    ports:
+      - "8025:8025"
 
   # Broker MQTT cho thiết bị IoT hiện trường (dev: cho phép ẩn danh — xem mqtt/mosquitto.conf)
   mqtt:
@@ -51,6 +91,46 @@ services:
       - "1883:1883"
     volumes:
       - ./mqtt/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+
+  backend:
+    build: ./backend
+    image: caobang-pctt-backend
+    container_name: caobang-pctt-backend
+    environment:
+      <<: *backend-env
+      RUN_MODE: api
+    # Một dòng duy nhất: YAML ">" giữ xuống dòng ở dòng thụt sâu → shell tách thành lệnh riêng
+    command: ["sh", "-c", "alembic upgrade head && python -m app.seed && exec gunicorn app.main:app -k uvicorn.workers.UvicornWorker -w ${API_WORKERS:-2} -b 0.0.0.0:8000 --forwarded-allow-ips=* --timeout 120 --access-logfile -"]
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"]
+      interval: 10s
+      timeout: 6s
+      retries: 30
+      start_period: 20s
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+      mailpit:
+        condition: service_started
+
+  worker:
+    image: caobang-pctt-backend
+    container_name: caobang-pctt-worker
+    environment:
+      <<: *backend-env
+      RUN_MODE: worker
+    command: python -m app.worker
+    depends_on:
+      backend:
+        condition: service_healthy  # chờ API migrate + seed xong
+      mqtt:
+        condition: service_started
 
   frontend:
     build: ./frontend
@@ -62,3 +142,4 @@ services:
 
 volumes:
   pgdata:
+  minio_data:

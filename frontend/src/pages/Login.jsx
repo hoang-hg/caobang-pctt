@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { ShieldAlert, LogIn, Loader2, UserRound } from 'lucide-react';
 import { api } from '../api/client';
 import { useStore } from '../app/store';
@@ -18,6 +19,7 @@ export default function Login() {
     setError('');
     try {
       setAuth(await api('/auth/login', { method: 'POST', body: { username: u, password: p } }));
+      // chuyển trang do route /dang-nhap (AfterLogin) đảm nhận theo ?next=
     } catch (e) {
       setError(e.message);
     } finally {
@@ -54,6 +56,10 @@ export default function Login() {
           <button className="btn-primary justify-center py-2" disabled={!username || !password || busy}>
             {busy ? <Loader2 size={16} className="animate-spin" /> : <LogIn size={16} />} Đăng nhập
           </button>
+          <div className="flex justify-between text-xs">
+            <Link to="/quen-mat-khau" className="text-accent hover:underline">Quên mật khẩu?</Link>
+            <Link to="/" className="text-muted hover:underline">← Cổng thông tin công khai</Link>
+          </div>
           <p className="text-xs text-muted">Quyền thao tác được cấp theo vai trò và phạm vi địa bàn (toàn tỉnh, cụm hoặc xã/phường).</p>
         </form>
 

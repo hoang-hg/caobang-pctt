@@ -13,11 +13,11 @@ import json
 
 from fastapi import HTTPException
 
-from app.auth import bump_token_version, hash_secret
+from app.auth import bump_token_version, hash_secret, password_problem
 from app.db import execute, fetch_all, fetch_one
 from app.rbac import domains
 from app.rbac.authz import allowed_patterns, can, groupings
-from app.rbac.enforcer import get_enforcer
+from app.rbac.enforcer import get_enforcer, notify_policy_changed
 from app.rbac.permissions import (
     GLOBAL_SCOPE,
     NON_DELEGATABLE,
@@ -48,6 +48,8 @@ async def rbac_audit(
             "det": json.dumps(details or {}, ensure_ascii=False),
         },
     )
+    if action != "user.update":  # thay đổi policy → các tiến trình khác nạp lại
+        await notify_policy_changed()
 
 
 # ---------------------------------------------------------------- roles
@@ -58,7 +60,7 @@ def role_permissions(role: str) -> list[str]:
 async def list_roles() -> list[dict]:
     meta = await fetch_all(
         """SELECT * FROM communications.rbac_role_metadata
-            ORDER BY is_system DESC, array_position(ARRAY['super_admin', 'truong_ban', 'chi_huy_cum', 'truc_ban', 'can_bo_xa',
+            ORDER BY is_system DESC, array_position(ARRAY['super_admin', 'truong_ban', 'admin_tinh', 'admin_xa', 'chi_huy_cum', 'truc_ban', 'can_bo_xa',
                                                            'thu_kho', 'quan_sat'], name), name"""
     )
     e = get_enforcer()
@@ -191,9 +193,7 @@ async def assert_can_manage_user(actor: dict, target: dict) -> None:
 
 
 # ---------------------------------------------------------------- users
-USER_COLS = (
-    "id, username, full_name, position, is_active, created_at, created_by, (pin_hash IS NOT NULL) AS has_pin"
-)
+USER_COLS = "id, username, full_name, position, email, is_active, created_at, created_by, (pin_hash IS NOT NULL) AS has_pin"
 
 
 async def list_users(actor: dict) -> list[dict]:
@@ -240,13 +240,19 @@ async def get_user(user_id: str) -> dict:
     return u
 
 
-async def create_user(actor, username, full_name, position, password, pin, role, domain) -> dict:
+async def create_user(actor, username, full_name, position, password, pin, role, domain, email=None) -> dict:
     await assert_can_delegate(actor, role, domain)
+    if problem := password_problem(password):
+        raise HTTPException(422, problem)
+    if email and await fetch_one(
+        "SELECT 1 FROM communications.users WHERE lower(email) = lower(:e)", {"e": email}
+    ):
+        raise HTTPException(409, "Email đã được dùng cho tài khoản khác")
     if await fetch_one("SELECT 1 FROM communications.users WHERE username = :u", {"u": username}):
         raise HTTPException(409, "Tên đăng nhập đã tồn tại")
     row = await fetch_one(
-        """INSERT INTO communications.users (username, full_name, position, password_hash, pin_hash, created_by)
-           VALUES (:u, :f, :p, :pw, :pin, :by) RETURNING id""",
+        """INSERT INTO communications.users (username, full_name, position, password_hash, pin_hash, created_by, email)
+           VALUES (:u, :f, :p, :pw, :pin, :by, :e) RETURNING id""",
         {
             "u": username,
             "f": full_name,
@@ -254,6 +260,7 @@ async def create_user(actor, username, full_name, position, password, pin, role,
             "pw": hash_secret(password),
             "pin": hash_secret(pin) if pin else None,
             "by": actor["id"],
+            "e": email or None,
         },
     )
     await get_enforcer().add_grouping_policy(username, role, domain)
@@ -262,10 +269,17 @@ async def create_user(actor, username, full_name, position, password, pin, role,
 
 
 async def update_user(
-    actor, user_id, *, full_name=None, position=None, password=None, pin=None, is_active=None
+    actor, user_id, *, full_name=None, position=None, password=None, pin=None, is_active=None, email=None
 ) -> dict:
     target = await get_user(user_id)
     await assert_can_manage_user(actor, target)
+    if password and (problem := password_problem(password)):
+        raise HTTPException(422, problem)
+    if email and await fetch_one(
+        "SELECT 1 FROM communications.users WHERE lower(email) = lower(:e) AND id <> CAST(:id AS uuid)",
+        {"e": email, "id": user_id},
+    ):
+        raise HTTPException(409, "Email đã được dùng cho tài khoản khác")
     if is_active is False and target["id"] == actor["id"]:
         raise HTTPException(400, "Không tự khoá tài khoản của mình")
     await execute(
@@ -273,7 +287,8 @@ async def update_user(
                   position = COALESCE(CAST(:p AS text), position),
                   password_hash = COALESCE(CAST(:pw AS text), password_hash),
                   pin_hash = COALESCE(CAST(:pin AS text), pin_hash),
-                  is_active = COALESCE(CAST(:act AS boolean), is_active)
+                  is_active = COALESCE(CAST(:act AS boolean), is_active),
+                  email = COALESCE(CAST(:email AS text), email)
             WHERE id = CAST(:id AS uuid)""",
         {
             "f": full_name,
@@ -281,6 +296,7 @@ async def update_user(
             "pw": hash_secret(password) if password else None,
             "pin": hash_secret(pin) if pin else None,
             "act": is_active,
+            "email": email,
             "id": user_id,
         },
     )
@@ -294,6 +310,7 @@ async def update_user(
             "password": password,
             "pin": pin,
             "is_active": is_active,
+            "email": email,
         }.items()
         if v is not None
     ]

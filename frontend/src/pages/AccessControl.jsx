@@ -10,6 +10,7 @@ import { Empty, Modal, Tabs } from '../components/common/ui';
 import { usePermission } from '../rbac/usePermission';
 import { canManageAt, GLOBAL, hasPermission } from '../rbac/permissions';
 import { dateTime } from '../utils/format';
+import { PASSWORD_HINT, weakPassword } from './AccountPages';
 
 const RESOURCE_LABEL = {
   monitoring: 'Giám sát', sos: 'SOS', dispatch: 'Điều động', resource: 'Nguồn lực', inventory: 'Kho vật tư', vehicle: 'Phương tiện',
@@ -91,20 +92,21 @@ function useMutate() {
 
 function CreateUserModal({ onClose }) {
   const run = useMutate();
-  const [f, setF] = useState({ username: '', full_name: '', position: '', password: '', pin: '', role: '', domain: '' });
+  const [f, setF] = useState({ username: '', full_name: '', position: '', email: '', password: '', pin: '', role: '', domain: '' });
   const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }));
-  const valid = /^[a-z0-9._-]{3,40}$/.test(f.username) && f.full_name.length > 1 && f.password.length >= 6 && f.role && f.domain
+  const valid = /^[a-z0-9._-]{3,40}$/.test(f.username) && f.full_name.length > 1 && !weakPassword(f.password) && f.role && f.domain && (!f.email || /^[^@s]+@[^@s]+.[^@s]+$/.test(f.email))
     && (!f.pin || /^\d{4,8}$/.test(f.pin));
   const submit = async () => {
-    if (await run(() => api('/rbac/users', { method: 'POST', body: { ...f, pin: f.pin || null, position: f.position || null } }), `Đã tạo tài khoản ${f.username}`)) onClose();
+    if (await run(() => api('/rbac/users', { method: 'POST', body: { ...f, pin: f.pin || null, position: f.position || null, email: f.email || null } }), `Đã tạo tài khoản ${f.username}`)) onClose();
   };
   return (
     <Modal open onClose={onClose} title="Tạo tài khoản con" footer={<><button className="btn-ghost" onClick={onClose}>Huỷ</button><button className="btn-primary" disabled={!valid} onClick={submit}><UserPlus size={15} /> Tạo</button></>}>
       <div className="grid gap-3 text-sm sm:grid-cols-2">
         <label>Tên đăng nhập<input className="input mt-1 font-mono" placeholder="vd: canbo.baolam" value={f.username} onChange={set('username')} /></label>
         <label>Họ tên<input className="input mt-1" value={f.full_name} onChange={set('full_name')} /></label>
-        <label className="sm:col-span-2">Chức vụ<input className="input mt-1" value={f.position} onChange={set('position')} /></label>
-        <label>Mật khẩu (≥ 6 ký tự)<input className="input mt-1" type="password" value={f.password} onChange={set('password')} /></label>
+        <label>Chức vụ<input className="input mt-1" value={f.position} onChange={set('position')} /></label>
+        <label>Email (để tự khôi phục mật khẩu)<input className="input mt-1" type="email" value={f.email} onChange={set('email')} /></label>
+        <label>Mật khẩu ({PASSWORD_HINT.toLowerCase()})<input className="input mt-1" type="password" value={f.password} onChange={set('password')} /></label>
         <label>PIN phê duyệt (tuỳ chọn)<input className="input mt-1 font-mono" inputMode="numeric" value={f.pin} onChange={set('pin')} /></label>
         <label>Vai trò<div className="mt-1"><RolePicker value={f.role} onChange={(v) => setF((x) => ({ ...x, role: v }))} /></div></label>
         <label>Phạm vi<div className="mt-1"><ScopePicker value={f.domain} onChange={(v) => setF((x) => ({ ...x, domain: v }))} /></div></label>
@@ -141,7 +143,7 @@ function CredentialsModal({ user, onClose }) {
     if (await run(() => api(`/rbac/users/${user.id}`, { method: 'PATCH', body }), 'Đã cập nhật thông tin đăng nhập')) onClose();
   };
   return (
-    <Modal open onClose={onClose} title={`Đặt lại mật khẩu / PIN – ${user.full_name}`} footer={<><button className="btn-ghost" onClick={onClose}>Huỷ</button><button className="btn-primary" disabled={(!password && !pin) || (password && password.length < 6) || (pin && !/^\d{4,8}$/.test(pin))} onClick={submit}><KeyRound size={15} /> Lưu</button></>}>
+    <Modal open onClose={onClose} title={`Đặt lại mật khẩu / PIN – ${user.full_name}`} footer={<><button className="btn-ghost" onClick={onClose}>Huỷ</button><button className="btn-primary" disabled={(!password && !pin) || (password && weakPassword(password)) || (pin && !/^\d{4,8}$/.test(pin))} onClick={submit}><KeyRound size={15} /> Lưu</button></>}>
       <div className="grid gap-3 text-sm sm:grid-cols-2">
         <label>Mật khẩu mới<input className="input mt-1" type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></label>
         <label>PIN mới (4–8 số)<input className="input mt-1 font-mono" inputMode="numeric" value={pin} onChange={(e) => setPin(e.target.value)} /></label>
@@ -181,6 +183,7 @@ function UsersTab() {
                   <td>
                     <div className="font-medium">{u.full_name}</div>
                     <div className="text-xs text-muted"><span className="font-mono">{u.username}</span>{u.position ? ` · ${u.position}` : ''}</div>
+                    {u.email && <div className="text-[11px] text-muted">{u.email}</div>}
                   </td>
                   <td>
                     <div className="flex flex-wrap gap-1">

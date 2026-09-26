@@ -67,3 +67,13 @@ def targets_to_domains(codes: list[str]) -> list[str]:
     ds = [domains.domain_of_code(c) for c in codes or []]
     ds = [d for d in ds if d]
     return ds or ["*"]
+
+
+async def citizen_report(report_id: str) -> str | None:
+    rid = _uuid_or_none(report_id)
+    if not rid:
+        return None
+    row = await fetch_one(
+        "SELECT admin_unit_id FROM community.citizen_reports WHERE id = CAST(:id AS uuid)", {"id": rid}
+    )
+    return domains.domain_of_unit_id(row["admin_unit_id"]) if row else None

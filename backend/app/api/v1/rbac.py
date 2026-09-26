@@ -82,8 +82,9 @@ class UserIn(BaseModel):
     username: str = Field(pattern=r"^[a-z0-9._-]{3,40}$")
     full_name: str = Field(min_length=2)
     position: str | None = None
-    password: str = Field(min_length=6)
+    password: str = Field(max_length=128)
     pin: str | None = Field(None, pattern=r"^\d{4,8}$")
+    email: str | None = Field(None, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
     role: str
     domain: str
 
@@ -91,16 +92,25 @@ class UserIn(BaseModel):
 @router.post("/users", status_code=201)
 async def create_user(body: UserIn, actor: dict = Depends(require_any("user", "manage"))):
     return await svc.create_user(
-        actor, body.username, body.full_name, body.position, body.password, body.pin, body.role, body.domain
+        actor,
+        body.username,
+        body.full_name,
+        body.position,
+        body.password,
+        body.pin,
+        body.role,
+        body.domain,
+        body.email,
     )
 
 
 class UserPatch(BaseModel):
     full_name: str | None = None
     position: str | None = None
-    password: str | None = Field(None, min_length=6)
+    password: str | None = Field(None, max_length=128)
     pin: str | None = Field(None, pattern=r"^\d{4,8}$")
     is_active: bool | None = None
+    email: str | None = Field(None, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 @router.patch("/users/{user_id}")

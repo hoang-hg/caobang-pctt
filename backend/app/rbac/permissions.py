@@ -27,6 +27,7 @@ class Resource(StrEnum):
     USER = "user"  # tài khoản người dùng
     RBAC = "rbac"  # quản trị vai trò
     INTEGRATION = "integration"  # nguồn dữ liệu ngoài, thiết bị IoT
+    REPORT = "report"  # phản ánh hiện trường của người dân
 
 
 class Action(StrEnum):
@@ -38,6 +39,7 @@ class Action(StrEnum):
     APPROVE = "approve"
     OPERATE = "operate"
     MANAGE = "manage"
+    MODERATE = "moderate"
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,6 +75,8 @@ ALL_PERMISSIONS: Final[tuple[Permission, ...]] = (
     Permission(R.USER, A.VIEW, True, "Xem tài khoản trong phạm vi"),
     Permission(R.USER, A.MANAGE, True, "Tạo tài khoản con, cấp / thu hồi vai trò trong phạm vi"),
     Permission(R.RBAC, A.MANAGE, False, "Quản trị vai trò (tạo / sửa / xoá role)"),
+    Permission(R.REPORT, A.VIEW, True, "Xem phản ánh của người dân (kể cả SĐT người gửi)"),
+    Permission(R.REPORT, A.MODERATE, True, "Duyệt / từ chối / chuyển SOS phản ánh của người dân"),
     Permission(R.INTEGRATION, A.VIEW, False, "Xem nguồn dữ liệu, thiết bị IoT, giám sát kết nối"),
     Permission(R.INTEGRATION, A.MANAGE, False, "Cấu hình nguồn dữ liệu, đăng ký thiết bị IoT, cấp khoá"),
 )
@@ -122,6 +126,48 @@ SYSTEM_ROLES: Final[tuple[tuple[str, str, str, bool, list[tuple[str, str]]], ...
         perms(*(p.code for p in ALL_PERMISSIONS if p.code != "rbac.manage")),
     ),
     (
+        "admin_tinh",
+        "Quản trị tỉnh",
+        "Quản lý tài khoản, phân quyền cấp dưới, duyệt phản ánh và xử lý SOS toàn tỉnh — không điều động, không duyệt cảnh báo",
+        False,
+        perms(
+            "monitoring.view",
+            "sos.view",
+            "sos.create",
+            "sos.update",
+            "sos.resolve",
+            "resource.view",
+            "alert.view",
+            "contact.view",
+            "audit.view",
+            "integration.view",
+            "user.view",
+            "user.manage",
+            "report.view",
+            "report.moderate",
+        ),
+    ),
+    (
+        "admin_xa",
+        "Quản trị xã/phường",
+        "Tạo tài khoản cán bộ xã, duyệt phản ánh và xử lý SOS trong xã",
+        True,
+        perms(
+            "monitoring.view",
+            "sos.view",
+            "sos.create",
+            "sos.update",
+            "sos.resolve",
+            "resource.view",
+            "alert.view",
+            "contact.view",
+            "user.view",
+            "user.manage",
+            "report.view",
+            "report.moderate",
+        ),
+    ),
+    (
         "chi_huy_cum",
         "Chỉ huy cụm (địa bàn huyện cũ)",
         "Điều hành, phê duyệt cảnh báo và quản lý tài khoản trong cụm được giao",
@@ -136,6 +182,8 @@ SYSTEM_ROLES: Final[tuple[tuple[str, str, str, bool, list[tuple[str, str]]], ...
             "contact.view",
             "user.view",
             "user.manage",
+            "report.view",
+            "report.moderate",
         ),
     ),
     (
@@ -151,6 +199,8 @@ SYSTEM_ROLES: Final[tuple[tuple[str, str, str, bool, list[tuple[str, str]]], ...
             "contact.view",
             "hotline.operate",
             "integration.view",
+            "report.view",
+            "report.moderate",
         ),
     ),
     (
@@ -167,6 +217,7 @@ SYSTEM_ROLES: Final[tuple[tuple[str, str, str, bool, list[tuple[str, str]]], ...
             "resource.view",
             "alert.view",
             "contact.view",
+            "report.view",
         ),
     ),
     (
@@ -185,4 +236,4 @@ SYSTEM_ROLES: Final[tuple[tuple[str, str, str, bool, list[tuple[str, str]]], ...
     ),
 )
 SYSTEM_ROLE_NAMES: Final[frozenset[str]] = frozenset(r[0] for r in SYSTEM_ROLES)
-NON_DELEGATABLE: Final[frozenset[str]] = frozenset({SUPER_ADMIN_ROLE, "truong_ban"})
+NON_DELEGATABLE: Final[frozenset[str]] = frozenset({SUPER_ADMIN_ROLE, "truong_ban", "admin_tinh"})

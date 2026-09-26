@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import Header from './components/layout/Header';
 import Sidebar from './components/layout/Sidebar';
@@ -16,6 +16,9 @@ import RescueCenter from './pages/RescueCenter';
 import Alerts from './pages/Alerts';
 import AccessControl from './pages/AccessControl';
 import DataSources from './pages/DataSources';
+import CitizenReports from './pages/CitizenReports';
+import PublicPortal from './pages/public/PublicPortal';
+import { ForgotPassword, ResetPassword } from './pages/AccountPages';
 
 function Guard({ obj, act, children }) {
   return usePermission(obj, act) ? children : <NoAccess />;
@@ -56,6 +59,7 @@ function Shell() {
             <Route path="/nguon-luc" element={<Guard obj="resource" act="view"><Resources /></Guard>} />
             <Route path="/cuu-ho" element={<Guard obj="sos" act="view"><RescueCenter /></Guard>} />
             <Route path="/canh-bao" element={<Guard obj="alert" act="view"><Alerts /></Guard>} />
+            <Route path="/phan-anh" element={<Guard obj="report" act="view"><CitizenReports /></Guard>} />
             <Route path="/nguon-du-lieu" element={<Guard obj="integration" act="view"><DataSources /></Guard>} />
             <Route path="/phan-quyen" element={<Guard obj="user" act="view"><AccessControl /></Guard>} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
@@ -66,11 +70,33 @@ function Shell() {
   );
 }
 
+/** Đã đăng nhập mà mở /dang-nhap → về trang định vào (?next=) hoặc Tổng quan. Chỉ nhận đường dẫn nội bộ. */
+function AfterLogin() {
+  const [params] = useSearchParams();
+  const next = params.get('next');
+  return <Navigate to={next && next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard'} replace />;
+}
+
+function RequireLogin() {
+  const location = useLocation();
+  return <Navigate to={`/dang-nhap?next=${encodeURIComponent(location.pathname + location.search)}`} replace />;
+}
+
 export default function App() {
   const auth = useStore((s) => s.auth);
+  const loggedIn = !!auth?.token;
   return (
     <>
-      {auth?.token ? <Shell key={auth.user?.id} /> : <Login />}
+      <Routes>
+        {/* Công khai — không cần đăng nhập */}
+        <Route path="/cong-khai" element={<PublicPortal />} />
+        <Route path="/dang-nhap" element={loggedIn ? <AfterLogin /> : <Login />} />
+        <Route path="/quen-mat-khau" element={<ForgotPassword />} />
+        <Route path="/dat-lai-mat-khau" element={<ResetPassword />} />
+        <Route path="/" element={loggedIn ? <Navigate to="/dashboard" replace /> : <PublicPortal />} />
+        {/* Điều hành — cần đăng nhập */}
+        <Route path="/*" element={loggedIn ? <Shell key={auth.user?.id} /> : <RequireLogin />} />
+      </Routes>
       <Toasts />
     </>
   );

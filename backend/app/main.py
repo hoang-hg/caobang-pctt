@@ -15,20 +15,21 @@ from app.api.v1 import (
     ingest,
     integrations,
     map_layers,
+    public,
     rbac,
+    reports,
     resources,
     search,
     sos,
 )
 from app.auth import user_from_token
 from app.config import settings
-from app.db import engine, fetch_one
-from app.integrations.mqtt_bridge import bridge
-from app.integrations.runner import ensure_default_sources, runner
-from app.rbac import domains
+from app.db import fetch_one
+from app.infra import storage
+from app.infra.ratelimit import RateLimitMiddleware
+from app.infra.redis import get_redis
+from app.lifecycle import shutdown, startup
 from app.rbac.authz import allowed_codes
-from app.rbac.enforcer import init_enforcer
-from app.rbac.seed import bootstrap as rbac_bootstrap
 from app.services.simulator import simulator
 from app.ws.hub import Client, hub
 
@@ -39,19 +40,9 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    await domains.load_units()
-    await init_enforcer()
-    await rbac_bootstrap()
-    await ensure_default_sources()
-    runner.start()
-    bridge.start()
-    if settings.simulator:
-        simulator.start()
+    await startup()
     yield
-    await simulator.stop()
-    await runner.stop()
-    await bridge.stop()
-    await engine.dispose()
+    await shutdown()
 
 
 app = FastAPI(
@@ -60,6 +51,7 @@ app = FastAPI(
     description="Dashboard, bản đồ giám sát, nguồn lực, cứu hộ, cảnh báo đa kênh — dữ liệu mô phỏng.",
     lifespan=lifespan,
 )
+app.add_middleware(RateLimitMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in settings.cors_origins.split(",") if o.strip()],
@@ -89,6 +81,8 @@ for r in (
     ingest,
     integrations,
     forecast,
+    public,
+    reports,
 ):
     app.include_router(r.router, prefix="/api/v1")
 
@@ -98,9 +92,18 @@ async def health():
     db = await fetch_one(
         "SELECT now() AS time, postgis_version() AS postgis, extversion AS timescaledb FROM pg_extension WHERE extname = 'timescaledb'"
     )
+    redis_ok = None
+    if (r := get_redis()) is not None:
+        try:
+            redis_ok = bool(await r.ping())
+        except Exception:
+            redis_ok = False
     return {
-        "status": "ok",
+        "status": "ok" if redis_ok is not False else "degraded",
         "db": db,
+        "redis": redis_ok,
+        "storage": storage.backend_name(),
+        "run_mode": settings.run_mode,
         "ws_clients": hub.client_count,
         "simulator": settings.simulator,
         "tick": simulator.tick,
@@ -115,7 +118,7 @@ async def ws_endpoint(ws: WebSocket, token: str = ""):
         await ws.close(code=4401)
         return
     scopes = {}
-    for obj in ("sos", "monitoring"):
+    for obj in ("sos", "monitoring", "report"):
         codes = allowed_codes(user, obj, "view")
         scopes[obj] = None if codes is None else set(codes)
     client = Client(ws, user["username"], scopes)

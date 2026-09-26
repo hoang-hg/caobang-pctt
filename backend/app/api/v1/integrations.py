@@ -8,7 +8,6 @@ from pydantic import BaseModel, Field
 from app.auth import audit
 from app.db import execute, fetch_all, fetch_one
 from app.integrations import crypto
-from app.integrations.mqtt_bridge import bridge
 from app.integrations.runner import run_source
 from app.rbac.authz import require_permission
 
@@ -32,7 +31,7 @@ async def sources(_: dict = Depends(VIEW)):
     for r in rows:
         r["secret_hint"] = _mask(crypto.decrypt(r.pop("secret_enc")))
         if r["type"] == "mqtt":
-            r["connected"] = bridge.connected
+            r["connected"] = r["enabled"] and r["status"] == "ok"
     return rows
 
 
@@ -259,10 +258,12 @@ async def monitor(limit: int = 100, _: dict = Depends(VIEW)):
         "SELECT id, time, source, level, message, accepted, rejected FROM integrations.ingest_log ORDER BY time DESC LIMIT :l",
         {"l": limit},
     )
+    # Cầu nối MQTT chạy ở tiến trình worker → đọc trạng thái nó ghi trong CSDL
+    mqtt = await fetch_one("SELECT enabled, status FROM integrations.data_sources WHERE code = 'IOT_MQTT'")
     return {
         "devices": devices,
         "stations": stations,
         "last24": last24,
         "log": log,
-        "mqtt_connected": bridge.connected,
+        "mqtt_connected": bool(mqtt and mqtt["enabled"] and mqtt["status"] == "ok"),
     }

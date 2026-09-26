@@ -534,12 +534,13 @@ async def seed_comms(conn: AsyncConnection, units: dict[str, dict], now: datetim
     users = {}
     for username, full, pos, pw, pin, _role, _domain in D.USERS:
         row = await fetch_one(
-            """INSERT INTO communications.users (username, full_name, position, password_hash, pin_hash)
-                                 VALUES (:u,:f,:p,:pw,:pin) RETURNING id, full_name""",
+            """INSERT INTO communications.users (username, full_name, position, password_hash, pin_hash, email)
+                                 VALUES (:u,:f,:p,:pw,:pin,:e) RETURNING id, full_name""",
             {
                 "u": username,
                 "f": full,
                 "p": pos,
+                "e": f"{username}@{D.DEMO_EMAIL_DOMAIN}",
                 "pw": hash_secret(pw),
                 "pin": hash_secret(pin) if pin else None,
             },
@@ -971,7 +972,8 @@ async def reconcile_admin_units(conn: AsyncConnection):
 
 
 RESET_SQL = """
-TRUNCATE communications.audit_logs, communications.rbac_audit_log, communications.call_logs, communications.alert_broadcasts, communications.contacts,
+TRUNCATE communications.audit_logs, communications.rbac_audit_log, communications.password_reset_tokens,
+         community.citizen_reports, communications.call_logs, communications.alert_broadcasts, communications.contacts,
          communications.message_templates, communications.users,
          iot_telemetry.sensor_readings, iot_telemetry.forecasts, iot_telemetry.hazard_zones, iot_telemetry.hazard_points,
          iot_telemetry.cameras, iot_telemetry.reservoirs, iot_telemetry.monitoring_stations,

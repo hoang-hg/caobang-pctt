@@ -2,14 +2,16 @@
 
 Domain phân cấp tỉnh → cụm → xã dùng ``key_match``: nhóm quyền gán ở ``"BAOLAC/*"``
 khớp mọi yêu cầu có domain ``"BAOLAC/CB-..."``; gán ở ``"*"`` khớp mọi domain.
-Backend chạy 1 worker nên không cần watcher đồng bộ policy giữa tiến trình
-(khi scale nhiều worker: thêm Redis watcher như thientai-org-backend).
+
+Nhiều tiến trình: sau mỗi thay đổi policy, ``notify_policy_changed()`` phát lên kênh Redis
+``pctt:casbin``; mọi tiến trình nghe kênh đó và nạp lại policy (tương tự Redis watcher của thientai-org-backend).
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from pathlib import Path
 
 from casbin import AsyncEnforcer
@@ -17,12 +19,16 @@ from casbin.util.builtin_operators import key_match_func
 from casbin_async_sqlalchemy_adapter import Adapter
 
 from app.db import engine
+from app.infra.redis import get_redis
 
 log = logging.getLogger(__name__)
 
 _MODEL = Path(__file__).with_name("model.conf")
+CHANNEL = "pctt:casbin"
 _enforcer: AsyncEnforcer | None = None
 _lock: asyncio.Lock | None = None
+_watcher: asyncio.Task | None = None
+_PROCESS_ID = f"{os.getpid()}"
 
 
 async def init_enforcer() -> AsyncEnforcer:
@@ -51,3 +57,39 @@ def get_enforcer() -> AsyncEnforcer:
 async def reload_policy() -> None:
     if _enforcer is not None:
         await _enforcer.load_policy()
+
+
+async def notify_policy_changed() -> None:
+    r = get_redis()
+    if r is not None:
+        try:
+            await r.publish(CHANNEL, _PROCESS_ID)
+        except Exception:
+            log.warning("[rbac] không phát được thông báo đổi policy", exc_info=True)
+
+
+def start_policy_watcher() -> None:
+    global _watcher
+    if get_redis() is not None and _watcher is None:
+        _watcher = asyncio.create_task(_watch())
+
+
+async def stop_policy_watcher() -> None:
+    if _watcher:
+        _watcher.cancel()
+
+
+async def _watch() -> None:
+    while True:
+        try:
+            pubsub = get_redis().pubsub()
+            await pubsub.subscribe(CHANNEL)
+            async for msg in pubsub.listen():
+                if msg.get("type") == "message" and msg.get("data") != _PROCESS_ID:
+                    await reload_policy()
+                    log.info("[rbac] nạp lại policy (thay đổi từ tiến trình %s)", msg.get("data"))
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            log.warning("[rbac] watcher mất kết nối Redis — thử lại", exc_info=True)
+            await asyncio.sleep(3)

@@ -962,6 +962,9 @@ PLACE_NAMES = [
     ("Thôn Pác Rà", "thon", "Tĩnh Túc", 22.650, 105.862),
 ]
 
+# Email demo: <username>@caobang-pctt.local (nhận link đặt lại mật khẩu qua Mailpit khi chạy dev)
+DEMO_EMAIL_DOMAIN = "caobang-pctt.local"
+
 # Tài khoản demo: (username, họ tên, chức vụ, mật khẩu, PIN phê duyệt, vai trò RBAC, phạm vi)
 # Phạm vi: "*" toàn tỉnh · "<CUM>/*" cả cụm (địa bàn huyện cũ) · "<CUM>/<MA_XA>" một xã
 USERS = [
@@ -975,6 +978,16 @@ USERS = [
         "truong_ban",
         "*",
     ),
+    (
+        "admin.tinh",
+        "Đàm Thị Quản",
+        "Quản trị hệ thống cấp tỉnh – Văn phòng BCH",
+        "admintinh123",
+        None,
+        "admin_tinh",
+        "*",
+    ),
+    ("admin.coba", "Lục Văn Xã", "Quản trị xã Cô Ba", "admincoba123", None, "admin_xa", "BAOLAC/CB-COBA"),
     ("trucban", "Nông Văn Trực", "Cán bộ trực ban Văn phòng BCH tỉnh", "trucban123", None, "truc_ban", "*"),
     ("chihuy.baolac", "Ma Văn Thành", "Chỉ huy cụm Bảo Lạc", "baolac123", "1357", "chi_huy_cum", "BAOLAC/*"),
     ("canbo.coba", "Triệu Thị Mai", "Cán bộ PCTT xã Cô Ba", "coba123", None, "can_bo_xa", "BAOLAC/CB-COBA"),

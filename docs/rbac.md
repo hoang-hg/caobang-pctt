@@ -43,6 +43,7 @@ chỉ có hiệu lực khi được cấp ở `*`.
 | `hotline.operate` | toàn tỉnh | Tổng đài, phân luồng cuộc gọi IVR |
 | `audit.view` | toàn tỉnh | Nhật ký pháp lý |
 | `user.view` / `user.manage` | ✓ | Xem / tạo tài khoản con, cấp – thu hồi vai trò trong phạm vi |
+| `report.view` / `report.moderate` | ✓ | Xem / duyệt – từ chối – đánh dấu đã xử lý – chuyển SOS phản ánh của người dân |
 | `rbac.manage` | toàn tỉnh | Tạo / sửa / xoá định nghĩa vai trò |
 
 ## 3. Vai trò hệ thống (seed mỗi lần khởi động)
@@ -50,6 +51,8 @@ chỉ có hiệu lực khi được cấp ở `*`.
 | Vai trò | Uỷ quyền được | Quyền chính |
 |---|---|---|
 | `super_admin` Quản trị hệ thống | ✗ | Tất cả (`*.*`) |
+| `admin_tinh` Quản trị tỉnh | ✗ | Quản lý tài khoản & duyệt phản ánh toàn tỉnh; xem giám sát, SOS, nguồn lực, cảnh báo, nhật ký, nguồn dữ liệu. **Không** điều động, không soạn/duyệt cảnh báo, không sửa vai trò |
+| `admin_xa` Quản trị xã | ✓ | Quản lý tài khoản & duyệt phản ánh trong xã; tiếp nhận – cập nhật SOS của xã |
 | `truong_ban` Lãnh đạo BCH | ✗ | Tất cả trừ `rbac.manage` |
 | `chi_huy_cum` Chỉ huy cụm | ✓ | Điều hành, xuất kho, soạn + duyệt cảnh báo, quản lý tài khoản trong cụm |
 | `truc_ban` Trực ban điều hành | ✓ | Tiếp nhận SOS, điều động, soạn cảnh báo (Maker), tổng đài |
@@ -62,7 +65,9 @@ Vai trò tuỳ chỉnh do `super_admin` tạo ở trang **Phân quyền → Vai 
 ## 4. Uỷ quyền & chống leo thang (`app/rbac/management.py::assert_can_delegate`)
 
 1. `super_admin` cấp được mọi vai trò ở mọi phạm vi.
-2. Người khác chỉ cấp vai trò có cờ **uỷ quyền được** và không phải `super_admin` / `truong_ban`.
+2. Người khác chỉ cấp vai trò có cờ **uỷ quyền được** và không phải `super_admin` / `truong_ban` / `admin_tinh`.
+   Như vậy chuỗi quản trị là **super admin → admin tỉnh → admin xã → cán bộ**: admin tỉnh tạo admin xã ở bất kỳ xã nào,
+   admin xã chỉ tạo tài khoản trong xã mình và không tự nâng quyền được.
 3. Phạm vi cấp phải nằm trong phạm vi `user.manage` của người cấp (chỉ huy cụm Bảo Lạc không cấp cho cụm khác).
 4. **Không leo thang**: mọi quyền của vai trò được cấp, người cấp phải đang có ở phạm vi đó
    (VD chỉ huy cụm không cấp được `truc_ban` vì thiếu `hotline.operate`).

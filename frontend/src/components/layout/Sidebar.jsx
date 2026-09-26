@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Map, Boxes, Siren, Megaphone, KeyRound, DatabaseZap } from 'lucide-react';
+import { LayoutDashboard, Map, Boxes, Siren, Megaphone, KeyRound, DatabaseZap, Camera } from 'lucide-react';
 import clsx from 'clsx';
 import { useAreaQuery } from '../../api/hooks';
 import { useStore } from '../../app/store';
@@ -9,6 +9,7 @@ const NAV = [
   { to: '/dashboard', label: 'Tổng quan', icon: LayoutDashboard, perm: ['monitoring', 'view'] },
   { to: '/ban-do', label: 'Bản đồ giám sát', icon: Map, perm: ['monitoring', 'view'] },
   { to: '/cuu-ho', label: 'Điều hành cứu hộ', icon: Siren, badge: true, perm: ['sos', 'view'] },
+  { to: '/phan-anh', label: 'Phản ánh người dân', icon: Camera, perm: ['report', 'view'], badgeKey: 'reports' },
   { to: '/nguon-luc', label: 'Vật tư & Lực lượng', icon: Boxes, perm: ['resource', 'view'] },
   { to: '/canh-bao', label: 'Cảnh báo & Hotline', icon: Megaphone, perm: ['alert', 'view'] },
   { to: '/nguon-du-lieu', label: 'Nguồn dữ liệu & IoT', icon: DatabaseZap, perm: ['integration', 'view'] },
@@ -19,9 +20,12 @@ export default function Sidebar() {
   const perms = useStore((s) => s.auth?.user?.permissions);
   const { data } = useAreaQuery('kpis', '/dashboard/kpis', {}, { refetchInterval: 30_000 });
   const waiting = data?.sos?.waiting || 0;
+  const canReports = hasPermission(perms, 'report', 'view');
+  const { data: rep } = useAreaQuery('reports', '/reports', { status: 'cho_duyet', limit: 1 }, { enabled: canReports, refetchInterval: 60_000 });
+  const badges = { sos: waiting, reports: rep?.counts?.cho_duyet || 0 };
   return (
     <nav className="no-print flex w-16 shrink-0 flex-col gap-1 border-r border-line bg-panel py-3 lg:w-52">
-      {NAV.filter((n) => hasPermission(perms, ...n.perm)).map(({ to, label, icon: Icon, badge }) => (
+      {NAV.filter((n) => hasPermission(perms, ...n.perm)).map(({ to, label, icon: Icon, badge, badgeKey }) => (
         <NavLink
           key={to}
           to={to}
@@ -35,9 +39,9 @@ export default function Sidebar() {
         >
           <Icon size={19} className="shrink-0" />
           <span className="hidden lg:inline">{label}</span>
-          {badge && waiting > 0 && (
+          {(badge || badgeKey) && badges[badgeKey || 'sos'] > 0 && (
             <span className="absolute right-2 top-1.5 rounded-full bg-danger px-1.5 text-[11px] font-bold text-white animate-blink lg:static lg:ml-auto">
-              {waiting}
+              {badges[badgeKey || 'sos']}
             </span>
           )}
         </NavLink>

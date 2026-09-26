@@ -13,3 +13,8 @@ casbin==1.43.0
 casbin-async-sqlalchemy-adapter==1.17.0
 cryptography==44.0.0
 aiomqtt==2.3.0
+redis==5.2.1
+minio==7.2.12
+Pillow==11.0.0
+python-multipart==0.0.19
+gunicorn==23.0.0

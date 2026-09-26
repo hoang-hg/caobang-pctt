@@ -71,6 +71,13 @@ export function useSocket() {
         case 'ingest.log':
           throttle('ingest', 5_000, () => inv('int-monitor', 'int-devices'));
           break;
+        case 'report.new':
+          inv('reports');
+          toast({ tone: 'warn', title: `Phản ánh mới ${data.code}`, body: `${data.admin_name || ''} · ${data.photos} ảnh — chờ duyệt` });
+          break;
+        case 'report.updated':
+          inv('reports');
+          break;
         case 'call.new':
           inv('hotline');
           break;

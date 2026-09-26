@@ -20,7 +20,9 @@
 | F | Bộ lọc địa phương & Sáng/Tối | toàn cục | 56 xã/phường (sau 01/07/2025), preset lưu vực Bằng Giang–Hiến, vùng núi cao, biên giới, địa bàn huyện cũ; bản đồ zoom + mask; Omni-search (địa danh, toạ độ, mã SOS); theme theo `prefers-color-scheme` + lưu lựa chọn |
 | G | CSDL | PostgreSQL 16 + PostGIS + TimescaleDB | 5 schema: `spatial_admin`, `resources`, `operations`, `iot_telemetry` (hypertable `sensor_readings`), `communications` — xem [backend/alembic/sql/](backend/alembic/sql/) |
 | Dữ liệu | Nguồn dữ liệu & IoT | `/nguon-du-lieu` | **Dự báo thật** tổ hợp ECMWF IFS + NOAA GEFS (Open-Meteo) cho 56 xã, P10/P50/P90, 72 giờ; OpenWeather (tuỳ chọn); cổng IoT **HTTP / MQTT / LoRaWAN (ChirpStack, TTN)**; kiểm tra số đo; cảnh báo mất tín hiệu; giám sát kết nối — xem [docs/integrations.md](docs/integrations.md) |
-| RBAC | Phân quyền | `/phan-quyen` | Casbin `rbac_with_domains` theo phạm vi **toàn tỉnh → cụm (địa bàn huyện cũ) → xã/phường**; 7 vai trò hệ thống + vai trò tuỳ chỉnh; tạo tài khoản con, cấp/thu hồi quyền có rào chắn chống leo thang; nhật ký phân quyền — xem [docs/rbac.md](docs/rbac.md) |
+| Công khai | Cổng thông tin cho người dân | `/` (chưa đăng nhập), `/cong-khai` | **Không cần đăng nhập**: cảnh báo chính thức (có nút chia sẻ Zalo/Facebook), bản đồ vùng nguy hiểm – đường chia cắt – điểm sơ tán, dự báo mưa theo xã, mực nước sông, **“Tôi đang ở đâu?”** (xã + điểm sơ tán gần nhất + chỉ đường an toàn), đường dây nóng, **gửi phản ánh kèm ảnh**. API công khai `/api/v1/public/*` có cache, giới hạn tần suất và **ẩn thông tin nhạy cảm** (không lộ vị trí lực lượng, kho, SOS chi tiết, số điện thoại cán bộ) — xem [docs/public-portal.md](docs/public-portal.md) |
+| Phản ánh | Phản ánh của người dân | `/phan-anh` | Người dân gửi ảnh + vị trí → **cán bộ xã/cụm/tỉnh duyệt** (đúng địa bàn) → hiện công khai kèm ghi chú xử lý, hoặc chuyển thành phiếu SOS. Ảnh lưu **MinIO** (bị xoá EXIF/GPS, thu nhỏ), link ảnh có chữ ký hết hạn sau 1 giờ |
+| RBAC | Phân quyền | `/phan-quyen` | Casbin `rbac_with_domains` theo phạm vi **toàn tỉnh → cụm (địa bàn huyện cũ) → xã/phường**; 9 vai trò hệ thống (gồm **super admin → admin tỉnh → admin xã**) + vai trò tuỳ chỉnh; tạo tài khoản con, cấp/thu hồi quyền có rào chắn chống leo thang; nhật ký phân quyền — xem [docs/rbac.md](docs/rbac.md) |
 
 Tự động hoá: cảm biến nghiêng / độ ẩm đất vượt BĐ II → tự khoanh vùng nguy cơ 1 km, tạo phiếu SOS nguồn `SENSOR`
 và **bản nháp cảnh báo chờ Lãnh đạo duyệt**; dự báo mực nước 3 giờ tới vượt BĐ III → nháp "Chuẩn bị sơ tán".
@@ -28,14 +30,25 @@ và **bản nháp cảnh báo chờ Lãnh đạo duyệt**; dự báo mực nư�
 ## Kiến trúc
 
 ```
-frontend (React 18 + Vite + Tailwind, react-leaflet, Recharts, TanStack Query, Zustand)
-   │  REST /api/v1 (JSON, GeoJSON)      WebSocket /ws (sos.new, gps.update, reading.new, …)
-backend (FastAPI async, SQLAlchemy 2 + psycopg3, Alembic)
-   ├── simulator: số đo IoT, GPS lực lượng, SOS, vận hành hồ, giao nhận tin (thay cho nguồn thật)
-   ├── services: safe_routing (Dijkstra né vùng nguy hiểm), dispatch_matching (ST_DWithin + kỹ năng),
-   │             sos_nlp (bộ luật + hook LLM tuỳ chọn), broadcast (ước tính đối tượng theo diện tích giao cắt)
-db (timescale/timescaledb-ha:pg16 — PostGIS + TimescaleDB)
+Người dân (không đăng nhập)          Cán bộ (đăng nhập JWT + RBAC)
+        │                                      │
+        └──────── nginx (frontend :8080) ──────┘   React 18 + Vite + Tailwind, react-leaflet, Recharts
+                   │ /api/v1/public/*  /api/v1/*  /ws
+backend  (RUN_MODE=api, gunicorn × API_WORKERS tiến trình, FastAPI async)
+   ├── RateLimitMiddleware (Redis) · cache API công khai (Redis) · khoá đăng nhập sai 10 lần/15′
+   ├── WebSocket hub ── nhận sự kiện qua Redis pub/sub "pctt:events" (mọi tiến trình đều phát được)
+   └── Casbin enforcer ── đồng bộ chính sách giữa tiến trình qua Redis "pctt:casbin"
+worker   (RUN_MODE=worker, 1 tiến trình: python -m app.worker)
+   ├── simulator (số đo, GPS, SOS, vận hành hồ) · runner đồng bộ nguồn dữ liệu (Open-Meteo…)
+   └── cầu nối MQTT (IoT)
+db       timescale/timescaledb-ha:pg16 — PostGIS + TimescaleDB
+redis    rate limit · cache · pub/sub sự kiện & chính sách
+minio    ảnh phản ánh (bucket riêng tư)       mailpit  SMTP thử nghiệm (email đặt lại mật khẩu)
+mqtt     Mosquitto (thiết bị IoT)
 ```
+
+Khởi động an toàn nhiều tiến trình: migration/seed chạy 1 lần trước gunicorn; bootstrap RBAC, nguồn dữ liệu, bucket
+MinIO chạy trong **advisory lock** của Postgres. Chi tiết vận hành thật: [docs/production.md](docs/production.md).
 
 Bộ lọc địa phương: frontend chỉ gửi `admin_codes`, backend hợp nhất ranh giới và lọc bằng `ST_Intersects`.
 
@@ -102,10 +115,12 @@ npm run dev                                # proxy /api & /ws → localhost:8000
 
 | Địa chỉ | Nội dung |
 |---|---|
-| **http://localhost:8080** | Giao diện web điều hành (Cách A) |
+| **http://localhost:8080** | Cổng công khai cho người dân; **Đăng nhập** (góc phải) để vào hệ thống điều hành (Cách A) |
 | **http://localhost:5173** | Giao diện chế độ phát triển (Cách B) |
 | http://localhost:8000/docs | Tài liệu API (Swagger) – thử gọi API trực tiếp |
 | http://localhost:8000/health | Kiểm tra trạng thái hệ thống, CSDL |
+| http://localhost:8025 | **Mailpit** – hộp thư thử nghiệm, xem email “Quên mật khẩu” |
+| http://localhost:9001 | **MinIO Console** – kho ảnh phản ánh (user `pctt_minio` / `pctt_minio_dev_password`) |
 | `localhost:1883` | Broker MQTT cho thiết bị IoT (dev, cho phép ẩn danh — xem [docs/integrations.md](docs/integrations.md)) |
 | `localhost:5433` | PostgreSQL (user `pctt` / mật khẩu `pctt_dev_password`, db `caobang_pctt`) – mở bằng DBeaver, pgAdmin… |
 
@@ -113,7 +128,9 @@ Nên dùng Chrome / Edge / Firefox bản mới. Bản đồ nền, radar mưa v�
 
 ### Bước 5 – Dùng thử các chức năng
 
-1. Màn hình **đăng nhập** hiện đầu tiên → bấm một tài khoản demo (bảng bên dưới). Mỗi tài khoản thấy và thao tác được
+0. Trang đầu tiên là **cổng công khai** (người dân xem không cần tài khoản): bấm **Tôi đang ở đâu?**, **Gửi phản ánh**
+   (kèm ảnh), nút **Chia sẻ** trên từng cảnh báo.
+1. Bấm **Đăng nhập** (góc phải) → bấm một tài khoản demo (bảng bên dưới). Mỗi tài khoản thấy và thao tác được
    những gì tuỳ **vai trò + phạm vi địa bàn**: VD **Triệu Thị Mai** (cán bộ xã Cô Ba) chỉ thấy SOS của xã Cô Ba,
    **Ma Văn Thành** (chỉ huy cụm Bảo Lạc) điều hành và tạo tài khoản con trong 8 xã của cụm. Đổi tài khoản: menu tên người dùng → Đăng xuất.
 2. **Tổng quan**: xem KPI, biểu đồ thủy văn, mưa, sạt lở, vật tư; bấm **Xuất PDF báo cáo nhanh**.
@@ -123,7 +140,10 @@ Nên dùng Chrome / Edge / Firefox bản mới. Bản đồ nền, radar mưa v�
 4. **Điều hành cứu hộ**: kéo thả phiếu SOS giữa các cột; dán tin nhắn cầu cứu vào ô “Tiếp nhận đa kênh” → **Bóc tách thông tin**.
 5. **Vật tư & Lực lượng**: lọc, tìm kiếm, **Điều động nhanh**, **Xuất kho**, xuất Excel/PDF.
 6. **Cảnh báo & Hotline**: Trực ban soạn lệnh từ mẫu → đăng nhập Lãnh đạo → **Phê duyệt** → xem bảng tỷ lệ chuyển giao.
-7. Dùng **bộ lọc địa phương** (nút “Toàn tỉnh Cao Bằng” trên đầu trang) và **ô tìm kiếm** (VD: `Bản Giốc`, `22.66, 106.25`, `SOS-1001`);
+7. **Phản ánh người dân**: đăng nhập **Lục Văn Xã** (admin xã Cô Ba) → duyệt / từ chối / chuyển SOS phản ánh vừa gửi ở bước 0
+   → quay lại cổng công khai thấy phản ánh đã xác minh kèm ghi chú.
+8. **Tài khoản**: menu tên người dùng → **Đổi mật khẩu**; màn đăng nhập → **Quên mật khẩu?** → mở Mailpit (:8025) lấy link đặt lại.
+9. Dùng **bộ lọc địa phương** (nút “Toàn tỉnh Cao Bằng” trên đầu trang) và **ô tìm kiếm** (VD: `Bản Giốc`, `22.66, 106.25`, `SOS-1001`);
    nút mặt trời/mặt trăng để đổi **Sáng/Tối**.
 
 Bộ mô phỏng tự sinh số đo cảm biến mỗi 4 giây, SOS mới khoảng 3 phút/lần, lực lượng di chuyển trên bản đồ sau khi điều động.
@@ -132,7 +152,7 @@ Bộ mô phỏng tự sinh số đo cảm biến mỗi 4 giây, SOS mới khoả
 
 ```bash
 docker compose ps                                    # xem trạng thái
-docker compose logs -f backend                       # xem log backend
+docker compose logs -f backend worker                # xem log API và tiến trình nền
 docker compose restart backend                       # khởi động lại backend
 docker compose stop                                  # tạm dừng (giữ dữ liệu)
 docker compose down                                  # tắt và xoá container (giữ dữ liệu CSDL)
@@ -141,7 +161,10 @@ docker compose up -d --build                         # chạy lại sau khi sử
 
 # Xoá dữ liệu nghiệp vụ và nạp lại dữ liệu mẫu từ đầu
 docker compose exec backend python -m app.seed --reset
-docker compose restart backend
+docker compose restart backend worker
+
+# Mở khoá khi thử nghiệm bị chặn do giới hạn tần suất (HTTP 429)
+docker compose exec redis sh -c "redis-cli --scan --pattern 'rl:*' | xargs -r redis-cli del"
 ```
 
 ### Xử lý lỗi thường gặp
@@ -156,6 +179,8 @@ docker compose restart backend
 | Bản đồ trắng / không có nền | Máy không có Internet hoặc mạng chặn máy chủ bản đồ → đổi nền bản đồ (menu “Nền” trên bản đồ) hoặc kiểm tra mạng |
 | Không thấy nút / menu, hoặc báo “Không có quyền” | Tài khoản không có quyền đó tại địa bàn này (VD cán bộ xã không điều động được) — xem vai trò ở menu tên người dùng, xin cấp quyền tại trang **Phân quyền** |
 | Bị đăng xuất đột ngột (“quyền đã thay đổi”) | Quản trị viên vừa cấp/thu hồi quyền hoặc khoá tài khoản → đăng nhập lại để nhận quyền mới |
+| **429 – Thao tác quá nhanh** / “Đăng nhập sai quá nhiều lần” | Giới hạn tần suất đang hoạt động → chờ theo thời gian báo, hoặc xoá khoá `rl:*` / `loginfail:*` trong Redis (lệnh ở trên) |
+| Không nhận email quên mật khẩu | Môi trường dev gửi vào Mailpit http://localhost:8025; thật thì cấu hình `SMTP_*` trong `.env` |
 | Không nghe âm báo SOS | Trình duyệt chặn âm thanh khi chưa tương tác → click vào trang một lần; kiểm tra nút loa trên thanh đầu trang |
 | Muốn làm sạch hoàn toàn | `docker compose down -v` rồi `docker compose up -d --build` |
 
@@ -163,13 +188,18 @@ docker compose restart backend
 
 | Tài khoản | Mật khẩu | Vai trò | Phạm vi | PIN |
 |---|---|---|---|---|
-| `admin` | `admin123` | Quản trị hệ thống (toàn quyền, quản trị vai trò) | Toàn tỉnh | `0000` |
+| `admin` | `admin123` | **Super admin** – quản trị hệ thống (toàn quyền, quản trị vai trò) | Toàn tỉnh | `0000` |
+| `admin.tinh` | `admintinh123` | **Admin tỉnh** – quản lý tài khoản, duyệt phản ánh toàn tỉnh | Toàn tỉnh | – |
+| `admin.coba` | `admincoba123` | **Admin xã** – quản lý tài khoản & phản ánh của xã | Xã Cô Ba | – |
 | `chihuy` | `chihuy123` | Lãnh đạo BCH – phê duyệt (Checker) | Toàn tỉnh | `2468` |
 | `trucban` | `trucban123` | Trực ban điều hành – soạn lệnh (Maker) | Toàn tỉnh | – |
 | `chihuy.baolac` | `baolac123` | Chỉ huy cụm | Cụm Bảo Lạc (8 xã) | `1357` |
 | `canbo.coba` | `coba123` | Cán bộ PCTT xã | Xã Cô Ba | – |
 | `thukho` | `thukho123` | Thủ kho | Toàn tỉnh | – |
 | `xem` | `xem123` | Quan sát (chỉ xem) | Toàn tỉnh | – |
+
+Mật khẩu mới (tạo tài khoản, đổi, đặt lại) phải **≥ 8 ký tự, có cả chữ và số**. Đổi mật khẩu sẽ đăng xuất các phiên khác.
+Tài khoản demo giữ mật khẩu cũ ở trên để dễ thử. Khi chạy thật đặt `DEMO_MODE=false` và đổi mật khẩu `admin` ngay.
 
 Người soạn không được tự duyệt lệnh của mình (nguyên tắc 4 mắt); người duyệt phải có quyền trên **mọi** xã nhận tin.
 Mọi thao tác ghi vào `communications.audit_logs`; thao tác phân quyền ghi vào `communications.rbac_audit_log`.
@@ -182,8 +212,15 @@ docker compose exec backend pytest -q        # kiểm thử đơn vị thuật t
 node scripts/smoke.mjs                        # kiểm thử luồng nghiệp vụ qua API (cần stack đang chạy)
 node scripts/rbac-test.mjs                    # kiểm thử phân quyền theo phạm vi (46 kịch bản)
 node scripts/iot-test.mjs                     # kiểm thử cổng IoT HTTP/batch/LoRaWAN/MQTT + dự báo (22 kịch bản)
+node scripts/public-test.mjs                  # cổng & API công khai, phản ánh + duyệt, admin tỉnh/xã, mật khẩu, giới hạn tần suất (52 kịch bản)
 cd frontend && npm run build                  # build production
 ```
+
+Chạy lại `public-test` nhiều lần liên tiếp: xoá khoá `rl:*` trong Redis trước (xem “Các lệnh thường dùng”).
+
+**CI (GitHub Actions)** — [.github/workflows/ci.yml](.github/workflows/ci.yml) chạy mỗi lần push/PR: ruff + pytest, build
+frontend, rồi dựng toàn bộ stack bằng Docker Compose và chạy 4 bộ kiểm thử API. Tạo tag `v1.2.3` →
+[deploy.yml](.github/workflows/deploy.yml) build & đẩy image lên GitHub Container Registry (`ghcr.io/<owner>/caobang-pctt-backend|frontend`).
 
 ## Tích hợp thật (thay mô phỏng)
 

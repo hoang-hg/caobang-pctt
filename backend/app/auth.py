@@ -91,3 +91,12 @@ async def audit(
         },
         conn,
     )
+
+
+PASSWORD_HINT = "Mật khẩu tối thiểu 8 ký tự, gồm cả chữ và số"
+
+
+def password_problem(password: str) -> str | None:
+    if len(password) < 8 or not any(c.isdigit() for c in password) or not any(c.isalpha() for c in password):
+        return PASSWORD_HINT
+    return None

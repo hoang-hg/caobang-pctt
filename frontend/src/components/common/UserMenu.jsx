@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { LogOut, UserCircle2, ShieldCheck } from 'lucide-react';
+import { LogOut, UserCircle2, ShieldCheck, KeyRound, Globe } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ChangePasswordModal } from '../../pages/AccountPages';
 import { useStore } from '../../app/store';
 import { useClickOutside } from '../../utils/useClickOutside';
 
@@ -9,6 +11,7 @@ export default function UserMenu() {
   const { auth, setAuth } = useStore();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [changing, setChanging] = useState(false);
   const ref = useRef(null);
   useClickOutside(ref, () => setOpen(false));
   const user = auth?.user;
@@ -40,11 +43,17 @@ export default function UserMenu() {
             {!user.assignments.length && <li className="text-xs text-danger">Chưa được cấp vai trò nào</li>}
           </ul>
           <div className="mt-2 text-[11px] text-muted">{user.permissions.length} quyền · PIN phê duyệt: {user.has_pin ? 'đã thiết lập' : 'chưa có'}</div>
-          <button className="btn-ghost mt-3 w-full justify-center" onClick={logout}>
+          {user.email && <div className="mt-1 text-[11px] text-muted">Email khôi phục: {user.email}</div>}
+          <div className="mt-3 grid grid-cols-2 gap-1">
+            <button className="btn-ghost justify-center text-xs" onClick={() => { setChanging(true); setOpen(false); }}><KeyRound size={13} /> Đổi mật khẩu</button>
+            <Link to="/cong-khai" className="btn-ghost justify-center text-xs" onClick={() => setOpen(false)}><Globe size={13} /> Cổng công khai</Link>
+          </div>
+          <button className="btn-ghost mt-1 w-full justify-center" onClick={logout}>
             <LogOut size={14} /> Đăng xuất / đổi tài khoản
           </button>
         </div>
       )}
+      {changing && <ChangePasswordModal onClose={() => setChanging(false)} />}
     </div>
   );
 }

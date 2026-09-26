@@ -13,6 +13,7 @@ import logging
 from urllib.parse import urlparse
 
 from app.config import settings
+from app.db import execute
 from app.integrations.ingest import IngestError, get_device, ingest_log, ingest_readings
 
 log = logging.getLogger(__name__)
@@ -57,6 +58,16 @@ async def handle(topic: str, payload: bytes, pattern: str) -> None:
         await ingest_log(f"device:{device_id}", f"MQTT bị từ chối: {exc}", level="warning", rejected=1)
 
 
+async def _set_status(ok: bool, error: str | None = None) -> None:
+    """Ghi trạng thái vào CSDL để tiến trình API (khác tiến trình worker) đọc được."""
+    await execute(
+        """UPDATE integrations.data_sources SET status = :s, last_error = :e, updated_at = now(),
+                  last_success_at = CASE WHEN :ok THEN now() ELSE last_success_at END
+            WHERE code = 'IOT_MQTT'""",
+        {"s": "ok" if ok else "loi", "e": error, "ok": ok},
+    )
+
+
 class MqttBridge:
     def __init__(self) -> None:
         self._task: asyncio.Task | None = None
@@ -86,6 +97,7 @@ class MqttBridge:
                 ) as client:
                     await client.subscribe(topic, qos=1)
                     self.connected = True
+                    await _set_status(True)
                     await ingest_log(
                         "IOT_MQTT", f"Đã kết nối broker {url.hostname}:{url.port or 1883}, topic {topic}"
                     )
@@ -100,6 +112,7 @@ class MqttBridge:
                 if self.connected:
                     await ingest_log("IOT_MQTT", f"Mất kết nối broker: {exc}", level="error")
                 self.connected = False
+                await _set_status(False, f"Không kết nối được broker: {exc}"[:300])
                 await asyncio.sleep(10)
 
 
