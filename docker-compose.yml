@@ -66,7 +66,8 @@ services:
       retries: 20
 
   minio:
-    image: minio/minio:latest
+    # MinIO đã ngừng phát hành image chính thức (Docker Hub, quay.io) → dùng bản cộng đồng duy trì, cùng lệnh & biến môi trường
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
     container_name: caobang-pctt-minio
     command: server /data --console-address ":9001"
     environment:
@@ -120,6 +121,7 @@ services:
         condition: service_started
 
   worker:
+    build: ./backend  # không có build → máy mới (CI) sẽ cố kéo image từ Docker Hub và lỗi
     image: caobang-pctt-backend
     container_name: caobang-pctt-worker
     environment:
