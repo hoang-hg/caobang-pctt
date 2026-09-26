@@ -69,6 +69,7 @@ def test_rate_limit_rule_matching():
     assert match_rule("GET", "/api/v1/public/locate").name == "public_locate"
     assert match_rule("POST", "/api/v1/public/reports").name == "public_report"
     assert match_rule("GET", "/api/v1/public/map").name == "public"
+    assert match_rule("POST", "/api/v1/public/track").name == "public_track"
     assert match_rule("GET", "/api/v1/sos").name == "api"
     assert match_rule("GET", "/health") is None
 
@@ -96,3 +97,16 @@ def test_memory_cache_hits_and_invalidates():
 
     a, b, c = asyncio.run(run())
     assert a == b == {"v": 1} and c == {"v": 2}
+
+
+def test_track_code_and_phone_matching():
+    from app.services.tracking import normalize_code, phone_matches
+
+    assert normalize_code("pa 1017") == "PA-1017"
+    assert normalize_code("SOS1021") == "SOS-1021"
+    assert normalize_code("SOS") is None  # không cho tìm gần đúng / liệt kê
+    assert normalize_code("100") is None
+    assert normalize_code("0999555666") is None
+    assert phone_matches("0999 555 666", "+84999555666")
+    assert not phone_matches("0999555666", "555666")  # đuôi ngắn không đủ
+    assert not phone_matches(None, "0999555666")

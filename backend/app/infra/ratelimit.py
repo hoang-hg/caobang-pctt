@@ -34,6 +34,7 @@ RULES: tuple[Rule, ...] = (
     Rule("public_report", "POST", "/api/v1/public/reports", 5, 3600),
     Rule("public_route", "GET", "/api/v1/public/route", 20, 60),
     Rule("public_locate", "GET", "/api/v1/public/locate", 30, 60),
+    Rule("public_track", "POST", "/api/v1/public/track", 20, 60),  # chống dò SĐT / mã phiếu
     Rule("public", "*", "/api/v1/public", 120, 60),
     Rule("intake", "POST", "/api/v1/sos/intake", 10, 3600),
     Rule("ingest", "POST", "/api/v1/ingest", 1200, 60),

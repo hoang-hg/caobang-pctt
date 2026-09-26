@@ -5,7 +5,7 @@ import { Circle, CircleMarker, GeoJSON, MapContainer, Marker, Polyline, Popup, T
 import clsx from 'clsx';
 import {
   ShieldAlert, LocateFixed, Megaphone, Phone, Home, CloudRain, Waves, Camera, LogIn, Moon, Sun, Navigation, AlertTriangle,
-  CheckCircle2, Loader2, Share2, Info, BookOpen, ExternalLink, HelpCircle, MapPin, ChevronRight, PhoneCall, Compass
+  CheckCircle2, Loader2, Share2, Info, BookOpen, ExternalLink, HelpCircle, MapPin, ChevronRight, PhoneCall, Compass, Search
 } from 'lucide-react';
 import { api } from '../../api/client';
 import { useUnitsGeo } from '../../api/hooks';
@@ -15,6 +15,7 @@ import { evacIcon, hazardIcon, pinIcon, stationIcon } from '../../components/map
 import { alarmLevel, LEVEL } from '../../utils/labels';
 import { ago, dateTime } from '../../utils/format';
 import ReportForm from './ReportForm';
+import TicketTracker from './TicketTracker';
 
 const REFRESH = 60_000;
 const pub = (path, params) => api(`/public${path}`, { params });
@@ -133,7 +134,10 @@ export default function PublicPortal() {
   const { theme, toggleTheme, auth } = useStore();
   const [params] = useSearchParams();
   const focusAlert = params.get('canh-bao');
-  const [activeTab, setActiveTab] = useState('bando'); // bando | muanuoc | sotan | hotlines | huongdan
+  const trackParam = params.get('tra-cuu') || '';
+  const [activeTab, setActiveTab] = useState(trackParam ? 'tracuu' : 'bando'); // bando | tracuu | muanuoc | sotan | hotlines | huongdan
+  // SĐT chỉ giữ trong state (không đưa lên URL)
+  const [track, setTrack] = useState({ code: trackParam, phone: '' });
   const [layers, setLayers] = useState({ forecast: true, hazard: true, stations: true, evac: true, reports: true });
   const [me, setMe] = useState(null);
   const [locating, setLocating] = useState(false);
@@ -162,6 +166,13 @@ export default function PublicPortal() {
       document.getElementById(`canh-bao-${focusAlert}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }, [focusAlert, alerts]);
+
+  useEffect(() => {
+    if (trackParam) {
+      setTrack((x) => ({ ...x, code: trackParam }));
+      setActiveTab('tracuu');
+    }
+  }, [trackParam]);
 
   const locate = () => {
     setLocErr('');
@@ -297,8 +308,8 @@ export default function PublicPortal() {
           </div>
         </div>
 
-        {/* 3 Thẻ hành động nhanh cho người dân */}
-        <div className="grid gap-3 sm:grid-cols-3">
+        {/* 4 Thẻ hành động nhanh cho người dân */}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {/* Nút 1: Kiểm tra vị trí an toàn */}
           <div
             onClick={locate}
@@ -316,7 +327,27 @@ export default function PublicPortal() {
             </div>
           </div>
 
-          {/* Nút 2: Gửi phản ánh hiện trường */}
+          {/* Nút 2: Tra cứu tiến độ cứu hộ / phản ánh */}
+          <div
+            onClick={() => {
+              setActiveTab('tracuu');
+              window.scrollTo({ top: 380, behavior: 'smooth' });
+            }}
+            className="card p-4 flex flex-col justify-between cursor-pointer hover:border-amber-500 hover:shadow-md transition-all group border-l-4 border-l-amber-500"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/15 text-amber-600 group-hover:scale-105 transition-transform">
+                <Search size={20} />
+              </div>
+              <span className="text-[11px] font-semibold text-amber-600 group-hover:underline">Tra cứu ngay →</span>
+            </div>
+            <div className="mt-3">
+              <div className="font-bold text-sm text-ink">Tra cứu tiến độ cứu hộ & phản ánh</div>
+              <div className="text-xs text-muted mt-0.5">Nhập mã phiếu (SOS-…, PA-…) và SĐT đã dùng khi gửi</div>
+            </div>
+          </div>
+
+          {/* Nút 3: Gửi phản ánh hiện trường */}
           <div
             onClick={() => setReporting(true)}
             className="card p-4 flex flex-col justify-between cursor-pointer hover:border-danger hover:shadow-md transition-all group border-l-4 border-l-danger"
@@ -333,16 +364,16 @@ export default function PublicPortal() {
             </div>
           </div>
 
-          {/* Nút 3: Đường dây nóng cứu nạn */}
+          {/* Nút 4: Đường dây nóng cứu nạn */}
           <div
             onClick={() => setShowSosModal(true)}
-            className="card p-4 flex flex-col justify-between cursor-pointer hover:border-amber-500 hover:shadow-md transition-all group border-l-4 border-l-amber-500"
+            className="card p-4 flex flex-col justify-between cursor-pointer hover:border-red-500 hover:shadow-md transition-all group border-l-4 border-l-red-500"
           >
             <div className="flex items-center justify-between">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/15 text-amber-600 group-hover:scale-105 transition-transform">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/15 text-red-600 group-hover:scale-105 transition-transform">
                 <Phone size={20} />
               </div>
-              <span className="text-[11px] font-semibold text-amber-600 group-hover:underline">Xem danh bạ →</span>
+              <span className="text-[11px] font-semibold text-red-600 group-hover:underline">Xem danh bạ →</span>
             </div>
             <div className="mt-3">
               <div className="font-bold text-sm text-ink">Tổng đài cứu trợ & Đường dây nóng</div>
@@ -454,10 +485,11 @@ export default function PublicPortal() {
           </section>
         )}
 
-        {/* Thanh Điều hướng Tabs (Bản đồ / Mực nước / Điểm sơ tán / Hotline / Cẩm nang) */}
+        {/* Thanh Điều hướng Tabs (Bản đồ / Tra cứu tiến độ / Mực nước / Điểm sơ tán / Hotline / Cẩm nang) */}
         <div className="flex border-b border-line gap-2 overflow-x-auto scroll-thin pb-1">
           {[
             { id: 'bando', label: 'Bản đồ & Cảnh báo', icon: Compass },
+            { id: 'tracuu', label: 'Tra cứu tiến độ (SOS / Phản ánh)', icon: Search },
             { id: 'muanuoc', label: 'Mực nước sông suối', icon: Waves },
             { id: 'sotan', label: 'Điểm sơ tán an toàn', icon: Home },
             { id: 'hotlines', label: 'Đường dây nóng', icon: Phone },
@@ -568,6 +600,15 @@ export default function PublicPortal() {
               </section>
             </div>
           </div>
+        )}
+
+        {/* TAB TRA CỨU TIẾN ĐỘ CỨU HỘ & PHẢN ÁNH */}
+        {activeTab === 'tracuu' && (
+          <TicketTracker
+            initialCode={track.code}
+            initialPhone={track.phone}
+            onQueryChange={setTrack}
+          />
         )}
 
         {/* TAB 2: MỰC NƯỚC SÔNG SUỐI */}
@@ -895,7 +936,17 @@ export default function PublicPortal() {
       </div>
 
       {/* Form Gửi phản ánh hiện trường */}
-      {reporting && <ReportForm onClose={() => setReporting(false)} myLocation={me} />}
+      {reporting && (
+        <ReportForm
+          onClose={() => setReporting(false)}
+          myLocation={me}
+          onTrack={(code, phone) => {
+            setTrack({ code, phone: phone || '' });
+            setActiveTab('tracuu');
+            window.scrollTo({ top: 380, behavior: 'smooth' });
+          }}
+        />
+      )}
     </div>
   );
 }

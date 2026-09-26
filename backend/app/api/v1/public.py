@@ -13,6 +13,7 @@ import html
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import HTMLResponse
+from pydantic import BaseModel, Field
 
 from app.api.v1.reports import _serve_photo
 from app.config import settings
@@ -21,6 +22,7 @@ from app.infra.cache import cached
 from app.services.reports import CATEGORY, ReportError, create_report, public_photo_url, verify_turnstile
 from app.services.safe_routing import haversine_km, plan_route
 from app.services.simulator import alarm_level
+from app.services.tracking import track_ticket
 
 router = APIRouter(prefix="/public", tags=["Công khai"])
 
@@ -394,3 +396,17 @@ async def submit_report(
         "message": "Đã tiếp nhận phản ánh. Cán bộ sẽ xác minh trước khi hiển thị công khai. "
         "Trường hợp nguy hiểm đến tính mạng, hãy gọi ngay 112.",
     }
+
+
+class TrackIn(BaseModel):
+    code: str = Field(..., min_length=3, max_length=20, description="Mã phiếu SOS-… hoặc PA-…")
+    phone: str | None = Field(None, max_length=20, description="SĐT người gửi — bắt buộc nếu phiếu có SĐT")
+
+
+@router.post("/track")
+async def track_public(body: TrackIn):
+    """Tra cứu tiến độ 1 phiếu SOS / phản ánh.
+
+    POST (không phải GET) để SĐT không nằm trong URL và log truy cập. Không cache (dữ liệu theo từng người).
+    """
+    return await track_ticket(body.code, body.phone)

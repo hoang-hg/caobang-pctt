@@ -213,13 +213,14 @@ node scripts/smoke.mjs                        # kiểm thử luồng nghiệp v�
 node scripts/rbac-test.mjs                    # kiểm thử phân quyền theo phạm vi (46 kịch bản)
 node scripts/iot-test.mjs                     # kiểm thử cổng IoT HTTP/batch/LoRaWAN/MQTT + dự báo (22 kịch bản)
 node scripts/public-test.mjs                  # cổng & API công khai, phản ánh + duyệt, admin tỉnh/xã, mật khẩu, giới hạn tần suất (52 kịch bản)
+node scripts/track-test.mjs                   # tra cứu tiến độ phiếu SOS / phản ánh (mã + SĐT, chống dò, không lộ dữ liệu nội bộ)
 cd frontend && npm run build                  # build production
 ```
 
 Chạy lại `public-test` nhiều lần liên tiếp: xoá khoá `rl:*` trong Redis trước (xem “Các lệnh thường dùng”).
 
 **CI (GitHub Actions)** — [.github/workflows/ci.yml](.github/workflows/ci.yml) chạy mỗi lần push/PR: ruff + pytest, build
-frontend, rồi dựng toàn bộ stack bằng Docker Compose và chạy 4 bộ kiểm thử API. Tạo tag `v1.2.3` →
+frontend, rồi dựng toàn bộ stack bằng Docker Compose và chạy 5 bộ kiểm thử API. Tạo tag `v1.2.3` →
 [deploy.yml](.github/workflows/deploy.yml) build & đẩy image lên GitHub Container Registry (`ghcr.io/<owner>/caobang-pctt-backend|frontend`).
 
 ## Tích hợp thật (thay mô phỏng)

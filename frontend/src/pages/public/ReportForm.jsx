@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { MapContainer, Marker, useMap, useMapEvents } from 'react-leaflet';
-import { Camera, CheckCircle2, LocateFixed, Loader2, Send, Trash2, MapPin, AlertCircle, ShieldCheck, Sparkles, ImagePlus } from 'lucide-react';
+import { Camera, CheckCircle2, LocateFixed, Loader2, Send, Trash2, MapPin, AlertCircle, ShieldCheck, Sparkles, ImagePlus, Search } from 'lucide-react';
 import { Modal } from '../../components/common/ui';
 import { BaseLayer } from '../../components/map/MapTools';
 import { pinIcon } from '../../components/map/icons';
@@ -24,7 +24,7 @@ function Picker({ value, onChange }) {
 }
 
 /** Người dân gửi phản ánh hiện trường kèm ảnh — hiển thị công khai sau khi cán bộ xác minh. */
-export default function ReportForm({ onClose, myLocation }) {
+export default function ReportForm({ onClose, myLocation, onTrack }) {
   const { data: categories = [] } = useQuery({ queryKey: ['pub-cats'], queryFn: () => api('/public/report-categories'), staleTime: Infinity });
   const [f, setF] = useState({ category: 'ngap', description: '', address: '', reporter_name: '', reporter_phone: '', website: '' });
   const [pos, setPos] = useState(myLocation ? { lat: myLocation.lat, lon: myLocation.lon } : null);
@@ -81,14 +81,40 @@ export default function ReportForm({ onClose, myLocation }) {
 
   if (done) {
     return (
-      <Modal open onClose={onClose} title="Gửi phản ánh thành công" footer={<button className="btn-primary px-6" onClick={onClose}>Hoàn tất</button>}>
+      <Modal
+        open
+        onClose={onClose}
+        title="Gửi phản ánh thành công"
+        footer={
+          <div className="flex items-center justify-end gap-2 w-full">
+            {onTrack && (
+              <button
+                className="btn bg-accent text-white hover:brightness-110 px-4 py-2 text-xs sm:text-sm font-semibold flex items-center gap-1.5 shadow-sm"
+                onClick={() => {
+                  onClose();
+                  onTrack(done.code, f.reporter_phone);
+                }}
+              >
+                <Search size={15} />
+                <span>Theo dõi tiến độ phiếu này</span>
+              </button>
+            )}
+            <button className="btn-ghost px-4 py-2 text-xs sm:text-sm" onClick={onClose}>
+              Đóng
+            </button>
+          </div>
+        }
+      >
         <div className="flex flex-col items-center gap-3 py-6 text-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-good/15 text-good">
             <CheckCircle2 size={40} />
           </div>
           <div className="text-xl font-bold text-ink">Đã tiếp nhận phản ánh</div>
-          <div className="rounded-xl bg-panel2 p-3 text-sm">
-            Mã phản ánh: <b className="font-mono text-base text-accent">{done.code}</b>
+          <div className="rounded-xl bg-panel2 p-3 text-sm flex flex-col items-center gap-1 max-w-sm w-full border border-line">
+            <div>Mã phản ánh: <b className="font-mono text-base text-accent">{done.code}</b></div>
+            <div className="text-xs text-muted">
+              Lưu lại mã này. Tra cứu tiến độ trên Cổng công khai bằng mã phiếu và số điện thoại bạn đã nhập (nếu có).
+            </div>
           </div>
           <p className="max-w-md text-sm text-ink-2 leading-relaxed">
             {done.message || 'Cảm ơn bạn. Cán bộ địa phương sẽ xác minh phản ánh; nếu nguy hiểm đến tính mạng hãy gọi ngay 112.'}

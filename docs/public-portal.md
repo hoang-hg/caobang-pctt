@@ -28,6 +28,7 @@ Người dân mở trang web **không cần đăng nhập** (người đã đăn
 | `GET /hotlines` | Đường dây nóng | 1 giờ |
 | `GET /reports`, `/reports/{id}/photos/{idx}` | Phản ánh **đã duyệt** + ảnh | 30 s |
 | `GET /report-categories` | Loại sự việc | – |
+| `POST /track` `{code, phone}` | Tra cứu tiến độ 1 phiếu SOS / phản ánh: đúng mã + SĐT người gửi (phản ánh ẩn danh chỉ cần mã, chỉ trả mốc tiến độ) | – |
 | `POST /reports` | Gửi phản ánh (multipart, tối đa 3 ảnh × 8 MB) | – |
 
 ### Ẩn thông tin nhạy cảm (nguyên tắc)
@@ -42,6 +43,7 @@ danh bạ cán bộ; họ tên, SĐT, IP người phản ánh; phản ánh chưa
 | Gửi phản ánh | 5 / giờ |
 | Chỉ đường | 20 / phút |
 | Định vị | 30 / phút |
+| Tra cứu tiến độ phiếu | 20 / phút |
 | API công khai khác | 120 / phút |
 | Đăng nhập | 30 / phút (+ khoá tài khoản 15′ sau 10 lần sai) |
 | Quên mật khẩu / đặt lại | 5 / giờ, 10 / giờ |
