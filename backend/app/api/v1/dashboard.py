@@ -5,6 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.area import area_clause, unit_clause
 from app.db import fetch_all, fetch_one
 from app.rbac.authz import area_scope, require_any
+from app.services.landslides import get_landslides_overview
+from app.services.reservoirs import get_reservoirs_overview
 
 router = APIRouter(tags=["Dashboard"])
 MON = area_scope("monitoring", "view")
@@ -70,6 +72,13 @@ async def kpis(codes: list[str] = Depends(MON)):
               FROM resources.vehicles v WHERE {area_clause('v.current_location', codes)}""",
         p,
     )
+    # Tổng quan toàn tỉnh → lọc theo vùng đang xem / phạm vi được giao (codes rỗng = toàn tỉnh)
+    reservoirs = [
+        r for r in (await get_reservoirs_overview())["reservoirs"] if not codes or r["admin_code"] in codes
+    ]
+    landslides = [
+        p for p in (await get_landslides_overview())["points"] if not codes or p["admin_code"] in codes
+    ]
     return {
         "rain": rain,
         "rivers": rivers,
@@ -77,6 +86,21 @@ async def kpis(codes: list[str] = Depends(MON)):
         "sos": sos,
         "forces": forces,
         "vehicles": vehicles,
+        "reservoirs": {
+            "total": len(reservoirs),
+            "spill_count": sum(r["status_code"] != "binh_thuong" for r in reservoirs),
+            "emergency_count": sum(r["status_code"] == "xa_khan_cap" for r in reservoirs),
+            "total_inflow": round(sum(r["inflow_m3s"] for r in reservoirs), 1),
+            "total_outflow": round(sum(r["outflow_m3s"] for r in reservoirs), 1),
+            "reservoirs": reservoirs,
+        },
+        "landslides": {
+            "total": len(landslides),
+            "blocked_count": sum(p["traffic_status"] == "cam_duong" for p in landslides),
+            "warning_count": sum(p["traffic_status"] == "canh_bao" for p in landslides),
+            "safe_count": sum(p["traffic_status"] == "thong_suot" for p in landslides),
+            "points": landslides,
+        },
     }
 
 

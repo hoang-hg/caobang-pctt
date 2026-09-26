@@ -11,7 +11,8 @@ Tài liệu này quy định chi tiết 5 quy trình nghiệp vụ cốt lõi c�
 3. [Quy trình 3: Soạn thảo, Thẩm duyệt & Phát Cảnh báo Đa kênh (Alert Workflow)](#quy-trinh-3)
 4. [Quy trình 4: Giám sát Khí tượng Thủy văn, IoT & Bản đồ Tác chiến (Monitoring Workflow)](#quy-trinh-4)
 5. [Quy trình 5: Phân quyền & Giám sát An toàn Lãnh thổ (RBAC Workflow)](#quy-trinh-5)
-6. [Bảng kiểm tra thực nghiệm (Test Execution Matrix)](#bang-kiem-tra)
+6. [Chuyên đề Tác chiến Trọng tâm: (1) Lũ, Ngập lụt & (2) Sạt lở, Lũ quét](#chuyen-de-trong-tam)
+7. [Bảng kiểm tra thực nghiệm (Test Execution Matrix)](#bang-kiem-tra)
 
 ---
 
@@ -183,8 +184,86 @@ Chi tiết quyền từng vai trò: [docs/rbac.md](rbac.md).
 
 ---
 
+<a name="chuyen-de-trong-tam"></a>
+## 6. Chuyên đề Tác chiến Trọng tâm: (1) Lũ, Ngập lụt & (2) Sạt lở, Lũ quét
+
+Địa hình tỉnh Cao Bằng đặc trưng bởi các dãy núi dốc đứng, hệ thống sông suối hẹp chia cắt và vùng karst trũng thấp. Hai loại hình thiên tai gây thiệt hại nặng nề nhất về người và tài sản là **Lũ & Ngập lụt** và **Sạt lở đất đá & Lũ quét**. Hệ thống thiết lập kịch bản vận hành chuyên biệt cho từng loại hình như sau:
+
+---
+
+### 6.1. Kịch bản Tác chiến 1: Ứng phó Lũ & Ngập lụt (River Flood & Basin Inundation SOP)
+
+```mermaid
+graph TD
+    A[Mực nước sông Bằng Giang / sông Gâm tăng] --> B{Kiểm tra Cấp Báo Động Thủy văn}
+    B -->|Đạt Báo động I| C[Cảnh báo cấp 1: Thông báo hộ ven sông kê cao tài sản, neo đậu xuồng bè]
+    B -->|Đạt Báo động II| D[Cảnh báo cấp 2: Cấm đường trũng ven sông, sơ tán đối tượng yếu thế]
+    B -->|Đạt Báo động III| E[Khẩn cấp cấp 3: Phát Lệnh Sơ Tán Toàn Dân vùng ngập đến Điểm sơ tán an toàn]
+    E --> F[Điều động cano, xuồng máy cao su, phao cứu sinh tiếp cận hộ cô lập]
+    E --> G[Phối hợp Thủy điện thượng nguồn kiểm soát điều tiết xả lũ an toàn]
+    F --> H[Đưa nhân dân đến nơi an toàn -> Xác nhận hoàn thành SOS]
+```
+
+#### A. Đặc thù lưu vực & Vùng trũng xung yếu
+* **Lưu vực sông Bằng Giang**: Chảy qua khu vực nội thị Cao Bằng và địa bàn các huyện cũ Hòa An, Quảng Hòa (Phục Hòa). Khi mưa lớn diện rộng, lũ lên nhanh nhưng thoát chậm qua các hẻm núi hẹp, gây ngập úng kéo dài tại các vùng trũng TP Cao Bằng và vùng trồng trọt Hòa An.
+* **Lưu vực sông Gâm**: Lưu vực dốc đứng chảy qua Bảo Lạc, Bảo Lâm; biên độ lũ cực lớn, dòng chảy xiết uy hiếp các xóm ven sông.
+
+#### B. Ngưỡng kích hoạt 3 Cấp báo động lũ (trạm thuỷ văn Cao Bằng – sông Bằng Giang; Bảo Lạc – sông Gâm)
+
+> Giá trị ngưỡng trong hệ thống hiện là **minh hoạ** (cấu hình tại `monitoring_stations.alarm_thresholds`), phải thay bằng ngưỡng chính thức theo quy định của Đài KTTV tỉnh.
+
+* **Báo động I**: Mực nước mấp mé bờ sông (Cao Bằng: 180,0 m · Bảo Lạc: 212,0 m).
+  - *Hành động*: Chuyển ca trực sang trạng thái sẵn sàng 24/24; phát tin thông báo người dân ven sông neo đậu thuyền bè, thu hoạch hoa màu, di dời tài sản lên cao.
+* **Báo động II**: Nước tràn bờ, ngập đường ven sông và vùng đất thấp (Cao Bằng: 181,0 m · Bảo Lạc: 214,0 m).
+  - *Hành động*: Kích hoạt cấm đường ven sông trũng; ban hành lệnh sơ tán đối tượng yếu thế (trẻ em, người già, người khuyết tật) về Điểm sơ tán an toàn cấp xã.
+* **Báo động III (Nguy hiểm)**: Ngập sâu diện rộng, uy hiếp khu dân cư tập trung (Cao Bằng: 182,0 m · Bảo Lạc: 216,0 m).
+  - *Hành động*: Ban hành Lệnh sơ tán khẩn cấp toàn bộ nhân dân trong vùng ngập; cấm toàn bộ phương tiện lưu thông qua vùng ngập; kiểm soát chặt các hồ chứa thủy điện thượng nguồn.
+
+#### C. Điều phối lực lượng & Phương tiện cứu trợ
+* **Phương tiện chủ lực**: Xuồng máy cao su, cano cứu hộ của Quân sự và Công an PCCC & CNCH; áo phao, phao tròn cứu sinh.
+* **Quy tắc an toàn**: Không cho phương tiện thô sơ hoặc người dân tự ý chèo thuyền qua dòng nước xoáy; lập chốt kiểm soát tuyệt đối tại các cầu ngầm tràn.
+
+---
+
+### 6.2. Kịch bản Tác chiến 2: Ứng phó Sạt lở Đất đá & Lũ quét (Landslide & Flash Flood SOP)
+
+```mermaid
+graph TD
+    M[Mưa tích lũy 24h > 100mm hoặc Độ ẩm đất IoT ≥ BĐ II (43%)] --> N{Phát hiện Dấu hiệu Rủi ro}
+    N -->|Nứt taluy sườn đồi, rùa bò, cây rừng nghiêng| O[Kích hoạt Nguyên tắc Vàng: SƠ TÁN CHỦ ĐỘNG TRƯỚC KHI SẠT LỞ]
+    N -->|Sạt lở chia cắt đèo giao thông| P[Kích hoạt Phong tỏa Cấm đường: QL34, Đèo Khau Liêu, Đèo Mã Phục]
+    O --> Q[Cưỡng chế di dời khẩn cấp toàn bộ hộ dân dưới chân đồi đến nơi an toàn]
+    P --> R[Cảnh báo đỏ trên Cổng công khai, CSGT chốt chặn 2 đầu đèo]
+    P --> S[Hạt giao thông đưa máy xúc dọn thông tuyến khi điều kiện an toàn]
+    Q --> T{Có người bị vùi lấp?}
+    T -->|Có| U[Điều động Công binh, Đội chó nghiệp vụ, Flycam tầm nhiệt tìm kiếm khẩn cấp]
+    T -->|Không| V[Bảo toàn tính mạng người dân 100% -> Thành công]
+```
+
+#### A. Chỉ số kích hoạt rủi ro (Trigger Thresholds)
+* **Lượng mưa tích lũy 24 giờ > 100 mm** (hoặc > 50 mm trong 3 giờ liên tục).
+* **Độ ẩm đất (cảm biến IoT) vượt ngưỡng**: BĐ I 38% · BĐ II 43% · BĐ III 48% (giá trị minh hoạ theo loại đất, cấu hình tại `alarm_thresholds`). Vượt BĐ II → hệ thống tự khoanh vùng nguy cơ 1 km, tạo phiếu SOS nguồn cảm biến và bản nháp cảnh báo chờ duyệt.
+* **Cảm biến nghiêng taluy**: BĐ I 0,5° · BĐ II 1,0° · BĐ III 2,0°.
+* **Tuyến đường đèo xung yếu**: Quốc lộ 34 (đoạn Bảo Lạc – Bảo Lâm), Đèo Khau Liêu, Đèo Mã Phục, các cung đường đèo dốc địa bàn Nguyên Bình, Hà Quảng, Thông Nông cũ. Danh mục điểm đen theo dõi trên Cổng công khai: tab **Sạt trượt & Đường đèo** (`GET /api/v1/public/landslides`).
+
+#### B. Nguyên tắc cốt tử: "Sơ tán chủ động trước khi sạt lở" (Pre-emptive Evacuation)
+* **Nhận diện sớm dấu hiệu đứt gãy**: Vết nứt toác trên sườn đồi, bờ taluy dương nứt nẻ, cây rừng bị nghiêng rạp, nước ngầm phụt đục bất thường, có tiếng nổ lớn hoặc rung chấn trong lòng núi.
+* **Mệnh lệnh sơ tán**: **Ra lệnh di dời khẩn cấp NGAY LẬP TỨC** khi phát hiện dấu hiệu rạn nứt sườn đồi, kiên quyết cưỡng chế di dời nếu người dân chần chừ; tuyệt đối không đợi bùn đất trôi xuống mới chạy.
+
+#### C. Biện pháp Phong tỏa & Thông tuyến giao thông
+* **Phong tỏa tức thời**: Đoạn đường giao với vùng nguy hiểm đang hiệu lực (sạt lở, lũ quét, ngập mức đỏ) tự hiển thị **bị chia cắt** trên bản đồ công khai, điểm đen liên quan chuyển trạng thái "Đường bị chia cắt" và công cụ chỉ đường an toàn tự tránh. Việc chốt chặn thực địa do lực lượng chức năng thực hiện.
+  - *Hạn chế hiện tại*: vùng nguy hiểm mới được tạo tự động từ cảm biến (và dữ liệu nạp sẵn); **chưa có** chức năng để cán bộ tự khoanh/đóng một đoạn đường trên giao diện.
+* **Quy tắc giải tỏa hiện trường**: Chỉ cho phép máy xúc, máy ủi của Hạt giao thông tiếp cận dọn dẹp khi trời đã ngớt mưa và có người lập chốt quan trắc an toàn trên cao cảnh giới sạt lở thứ cấp.
+
+#### D. Kế hoạch Tìm kiếm Cứu nạn khi xảy ra vùi lấp
+* **Lực lượng**: Huy động Đại đội Công binh Quân sự tỉnh, Đội CNCH Công an tỉnh, lực lượng Dân quân tại chỗ.
+* **Công nghệ & Thiết bị**: Sử dụng Flycam dò nhiệt tìm kiếm thân nhiệt người mắc kẹt, máy dò rung chấn và chó nghiệp vụ quân sự.
+* **Hậu cần y tế**: Thiết lập trạm cấp cứu dã chiến ngay tại chân điểm sạt lở để cấp cứu sốc chấn thương và hồi sức tại chỗ trước khi chuyển viện.
+
+---
+
 <a name="bang-kiem-tra"></a>
-## 6. Bảng kiểm tra thực nghiệm (Test Execution Matrix)
+## 7. Bảng kiểm tra thực nghiệm (Test Execution Matrix)
 
 Các quy trình được kiểm tra tự động bằng các kịch bản kiểm thử API (chạy trong CI mỗi lần push — xem `.github/workflows/ci.yml`):
 
@@ -195,7 +274,9 @@ Các quy trình được kiểm tra tự động bằng các kịch bản kiểm
 | **2.2. Tra cứu tiến độ** | `node scripts/track-test.mjs` |
 | **3. Phát cảnh báo đa kênh** | `node scripts/smoke.mjs` |
 | **4. Quan trắc IoT & Bản đồ** | `node scripts/iot-test.mjs` |
-| **5. Phân quyền RBAC** | `node scripts/rbac-test.mjs` |
+| **5. Giám sát hồ chứa & Xả lũ** | `node scripts/reservoir-test.mjs` |
+| **6. Điểm đen sạt trượt & Đường đèo** | `node scripts/landslide-test.mjs` |
+| **7. Phân quyền RBAC** | `node scripts/rbac-test.mjs` |
 
 Kết quả từng lần chạy xem ở tab **Actions** trên GitHub.
 

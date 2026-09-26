@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { MapContainer, Marker, useMap, useMapEvents } from 'react-leaflet';
-import { Camera, CheckCircle2, LocateFixed, Loader2, Send, Trash2, MapPin, AlertCircle, ShieldCheck, Sparkles, ImagePlus, Search } from 'lucide-react';
+import {
+  Camera, CheckCircle2, LocateFixed, Loader2, Send, Trash2, MapPin, AlertCircle,
+  ShieldCheck, Sparkles, ImagePlus, Search, Waves, AlertTriangle
+} from 'lucide-react';
 import { Modal } from '../../components/common/ui';
 import { BaseLayer } from '../../components/map/MapTools';
 import { pinIcon } from '../../components/map/icons';
@@ -157,18 +160,57 @@ export default function ReportForm({ onClose, myLocation, onTrack }) {
         {/* Cột 1: Thông tin mô tả & Ảnh */}
         <div className="flex flex-col gap-3 text-sm">
           <div>
-            <label className="block text-xs font-semibold uppercase text-muted mb-1">
-              Loại sự việc <span className="text-danger">*</span>
+            <label className="block text-xs font-semibold uppercase text-muted mb-1.5">
+              Loại sự việc trọng tâm <span className="text-danger">*</span>
             </label>
-            <select
-              className="input"
-              value={f.category}
-              onChange={set('category')}
-            >
-              {categories.map((c) => (
-                <option key={c.code} value={c.code}>{c.label}</option>
-              ))}
-            </select>
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              <button
+                type="button"
+                onClick={() => setF((x) => ({ ...x, category: 'ngap' }))}
+                className={clsx(
+                  'flex items-center gap-2 p-2.5 rounded-xl border text-xs font-bold transition-all text-left cursor-pointer',
+                  f.category === 'ngap'
+                    ? 'border-blue-500 bg-blue-500/10 text-blue-600 ring-2 ring-blue-500/20 shadow-sm'
+                    : 'border-line bg-panel2/60 text-ink hover:bg-panel2'
+                )}
+              >
+                <Waves size={18} className="text-blue-500 shrink-0" />
+                <div className="min-w-0">
+                  <div className="truncate">🌊 Lũ, Ngập lụt</div>
+                  <div className="text-[10px] text-muted font-normal truncate">Ngập đường, nước sông dâng</div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setF((x) => ({ ...x, category: 'sat_lo' }))}
+                className={clsx(
+                  'flex items-center gap-2 p-2.5 rounded-xl border text-xs font-bold transition-all text-left cursor-pointer',
+                  f.category === 'sat_lo' || f.category === 'lu_quet'
+                    ? 'border-amber-500 bg-amber-500/10 text-amber-600 ring-2 ring-amber-500/20 shadow-sm'
+                    : 'border-line bg-panel2/60 text-ink hover:bg-panel2'
+                )}
+              >
+                <AlertTriangle size={18} className="text-amber-500 shrink-0" />
+                <div className="min-w-0">
+                  <div className="truncate">⛰️ Sạt lở, Lũ quét</div>
+                  <div className="text-[10px] text-muted font-normal truncate">Sạt đèo, vách núi, lũ ống</div>
+                </div>
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-muted shrink-0 text-[11px]">Hoặc chọn loại khác:</span>
+              <select
+                className="input py-1 px-2 text-xs flex-1"
+                value={f.category}
+                onChange={set('category')}
+              >
+                {categories.map((c) => (
+                  <option key={c.code} value={c.code}>{c.label}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div>

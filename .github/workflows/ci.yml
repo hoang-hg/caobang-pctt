@@ -2,7 +2,7 @@
 # CI — kiểm tra mỗi lần push / pull request
 #   backend  : ruff (format + lint) + pytest (kiểm thử đơn vị)
 #   frontend : build production
-#   e2e      : dựng toàn bộ stack bằng Docker Compose, chạy 5 bộ kiểm thử API
+#   e2e      : dựng toàn bộ stack bằng Docker Compose, chạy 7 bộ kiểm thử API
 # ==========================================
 name: CI
 
@@ -88,6 +88,10 @@ jobs:
         run: |
           docker compose exec -T redis sh -c "redis-cli --scan --pattern 'rl:*' | xargs -r redis-cli del"
           node scripts/track-test.mjs
+      - name: Kiểm thử hồ chứa & điểm đen sạt lở
+        run: |
+          node scripts/reservoir-test.mjs
+          node scripts/landslide-test.mjs
       - name: Log khi lỗi
         if: failure()
         run: docker compose logs --tail=300 backend worker

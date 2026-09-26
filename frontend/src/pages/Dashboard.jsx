@@ -1,7 +1,10 @@
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import clsx from 'clsx';
-import { CloudRain, Waves, Home, Siren, Users, Ship, FileDown, Loader2, MapPin, X, ArrowUpRight, BarChart3, Activity } from 'lucide-react';
+import {
+  CloudRain, Waves, Home, Siren, Users, Ship, FileDown, Loader2, MapPin, X, ArrowUpRight, BarChart3, Activity,
+  Droplets, Mountain, Ban, LayoutDashboard
+} from 'lucide-react';
 import { useAreaQuery } from '../api/hooks';
 import { useStore } from '../app/store';
 import { KpiCard, Progress, Section } from '../components/common/ui';
@@ -14,6 +17,8 @@ import AreaForecastChart from '../components/charts/AreaForecastChart';
 import { ALARM, alarmLevel } from '../utils/labels';
 import { int, minutesSince, num, pct } from '../utils/format';
 import { exportSnapshotPdf } from '../utils/exportPdf';
+import ReservoirMonitor from './public/ReservoirMonitor';
+import LandslideMonitor, { maxTiltText } from './public/LandslideMonitor';
 
 function RiverKpi({ rivers = [] }) {
   const worst = rivers.reduce((m, r) => Math.max(m, alarmLevel(r.value, r.thresholds)), 0);
@@ -49,6 +54,7 @@ export default function Dashboard() {
   const filterLabel = filter.label;
   const isFiltered = filter.codes.length > 0;
   const [stationId, setStationId] = useState('CB-WL-01');
+  const [activeMode, setActiveMode] = useState('tong_hop'); // tong_hop | hochua | satlo
   const [exporting, setExporting] = useState(false);
   const ref = useRef(null);
 
@@ -114,10 +120,155 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div ref={ref} className="grid gap-3.5 bg-bg xl:grid-cols-[1fr_350px]">
-        <div className="flex min-w-0 flex-col gap-3.5">
-          {/* Khối chỉ số nhanh (KPIs) */}
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 2xl:grid-cols-6">
+      {/* Thanh chuyển đổi chuyên đề tác chiến Ban Chỉ huy */}
+      <div className="flex items-center gap-2 border-b border-line pb-2.5 overflow-x-auto scroll-thin">
+        {[
+          { id: 'tong_hop', label: 'Tác chiến tổng hợp', icon: LayoutDashboard },
+          {
+            id: 'hochua',
+            label: 'Chuyên đề: Hồ chứa & Xả lũ',
+            icon: Droplets,
+            badge: k?.reservoirs?.spill_count ? `${k.reservoirs.spill_count} hồ xả` : null,
+            badgeCls: k?.reservoirs?.emergency_count > 0 ? 'bg-danger text-white animate-pulse' : 'bg-amber-500 text-white',
+          },
+          {
+            id: 'satlo',
+            label: 'Chuyên đề: Sạt trượt & Đường đèo',
+            icon: Mountain,
+            badge: k?.landslides?.blocked_count ? `${k.landslides.blocked_count} điểm cấm` : null,
+            badgeCls: 'bg-danger text-white animate-pulse',
+          },
+        ].map((m) => {
+          const Icon = m.icon;
+          const active = activeMode === m.id;
+          return (
+            <button
+              key={m.id}
+              onClick={() => setActiveMode(m.id)}
+              className={clsx(
+                'flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap border',
+                active
+                  ? 'bg-accent text-white border-accent shadow-md shadow-accent/20'
+                  : 'bg-panel text-ink-2 hover:bg-panel2 border-line hover:text-ink'
+              )}
+            >
+              <Icon size={15} />
+              <span>{m.label}</span>
+              {m.badge && (
+                <span className={clsx('px-1.5 py-0.5 rounded-full text-[10px] font-bold shadow-sm', m.badgeCls || 'bg-amber-500 text-white')}>
+                  {m.badge}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* CHUYÊN ĐỀ 1: HỒ CHỨA & XẢ LŨ */}
+      {activeMode === 'hochua' && (
+        <div className="card p-4 sm:p-5 bg-panel border-line shadow-sm space-y-4">
+          <div className="pb-3 border-b border-line flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider text-sky-600">Bảng điều hành tác chiến chuyên sâu</span>
+              <h2 className="text-lg font-bold text-ink flex items-center gap-2 mt-0.5">
+                <Droplets className="text-sky-600" size={20} />
+                Giám Sát Vận Hành Hồ Chứa & Cảnh Báo Xả Lũ Tỉnh Cao Bằng
+              </h2>
+            </div>
+            <Link to="/ban-do" className="btn-ghost text-xs self-start sm:self-auto">
+              Mở bản đồ chuyên đề →
+            </Link>
+          </div>
+          <ReservoirMonitor onSelectOnMap={() => window.location.href = '/ban-do'} />
+        </div>
+      )}
+
+      {/* CHUYÊN ĐỀ 2: SẠT TRƯỢT & ĐƯỜNG ĐÈO */}
+      {activeMode === 'satlo' && (
+        <div className="card p-4 sm:p-5 bg-panel border-line shadow-sm space-y-4">
+          <div className="pb-3 border-b border-line flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider text-danger">Bảng điều hành tác chiến chuyên sâu</span>
+              <h2 className="text-lg font-bold text-ink flex items-center gap-2 mt-0.5">
+                <Mountain className="text-danger" size={20} />
+                Bản Đồ Điểm Đen Sạt Trượt & Trạng Thái Đường Đèo Tỉnh Cao Bằng
+              </h2>
+            </div>
+            <Link to="/ban-do" className="btn-ghost text-xs self-start sm:self-auto">
+              Mở bản đồ chuyên đề →
+            </Link>
+          </div>
+          <LandslideMonitor onSelectOnMap={() => window.location.href = '/ban-do'} />
+        </div>
+      )}
+
+      {/* CHUYÊN ĐỀ TỔNG HỢP MULTI-HAZARD */}
+      {activeMode === 'tong_hop' && (
+        <div ref={ref} className="grid gap-3.5 bg-bg xl:grid-cols-[1fr_350px]">
+          <div className="flex min-w-0 flex-col gap-3.5">
+            {/* 2 Bảng chuyên đề tác chiến nổi bật */}
+            <div className="grid gap-3 sm:grid-cols-2">
+              {/* Chuyên đề 1: Hồ chứa & Xả lũ */}
+              <div
+                onClick={() => setActiveMode('hochua')}
+                className="card p-3.5 cursor-pointer border-l-4 border-l-sky-500 hover:border-sky-600 hover:shadow-md transition-all group bg-gradient-to-r from-sky-500/5 to-transparent"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-500/15 text-sky-600 group-hover:scale-105 transition-transform">
+                      <Droplets size={18} />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-sky-600">Chuyên đề trọng tâm 1</span>
+                      <h3 className="font-bold text-sm text-ink group-hover:text-accent">Hồ Chứa & Cảnh Báo Xả Lũ</h3>
+                    </div>
+                  </div>
+                  <span className="text-[11px] font-semibold text-accent group-hover:underline flex items-center gap-0.5">
+                    Mở tác chiến <ArrowUpRight size={12} />
+                  </span>
+                </div>
+                <div className="mt-3 flex items-baseline justify-between text-xs border-t border-line/60 pt-2">
+                  <div className="text-muted">
+                    Đang mở xả tràn: <b className="text-amber-600 font-mono font-bold">{k?.reservoirs?.spill_count ?? '–'} / {k?.reservoirs?.total ?? '–'} hồ</b>
+                  </div>
+                  <div className="text-muted">
+                    Tổng xả hạ du: <b className="font-mono text-ink font-bold">{k ? Math.round(k.reservoirs?.total_outflow ?? 0) : '–'} m³/s</b>
+                  </div>
+                </div>
+              </div>
+
+              {/* Chuyên đề 2: Sạt trượt & Đường đèo */}
+              <div
+                onClick={() => setActiveMode('satlo')}
+                className="card p-3.5 cursor-pointer border-l-4 border-l-danger hover:border-red-600 hover:shadow-md transition-all group bg-gradient-to-r from-danger/5 to-transparent"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-danger/15 text-danger group-hover:scale-105 transition-transform">
+                      <Mountain size={18} />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-danger">Chuyên đề trọng tâm 2</span>
+                      <h3 className="font-bold text-sm text-ink group-hover:text-danger">Sạt Trượt & Đường Đèo</h3>
+                    </div>
+                  </div>
+                  <span className="text-[11px] font-semibold text-danger group-hover:underline flex items-center gap-0.5">
+                    Mở tác chiến <ArrowUpRight size={12} />
+                  </span>
+                </div>
+                <div className="mt-3 flex items-baseline justify-between text-xs border-t border-line/60 pt-2">
+                  <div className="text-muted">
+                    Tắc đường / Cấm xe: <b className="text-danger font-mono font-bold">{k?.landslides?.blocked_count ?? '–'} vị trí</b>
+                  </div>
+                  <div className="text-muted">
+                    Độ nghiêng taluy: <b className="font-mono text-danger font-bold">{maxTiltText(k?.landslides?.points)}</b>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Khối chỉ số nhanh (KPIs) */}
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 2xl:grid-cols-6">
             <KpiCard
               label="Mưa TB 24h"
               value={num(k?.rain?.avg_24h, 1)}
@@ -214,6 +365,7 @@ export default function Dashboard() {
           <EventLog className="max-h-[70vh] xl:max-h-none xl:h-full" limit={50} />
         </Section>
       </div>
+      )}
     </div>
   );
 }

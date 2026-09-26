@@ -166,7 +166,8 @@ let lastStatus;
 for (let i = 0; i < 11; i++) lastStatus = (await call('POST', '/auth/login', { username: `do.mat.khau.${stamp}`, password: 'sai' })).status;
 check('Sai mật khẩu 10 lần → tạm khoá đăng nhập 15 phút (429)', lastStatus === 429);
 let rl;
-for (let i = 0; i < 32; i++) rl = await call('GET', `/public/locate?lat=${TP.lat}&lon=${TP.lon}`);
+// Cửa sổ cố định theo phút đồng hồ: 62 lần bảo đảm có 1 cửa sổ > 30 dù chạy vắt qua ranh giới phút
+for (let i = 0; i < 62 && rl?.status !== 429; i++) rl = await call('GET', `/public/locate?lat=${TP.lat}&lon=${TP.lon}`);
 check('Giới hạn tần suất API công khai (30 lần/phút) → 429 + Retry-After', rl.status === 429 && !!rl.headers.get('retry-after'));
 
 console.log(failures ? `\n${failures} kiểm tra THẤT BẠI` : '\nTất cả kiểm tra cổng công khai, phản ánh & tài khoản đạt');

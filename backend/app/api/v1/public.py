@@ -19,7 +19,9 @@ from app.api.v1.reports import _serve_photo
 from app.config import settings
 from app.db import fetch_all, fetch_one
 from app.infra.cache import cached
+from app.services.landslides import get_landslides_overview
 from app.services.reports import CATEGORY, ReportError, create_report, public_photo_url, verify_turnstile
+from app.services.reservoirs import get_reservoirs_overview
 from app.services.safe_routing import haversine_km, plan_route
 from app.services.simulator import alarm_level
 from app.services.tracking import track_ticket
@@ -78,6 +80,8 @@ async def overview():
                         WHERE a.model = 'BLEND' AND a.time > now() AND a.time <= now() + interval '24 hours'
                         GROUP BY u.name) t"""
         )
+        res_overview = await get_reservoirs_overview()
+        ls_overview = await get_landslides_overview()
         return {
             "rain": rain,
             "rivers": rivers,
@@ -85,6 +89,18 @@ async def overview():
             "evacuation": evac,
             "alerts": {"active": alerts["active"], "has_red": bool(alerts["has_red"])},
             "forecast_24h": forecast,
+            "reservoirs": {
+                "total": res_overview["total_reservoirs"],
+                "spill_count": res_overview["spill_count"],
+                "emergency_count": res_overview["emergency_count"],
+                "total_outflow": res_overview["total_outflow_m3s"],
+            },
+            "landslides": {
+                "total": ls_overview["total_points"],
+                "blocked_count": ls_overview["blocked_count"],
+                "warning_count": ls_overview["warning_count"],
+                "safe_count": ls_overview["safe_count"],
+            },
             "generated_at": (await fetch_one("SELECT now() AS t"))["t"],
         }
 
@@ -119,6 +135,8 @@ async def public_map():
                 WHERE EXISTS (SELECT 1 FROM iot_telemetry.hazard_zones z WHERE z.valid_until > now()
                                AND (z.type <> 'ngap' OR z.level = 'do') AND ST_Intersects(z.geom, s.geom))"""
         )
+        res_overview = await get_reservoirs_overview()
+        ls_overview = await get_landslides_overview()
         return {
             "stations": stations,
             "hazard_zones": zones,
@@ -126,6 +144,8 @@ async def public_map():
             "evacuation_sites": evac,
             "blocked_roads": roads,
             "reports": await _approved_reports(72),
+            "reservoirs": res_overview["reservoirs"],
+            "landslides": ls_overview["points"],
         }
 
     return await cached("public:map", 30, build)
@@ -410,3 +430,15 @@ async def track_public(body: TrackIn):
     POST (không phải GET) để SĐT không nằm trong URL và log truy cập. Không cache (dữ liệu theo từng người).
     """
     return await track_ticket(body.code, body.phone)
+
+
+@router.get("/reservoirs")
+async def public_reservoirs():
+    """Giám sát tình hình vận hành các hồ chứa thủy điện, hồ thủy lợi & cảnh báo xả lũ."""
+    return await cached("public:reservoirs", 20, get_reservoirs_overview)
+
+
+@router.get("/landslides")
+async def public_landslides():
+    """Giám sát các điểm đen sạt trượt đất đá, lũ quét & trạng thái đường đèo tỉnh Cao Bằng."""
+    return await cached("public:landslides", 20, get_landslides_overview)
