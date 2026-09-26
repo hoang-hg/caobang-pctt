@@ -1,0 +1,50 @@
+# Hệ thống Điều hành PCTT & TKCN tỉnh Cao Bằng
+#   docker compose up -d --build        → db + backend + frontend (nginx)
+#   Frontend dev: cd frontend && npm run dev (proxy /api, /ws → localhost:8000)
+services:
+  db:
+    image: timescale/timescaledb-ha:pg16
+    container_name: caobang-pctt-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pctt}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pctt_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-caobang_pctt}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/home/postgres/pgdata/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pctt} -d ${POSTGRES_DB:-caobang_pctt}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build: ./backend
+    container_name: caobang-pctt-backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-pctt}:${POSTGRES_PASSWORD:-pctt_dev_password}@db:5432/${POSTGRES_DB:-caobang_pctt}
+      JWT_SECRET: ${JWT_SECRET:-doi-khoa-bi-mat-nay-khi-trien-khai-that}
+      SIMULATOR: ${SIMULATOR:-true}
+      DEMO_MODE: ${DEMO_MODE:-true}
+      CORS_ORIGINS: http://localhost:5173,http://localhost:8080
+      LLM_API_URL: ${LLM_API_URL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    container_name: caobang-pctt-frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:

@@ -1,0 +1,219 @@
+"""Bản đồ giám sát tương tác: các lớp dữ liệu GeoJSON, thanh thời gian, phân tích vùng, định tuyến (Phân hệ B)."""
+
+from datetime import UTC, datetime, timedelta
+
+from fastapi import APIRouter, Depends
+from pydantic import BaseModel
+
+from app.area import area_clause, parse_codes
+from app.db import fetch_all, fetch_one
+from app.services.broadcast import estimate_audience
+from app.services.safe_routing import plan_route
+
+router = APIRouter(prefix="/map", tags=["Bản đồ"])
+
+
+def fc(rows: list[dict], geom_key: str = "geom") -> dict:
+    """Chuyển hàng có cột geojson → FeatureCollection; nếu không có geom thì dựng Point từ lat/lon."""
+    features = []
+    for r in rows:
+        geom = r.pop(geom_key, None) or {"type": "Point", "coordinates": [r["lon"], r["lat"]]}
+        features.append({"type": "Feature", "geometry": geom, "properties": r})
+    return {"type": "FeatureCollection", "features": features}
+
+
+@router.get("/layers")
+async def layers(codes: list[str] = Depends(parse_codes)):
+    p = {"codes": codes}
+    stations = await fetch_all(
+        f"""SELECT s.id, s.name, s.type, s.river, s.unit, s.alarm_thresholds AS thresholds, ST_Y(s.location) AS lat, ST_X(s.location) AS lon,
+                   (SELECT value FROM iot_telemetry.sensor_readings r WHERE r.station_id = s.id ORDER BY time DESC LIMIT 1) AS value
+              FROM iot_telemetry.monitoring_stations s WHERE {area_clause('s.location', codes)}""",
+        p,
+    )
+    reservoirs = await fetch_all(
+        f"""SELECT id, name, river, capacity_mw, normal_level, current_level, inflow_m3s, outflow_m3s, spill_gates_open, spill_gates,
+                   updated_at, ST_Y(location) AS lat, ST_X(location) AS lon
+              FROM iot_telemetry.reservoirs WHERE {area_clause('location', codes)}""",
+        p,
+    )
+    hazard_zones = await fetch_all(
+        f"""SELECT id, type, level, name, depth_m, source, valid_until, ST_AsGeoJSON(geom, 5)::json AS geom
+              FROM iot_telemetry.hazard_zones WHERE valid_until > now() AND {area_clause('geom', codes)}""",
+        p,
+    )
+    hazard_points = await fetch_all(
+        f"""SELECT id, type, level, name, description, reported_at, ST_Y(location) AS lat, ST_X(location) AS lon
+              FROM iot_telemetry.hazard_points WHERE active AND {area_clause('location', codes)}""",
+        p,
+    )
+    forces = await fetch_all(
+        f"""SELECT id, code, name, org_type, commander, contact_phone, radio_freq, personnel_ready, personnel_on_mission, status, skills,
+                   ST_Y(location) AS lat, ST_X(location) AS lon
+              FROM resources.forces WHERE {area_clause('location', codes)}""",
+        p,
+    )
+    vehicles = await fetch_all(
+        f"""SELECT v.id, v.code, v.name, v.vehicle_type, v.category, v.status, v.fuel_level, f.name AS force_name,
+                   ST_Y(v.current_location) AS lat, ST_X(v.current_location) AS lon
+              FROM resources.vehicles v LEFT JOIN resources.forces f ON f.id = v.force_id
+             WHERE {area_clause('v.current_location', codes)}""",
+        p,
+    )
+    warehouses = await fetch_all(
+        f"""SELECT w.id, w.code, w.name, w.level, w.phone, ST_Y(w.location) AS lat, ST_X(w.location) AS lon,
+                   json_agg(json_build_object('category', i.category, 'pct',
+                            round(100.0 * inv.quantity / NULLIF(inv.safety_quota, 0)))) AS items,
+                   round(100.0 * sum(inv.quantity) / NULLIF(sum(inv.safety_quota), 0))::int AS pct
+              FROM resources.warehouses w
+              JOIN resources.inventory inv ON inv.warehouse_id = w.id JOIN resources.items i ON i.code = inv.item_code
+             WHERE {area_clause('w.location', codes)}
+             GROUP BY w.id""",
+        p,
+    )
+    for w in warehouses:  # gộp % theo nhóm hàng cho biểu đồ tròn trong popup
+        groups: dict[str, list] = {}
+        for it in w.pop("items"):
+            groups.setdefault(it["category"], []).append(min(it["pct"] or 0, 150))
+        w["categories"] = {k: round(sum(v) / len(v)) for k, v in groups.items()}
+    evac = await fetch_all(
+        f"""SELECT id, name, site_type, capacity, current_occupancy, contact_phone, ST_Y(location) AS lat, ST_X(location) AS lon
+              FROM resources.evacuation_sites WHERE {area_clause('location', codes)}""",
+        p,
+    )
+    sos = await fetch_all(
+        f"""SELECT id, code, incident_type, priority, status, trapped_count, address, source, received_at, raw_message,
+                   ST_Y(location) AS lat, ST_X(location) AS lon
+              FROM operations.sos_tickets WHERE status <> 'hoan_thanh' AND {area_clause('location', codes)}""",
+        p,
+    )
+    cameras = await fetch_all(
+        f"""SELECT id, name, stream_url, ST_Y(location) AS lat, ST_X(location) AS lon
+              FROM iot_telemetry.cameras WHERE {area_clause('location', codes)}""",
+        p,
+    )
+    routes = await fetch_all(
+        """SELECT o.id, o.ticket_id, o.status, o.progress, o.eta, o.route_safe, f.name AS force_name, t.code AS ticket_code,
+                  ST_AsGeoJSON(o.route_geom, 5)::json AS geom
+             FROM operations.dispatch_orders o JOIN operations.sos_tickets t ON t.id = o.ticket_id
+             LEFT JOIN resources.forces f ON f.id = o.force_id
+            WHERE o.status IN ('dang_di', 'da_den')"""
+    )
+    roads = await fetch_all(
+        """SELECT s.id, s.road_name, EXISTS (SELECT 1 FROM iot_telemetry.hazard_zones z WHERE z.valid_until > now()
+                                                AND (z.type <> 'ngap' OR z.level = 'do') AND ST_Intersects(z.geom, s.geom)) AS blocked,
+                  ST_AsGeoJSON(s.geom, 5)::json AS geom FROM operations.road_segments s"""
+    )
+    return {
+        "stations": fc(stations),
+        "reservoirs": fc(reservoirs),
+        "hazard_zones": fc(hazard_zones),
+        "hazard_points": fc(hazard_points),
+        "forces": fc(forces),
+        "vehicles": fc(vehicles),
+        "warehouses": fc(warehouses),
+        "evacuation_sites": fc(evac),
+        "sos": fc(sos),
+        "cameras": fc(cameras),
+        "routes": fc(routes),
+        "roads": fc(roads),
+    }
+
+
+@router.get("/timeline")
+async def timeline(offset_h: int = 0):
+    """Giá trị các trạm tại thời điểm (hiện tại + offset): quá khứ dùng số đo, tương lai dùng dự báo.
+    Kèm hệ số ngập (0..1.6) để phóng to/thu nhỏ lớp vùng ngập theo diễn biến lũ."""
+    at = datetime.now(UTC) + timedelta(hours=offset_h)
+    if offset_h <= 0:
+        rows = await fetch_all(
+            """SELECT s.id, s.type, round(avg(r.value)::numeric, 2)::float AS value
+                 FROM iot_telemetry.monitoring_stations s JOIN iot_telemetry.sensor_readings r ON r.station_id = s.id
+                WHERE r.time BETWEEN CAST(:at AS timestamptz) - interval '30 minutes' AND CAST(:at AS timestamptz) + interval '30 minutes'
+                GROUP BY s.id, s.type""",
+            {"at": at},
+        )
+    else:
+        rows = await fetch_all(
+            """SELECT DISTINCT ON (f.station_id) f.station_id AS id, s.type, f.value
+                 FROM iot_telemetry.forecasts f JOIN iot_telemetry.monitoring_stations s ON s.id = f.station_id
+                WHERE f.time >= CAST(:at AS timestamptz) - interval '30 minutes'
+                ORDER BY f.station_id, f.time""",
+            {"at": at},
+        )
+    wl = await fetch_one(
+        """SELECT (s.alarm_thresholds->>'bd1')::float AS bd1, (s.alarm_thresholds->>'bd3')::float AS bd3
+             FROM iot_telemetry.monitoring_stations s WHERE s.id = 'CB-WL-01'"""
+    )
+    main = next((r["value"] for r in rows if r["id"] == "CB-WL-01"), None)
+    flood_factor = None
+    if main is not None:
+        flood_factor = round(max(0.0, min(1.6, (main - (wl["bd1"] - 1)) / (wl["bd3"] - wl["bd1"] + 1))), 2)
+    return {
+        "time": at,
+        "offset_h": offset_h,
+        "values": {r["id"]: r["value"] for r in rows},
+        "flood_factor": flood_factor,
+    }
+
+
+@router.get("/storm-track")
+async def storm_track():
+    """Quỹ đạo hoàn lưu bão/ATNĐ mẫu (vào Bắc Bộ, suy yếu thành vùng áp thấp qua Cao Bằng)."""
+    now = datetime.now(UTC).replace(minute=0, second=0, microsecond=0)
+    pts = [
+        (-24, 20.9, 107.9, 118, "Bão cấp 11"),
+        (-18, 21.3, 107.2, 102, "Bão cấp 10"),
+        (-12, 21.8, 106.7, 75, "ATNĐ"),
+        (-6, 22.3, 106.4, 55, "Vùng áp thấp"),
+        (0, 22.7, 106.0, 45, "Vùng áp thấp"),
+        (6, 23.1, 105.5, 35, "Suy yếu"),
+        (12, 23.5, 105.0, 30, "Tan dần"),
+    ]
+    return {
+        "name": "Hoàn lưu bão số 3 (kịch bản mô phỏng)",
+        "points": [
+            {
+                "time": now + timedelta(hours=h),
+                "lat": la,
+                "lon": lo,
+                "wind_kmh": w,
+                "label": lb,
+                "forecast": h > 0,
+            }
+            for h, la, lo, w, lb in pts
+        ],
+    }
+
+
+class AreaIn(BaseModel):
+    polygon: dict
+
+
+@router.post("/area-stats")
+async def area_stats(body: AreaIn):
+    """Khoanh vùng: đếm dân cư, hộ, thuê bao, SOS, lực lượng, điểm sơ tán trong đa giác vẽ trên bản đồ."""
+    import json
+
+    audience = await estimate_audience([], body.polygon)
+    counts = await fetch_one(
+        """WITH g AS (SELECT ST_SetSRID(ST_GeomFromGeoJSON(:p), 4326) AS g)
+           SELECT (SELECT count(*) FROM operations.sos_tickets t, g WHERE t.status <> 'hoan_thanh' AND ST_Contains(g.g, t.location)) AS sos_open,
+                  (SELECT count(*) FROM resources.forces f, g WHERE ST_Contains(g.g, f.location)) AS forces,
+                  (SELECT COALESCE(sum(capacity - current_occupancy), 0) FROM resources.evacuation_sites e, g WHERE ST_Contains(g.g, e.location)) AS evac_free,
+                  (SELECT count(*) FROM iot_telemetry.hazard_zones z, g WHERE z.valid_until > now() AND ST_Intersects(g.g, z.geom)) AS hazard_zones""",
+        {"p": json.dumps(body.polygon)},
+    )
+    return {**audience, **counts}
+
+
+class RouteIn(BaseModel):
+    from_lat: float
+    from_lon: float
+    to_lat: float
+    to_lon: float
+
+
+@router.post("/route")
+async def route(body: RouteIn):
+    return await plan_route(body.from_lat, body.from_lon, body.to_lat, body.to_lon)
