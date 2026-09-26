@@ -62,15 +62,16 @@ export default function AdminFilter() {
         </button>
       )}
       {open && (
-        <div className="card absolute left-0 top-11 z-[1200] w-[26rem] p-2 shadow-2xl">
-          <input className="input mb-2" placeholder="Tìm xã/phường…" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
-          <div className="max-h-[70vh] overflow-y-auto scroll-thin">
+        <div className="card absolute left-0 top-11 z-[1200] w-[min(26rem,calc(100vw-2rem))] p-3 shadow-2xl bg-panel/95 backdrop-blur-md border border-line">
+          <input className="input mb-2.5 text-xs py-1.5" placeholder="Tìm xã / phường trong tỉnh..." value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
+          <div className="max-h-[70vh] overflow-y-auto scroll-thin space-y-1">
             {!q && (
               <>
-                <button className="w-full rounded-md px-2 py-1.5 text-left text-sm font-semibold hover:bg-panel2" onClick={() => pick({ codes: [], label: restricted ? 'Phạm vi được giao' : 'Toàn tỉnh Cao Bằng', presetCode: null })}>
-                  {restricted ? 'Toàn bộ phạm vi được giao' : 'Toàn tỉnh Cao Bằng'} <span className="text-xs font-normal text-muted">· {units.length} xã/phường</span>
+                <button className="w-full rounded-xl px-2.5 py-2 text-left text-sm font-semibold hover:bg-panel2 transition-colors flex items-center justify-between" onClick={() => pick({ codes: [], label: restricted ? 'Phạm vi được giao' : 'Toàn tỉnh Cao Bằng', presetCode: null })}>
+                  <span>{restricted ? 'Toàn bộ phạm vi được giao' : 'Toàn tỉnh Cao Bằng'}</span>
+                  <span className="chip bg-panel2 text-[10px] text-muted font-normal">{units.length} xã/phường</span>
                 </button>
-                <div className="mt-2 px-2 text-[11px] font-semibold uppercase text-muted">Lọc nhanh theo đặc thù thiên tai</div>
+                <div className="mt-2.5 px-2 text-[10px] font-bold uppercase tracking-wider text-muted">Lọc nhanh theo đặc thù thiên tai</div>
                 {hazardPresets.map((p) => {
                   const Icon = PRESET_ICON[p.hazard] || Flag;
                   return (

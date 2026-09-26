@@ -60,30 +60,41 @@ body {
 }
 
 @layer components {
-.card { @apply bg-panel border border-line rounded-xl; }
-.card-title { @apply text-[13px] font-semibold text-ink-2 uppercase tracking-wide; }
-.btn { @apply inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed; }
-.btn-primary { @apply btn bg-accent text-white hover:brightness-110; }
-.btn-danger { @apply btn bg-danger text-white hover:brightness-110; }
-.btn-ghost { @apply btn border border-line text-ink-2 hover:bg-panel2; }
-.input { @apply w-full rounded-lg border border-line bg-panel2 px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent/50; }
-.chip { @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold; }
-.table-base { @apply w-full text-sm; }
-.table-base th { @apply sticky top-0 bg-panel2 text-left text-xs font-semibold uppercase tracking-wide text-muted px-3 py-2 border-b border-line; }
-.table-base td { @apply px-3 py-2 border-b border-line/60 align-top; }
-.table-base tr:hover td { @apply bg-panel2/60; }
+  .card { @apply bg-panel border border-line rounded-xl shadow-sm transition-all; }
+  .card-hover { @apply card hover:shadow-md hover:border-line/90; }
+  .card-glass { @apply bg-panel/90 backdrop-blur-md border border-line rounded-xl shadow-lg; }
+  .card-title { @apply text-[13px] font-semibold text-ink-2 uppercase tracking-wide flex items-center gap-1.5; }
+  
+  .btn { @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-medium transition-all duration-150 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 select-none; }
+  .btn-primary { @apply btn bg-accent text-white shadow-sm hover:brightness-110 hover:shadow active:brightness-95; }
+  .btn-danger { @apply btn bg-danger text-white shadow-sm hover:brightness-110 hover:shadow active:brightness-95; }
+  .btn-good { @apply btn bg-good text-white shadow-sm hover:brightness-110 hover:shadow active:brightness-95; }
+  .btn-ghost { @apply btn border border-line text-ink-2 hover:bg-panel2 hover:text-ink hover:border-muted/40; }
+  .btn-soft { @apply btn bg-panel2 text-ink hover:bg-line/50; }
+  
+  .input { @apply w-full rounded-lg border border-line bg-panel2 px-3 py-1.5 text-sm text-ink placeholder:text-muted transition-colors focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25; }
+  .chip { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-wide border border-transparent; }
+  
+  .badge-live { @apply relative inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold bg-good/15 text-good border border-good/30; }
+  
+  .table-base { @apply w-full text-sm; }
+  .table-base th { @apply sticky top-0 bg-panel2 text-left text-xs font-semibold uppercase tracking-wide text-muted px-3 py-2.5 border-b border-line z-10; }
+  .table-base td { @apply px-3 py-2 border-b border-line/60 align-top; }
+  .table-base tr:hover td { @apply bg-panel2/60; }
 }
 
 .scroll-thin::-webkit-scrollbar { width: 6px; height: 6px; }
-.scroll-thin::-webkit-scrollbar-thumb { background: rgb(var(--line)); border-radius: 3px; }
+.scroll-thin::-webkit-scrollbar-track { background: transparent; }
+.scroll-thin::-webkit-scrollbar-thumb { background: rgb(var(--line)); border-radius: 9999px; }
+.scroll-thin::-webkit-scrollbar-thumb:hover { background: rgb(var(--muted) / 0.7); }
 
 /* Leaflet theo theme */
 .leaflet-container { background: rgb(var(--panel-2)); font-family: inherit; }
-.leaflet-popup-content-wrapper, .leaflet-popup-tip { background: rgb(var(--panel)); color: rgb(var(--ink)); }
-.leaflet-popup-content { margin: 10px 12px; font-size: 13px; }
-.leaflet-bar a, .leaflet-bar a:hover { background: rgb(var(--panel)); color: rgb(var(--ink)); border-color: rgb(var(--line)); }
+.leaflet-popup-content-wrapper, .leaflet-popup-tip { background: rgb(var(--panel)); color: rgb(var(--ink)); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.15); border-radius: 0.75rem; border: 1px solid rgb(var(--line)); }
+.leaflet-popup-content { margin: 12px 14px; font-size: 13px; line-height: 1.4; }
+.leaflet-bar a, .leaflet-bar a:hover { background: rgb(var(--panel)); color: rgb(var(--ink)); border-color: rgb(var(--line)); border-radius: 0.5rem; }
 .leaflet-draw-toolbar a { background-color: rgb(var(--panel)); }
-.leaflet-tooltip { background: rgb(var(--panel)); color: rgb(var(--ink)); border-color: rgb(var(--line)); }
+.leaflet-tooltip { background: rgb(var(--panel)); color: rgb(var(--ink)); border-color: rgb(var(--line)); border-radius: 0.375rem; font-size: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
 
 .map-icon { background: none; border: none; }
 .sos-pulse { position: relative; }

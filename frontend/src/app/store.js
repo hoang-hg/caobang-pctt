@@ -55,6 +55,16 @@ export const useStore = create((set, get) => ({
   soundOn: safeGet('pctt_sound') !== 'off',
   toggleSound: () => { const soundOn = !get().soundOn; safeSet('pctt_sound', soundOn ? 'on' : 'off'); set({ soundOn }); },
 
+  // ---- Điều khiển Sidebar (Thu gọn trên Desktop & Mở Drawer trên Mobile) ----
+  sidebarCollapsed: safeGet('pctt_sidebar_collapsed') === 'true',
+  toggleSidebarCollapse: () => {
+    const next = !get().sidebarCollapsed;
+    safeSet('pctt_sidebar_collapsed', String(next));
+    set({ sidebarCollapsed: next });
+  },
+  mobileMenuOpen: false,
+  setMobileMenuOpen: (mobileMenuOpen) => set({ mobileMenuOpen }),
+
   // ---- Thông báo nổi ----
   toasts: [],
   toast: (t) => {
