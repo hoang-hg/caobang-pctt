@@ -37,29 +37,123 @@ db (timescale/timescaledb-ha:pg16 — PostGIS + TimescaleDB)
 
 Bộ lọc địa phương: frontend chỉ gửi `admin_codes`, backend hợp nhất ranh giới và lọc bằng `ST_Intersects`.
 
-## Chạy nhanh
+## Hướng dẫn chạy và xem trên trình duyệt
 
-Yêu cầu: Docker Desktop, Node ≥ 20 (chỉ khi chạy frontend dev).
+### Bước 1 – Cài phần mềm cần thiết
 
-```bash
-cp .env.example .env
-docker compose up -d --build        # db + backend (tự migrate + seed) + frontend nginx
-```
+| Phần mềm | Bắt buộc? | Tải về | Ghi chú |
+|---|---|---|---|
+| **Docker Desktop** | Có | https://www.docker.com/products/docker-desktop/ | Windows cần bật WSL 2 (trình cài đặt tự hướng dẫn). Máy nên có ≥ 8 GB RAM, trống ≥ 6 GB ổ đĩa |
+| **Git** | Có | https://git-scm.com/downloads | Để tải mã nguồn |
+| **Node.js 20+** | Chỉ khi sửa giao diện | https://nodejs.org/ | Dùng cho chế độ phát triển (Cách B) |
 
-- Giao diện: http://localhost:8080 · API docs: http://localhost:8000/docs · Health: http://localhost:8000/health
-- Postgres: `localhost:5433` (user `pctt`, db `caobang_pctt`)
-
-Frontend dev (hot reload, proxy `/api` & `/ws` → `localhost:8000`):
-
-```bash
-cd frontend && npm install && npm run dev   # http://localhost:5173
-```
-
-Nạp lại dữ liệu mẫu (xoá dữ liệu nghiệp vụ):
+Sau khi cài, **mở Docker Desktop và chờ biểu tượng cá voi báo “Engine running”** rồi mới chạy lệnh.
+Kiểm tra nhanh trong terminal (PowerShell, Git Bash hoặc Terminal trên macOS/Linux):
 
 ```bash
-docker compose exec backend python -m app.seed --reset && docker compose restart backend
+docker --version
+docker compose version
+git --version
 ```
+
+### Bước 2 – Tải mã nguồn
+
+```bash
+git clone https://github.com/hoang-hg/caobang-pctt.git
+cd caobang-pctt
+```
+
+Tạo file cấu hình từ mẫu (có thể giữ nguyên giá trị mặc định):
+
+```bash
+cp .env.example .env            # PowerShell: Copy-Item .env.example .env
+```
+
+### Bước 3 – Chạy hệ thống
+
+#### Cách A – Chạy toàn bộ bằng Docker (khuyên dùng để xem thử)
+
+```bash
+docker compose up -d --build
+```
+
+Lệnh này dựng 3 dịch vụ: `db` (PostgreSQL + PostGIS + TimescaleDB), `backend` (FastAPI – tự tạo bảng và nạp dữ liệu mẫu),
+`frontend` (giao diện qua nginx). **Lần đầu mất khoảng 5–10 phút** vì phải tải image CSDL (~1 GB); các lần sau chỉ vài giây.
+
+Kiểm tra các dịch vụ đã chạy:
+
+```bash
+docker compose ps                     # cả 3 dịch vụ ở trạng thái "Up" / "healthy"
+docker compose logs -f backend        # thấy "[seed] Hoàn tất" và "Uvicorn running" là xong (Ctrl+C để thoát)
+```
+
+#### Cách B – Chế độ phát triển giao diện (sửa code thấy ngay)
+
+```bash
+docker compose up -d --build db backend    # chỉ chạy CSDL + backend bằng Docker
+cd frontend
+npm install                                # lần đầu
+npm run dev                                # proxy /api & /ws → localhost:8000
+```
+
+### Bước 4 – Mở trình duyệt
+
+| Địa chỉ | Nội dung |
+|---|---|
+| **http://localhost:8080** | Giao diện web điều hành (Cách A) |
+| **http://localhost:5173** | Giao diện chế độ phát triển (Cách B) |
+| http://localhost:8000/docs | Tài liệu API (Swagger) – thử gọi API trực tiếp |
+| http://localhost:8000/health | Kiểm tra trạng thái hệ thống, CSDL |
+| `localhost:5433` | PostgreSQL (user `pctt` / mật khẩu `pctt_dev_password`, db `caobang_pctt`) – mở bằng DBeaver, pgAdmin… |
+
+Nên dùng Chrome / Edge / Firefox bản mới. Bản đồ nền, radar mưa và font chữ tải từ Internet nên máy cần có mạng.
+
+### Bước 5 – Dùng thử các chức năng
+
+1. Bấm **Đăng nhập** (góc phải trên) → chọn tài khoản demo:
+   - **Nông Văn Trực** – Trực ban: soạn lệnh cảnh báo, điều động lực lượng, xuất kho.
+   - **Hoàng Đức Chỉ** – Lãnh đạo: phê duyệt lệnh cảnh báo bằng **PIN 2468**.
+2. **Tổng quan**: xem KPI, biểu đồ thủy văn, mưa, sạt lở, vật tư; bấm **Xuất PDF báo cáo nhanh**.
+3. **Bản đồ giám sát**: bật/tắt lớp dữ liệu bên trái; click trạm/hồ/kho để xem popup; **kéo biểu tượng đội cứu hộ
+   (ô vuông xanh) thả lên điểm SOS đỏ** để điều động; dùng công cụ góc phải để đo khoảng cách, tìm đường an toàn A→B,
+   khoanh vùng rồi bấm “Soạn cảnh báo sơ tán”; kéo thanh thời gian ở đáy để xem −12h…+24h.
+4. **Điều hành cứu hộ**: kéo thả phiếu SOS giữa các cột; dán tin nhắn cầu cứu vào ô “Tiếp nhận đa kênh” → **Bóc tách thông tin**.
+5. **Vật tư & Lực lượng**: lọc, tìm kiếm, **Điều động nhanh**, **Xuất kho**, xuất Excel/PDF.
+6. **Cảnh báo & Hotline**: Trực ban soạn lệnh từ mẫu → đăng nhập Lãnh đạo → **Phê duyệt** → xem bảng tỷ lệ chuyển giao.
+7. Dùng **bộ lọc địa phương** (nút “Toàn tỉnh Cao Bằng” trên đầu trang) và **ô tìm kiếm** (VD: `Bản Giốc`, `22.66, 106.25`, `SOS-1001`);
+   nút mặt trời/mặt trăng để đổi **Sáng/Tối**.
+
+Bộ mô phỏng tự sinh số đo cảm biến mỗi 4 giây, SOS mới khoảng 3 phút/lần, lực lượng di chuyển trên bản đồ sau khi điều động.
+
+### Các lệnh thường dùng
+
+```bash
+docker compose ps                                    # xem trạng thái
+docker compose logs -f backend                       # xem log backend
+docker compose restart backend                       # khởi động lại backend
+docker compose stop                                  # tạm dừng (giữ dữ liệu)
+docker compose down                                  # tắt và xoá container (giữ dữ liệu CSDL)
+docker compose down -v                               # tắt và XOÁ LUÔN dữ liệu CSDL
+docker compose up -d --build                         # chạy lại sau khi sửa code backend / frontend
+
+# Xoá dữ liệu nghiệp vụ và nạp lại dữ liệu mẫu từ đầu
+docker compose exec backend python -m app.seed --reset
+docker compose restart backend
+```
+
+### Xử lý lỗi thường gặp
+
+| Hiện tượng | Nguyên nhân / Cách xử lý |
+|---|---|
+| `failed to connect to the docker API` / `Cannot connect to the Docker daemon` | Docker Desktop chưa mở → mở Docker Desktop, chờ “Engine running” rồi chạy lại |
+| `port is already allocated` (8080, 8000, 5433) | Cổng đang bị chương trình khác dùng → tắt chương trình đó, hoặc đổi cổng: `POSTGRES_PORT` trong `.env`; cổng `8080:80` / `8000:8000` trong `docker-compose.yml` |
+| Trang báo **502 Bad Gateway** ngay sau khi chạy | Backend còn đang tạo bảng / nạp dữ liệu → chờ 20–30 giây rồi tải lại trang (xem `docker compose logs -f backend`) |
+| `pip install … did not complete successfully` khi build | Mạng chập chờn khi tải thư viện → chạy lại `docker compose up -d --build` |
+| Góc phải hiện **“Mất kết nối”** | Backend dừng hoặc khởi động lại → `docker compose ps`, `docker compose restart backend` |
+| Bản đồ trắng / không có nền | Máy không có Internet hoặc mạng chặn máy chủ bản đồ → đổi nền bản đồ (menu “Nền” trên bản đồ) hoặc kiểm tra mạng |
+| Nút **Phát lệnh**, **Phê duyệt** bị mờ | Chưa đăng nhập, hoặc sai vai trò (phê duyệt cần tài khoản Lãnh đạo) |
+| Không nghe âm báo SOS | Trình duyệt chặn âm thanh khi chưa tương tác → click vào trang một lần; kiểm tra nút loa trên thanh đầu trang |
+| Muốn làm sạch hoàn toàn | `docker compose down -v` rồi `docker compose up -d --build` |
 
 ### Tài khoản demo (nút **Đăng nhập** góc phải, khi `DEMO_MODE=true`)
 
