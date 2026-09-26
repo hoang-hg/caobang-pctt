@@ -92,7 +92,7 @@ check('ChirpStack event khác "up" được bỏ qua', (await call('POST', '/ing
 
 // MQTT (publish qua container broker)
 try {
-  execSync(`docker compose exec -T mqtt mosquitto_pub -t caobang/pctt/${MQTT_ID}/readings -m "{\\"value\\": 1.35}"`, { stdio: 'ignore' });
+  execSync(`docker exec caobang-pctt-mqtt mosquitto_pub -t caobang/pctt/${MQTT_ID}/readings -m "{\\"value\\": 1.35}"`, { stdio: 'ignore' });
   await sleep(2500);
   const tl = (await call('GET', '/stations?type=do_nghieng', null, A)).data.find((s) => s.id === 'CB-TL-02');
   check('MQTT: cảm biến nghiêng nhận 1,35°', tl?.value === 1.35, String(tl?.value));
