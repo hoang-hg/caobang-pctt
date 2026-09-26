@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import { useStore } from '../../app/store';
 import { usePresets, useUnits } from '../../api/hooks';
 import { useClickOutside } from '../../utils/useClickOutside';
+import { useAllowedCodes } from '../../rbac/usePermission';
 
 const norm = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
 const PRESET_ICON = { ngap_lut: Waves, sat_lo: Mountain, tong_hop: Flag };
@@ -11,8 +12,17 @@ const PRESET_ICON = { ngap_lut: Waves, sat_lo: Mountain, tong_hop: Flag };
 /** Bộ lọc địa phương toàn cục: Toàn tỉnh → preset lưu vực/địa bàn cũ → xã/phường. */
 export default function AdminFilter() {
   const { filter, setFilter, clearFilter } = useStore();
-  const { data: units = [] } = useUnits();
-  const { data: presets = [] } = usePresets();
+  const { data: allUnits = [] } = useUnits();
+  const { data: allPresets = [] } = usePresets();
+  // Chỉ liệt kê địa bàn trong phạm vi được giao
+  const allowed = useAllowedCodes('monitoring', 'view');
+  const restricted = allowed !== null;
+  const units = restricted ? allUnits.filter((u) => allowed.includes(u.code)) : allUnits;
+  const presets = restricted
+    ? allPresets
+        .map((p) => ({ ...p, unit_codes: p.unit_codes.filter((c) => allowed.includes(c)) }))
+        .filter((p) => p.unit_codes.length)
+    : allPresets;
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
   const ref = useRef(null);
@@ -43,7 +53,7 @@ export default function AdminFilter() {
         title="Lọc dữ liệu theo địa phương"
       >
         <MapPin size={15} />
-        <span className="truncate">{filter.label}</span>
+        <span className="truncate">{restricted && !filter.codes.length ? 'Phạm vi được giao' : filter.label}</span>
         <ChevronDown size={14} />
       </button>
       {filter.codes.length > 0 && (
@@ -57,8 +67,8 @@ export default function AdminFilter() {
           <div className="max-h-[70vh] overflow-y-auto scroll-thin">
             {!q && (
               <>
-                <button className="w-full rounded-md px-2 py-1.5 text-left text-sm font-semibold hover:bg-panel2" onClick={() => pick({ codes: [], label: 'Toàn tỉnh Cao Bằng', presetCode: null })}>
-                  Toàn tỉnh Cao Bằng <span className="text-xs font-normal text-muted">· 56 xã/phường</span>
+                <button className="w-full rounded-md px-2 py-1.5 text-left text-sm font-semibold hover:bg-panel2" onClick={() => pick({ codes: [], label: restricted ? 'Phạm vi được giao' : 'Toàn tỉnh Cao Bằng', presetCode: null })}>
+                  {restricted ? 'Toàn bộ phạm vi được giao' : 'Toàn tỉnh Cao Bằng'} <span className="text-xs font-normal text-muted">· {units.length} xã/phường</span>
                 </button>
                 <div className="mt-2 px-2 text-[11px] font-semibold uppercase text-muted">Lọc nhanh theo đặc thù thiên tai</div>
                 {hazardPresets.map((p) => {

@@ -8,7 +8,8 @@ import { api } from '../api/client';
 import { usePresets, useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
 import { Empty, Modal, Section, Tabs } from '../components/common/ui';
-import { BROADCAST_STATUS, CHANNEL, LEVEL, ROLE } from '../utils/labels';
+import { BROADCAST_STATUS, CHANNEL, LEVEL } from '../utils/labels';
+import { Can, useAllowedCodes, usePermission } from '../rbac/usePermission';
 import { dateTime, int, pct } from '../utils/format';
 
 const PARAM_LABEL = {
@@ -22,8 +23,14 @@ function Composer() {
   const qc = useQueryClient();
   const { auth, toast, alertDraft, setAlertDraft } = useStore();
   const { data: templates = [] } = useQuery({ queryKey: ['templates'], queryFn: () => api('/alerts/templates'), staleTime: Infinity });
-  const { data: units = [] } = useUnits();
-  const { data: presets = [] } = usePresets();
+  const { data: allUnits = [] } = useUnits();
+  const { data: allPresets = [] } = usePresets();
+  // Chỉ soạn được cho xã trong phạm vi alert.create
+  const allowed = useAllowedCodes('alert', 'create');
+  const units = allowed ? allUnits.filter((u) => allowed.includes(u.code)) : allUnits;
+  const presets = allowed
+    ? allPresets.filter((p) => p.unit_codes.every((c) => allowed.includes(c)))
+    : allPresets;
   const [tpl, setTpl] = useState('');
   const [params, setParams] = useState({});
   const [title, setTitle] = useState('');
@@ -241,12 +248,10 @@ function Delivery({ b }) {
 }
 
 function Broadcasts() {
-  const auth = useStore((s) => s.auth);
   const { data = [] } = useQuery({ queryKey: ['broadcasts'], queryFn: () => api('/alerts/broadcasts'), refetchInterval: 15_000 });
   const [approve, setApprove] = useState(null);
   const pending = data.filter((b) => b.status === 'pending_approval');
   const active = data.filter((b) => b.status === 'sending' || b.status === 'sent').slice(0, 6);
-  const isChecker = auth && ['checker', 'admin'].includes(auth.user.role);
 
   return (
     <div className="flex flex-col gap-3">
@@ -264,7 +269,7 @@ function Broadcasts() {
               <p className="line-clamp-2 text-xs text-ink-2">{b.message_body}</p>
               <div className="mt-1 flex items-center gap-2 text-xs text-muted">
                 <Users size={12} /> {int(b.audience?.households)} hộ · {b.channels.map((c) => CHANNEL[c]).join(', ')}
-                {isChecker ? (
+                {b.can_approve ? (
                   <button className="btn-danger ml-auto px-2 py-1 text-xs" onClick={() => setApprove(b)}><ShieldCheck size={12} /> Phê duyệt</button>
                 ) : (
                   <span className="ml-auto italic">Chờ Lãnh đạo BCH xác nhận</span>
@@ -325,8 +330,10 @@ function ContactNode({ n, depth, q }) {
 function Hotline() {
   const qc = useQueryClient();
   const toast = useStore((s) => s.toast);
-  const { data: contacts = [] } = useQuery({ queryKey: ['contacts'], queryFn: () => api('/alerts/contacts'), staleTime: 5 * 60_000 });
-  const { data: hot } = useQuery({ queryKey: ['hotline'], queryFn: () => api('/alerts/hotline'), refetchInterval: 30_000 });
+  const canContacts = usePermission('contact', 'view');
+  const canHotline = usePermission('hotline', 'operate', '*');
+  const { data: contacts = [] } = useQuery({ queryKey: ['contacts'], queryFn: () => api('/alerts/contacts'), staleTime: 5 * 60_000, enabled: canContacts });
+  const { data: hot } = useQuery({ queryKey: ['hotline'], queryFn: () => api('/alerts/hotline'), refetchInterval: 30_000, enabled: canHotline });
   const [q, setQ] = useState('');
   const [caller, setCaller] = useState('0999 123 456');
   const [msg, setMsg] = useState('');
@@ -345,6 +352,7 @@ function Hotline() {
         </div>
       </Section>
       <div className="flex flex-col gap-3">
+        {canHotline ? (<>
         <Section title="Đường dây nóng">
           <div className="grid grid-cols-2 gap-2">
             {hot?.hotlines.map((h) => (
@@ -380,6 +388,16 @@ function Hotline() {
             ))}
           </ul>
         </Section>
+        </>) : (
+          <Section title="Đường dây nóng">
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              {[['112', 'Tìm kiếm cứu nạn'], ['114', 'Cứu nạn cứu hộ – PCCC'], ['115', 'Cấp cứu y tế'], ['113', 'Công an']].map(([n, l]) => (
+                <a key={n} href={`tel:${n}`} className="card flex items-center gap-2 p-2"><PhoneCall size={18} className="text-danger" /><div><b className="font-mono text-lg">{n}</b><div className="text-[11px] text-muted">{l}</div></div></a>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-muted">Vận hành tổng đài cần quyền “Vận hành tổng đài” (cấp toàn tỉnh).</p>
+          </Section>
+        )}
       </div>
     </div>
   );
@@ -392,9 +410,7 @@ const ACTION = {
 };
 
 function Audit() {
-  const auth = useStore((s) => s.auth);
-  const { data = [] } = useQuery({ queryKey: ['audit'], queryFn: () => api('/alerts/audit', { params: { limit: 200 } }), enabled: !!auth });
-  if (!auth) return <Empty>Đăng nhập để xem nhật ký pháp lý</Empty>;
+  const { data = [] } = useQuery({ queryKey: ['audit'], queryFn: () => api('/alerts/audit', { params: { limit: 200 } }) });
   return (
     <div className="card overflow-x-auto">
       <table className="table-base">
@@ -422,7 +438,12 @@ export default function Alerts() {
   useEffect(() => {
     if (alertDraft) setTab('broadcast');
   }, [alertDraft]);
-  const who = useMemo(() => (auth ? `${auth.user.full_name} · ${ROLE[auth.user.role]}` : 'Chưa đăng nhập'), [auth]);
+  const who = useMemo(
+    () => (auth ? `${auth.user.full_name} · ${auth.user.assignments.map((a) => `${a.role_name} (${a.domain_label})`).join(', ')}` : ''),
+    [auth],
+  );
+  const canAudit = usePermission('audit', 'view', '*');
+  const canCreate = usePermission('alert', 'create');
 
   return (
     <div className="flex flex-col gap-3 p-3">
@@ -439,17 +460,17 @@ export default function Alerts() {
         tabs={[
           { value: 'broadcast', label: 'Phát cảnh báo', icon: Megaphone },
           { value: 'hotline', label: 'Danh bạ & Tổng đài', icon: Phone },
-          { value: 'audit', label: 'Nhật ký pháp lý', icon: History },
+          ...(canAudit ? [{ value: 'audit', label: 'Nhật ký pháp lý', icon: History }] : []),
         ]}
       />
       {tab === 'broadcast' && (
-        <div className="grid gap-3 xl:grid-cols-[420px_1fr]">
-          <Composer />
+        <div className={clsx('grid gap-3', canCreate && 'xl:grid-cols-[420px_1fr]')}>
+          <Can I="alert" a="create"><Composer /></Can>
           <Broadcasts />
         </div>
       )}
       {tab === 'hotline' && <Hotline />}
-      {tab === 'audit' && <Audit />}
+      {tab === 'audit' && canAudit && <Audit />}
     </div>
   );
 }

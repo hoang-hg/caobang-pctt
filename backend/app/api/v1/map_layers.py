@@ -6,7 +6,9 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from app.area import area_clause, parse_codes
+from app.auth import current_user
 from app.db import fetch_all, fetch_one
+from app.rbac.authz import NO_MATCH, allowed_codes, forbidden, require_any, restrict_codes
 from app.services.broadcast import estimate_audience
 from app.services.safe_routing import plan_route
 
@@ -23,8 +25,17 @@ def fc(rows: list[dict], geom_key: str = "geom") -> dict:
 
 
 @router.get("/layers")
-async def layers(codes: list[str] = Depends(parse_codes)):
-    p = {"codes": codes}
+async def layers(requested: list[str] = Depends(parse_codes), user: dict = Depends(current_user)):
+    # Mỗi nhóm lớp lọc theo quyền tương ứng (quan trắc / nguồn lực / SOS); thiếu quyền → lớp rỗng
+    def scope(obj: str) -> list[str]:
+        allowed = allowed_codes(user, obj, "view")
+        return NO_MATCH if allowed == [] else restrict_codes(requested, allowed)
+
+    codes = scope("monitoring")
+    if codes == NO_MATCH and allowed_codes(user, "monitoring", "view") == []:
+        raise forbidden()
+    res_codes, sos_codes = scope("resource"), scope("sos")
+    p, pr, ps = {"codes": codes}, {"codes": res_codes}, {"codes": sos_codes}
     stations = await fetch_all(
         f"""SELECT s.id, s.name, s.type, s.river, s.unit, s.alarm_thresholds AS thresholds, ST_Y(s.location) AS lat, ST_X(s.location) AS lon,
                    (SELECT value FROM iot_telemetry.sensor_readings r WHERE r.station_id = s.id ORDER BY time DESC LIMIT 1) AS value
@@ -50,26 +61,27 @@ async def layers(codes: list[str] = Depends(parse_codes)):
     forces = await fetch_all(
         f"""SELECT id, code, name, org_type, commander, contact_phone, radio_freq, personnel_ready, personnel_on_mission, status, skills,
                    ST_Y(location) AS lat, ST_X(location) AS lon
-              FROM resources.forces WHERE {area_clause('location', codes)}""",
-        p,
+              FROM resources.forces WHERE {area_clause('location', res_codes)}""",
+        pr,
     )
     vehicles = await fetch_all(
         f"""SELECT v.id, v.code, v.name, v.vehicle_type, v.category, v.status, v.fuel_level, f.name AS force_name,
                    ST_Y(v.current_location) AS lat, ST_X(v.current_location) AS lon
               FROM resources.vehicles v LEFT JOIN resources.forces f ON f.id = v.force_id
-             WHERE {area_clause('v.current_location', codes)}""",
-        p,
+             WHERE {area_clause('v.current_location', res_codes)}""",
+        pr,
     )
     warehouses = await fetch_all(
-        f"""SELECT w.id, w.code, w.name, w.level, w.phone, ST_Y(w.location) AS lat, ST_X(w.location) AS lon,
+        f"""SELECT w.id, w.code, w.name, w.level, w.phone,
+                   (SELECT u.code FROM spatial_admin.administrative_units u WHERE u.id = w.admin_unit_id) AS admin_code, ST_Y(w.location) AS lat, ST_X(w.location) AS lon,
                    json_agg(json_build_object('category', i.category, 'pct',
                             round(100.0 * inv.quantity / NULLIF(inv.safety_quota, 0)))) AS items,
                    round(100.0 * sum(inv.quantity) / NULLIF(sum(inv.safety_quota), 0))::int AS pct
               FROM resources.warehouses w
               JOIN resources.inventory inv ON inv.warehouse_id = w.id JOIN resources.items i ON i.code = inv.item_code
-             WHERE {area_clause('w.location', codes)}
+             WHERE {area_clause('w.location', res_codes)}
              GROUP BY w.id""",
-        p,
+        pr,
     )
     for w in warehouses:  # gộp % theo nhóm hàng cho biểu đồ tròn trong popup
         groups: dict[str, list] = {}
@@ -78,14 +90,15 @@ async def layers(codes: list[str] = Depends(parse_codes)):
         w["categories"] = {k: round(sum(v) / len(v)) for k, v in groups.items()}
     evac = await fetch_all(
         f"""SELECT id, name, site_type, capacity, current_occupancy, contact_phone, ST_Y(location) AS lat, ST_X(location) AS lon
-              FROM resources.evacuation_sites WHERE {area_clause('location', codes)}""",
-        p,
+              FROM resources.evacuation_sites WHERE {area_clause('location', res_codes)}""",
+        pr,
     )
     sos = await fetch_all(
         f"""SELECT id, code, incident_type, priority, status, trapped_count, address, source, received_at, raw_message,
+                   (SELECT u.code FROM spatial_admin.administrative_units u WHERE u.id = admin_unit_id) AS admin_code,
                    ST_Y(location) AS lat, ST_X(location) AS lon
-              FROM operations.sos_tickets WHERE status <> 'hoan_thanh' AND {area_clause('location', codes)}""",
-        p,
+              FROM operations.sos_tickets WHERE status <> 'hoan_thanh' AND {area_clause('location', sos_codes)}""",
+        ps,
     )
     cameras = await fetch_all(
         f"""SELECT id, name, stream_url, ST_Y(location) AS lat, ST_X(location) AS lon
@@ -93,11 +106,12 @@ async def layers(codes: list[str] = Depends(parse_codes)):
         p,
     )
     routes = await fetch_all(
-        """SELECT o.id, o.ticket_id, o.status, o.progress, o.eta, o.route_safe, f.name AS force_name, t.code AS ticket_code,
+        f"""SELECT o.id, o.ticket_id, o.status, o.progress, o.eta, o.route_safe, f.name AS force_name, t.code AS ticket_code,
                   ST_AsGeoJSON(o.route_geom, 5)::json AS geom
              FROM operations.dispatch_orders o JOIN operations.sos_tickets t ON t.id = o.ticket_id
              LEFT JOIN resources.forces f ON f.id = o.force_id
-            WHERE o.status IN ('dang_di', 'da_den')"""
+            WHERE o.status IN ('dang_di', 'da_den') AND {area_clause('t.location', sos_codes)}""",
+        ps,
     )
     roads = await fetch_all(
         """SELECT s.id, s.road_name, EXISTS (SELECT 1 FROM iot_telemetry.hazard_zones z WHERE z.valid_until > now()
@@ -121,7 +135,7 @@ async def layers(codes: list[str] = Depends(parse_codes)):
 
 
 @router.get("/timeline")
-async def timeline(offset_h: int = 0):
+async def timeline(offset_h: int = 0, _: dict = Depends(require_any("monitoring", "view"))):
     """Giá trị các trạm tại thời điểm (hiện tại + offset): quá khứ dùng số đo, tương lai dùng dự báo.
     Kèm hệ số ngập (0..1.6) để phóng to/thu nhỏ lớp vùng ngập theo diễn biến lũ."""
     at = datetime.now(UTC) + timedelta(hours=offset_h)
@@ -191,7 +205,7 @@ class AreaIn(BaseModel):
 
 
 @router.post("/area-stats")
-async def area_stats(body: AreaIn):
+async def area_stats(body: AreaIn, _: dict = Depends(require_any("monitoring", "view"))):
     """Khoanh vùng: đếm dân cư, hộ, thuê bao, SOS, lực lượng, điểm sơ tán trong đa giác vẽ trên bản đồ."""
     import json
 
@@ -215,5 +229,5 @@ class RouteIn(BaseModel):
 
 
 @router.post("/route")
-async def route(body: RouteIn):
+async def route(body: RouteIn, _: dict = Depends(require_any("monitoring", "view"))):
     return await plan_route(body.from_lat, body.from_lon, body.to_lat, body.to_lon)

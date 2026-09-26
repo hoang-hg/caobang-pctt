@@ -4,11 +4,13 @@ import { PackageMinus } from 'lucide-react';
 import { api } from '../../api/client';
 import { useStore } from '../../app/store';
 import { Modal } from './ui';
+import { usePermission } from '../../rbac/usePermission';
 
 /** Ra lệnh xuất kho: số tồn trên mọi màn hình tự nhảy qua WebSocket. */
 export default function IssueModal({ warehouse, onClose }) {
   const qc = useQueryClient();
-  const { auth, toast } = useStore();
+  const toast = useStore((s) => s.toast);
+  const allowed = usePermission('inventory', 'issue', warehouse?.admin_code);
   const { data: list = [] } = useQuery({ queryKey: ['warehouses', 'all'], queryFn: () => api('/resources/warehouses'), enabled: !!warehouse });
   const wh = list.find((w) => w.id === warehouse?.id);
   const [item, setItem] = useState('');
@@ -36,9 +38,9 @@ export default function IssueModal({ warehouse, onClose }) {
       title={`Ra lệnh xuất kho – ${warehouse.name}`}
       footer={
         <>
-          {!auth && <span className="mr-auto self-center text-xs text-danger">Cần đăng nhập để ra lệnh</span>}
+          {!allowed && <span className="mr-auto self-center text-xs text-danger">Bạn không có quyền xuất kho này</span>}
           <button className="btn-ghost" onClick={onClose}>Huỷ</button>
-          <button className="btn-primary" disabled={!auth || !item || qty < 1} onClick={submit}><PackageMinus size={15} /> Xuất kho</button>
+          <button className="btn-primary" disabled={!allowed || !item || qty < 1} onClick={submit}><PackageMinus size={15} /> Xuất kho</button>
         </>
       }
     >

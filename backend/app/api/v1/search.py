@@ -2,9 +2,10 @@
 
 import re
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from app.db import fetch_all
+from app.rbac.authz import allowed_codes, require_any
 
 router = APIRouter(prefix="/search", tags=["Tìm kiếm"])
 
@@ -12,7 +13,9 @@ COORD_RE = re.compile(r"^\s*(-?\d{1,2}\.\d+)\s*[,; ]\s*(-?\d{2,3}\.\d+)\s*$")
 
 
 @router.get("")
-async def search(q: str, limit: int = 12):
+async def search(q: str, limit: int = 12, user: dict = Depends(require_any("monitoring", "view"))):
+    sos_codes = allowed_codes(user, "sos", "view")
+    res_codes = allowed_codes(user, "resource", "view")
     q = q.strip()
     if not q:
         return []
@@ -62,18 +65,28 @@ async def search(q: str, limit: int = 12):
           SELECT 'luc_luong', f.name, f.commander, ST_Y(f.location), ST_X(f.location), NULL, f.id::text,
                  similarity(spatial_admin.norm(f.name), (SELECT n FROM q))
             FROM resources.forces f
+           WHERE CAST(:res_all AS boolean) OR f.admin_unit_id IN (SELECT id FROM spatial_admin.administrative_units WHERE code = ANY(:res_codes))
           UNION ALL
           SELECT 'kho', w.name, w.code, ST_Y(w.location), ST_X(w.location), NULL, w.id::text,
                  similarity(spatial_admin.norm(w.name), (SELECT n FROM q))
             FROM resources.warehouses w
+           WHERE CAST(:res_all AS boolean) OR w.admin_unit_id IN (SELECT id FROM spatial_admin.administrative_units WHERE code = ANY(:res_codes))
           UNION ALL
           SELECT 'sos', t.code, left(COALESCE(t.address, ''), 60), ST_Y(t.location), ST_X(t.location), NULL, t.id::text,
                  CASE WHEN lower(t.code) = lower(:q) THEN 1 ELSE similarity(lower(t.code), lower(:q)) END
             FROM operations.sos_tickets t
+           WHERE CAST(:sos_all AS boolean) OR t.admin_unit_id IN (SELECT id FROM spatial_admin.administrative_units WHERE code = ANY(:sos_codes))
         ) s
         WHERE score > 0.15 OR spatial_admin.norm(label) LIKE '%' || (SELECT n FROM q) || '%'
         ORDER BY (spatial_admin.norm(label) LIKE (SELECT n FROM q) || '%') DESC, score DESC
         LIMIT :limit
         """,
-        {"q": q, "limit": limit},
+        {
+            "q": q,
+            "limit": limit,
+            "sos_all": sos_codes is None,
+            "sos_codes": sos_codes or [],
+            "res_all": res_codes is None,
+            "res_codes": res_codes or [],
+        },
     )

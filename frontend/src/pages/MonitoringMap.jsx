@@ -14,6 +14,7 @@ import { AdminBoundaries, AreaFocus, BASEMAPS, BaseLayer, DrawTool, FocusHandler
 import DispatchModal from '../components/common/DispatchModal';
 import CameraModal from '../components/common/CameraModal';
 import IssueModal from '../components/common/IssueModal';
+import { Can, usePermission } from '../rbac/usePermission';
 import { ALARM, alarmLevel, INCIDENT, PRIORITY, STATION_TYPE } from '../utils/labels';
 import { ago, int } from '../utils/format';
 
@@ -95,6 +96,7 @@ export default function MonitoringMap() {
   const sos = data?.sos.features.map((f) => f.properties).sort((a, b) => a.priority - b.priority || new Date(a.received_at) - new Date(b.received_at)) || [];
   const sensorAlerts = data?.stations.features.map((f) => f.properties).filter((p) => alarmLevel(p.value, p.thresholds) > 0) || [];
   const setFocus = useStore((s) => s.setFocus);
+  const canDispatch = usePermission('dispatch', 'create');
 
   return (
     <div className="relative h-[calc(100vh-3.5rem)] w-full">
@@ -185,9 +187,11 @@ export default function MonitoringMap() {
                   <div>SOS đang mở</div><b className="text-right font-mono">{drawn.stats.sos_open}</b>
                   <div>Chỗ trống sơ tán</div><b className="text-right font-mono">{int(drawn.stats.evac_free)}</b>
                 </div>
-                <button className="btn-danger mt-2 w-full justify-center" onClick={() => { setAlertDraft(drawn); navigate('/canh-bao'); }}>
-                  <Megaphone size={15} /> Soạn cảnh báo sơ tán cho vùng này
-                </button>
+                <Can I="alert" a="create">
+                  <button className="btn-danger mt-2 w-full justify-center" onClick={() => { setAlertDraft(drawn); navigate('/canh-bao'); }}>
+                    <Megaphone size={15} /> Soạn cảnh báo sơ tán cho vùng này
+                  </button>
+                </Can>
               </>
             )}
           </div>
@@ -214,7 +218,7 @@ export default function MonitoringMap() {
                   <span className="ml-auto text-[11px] text-muted">{ago(s.received_at)}</span>
                 </div>
                 <div className="text-xs">{INCIDENT[s.incident_type]} · {s.trapped_count} người · {s.address}</div>
-                {s.status === 'moi' && (
+                {s.status === 'moi' && canDispatch && (
                   <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-danger" onClick={(e) => { e.stopPropagation(); setDispatch({ ticket: s }); }}>
                     → Điều phối ngay
                   </span>

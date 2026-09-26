@@ -1,60 +1,48 @@
 import { useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { LogIn, LogOut, UserCircle2 } from 'lucide-react';
-import { api } from '../../api/client';
+import { useQueryClient } from '@tanstack/react-query';
+import { LogOut, UserCircle2, ShieldCheck } from 'lucide-react';
 import { useStore } from '../../app/store';
-import { ROLE } from '../../utils/labels';
 import { useClickOutside } from '../../utils/useClickOutside';
 
-/** Đăng nhập nhanh bằng tài khoản demo để thử quy trình Maker–Checker. */
+/** Thông tin tài khoản đang đăng nhập + vai trò/phạm vi được giao. */
 export default function UserMenu() {
-  const { auth, setAuth, toast } = useStore();
+  const { auth, setAuth } = useStore();
+  const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   useClickOutside(ref, () => setOpen(false));
-  const { data: demo = [] } = useQuery({ queryKey: ['demo-accounts'], queryFn: () => api('/auth/demo-accounts'), staleTime: Infinity });
+  const user = auth?.user;
+  if (!user) return null;
 
-  const login = async (acc) => {
-    try {
-      const res = await api('/auth/login', { method: 'POST', body: { username: acc.username, password: acc.password } });
-      setAuth(res);
-      setOpen(false);
-      toast({ tone: 'good', title: `Đăng nhập: ${res.user.full_name}`, body: ROLE[res.user.role] });
-    } catch (e) {
-      toast({ tone: 'danger', title: 'Đăng nhập thất bại', body: e.message });
-    }
+  const logout = () => {
+    setAuth(null);
+    qc.clear();
   };
 
   return (
     <div className="relative" ref={ref}>
       <button className="btn-ghost" onClick={() => setOpen((o) => !o)}>
-        {auth ? <UserCircle2 size={16} /> : <LogIn size={16} />}
-        <span className="hidden max-w-[9rem] truncate lg:inline">{auth ? auth.user.full_name : 'Đăng nhập'}</span>
+        <UserCircle2 size={16} />
+        <span className="hidden max-w-[10rem] truncate lg:inline">{user.full_name}</span>
       </button>
       {open && (
-        <div className="card absolute right-0 top-11 z-[1200] w-80 p-2 shadow-2xl">
-          {auth && (
-            <div className="mb-2 rounded-lg bg-panel2 p-2 text-sm">
-              <div className="font-semibold">{auth.user.full_name}</div>
-              <div className="text-xs text-muted">{auth.user.position}</div>
-              <div className="mt-1 text-xs text-accent">{ROLE[auth.user.role]}</div>
-            </div>
-          )}
-          <div className="px-1 pb-1 text-[11px] font-semibold uppercase text-muted">Tài khoản demo</div>
-          {demo.map((a) => (
-            <button key={a.username} className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left hover:bg-panel2" onClick={() => login(a)}>
-              <span>
-                <span className="block text-sm">{a.full_name}</span>
-                <span className="block text-xs text-muted">{ROLE[a.role]}{a.pin ? ` · PIN ${a.pin}` : ''}</span>
-              </span>
-              <LogIn size={14} className="text-muted" />
-            </button>
-          ))}
-          {auth && (
-            <button className="btn-ghost mt-2 w-full justify-center" onClick={() => { setAuth(null); setOpen(false); }}>
-              <LogOut size={14} /> Đăng xuất
-            </button>
-          )}
+        <div className="card absolute right-0 top-11 z-[1200] w-80 p-3 shadow-2xl">
+          <div className="font-semibold">{user.full_name}</div>
+          <div className="text-xs text-muted">{user.position} · <span className="font-mono">{user.username}</span></div>
+          <div className="mt-2 text-[11px] font-semibold uppercase text-muted">Vai trò & phạm vi</div>
+          <ul className="mt-1 flex flex-col gap-1">
+            {user.assignments.map((a) => (
+              <li key={`${a.role}@${a.domain}`} className="flex items-start gap-2 rounded-md bg-panel2 px-2 py-1 text-xs">
+                <ShieldCheck size={14} className="mt-0.5 shrink-0 text-accent" />
+                <span><b>{a.role_name}</b><br /><span className="text-muted">{a.domain_label}</span></span>
+              </li>
+            ))}
+            {!user.assignments.length && <li className="text-xs text-danger">Chưa được cấp vai trò nào</li>}
+          </ul>
+          <div className="mt-2 text-[11px] text-muted">{user.permissions.length} quyền · PIN phê duyệt: {user.has_pin ? 'đã thiết lập' : 'chưa có'}</div>
+          <button className="btn-ghost mt-3 w-full justify-center" onClick={logout}>
+            <LogOut size={14} /> Đăng xuất / đổi tài khoản
+          </button>
         </div>
       )}
     </div>

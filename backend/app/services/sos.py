@@ -1,8 +1,10 @@
 """Nghiệp vụ phiếu SOS: tạo phiếu (từ tin nhắn thô hoặc dữ liệu có cấu trúc), đọc chi tiết."""
 
 import random
+from collections.abc import Callable
 
 from app.db import fetch_one
+from app.rbac import domains
 from app.services.events import log_event
 from app.services.sos_nlp import extract
 from app.ws.hub import hub
@@ -49,6 +51,7 @@ async def create_ticket(
     vulnerable: list[str] | None = None,
     address: str | None = None,
     notes: str | None = None,
+    authorize: Callable[[str], None] | None = None,
 ) -> dict:
     parsed = await extract(raw_message) if raw_message else {}
     place = parsed.get("place")
@@ -62,13 +65,19 @@ async def create_ticket(
         else:
             raise ValueError("Không xác định được vị trí — hãy nhập toạ độ hoặc tên thôn/xã")
 
+    unit = await fetch_one(
+        """SELECT id FROM spatial_admin.administrative_units WHERE level = 'xa'
+            ORDER BY geom <-> ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) LIMIT 1""",
+        {"lat": lat, "lon": lon},
+    )
+    if authorize:  # kiểm tra quyền theo xã của vị trí TRƯỚC khi ghi
+        authorize(domains.domain_of_unit_id(unit["id"] if unit else None))
+
     row = await fetch_one(
         """
         INSERT INTO operations.sos_tickets (reporter_name, reporter_phone, source, raw_message, address, admin_unit_id, location,
                                             incident_type, priority, trapped_count, vulnerable, notes)
-        VALUES (:rn, :rp, :src, :msg, :addr,
-                (SELECT id FROM spatial_admin.administrative_units WHERE level = 'xa'
-                  ORDER BY geom <-> ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) LIMIT 1),
+        VALUES (:rn, :rp, :src, :msg, :addr, :unit,
                 ST_SetSRID(ST_MakePoint(:lon, :lat), 4326), :it, :pr, :tc, :vu, :notes)
         RETURNING id
         """,
@@ -78,6 +87,7 @@ async def create_ticket(
             "src": source,
             "msg": raw_message,
             "addr": address or (place["name"] if place else None),
+            "unit": unit["id"] if unit else None,
             "lat": lat,
             "lon": lon,
             "it": incident_type or parsed.get("incident_type", "ngap_lut"),
@@ -89,7 +99,7 @@ async def create_ticket(
     )
     ticket = await get_ticket(row["id"])
     ticket["parsed"] = parsed or None
-    await hub.publish("sos.new", ticket)
+    await hub.publish("sos.new", ticket, "sos", ticket["admin_code"])
     await log_event(
         f"{ticket['code']} – {INCIDENT_LABEL[ticket['incident_type']]} tại {ticket['address'] or ticket['admin_name']}"
         f" ({ticket['trapped_count']} người) qua {source}",

@@ -19,7 +19,9 @@ from app.db import engine, execute, fetch_all, fetch_one
 from app.services import scenario
 from app.services.safe_routing import haversine_km
 
-PROVINCE_FILE = Path(__file__).resolve().parents[1] / "seed" / "caobang_province.geojson"  # OSM relation 1844412
+PROVINCE_FILE = (
+    Path(__file__).resolve().parents[1] / "seed" / "caobang_province.geojson"
+)  # OSM relation 1844412
 rng = random.Random(2025)
 PRESET_TAGS = {"LV_BANG_GIANG": "vung_trung", "VUNG_NUI_CAO": "vung_nui", "BIEN_GIOI": "bien_gioi"}
 
@@ -110,6 +112,14 @@ async def seed_admin(conn: AsyncConnection) -> dict[str, dict]:
           FROM cells c
          WHERE u.level = 'xa' AND ST_Contains(c.cell, u.center)
         """,
+    )
+    # Phạm vi RBAC: "<CUM>/<MA_XA>" (cụm = địa bàn huyện cũ)
+    await ex(
+        conn,
+        """UPDATE spatial_admin.administrative_units
+              SET rbac_domain = CASE WHEN level = 'tinh' THEN '*'
+                  ELSE regexp_replace(upper(spatial_admin.norm(old_district)), '[^A-Z0-9]', '', 'g') || '/' || code END
+            WHERE level IN ('tinh', 'xa')""",
     )
 
     for code, name, desc, hazard, names in D.PRESETS:
@@ -522,15 +532,14 @@ async def seed_resources(conn: AsyncConnection, units: dict[str, dict], now: dat
 
 async def seed_comms(conn: AsyncConnection, units: dict[str, dict], now: datetime) -> dict[str, dict]:
     users = {}
-    for username, full, pos, role, pw, pin in D.USERS:
+    for username, full, pos, pw, pin, _role, _domain in D.USERS:
         row = await fetch_one(
-            """INSERT INTO communications.users (username, full_name, position, role, password_hash, pin_hash)
-                                 VALUES (:u,:f,:p,:r,:pw,:pin) RETURNING id, full_name""",
+            """INSERT INTO communications.users (username, full_name, position, password_hash, pin_hash)
+                                 VALUES (:u,:f,:p,:pw,:pin) RETURNING id, full_name""",
             {
                 "u": username,
                 "f": full,
                 "p": pos,
-                "r": role,
                 "pw": hash_secret(pw),
                 "pin": hash_secret(pin) if pin else None,
             },
@@ -936,8 +945,33 @@ async def seed_operations(conn: AsyncConnection, units: dict[str, dict], users: 
     )
 
 
+# Gán lại xã theo vị trí thực tế (ranh giới xã là xấp xỉ) — phạm vi RBAC dựa trên ranh giới này
+RECONCILE = [
+    ("spatial_admin.place_names", "geom"),
+    ("iot_telemetry.monitoring_stations", "location"),
+    ("iot_telemetry.hazard_points", "location"),
+    ("iot_telemetry.reservoirs", "location"),
+    ("iot_telemetry.cameras", "location"),
+    ("resources.forces", "home_location"),
+    ("resources.warehouses", "location"),
+    ("resources.evacuation_sites", "location"),
+    ("resources.fuel_depots", "location"),
+    ("operations.sos_tickets", "location"),
+]
+
+
+async def reconcile_admin_units(conn: AsyncConnection):
+    for table, col in RECONCILE:
+        await ex(
+            conn,
+            f"""UPDATE {table} t SET admin_unit_id = (
+                   SELECT u.id FROM spatial_admin.administrative_units u WHERE u.level = 'xa'
+                    ORDER BY u.geom <-> t.{col} LIMIT 1)""",
+        )
+
+
 RESET_SQL = """
-TRUNCATE communications.audit_logs, communications.call_logs, communications.alert_broadcasts, communications.contacts,
+TRUNCATE communications.audit_logs, communications.rbac_audit_log, communications.call_logs, communications.alert_broadcasts, communications.contacts,
          communications.message_templates, communications.users,
          iot_telemetry.sensor_readings, iot_telemetry.forecasts, iot_telemetry.hazard_zones, iot_telemetry.hazard_points,
          iot_telemetry.cameras, iot_telemetry.reservoirs, iot_telemetry.monitoring_stations,
@@ -972,6 +1006,7 @@ async def main(reset: bool = False):
         await seed_resources(conn, units, now)
         users = await seed_comms(conn, units, now)
         await seed_operations(conn, units, users, now)
+        await reconcile_admin_units(conn)
     counts = await fetch_one(
         """SELECT (SELECT count(*) FROM spatial_admin.administrative_units WHERE level IN ('tinh','xa')) AS units,
                   (SELECT count(*) FROM iot_telemetry.sensor_readings) AS readings,

@@ -1,22 +1,26 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Map, Boxes, Siren, Megaphone } from 'lucide-react';
+import { LayoutDashboard, Map, Boxes, Siren, Megaphone, KeyRound } from 'lucide-react';
 import clsx from 'clsx';
 import { useAreaQuery } from '../../api/hooks';
+import { useStore } from '../../app/store';
+import { hasPermission } from '../../rbac/permissions';
 
 const NAV = [
-  { to: '/dashboard', label: 'Tổng quan', icon: LayoutDashboard },
-  { to: '/ban-do', label: 'Bản đồ giám sát', icon: Map },
-  { to: '/cuu-ho', label: 'Điều hành cứu hộ', icon: Siren, badge: true },
-  { to: '/nguon-luc', label: 'Vật tư & Lực lượng', icon: Boxes },
-  { to: '/canh-bao', label: 'Cảnh báo & Hotline', icon: Megaphone },
+  { to: '/dashboard', label: 'Tổng quan', icon: LayoutDashboard, perm: ['monitoring', 'view'] },
+  { to: '/ban-do', label: 'Bản đồ giám sát', icon: Map, perm: ['monitoring', 'view'] },
+  { to: '/cuu-ho', label: 'Điều hành cứu hộ', icon: Siren, badge: true, perm: ['sos', 'view'] },
+  { to: '/nguon-luc', label: 'Vật tư & Lực lượng', icon: Boxes, perm: ['resource', 'view'] },
+  { to: '/canh-bao', label: 'Cảnh báo & Hotline', icon: Megaphone, perm: ['alert', 'view'] },
+  { to: '/phan-quyen', label: 'Phân quyền', icon: KeyRound, perm: ['user', 'view'] },
 ];
 
 export default function Sidebar() {
+  const perms = useStore((s) => s.auth?.user?.permissions);
   const { data } = useAreaQuery('kpis', '/dashboard/kpis', {}, { refetchInterval: 30_000 });
   const waiting = data?.sos?.waiting || 0;
   return (
     <nav className="no-print flex w-16 shrink-0 flex-col gap-1 border-r border-line bg-panel py-3 lg:w-52">
-      {NAV.map(({ to, label, icon: Icon, badge }) => (
+      {NAV.filter((n) => hasPermission(perms, ...n.perm)).map(({ to, label, icon: Icon, badge }) => (
         <NavLink
           key={to}
           to={to}

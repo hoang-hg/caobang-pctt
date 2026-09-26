@@ -8,6 +8,7 @@ import { useAreaQuery } from '../api/hooks';
 import { useStore } from '../app/store';
 import { Empty, Progress, Section } from '../components/common/ui';
 import DispatchModal from '../components/common/DispatchModal';
+import { Can, usePermission } from '../rbac/usePermission';
 import { INCIDENT, PRIORITY, SOS_STATUS, SOURCE, VULNERABLE } from '../utils/labels';
 import { int, pct, time } from '../utils/format';
 
@@ -35,6 +36,7 @@ const mmss = (sec) => {
 };
 
 function TicketCard({ t, now, onDispatch, onResolve, onFocus }) {
+  const canUpdate = usePermission('sos', 'update', t.admin_code);
   const pr = PRIORITY[t.priority];
   const waitingSec = (now - new Date(t.received_at).getTime()) / 1000;
   const slaSec = t.sla_minutes * 60;
@@ -42,9 +44,9 @@ function TicketCard({ t, now, onDispatch, onResolve, onFocus }) {
   const etaSec = t.eta ? (new Date(t.eta).getTime() - now) / 1000 : null;
   return (
     <div
-      draggable={t.status !== 'hoan_thanh'}
+      draggable={canUpdate && t.status !== 'hoan_thanh'}
       onDragStart={(e) => e.dataTransfer.setData('text/plain', t.id)}
-      className={clsx('card cursor-grab border-l-4 p-2.5 active:cursor-grabbing', { 1: 'border-l-danger', 2: 'border-l-serious', 3: 'border-l-warn' }[t.priority], breached && 'ring-2 ring-danger')}
+      className={clsx('card cursor-grab border-l-4 p-2.5 active:cursor-grabbing', !canUpdate && 'cursor-default', { 1: 'border-l-danger', 2: 'border-l-serious', 3: 'border-l-warn' }[t.priority], breached && 'ring-2 ring-danger')}
     >
       <div className="flex items-center gap-2">
         <b className="text-sm">{t.code}</b>
@@ -81,10 +83,14 @@ function TicketCard({ t, now, onDispatch, onResolve, onFocus }) {
         <button className="btn-ghost px-2 py-0.5 text-xs" onClick={() => onFocus(t)}><MapPin size={12} /> Bản đồ</button>
         {t.reporter_phone && <a className="btn-ghost px-2 py-0.5 text-xs" href={`tel:${t.reporter_phone.replace(/\s/g, '')}`}><Phone size={12} /> Gọi</a>}
         {(t.status === 'moi' || t.status === 'dieu_phoi') && (
-          <button className="btn-danger px-2 py-0.5 text-xs" onClick={() => onDispatch(t)}><Send size={12} /> Điều phối</button>
+          <Can I="dispatch" a="create" scope={t.admin_code}>
+            <button className="btn-danger px-2 py-0.5 text-xs" onClick={() => onDispatch(t)}><Send size={12} /> Điều phối</button>
+          </Can>
         )}
         {t.status === 'thuc_thi' && (
-          <button className="btn px-2 py-0.5 text-xs bg-good text-white" onClick={() => onResolve(t)}><CheckCircle2 size={12} /> Đã cứu an toàn</button>
+          <Can I="sos" a="resolve" scope={t.admin_code}>
+            <button className="btn px-2 py-0.5 text-xs bg-good text-white" onClick={() => onResolve(t)}><CheckCircle2 size={12} /> Đã cứu an toàn</button>
+          </Can>
         )}
       </div>
     </div>
@@ -204,7 +210,7 @@ function Evacuation() {
 export default function RescueCenter() {
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const { setFocus, toast, auth } = useStore();
+  const { setFocus, toast } = useStore();
   const now = useNow();
   const { data: tickets = [] } = useAreaQuery('sos', '/sos', {}, { refetchInterval: 20_000 });
   const [dispatch, setDispatch] = useState(null);
@@ -213,10 +219,6 @@ export default function RescueCenter() {
   const move = async (id, status) => {
     const t = tickets.find((x) => x.id === id);
     if (!t || t.status === status) return;
-    if (!auth) {
-      toast({ tone: 'warn', title: 'Cần đăng nhập để cập nhật trạng thái phiếu' });
-      return;
-    }
     try {
       if (status === 'hoan_thanh') await api(`/sos/${id}/resolve`, { method: 'POST' });
       else await api(`/sos/${id}`, { method: 'PATCH', body: { status } });
@@ -269,7 +271,7 @@ export default function RescueCenter() {
           ))}
         </div>
         <div className="flex flex-col gap-3">
-          <Intake />
+          <Can I="sos" a="create"><Intake /></Can>
           <Evacuation />
         </div>
       </div>

@@ -8,6 +8,7 @@ import { api } from '../../api/client';
 import { useStore } from '../../app/store';
 import Hydrograph from '../charts/Hydrograph';
 import { useChartTheme } from '../charts/chartTheme';
+import { Can, usePermission } from '../../rbac/usePermission';
 import { cameraIcon, evacIcon, forceIcon, hazardIcon, reservoirIcon, sosIcon, stationIcon, vehicleIcon, warehouseIcon } from './icons';
 import { ALARM, alarmLevel, CATEGORY, FORCE_TYPE, INCIDENT, LEVEL, PRIORITY, RES_STATUS, SKILL, SOS_STATUS, SOURCE, STATION_TYPE, VEHICLE } from '../../utils/labels';
 import { ago, num } from '../../utils/format';
@@ -80,7 +81,9 @@ function WarehousePopup({ p, onIssue }) {
         </ul>
       </div>
       <div className="mt-2 flex gap-1">
-        <button className="btn-primary px-2 py-1 text-xs" onClick={() => onIssue(p)}><PackageMinus size={12} /> Ra lệnh xuất kho</button>
+        <Can I="inventory" a="issue" scope={p.admin_code}>
+          <button className="btn-primary px-2 py-1 text-xs" onClick={() => onIssue(p)}><PackageMinus size={12} /> Ra lệnh xuất kho</button>
+        </Can>
         <Tel phone={p.phone} label="Thủ kho" />
       </div>
     </div>
@@ -100,7 +103,9 @@ function SosPopup({ p, onDispatch }) {
       <div className="text-xs text-muted">{p.address} · {SOURCE[p.source]} · {ago(p.received_at)}</div>
       {p.raw_message && <p className="mt-1 text-xs italic">“{p.raw_message}”</p>}
       {p.status !== 'thuc_thi' && (
-        <button className="btn-danger mt-2 px-2 py-1 text-xs" onClick={() => onDispatch(p)}><Send size={12} /> Điều phối lực lượng</button>
+        <Can I="dispatch" a="create" scope={p.admin_code}>
+          <button className="btn-danger mt-2 px-2 py-1 text-xs" onClick={() => onDispatch(p)}><Send size={12} /> Điều phối lực lượng</button>
+        </Can>
       )}
       <p className="mt-1 text-[11px] text-muted">Mẹo: kéo biểu tượng đội cứu hộ thả vào điểm SOS để điều động nhanh.</p>
     </div>
@@ -112,6 +117,7 @@ export default function MapLayers({ data, layers, timeline, onDispatch, onCamera
   const gps = useStore((s) => s.gps);
   const theme = useStore((s) => s.theme);
   const toast = useStore((s) => s.toast);
+  const canDispatch = usePermission('dispatch', 'create');
 
   const openSos = useMemo(() => data?.sos.features || [], [data]);
   const floodFactor = timeline?.flood_factor ?? 1;
@@ -265,7 +271,7 @@ export default function MapLayers({ data, layers, timeline, onDispatch, onCamera
               key={p.id}
               position={pos(f)}
               icon={forceIcon(p.status)}
-              draggable
+              draggable={canDispatch}
               eventHandlers={{ dragend: (e) => onForceDrop(p, e.target) }}
               zIndexOffset={500}
             >

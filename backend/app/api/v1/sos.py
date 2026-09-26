@@ -6,9 +6,11 @@ from datetime import UTC, datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app.area import area_clause, parse_codes, unit_clause
-from app.auth import audit, current_user, require_role
+from app.area import area_clause, unit_clause
+from app.auth import audit
 from app.db import execute, fetch_all, fetch_one, transaction
+from app.rbac import scope_loaders
+from app.rbac.authz import area_scope, can, forbidden, require_any, require_permission
 from app.services import dispatch_matching
 from app.services.events import log_event
 from app.services.safe_routing import VEHICLE_SPEED, plan_route
@@ -28,7 +30,9 @@ SLA_MINUTES = {1: 3, 2: 15, 3: 60}  # thời hạn phản hồi điều phối t
 
 
 @router.get("/sos")
-async def list_sos(codes: list[str] = Depends(parse_codes), status: str | None = None, hours: int = 48):
+async def list_sos(
+    codes: list[str] = Depends(area_scope("sos", "view")), status: str | None = None, hours: int = 48
+):
     rows = await fetch_all(
         TICKET_SELECT
         + f""" WHERE {area_clause('t.location', codes)}
@@ -57,10 +61,25 @@ class SosIn(BaseModel):
 
 
 @router.post("/sos")
-async def create_sos(body: SosIn):
-    """Tiếp nhận SOS (API công khai cho Zalo OA webhook / app di động / tổng đài)."""
+async def create_sos(body: SosIn, user: dict = Depends(require_any("sos", "create"))):
+    """Cán bộ tạo phiếu SOS — chỉ trong xã thuộc phạm vi được giao (kiểm tra sau khi xác định vị trí)."""
+
+    def authorize(domain: str) -> None:
+        if not can(user, "sos", "create", domain):
+            raise forbidden()
+
     try:
-        return await create_ticket(**body.model_dump())
+        return await create_ticket(**body.model_dump(), authorize=authorize)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@router.post("/sos/intake")
+async def intake_sos(body: SosIn):
+    """Cổng tiếp nhận công khai cho webhook Zalo OA / ứng dụng di động của người dân.
+    Khi triển khai thật: đặt sau API gateway có xác thực webhook + giới hạn tần suất."""
+    try:
+        return await create_ticket(**body.model_dump(exclude={"priority"}))
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
 
@@ -70,7 +89,7 @@ class ParseIn(BaseModel):
 
 
 @router.post("/sos/parse")
-async def parse_sos(body: ParseIn):
+async def parse_sos(body: ParseIn, _: dict = Depends(require_any("sos", "create"))):
     return await extract(body.text)
 
 
@@ -81,10 +100,18 @@ class SosPatch(BaseModel):
 
 
 @router.patch("/sos/{ticket_id}")
-async def update_sos(ticket_id: str, body: SosPatch, user: dict = Depends(require_role("maker", "checker"))):
+async def update_sos(
+    ticket_id: str,
+    body: SosPatch,
+    user: dict = Depends(require_permission("sos", "update", scope_loaders.sos_ticket)),
+):
     before = await get_ticket(ticket_id)
     if not before:
         raise HTTPException(404, "Không tìm thấy phiếu")
+    if body.status == "hoan_thanh" and not can(
+        user, "sos", "resolve", await scope_loaders.sos_ticket(ticket_id)
+    ):
+        raise forbidden()
     await execute(
         """UPDATE operations.sos_tickets SET
                   status = COALESCE(CAST(:s AS text), status), priority = COALESCE(CAST(:p AS smallint), priority),
@@ -100,7 +127,7 @@ async def update_sos(ticket_id: str, body: SosPatch, user: dict = Depends(requir
         await release_dispatch(ticket_id)
     ticket = await get_ticket(ticket_id)
     await audit(user, "sos.update", "sos_ticket", ticket["code"], body.model_dump(exclude_none=True))
-    await hub.publish("sos.updated", ticket)
+    await hub.publish("sos.updated", ticket, "sos", ticket["admin_code"])
     if body.status and body.status != before["status"]:
         await log_event(
             f"{ticket['code']} chuyển sang “{STATUS_LABEL[body.status]}” ({user['full_name']})",
@@ -139,7 +166,9 @@ async def release_dispatch(ticket_id: str) -> None:
 
 
 @router.post("/sos/{ticket_id}/resolve")
-async def resolve(ticket_id: str, user: dict = Depends(current_user)):
+async def resolve(
+    ticket_id: str, user: dict = Depends(require_permission("sos", "resolve", scope_loaders.sos_ticket))
+):
     """Cán bộ hiện trường xác nhận “Đã cứu an toàn”."""
     return await update_sos(
         ticket_id, SosPatch(status="hoan_thanh", notes="Đã cứu an toàn – xác nhận từ hiện trường"), user
@@ -147,7 +176,9 @@ async def resolve(ticket_id: str, user: dict = Depends(current_user)):
 
 
 @router.get("/sos/{ticket_id}/match")
-async def match(ticket_id: str):
+async def match(
+    ticket_id: str, _: dict = Depends(require_permission("dispatch", "create", scope_loaders.sos_ticket))
+):
     ticket = await get_ticket(ticket_id)
     if not ticket:
         raise HTTPException(404, "Không tìm thấy phiếu")
@@ -163,8 +194,14 @@ class DispatchIn(BaseModel):
 
 
 @router.post("/dispatch")
-async def dispatch(body: DispatchIn, user: dict = Depends(require_role("maker", "checker"))):
-    """Phát lệnh điều động: tính lộ trình an toàn, cập nhật trạng thái, đẩy thông báo tới trưởng nhóm."""
+async def dispatch(body: DispatchIn, user: dict = Depends(require_any("dispatch", "create"))):
+    """Phát lệnh điều động: tính lộ trình an toàn, cập nhật trạng thái, đẩy thông báo tới trưởng nhóm.
+    Quyền kiểm tra theo xã của điểm SOS (được điều lực lượng ngoài xã — chi viện)."""
+    domain = await scope_loaders.sos_ticket(body.ticket_id)
+    if domain is None:
+        raise HTTPException(404, "Không tìm thấy phiếu SOS")
+    if not can(user, "dispatch", "create", domain):
+        raise forbidden()
     ticket = await get_ticket(body.ticket_id)
     force = await fetch_one(
         "SELECT id, name, contact_phone, personnel_ready, ST_Y(location) AS lat, ST_X(location) AS lon FROM resources.forces WHERE id = CAST(:id AS uuid)",
@@ -239,7 +276,7 @@ async def dispatch(body: DispatchIn, user: dict = Depends(require_role("maker", 
         )
 
     updated = await get_ticket(body.ticket_id)
-    await hub.publish("sos.updated", updated)
+    await hub.publish("sos.updated", updated, "sos", updated["admin_code"])
     await hub.publish(
         "dispatch.updated", {"dispatch_id": order["id"], "ticket_id": body.ticket_id, "status": "dang_di"}
     )
@@ -267,7 +304,7 @@ async def dispatch(body: DispatchIn, user: dict = Depends(require_role("maker", 
 
 
 @router.get("/evacuation")
-async def evacuation(codes: list[str] = Depends(parse_codes)):
+async def evacuation(codes: list[str] = Depends(area_scope("monitoring", "view"))):
     progress = await fetch_all(
         f"""SELECT u.code, u.name, u.old_district, e.planned_households, e.evacuated_households, e.planned_persons,
                    e.evacuated_persons, e.updated_at

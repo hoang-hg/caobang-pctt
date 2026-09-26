@@ -17,6 +17,7 @@ import { CATEGORY, FORCE_TYPE, INCIDENT, PRIORITY, RES_STATUS, SKILL, VEHICLE, V
 import { dateTime, int } from '../utils/format';
 import { exportExcel } from '../utils/exportExcel';
 import { exportSnapshotPdf } from '../utils/exportPdf';
+import { Can } from '../rbac/usePermission';
 
 const norm = (s = '') => s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').toLowerCase();
 const Tel = ({ phone }) => <a href={`tel:${phone.replace(/\s/g, '')}`} className="inline-flex items-center gap-1 text-accent hover:underline"><Phone size={12} />{phone}</a>;
@@ -178,7 +179,9 @@ export default function Resources() {
                     </td>
                     <td><div className="flex max-w-[16rem] flex-wrap gap-1">{f.skills.map((sk) => <span key={sk} className="chip bg-panel2 text-ink-2">{SKILL[sk]}</span>)}</div></td>
                     <td className="no-print">
-                      <button className="btn-danger px-2 py-1 text-xs" disabled={f.personnel_ready < 1} onClick={() => setQuick(f)}><Send size={12} /> Điều động nhanh</button>
+                      <Can I="dispatch" a="create">
+                        <button className="btn-danger px-2 py-1 text-xs" disabled={f.personnel_ready < 1} onClick={() => setQuick(f)}><Send size={12} /> Điều động nhanh</button>
+                      </Can>
                     </td>
                   </tr>
                 ))}
@@ -201,7 +204,9 @@ export default function Resources() {
                     </div>
                     <div className="no-print flex gap-1">
                       <button className="btn-ghost px-2 py-1" title="Xem trên bản đồ" onClick={() => showOnMap(w.lat, w.lon, w.name)}><MapPin size={14} /></button>
-                      <button className="btn-primary px-2 py-1 text-xs" onClick={() => setIssue(w)}><PackageMinus size={12} /> Xuất kho</button>
+                      <Can I="inventory" a="issue" scope={w.admin_code}>
+                        <button className="btn-primary px-2 py-1 text-xs" onClick={() => setIssue(w)}><PackageMinus size={12} /> Xuất kho</button>
+                      </Can>
                     </div>
                   </div>
                   <table className="mt-2 w-full text-xs">

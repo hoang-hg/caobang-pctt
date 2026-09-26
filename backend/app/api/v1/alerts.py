@@ -5,8 +5,10 @@ import json
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app.auth import audit, current_user, require_role, verify_secret
+from app.auth import audit, verify_secret
 from app.db import fetch_all, fetch_one
+from app.rbac.authz import allowed_codes, can_all, forbidden, require_any, require_permission
+from app.rbac.scope_loaders import broadcast_domains, targets_to_domains
 from app.services.broadcast import CHANNELS, estimate_audience, init_metrics
 from app.services.events import log_event
 from app.services.sos import create_ticket
@@ -17,6 +19,7 @@ router = APIRouter(prefix="/alerts", tags=["Cảnh báo & Hotline"])
 BROADCAST_SELECT = """
 SELECT b.id, b.code, b.title, b.message_body, b.template_code, b.severity, b.target_admin_codes, b.channels, b.status,
        b.auto_generated, b.trigger_source, b.audience, b.metrics, b.created_at, b.approved_at, b.sent_at, b.rejected_reason,
+       b.created_by,
        mk.full_name AS created_by_name, ck.full_name AS approved_by_name,
        ST_AsGeoJSON(ST_SimplifyPreserveTopology(b.target_polygon, 0.0005), 5)::json AS target_geom
   FROM communications.alert_broadcasts b
@@ -26,20 +29,33 @@ SELECT b.id, b.code, b.title, b.message_body, b.template_code, b.severity, b.tar
 
 
 @router.get("/channels")
-async def channels():
+async def channels(_: dict = Depends(require_any("alert", "view"))):
     return [{"code": k, "name": v} for k, v in CHANNELS.items()]
 
 
 @router.get("/templates")
-async def templates():
+async def templates(_: dict = Depends(require_any("alert", "view"))):
     return await fetch_all(
         "SELECT code, name, severity, body, params FROM communications.message_templates ORDER BY code"
     )
 
 
 @router.get("/broadcasts")
-async def broadcasts(limit: int = 50):
-    return await fetch_all(BROADCAST_SELECT + " ORDER BY b.created_at DESC LIMIT :l", {"l": limit})
+async def broadcasts(limit: int = 50, user: dict = Depends(require_any("alert", "view"))):
+    allowed = allowed_codes(user, "alert", "view")
+    rows = await fetch_all(
+        BROADCAST_SELECT
+        + """ WHERE CAST(:all AS boolean) OR b.target_admin_codes && CAST(:codes AS text[])
+              ORDER BY b.created_at DESC LIMIT :l""",
+        {"l": limit, "all": allowed is None, "codes": allowed or []},
+    )
+    for b in rows:  # frontend dùng để hiện/ẩn nút phê duyệt
+        b["can_approve"] = (
+            b["status"] == "pending_approval"
+            and b["created_by"] != user["id"]
+            and can_all(user, "alert", "approve", targets_to_domains(b["target_admin_codes"]))
+        )
+    return rows
 
 
 class AudienceIn(BaseModel):
@@ -48,7 +64,7 @@ class AudienceIn(BaseModel):
 
 
 @router.post("/audience")
-async def audience(body: AudienceIn):
+async def audience(body: AudienceIn, _: dict = Depends(require_any("alert", "create"))):
     if not body.admin_codes and not body.polygon:
         raise HTTPException(422, "Chọn xã/phường hoặc vẽ vùng cảnh báo")
     return await estimate_audience(body.admin_codes, body.polygon)
@@ -65,13 +81,15 @@ class BroadcastIn(BaseModel):
 
 
 @router.post("/broadcasts")
-async def create_broadcast(body: BroadcastIn, user: dict = Depends(require_role("maker", "checker"))):
-    """MAKER: soạn lệnh cảnh báo → chuyển sang chờ Lãnh đạo phê duyệt."""
+async def create_broadcast(body: BroadcastIn, user: dict = Depends(require_any("alert", "create"))):
+    """MAKER: soạn lệnh cảnh báo → chuyển sang chờ Lãnh đạo phê duyệt. Mọi xã nhận tin phải thuộc phạm vi được giao."""
     bad = set(body.channels) - set(CHANNELS)
     if bad:
         raise HTTPException(422, f"Kênh không hợp lệ: {', '.join(bad)}")
     aud = await estimate_audience(body.admin_codes, body.polygon)
     codes = body.admin_codes or aud["admin_codes"]
+    if not can_all(user, "alert", "create", targets_to_domains(codes)):
+        raise HTTPException(403, "Vùng cảnh báo có xã/phường nằm ngoài phạm vi bạn được giao")
     row = await fetch_one(
         """INSERT INTO communications.alert_broadcasts (title, message_body, template_code, severity, target_admin_codes, target_polygon,
                  channels, status, audience, created_by)
@@ -116,8 +134,14 @@ class ApproveIn(BaseModel):
 
 
 @router.post("/broadcasts/{broadcast_id}/approve")
-async def approve(broadcast_id: str, body: ApproveIn, user: dict = Depends(require_role("checker"))):
-    """CHECKER: Lãnh đạo xác nhận bằng mã PIN → hệ thống bắt đầu phát trên các kênh."""
+async def approve(broadcast_id: str, body: ApproveIn, user: dict = Depends(require_any("alert", "approve"))):
+    """CHECKER: Lãnh đạo xác nhận bằng mã PIN → hệ thống bắt đầu phát trên các kênh.
+    Phải có quyền phê duyệt trên TẤT CẢ xã nhận tin (chỉ huy cụm không duyệt được lệnh toàn tỉnh)."""
+    doms = await broadcast_domains(broadcast_id)
+    if doms is None:
+        raise HTTPException(404, "Không tìm thấy lệnh")
+    if not can_all(user, "alert", "approve", doms):
+        raise forbidden()
     if not verify_secret(body.pin, user["pin_hash"]):
         await audit(user, "broadcast.approve_failed", "alert_broadcast", broadcast_id, {"reason": "sai PIN"})
         raise HTTPException(403, "Mã PIN không đúng")
@@ -160,7 +184,12 @@ class RejectIn(BaseModel):
 
 
 @router.post("/broadcasts/{broadcast_id}/reject")
-async def reject(broadcast_id: str, body: RejectIn, user: dict = Depends(require_role("checker"))):
+async def reject(broadcast_id: str, body: RejectIn, user: dict = Depends(require_any("alert", "approve"))):
+    doms = await broadcast_domains(broadcast_id)
+    if doms is None:
+        raise HTTPException(404, "Không tìm thấy lệnh")
+    if not can_all(user, "alert", "approve", doms):
+        raise forbidden()
     row = await fetch_one(
         """UPDATE communications.alert_broadcasts SET status = 'rejected', rejected_reason = :r, approved_by = :u, approved_at = now()
             WHERE id = CAST(:id AS uuid) AND status = 'pending_approval' RETURNING id, code, title""",
@@ -174,7 +203,7 @@ async def reject(broadcast_id: str, body: RejectIn, user: dict = Depends(require
 
 
 @router.get("/audit")
-async def audit_log(limit: int = 100, user: dict = Depends(current_user)):
+async def audit_log(limit: int = 100, _: dict = Depends(require_permission("audit", "view"))):
     return await fetch_all(
         "SELECT id, time, actor_name, action, entity, entity_id, details FROM communications.audit_logs ORDER BY time DESC LIMIT :l",
         {"l": limit},
@@ -182,13 +211,16 @@ async def audit_log(limit: int = 100, user: dict = Depends(current_user)):
 
 
 @router.get("/contacts")
-async def contacts():
+async def contacts(user: dict = Depends(require_any("contact", "view"))):
+    allowed = allowed_codes(user, "contact", "view")
     rows = await fetch_all(
         """SELECT c.id, c.parent_id, c.level, c.org, c.full_name, c.position, c.phone, c.radio_freq, c.status, c.sort,
                   u.code AS admin_code, u.name AS admin_name, u.old_district
              FROM communications.contacts c LEFT JOIN spatial_admin.administrative_units u ON u.id = c.admin_unit_id
             ORDER BY c.sort, c.full_name"""
     )
+    if allowed is not None:  # danh bạ cấp tỉnh luôn hiển thị; cấp xã/thôn theo phạm vi
+        rows = [r for r in rows if r["level"] == "tinh" or r["admin_code"] in set(allowed)]
     nodes = {r["id"]: {**r, "children": []} for r in rows}
     roots = []
     for n in nodes.values():
@@ -212,7 +244,7 @@ IVR_ROUTES = {
 
 
 @router.get("/hotline")
-async def hotline():
+async def hotline(_: dict = Depends(require_permission("hotline", "operate"))):
     calls = await fetch_all(
         "SELECT id, time, caller, ivr_key, category, routed_to, duration_s, ticket_id FROM communications.call_logs ORDER BY time DESC LIMIT 30"
     )
@@ -230,7 +262,7 @@ class IvrIn(BaseModel):
 
 
 @router.post("/ivr")
-async def ivr(body: IvrIn):
+async def ivr(body: IvrIn, _: dict = Depends(require_permission("hotline", "operate"))):
     """Mô phỏng tổng đài phân luồng phím bấm: ghi cuộc gọi, chuyển ca trực; nếu có lời nhắn → tạo phiếu SOS."""
     label, route, incident = IVR_ROUTES[body.key]
     ticket = None

@@ -1,7 +1,12 @@
-"""Xác thực JWT đơn giản + băm mật khẩu/PIN bằng PBKDF2 (thư viện chuẩn)."""
+"""Xác thực JWT + băm mật khẩu/PIN (PBKDF2). Phân quyền nằm ở ``app.rbac.authz``.
+
+JWT mang ``tv`` (token_version): mỗi lần cấp/thu hồi quyền hoặc khoá tài khoản,
+token_version tăng → token cũ bị từ chối, người dùng phải đăng nhập lại để nhận quyền mới.
+"""
 
 import hashlib
 import hmac
+import json
 import os
 from datetime import UTC, datetime, timedelta
 
@@ -13,6 +18,9 @@ from app.config import settings
 from app.db import execute, fetch_one
 
 _bearer = HTTPBearer(auto_error=False)
+
+USER_SELECT = """SELECT id, username, full_name, position, pin_hash, token_version, is_active
+                   FROM communications.users"""
 
 
 def hash_secret(secret: str) -> str:
@@ -33,42 +41,43 @@ def create_token(user: dict) -> str:
     payload = {
         "sub": str(user["id"]),
         "name": user["full_name"],
-        "role": user["role"],
+        "tv": user["token_version"],
         "exp": datetime.now(UTC) + timedelta(hours=settings.jwt_expire_hours),
     }
     return jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
 
 
-async def current_user(creds: HTTPAuthorizationCredentials | None = Depends(_bearer)) -> dict:
-    if creds is None:
-        raise HTTPException(401, "Chưa đăng nhập")
+async def user_from_token(token: str) -> dict | None:
     try:
-        payload = jwt.decode(creds.credentials, settings.jwt_secret, algorithms=["HS256"])
-    except jwt.PyJWTError as exc:
-        raise HTTPException(401, "Phiên đăng nhập không hợp lệ") from exc
-    user = await fetch_one(
-        "SELECT id, username, full_name, position, role, pin_hash FROM communications.users WHERE id = CAST(:id AS uuid)",
-        {"id": payload["sub"]},
-    )
-    if not user:
-        raise HTTPException(401, "Tài khoản không tồn tại")
+        payload = jwt.decode(token, settings.jwt_secret, algorithms=["HS256"])
+    except jwt.PyJWTError:
+        return None
+    user = await fetch_one(USER_SELECT + " WHERE id = CAST(:id AS uuid)", {"id": payload["sub"]})
+    if not user or not user["is_active"] or user["token_version"] != payload.get("tv"):
+        return None
     return user
 
 
-def require_role(*roles: str):
-    async def dep(user: dict = Depends(current_user)) -> dict:
-        if user["role"] not in roles and user["role"] != "admin":
-            raise HTTPException(403, "Không đủ quyền thực hiện thao tác này")
-        return user
+async def current_user(creds: HTTPAuthorizationCredentials | None = Depends(_bearer)) -> dict:
+    if creds is None:
+        raise HTTPException(401, "Chưa đăng nhập")
+    user = await user_from_token(creds.credentials)
+    if user is None:
+        raise HTTPException(401, "Phiên đăng nhập hết hạn hoặc quyền đã thay đổi — vui lòng đăng nhập lại")
+    return user
 
-    return dep
+
+async def bump_token_version(user_id, conn=None) -> None:
+    await execute(
+        "UPDATE communications.users SET token_version = token_version + 1 WHERE id = CAST(:id AS uuid)",
+        {"id": str(user_id)},
+        conn,
+    )
 
 
 async def audit(
     user: dict | None, action: str, entity: str, entity_id: str | None, details: dict | None = None, conn=None
 ):
-    import json
-
     await execute(
         """INSERT INTO communications.audit_logs (actor_id, actor_name, action, entity, entity_id, details)
            VALUES (:aid, :aname, :action, :entity, :eid, CAST(:details AS jsonb))""",

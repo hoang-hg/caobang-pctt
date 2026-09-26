@@ -5,6 +5,7 @@ import { Send, Phone, Route, ShieldCheck, TriangleAlert, Loader2, CheckCircle2 }
 import { api } from '../../api/client';
 import { useStore } from '../../app/store';
 import { Modal } from './ui';
+import { usePermission } from '../../rbac/usePermission';
 import { FORCE_TYPE, INCIDENT, PRIORITY, SKILL, VEHICLE, VULNERABLE } from '../../utils/labels';
 
 const ITEM_NAME = {
@@ -15,7 +16,8 @@ const ITEM_NAME = {
 /** Lệnh điều động: gợi ý nhu cầu + khớp nối lực lượng/phương tiện gần nhất → phát lệnh khẩn cấp. */
 export default function DispatchModal({ ticket, presetForceId, onClose }) {
   const qc = useQueryClient();
-  const { auth, toast } = useStore();
+  const toast = useStore((s) => s.toast);
+  const allowed = usePermission('dispatch', 'create', ticket?.admin_code);
   const [forceId, setForceId] = useState(presetForceId || null);
   const [vehicleIds, setVehicleIds] = useState([]);
   const [personnel, setPersonnel] = useState(3);
@@ -74,9 +76,9 @@ export default function DispatchModal({ ticket, presetForceId, onClose }) {
           <button className="btn-primary" onClick={onClose}>Đóng</button>
         ) : (
           <>
-            {!auth && <span className="mr-auto self-center text-xs text-danger">Cần đăng nhập (tài khoản Trực ban/Lãnh đạo) để phát lệnh</span>}
+            {!allowed && <span className="mr-auto self-center text-xs text-danger">Bạn không có quyền điều động tại địa bàn này</span>}
             <button className="btn-ghost" onClick={onClose}>Huỷ</button>
-            <button className="btn-danger" disabled={!auth || !forceId || busy} onClick={submit}>
+            <button className="btn-danger" disabled={!allowed || !forceId || busy} onClick={submit}>
               {busy ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} Phát lệnh khẩn cấp
             </button>
           </>

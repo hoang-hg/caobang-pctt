@@ -14,6 +14,14 @@ Hệ thống điều hành PCTT & TKCN tỉnh Cao Bằng. Monorepo: `backend/` (
 - Lint/test: `ruff format && ruff check`, `pytest` (chạy trong container: `docker compose exec backend …`).
   Git Bash trên Windows: đặt `MSYS_NO_PATHCONV=1` khi `docker run -w /src`.
 
+## Phân quyền (RBAC) — bắt buộc
+- Casbin `rbac_with_domains`, domain phân cấp `*` → `CUM/*` → `CUM/MA_XA` (cột `administrative_units.rbac_domain`). Xem [docs/rbac.md](docs/rbac.md).
+- Endpoint mới: `require_permission(obj, act, scope_loader)` / `area_scope(obj, act)` / `require_any` từ `app.rbac.authz`.
+  **Không** kiểm tra tên vai trò trong route. Quyền mới → `app/rbac/permissions.py` + `docs/rbac.md`.
+- Sự kiện WebSocket gắn xã: `hub.publish(event, data, "sos", admin_code)` để lọc theo phạm vi người nhận.
+- Frontend: `<Can I a scope>`, `usePermission`, `useAllowedCodes` (`src/rbac/`); API trả `admin_code` cho đối tượng cần gate theo xã.
+- Seed gán lại `admin_unit_id` theo vị trí thực (ranh giới xã xấp xỉ) — phạm vi RBAC dựa trên ranh giới này.
+
 ## Quy ước frontend
 - Màu qua biến CSS (`src/index.css`) + Tailwind tokens (`bg-panel`, `text-ink-2`, `bg-danger`…); màu trạng thái cố định.
 - Biểu đồ Recharts lấy màu từ `useChartTheme()`; không dùng 2 trục Y (tách biểu đồ).

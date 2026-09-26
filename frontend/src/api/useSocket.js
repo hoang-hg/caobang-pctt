@@ -7,8 +7,10 @@ import { INCIDENT } from '../utils/labels';
 /** Kết nối WebSocket /ws: nhận sự kiện realtime và làm mới dữ liệu tương ứng (không cần F5). */
 export function useSocket() {
   const qc = useQueryClient();
+  const token = useStore((s) => s.auth?.token);
 
   useEffect(() => {
+    if (!token) return undefined;
     let ws;
     let retry;
     let closed = false;
@@ -72,7 +74,7 @@ export function useSocket() {
 
     const connect = () => {
       const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-      ws = new WebSocket(`${proto}://${window.location.host}/ws`);
+      ws = new WebSocket(`${proto}://${window.location.host}/ws?token=${encodeURIComponent(token)}`);
       setWsStatus('connecting');
       ws.onopen = () => setWsStatus('online');
       ws.onmessage = (e) => {
@@ -82,8 +84,9 @@ export function useSocket() {
           /* bỏ qua gói lỗi */
         }
       };
-      ws.onclose = () => {
+      ws.onclose = (e) => {
         setWsStatus('offline');
+        if (e.code === 4401) return; // token hết hạn / quyền đã đổi — chờ đăng nhập lại
         if (!closed) retry = setTimeout(connect, 3000);
       };
     };
@@ -93,5 +96,5 @@ export function useSocket() {
       clearTimeout(retry);
       ws?.close();
     };
-  }, [qc]);
+  }, [qc, token]);
 }

@@ -11,7 +11,7 @@ router = APIRouter(prefix="/admin-units", tags=["Hành chính"])
 @router.get("")
 async def list_units(level: str | None = None):
     return await fetch_all(
-        """SELECT u.id, u.code, u.name, u.level, u.unit_type, u.old_district, u.population, u.households, u.tags,
+        """SELECT u.id, u.code, u.name, u.level, u.unit_type, u.old_district, u.population, u.households, u.tags, u.rbac_domain,
                   p.code AS parent_code, ST_Y(u.center) AS lat, ST_X(u.center) AS lon,
                   CASE WHEN u.geom IS NULL THEN NULL ELSE
                     json_build_array(ST_XMin(u.geom), ST_YMin(u.geom), ST_XMax(u.geom), ST_YMax(u.geom)) END AS bbox

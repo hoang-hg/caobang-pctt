@@ -18,7 +18,8 @@
 | D | Điều hành cứu hộ | `/cuu-ho` | Kanban 4 cột kéo–thả, SLA cấp 1/2/3 (3′/15′/60′), tiếp nhận đa kênh + bóc tách tin nhắn (NLP), khớp nối lực lượng gần nhất theo kỹ năng, ETA, giám sát sơ tán & sức chứa |
 | E | Cảnh báo & Hotline | `/canh-bao` | Mẫu tin có tham số, phát theo xã/vùng vẽ, 5 kênh (SMS, Cell Broadcast, Zalo OA, Push, loa), **Maker–Checker + PIN**, Delivery Dashboard, danh bạ cây Tỉnh→Xã→Thôn, IVR phím 1/2/3, nhật ký pháp lý |
 | F | Bộ lọc địa phương & Sáng/Tối | toàn cục | 56 xã/phường (sau 01/07/2025), preset lưu vực Bằng Giang–Hiến, vùng núi cao, biên giới, địa bàn huyện cũ; bản đồ zoom + mask; Omni-search (địa danh, toạ độ, mã SOS); theme theo `prefers-color-scheme` + lưu lựa chọn |
-| G | CSDL | PostgreSQL 16 + PostGIS + TimescaleDB | 5 schema: `spatial_admin`, `resources`, `operations`, `iot_telemetry` (hypertable `sensor_readings`), `communications` — xem [backend/alembic/sql/0001_schema.sql](backend/alembic/sql/0001_schema.sql) |
+| G | CSDL | PostgreSQL 16 + PostGIS + TimescaleDB | 5 schema: `spatial_admin`, `resources`, `operations`, `iot_telemetry` (hypertable `sensor_readings`), `communications` — xem [backend/alembic/sql/](backend/alembic/sql/) |
+| RBAC | Phân quyền | `/phan-quyen` | Casbin `rbac_with_domains` theo phạm vi **toàn tỉnh → cụm (địa bàn huyện cũ) → xã/phường**; 7 vai trò hệ thống + vai trò tuỳ chỉnh; tạo tài khoản con, cấp/thu hồi quyền có rào chắn chống leo thang; nhật ký phân quyền — xem [docs/rbac.md](docs/rbac.md) |
 
 Tự động hoá: cảm biến nghiêng / độ ẩm đất vượt BĐ II → tự khoanh vùng nguy cơ 1 km, tạo phiếu SOS nguồn `SENSOR`
 và **bản nháp cảnh báo chờ Lãnh đạo duyệt**; dự báo mực nước 3 giờ tới vượt BĐ III → nháp "Chuẩn bị sơ tán".
@@ -110,9 +111,9 @@ Nên dùng Chrome / Edge / Firefox bản mới. Bản đồ nền, radar mưa v�
 
 ### Bước 5 – Dùng thử các chức năng
 
-1. Bấm **Đăng nhập** (góc phải trên) → chọn tài khoản demo:
-   - **Nông Văn Trực** – Trực ban: soạn lệnh cảnh báo, điều động lực lượng, xuất kho.
-   - **Hoàng Đức Chỉ** – Lãnh đạo: phê duyệt lệnh cảnh báo bằng **PIN 2468**.
+1. Màn hình **đăng nhập** hiện đầu tiên → bấm một tài khoản demo (bảng bên dưới). Mỗi tài khoản thấy và thao tác được
+   những gì tuỳ **vai trò + phạm vi địa bàn**: VD **Triệu Thị Mai** (cán bộ xã Cô Ba) chỉ thấy SOS của xã Cô Ba,
+   **Ma Văn Thành** (chỉ huy cụm Bảo Lạc) điều hành và tạo tài khoản con trong 8 xã của cụm. Đổi tài khoản: menu tên người dùng → Đăng xuất.
 2. **Tổng quan**: xem KPI, biểu đồ thủy văn, mưa, sạt lở, vật tư; bấm **Xuất PDF báo cáo nhanh**.
 3. **Bản đồ giám sát**: bật/tắt lớp dữ liệu bên trái; click trạm/hồ/kho để xem popup; **kéo biểu tượng đội cứu hộ
    (ô vuông xanh) thả lên điểm SOS đỏ** để điều động; dùng công cụ góc phải để đo khoảng cách, tìm đường an toàn A→B,
@@ -151,26 +152,33 @@ docker compose restart backend
 | `pip install … did not complete successfully` khi build | Mạng chập chờn khi tải thư viện → chạy lại `docker compose up -d --build` |
 | Góc phải hiện **“Mất kết nối”** | Backend dừng hoặc khởi động lại → `docker compose ps`, `docker compose restart backend` |
 | Bản đồ trắng / không có nền | Máy không có Internet hoặc mạng chặn máy chủ bản đồ → đổi nền bản đồ (menu “Nền” trên bản đồ) hoặc kiểm tra mạng |
-| Nút **Phát lệnh**, **Phê duyệt** bị mờ | Chưa đăng nhập, hoặc sai vai trò (phê duyệt cần tài khoản Lãnh đạo) |
+| Không thấy nút / menu, hoặc báo “Không có quyền” | Tài khoản không có quyền đó tại địa bàn này (VD cán bộ xã không điều động được) — xem vai trò ở menu tên người dùng, xin cấp quyền tại trang **Phân quyền** |
+| Bị đăng xuất đột ngột (“quyền đã thay đổi”) | Quản trị viên vừa cấp/thu hồi quyền hoặc khoá tài khoản → đăng nhập lại để nhận quyền mới |
 | Không nghe âm báo SOS | Trình duyệt chặn âm thanh khi chưa tương tác → click vào trang một lần; kiểm tra nút loa trên thanh đầu trang |
 | Muốn làm sạch hoàn toàn | `docker compose down -v` rồi `docker compose up -d --build` |
 
-### Tài khoản demo (nút **Đăng nhập** góc phải, khi `DEMO_MODE=true`)
+### Tài khoản demo (hiện trên màn hình đăng nhập khi `DEMO_MODE=true`)
 
-| Tài khoản | Vai trò | Mật khẩu | PIN |
-|---|---|---|---|
-| `trucban` | Trực ban – soạn lệnh (Maker) | `trucban123` | – |
-| `chihuy` | Lãnh đạo – phê duyệt (Checker) | `chihuy123` | `2468` |
-| `admin` | Quản trị | `admin123` | `0000` |
-| `xem` | Chỉ xem | `xem123` | – |
+| Tài khoản | Mật khẩu | Vai trò | Phạm vi | PIN |
+|---|---|---|---|---|
+| `admin` | `admin123` | Quản trị hệ thống (toàn quyền, quản trị vai trò) | Toàn tỉnh | `0000` |
+| `chihuy` | `chihuy123` | Lãnh đạo BCH – phê duyệt (Checker) | Toàn tỉnh | `2468` |
+| `trucban` | `trucban123` | Trực ban điều hành – soạn lệnh (Maker) | Toàn tỉnh | – |
+| `chihuy.baolac` | `baolac123` | Chỉ huy cụm | Cụm Bảo Lạc (8 xã) | `1357` |
+| `canbo.coba` | `coba123` | Cán bộ PCTT xã | Xã Cô Ba | – |
+| `thukho` | `thukho123` | Thủ kho | Toàn tỉnh | – |
+| `xem` | `xem123` | Quan sát (chỉ xem) | Toàn tỉnh | – |
 
-Người soạn không được tự duyệt lệnh của mình (nguyên tắc 4 mắt); mọi thao tác ghi vào `communications.audit_logs`.
+Người soạn không được tự duyệt lệnh của mình (nguyên tắc 4 mắt); người duyệt phải có quyền trên **mọi** xã nhận tin.
+Mọi thao tác ghi vào `communications.audit_logs`; thao tác phân quyền ghi vào `communications.rbac_audit_log`.
+Chi tiết phân quyền: [docs/rbac.md](docs/rbac.md).
 
 ## Kiểm thử
 
 ```bash
 docker compose exec backend pytest -q        # kiểm thử đơn vị thuật toán (NLP, định tuyến, khớp nối, ngưỡng…)
-node scripts/smoke.mjs                        # kiểm thử end-to-end qua API (cần stack đang chạy)
+node scripts/smoke.mjs                        # kiểm thử luồng nghiệp vụ qua API (cần stack đang chạy)
+node scripts/rbac-test.mjs                    # kiểm thử phân quyền theo phạm vi (46 kịch bản)
 cd frontend && npm run build                  # build production
 ```
 

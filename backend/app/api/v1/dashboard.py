@@ -2,10 +2,12 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.area import area_clause, parse_codes, unit_clause
+from app.area import area_clause, unit_clause
 from app.db import fetch_all, fetch_one
+from app.rbac.authz import area_scope, require_any
 
 router = APIRouter(tags=["Dashboard"])
+MON = area_scope("monitoring", "view")
 
 LATEST_READINGS = """
 SELECT DISTINCT ON (r.station_id) r.station_id, r.value, r.time
@@ -16,7 +18,7 @@ SELECT DISTINCT ON (r.station_id) r.station_id, r.value, r.time
 
 
 @router.get("/dashboard/kpis")
-async def kpis(codes: list[str] = Depends(parse_codes)):
+async def kpis(codes: list[str] = Depends(MON)):
     p = {"codes": codes}
     rain = await fetch_one(
         f"""
@@ -79,7 +81,7 @@ async def kpis(codes: list[str] = Depends(parse_codes)):
 
 
 @router.get("/stations")
-async def stations(type: str | None = None, codes: list[str] = Depends(parse_codes)):
+async def stations(type: str | None = None, codes: list[str] = Depends(MON)):
     return await fetch_all(
         f"""SELECT s.id, s.name, s.type, s.river, s.unit, s.alarm_thresholds AS thresholds, s.status,
                    ST_Y(s.location) AS lat, ST_X(s.location) AS lon, u.name AS admin_name, l.value, l.time
@@ -93,7 +95,12 @@ async def stations(type: str | None = None, codes: list[str] = Depends(parse_cod
 
 
 @router.get("/stations/{station_id}/series")
-async def station_series(station_id: str, hours: int = 48, bucket_minutes: int = 60):
+async def station_series(
+    station_id: str,
+    hours: int = 48,
+    bucket_minutes: int = 60,
+    _: dict = Depends(require_any("monitoring", "view")),
+):
     station = await fetch_one(
         "SELECT id, name, type, river, unit, alarm_thresholds AS thresholds FROM iot_telemetry.monitoring_stations WHERE id = :id",
         {"id": station_id},
@@ -116,7 +123,7 @@ async def station_series(station_id: str, hours: int = 48, bucket_minutes: int =
 
 
 @router.get("/dashboard/rainfall")
-async def rainfall(codes: list[str] = Depends(parse_codes), hours: int = 24):
+async def rainfall(codes: list[str] = Depends(MON), hours: int = 24):
     """Mưa giờ (trung bình các trạm trong vùng) + tích lũy + nowcast QPF 3h."""
     p = {"codes": codes, "h": hours}
     observed = await fetch_all(
@@ -139,7 +146,7 @@ async def rainfall(codes: list[str] = Depends(parse_codes), hours: int = 24):
 
 
 @router.get("/dashboard/landslide-risk")
-async def landslide_risk(codes: list[str] = Depends(parse_codes)):
+async def landslide_risk(codes: list[str] = Depends(MON)):
     """Ngưỡng kích hoạt sạt lở: mưa tích lũy 3 ngày vs cường độ mưa hiện tại (theo từng trạm mưa)
     + chỉ số cảm biến nghiêng/độ ẩm đất gần nhất. Ngưỡng I–D dạng I = a · R^-b (minh hoạ)."""
     rows = await fetch_all(
@@ -196,7 +203,7 @@ def classify_landslide(rain_72h: float, intensity: float, tilt: float | None) ->
 
 
 @router.get("/dashboard/supplies")
-async def supplies(codes: list[str] = Depends(parse_codes)):
+async def supplies(codes: list[str] = Depends(area_scope("resource", "view"))):
     """Vật tư theo kho/nhóm: hiện có vs định mức (phần thiếu hụt để vẽ cột chồng)."""
     rows = await fetch_all(
         f"""SELECT w.code, w.name, w.level, i.category,
@@ -220,7 +227,7 @@ async def supplies(codes: list[str] = Depends(parse_codes)):
 
 
 @router.get("/dashboard/logs")
-async def logs(limit: int = 40, codes: list[str] = Depends(parse_codes)):
+async def logs(limit: int = 40, codes: list[str] = Depends(MON)):
     return await fetch_all(
         f"""SELECT id, time, category, severity, message FROM operations.event_logs e
              WHERE e.admin_unit_id IS NULL OR {unit_clause('e.admin_unit_id', codes)}

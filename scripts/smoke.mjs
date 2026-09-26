@@ -23,16 +23,16 @@ const maker = await login('trucban', 'trucban123');
 const checker = await login('chihuy', 'chihuy123');
 check('Đăng nhập maker & checker', maker && checker);
 
-const parsed = (await call('POST', '/sos/parse', { text: 'Nhà ở thôn Bản Ngắn xã Hòa An ngập sâu, 3 hộ có trẻ em cần xuồng' })).data;
+const parsed = (await call('POST', '/sos/parse', { text: 'Nhà ở thôn Bản Ngắn xã Hòa An ngập sâu, 3 hộ có trẻ em cần xuồng' }, maker)).data;
 check('NLP bóc tách tin nhắn', parsed.place?.unit_code === 'CB-HOAAN' && parsed.trapped_count === 12 && parsed.vulnerable.includes('tre_em'),
   JSON.stringify({ place: parsed.place?.name, n: parsed.trapped_count, type: parsed.incident_type, p: parsed.priority }));
 
-const created = await call('POST', '/sos', { raw_message: 'Sạt lở vùi nhà ở xã Yên Thổ, 2 người bị thương nặng', source: 'ZALO' });
+const created = await call('POST', '/sos', { raw_message: 'Sạt lở vùi nhà ở xã Yên Thổ, 2 người bị thương nặng', source: 'ZALO' }, maker);
 const ticket = created.data;
 check('Tạo SOS từ tin nhắn thô', created.status === 200 && ticket.incident_type === 'sat_lo' && ticket.priority === 1,
   `${ticket.code} ${ticket.admin_name}`);
 
-const match = (await call('GET', `/sos/${ticket.id}/match`)).data;
+const match = (await call('GET', `/sos/${ticket.id}/match`, null, maker)).data;
 check('Khớp nối lực lượng/phương tiện', match.forces.length > 0 && match.vehicles.length > 0,
   `${match.forces[0]?.name} (${match.forces[0]?.distance_km} km), ${match.vehicles[0]?.code}; bán kính ${match.radius_km} km`);
 
@@ -46,12 +46,12 @@ check('Phát lệnh điều động + lộ trình', disp.status === 200 && disp.
   disp.status === 200 ? `${disp.data.route.distance_km} km, ${disp.data.route.duration_min} phút, an toàn=${disp.data.route.safe}` : JSON.stringify(disp.data));
 check('Phiếu chuyển sang Đang thực thi', disp.data.ticket?.status === 'thuc_thi');
 
-const route = (await call('POST', '/map/route', { from_lat: 22.676, from_lon: 106.25, to_lat: 22.95, to_lon: 105.672 })).data;
+const route = (await call('POST', '/map/route', { from_lat: 22.676, from_lon: 106.25, to_lat: 22.95, to_lon: 105.672 }, maker)).data;
 check('Định tuyến TP → Bảo Lạc', route.distance_km > 50, `${route.distance_km} km, an toàn=${route.safe}, ${route.roads.join(' → ')}`);
 
 const area = (await call('POST', '/map/area-stats', {
   polygon: { type: 'Polygon', coordinates: [[[106.2, 22.64], [106.3, 22.64], [106.3, 22.7], [106.2, 22.7], [106.2, 22.64]]] },
-})).data;
+}, maker)).data;
 check('Khoanh vùng đếm hộ dân', area.households > 0, `${area.households} hộ, ${area.subscribers} thuê bao`);
 
 const br = await call('POST', '/alerts/broadcasts', {
@@ -64,13 +64,13 @@ check('Sai PIN bị từ chối', (await call('POST', `/alerts/broadcasts/${br.d
 const ap = await call('POST', `/alerts/broadcasts/${br.data.id}/approve`, { pin: '2468' }, checker);
 check('Checker phê duyệt bằng PIN', ap.status === 200 && ap.data.status === 'sending');
 
-const ivr = await call('POST', '/alerts/ivr', { caller: '0999 111 222', key: '2', message: 'Sạt lở đèo Mẻ Pia, 3 người mắc kẹt' });
+const ivr = await call('POST', '/alerts/ivr', { caller: '0999 111 222', key: '2', message: 'Sạt lở đèo Mẻ Pia, 3 người mắc kẹt' }, maker);
 check('Tổng đài IVR phân luồng + tạo SOS', ivr.status === 200 && ivr.data.ticket?.incident_type === 'sat_lo', ivr.data.call?.routed_to);
 
-check('UUID sai → 400', (await call('GET', '/sos/khong-hop-le/match')).status === 400);
+check('Mã phiếu sai → 404', (await call('GET', '/sos/khong-hop-le/match', null, maker)).status === 404);
 
 await new Promise((r) => setTimeout(r, 10_000));
-const after = (await call('GET', '/alerts/broadcasts')).data.find((b) => b.id === br.data.id);
+const after = (await call('GET', '/alerts/broadcasts', null, checker)).data.find((b) => b.id === br.data.id);
 check('Delivery dashboard tăng số liệu', after.metrics.SMS?.delivered > 0, JSON.stringify(after.metrics.SMS));
 
 const resolved = await call('POST', `/sos/${ticket.id}/resolve`, null, maker);

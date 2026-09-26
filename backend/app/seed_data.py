@@ -962,18 +962,24 @@ PLACE_NAMES = [
     ("Thôn Pác Rà", "thon", "Tĩnh Túc", 22.650, 105.862),
 ]
 
+# Tài khoản demo: (username, họ tên, chức vụ, mật khẩu, PIN phê duyệt, vai trò RBAC, phạm vi)
+# Phạm vi: "*" toàn tỉnh · "<CUM>/*" cả cụm (địa bàn huyện cũ) · "<CUM>/<MA_XA>" một xã
 USERS = [
-    ("admin", "Quản trị hệ thống", "Kỹ sư vận hành", "admin", "admin123", "0000"),
-    ("trucban", "Nông Văn Trực", "Cán bộ trực ban Văn phòng BCH", "maker", "trucban123", None),
+    ("admin", "Quản trị hệ thống", "Kỹ sư vận hành hệ thống", "admin123", "0000", "super_admin", "*"),
     (
         "chihuy",
         "Hoàng Đức Chỉ",
         "Phó Trưởng ban Thường trực BCH PCTT & TKCN tỉnh",
-        "checker",
         "chihuy123",
         "2468",
+        "truong_ban",
+        "*",
     ),
-    ("xem", "Tài khoản xem", "Lãnh đạo Sở ngành", "viewer", "xem123", None),
+    ("trucban", "Nông Văn Trực", "Cán bộ trực ban Văn phòng BCH tỉnh", "trucban123", None, "truc_ban", "*"),
+    ("chihuy.baolac", "Ma Văn Thành", "Chỉ huy cụm Bảo Lạc", "baolac123", "1357", "chi_huy_cum", "BAOLAC/*"),
+    ("canbo.coba", "Triệu Thị Mai", "Cán bộ PCTT xã Cô Ba", "coba123", None, "can_bo_xa", "BAOLAC/CB-COBA"),
+    ("thukho", "Lý Văn Kho", "Thủ kho dự trữ PCTT tỉnh", "thukho123", None, "thu_kho", "*"),
+    ("xem", "Tài khoản xem", "Lãnh đạo Sở ngành", "xem123", None, "quan_sat", "*"),
 ]
 
 TEMPLATES = [
