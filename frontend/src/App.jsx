@@ -15,6 +15,7 @@ import Resources from './pages/Resources';
 import RescueCenter from './pages/RescueCenter';
 import Alerts from './pages/Alerts';
 import AccessControl from './pages/AccessControl';
+import DataSources from './pages/DataSources';
 
 function Guard({ obj, act, children }) {
   return usePermission(obj, act) ? children : <NoAccess />;
@@ -55,6 +56,7 @@ function Shell() {
             <Route path="/nguon-luc" element={<Guard obj="resource" act="view"><Resources /></Guard>} />
             <Route path="/cuu-ho" element={<Guard obj="sos" act="view"><RescueCenter /></Guard>} />
             <Route path="/canh-bao" element={<Guard obj="alert" act="view"><Alerts /></Guard>} />
+            <Route path="/nguon-du-lieu" element={<Guard obj="integration" act="view"><DataSources /></Guard>} />
             <Route path="/phan-quyen" element={<Guard obj="user" act="view"><AccessControl /></Guard>} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>

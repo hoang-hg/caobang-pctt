@@ -9,6 +9,7 @@ import Hydrograph from '../components/charts/Hydrograph';
 import RainfallChart from '../components/charts/RainfallChart';
 import LandslideScatter from '../components/charts/LandslideScatter';
 import SuppliesChart from '../components/charts/SuppliesChart';
+import AreaForecastChart from '../components/charts/AreaForecastChart';
 import { ALARM, alarmLevel } from '../utils/labels';
 import { int, minutesSince, num, pct } from '../utils/format';
 import { exportSnapshotPdf } from '../utils/exportPdf';
@@ -131,6 +132,9 @@ export default function Dashboard() {
             </Section>
             <Section title="Cường độ mưa & Nowcasting 3 giờ">
               <RainfallChart height={270} />
+            </Section>
+            <Section title="Dự báo mưa 72 giờ theo xã – tổ hợp ECMWF + GFS (P10–P90)" className="lg:col-span-2">
+              <AreaForecastChart height={230} />
             </Section>
             <Section title="Ngưỡng kích hoạt sạt lở (mưa 72h vs cường độ)">
               <LandslideScatter height={240} />

@@ -223,3 +223,34 @@ export function RouteTool({ active, onResult }) {
     </>
   );
 }
+
+// Thang màu tuần tự 1 sắc độ (xanh) cho lượng mưa dự báo
+export const RAIN_BINS = [
+  { max: 5, color: '#cde2fb', label: '< 5 mm' },
+  { max: 20, color: '#86b6ef', label: '5–20' },
+  { max: 50, color: '#3987e5', label: '20–50' },
+  { max: 100, color: '#1c5cab', label: '50–100' },
+  { max: Infinity, color: '#0d366b', label: '≥ 100 mm' },
+];
+const rainColor = (mm) => RAIN_BINS.find((b) => mm < b.max).color;
+
+/** Lớp mưa dự báo 24 giờ tới (P50 kết hợp ECMWF/GFS) tô theo xã. */
+export function ForecastChoropleth({ geo, areas }) {
+  const byCode = useMemo(() => Object.fromEntries((areas || []).map((a) => [a.code, a])), [areas]);
+  if (!geo || !areas?.length) return null;
+  const data = { ...geo, features: geo.features.filter((f) => byCode[f.properties.code]) };
+  return (
+    <GeoJSON
+      key={`fc-${areas.map((a) => a.p50).join(',')}`}
+      data={data}
+      style={(f) => ({ color: '#ffffff', weight: 1, fillColor: rainColor(byCode[f.properties.code].p50), fillOpacity: 0.65 })}
+      onEachFeature={(f, layer) => {
+        const a = byCode[f.properties.code];
+        layer.bindTooltip(
+          `<b>${a.name}</b><br/>Mưa 24h tới: <b>${a.p50} mm</b> (P10 ${a.p10} – P90 ${a.p90})<br/>Xác suất mưa ≥ 5 mm/h: ${Math.round(a.max_prob_heavy * 100)}%`,
+          { sticky: true },
+        );
+      }}
+    />
+  );
+}

@@ -100,9 +100,18 @@ class Simulator:
 
     # 1 ---------------------------------------------------------------
     async def readings(self, now: datetime) -> list[dict]:
+        """Chỉ sinh số đo cho trạm còn ở chế độ mô phỏng (trạm đã có thiết bị IoT thật thì bỏ qua)."""
         t = self.t_rel(now)
         out = []
+        simulated = {
+            r["id"]
+            for r in await fetch_all(
+                "SELECT id FROM iot_telemetry.monitoring_stations WHERE source = 'simulator'"
+            )
+        }
         for sid, (stype, params, thr, _name) in STATION_PARAMS.items():
+            if sid not in simulated:
+                continue
             noise = {
                 "luong_mua": rng.uniform(-0.8, 0.8),
                 "muc_nuoc": rng.uniform(-0.02, 0.02),
@@ -119,6 +128,8 @@ class Simulator:
                     "level": alarm_level(value, thr),
                 }
             )
+        if not out:
+            return out
         async with transaction() as conn:
             await conn.exec_driver_sql(
                 "INSERT INTO iot_telemetry.sensor_readings (time, station_id, value) VALUES (%(time)s, %(station_id)s, %(value)s)",
@@ -131,7 +142,9 @@ class Simulator:
     async def check_triggers(self, readings: list[dict], now: datetime) -> None:
         for r in readings:
             sid, stype, value, level = r["station_id"], r["type"], r["value"], r["level"]
-            _, _, thr, name = STATION_PARAMS[sid]
+            # Số đo từ IoT thật mang sẵn ngưỡng/tên trạm; số đo mô phỏng lấy từ STATION_PARAMS
+            thr = r.get("thresholds") or STATION_PARAMS.get(sid, (None, None, {}, sid))[2]
+            name = r.get("name") or STATION_PARAMS.get(sid, (None, None, {}, sid))[3]
             if stype == "muc_nuoc":
                 # Trễ (hysteresis) 0,15 m: không báo lặp khi mực nước dao động quanh vạch báo động
                 prev = self.wl_levels.get(sid)
@@ -147,9 +160,11 @@ class Simulator:
                 elif level < prev and value < thr[f"bd{prev}"] - 0.15:
                     self.wl_levels[sid] = level
             elif stype in ("do_nghieng", "do_am_dat") and level >= 2:
-                await self.sensor_hotspot(sid, name, value, level, thr)
+                await self.sensor_hotspot(sid, name, value, level, thr, stype)
 
-    async def sensor_hotspot(self, sid: str, name: str, value: float, level: int, thr: dict) -> None:
+    async def sensor_hotspot(
+        self, sid: str, name: str, value: float, level: int, thr: dict, stype: str = "do_nghieng"
+    ) -> None:
         active = await fetch_one(
             "SELECT id FROM iot_telemetry.hazard_zones WHERE station_id = :s AND valid_until > now()",
             {"s": sid},
@@ -178,7 +193,7 @@ class Simulator:
             },
         )
         await hub.publish("hazard.new", zone)
-        unit = "°" if STATION_PARAMS[sid][0] == "do_nghieng" else "%"
+        unit = "°" if stype == "do_nghieng" else "%"
         await log_event(
             f"TỰ ĐỘNG: {name} đạt {value}{unit} (vượt BĐ {LEVEL_NAMES[level]}) – khoanh vùng nguy cơ sạt lở bán kính 1 km",
             "canh_bao",
@@ -314,9 +329,14 @@ class Simulator:
 
     async def refresh_forecasts(self, now: datetime) -> None:
         base = now.replace(minute=0, second=0, microsecond=0)
+        # Nguồn dự báo thật (Open-Meteo) còn hoạt động → không ghi đè nowcast mưa bằng kịch bản
+        real_qpf = await fetch_one(
+            """SELECT 1 FROM integrations.data_sources WHERE type = 'open_meteo' AND enabled
+                  AND last_success_at > now() - interval '6 hours' LIMIT 1"""
+        )
         async with transaction() as conn:
             for sid, (stype, params, _, _) in STATION_PARAMS.items():
-                if stype not in ("muc_nuoc", "luong_mua"):
+                if stype not in ("muc_nuoc", "luong_mua") or (stype == "luong_mua" and real_qpf):
                     continue
                 horizon, model = (24, "HEC-HMS") if stype == "muc_nuoc" else (3, "QPF-NOWCAST")
                 await execute(

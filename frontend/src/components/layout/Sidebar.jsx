@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Map, Boxes, Siren, Megaphone, KeyRound } from 'lucide-react';
+import { LayoutDashboard, Map, Boxes, Siren, Megaphone, KeyRound, DatabaseZap } from 'lucide-react';
 import clsx from 'clsx';
 import { useAreaQuery } from '../../api/hooks';
 import { useStore } from '../../app/store';
@@ -11,6 +11,7 @@ const NAV = [
   { to: '/cuu-ho', label: 'Điều hành cứu hộ', icon: Siren, badge: true, perm: ['sos', 'view'] },
   { to: '/nguon-luc', label: 'Vật tư & Lực lượng', icon: Boxes, perm: ['resource', 'view'] },
   { to: '/canh-bao', label: 'Cảnh báo & Hotline', icon: Megaphone, perm: ['alert', 'view'] },
+  { to: '/nguon-du-lieu', label: 'Nguồn dữ liệu & IoT', icon: DatabaseZap, perm: ['integration', 'view'] },
   { to: '/phan-quyen', label: 'Phân quyền', icon: KeyRound, perm: ['user', 'view'] },
 ];
 

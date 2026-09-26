@@ -6,10 +6,25 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import DBAPIError
 
-from app.api.v1 import admin_units, alerts, auth, dashboard, map_layers, rbac, resources, search, sos
+from app.api.v1 import (
+    admin_units,
+    alerts,
+    auth,
+    dashboard,
+    forecast,
+    ingest,
+    integrations,
+    map_layers,
+    rbac,
+    resources,
+    search,
+    sos,
+)
 from app.auth import user_from_token
 from app.config import settings
 from app.db import engine, fetch_one
+from app.integrations.mqtt_bridge import bridge
+from app.integrations.runner import ensure_default_sources, runner
 from app.rbac import domains
 from app.rbac.authz import allowed_codes
 from app.rbac.enforcer import init_enforcer
@@ -18,6 +33,8 @@ from app.services.simulator import simulator
 from app.ws.hub import Client, hub
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+# httpx ghi cả URL ở mức INFO → lộ API key trong query (Open-Meteo, OpenWeather). Chỉ ghi cảnh báo.
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 @asynccontextmanager
@@ -25,10 +42,15 @@ async def lifespan(_: FastAPI):
     await domains.load_units()
     await init_enforcer()
     await rbac_bootstrap()
+    await ensure_default_sources()
+    runner.start()
+    bridge.start()
     if settings.simulator:
         simulator.start()
     yield
     await simulator.stop()
+    await runner.stop()
+    await bridge.stop()
     await engine.dispose()
 
 
@@ -54,7 +76,20 @@ async def db_error(_: Request, exc: DBAPIError):
     return JSONResponse(status_code=400, content={"detail": "Dữ liệu không hợp lệ"})
 
 
-for r in (auth, admin_units, search, dashboard, map_layers, resources, sos, alerts, rbac):
+for r in (
+    auth,
+    admin_units,
+    search,
+    dashboard,
+    map_layers,
+    resources,
+    sos,
+    alerts,
+    rbac,
+    ingest,
+    integrations,
+    forecast,
+):
     app.include_router(r.router, prefix="/api/v1")
 
 

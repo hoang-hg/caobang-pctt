@@ -65,6 +65,12 @@ export function useSocket() {
           inv('map-layers');
           toast({ tone: 'danger', title: 'Cảm biến vượt ngưỡng', body: data.name });
           break;
+        case 'source.updated':
+          inv('int-sources', 'int-monitor', 'forecast-areas', 'forecast-series', 'rainfall');
+          break;
+        case 'ingest.log':
+          throttle('ingest', 5_000, () => inv('int-monitor', 'int-devices'));
+          break;
         case 'call.new':
           inv('hotline');
           break;

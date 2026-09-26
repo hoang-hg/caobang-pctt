@@ -26,6 +26,7 @@ class Resource(StrEnum):
     AUDIT = "audit"  # nhật ký pháp lý
     USER = "user"  # tài khoản người dùng
     RBAC = "rbac"  # quản trị vai trò
+    INTEGRATION = "integration"  # nguồn dữ liệu ngoài, thiết bị IoT
 
 
 class Action(StrEnum):
@@ -72,6 +73,8 @@ ALL_PERMISSIONS: Final[tuple[Permission, ...]] = (
     Permission(R.USER, A.VIEW, True, "Xem tài khoản trong phạm vi"),
     Permission(R.USER, A.MANAGE, True, "Tạo tài khoản con, cấp / thu hồi vai trò trong phạm vi"),
     Permission(R.RBAC, A.MANAGE, False, "Quản trị vai trò (tạo / sửa / xoá role)"),
+    Permission(R.INTEGRATION, A.VIEW, False, "Xem nguồn dữ liệu, thiết bị IoT, giám sát kết nối"),
+    Permission(R.INTEGRATION, A.MANAGE, False, "Cấu hình nguồn dữ liệu, đăng ký thiết bị IoT, cấp khoá"),
 )
 
 GLOBAL_SCOPE: Final[str] = "*"
@@ -140,7 +143,15 @@ SYSTEM_ROLES: Final[tuple[tuple[str, str, str, bool, list[tuple[str, str]]], ...
         "Trực ban điều hành",
         "Tiếp nhận SOS, điều động, soạn lệnh cảnh báo (Maker), vận hành tổng đài",
         True,
-        perms(*_OPS, "vehicle.update", "alert.view", "alert.create", "contact.view", "hotline.operate"),
+        perms(
+            *_OPS,
+            "vehicle.update",
+            "alert.view",
+            "alert.create",
+            "contact.view",
+            "hotline.operate",
+            "integration.view",
+        ),
     ),
     (
         "can_bo_xa",

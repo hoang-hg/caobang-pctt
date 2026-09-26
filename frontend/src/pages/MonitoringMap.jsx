@@ -10,7 +10,7 @@ import { api } from '../api/client';
 import { useAreaQuery, useUnitsGeo } from '../api/hooks';
 import { useStore } from '../app/store';
 import MapLayers, { StormLayer } from '../components/map/MapLayers';
-import { AdminBoundaries, AreaFocus, BASEMAPS, BaseLayer, DrawTool, FocusHandler, MeasureTool, RadarLayer, RouteTool } from '../components/map/MapTools';
+import { AdminBoundaries, AreaFocus, BASEMAPS, BaseLayer, DrawTool, FocusHandler, ForecastChoropleth, MeasureTool, RadarLayer, RAIN_BINS, RouteTool } from '../components/map/MapTools';
 import DispatchModal from '../components/common/DispatchModal';
 import CameraModal from '../components/common/CameraModal';
 import IssueModal from '../components/common/IssueModal';
@@ -24,6 +24,7 @@ const LAYER_GROUPS = [
     items: [
       ['stations', 'Trạm đo mưa, mực nước, cảm biến IoT'],
       ['reservoirs', 'Hồ chứa & đập thủy điện'],
+      ['forecast', 'Mưa dự báo 24h theo xã (ECMWF + GFS)'],
       ['radar', 'Radar mưa thời gian thực'],
       ['storm', 'Quỹ đạo bão / áp thấp'],
     ],
@@ -53,7 +54,7 @@ const LAYER_GROUPS = [
 ];
 
 const DEFAULT_LAYERS = {
-  stations: true, reservoirs: true, radar: false, storm: false, flood: true, landslide: true, hazardPoints: true, roads: false,
+  stations: true, reservoirs: true, forecast: false, radar: false, storm: false, flood: true, landslide: true, hazardPoints: true, roads: false,
   forces: true, vehicles: false, routes: true, warehouses: true, evac: false, cameras: true, sos: true, admin: true,
 };
 
@@ -75,6 +76,7 @@ export default function MonitoringMap() {
   const { data } = useAreaQuery('map-layers', '/map/layers', {}, { refetchInterval: 30_000 });
   const { data: area } = useAreaQuery('area', '/admin-units/area', {}, { staleTime: Infinity });
   const { data: unitsGeo } = useUnitsGeo();
+  const { data: fcAreas } = useAreaQuery('forecast-areas', '/forecast/areas', { hours: 24 }, { enabled: layers.forecast, refetchInterval: 10 * 60_000 });
   const { data: timeline } = useQuery({
     queryKey: ['timeline', offset],
     queryFn: () => api('/map/timeline', { params: { offset_h: offset } }),
@@ -105,6 +107,7 @@ export default function MonitoringMap() {
         {layers.radar && <RadarLayer />}
         <ZoomControl position="bottomright" />
         <ScaleControl position="bottomleft" imperial={false} />
+        {layers.forecast && <ForecastChoropleth geo={unitsGeo} areas={fcAreas} />}
         {layers.admin && <AdminBoundaries geo={unitsGeo} />}
         <AreaFocus
           area={area}
@@ -241,6 +244,16 @@ export default function MonitoringMap() {
           </div>
         </div>
       </div>
+
+      {layers.forecast && (
+        <div className="card absolute bottom-24 left-3 z-[1000] p-2 text-xs shadow-xl">
+          <div className="mb-1 font-semibold">Mưa dự báo 24 giờ tới (P50)</div>
+          {RAIN_BINS.map((b) => (
+            <div key={b.label} className="flex items-center gap-2"><span className="h-3 w-5 rounded-sm" style={{ background: b.color }} />{b.label}</div>
+          ))}
+          <div className="mt-1 text-[10px] text-muted">Tổ hợp ECMWF IFS + NOAA GEFS · Open-Meteo</div>
+        </div>
+      )}
 
       {/* Thanh thời gian – dưới */}
       <div className="card absolute bottom-3 left-1/2 z-[1000] w-[min(640px,calc(100%-7rem))] -translate-x-1/2 px-4 py-2 shadow-xl">

@@ -22,6 +22,12 @@ Hệ thống điều hành PCTT & TKCN tỉnh Cao Bằng. Monorepo: `backend/` (
 - Frontend: `<Can I a scope>`, `usePermission`, `useAllowedCodes` (`src/rbac/`); API trả `admin_code` cho đối tượng cần gate theo xã.
 - Seed gán lại `admin_unit_id` theo vị trí thực (ranh giới xã xấp xỉ) — phạm vi RBAC dựa trên ranh giới này.
 
+## Tích hợp dữ liệu (app/integrations)
+- Nguồn kéo: adapter `adapters/<tên>.py` có `run(source, api_key)`, đăng ký trong `runner.ADAPTERS`; hàm phân tích dữ liệu viết thuần để unit test.
+- Nguồn đẩy: mọi số đo đi qua `ingest.ingest_readings()` (kiểm tra → ghi → WebSocket → `simulator.check_triggers`).
+- Trạm có `source` = simulator | iot | external; bộ mô phỏng chỉ sinh cho `simulator`.
+- Bí mật: `crypto.encrypt/decrypt` (Fernet); không log URL chứa API key. Xem [docs/integrations.md](docs/integrations.md).
+
 ## Quy ước frontend
 - Màu qua biến CSS (`src/index.css`) + Tailwind tokens (`bg-panel`, `text-ink-2`, `bg-danger`…); màu trạng thái cố định.
 - Biểu đồ Recharts lấy màu từ `useChartTheme()`; không dùng 2 trục Y (tách biểu đồ).

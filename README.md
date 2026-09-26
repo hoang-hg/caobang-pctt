@@ -3,7 +3,7 @@
 Ứng dụng web điều hành, ứng phó thiên tai cho **Ban Chỉ huy Phòng chống thiên tai & Tìm kiếm cứu nạn tỉnh Cao Bằng**
 — màn hình trung tâm (video wall, Dark Mode) và máy tính bảng hiện trường (Light Mode).
 
-> ⚠️ **Dữ liệu mô phỏng.** Trạm quan trắc, ngưỡng báo động, hồ chứa, lực lượng, kho, danh bạ và số điện thoại
+> ⚠️ **Dữ liệu mô phỏng** (trừ dự báo mưa ECMWF/GFS lấy thật từ Open-Meteo và các trạm đã gắn thiết bị IoT thật). Trạm quan trắc, ngưỡng báo động, hồ chứa, lực lượng, kho, danh bạ và số điện thoại
 > (đầu số `0999` không cấp phát) đều là **minh hoạ**. Ranh giới 56 xã/phường được **sinh xấp xỉ bằng Voronoi** từ toạ độ
 > tâm và cắt theo ranh giới tỉnh. Khi triển khai thật cần thay bằng dữ liệu chính thức của
 > Sở NN&MT, Đài KTTV, BCH PCTT & TKCN tỉnh.
@@ -19,6 +19,7 @@
 | E | Cảnh báo & Hotline | `/canh-bao` | Mẫu tin có tham số, phát theo xã/vùng vẽ, 5 kênh (SMS, Cell Broadcast, Zalo OA, Push, loa), **Maker–Checker + PIN**, Delivery Dashboard, danh bạ cây Tỉnh→Xã→Thôn, IVR phím 1/2/3, nhật ký pháp lý |
 | F | Bộ lọc địa phương & Sáng/Tối | toàn cục | 56 xã/phường (sau 01/07/2025), preset lưu vực Bằng Giang–Hiến, vùng núi cao, biên giới, địa bàn huyện cũ; bản đồ zoom + mask; Omni-search (địa danh, toạ độ, mã SOS); theme theo `prefers-color-scheme` + lưu lựa chọn |
 | G | CSDL | PostgreSQL 16 + PostGIS + TimescaleDB | 5 schema: `spatial_admin`, `resources`, `operations`, `iot_telemetry` (hypertable `sensor_readings`), `communications` — xem [backend/alembic/sql/](backend/alembic/sql/) |
+| Dữ liệu | Nguồn dữ liệu & IoT | `/nguon-du-lieu` | **Dự báo thật** tổ hợp ECMWF IFS + NOAA GEFS (Open-Meteo) cho 56 xã, P10/P50/P90, 72 giờ; OpenWeather (tuỳ chọn); cổng IoT **HTTP / MQTT / LoRaWAN (ChirpStack, TTN)**; kiểm tra số đo; cảnh báo mất tín hiệu; giám sát kết nối — xem [docs/integrations.md](docs/integrations.md) |
 | RBAC | Phân quyền | `/phan-quyen` | Casbin `rbac_with_domains` theo phạm vi **toàn tỉnh → cụm (địa bàn huyện cũ) → xã/phường**; 7 vai trò hệ thống + vai trò tuỳ chỉnh; tạo tài khoản con, cấp/thu hồi quyền có rào chắn chống leo thang; nhật ký phân quyền — xem [docs/rbac.md](docs/rbac.md) |
 
 Tự động hoá: cảm biến nghiêng / độ ẩm đất vượt BĐ II → tự khoanh vùng nguy cơ 1 km, tạo phiếu SOS nguồn `SENSOR`
@@ -105,6 +106,7 @@ npm run dev                                # proxy /api & /ws → localhost:8000
 | **http://localhost:5173** | Giao diện chế độ phát triển (Cách B) |
 | http://localhost:8000/docs | Tài liệu API (Swagger) – thử gọi API trực tiếp |
 | http://localhost:8000/health | Kiểm tra trạng thái hệ thống, CSDL |
+| `localhost:1883` | Broker MQTT cho thiết bị IoT (dev, cho phép ẩn danh — xem [docs/integrations.md](docs/integrations.md)) |
 | `localhost:5433` | PostgreSQL (user `pctt` / mật khẩu `pctt_dev_password`, db `caobang_pctt`) – mở bằng DBeaver, pgAdmin… |
 
 Nên dùng Chrome / Edge / Firefox bản mới. Bản đồ nền, radar mưa và font chữ tải từ Internet nên máy cần có mạng.
@@ -179,6 +181,7 @@ Chi tiết phân quyền: [docs/rbac.md](docs/rbac.md).
 docker compose exec backend pytest -q        # kiểm thử đơn vị thuật toán (NLP, định tuyến, khớp nối, ngưỡng…)
 node scripts/smoke.mjs                        # kiểm thử luồng nghiệp vụ qua API (cần stack đang chạy)
 node scripts/rbac-test.mjs                    # kiểm thử phân quyền theo phạm vi (46 kịch bản)
+node scripts/iot-test.mjs                     # kiểm thử cổng IoT HTTP/batch/LoRaWAN/MQTT + dự báo (22 kịch bản)
 cd frontend && npm run build                  # build production
 ```
 

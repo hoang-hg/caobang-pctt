@@ -83,7 +83,7 @@ async def kpis(codes: list[str] = Depends(MON)):
 @router.get("/stations")
 async def stations(type: str | None = None, codes: list[str] = Depends(MON)):
     return await fetch_all(
-        f"""SELECT s.id, s.name, s.type, s.river, s.unit, s.alarm_thresholds AS thresholds, s.status,
+        f"""SELECT s.id, s.name, s.type, s.river, s.unit, s.alarm_thresholds AS thresholds, s.status, s.source,
                    ST_Y(s.location) AS lat, ST_X(s.location) AS lon, u.name AS admin_name, l.value, l.time
               FROM iot_telemetry.monitoring_stations s
               LEFT JOIN spatial_admin.administrative_units u ON u.id = s.admin_unit_id

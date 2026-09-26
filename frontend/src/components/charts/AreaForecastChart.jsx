@@ -1,0 +1,89 @@
+import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Area, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { api } from '../../api/client';
+import { useAreaQuery } from '../../api/hooks';
+import { axisProps, Legend, useChartTheme } from './chartTheme';
+
+const fmtTime = (t) => new Date(t).toLocaleString('vi-VN', { hour: '2-digit', day: '2-digit', month: '2-digit' });
+
+function Tip({ active, payload }) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0].payload;
+  return (
+    <div className="card px-3 py-2 text-xs shadow-lg">
+      <div className="mb-1 font-semibold">{fmtTime(d.t)}</div>
+      <div>Kết hợp P50: <b className="font-mono">{d.p50} mm/h</b></div>
+      <div className="text-muted">Khoảng P10–P90: {d.p10} – {d.p90} mm/h</div>
+      {d.ecmwf != null && <div>ECMWF P50: <span className="font-mono">{d.ecmwf}</span> · GFS P50: <span className="font-mono">{d.gfs ?? '–'}</span></div>}
+      {d.prob != null && <div>Xác suất mưa ≥ 5 mm/h: <b className="font-mono">{Math.round(d.prob * 100)}%</b></div>}
+      {d.temp != null && <div className="text-muted">Nhiệt độ {d.temp}°C · gió giật {d.gust} km/h</div>}
+    </div>
+  );
+}
+
+/** Dự báo mưa 72 giờ theo xã: dải tin cậy P10–P90 (tổ hợp ECMWF + GFS), đường P50, P50 từng mô hình. */
+export default function AreaForecastChart({ height = 250 }) {
+  const c = useChartTheme();
+  const { data: areas = [] } = useAreaQuery('forecast-areas', '/forecast/areas', { hours: 72 }, { refetchInterval: 10 * 60_000 });
+  const [code, setCode] = useState('');
+  useEffect(() => {
+    if (areas.length && !areas.some((a) => a.code === code)) setCode(areas[0].code);
+  }, [areas, code]);
+  const { data } = useQuery({
+    queryKey: ['forecast-series', code],
+    queryFn: () => api(`/forecast/areas/${code}`),
+    enabled: !!code,
+    refetchInterval: 10 * 60_000,
+  });
+
+  const rows = useMemo(() => {
+    const blend = data?.series?.BLEND || [];
+    const idx = (list) => Object.fromEntries((list || []).map((r) => [r.time, r.precip_p50]));
+    const ec = idx(data?.series?.ECMWF_ENS);
+    const gf = idx(data?.series?.GFS_ENS);
+    return blend.map((r) => ({
+      t: new Date(r.time).getTime(),
+      band: [r.precip_p10, r.precip_p90],
+      p10: r.precip_p10, p50: r.precip_p50, p90: r.precip_p90,
+      ecmwf: ec[r.time], gfs: gf[r.time], prob: r.prob_heavy, temp: r.temp_c, gust: r.gust_kmh,
+    }));
+  }, [data]);
+
+  if (!areas.length) {
+    return <div className="py-10 text-center text-sm text-muted">Chưa có dữ liệu dự báo — bật nguồn Open-Meteo tại trang Nguồn dữ liệu.</div>;
+  }
+  const sel = areas.find((a) => a.code === code);
+  return (
+    <div>
+      <div className="mb-1 flex flex-wrap items-center gap-2">
+        <select className="input w-auto py-1 text-xs" value={code} onChange={(e) => setCode(e.target.value)} aria-label="Chọn xã">
+          {areas.map((a) => <option key={a.code} value={a.code}>{a.name} — {a.p50} mm (P90 {a.p90})</option>)}
+        </select>
+        {sel && <span className="text-xs text-muted">Tổng 72 giờ: <b className="font-mono text-ink">{sel.p50} mm</b> (P10 {sel.p10} – P90 {sel.p90})</span>}
+      </div>
+      <Legend items={[
+        { label: 'Khoảng P10–P90', color: c.s1 },
+        { label: 'Kết hợp P50', color: c.s1, line: true },
+        { label: 'ECMWF P50', color: c.s2, dashed: true },
+        { label: 'GFS P50', color: c.s3, dashed: true },
+      ]} />
+      <ResponsiveContainer width="100%" height={height}>
+        <ComposedChart data={rows} margin={{ top: 6, right: 8, bottom: 0, left: -12 }}>
+          <CartesianGrid stroke={c.grid} vertical={false} />
+          <XAxis dataKey="t" type="number" scale="time" domain={['dataMin', 'dataMax']} tickFormatter={fmtTime} minTickGap={50} {...axisProps(c)} />
+          <YAxis width={44} {...axisProps(c)} label={{ value: 'mm/h', angle: -90, position: 'insideLeft', fill: c.axis, fontSize: 10, dx: 14 }} />
+          <Tooltip content={<Tip />} cursor={{ stroke: c.axis, strokeDasharray: '3 3' }} />
+          <Area dataKey="band" stroke="none" fill={c.s1} fillOpacity={0.18} isAnimationActive={false} />
+          <Line dataKey="p50" stroke={c.s1} strokeWidth={2} dot={false} isAnimationActive={false} />
+          <Line dataKey="ecmwf" stroke={c.s2} strokeWidth={1.5} strokeDasharray="5 4" dot={false} isAnimationActive={false} />
+          <Line dataKey="gfs" stroke={c.s3} strokeWidth={1.5} strokeDasharray="2 3" dot={false} isAnimationActive={false} />
+        </ComposedChart>
+      </ResponsiveContainer>
+      <div className="mt-1 text-[11px] text-muted">
+        Nguồn: Open-Meteo · ECMWF IFS ({data?.series?.ECMWF_ENS?.[0]?.members || 51} thành phần) + NOAA GEFS ({data?.series?.GFS_ENS?.[0]?.members || 31}) ·
+        phát hành {sel?.issued_at ? new Date(sel.issued_at).toLocaleString('vi-VN') : '–'}
+      </div>
+    </div>
+  );
+}

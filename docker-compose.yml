@@ -28,6 +28,9 @@ services:
       JWT_SECRET: ${JWT_SECRET:-doi-khoa-bi-mat-nay-khi-trien-khai-that}
       SIMULATOR: ${SIMULATOR:-true}
       DEMO_MODE: ${DEMO_MODE:-true}
+      SECRET_KEY: ${SECRET_KEY:-}
+      OPEN_METEO_ENABLED: ${OPEN_METEO_ENABLED:-true}
+      MQTT_URL: ${MQTT_URL:-mqtt://mqtt:1883}
       CORS_ORIGINS: http://localhost:5173,http://localhost:8080
       LLM_API_URL: ${LLM_API_URL:-}
       LLM_API_KEY: ${LLM_API_KEY:-}
@@ -37,6 +40,17 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      mqtt:
+        condition: service_started
+
+  # Broker MQTT cho thiết bị IoT hiện trường (dev: cho phép ẩn danh — xem mqtt/mosquitto.conf)
+  mqtt:
+    image: eclipse-mosquitto:2
+    container_name: caobang-pctt-mqtt
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mqtt/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
 
   frontend:
     build: ./frontend
