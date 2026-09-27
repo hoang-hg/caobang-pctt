@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Kiểm thử giám sát hồ chứa & xả lũ (API công khai + dashboard).
-// Chạy: node scripts/reservoir-test.mjs [http://localhost:8000]
+// Chạy: node tests/e2e/reservoir-test.mjs [http://localhost:8000]
 const BASE = (process.argv[2] || 'http://localhost:8000') + '/api/v1';
 let failed = 0;
 const check = (name, cond, extra = '') => {

@@ -1,5 +1,5 @@
 // Kiểm thử phân quyền RBAC theo phạm vi địa bàn qua API.
-//   node scripts/rbac-test.mjs [http://localhost:8000]
+//   node tests/e2e/rbac-test.mjs [http://localhost:8000]
 const BASE = (process.argv[2] || 'http://localhost:8000') + '/api/v1';
 let failures = 0;
 

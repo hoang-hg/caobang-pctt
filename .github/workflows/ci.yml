@@ -67,31 +67,56 @@ jobs:
       JWT_SECRET: ci-jwt-secret-${{ github.run_id }}
       SECRET_KEY: ci-secret-key-${{ github.run_id }}
       OPEN_METEO_ENABLED: "true"
+      # Kiểm thử API dùng tài khoản demo + dữ liệu mẫu + bộ mô phỏng
+      DEMO_MODE: "true"
+      SIMULATOR: "true"
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
           node-version: "22"
+      - name: Kiểm tra cấu hình triển khai thật (docker-compose.prod.yml)
+        run: |
+          # tệp mẫu còn trống bí mật → compose phải báo lỗi (không dùng "! lệnh": bash -e bỏ qua lệnh bị phủ định)
+          if docker compose -f docker-compose.prod.yml --env-file .env.production.example config -q 2>/dev/null; then
+            echo "docker-compose.prod.yml chấp nhận cấu hình thiếu bí mật — phải dùng \${VAR:?…}"; exit 1
+          fi
+          # điền đủ bí mật → cấu hình hợp lệ
+          cp .env.production.example ci.prod.env
+          cat >> ci.prod.env <<EOF
+          DOMAIN=pctt.ci.local
+          ACME_EMAIL=ci@ci.local
+          JWT_SECRET=$(openssl rand -hex 32)
+          SECRET_KEY=$(openssl rand -hex 32)
+          SUPERADMIN_EMAIL=ci@ci.local
+          SUPERADMIN_PASSWORD=Ci-Pass-$(openssl rand -hex 8)
+          SUPERADMIN_PIN=480193
+          POSTGRES_PASSWORD=$(openssl rand -hex 16)
+          MINIO_ROOT_PASSWORD=$(openssl rand -hex 16)
+          SMTP_HOST=smtp.ci.local
+          EOF
+          docker compose -f docker-compose.prod.yml --env-file ci.prod.env --profile caddy --profile mqtt config -q
+          rm ci.prod.env
       - name: Build & khởi động stack
         run: docker compose up -d --build --wait --wait-timeout 600 db redis minio mailpit mqtt backend worker
       - name: Chờ dữ liệu đầu tiên (mô phỏng + đồng bộ dự báo)
         run: sleep 45
       - name: Kiểm thử luồng nghiệp vụ
-        run: node scripts/smoke.mjs
+        run: node tests/e2e/smoke.mjs
       - name: Kiểm thử phân quyền RBAC
-        run: node scripts/rbac-test.mjs
+        run: node tests/e2e/rbac-test.mjs
       - name: Kiểm thử IoT & nguồn dữ liệu
-        run: node scripts/iot-test.mjs
+        run: node tests/e2e/iot-test.mjs
       - name: Kiểm thử cổng công khai, phản ánh, tài khoản
-        run: node scripts/public-test.mjs
+        run: node tests/e2e/public-test.mjs
       - name: Kiểm thử tra cứu tiến độ phiếu
         run: |
           docker compose exec -T redis sh -c "redis-cli --scan --pattern 'rl:*' | xargs -r redis-cli del"
-          node scripts/track-test.mjs
+          node tests/e2e/track-test.mjs
       - name: Kiểm thử hồ chứa & điểm đen sạt lở
         run: |
-          node scripts/reservoir-test.mjs
-          node scripts/landslide-test.mjs
+          node tests/e2e/reservoir-test.mjs
+          node tests/e2e/landslide-test.mjs
       - name: Log khi lỗi
         if: failure()
         run: docker compose logs --tail=300 backend worker

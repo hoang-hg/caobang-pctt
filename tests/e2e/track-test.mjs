@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Kiểm thử tra cứu tiến độ phiếu SOS / phản ánh trên cổng công khai (POST /api/v1/public/track).
-// Tự tạo dữ liệu, không phụ thuộc mã phiếu cố định. Chạy: node scripts/track-test.mjs [http://localhost:8000]
+// Tự tạo dữ liệu, không phụ thuộc mã phiếu cố định. Chạy: node tests/e2e/track-test.mjs [http://localhost:8000]
 // Chạy lại nhiều lần: xoá khoá rl:* trong Redis trước (giới hạn 5 phản ánh/giờ/IP).
 const ROOT = process.argv[2] || 'http://localhost:8000';
 const BASE = ROOT + '/api/v1';

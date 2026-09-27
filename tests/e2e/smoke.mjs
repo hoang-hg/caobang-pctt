@@ -1,5 +1,5 @@
 // Kiểm thử nhanh luồng nghiệp vụ end-to-end qua API.
-//   node scripts/smoke.mjs [http://localhost:8000]
+//   node tests/e2e/smoke.mjs [http://localhost:8000]
 const BASE = (process.argv[2] || 'http://localhost:8000') + '/api/v1';
 let failures = 0;
 
