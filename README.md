@@ -107,8 +107,53 @@ vùng nguy hiểm, số điện thoại không có thật.
 | Điểm sơ tán | `resources.evacuation_sites` | ⛔ trống | Phương án ứng phó của từng xã |
 | Danh bạ, đường dây nóng tỉnh | `communications.contacts` | ⛔ trống (cổng chỉ hiện 112/113/114/115) | Văn phòng BCH |
 
-**Chưa có giao diện nhập** trạm, hồ, lực lượng, kho, điểm sơ tán, vùng nguy hiểm, danh bạ. Trong lúc chờ công cụ
-nhập CSV/GeoJSON: nhập bằng SQL theo cấu trúc bảng ở `backend/alembic/sql/`, có người thứ hai đối chiếu.
+Nhập bằng công cụ ở [2.4](#nhap-du-lieu), có người thứ hai đối chiếu với văn bản gốc.
+
+<a id="nhap-du-lieu"></a>
+### 2.4. Nhập dữ liệu chính thức
+
+Trang **Nhập dữ liệu** (`/nhap-du-lieu`, quyền `data.import`: Super admin, Lãnh đạo BCH, Admin tỉnh) hoặc dòng lệnh trên
+máy chủ. Quy trình: **Tải tệp mẫu** → điền → **Kiểm tra** (không ghi gì: báo lỗi theo dòng, số bản ghi thêm / cập nhật /
+xoá, xem trước) → **Nhập** (kiểm tra lại, ghi toàn bộ trong 1 transaction hoặc không ghi gì; ghi nhật ký pháp lý; mọi màn
+hình và cổng công khai cập nhật ngay).
+
+| Loại (mã) | Bảng | Định dạng | Khoá | Thay toàn bộ |
+|---|---|---|---|---|
+| Ranh giới xã/phường (`ranh_gioi_xa`) | `administrative_units` | GeoJSON vùng | mã xã có sẵn — chỉ cập nhật | — |
+| Điểm sơ tán (`diem_so_tan`) 🌐 | `evacuation_sites` | CSV / Excel / GeoJSON điểm | `ma` | ✓ |
+| Vùng nguy hiểm (`vung_nguy_hiem`) 🌐 | `hazard_zones` | GeoJSON vùng | `ma` | ✓ (không xoá vùng do cảm biến tạo) |
+| Điểm nguy hiểm (`diem_nguy_hiem`) 🌐 | `hazard_points` | CSV / Excel / GeoJSON điểm | `ma` | ✓ |
+| Danh bạ & đường dây nóng (`danh_ba`) 🌐 | `contacts` | CSV / Excel | `ma` (+ `ma_cap_tren`) | ✓ |
+| Trạm quan trắc (`tram_quan_trac`) | `monitoring_stations` | CSV / Excel / GeoJSON điểm | `ma` | — |
+| Hồ chứa (`ho_chua`) 🌐 | `reservoirs` | CSV / Excel / GeoJSON điểm | `ma` | — |
+| Kho vật tư (`kho`) | `warehouses` | CSV / Excel / GeoJSON điểm | `ma` | — |
+| Tồn kho (`ton_kho`) | `inventory` | CSV / Excel | `ma_kho` + `ma_vat_tu` | — |
+| Lực lượng (`luc_luong`) | `forces` | CSV / Excel / GeoJSON điểm | `ma` | — |
+| Phương tiện (`phuong_tien`) | `vehicles` | CSV / Excel | `ma` (+ `ma_luc_luong`) | — |
+| Điểm cấp nhiên liệu (`cay_xang`) | `fuel_depots` | CSV / Excel / GeoJSON điểm | `ma` | ✓ |
+
+🌐 = hiện trên cổng công khai. Quy tắc:
+
+- **Mã (`ma`)** là định danh ổn định: nhập lại tệp đã sửa → **cập nhật** đúng bản ghi, không nhân đôi. Ô trống ghi
+  đè thành trống (tệp là nguồn chính), trừ cột ghi "trống = giữ nguyên".
+- **Toạ độ WGS84** (vĩ độ ~22,3–23,1; kinh độ ~105,3–106,9 cho Cao Bằng); điểm ngoài tỉnh bị từ chối. GeoJSON phải là
+  WGS84 (EPSG:4326) — tệp VN-2000 phải chuyển hệ trước. Hình học vùng lỗi tự sửa (`ST_MakeValid`) kèm cảnh báo.
+- **Xã/phường** tự xác định theo vị trí nếu để trống `ma_xa`. Nhập ranh giới xã mới → mọi đối tượng (SOS, phản ánh,
+  điểm sơ tán…) được gán lại xã theo ranh giới mới.
+- **Excel**: dùng trang tính đầu tiên, dòng 1 là tên cột; CSV phải là UTF-8 (Excel: Lưu thành → "CSV UTF-8"). Tên cột
+  và giá trị liệt kê viết có dấu cũng được ("Vĩ độ", "Trường học"). Tối đa 20 MB, 20.000 dòng.
+- **Thay toàn bộ** xoá mọi bản ghi của bảng không có trong tệp (kể cả dữ liệu mẫu) — giao diện báo trước số bản ghi sẽ
+  xoá và bắt buộc tích xác nhận. Chỉ có ở bảng không bị bảng khác tham chiếu.
+- Thứ tự khi nhập lần đầu: ranh giới xã → kho → tồn kho → lực lượng → phương tiện → phần còn lại.
+
+Dòng lệnh (tệp lớn, người vận hành máy chủ):
+
+```bash
+docker compose cp diem_so_tan.csv backend:/tmp/        # chạy thật: dcp cp …
+docker compose exec backend python -m app.services.data_import --list
+docker compose exec backend python -m app.services.data_import diem_so_tan /tmp/diem_so_tan.csv            # kiểm tra
+docker compose exec backend python -m app.services.data_import diem_so_tan /tmp/diem_so_tan.csv --apply    # nhập
+```
 
 ### 2.3. Việc phải xong trước khi mở cho người dân
 
@@ -116,13 +161,14 @@ Bắt buộc:
 
 1. ⛔ Tích hợp ít nhất một kênh cảnh báo thật có báo cáo giao nhận (SMS Brandname hoặc Cell Broadcast qua nhà mạng)
    và gỡ số liệu giao nhận ngẫu nhiên khỏi giao diện.
-2. ⛔ Nhập dữ liệu chính thức mục 2.2 (tối thiểu: ranh giới xã, điểm sơ tán, vùng nguy hiểm, danh bạ đường dây nóng).
+2. ⛔ Nhập dữ liệu chính thức mục 2.2 bằng công cụ [2.4](#nhap-du-lieu) (tối thiểu: ranh giới xã, điểm sơ tán, vùng
+   nguy hiểm, danh bạ đường dây nóng).
 3. ⛔ Bản đồ nền có giấy phép sử dụng ([6.9](#ban-do-nen)).
 4. ⛔ Triển khai theo [mục 10](#trien-khai): `APP_ENV=production`, HTTPS, sao lưu ra ngoài máy chủ, đã diễn tập khôi phục.
 5. ⛔ Hồ sơ cấp độ an toàn thông tin, kiểm thử xâm nhập, thông báo xử lý dữ liệu cá nhân ([mục 11](#bao-mat)).
 6. ⛔ Diễn tập trên một xã thí điểm: soạn → duyệt → phát → người dân nhận được.
 
-Nên có: công cụ nhập dữ liệu CSV/GeoJSON; chính sách xoá SĐT người phản ánh sau thời hạn; Content-Security-Policy;
+Nên có: chính sách xoá SĐT người phản ánh sau thời hạn; Content-Security-Policy;
 máy chủ dự phòng ngoài tỉnh; giám sát số liệu (metrics) + cảnh báo; kiểm thử tải lại trên máy chủ thật ([12.2](#kiem-thu-tai)).
 
 ---
@@ -675,6 +721,7 @@ Yêu cầu ở phạm vi toàn tỉnh **không** khớp phân quyền cấp cụ
 | `user.view` / `user.manage` | ✓ | Xem / tạo tài khoản con, cấp – thu hồi vai trò trong phạm vi |
 | `report.view` / `report.moderate` | ✓ | Xem (kể cả SĐT người gửi) / duyệt – từ chối – chuyển SOS phản ánh |
 | `integration.view` / `integration.manage` | toàn tỉnh | Xem / cấu hình nguồn dữ liệu, thiết bị IoT, cấp khoá |
+| `data.import` | toàn tỉnh | Nhập dữ liệu chính thức từ tệp ([2.4](#nhap-du-lieu)) |
 | `rbac.manage` | toàn tỉnh | Tạo / sửa / xoá định nghĩa vai trò |
 
 ### 8.2. Vai trò hệ thống (đồng bộ mỗi lần khởi động)
@@ -683,7 +730,7 @@ Yêu cầu ở phạm vi toàn tỉnh **không** khớp phân quyền cấp cụ
 |---|---|---|
 | `super_admin` Quản trị hệ thống | ✗ | Tất cả |
 | `truong_ban` Lãnh đạo BCH | ✗ | Tất cả trừ `rbac.manage` |
-| `admin_tinh` Quản trị tỉnh | ✗ | Tài khoản, duyệt phản ánh, xử lý SOS và **điều động** toàn tỉnh; xem nguồn lực, cảnh báo, nhật ký, nguồn dữ liệu. Không soạn/duyệt cảnh báo, không sửa vai trò |
+| `admin_tinh` Quản trị tỉnh | ✗ | Tài khoản, duyệt phản ánh, xử lý SOS và **điều động** toàn tỉnh; xem nguồn lực, cảnh báo, nhật ký, nguồn dữ liệu; **nhập dữ liệu chính thức**. Không soạn/duyệt cảnh báo, không sửa vai trò |
 | `admin_xa` Quản trị xã/phường | ✓ | Tài khoản & duyệt phản ánh trong xã; tiếp nhận – cập nhật SOS của xã |
 | `chi_huy_cum` Chỉ huy cụm | ✓ | Điều hành, xuất kho, soạn + duyệt cảnh báo, tài khoản trong cụm |
 | `truc_ban` Trực ban điều hành | ✓ | Tiếp nhận SOS, điều động, soạn cảnh báo (Maker), tổng đài |
@@ -852,7 +899,7 @@ Sau lần chạy đầu:
 1. Đăng nhập Superadmin → **đổi mật khẩu và PIN** ngay.
 2. Trang **Phân quyền**: tạo tài khoản đích danh cho từng người; không dùng chung tài khoản; có Superadmin đích danh
    rồi thì **khoá** tài khoản `admin` ban đầu.
-3. Nhập dữ liệu chính thức ([2.2](#hien-trang)) **trước** khi công bố địa chỉ cổng.
+3. Nhập dữ liệu chính thức ([2.4](#nhap-du-lieu)) **trước** khi công bố địa chỉ cổng.
 4. Trang **Nguồn dữ liệu & IoT**: kiểm tra Open-Meteo chạy "OK", đăng ký thiết bị.
 5. Thử "Quên mật khẩu" để xác nhận SMTP.
 
@@ -968,6 +1015,7 @@ Kiểm thử API (cần stack dev đang chạy với `DEMO_MODE=true`; tham số
 | Tra cứu tiến độ phiếu | `node tests/e2e/track-test.mjs` |
 | Hồ chứa & xả lũ | `node tests/e2e/reservoir-test.mjs` |
 | Điểm đen sạt lở & đường đèo | `node tests/e2e/landslide-test.mjs` |
+| Nhập dữ liệu (12 loại, kiểm tra lỗi, cập nhật không trùng, thay toàn bộ) — chạy cuối | `node tests/e2e/import-test.mjs` |
 
 Chạy lại nhiều lần liên tiếp: xoá khoá `rl:*` trong Redis trước (lệnh ở 4.5).
 
@@ -1014,7 +1062,7 @@ tăng CPU nếu kịch bản đồng thời chưa đạt.
 
 **CI** (`.github/workflows/ci.yml`, mỗi push / PR): ruff + pytest; build frontend; kiểm tra `docker-compose.prod.yml`
 (thiếu bí mật phải báo lỗi, đủ bí mật phải hợp lệ); dựng stack bằng `docker-compose.yml` với `DEMO_MODE=true`,
-`SIMULATOR=true` và chạy 7 bộ kiểm thử API. **Deploy** (`deploy.yml`): tag `vX.Y.Z` → build & đẩy image lên GitHub
+`SIMULATOR=true` và chạy 8 bộ kiểm thử API. **Deploy** (`deploy.yml`): tag `vX.Y.Z` → build & đẩy image lên GitHub
 Container Registry.
 
 ---

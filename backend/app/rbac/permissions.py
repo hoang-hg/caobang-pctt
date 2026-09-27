@@ -28,6 +28,7 @@ class Resource(StrEnum):
     RBAC = "rbac"  # quản trị vai trò
     INTEGRATION = "integration"  # nguồn dữ liệu ngoài, thiết bị IoT
     REPORT = "report"  # phản ánh hiện trường của người dân
+    DATA = "data"  # nhập dữ liệu chính thức từ tệp
 
 
 class Action(StrEnum):
@@ -40,6 +41,7 @@ class Action(StrEnum):
     OPERATE = "operate"
     MANAGE = "manage"
     MODERATE = "moderate"
+    IMPORT = "import"
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,6 +81,9 @@ ALL_PERMISSIONS: Final[tuple[Permission, ...]] = (
     Permission(R.REPORT, A.MODERATE, True, "Duyệt / từ chối / chuyển SOS phản ánh của người dân"),
     Permission(R.INTEGRATION, A.VIEW, False, "Xem nguồn dữ liệu, thiết bị IoT, giám sát kết nối"),
     Permission(R.INTEGRATION, A.MANAGE, False, "Cấu hình nguồn dữ liệu, đăng ký thiết bị IoT, cấp khoá"),
+    Permission(
+        R.DATA, A.IMPORT, False, "Nhập dữ liệu chính thức từ tệp (điểm sơ tán, vùng nguy hiểm, danh bạ…)"
+    ),
 )
 
 GLOBAL_SCOPE: Final[str] = "*"
@@ -146,6 +151,7 @@ SYSTEM_ROLES: Final[tuple[tuple[str, str, str, bool, list[tuple[str, str]]], ...
             "user.manage",
             "report.view",
             "report.moderate",
+            "data.import",
         ),
     ),
     (

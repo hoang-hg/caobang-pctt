@@ -65,6 +65,9 @@ export function useSocket() {
           inv('map-layers');
           toast({ tone: 'danger', title: 'Cảm biến vượt ngưỡng', body: data.name });
           break;
+        case 'data.imported': // nhập dữ liệu chính thức → mọi màn hình tải lại
+          qc.invalidateQueries();
+          break;
         case 'source.updated':
           inv('int-sources', 'int-monitor', 'forecast-areas', 'forecast-series', 'rainfall');
           break;

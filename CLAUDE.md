@@ -49,6 +49,9 @@ backend/                   Python 3.12, FastAPI, SQLAlchemy async (psycopg3), Ca
                            chống leo thang) · seed.py (đồng bộ vai trò, tạo Superadmin / tài khoản demo)
   app/services/            sos, sos_nlp, dispatch_matching, safe_routing, broadcast, reports, tracking, reservoirs,
                            landslides, events (log_event), simulator, scenario
+  app/services/data_import/  nhập dữ liệu chính thức từ tệp: specs.py (khai báo 12 loại) · parsing.py (CSV/xlsx/GeoJSON,
+                           chuẩn hoá — thuần) · engine.py (validate / apply 1 transaction) · templates.py · service.py
+                           (nhật ký, sự kiện, xoá cache) · __main__.py (dòng lệnh). API: app/api/v1/data_import.py
   app/integrations/        runner.py (lập lịch nguồn kéo, DEFAULT_SOURCES, ADAPTERS, env_source_keys) · adapters/
                            (open_meteo, openweather) · ingest.py (lõi nhận số đo) · mqtt_bridge.py · crypto.py (Fernet)
   app/infra/               redis.py · cache.py (cached, cached_view, invalidate, bump_data_version) · ratelimit.py
@@ -67,7 +70,7 @@ frontend/                  React 18, Vite 6, Tailwind 3, TanStack Query 5, Zusta
   src/api/                 client.js (api(), useAreaParams) · hooks.js (useAreaQuery, useUnits…) · useSocket.js
   src/app/store.js         Zustand: theme, filter, focus, alertDraft, gps, auth, wsStatus, soundOn, sidebar, toasts
   src/rbac/                permissions.js (khớp domain) · usePermission.js (usePermission, useCanAll, useAllowedCodes, Can)
-  src/pages/               trang điều hành; pages/public/ = cổng công khai (PublicPortal, ReportForm, TicketTracker,
+  src/pages/               trang điều hành (DataImport = nhập dữ liệu chính thức); pages/public/ = cổng công khai (PublicPortal, ReportForm, TicketTracker,
                            ReservoirMonitor, LandslideMonitor)
   src/components/          common/ (ui.jsx: KpiCard Modal Tabs Section Empty…, Turnstile, DispatchModal…) · layout/ ·
                            map/ (MapLayers, MapTools = nền bản đồ + công cụ, icons, leafletGlobal) · charts/ (chartTheme)
@@ -292,6 +295,11 @@ Python trong container.
   config → test hàm phân tích → README §6.1.
 - **Kênh cảnh báo thật** (SMS, Cell Broadcast, Zalo…): bộ gửi trong `services/broadcast.py` (hoặc `services/channels/`),
   trạng thái giao nhận lấy từ nhà cung cấp thay `advance_delivery`, bí mật qua config + preflight, cập nhật README §2.1 / §6.
+- **Loại dữ liệu nhập mới** (README §2.4): thêm `Dataset` vào `data_import/specs.py` (cột CSDL, kiểu, ràng buộc, khoá,
+  `refs`, `insert_only`, `replaceable` chỉ khi bảng không bị tham chiếu); kiểm tra riêng → `engine._row_checks`; bảng
+  chưa có mã ổn định → migration thêm `code` + unique index. `test_data_import` tự nhập thử dòng mẫu của mọi loại;
+  thêm tên vào `ORDER` trong `tests/e2e/import-test.mjs`; cập nhật bảng README §2.4. Không nhập dữ liệu chính thức
+  bằng SQL tay.
 - **Chức năng mô phỏng → thật**: tắt nhánh mô phỏng tương ứng khi có dữ liệu thật (mẫu: trạm `source='iot'`), cập nhật README §2.
 
 ## 11. Bẫy đã biết
