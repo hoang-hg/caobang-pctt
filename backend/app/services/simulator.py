@@ -368,10 +368,14 @@ class Simulator:
         }
         res = await fetch_all("SELECT * FROM iot_telemetry.reservoirs")
         for r in res:
+            if r["normal_level"] is None:
+                continue  # hồ nhập từ tệp chưa có mực nước dâng bình thường → không có gì để mô phỏng
             stations = basin.get(r["river"], ["CB-RN-01"])
             intensity = sum(rain.get(s, 0) for s in stations) / len(stations)
             inflow = round(max(60, 120 + intensity * 38 + rng.uniform(-25, 25)))
-            level = r["current_level"] + (inflow - r["outflow_m3s"]) / 25000
+            # hồ mới nhập: chưa có mực nước / lưu lượng vận hành (cập nhật qua nguồn dữ liệu) → bắt đầu dưới MNDBT
+            current = r["current_level"] if r["current_level"] is not None else r["normal_level"] - 1.5
+            level = current + (inflow - (r["outflow_m3s"] or 0)) / 25000
             gates = r["spill_gates_open"]
             if level > r["normal_level"] - 0.3 and gates < r["spill_gates"]:
                 gates += 1
