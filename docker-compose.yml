@@ -1,4 +1,5 @@
-# Hệ thống Điều hành PCTT & TKCN tỉnh Cao Bằng
+# Hệ thống Điều hành PCTT & TKCN tỉnh Cao Bằng — MÔI TRƯỜNG PHÁT TRIỂN / TRÌNH DIỄN
+#   Triển khai thật dùng docker-compose.prod.yml + .env.production (README.md mục 10).
 #   docker compose up -d --build
 #     db       PostgreSQL 16 + PostGIS + TimescaleDB
 #     redis    cache, giới hạn tần suất, phát sự kiện WebSocket & đồng bộ quyền giữa các tiến trình
@@ -11,17 +12,32 @@
 #   Frontend dev: cd frontend && npm run dev (proxy /api, /ws → localhost:8000)
 
 x-backend-env: &backend-env
+  APP_ENV: ${APP_ENV:-development}
   DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-pctt}:${POSTGRES_PASSWORD:-pctt_dev_password}@db:5432/${POSTGRES_DB:-caobang_pctt}
   REDIS_URL: redis://redis:6379/0
   JWT_SECRET: ${JWT_SECRET:-doi-khoa-bi-mat-nay-khi-trien-khai-that}
   SECRET_KEY: ${SECRET_KEY:-}
-  SIMULATOR: ${SIMULATOR:-true}
-  DEMO_MODE: ${DEMO_MODE:-true}
+  SIMULATOR: ${SIMULATOR:-false}
+  DEMO_MODE: ${DEMO_MODE:-false}
+  SUPERADMIN_USERNAME: ${SUPERADMIN_USERNAME:-admin}
+  SUPERADMIN_FULL_NAME: ${SUPERADMIN_FULL_NAME:-Quản trị hệ thống}
+  SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL:-admin@caobang-pctt.local}
+  SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD:-admin123}
+  SUPERADMIN_PIN: ${SUPERADMIN_PIN:-0000}
+  SUPERADMIN_ROLE: ${SUPERADMIN_ROLE:-super_admin}
+  SUPERADMIN_DOMAIN: ${SUPERADMIN_DOMAIN:-*}
   OPEN_METEO_ENABLED: ${OPEN_METEO_ENABLED:-true}
+  OPEN_METEO_API_KEY: ${OPEN_METEO_API_KEY:-}
+  OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY:-}
   MQTT_URL: ${MQTT_URL:-mqtt://mqtt:1883}
-  CORS_ORIGINS: http://localhost:5173,http://localhost:8080
+  MQTT_TOPIC: ${MQTT_TOPIC:-caobang/pctt/+/readings}
+  INTAKE_API_KEY: ${INTAKE_API_KEY:-}
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:8080}
   PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8080}
   RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+  TRUSTED_PROXIES: ${TRUSTED_PROXIES:-127.0.0.1,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}
+  DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
+  DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-5}
   MINIO_ENDPOINT: minio:9000
   MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-pctt_minio}
   MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-pctt_minio_dev_password}
@@ -31,6 +47,7 @@ x-backend-env: &backend-env
   SMTP_USER: ${SMTP_USER:-}
   SMTP_PASSWORD: ${SMTP_PASSWORD:-}
   SMTP_STARTTLS: ${SMTP_STARTTLS:-false}
+  TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-}
   TURNSTILE_SECRET: ${TURNSTILE_SECRET:-}
   LLM_API_URL: ${LLM_API_URL:-}
   LLM_API_KEY: ${LLM_API_KEY:-}
@@ -100,8 +117,10 @@ services:
     environment:
       <<: *backend-env
       RUN_MODE: api
+    # Dev: migrate + seed rồi chạy API trong cùng container. IP người dùng: nginx ghi đè X-Forwarded-For, app tin
+    # TRUSTED_PROXIES (không dùng --forwarded-allow-ips=* — cho phép giả mạo IP để vượt giới hạn tần suất).
     # Một dòng duy nhất: YAML ">" giữ xuống dòng ở dòng thụt sâu → shell tách thành lệnh riêng
-    command: ["sh", "-c", "alembic upgrade head && python -m app.seed && exec gunicorn app.main:app -k uvicorn.workers.UvicornWorker -w ${API_WORKERS:-2} -b 0.0.0.0:8000 --forwarded-allow-ips=* --timeout 120 --access-logfile -"]
+    command: ["sh", "-c", "alembic upgrade head && python -m app.seed && exec gunicorn app.main:app -k uvicorn.workers.UvicornWorker -w ${API_WORKERS:-2} -b 0.0.0.0:8000 --timeout 120 --access-logfile -"]
     ports:
       - "8000:8000"
     healthcheck:

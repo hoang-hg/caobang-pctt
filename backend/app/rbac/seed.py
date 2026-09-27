@@ -1,4 +1,4 @@
-"""Đồng bộ vai trò hệ thống (idempotent, mỗi lần khởi động) + gán vai trò cho tài khoản demo lần đầu."""
+"""Đồng bộ vai trò hệ thống (idempotent, mỗi lần khởi động) + tạo tài khoản Superadmin / tài khoản demo lần đầu."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import logging
 from app import seed_data as D
 from app.auth import hash_secret
 from app.config import settings
-from app.db import execute, fetch_all
+from app.db import execute, fetch_one
 from app.rbac.enforcer import get_enforcer, notify_policy_changed
 from app.rbac.permissions import GLOBAL_SCOPE, SYSTEM_ROLES
 
@@ -44,42 +44,49 @@ async def sync_system_roles() -> None:
         )
 
 
-async def ensure_demo_users() -> None:
-    """DEMO_MODE: tạo tài khoản demo còn thiếu (khi thêm tài khoản mới vào seed_data) và gán email demo."""
-    if not settings.demo_mode:
+async def ensure_user(username, full_name, position, password, pin, email, role, domain) -> None:
+    """Tạo tài khoản + gán vai trò CHỈ khi tài khoản chưa tồn tại. Tài khoản đã có thì không đụng tới: mật khẩu, trạng
+    thái khoá và vai trò (kể cả khi quản trị viên đã gỡ hết vai trò) giữ nguyên qua các lần khởi động lại."""
+    created = await fetch_one(
+        """INSERT INTO communications.users (username, full_name, position, password_hash, pin_hash, email)
+           VALUES (:u, :f, :p, :pw, :pin, :e) ON CONFLICT (username) DO NOTHING RETURNING id""",
+        {
+            "u": username,
+            "f": full_name,
+            "p": position,
+            "pw": hash_secret(password),
+            "pin": hash_secret(pin) if pin else None,
+            "e": email,
+        },
+    )
+    if created is not None:
+        await get_enforcer().add_grouping_policy(username, role, domain)
+        log.info("[rbac] tạo tài khoản %s → %s @ %s", username, role, domain)
+
+
+async def ensure_system_accounts() -> None:
+    """Superadmin từ cấu hình (.env) — chỉ tạo lần đầu. Tài khoản demo (mật khẩu công khai trong seed_data)
+    chỉ tạo khi DEMO_MODE=true; khi chạy thật, admin tỉnh/xã do Superadmin tạo trong trang Phân quyền."""
+    s = settings
+    await ensure_user(
+        s.superadmin_username,
+        s.superadmin_full_name,
+        "Quản trị hệ thống",
+        s.superadmin_password,
+        s.superadmin_pin,
+        s.superadmin_email,
+        s.superadmin_role,
+        s.superadmin_domain,
+    )
+    if not s.demo_mode:
         return
-    for username, full, pos, pw, pin, _role, _domain in D.USERS:
-        await execute(
-            """INSERT INTO communications.users (username, full_name, position, password_hash, pin_hash, email)
-               VALUES (:u, :f, :p, :pw, :pin, :e) ON CONFLICT (username) DO NOTHING""",
-            {
-                "u": username,
-                "f": full,
-                "p": pos,
-                "pw": hash_secret(pw),
-                "pin": hash_secret(pin) if pin else None,
-                "e": f"{username}@{D.DEMO_EMAIL_DOMAIN}",
-            },
-        )
-        await execute(
-            "UPDATE communications.users SET email = :e WHERE username = :u AND email IS NULL",
-            {"u": username, "e": f"{username}@{D.DEMO_EMAIL_DOMAIN}"},
-        )
-
-
-async def seed_demo_assignments() -> None:
-    """Chỉ gán cho tài khoản demo CHƯA có vai trò nào (không ghi đè thay đổi của quản trị viên)."""
-    e = get_enforcer()
-    users = {u["username"] for u in await fetch_all("SELECT username FROM communications.users")}
-    for username, *_rest, role, domain in D.USERS:
-        if username in users and not e.get_filtered_grouping_policy(0, username):
-            await e.add_grouping_policy(username, role, domain)
-            log.info("[rbac] gán %s → %s @ %s", username, role, domain)
+    for username, full, pos, pw, pin, role, domain in D.USERS:
+        if username != s.superadmin_username:
+            await ensure_user(username, full, pos, pw, pin, f"{username}@{D.DEMO_EMAIL_DOMAIN}", role, domain)
 
 
 async def bootstrap() -> None:
     await dedupe_policies()
     await sync_system_roles()
-    await ensure_demo_users()
-    await seed_demo_assignments()
+    await ensure_system_accounts()
     await notify_policy_changed()

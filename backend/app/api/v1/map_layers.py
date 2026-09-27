@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from app.area import area_clause, parse_codes
 from app.auth import current_user
 from app.db import fetch_all, fetch_one
+from app.infra.cache import cached_view
 from app.rbac.authz import NO_MATCH, allowed_codes, forbidden, require_any, restrict_codes
 from app.services.broadcast import estimate_audience
 from app.services.safe_routing import plan_route
@@ -35,6 +36,15 @@ async def layers(requested: list[str] = Depends(parse_codes), user: dict = Depen
     if codes == NO_MATCH and allowed_codes(user, "monitoring", "view") == []:
         raise forbidden()
     res_codes, sos_codes = scope("resource"), scope("sos")
+    # Kết quả chỉ phụ thuộc 3 danh sách xã (đã giao với quyền) → dùng chung giữa cán bộ cùng phạm vi
+    return await cached_view(
+        "map-layers",
+        {"m": codes, "r": res_codes, "s": sos_codes},
+        lambda: _layers(codes, res_codes, sos_codes),
+    )
+
+
+async def _layers(codes: list[str], res_codes: list[str], sos_codes: list[str]) -> dict:
     p, pr, ps = {"codes": codes}, {"codes": res_codes}, {"codes": sos_codes}
     stations = await fetch_all(
         f"""SELECT s.id, s.name, s.type, s.river, s.unit, s.alarm_thresholds AS thresholds, ST_Y(s.location) AS lat, ST_X(s.location) AS lon,

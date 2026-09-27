@@ -5,6 +5,7 @@ from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import DBAPIError
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from app.api.v1 import (
     admin_units,
@@ -26,6 +27,7 @@ from app.auth import user_from_token
 from app.config import settings
 from app.db import fetch_one
 from app.infra import storage
+from app.infra.heartbeat import STALE_S, worker_age_s
 from app.infra.ratelimit import RateLimitMiddleware
 from app.infra.redis import get_redis
 from app.lifecycle import shutdown, startup
@@ -38,6 +40,22 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
+class DropQueryString(logging.Filter):
+    """Log của uvicorn không ghi query string: /ws?token=… chứa JWT, /public/locate?lat=… là vị trí người dân.
+    Áp cho log truy cập HTTP (uvicorn.access) và log kết nối WebSocket (uvicorn.error)."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if isinstance(record.args, tuple):
+            record.args = tuple(
+                a.split("?", 1)[0] if isinstance(a, str) and a.startswith("/") else a for a in record.args
+            )
+        return True
+
+
+for _name in ("uvicorn.access", "uvicorn.error"):
+    logging.getLogger(_name).addFilter(DropQueryString())
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     await startup()
@@ -48,8 +66,11 @@ async def lifespan(_: FastAPI):
 app = FastAPI(
     title="API Điều hành PCTT & TKCN tỉnh Cao Bằng",
     version="0.1.0",
-    description="Dashboard, bản đồ giám sát, nguồn lực, cứu hộ, cảnh báo đa kênh — dữ liệu mô phỏng.",
+    description="Dashboard, bản đồ giám sát, nguồn lực, cứu hộ, cảnh báo đa kênh.",
     lifespan=lifespan,
+    docs_url="/docs" if settings.docs_enabled else None,
+    redoc_url="/redoc" if settings.docs_enabled else None,
+    openapi_url="/openapi.json" if settings.docs_enabled else None,
 )
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(
@@ -59,6 +80,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# Ngoài cùng (thêm sau cùng): xác định IP người dùng TRƯỚC giới hạn tần suất. Chỉ tin X-Forwarded-For khi kết nối
+# đến từ TRUSTED_PROXIES (hỗ trợ CIDR — gunicorn --forwarded-allow-ips thì không), lấy IP không tin cậy ngoài cùng.
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=settings.trusted_proxies)
 
 
 @app.exception_handler(DBAPIError)
@@ -98,8 +122,14 @@ async def health():
             redis_ok = bool(await r.ping())
         except Exception:
             redis_ok = False
+    # Worker chạy riêng (RUN_MODE=api + Redis): mất nhịp > 2 phút → degraded để giám sát bên ngoài cảnh báo
+    worker_age = await worker_age_s() if settings.run_mode == "api" else None
+    worker_ok = (
+        settings.run_mode != "api" or redis_ok is None or (worker_age is not None and worker_age <= STALE_S)
+    )
     return {
-        "status": "ok" if redis_ok is not False else "degraded",
+        "status": "ok" if redis_ok is not False and worker_ok else "degraded",
+        "worker_heartbeat_age_s": worker_age,
         "db": db,
         "redis": redis_ok,
         "storage": storage.backend_name(),

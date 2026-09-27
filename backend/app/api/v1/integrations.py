@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from app.auth import audit
 from app.db import execute, fetch_all, fetch_one
 from app.integrations import crypto
-from app.integrations.runner import run_source
+from app.integrations.runner import env_source_keys, run_source
 from app.rbac.authz import require_permission
 
 router = APIRouter(prefix="/integrations", tags=["Nguồn dữ liệu & IoT"])
@@ -28,8 +28,12 @@ async def sources(_: dict = Depends(VIEW)):
     rows = await fetch_all(
         f"SELECT {SOURCE_COLS}, secret_enc FROM integrations.data_sources ORDER BY created_at"
     )
+    env_keys = env_source_keys()
     for r in rows:
         r["secret_hint"] = _mask(crypto.decrypt(r.pop("secret_enc")))
+        r["secret_from_env"] = (
+            r["code"] in env_keys
+        )  # key đặt trong .env: sửa ở giao diện bị ghi đè khi khởi động lại
         if r["type"] == "mqtt":
             r["connected"] = r["enabled"] and r["status"] == "ok"
     return rows

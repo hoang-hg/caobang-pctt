@@ -66,6 +66,30 @@ DEFAULT_SOURCES = [
 ]
 
 
+def env_source_keys() -> dict[str, str]:
+    """API key nguồn kéo đặt trong .env (mã nguồn → key). Key rỗng = quản lý bằng giao diện."""
+    keys = {"OPEN_METEO_ENS": settings.open_meteo_api_key, "OPENWEATHER": settings.openweather_api_key}
+    return {code: key.strip() for code, key in keys.items() if key.strip()}
+
+
+async def apply_env_keys() -> None:
+    """.env là nguồn chính khi có đặt: ghi key vào CSDL (mã hoá) nếu khác. Nguồn OpenWeather tự bật khi nhận key mới."""
+    for code, key in env_source_keys().items():
+        row = await fetch_one(
+            "SELECT id, secret_enc FROM integrations.data_sources WHERE code = :c", {"c": code}
+        )
+        if not row or crypto.decrypt(row["secret_enc"]) == key:
+            continue
+        await execute(
+            """UPDATE integrations.data_sources SET secret_enc = :s, updated_at = now(),
+                      enabled = enabled OR :on,
+                      status = CASE WHEN :on AND status = 'tat' THEN 'chua_chay' ELSE status END
+                WHERE id = :id""",
+            {"s": crypto.encrypt(key), "on": code == "OPENWEATHER", "id": row["id"]},
+        )
+        log.info("[nguồn dữ liệu] Áp dụng API key từ .env cho %s", code)
+
+
 async def ensure_default_sources() -> None:
     for s in DEFAULT_SOURCES:
         enabled = s["enabled"]
@@ -84,6 +108,7 @@ async def ensure_default_sources() -> None:
                 "p": s["poll_interval_s"],
             },
         )
+    await apply_env_keys()
     # Nguồn đẩy có token riêng (HTTP batch, LoRaWAN): sinh token lần đầu
     for code in ("IOT_HTTP", "LORAWAN"):
         row = await fetch_one(

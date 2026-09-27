@@ -1,0 +1,16 @@
+# HTTPS cho docker-compose.prod.yml (profile "caddy"): chứng chỉ Let's Encrypt tự cấp/gia hạn cho {$DOMAIN}.
+# Cần: bản ghi DNS A/AAAA của DOMAIN trỏ về máy chủ, mở cổng 80 + 443 từ Internet.
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+	# Caddy bỏ X-Forwarded-For do client tự gửi và đặt đúng IP người dùng; nginx (frontend) tin Caddy qua real-ip.conf
+	reverse_proxy frontend:80 {
+		flush_interval -1
+	}
+}

@@ -150,9 +150,20 @@ async def load_gazetteer() -> list[dict]:
     return _gazetteer_cache
 
 
+# SĐT / số giấy tờ (CCCD) Việt Nam: bắt đầu bằng 0, 84 hoặc +84, tổng 9–12 chữ số, cho phép 1 dấu cách, chấm, gạch
+# giữa các chữ số. Không bắt số thập phân như toạ độ "106.123456" (không bắt đầu bằng 0/84) — LLM cần vị trí.
+_PHONE_RE = re.compile(r"(?<![\d.])(?:\+?84|0)(?:[ .\-]?\d){8,11}(?!\d)")
+
+
+def redact_for_llm(text: str) -> str:
+    """Che SĐT / số giấy tờ trước khi gửi ra dịch vụ LLM bên ngoài — LLM không cần chúng để phân loại."""
+    return _PHONE_RE.sub("[SỐ]", text)
+
+
 async def _parse_llm(text: str) -> dict | None:
     if not (settings.llm_api_url and settings.llm_api_key):
         return None
+    text = redact_for_llm(text)
     prompt = (
         "Trích xuất thông tin từ tin nhắn cầu cứu thiên tai tại tỉnh Cao Bằng. Trả về JSON với các khóa: "
         "incident_type (ngap_lut|sat_lo|lu_quet|sap_nha|cap_cuu|tiep_te), priority (1|2|3), trapped_count (int), "

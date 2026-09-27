@@ -1,7 +1,12 @@
-"""Nạp dữ liệu mẫu tỉnh Cao Bằng (chạy idempotent: bỏ qua nếu đã có dữ liệu).
+"""Nạp dữ liệu tỉnh Cao Bằng (chạy idempotent: bỏ qua nếu đã có dữ liệu).
+
+DEMO_MODE=false (triển khai thật): chỉ dữ liệu NỀN — địa giới 56 xã, preset, địa danh, mạng đường, mẫu tin cảnh báo,
+    danh mục vật tư. Trạm, hồ, lực lượng, kho, điểm sơ tán, vùng nguy hiểm, danh bạ phải nhập từ dữ liệu chính thức
+    (README.md mục 2) — tuyệt đối không hiển thị điểm sơ tán / số điện thoại giả cho người dân.
+DEMO_MODE=true (trình diễn, CI): thêm toàn bộ dữ liệu MẪU + tài khoản demo.
 
 python -m app.seed            # nạp nếu CSDL trống
-python -m app.seed --reset    # xoá dữ liệu nghiệp vụ và nạp lại
+python -m app.seed --reset    # xoá dữ liệu nghiệp vụ và nạp lại (bị chặn ở APP_ENV=production)
 """
 
 import asyncio
@@ -13,8 +18,10 @@ from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncConnection
 
+from app import preflight
 from app import seed_data as D
 from app.auth import hash_secret
+from app.config import settings
 from app.db import engine, execute, fetch_all, fetch_one
 from app.services import scenario
 from app.services.safe_routing import haversine_km
@@ -350,6 +357,24 @@ async def seed_telemetry(conn: AsyncConnection, units: dict[str, dict], now: dat
         )
 
 
+async def seed_item_catalog(conn: AsyncConnection):
+    for code, name, cat, unit in D.ITEMS:
+        await ex(
+            conn,
+            "INSERT INTO resources.items (code, name, category, unit) VALUES (:c,:n,:cat,:u)",
+            {"c": code, "n": name, "cat": cat, "u": unit},
+        )
+
+
+async def seed_templates(conn: AsyncConnection):
+    for code, name, sev, body, params in D.TEMPLATES:
+        await ex(
+            conn,
+            "INSERT INTO communications.message_templates (code, name, severity, body, params) VALUES (:c,:n,:s,:b,:p)",
+            {"c": code, "n": name, "s": sev, "b": body, "p": params},
+        )
+
+
 async def seed_resources(conn: AsyncConnection, units: dict[str, dict], now: datetime):
     force_ids: dict[str, str] = {}
     for i, (code, name, org, level, commune, commander, total, skills) in enumerate(D.FORCES):
@@ -408,12 +433,7 @@ async def seed_resources(conn: AsyncConnection, units: dict[str, dict], now: dat
             },
         )
 
-    for code, name, cat, unit in D.ITEMS:
-        await ex(
-            conn,
-            "INSERT INTO resources.items (code, name, category, unit) VALUES (:c,:n,:cat,:u)",
-            {"c": code, "n": name, "cat": cat, "u": unit},
-        )
+    await seed_item_catalog(conn)
 
     low_stock = {
         ("K-BLAM", "NUOC_CHAI"),
@@ -532,7 +552,7 @@ async def seed_resources(conn: AsyncConnection, units: dict[str, dict], now: dat
 
 async def seed_comms(conn: AsyncConnection, units: dict[str, dict], now: datetime) -> dict[str, dict]:
     users = {}
-    for username, full, pos, pw, pin, _role, _domain in D.USERS:
+    for username, full, pos, pw, pin, role, domain in D.USERS:
         row = await fetch_one(
             """INSERT INTO communications.users (username, full_name, position, password_hash, pin_hash, email)
                                  VALUES (:u,:f,:p,:pw,:pin,:e) RETURNING id, full_name""",
@@ -547,12 +567,13 @@ async def seed_comms(conn: AsyncConnection, units: dict[str, dict], now: datetim
             conn,
         )
         users[username] = row
-    for code, name, sev, body, params in D.TEMPLATES:
+        # Gán vai trò ngay khi tạo (bootstrap RBAC lúc khởi động chỉ gán cho tài khoản do chính nó tạo)
         await ex(
             conn,
-            "INSERT INTO communications.message_templates (code, name, severity, body, params) VALUES (:c,:n,:s,:b,:p)",
-            {"c": code, "n": name, "s": sev, "b": body, "p": params},
+            "INSERT INTO public.casbin_rule (ptype, v0, v1, v2) VALUES ('g', :u, :r, :d)",
+            {"u": username, "r": role, "d": domain},
         )
+    await seed_templates(conn)
 
     # Danh bạ phân cấp Tỉnh → Xã → Thôn (tên, số điện thoại là giả định)
     idx = 0
@@ -983,11 +1004,15 @@ TRUNCATE communications.audit_logs, communications.rbac_audit_log, communication
          resources.fuel_depots, resources.evacuation_sites,
          spatial_admin.place_names, spatial_admin.presets, spatial_admin.administrative_units RESTART IDENTITY CASCADE;
 ALTER SEQUENCE operations.sos_code_seq RESTART WITH 1001;
-ALTER SEQUENCE communications.broadcast_code_seq RESTART WITH 101
+ALTER SEQUENCE communications.broadcast_code_seq RESTART WITH 101;
+DELETE FROM public.casbin_rule WHERE ptype = 'g'
 """
 
 
 async def main(reset: bool = False):
+    preflight.enforce()
+    if reset and settings.app_env == "production":
+        raise SystemExit("[seed] --reset xoá toàn bộ dữ liệu nghiệp vụ — không cho phép ở APP_ENV=production")
     existing = await fetch_one("SELECT count(*) AS n FROM spatial_admin.administrative_units")
     if existing["n"] and not reset:
         print(f"[seed] Đã có {existing['n']} đơn vị hành chính — bỏ qua.")
@@ -1004,10 +1029,14 @@ async def main(reset: bool = False):
         )
         units = await seed_admin(conn)
         await seed_roads(conn, units)
-        await seed_telemetry(conn, units, now)
-        await seed_resources(conn, units, now)
-        users = await seed_comms(conn, units, now)
-        await seed_operations(conn, units, users, now)
+        if settings.demo_mode:
+            await seed_telemetry(conn, units, now)
+            await seed_resources(conn, units, now)
+            users = await seed_comms(conn, units, now)
+            await seed_operations(conn, units, users, now)
+        else:
+            await seed_item_catalog(conn)
+            await seed_templates(conn)
         await reconcile_admin_units(conn)
     counts = await fetch_one(
         """SELECT (SELECT count(*) FROM spatial_admin.administrative_units WHERE level IN ('tinh','xa')) AS units,
@@ -1015,7 +1044,7 @@ async def main(reset: bool = False):
                   (SELECT count(*) FROM resources.forces) AS forces,
                   (SELECT count(*) FROM operations.sos_tickets) AS sos"""
     )
-    print(f"[seed] Hoàn tất: {counts}")
+    print(f"[seed] Hoàn tất ({'dữ liệu mẫu' if settings.demo_mode else 'dữ liệu nền'}): {counts}")
     await engine.dispose()
 
 

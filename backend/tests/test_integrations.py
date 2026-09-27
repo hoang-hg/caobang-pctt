@@ -131,3 +131,15 @@ def test_crypto_roundtrip_and_device_key():
     key = crypto.new_device_key()
     assert key.startswith("cbk_") and crypto.key_matches(key, crypto.hash_key(key))
     assert not crypto.key_matches("sai", crypto.hash_key(key))
+
+
+def test_env_source_keys(monkeypatch):
+    from app.config import settings
+    from app.integrations.runner import env_source_keys
+
+    monkeypatch.setattr(settings, "open_meteo_api_key", "")
+    monkeypatch.setattr(settings, "openweather_api_key", "  ")
+    assert env_source_keys() == {}  # trống → key quản lý bằng giao diện, không ghi đè
+    monkeypatch.setattr(settings, "openweather_api_key", " ow-key ")
+    monkeypatch.setattr(settings, "open_meteo_api_key", "om-key")
+    assert env_source_keys() == {"OPEN_METEO_ENS": "om-key", "OPENWEATHER": "ow-key"}
