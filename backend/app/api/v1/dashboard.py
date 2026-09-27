@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.area import area_clause, unit_clause
 from app.db import fetch_all, fetch_one
+from app.infra.cache import cached_view
 from app.rbac.authz import area_scope, require_any
 from app.services.landslides import get_landslides_overview
 from app.services.reservoirs import get_reservoirs_overview
@@ -19,8 +20,13 @@ SELECT DISTINCT ON (r.station_id) r.station_id, r.value, r.time
 """
 
 
+# Truy vấn tổng hợp dùng chung giữa cán bộ cùng phạm vi → cached_view (khoá = mã xã đã giao với quyền + tham số)
 @router.get("/dashboard/kpis")
 async def kpis(codes: list[str] = Depends(MON)):
+    return await cached_view("kpis", {"codes": codes}, lambda: _kpis(codes))
+
+
+async def _kpis(codes: list[str]) -> dict:
     p = {"codes": codes}
     rain = await fetch_one(
         f"""
@@ -106,6 +112,10 @@ async def kpis(codes: list[str] = Depends(MON)):
 
 @router.get("/stations")
 async def stations(type: str | None = None, codes: list[str] = Depends(MON)):
+    return await cached_view("stations", {"type": type, "codes": codes}, lambda: _stations(type, codes))
+
+
+async def _stations(type: str | None, codes: list[str]) -> list[dict]:
     return await fetch_all(
         f"""SELECT s.id, s.name, s.type, s.river, s.unit, s.alarm_thresholds AS thresholds, s.status, s.source,
                    ST_Y(s.location) AS lat, ST_X(s.location) AS lon, u.name AS admin_name, l.value, l.time
@@ -149,6 +159,10 @@ async def station_series(
 @router.get("/dashboard/rainfall")
 async def rainfall(codes: list[str] = Depends(MON), hours: int = 24):
     """Mưa giờ (trung bình các trạm trong vùng) + tích lũy + nowcast QPF 3h."""
+    return await cached_view("rainfall", {"codes": codes, "hours": hours}, lambda: _rainfall(codes, hours))
+
+
+async def _rainfall(codes: list[str], hours: int) -> dict:
     p = {"codes": codes, "h": hours}
     observed = await fetch_all(
         f"""SELECT b AS time, round(avg(v)::numeric, 1)::float AS mm, round(max(v)::numeric, 1)::float AS max_mm FROM (
@@ -173,6 +187,10 @@ async def rainfall(codes: list[str] = Depends(MON), hours: int = 24):
 async def landslide_risk(codes: list[str] = Depends(MON)):
     """Ngưỡng kích hoạt sạt lở: mưa tích lũy 3 ngày vs cường độ mưa hiện tại (theo từng trạm mưa)
     + chỉ số cảm biến nghiêng/độ ẩm đất gần nhất. Ngưỡng I–D dạng I = a · R^-b (minh hoạ)."""
+    return await cached_view("landslide-risk", {"codes": codes}, lambda: _landslide_risk(codes))
+
+
+async def _landslide_risk(codes: list[str]) -> dict:
     rows = await fetch_all(
         f"""
         WITH h AS (
@@ -229,6 +247,10 @@ def classify_landslide(rain_72h: float, intensity: float, tilt: float | None) ->
 @router.get("/dashboard/supplies")
 async def supplies(codes: list[str] = Depends(area_scope("resource", "view"))):
     """Vật tư theo kho/nhóm: hiện có vs định mức (phần thiếu hụt để vẽ cột chồng)."""
+    return await cached_view("supplies", {"codes": codes}, lambda: _supplies(codes))
+
+
+async def _supplies(codes: list[str]) -> list[dict]:
     rows = await fetch_all(
         f"""SELECT w.code, w.name, w.level, i.category,
                    sum(inv.quantity) AS quantity, sum(inv.safety_quota) AS quota,

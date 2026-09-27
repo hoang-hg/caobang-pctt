@@ -8,3 +8,13 @@ __pycache__/
 .env
 *.log
 .DS_Store
+.env.*
+!.env.example
+!.env.production.example
+backups/
+mqtt/passwd
+mqtt/acl
+mqtt/certs/
+
+# Ảnh mẫu kiểm thử tải (tạo bằng tests/load/make_photo.py)
+tests/load/photo.jpg

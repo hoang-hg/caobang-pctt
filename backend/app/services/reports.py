@@ -6,10 +6,12 @@ Quyền riêng tư: họ tên / SĐT người gửi chỉ cán bộ có ``report
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 import io
 import json
+import logging
 import time
 import uuid
 import warnings
@@ -18,12 +20,15 @@ from datetime import UTC, datetime
 import httpx
 from PIL import Image, ImageOps, UnidentifiedImageError
 
+from app.area import IN_PROVINCE_SQL
 from app.config import settings
 from app.db import fetch_one
 from app.infra import storage
 from app.rbac import domains
 from app.services.events import log_event
 from app.ws.hub import hub
+
+log = logging.getLogger(__name__)
 
 CATEGORY = {
     "ngap": "Ngập lụt",
@@ -111,12 +116,26 @@ async def verify_turnstile(token: str | None, ip: str | None) -> bool:
         return True
     if not token:
         return False
-    async with httpx.AsyncClient(timeout=10) as client:
-        r = await client.post(
-            "https://challenges.cloudflare.com/turnstile/v0/siteverify",
-            data={"secret": settings.turnstile_secret, "response": token, "remoteip": ip or ""},
-        )
-    return bool(r.json().get("success"))
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.post(
+                "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+                data={"secret": settings.turnstile_secret, "response": token, "remoteip": ip or ""},
+            )
+    except httpx.TransportError as exc:
+        # Mất kết nối quốc tế lúc thiên tai không được chặn người dân gửi phản ánh — vẫn còn giới hạn tần suất
+        log.warning("Turnstile không kết nối được (%s) — cho qua", exc)
+        return True
+    if r.status_code >= 500:  # Cloudflare gặp sự cố — xử lý như mất kết nối
+        log.warning("Turnstile lỗi máy chủ %s — cho qua", r.status_code)
+        return True
+    if r.status_code != 200:  # 4xx / 429 (khoá sai, bị giới hạn khi bị tấn công) → không cho qua
+        log.warning("Turnstile từ chối kiểm tra (%s)", r.status_code)
+        return False
+    try:
+        return bool(r.json().get("success"))
+    except ValueError:
+        return False
 
 
 async def create_report(
@@ -136,13 +155,14 @@ async def create_report(
     if len(photos) > MAX_PHOTOS:
         raise ReportError(f"Tối đa {MAX_PHOTOS} ảnh")
     inside = await fetch_one(
-        """SELECT ST_DWithin(geom::geography, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography, 5000) AS ok
-             FROM spatial_admin.administrative_units WHERE code = 'CB'""",
+        f"SELECT {IN_PROVINCE_SQL} AS ok FROM spatial_admin.administrative_units p WHERE p.code = 'CB'",
         {"lat": lat, "lon": lon},
     )
     if not inside or not inside["ok"]:
         raise ReportError("Vị trí nằm ngoài địa bàn tỉnh Cao Bằng")
-    processed = [process_image(p) for p in photos]  # kiểm tra hết ảnh trước khi ghi gì
+    # Giải mã / thu nhỏ ảnh tốn CPU ~1 giây/ảnh → chạy trong thread để không chặn các yêu cầu khác của tiến trình.
+    # Kiểm tra hết ảnh trước khi ghi gì.
+    processed = await asyncio.to_thread(lambda: [process_image(p) for p in photos])
 
     report_id = str(uuid.uuid4())
     now = datetime.now(UTC)

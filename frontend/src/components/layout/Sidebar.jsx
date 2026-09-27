@@ -97,7 +97,7 @@ export default function Sidebar() {
 
         <div className="flex flex-col gap-2 px-2 pt-2 border-t border-line/60">
           {!sidebarCollapsed && (
-            <p className="px-1 text-[11px] leading-snug text-muted">Dữ liệu mô phỏng phục vụ thử nghiệm. Ranh giới xã là xấp xỉ.</p>
+            <p className="px-1 text-[11px] leading-snug text-muted">Hệ thống tác chiến PCTT & TKCN tỉnh Cao Bằng.</p>
           )}
           {!sidebarCollapsed && (
             <div className="rounded-xl bg-panel2/80 p-2.5 text-xs">

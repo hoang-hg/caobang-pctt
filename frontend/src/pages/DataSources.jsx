@@ -88,6 +88,9 @@ function SourceModal({ source, onClose }) {
         {pull && (
           <label>API key {source.has_secret && <span className="text-muted">(đang có: {source.secret_hint})</span>}
             <input className="input mt-1" type="password" placeholder={source.type === 'open_meteo' ? 'Tuỳ chọn — gói thương mại' : 'Bắt buộc'} value={secret} onChange={(e) => setSecret(e.target.value)} />
+            {source.secret_from_env && (
+              <span className="mt-1 block text-xs text-amber-500">Key đang đặt trong tệp .env của máy chủ — sửa ở đây sẽ bị ghi đè khi hệ thống khởi động lại.</span>
+            )}
           </label>
         )}
       </div>

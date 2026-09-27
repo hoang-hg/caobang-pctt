@@ -16,9 +16,11 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from app.api.v1.reports import _serve_photo
+from app.area import IN_PROVINCE_SQL
 from app.config import settings
 from app.db import fetch_all, fetch_one
-from app.infra.cache import cached
+from app.infra import ratelimit
+from app.infra.cache import cached, cached_view
 from app.services.landslides import get_landslides_overview
 from app.services.reports import CATEGORY, ReportError, create_report, public_photo_url, verify_turnstile
 from app.services.reservoirs import get_reservoirs_overview
@@ -266,10 +268,16 @@ async def forecast_area(code: str):
 @router.get("/locate")
 async def locate(lat: float = Query(..., ge=20, le=25), lon: float = Query(..., ge=103, le=108)):
     """“Tôi đang ở đâu?” — xã, mức nguy cơ, mưa dự báo, cảnh báo đang hiệu lực, điểm sơ tán gần nhất."""
+    # Làm tròn ~11 m (nhỏ hơn sai số GPS điện thoại) để người cùng chỗ / tải lại dùng chung kết quả;
+    # khoá theo phiên bản dữ liệu nên cảnh báo, vùng nguy hiểm mới có hiệu lực ngay
+    lat, lon = round(lat, 4), round(lon, 4)
+    return await cached_view("public-locate", {"lat": lat, "lon": lon}, lambda: _locate(lat, lon), ttl=60)
+
+
+async def _locate(lat: float, lon: float) -> dict:
     pt = {"lat": lat, "lon": lon}
     unit = await fetch_one(
-        """SELECT u.id, u.code, u.name, u.old_district,
-                  ST_DWithin(p.geom::geography, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography, 5000) AS in_province
+        f"""SELECT u.id, u.code, u.name, u.old_district, {IN_PROVINCE_SQL} AS in_province
              FROM spatial_admin.administrative_units u, spatial_admin.administrative_units p
             WHERE u.level = 'xa' AND p.code = 'CB'
             ORDER BY u.geom <-> ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) LIMIT 1""",
@@ -281,7 +289,9 @@ async def locate(lat: float = Query(..., ge=20, le=25), lon: float = Query(..., 
         """SELECT type, level, name,
                   round(ST_Distance(geom::geography, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography))::int AS distance_m
              FROM iot_telemetry.hazard_zones
-            WHERE valid_until > now() AND ST_DWithin(geom::geography, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography, 3000)
+            WHERE valid_until > now()
+              AND geom && ST_Expand(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326), 0.035)  -- lọc bằng index (~3,6 km)
+              AND ST_DWithin(geom::geography, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography, 3000)
             ORDER BY distance_m""",
         pt,
     )
@@ -368,6 +378,18 @@ async def public_report_photo(report_id: str, idx: int, thumb: int = 0):
     return await _serve_photo(report_id, idx, bool(thumb), public=True)
 
 
+@router.get("/config")
+async def public_config():
+    """Cấu hình công khai cho frontend (không bí mật): khoá site Cloudflare Turnstile nếu bật."""
+    return {"turnstile_site_key": settings.turnstile_site_key or None}
+
+
+def phone_key(phone: str) -> str:
+    """Chuẩn hoá SĐT để đếm giới hạn: bỏ ký tự phân cách, +84/84 → 0."""
+    digits = "".join(c for c in phone if c.isdigit())
+    return "0" + digits[2:] if digits.startswith("84") and len(digits) >= 11 else digits
+
+
 @router.get("/report-categories")
 async def report_categories():
     return [{"code": k, "label": v} for k, v in CATEGORY.items()]
@@ -393,6 +415,10 @@ async def submit_report(
         raise HTTPException(400, "Yêu cầu không hợp lệ")
     if not await verify_turnstile(turnstile_token, ip):
         raise HTTPException(400, "Xác minh chống spam không thành công")
+    # Nhiều người chung IP nhà mạng (CGNAT) → siết theo SĐT (5 phản ánh thành công / giờ), nới theo IP
+    phone = phone_key(reporter_phone) if reporter_phone else None
+    if phone:
+        await ratelimit.check_limit("report_phone", phone, 5, 3600)
     files = [p for p in (photos or []) if p.filename]
     blobs = []
     for f in files[:4]:
@@ -411,6 +437,8 @@ async def submit_report(
         )
     except ReportError as exc:
         raise HTTPException(422, str(exc)) from exc
+    if phone:
+        await ratelimit.count_hit("report_phone", phone, 3600)
     return {
         **result,
         "message": "Đã tiếp nhận phản ánh. Cán bộ sẽ xác minh trước khi hiển thị công khai. "

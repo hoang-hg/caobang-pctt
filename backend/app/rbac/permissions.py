@@ -1,6 +1,6 @@
 """Danh mục quyền RBAC — nguồn sự thật duy nhất (SSOT).
 
-Mọi quyền trong hệ thống khai báo tại đây và mô tả trong ``docs/rbac.md``.
+Mọi quyền trong hệ thống khai báo tại đây và mô tả trong ``README.md`` mục 8.
 Quyền ``scopable=True`` được kiểm tra theo phạm vi địa bàn (tỉnh / cụm / xã);
 quyền ``scopable=False`` chỉ cấp được ở phạm vi toàn tỉnh ``"*"``.
 """
@@ -128,7 +128,7 @@ SYSTEM_ROLES: Final[tuple[tuple[str, str, str, bool, list[tuple[str, str]]], ...
     (
         "admin_tinh",
         "Quản trị tỉnh",
-        "Quản lý tài khoản, phân quyền cấp dưới, duyệt phản ánh và xử lý SOS toàn tỉnh — không điều động, không duyệt cảnh báo",
+        "Quản trị hệ thống cấp tỉnh: Quản lý tài khoản, phân quyền cấp dưới, điều động, duyệt phản ánh và điều hành tác chiến toàn tỉnh",
         False,
         perms(
             "monitoring.view",
@@ -136,6 +136,7 @@ SYSTEM_ROLES: Final[tuple[tuple[str, str, str, bool, list[tuple[str, str]]], ...
             "sos.create",
             "sos.update",
             "sos.resolve",
+            "dispatch.create",
             "resource.view",
             "alert.view",
             "contact.view",
@@ -150,7 +151,7 @@ SYSTEM_ROLES: Final[tuple[tuple[str, str, str, bool, list[tuple[str, str]]], ...
     (
         "admin_xa",
         "Quản trị xã/phường",
-        "Tạo tài khoản cán bộ xã, duyệt phản ánh và xử lý SOS trong xã",
+        "Quản trị cấp xã/phường: Tạo tài khoản cán bộ xã, duyệt phản ánh và xử lý SOS trong địa bàn xã",
         True,
         perms(
             "monitoring.view",

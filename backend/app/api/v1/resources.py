@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 from app.area import area_clause
 from app.auth import audit
 from app.db import fetch_all, fetch_one, transaction
+from app.infra.cache import cached_view
 from app.rbac import scope_loaders
 from app.rbac.authz import area_scope, require_permission
 from app.services.events import log_event
@@ -18,6 +19,10 @@ RES = area_scope("resource", "view")
 
 @router.get("/summary")
 async def summary(codes: list[str] = Depends(RES)):
+    return await cached_view("resources-summary", {"codes": codes}, lambda: _summary(codes))
+
+
+async def _summary(codes: list[str]) -> dict:
     p = {"codes": codes}
     forces = await fetch_one(
         f"""SELECT COALESCE(sum(personnel_ready), 0) AS ready, COALESCE(sum(personnel_on_mission), 0) AS on_mission,

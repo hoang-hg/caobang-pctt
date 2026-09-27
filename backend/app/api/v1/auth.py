@@ -6,7 +6,6 @@ from datetime import UTC, datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from app import seed_data as D
 from app.auth import audit, create_token, current_user, hash_secret, password_problem, verify_secret
 from app.config import settings
 from app.db import execute, fetch_all, fetch_one
@@ -61,16 +60,24 @@ async def profile(user: dict) -> dict:
 
 @router.post("/login")
 async def login(body: LoginIn):
-    lock_key = f"loginfail:{body.username.lower()}"
+    clean_u = body.username.strip()
+    user = await fetch_one(
+        """SELECT * FROM communications.users
+            WHERE lower(username) = lower(:u) OR lower(email) = lower(:u)""",
+        {"u": clean_u},
+    )
+    # Đếm sai theo TÀI KHOẢN (không theo chuỗi đã gõ) → nhập username hay email đều chung 1 bộ đếm, đặt lại mật khẩu
+    # xoá đúng khoá này (reset_password xoá loginfail:<username>)
+    lock_key = f"loginfail:{(user['username'] if user else clean_u).lower()}"
     if await ratelimit.peek(lock_key) >= MAX_FAILED_LOGINS:
         raise HTTPException(429, "Đăng nhập sai quá nhiều lần — tài khoản tạm khoá 15 phút")
-    user = await fetch_one("SELECT * FROM communications.users WHERE username = :u", {"u": body.username})
     if not user or not verify_secret(body.password, user["password_hash"]):
         await ratelimit.hit(lock_key, LOCK_WINDOW_S)
         raise HTTPException(401, "Sai tên đăng nhập hoặc mật khẩu")
     if not user["is_active"]:
-        raise HTTPException(403, "Tài khoản đã bị khoá")
+        raise HTTPException(403, "Tài khoản đã bị khoá. Vui lòng liên hệ quản trị viên.")
     await ratelimit.clear(lock_key)
+    await audit(user, "auth.login", "user", user["username"])
     return {"token": create_token(user), "user": await profile(user)}
 
 
@@ -185,20 +192,5 @@ async def reset_password(body: ResetIn):
 
 @router.get("/demo-accounts")
 async def demo_accounts():
-    """Tài khoản demo cho nút đăng nhập nhanh (chỉ khi DEMO_MODE=true)."""
-    if not settings.demo_mode:
-        raise HTTPException(404, "Không khả dụng")
-    meta = await role_names()
-    return [
-        {
-            "username": u[0],
-            "full_name": u[1],
-            "position": u[2],
-            "password": u[3],
-            "pin": u[4],
-            "role": u[5],
-            "role_name": meta.get(u[5], u[5]),
-            "domain_label": domains.label(u[6]),
-        }
-        for u in D.USERS
-    ]
+    """Endpoint không còn công khai tài khoản để bảo mật thông tin theo chuẩn ATTT."""
+    raise HTTPException(404, "Chức năng xem nhanh tài khoản đã được gỡ bỏ để bảo mật thông tin.")

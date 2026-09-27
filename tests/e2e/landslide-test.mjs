@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Kiểm thử giám sát điểm đen sạt trượt & đường đèo (API công khai + dashboard).
 // Trạng thái phải tính từ dữ liệu thật: vùng nguy hiểm, đường bị chia cắt, cảm biến — không ghi cứng.
-// Chạy: node scripts/landslide-test.mjs [http://localhost:8000]
+// Chạy: node tests/e2e/landslide-test.mjs [http://localhost:8000]
 const BASE = (process.argv[2] || 'http://localhost:8000') + '/api/v1';
 let failed = 0;
 const check = (name, cond, extra = '') => {

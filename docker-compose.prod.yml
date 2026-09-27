@@ -1,0 +1,293 @@
+# Hệ thống Điều hành PCTT & TKCN tỉnh Cao Bằng — TRIỂN KHAI THẬT (1 máy chủ). Hướng dẫn: README.md mục 10
+#
+#   cp .env.production.example .env.production        # điền giá trị thật (openssl rand -hex 32 …)
+#   docker compose -f docker-compose.prod.yml --env-file .env.production --profile caddy up -d --build
+#
+#   caddy     HTTPS (Let's Encrypt) — cổng DUY NHẤT mở ra Internet (80/443). Bỏ profile "caddy" nếu đã có
+#             proxy/HTTPS của trung tâm dữ liệu: khi đó proxy đó trỏ vào FRONTEND_BIND.
+#   frontend  nginx: giao diện, cache API công khai, ghi đè X-Forwarded-For
+#   backend   API (gunicorn × API_WORKERS), nhân bản được: --scale backend=N
+#   worker    tác vụ nền — CHỈ 1 bản
+#   migrate   chạy 1 lần mỗi lần triển khai: alembic upgrade + seed dữ liệu nền (bỏ qua nếu đã có)
+#   db, redis, minio  chỉ trong mạng "data" (không mở cổng, không ra Internet)
+#   backup    pg_dump hằng ngày + lưu trữ ảnh vào BACKUP_DIR — PHẢI chép ra máy/nơi khác (README.md mục 10.5)
+#   mqtt      (profile "mqtt") broker IoT có tài khoản + ACL + TLS 8883
+#
+# Biến "${X:?…}" bắt buộc: thiếu → compose dừng kèm thông báo. Backend còn tự kiểm tra (app/preflight.py).
+#
+# Image dịch vụ ghim theo digest (tag@sha256) → mỗi lần triển khai chạy đúng bản đã kiểm thử. Nâng cấp:
+#   docker pull <image:tag> && docker image inspect <image:tag> --format "{{index .RepoDigests 0}}"
+#   → thay digest bên dưới, chạy thử ở staging, rồi mới triển khai (README.md mục 10.4).
+
+name: caobang-pctt-prod  # khác project dev (caobang-pctt) → không dùng chung volume CSDL
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "10"
+
+x-backend-env: &backend-env
+  APP_ENV: production
+  DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-pctt}:${POSTGRES_PASSWORD:?Đặt POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-caobang_pctt}
+  DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
+  DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-5}
+  REDIS_URL: redis://redis:6379/0
+  JWT_SECRET: ${JWT_SECRET:?Đặt JWT_SECRET (openssl rand -hex 32)}
+  SECRET_KEY: ${SECRET_KEY:?Đặt SECRET_KEY (openssl rand -hex 32, khác JWT_SECRET)}
+  DEMO_MODE: "false"
+  SIMULATOR: "false"
+  SUPERADMIN_USERNAME: ${SUPERADMIN_USERNAME:-admin}
+  SUPERADMIN_FULL_NAME: ${SUPERADMIN_FULL_NAME:-Quản trị hệ thống}
+  SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL:?Đặt SUPERADMIN_EMAIL (email thật của quản trị viên)}
+  SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD:?Đặt SUPERADMIN_PASSWORD}
+  SUPERADMIN_PIN: ${SUPERADMIN_PIN:?Đặt SUPERADMIN_PIN (≥ 6 chữ số)}
+  OPEN_METEO_ENABLED: ${OPEN_METEO_ENABLED:-true}
+  OPEN_METEO_API_KEY: ${OPEN_METEO_API_KEY:-}
+  OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY:-}
+  MQTT_URL: ${MQTT_URL:-}
+  MQTT_TOPIC: ${MQTT_TOPIC:-caobang/pctt/+/readings}
+  INTAKE_API_KEY: ${INTAKE_API_KEY:-}
+  CORS_ORIGINS: ${CORS_ORIGINS:-https://${DOMAIN:?Đặt DOMAIN}}
+  PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-https://${DOMAIN:?Đặt DOMAIN}}
+  RATE_LIMIT_ENABLED: "true"
+  TRUSTED_PROXIES: ${TRUSTED_PROXIES:-127.0.0.1,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}
+  MINIO_ENDPOINT: minio:9000
+  MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-pctt_minio}
+  MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?Đặt MINIO_ROOT_PASSWORD}
+  MINIO_BUCKET: caobang-pctt
+  SMTP_HOST: ${SMTP_HOST:?Đặt SMTP_HOST (máy chủ thư thật)}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  SMTP_FROM: ${SMTP_FROM:-BCH PCTT Cao Bang <no-reply@${DOMAIN}>}
+  SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
+  TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-}
+  TURNSTILE_SECRET: ${TURNSTILE_SECRET:-}
+  LLM_API_URL: ${LLM_API_URL:-}
+  LLM_API_KEY: ${LLM_API_KEY:-}
+  LLM_MODEL: ${LLM_MODEL:-}
+
+services:
+  db:
+    image: timescale/timescaledb-ha:pg16@sha256:4f288c0a521362cad799f265bc0ebd60c3f8f98596b850172cc2da72883420ff  # PostgreSQL 16.15
+    restart: unless-stopped
+    shm_size: 1g
+    # Mặc định cho máy chủ 16 GB RAM (README.md mục 10.2): shared_buffers ≈ 25%, effective_cache_size ≈ 75% RAM
+    command:
+      - postgres
+      - -c
+      - max_connections=${POSTGRES_MAX_CONNECTIONS:-200}
+      - -c
+      - shared_buffers=${POSTGRES_SHARED_BUFFERS:-4GB}
+      - -c
+      - effective_cache_size=${POSTGRES_EFFECTIVE_CACHE_SIZE:-12GB}
+      - -c
+      - work_mem=${POSTGRES_WORK_MEM:-16MB}
+      - -c
+      - maintenance_work_mem=${POSTGRES_MAINTENANCE_WORK_MEM:-512MB}
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pctt}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Đặt POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-caobang_pctt}
+    volumes:
+      - pgdata:/home/postgres/pgdata/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    networks: [data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pctt} -d ${POSTGRES_DB:-caobang_pctt}"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    logging: *logging
+
+  redis:
+    image: redis:7-alpine@sha256:7aec734b2bb298a1d769fd8729f13b8514a41bf90fcdd1f38ec52267fbaa8ee6  # 7.4.8
+    restart: unless-stopped
+    command: redis-server --appendonly no --maxmemory ${REDIS_MAXMEMORY:-512mb} --maxmemory-policy allkeys-lru
+    networks: [data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 30
+    logging: *logging
+
+  minio:
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z@sha256:b6bfe7239bfc83fb90d31612d9704d86039dd714f7904b3f1ad68f211e602372
+    restart: unless-stopped
+    command: server /data --console-address ":9001"  # console: chỉ mở qua SSH tunnel (README.md mục 10)
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-pctt_minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Đặt MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio_data:/data
+    networks: [data]
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    logging: *logging
+
+  migrate:
+    image: ${BACKEND_IMAGE:-caobang-pctt-backend:local}
+    build: ./backend
+    environment:
+      <<: *backend-env
+    command: ["sh", "-c", "alembic upgrade head && python -m app.seed"]
+    restart: "no"
+    networks: [data, default]
+    depends_on:
+      db:
+        condition: service_healthy
+    logging: *logging
+
+  backend:
+    image: ${BACKEND_IMAGE:-caobang-pctt-backend:local}
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      <<: *backend-env
+      RUN_MODE: api
+      API_WORKERS: ${API_WORKERS:-4}
+    networks: [data, default]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"]
+      interval: 15s
+      timeout: 6s
+      retries: 10
+      start_period: 30s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    logging: *logging
+
+  worker:
+    image: ${BACKEND_IMAGE:-caobang-pctt-backend:local}
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      <<: *backend-env
+      RUN_MODE: worker
+    command: ["python", "-m", "app.worker"]
+    networks: [data, default]
+    healthcheck:  # nhịp worker (app/infra/heartbeat.py) ghi mỗi 30 s; quá 2 phút → unhealthy
+      test: ["CMD-SHELL", "find /tmp/pctt-worker-heartbeat -mmin -2 | grep -q ."]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    depends_on:
+      backend:
+        condition: service_healthy
+    logging: *logging
+
+  frontend:
+    image: ${FRONTEND_IMAGE:-caobang-pctt-frontend:local}
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      # Mặc định chỉ nghe trên máy chủ (Caddy hoặc proxy cùng máy). Proxy của trung tâm dữ liệu ở máy khác:
+      # đặt FRONTEND_BIND=<IP nội bộ>:8080 và chặn cổng này từ Internet bằng tường lửa.
+      - "${FRONTEND_BIND:-127.0.0.1:8080}:80"
+    volumes:
+      # Cloudflare / proxy khác: trỏ NGINX_REAL_IP_CONF tới tệp real-ip riêng (xem frontend/nginx/real-ip.conf)
+      - ${NGINX_REAL_IP_CONF:-./frontend/nginx/real-ip.conf}:/etc/nginx/snippets/real-ip.conf:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      backend:
+        condition: service_healthy
+    logging: *logging
+
+  caddy:
+    image: caddy:2-alpine@sha256:6aeddd44c3078b0f9a35206472a11420648a79c184603ef95957d0a20044cb2b  # 2.11.4
+    profiles: [caddy]
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?Đặt DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?Đặt ACME_EMAIL (email nhận thông báo chứng chỉ)}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:2019/config/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      frontend:
+        condition: service_healthy
+    logging: *logging
+
+  backup:
+    image: timescale/timescaledb-ha:pg16@sha256:4f288c0a521362cad799f265bc0ebd60c3f8f98596b850172cc2da72883420ff  # cùng phiên bản pg_dump với CSDL
+    restart: unless-stopped
+    user: "0:0"
+    entrypoint: ["/bin/sh", "/backup.sh"]
+    environment:
+      PGHOST: db
+      PGUSER: ${POSTGRES_USER:-pctt}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Đặt POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB:-caobang_pctt}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+      BACKUP_AT: ${BACKUP_AT:-19:30}
+    volumes:
+      - ./deploy/backup.sh:/backup.sh:ro
+      - ${BACKUP_DIR:-./backups}:/backups
+      - minio_data:/minio:ro
+    networks: [data]
+    healthcheck:  # có bản sao lưu CSDL trong 26 giờ qua
+      test: ["CMD-SHELL", "find /backups/db -name '*.dump' -mmin -1560 | grep -q ."]
+      interval: 5m
+      timeout: 10s
+      retries: 2
+      start_period: 10m
+    depends_on:
+      migrate:
+        condition: service_completed_successfully  # bản sao lưu đầu tiên sau khi đã có dữ liệu
+    logging: *logging
+
+  mqtt:
+    image: eclipse-mosquitto:2@sha256:38c0da4f2ef84284d47b3b3eeea1cb3bdeabe81ee10caf0cd5c5ff61ee3ea408  # 2.1.2
+    profiles: [mqtt]
+    restart: unless-stopped
+    ports:
+      - "8883:8883"  # thiết bị hiện trường qua Internet — chỉ TLS; cổng 1883 chỉ trong mạng docker cho worker
+    volumes:
+      - ./mqtt/mosquitto.prod.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mqtt/passwd:/mosquitto/config/passwd:ro
+      - ./mqtt/acl:/mosquitto/config/acl:ro
+      - ./mqtt/certs:/mosquitto/certs:ro
+      - mqtt_data:/mosquitto/data
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "1883"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging: *logging
+
+networks:
+  default:
+  data:
+    internal: true  # CSDL, Redis, MinIO: không có đường ra Internet, không mở cổng
+
+volumes:
+  pgdata:
+  minio_data:
+  caddy_data:
+  caddy_config:
+  mqtt_data:

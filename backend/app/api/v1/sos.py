@@ -1,13 +1,15 @@
 """Trung tâm Điều hành Cứu hộ & Điểm nóng khẩn cấp (Phân hệ D)."""
 
+import hmac
 import json
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from app.area import area_clause, unit_clause
 from app.auth import audit
+from app.config import settings
 from app.db import execute, fetch_all, fetch_one, transaction
 from app.rbac import scope_loaders
 from app.rbac.authz import area_scope, can, forbidden, require_any, require_permission
@@ -74,10 +76,17 @@ async def create_sos(body: SosIn, user: dict = Depends(require_any("sos", "creat
         raise HTTPException(422, str(exc)) from exc
 
 
-@router.post("/sos/intake")
+def require_intake_key(x_intake_key: str | None = Header(None)) -> None:
+    """Chỉ cổng tích hợp đã cấp khoá (INTAKE_API_KEY) mới được tạo phiếu SOS tự động — chống spam phiếu giả."""
+    if not settings.intake_api_key:
+        raise HTTPException(503, "Cổng tiếp nhận SOS tự động chưa được bật (INTAKE_API_KEY)")
+    if not x_intake_key or not hmac.compare_digest(x_intake_key.encode(), settings.intake_api_key.encode()):
+        raise HTTPException(401, "Khoá tích hợp không hợp lệ")
+
+
+@router.post("/sos/intake", dependencies=[Depends(require_intake_key)])
 async def intake_sos(body: SosIn):
-    """Cổng tiếp nhận công khai cho webhook Zalo OA / ứng dụng di động của người dân.
-    Khi triển khai thật: đặt sau API gateway có xác thực webhook + giới hạn tần suất."""
+    """Cổng tiếp nhận cho webhook Zalo OA / ứng dụng di động (header X-Intake-Key = INTAKE_API_KEY)."""
     try:
         return await create_ticket(**body.model_dump(exclude={"priority"}))
     except ValueError as exc:

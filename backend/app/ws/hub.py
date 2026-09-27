@@ -19,6 +19,7 @@ from datetime import UTC, datetime
 
 from fastapi import WebSocket
 
+from app.infra.cache import bump_data_version
 from app.infra.redis import get_redis
 
 log = logging.getLogger(__name__)
@@ -58,6 +59,8 @@ class Hub:
         return len(self._clients)
 
     async def publish(self, event: str, data, scope: str | None = None, code: str | None = None) -> None:
+        # Dữ liệu nghiệp vụ đổi → cache màn hình điều hành (cached_view) hết hiệu lực; bỏ qua sự kiện tần suất cao
+        await bump_data_version(event)
         envelope = json.dumps(
             {"event": event, "data": data, "ts": datetime.now(UTC).isoformat(), "scope": scope, "code": code},
             ensure_ascii=False,

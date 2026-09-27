@@ -81,7 +81,9 @@ def test_password_policy():
     assert password_problem("MatKhau2026") is None
 
 
-def test_memory_cache_hits_and_invalidates():
+def test_memory_cache_hits_and_invalidates(monkeypatch):
+    # luôn kiểm bộ nhớ trong, không đụng Redis đang chạy
+    monkeypatch.setattr(cache, "get_redis", lambda: None)
     calls = {"n": 0}
 
     async def producer():

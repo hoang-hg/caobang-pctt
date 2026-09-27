@@ -1,5 +1,5 @@
 // Kiểm thử cổng công khai, phản ánh người dân, quên / đổi mật khẩu, giới hạn tần suất, phân cấp quản trị.
-//   node scripts/public-test.mjs [http://localhost:8000] [http://localhost:8025 (Mailpit)]
+//   node tests/e2e/public-test.mjs [http://localhost:8000] [http://localhost:8025 (Mailpit)]
 // Chạy lại nhiều lần trong 1 giờ: xoá bộ đếm giới hạn tần suất trước (mỗi IP chỉ được gửi 5 phản ánh/giờ):
 //   docker compose exec redis sh -c "redis-cli --scan --pattern 'rl:*' | xargs -r redis-cli del"
 const ROOT = process.argv[2] || 'http://localhost:8000';
@@ -126,7 +126,8 @@ check('Quản trị xã không tạo tài khoản ở xã khác → 403', (await
   username: `x.${stamp}`, full_name: 'Xã khác', password: 'MatKhau2026', role: 'can_bo_xa', domain: 'BAOLAC/CB-HUNGDAO',
 }, T.coba)).status === 403);
 check('Quản trị xã không cấp vai trò Thủ kho (không có quyền xuất kho) → 403', (await call('POST', `/rbac/users/${canbo.data.id}/assignments`, { role: 'thu_kho', domain: 'BAOLAC/CB-COBA' }, T.coba)).status === 403);
-check('Quản trị tỉnh không có quyền điều động → 403', (await call('POST', '/dispatch', { ticket_id: toSos.data.sos_id, force_id: toSos.data.sos_id }, T.tinh)).status === 403);
+// Quản trị tỉnh được điều động toàn tỉnh (vai trò admin_tinh có dispatch.create) — lực lượng không tồn tại → lỗi dữ liệu, không phải 403
+check('Quản trị tỉnh có quyền điều động (không bị 403)', (await call('POST', '/dispatch', { ticket_id: toSos.data.sos_id, force_id: toSos.data.sos_id }, T.tinh)).status !== 403);
 
 // ---------------------------------------------------------------- Mật khẩu
 check('Đổi mật khẩu sai mật khẩu hiện tại → 400', (await call('POST', '/auth/change-password', { current_password: 'sai', new_password: 'MoiMoi2026' }, T.xem)).status === 400);

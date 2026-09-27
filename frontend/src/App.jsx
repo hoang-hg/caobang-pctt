@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { Navigate, Route, Routes, useLocation, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import Header from './components/layout/Header';
@@ -8,17 +8,22 @@ import { useSocket } from './api/useSocket';
 import { api } from './api/client';
 import { useStore } from './app/store';
 import { usePermission } from './rbac/usePermission';
-import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import MonitoringMap from './pages/MonitoringMap';
-import Resources from './pages/Resources';
-import RescueCenter from './pages/RescueCenter';
-import Alerts from './pages/Alerts';
-import AccessControl from './pages/AccessControl';
-import DataSources from './pages/DataSources';
-import CitizenReports from './pages/CitizenReports';
-import PublicPortal from './pages/public/PublicPortal';
-import { ForgotPassword, ResetPassword } from './pages/AccountPages';
+import { ForgotPassword, ResetPassword } from './pages/AccountPages'; // nhỏ, UserMenu cũng dùng → import tĩnh
+// Mỗi trang một chunk tải khi cần: người dân mở cổng công khai không phải tải giao diện điều hành
+const Login = lazy(() => import('./pages/Login'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const MonitoringMap = lazy(() => import('./pages/MonitoringMap'));
+const Resources = lazy(() => import('./pages/Resources'));
+const RescueCenter = lazy(() => import('./pages/RescueCenter'));
+const Alerts = lazy(() => import('./pages/Alerts'));
+const AccessControl = lazy(() => import('./pages/AccessControl'));
+const DataSources = lazy(() => import('./pages/DataSources'));
+const CitizenReports = lazy(() => import('./pages/CitizenReports'));
+const PublicPortal = lazy(() => import('./pages/public/PublicPortal'));
+
+function PageLoading() {
+  return <div className="flex h-full min-h-[40vh] items-center justify-center text-sm text-muted">Đang tải…</div>;
+}
 
 function Guard({ obj, act, children }) {
   return usePermission(obj, act) ? children : <NoAccess />;
@@ -52,18 +57,20 @@ function Shell() {
       <div className="flex min-h-0 flex-1">
         <Sidebar />
         <main className="min-w-0 flex-1 overflow-auto scroll-thin">
-          <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<Guard obj="monitoring" act="view"><Dashboard /></Guard>} />
-            <Route path="/ban-do" element={<Guard obj="monitoring" act="view"><MonitoringMap /></Guard>} />
-            <Route path="/nguon-luc" element={<Guard obj="resource" act="view"><Resources /></Guard>} />
-            <Route path="/cuu-ho" element={<Guard obj="sos" act="view"><RescueCenter /></Guard>} />
-            <Route path="/canh-bao" element={<Guard obj="alert" act="view"><Alerts /></Guard>} />
-            <Route path="/phan-anh" element={<Guard obj="report" act="view"><CitizenReports /></Guard>} />
-            <Route path="/nguon-du-lieu" element={<Guard obj="integration" act="view"><DataSources /></Guard>} />
-            <Route path="/phan-quyen" element={<Guard obj="user" act="view"><AccessControl /></Guard>} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
+          <Suspense fallback={<PageLoading />}>
+            <Routes>
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/dashboard" element={<Guard obj="monitoring" act="view"><Dashboard /></Guard>} />
+              <Route path="/ban-do" element={<Guard obj="monitoring" act="view"><MonitoringMap /></Guard>} />
+              <Route path="/nguon-luc" element={<Guard obj="resource" act="view"><Resources /></Guard>} />
+              <Route path="/cuu-ho" element={<Guard obj="sos" act="view"><RescueCenter /></Guard>} />
+              <Route path="/canh-bao" element={<Guard obj="alert" act="view"><Alerts /></Guard>} />
+              <Route path="/phan-anh" element={<Guard obj="report" act="view"><CitizenReports /></Guard>} />
+              <Route path="/nguon-du-lieu" element={<Guard obj="integration" act="view"><DataSources /></Guard>} />
+              <Route path="/phan-quyen" element={<Guard obj="user" act="view"><AccessControl /></Guard>} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+          </Suspense>
         </main>
       </div>
     </div>
@@ -87,16 +94,18 @@ export default function App() {
   const loggedIn = !!auth?.token;
   return (
     <>
-      <Routes>
-        {/* Công khai — không cần đăng nhập */}
-        <Route path="/cong-khai" element={<PublicPortal />} />
-        <Route path="/dang-nhap" element={loggedIn ? <AfterLogin /> : <Login />} />
-        <Route path="/quen-mat-khau" element={<ForgotPassword />} />
-        <Route path="/dat-lai-mat-khau" element={<ResetPassword />} />
-        <Route path="/" element={loggedIn ? <Navigate to="/dashboard" replace /> : <PublicPortal />} />
-        {/* Điều hành — cần đăng nhập */}
-        <Route path="/*" element={loggedIn ? <Shell key={auth.user?.id} /> : <RequireLogin />} />
-      </Routes>
+      <Suspense fallback={<PageLoading />}>
+        <Routes>
+          {/* Công khai — không cần đăng nhập */}
+          <Route path="/cong-khai" element={<PublicPortal />} />
+          <Route path="/dang-nhap" element={loggedIn ? <AfterLogin /> : <Login />} />
+          <Route path="/quen-mat-khau" element={<ForgotPassword />} />
+          <Route path="/dat-lai-mat-khau" element={<ResetPassword />} />
+          <Route path="/" element={loggedIn ? <Navigate to="/dashboard" replace /> : <PublicPortal />} />
+          {/* Điều hành — cần đăng nhập */}
+          <Route path="/*" element={loggedIn ? <Shell key={auth.user?.id} /> : <RequireLogin />} />
+        </Routes>
+      </Suspense>
       <Toasts />
     </>
   );

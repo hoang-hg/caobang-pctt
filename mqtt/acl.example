@@ -1,0 +1,7 @@
+# ACL Mosquitto — chép thành mqtt/acl khi triển khai (tệp thật không đưa lên git).
+# Tài khoản của hệ thống (worker): chỉ đọc số đo mọi thiết bị
+user pctt-worker
+topic read caobang/pctt/+/readings
+
+# Thiết bị hiện trường: tên đăng nhập = mã thiết bị, chỉ được ghi vào topic của chính mình
+pattern write caobang/pctt/%u/readings

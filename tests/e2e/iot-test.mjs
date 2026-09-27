@@ -1,5 +1,5 @@
 // Kiểm thử cổng tiếp nhận IoT + nguồn dữ liệu (cần stack đang chạy, gồm broker MQTT).
-//   node scripts/iot-test.mjs [http://localhost:8000]
+//   node tests/e2e/iot-test.mjs [http://localhost:8000]
 // Tạo thiết bị thử, gửi số đo qua HTTP / batch / LoRaWAN / MQTT, kiểm tra từ chối số đo lỗi, rồi dọn dẹp.
 import { execSync } from 'node:child_process';
 

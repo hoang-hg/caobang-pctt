@@ -12,9 +12,11 @@ from contextlib import asynccontextmanager
 
 from sqlalchemy import text
 
+from app import preflight
 from app.config import settings
 from app.db import engine
 from app.infra import storage
+from app.infra.heartbeat import heartbeat
 from app.infra.redis import close_redis
 from app.integrations.mqtt_bridge import bridge
 from app.integrations.runner import ensure_default_sources, runner
@@ -49,6 +51,7 @@ def runs_worker() -> bool:
 
 
 async def startup() -> None:
+    preflight.enforce()  # staging/production: dừng ngay nếu cấu hình không an toàn
     await domains.load_units()
     await init_enforcer()
     async with advisory_lock(BOOTSTRAP_LOCK):
@@ -63,6 +66,7 @@ async def startup() -> None:
     if runs_api():
         hub.start_relay()
     if runs_worker():
+        heartbeat.start()
         runner.start()
         bridge.start()
         if settings.simulator:
@@ -71,6 +75,7 @@ async def startup() -> None:
 
 
 async def shutdown() -> None:
+    await heartbeat.stop()
     await simulator.stop()
     await runner.stop()
     await bridge.stop()

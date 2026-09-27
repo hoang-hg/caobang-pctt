@@ -8,30 +8,50 @@ import { useStore } from '../../app/store';
 import { pinIcon, COLORS } from './icons';
 
 export const BASEMAPS = {
-  street: { label: 'Bản đồ đường phố', url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', attr: '© OpenStreetMap' },
-  terrain: { label: 'Địa hình', url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', attr: '© OpenTopoMap, © OpenStreetMap', maxZoom: 17 },
+  street: {
+    label: 'Bản đồ Địa lý',
+    url: 'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}&hl=vi&gl=vn',
+    subdomains: ['0', '1', '2', '3'],
+    attr: '© Google Maps',
+    maxZoom: 20,
+  },
   satellite: {
     label: 'Vệ tinh',
-    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    attr: '© Esri World Imagery',
+    url: 'https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&hl=vi&gl=vn',
+    subdomains: ['0', '1', '2', '3'],
+    attr: '© Google Maps',
+    maxZoom: 20,
+  },
+  terrain: {
+    label: 'Địa hình',
+    url: 'https://mt{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}&hl=vi&gl=vn',
+    subdomains: ['0', '1', '2', '3'],
+    attr: '© Google Maps',
+    maxZoom: 20,
   },
   dark: {
     label: 'Chế độ ban đêm',
-    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
-    labels: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
-    attr: '© Esri, HERE, OpenStreetMap',
-    maxZoom: 16,
+    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    subdomains: ['a', 'b', 'c', 'd'],
+    attr: '© CARTO © OpenStreetMap',
+    maxZoom: 19,
   },
 };
 
-/** Nền bản đồ: 'auto' = nền tối (Dark Gray Canvas) khi giao diện tối, bản đồ đường phố khi sáng. */
+/** Nền bản đồ chuẩn: Google Maps với tiếng Việt (hl=vi&gl=vn) có sẵn tên Hoàng Sa, Trường Sa, Biển Đông tự nhiên trên bản đồ */
 export function BaseLayer({ basemap }) {
   const theme = useStore((s) => s.theme);
   const key = basemap === 'auto' ? (theme === 'dark' ? 'dark' : 'street') : basemap;
-  const b = BASEMAPS[key];
+  const b = BASEMAPS[key] || BASEMAPS.street;
   return (
     <>
-      <TileLayer key={key} url={b.url} attribution={b.attr} maxZoom={b.maxZoom || 19} />
+      <TileLayer
+        key={key}
+        url={b.url}
+        subdomains={b.subdomains || ['0', '1', '2', '3']}
+        attribution={b.attr}
+        maxZoom={b.maxZoom || 20}
+      />
       {b.labels && <TileLayer key={`${key}-labels`} url={b.labels} maxZoom={b.maxZoom || 19} zIndex={350} />}
     </>
   );
