@@ -14,3 +14,5 @@ export function useAreaQuery(key, path, extra = {}, options = {}) {
 export const useUnits = () => useQuery({ queryKey: ['units'], queryFn: () => api('/admin-units', { params: { level: 'xa' } }), staleTime: Infinity });
 export const usePresets = () => useQuery({ queryKey: ['presets'], queryFn: () => api('/admin-units/presets'), staleTime: Infinity });
 export const useUnitsGeo = () => useQuery({ queryKey: ['units-geo'], queryFn: () => api('/admin-units/geojson'), staleTime: Infinity });
+export const useProvinceArea = () => useQuery({ queryKey: ['province-area'], queryFn: () => api('/admin-units/area'), staleTime: Infinity });
+

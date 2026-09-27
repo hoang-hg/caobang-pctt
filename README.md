@@ -808,7 +808,7 @@ MISS / HIT / STALE) — lúc cao điểm, số yêu cầu vào backend gần nh�
 | Endpoint | Mô tả | Cache Redis |
 |---|---|---|
 | `GET /overview` | Mưa, sông, cảnh báo, SOS **chỉ đếm theo xã** | 30 s |
-| `GET /map` | GeoJSON vùng nguy hiểm, đường chia cắt, trạm, điểm sơ tán | 30 s |
+| `GET /map` | GeoJSON vùng nguy hiểm, đường chia cắt, trạm, điểm sơ tán (kèm số trực `hotline`) | 30 s |
 | `GET /alerts`, `/alerts/{code}/share` | Cảnh báo đang / đã phát; trang chia sẻ Open Graph | 30 s / – |
 | `GET /forecast/areas?hours=24\|72`, `/forecast/areas/{code}` | Dự báo mưa theo xã P10/P50/P90 | 5 phút |
 | `GET /locate?lat&lon`, `/route?…` | Xã, cảnh báo, điểm sơ tán gần nhất; đường an toàn | – |
@@ -823,6 +823,10 @@ MISS / HIT / STALE) — lúc cao điểm, số yêu cầu vào backend gần nh�
 **Không bao giờ trả ra công khai**: vị trí, quân số lực lượng, kho, phương tiện; nội dung / toạ độ / SĐT trong phiếu SOS;
 danh bạ cán bộ; họ tên, SĐT, IP người phản ánh; phản ánh chưa duyệt / bị từ chối; cảnh báo nháp / chờ duyệt.
 `tests/e2e/public-test.mjs` quét toàn bộ phản hồi công khai để phát hiện các trường này.
+
+**Công khai có chủ đích**: số điện thoại trực của **điểm sơ tán** (`evacuation_sites.contact_phone`, trả ra với tên
+`hotline`) — nút Gọi trên cổng, "Tôi đang ở đâu?" và bản nhẹ. Khi nhập (cột `sdt_lien_he`) chỉ dùng số trực của điểm
+hoặc UBND xã, **không dùng số di động cá nhân**. public-test kiểm tra điểm sơ tán chỉ có đúng các trường được phép.
 
 ### 9.2. Giới hạn tần suất
 
@@ -864,7 +868,7 @@ Lúc thiên tai, mạng di động thường chập chờn, tắc nghẽn hoặc
 **Bản nhẹ `/ban-nhe`** — HTML thuần do backend dựng (`backend/app/services/lite.py`), không JavaScript, không ảnh,
 **luôn dưới 50 KB** (thực tế ~7 KB, gzip ~3 KB), mở được trên điện thoại cũ, mạng 2G. Gồm: nút gọi 112/114/115, cảnh báo
 đang hiệu lực 48 giờ (tối đa 8, ưu tiên mức đỏ), sông vượt báo động, đường dây nóng; chọn xã (`?xa=<mã xã>`, form GET)
-→ mức nguy cơ + lời khuyên, vùng nguy hiểm, mưa dự báo 24 giờ, điểm sơ tán của xã (còn chỗ, link chỉ đường). Chỉ dùng
+→ mức nguy cơ + lời khuyên, vùng nguy hiểm, mưa dự báo 24 giờ, điểm sơ tán của xã (còn chỗ, chỉ đường, gọi số trực). Chỉ dùng
 dữ liệu đã công khai (9.1). nginx đổi `/ban-nhe` → `GET /api/v1/public/lite` và cache như API công khai; cache Redis
 30 giây, xoá ngay khi phê duyệt cảnh báo hoặc nhập dữ liệu. Nên in địa chỉ này trong tin nhắn cảnh báo / trên loa
 truyền thanh: `https://<tên miền>/ban-nhe`. Cổng đầy đủ gợi ý bản nhẹ khi trình duyệt báo mạng 2G hoặc bật tiết kiệm dữ
@@ -872,7 +876,7 @@ liệu, và có link ở chân trang.
 
 **PWA (service worker `frontend/src/sw.js`)** — chỉ bật ở bản build. Lần mở đầu tiên lưu sẵn giao diện cổng công khai;
 mỗi lần xem, bản mới nhất của cảnh báo, bản đồ, tổng quan, dự báo, đường dây nóng, hồ chứa, sạt lở và trang bản nhẹ được
-lưu trên máy. Mất mạng / máy chủ không phản hồi (hoặc chậm quá 6 giây) → hiện bản đã lưu kèm dải báo *"đang hiển thị dữ
+lưu trên máy (cùng danh sách, ranh giới xã / tỉnh). Mất mạng / máy chủ không phản hồi (hoặc chậm quá 6 giây) → hiện bản đã lưu kèm dải báo *"đang hiển thị dữ
 liệu đã lưu lúc …"*. Cài được lên màn hình chính (`manifest.webmanifest`).
 
 | Không bao giờ lưu trên máy | Lý do |

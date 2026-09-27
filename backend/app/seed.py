@@ -23,6 +23,8 @@ from app import seed_data as D
 from app.auth import hash_secret
 from app.config import settings
 from app.db import engine, execute, fetch_all, fetch_one
+from app.infra.cache import invalidate
+from app.infra.redis import close_redis
 from app.services import scenario
 from app.services.safe_routing import haversine_km
 
@@ -1045,6 +1047,8 @@ async def main(reset: bool = False):
                   (SELECT count(*) FROM operations.sos_tickets) AS sos"""
     )
     print(f"[seed] Hoàn tất ({'dữ liệu mẫu' if settings.demo_mode else 'dữ liệu nền'}): {counts}")
+    await invalidate("public:")  # --reset tạo lại đơn vị hành chính (id mới) → bỏ bản cache công khai cũ
+    await close_redis()
     await engine.dispose()
 
 

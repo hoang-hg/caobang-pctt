@@ -124,7 +124,7 @@ async def public_map():
                  FROM iot_telemetry.hazard_points WHERE active"""
         )
         evac = await fetch_all(
-            """SELECT e.id, e.name, e.site_type, e.capacity, e.current_occupancy, u.name AS admin_name,
+            """SELECT e.id, e.name, e.site_type, e.capacity, e.current_occupancy, e.contact_phone AS hotline, u.name AS admin_name,
                       ST_Y(e.location) AS lat, ST_X(e.location) AS lon
                  FROM resources.evacuation_sites e LEFT JOIN spatial_admin.administrative_units u ON u.id = e.admin_unit_id"""
         )
@@ -299,7 +299,7 @@ async def _locate(lat: float, lon: float) -> dict:
         {"u": unit["id"]},
     )
     sites = await fetch_all(
-        """SELECT id, name, capacity, current_occupancy, ST_Y(location) AS lat, ST_X(location) AS lon
+        """SELECT id, name, capacity, current_occupancy, contact_phone AS hotline, ST_Y(location) AS lat, ST_X(location) AS lon
              FROM resources.evacuation_sites WHERE current_occupancy < capacity
             ORDER BY location <-> ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) LIMIT 3""",
         pt,

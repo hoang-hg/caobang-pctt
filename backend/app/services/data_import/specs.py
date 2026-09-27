@@ -120,8 +120,13 @@ DATASETS: dict[str, Dataset] = {
                 ),
                 Field("suc_chua", "Sức chứa (người)", "capacity", "int", True, min=1, example="300"),
                 Field("dang_o", "Số người đang ở", "current_occupancy", "int", min=0, default=0, example="0"),
+                # Hiện CÔNG KHAI trên cổng (nút Gọi, bản nhẹ) — README 9.1
                 Field(
-                    "sdt_lien_he", "Số điện thoại liên hệ", "contact_phone", "phone", example="0206 3852 000"
+                    "sdt_lien_he",
+                    "Số điện thoại trực — CÔNG KHAI cho người dân (số của điểm / UBND xã, không dùng số cá nhân)",
+                    "contact_phone",
+                    "phone",
+                    example="0206 3852 000",
                 ),
                 LAT,
                 LON,

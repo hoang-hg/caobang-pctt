@@ -41,6 +41,11 @@ for (const p of ['/public/overview', '/public/map', '/public/alerts', '/public/f
 }
 const map = (await call('GET', '/public/map')).data;
 check('Bản đồ công khai không có lực lượng / kho / SOS chi tiết', !('forces' in map) && !('warehouses' in map) && !('sos' in map));
+// Điểm sơ tán: đúng danh sách trường được công khai — số trực điểm sơ tán (hotline) công khai có chủ đích (README 9.1)
+const EVAC_FIELDS = 'admin_name,capacity,current_occupancy,hotline,id,lat,lon,name,site_type';
+check('Điểm sơ tán công khai chỉ gồm trường cho phép (có số trực)',
+  map.evacuation_sites.length > 0 && map.evacuation_sites.every((e) => Object.keys(e).sort().join() === EVAC_FIELDS)
+    && map.evacuation_sites.some((e) => e.hotline));
 const ov = (await call('GET', '/public/overview')).data;
 check('Tổng quan công khai: SOS chỉ là số liệu tổng hợp theo xã', ov.sos_by_commune.every((s) => Object.keys(s).sort().join() === 'code,da_xu_ly_24h,dang_xu_ly,name'));
 const loc = await call('GET', `/public/locate?lat=${TP.lat}&lon=${TP.lon}`);

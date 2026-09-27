@@ -1,15 +1,29 @@
-"""Đơn vị hành chính, preset lọc nhanh, vùng lọc (phục vụ Bộ lọc địa phương)."""
+"""Đơn vị hành chính, preset lọc nhanh, vùng lọc (phục vụ Bộ lọc địa phương).
+
+Không cần đăng nhập — cổng công khai gọi danh sách xã, ranh giới xã / tỉnh mỗi lần mở trang → cache Redis 1 giờ với tiền
+tố "public:" (nhập ranh giới xã bằng công cụ nhập dữ liệu gọi invalidate("public:") nên bản mới có hiệu lực ngay).
+"""
 
 from fastapi import APIRouter, Depends
 
 from app.area import parse_codes
 from app.db import fetch_all, fetch_one
+from app.infra.cache import cached
+
+LEVELS = ("tinh", "xa")  # chỉ cache cấp có thật — tham số lạ không tạo thêm khoá cache
+TTL = 3600
 
 router = APIRouter(prefix="/admin-units", tags=["Hành chính"])
 
 
 @router.get("")
 async def list_units(level: str | None = None):
+    if level is None or level in LEVELS:
+        return await cached(f"public:admin-units:{level or 'all'}", TTL, lambda: _list_units(level))
+    return await _list_units(level)
+
+
+async def _list_units(level: str | None) -> list[dict]:
     return await fetch_all(
         """SELECT u.id, u.code, u.name, u.level, u.unit_type, u.old_district, u.population, u.households, u.tags, u.rbac_domain,
                   p.code AS parent_code, ST_Y(u.center) AS lat, ST_X(u.center) AS lon,
@@ -25,6 +39,12 @@ async def list_units(level: str | None = None):
 
 @router.get("/geojson")
 async def units_geojson(level: str = "xa"):
+    if level in LEVELS:
+        return await cached(f"public:admin-units-geojson:{level}", TTL, lambda: _units_geojson(level))
+    return await _units_geojson(level)
+
+
+async def _units_geojson(level: str) -> dict:
     rows = await fetch_all(
         """SELECT code, name, unit_type, old_district, population, households, tags,
                   ST_AsGeoJSON(ST_SimplifyPreserveTopology(geom, 0.001), 5)::json AS geom
@@ -46,7 +66,14 @@ async def presets():
 
 @router.get("/area")
 async def area(codes: list[str] = Depends(parse_codes)):
-    """Hình học hợp nhất + bbox của vùng đang lọc (để bản đồ fitBounds và phủ mask ngoài ranh giới)."""
+    """Hình học hợp nhất + bbox của vùng đang lọc (để bản đồ fitBounds và phủ mask ngoài ranh giới).
+    Toàn tỉnh (cổng công khai vẽ ranh giới tỉnh) được cache; vùng lọc của cán bộ thì tính mỗi lần."""
+    if not codes:
+        return await cached("public:admin-units-area:CB", TTL, lambda: _area(codes))
+    return await _area(codes)
+
+
+async def _area(codes: list[str]) -> dict | None:
     where = "code = ANY(:codes)" if codes else "code = 'CB'"
     return await fetch_one(
         f"""SELECT ST_AsGeoJSON(ST_SimplifyPreserveTopology(ST_Union(geom), 0.001), 5)::json AS geometry,

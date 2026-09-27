@@ -55,6 +55,7 @@ def test_worst_case_stays_under_limit():
                 "site_type": "truong_hoc",
                 "capacity": 300,
                 "current_occupancy": 120,
+                "hotline": "0206 3852 111",
                 "lat": 22.12345,
                 "lon": 106.12345,
             }
@@ -72,6 +73,7 @@ def test_worst_case_stays_under_limit():
     assert len(html.encode()) < lite.MAX_BYTES
     assert html.count('class="b do"') == lite.MAX_ALERTS + 1  # + khung mức nguy cơ của xã
     assert "NGUY CƠ CAO" in html and "Chỉ đường" in html
+    assert html.count('href="tel:02063852111"') == lite.MAX_SITES  # số trực điểm sơ tán (công khai)
 
 
 def test_commune_filter_and_counts():

@@ -14,6 +14,8 @@ const SHELL = `pctt-shell-${VERSION}`;
 const DATA = 'pctt-data-v1'; // dữ liệu công khai, giữ qua các bản build
 const PUBLIC_API =
   /^\/api\/v1\/public\/(overview|map|alerts|hotlines|forecast\/areas|reservoirs|landslides|config|report-categories)(\/[\w-]*)?$/;
+// Danh sách xã, ranh giới xã / tỉnh (không cần đăng nhập) — cổng dùng cho chọn xã, lớp mưa, viền tỉnh
+const PUBLIC_UNITS = /^\/api\/v1\/admin-units(\/(geojson|area))?$/;
 const TIMEOUT = 6000;
 
 self.addEventListener('install', (event) => {
@@ -44,7 +46,7 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(cacheFirst(req));
   } else if (path === '/ban-nhe') {
     networkFirst(event, true, () => caches.match('/ban-nhe', { ignoreSearch: true }));
-  } else if (PUBLIC_API.test(path)) {
+  } else if (PUBLIC_API.test(path) || PUBLIC_UNITS.test(path)) {
     networkFirst(event, true);
   } else if (req.mode === 'navigate' && !/^\/(api|tiles|ws|health)(\/|$)/.test(path)) {
     networkFirst(event, false, () => caches.match('/index.html'));
