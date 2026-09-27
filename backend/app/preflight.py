@@ -99,6 +99,13 @@ def check(s: Settings) -> tuple[list[str], list[str]]:
     elif not s.turnstile_secret:
         warnings.append("Chưa bật Cloudflare Turnstile — form phản ánh chỉ có giới hạn tần suất + honeypot")
 
+    # Xác thực 2 lớp
+    if not s.totp_required_role_set:
+        warnings.append(
+            "Chưa bắt buộc xác thực 2 lớp (TOTP_REQUIRED_ROLES) — nên bật cho super_admin, truong_ban, admin_tinh, "
+            "chi_huy_cum (quản trị tài khoản, phê duyệt cảnh báo)"
+        )
+
     # Dịch vụ phụ
     if s.smtp_host in ("", "mailpit"):
         warnings.append(

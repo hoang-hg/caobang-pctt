@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { GeoJSON, Marker, Polygon, Polyline, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet';
 import L from './leafletGlobal';
@@ -7,9 +7,18 @@ import { api } from '../../api/client';
 import { useStore } from '../../app/store';
 import { pinIcon, COLORS } from './icons';
 
+// Bản đồ nền tự lưu trữ trên máy chủ tỉnh (deploy/fetch-basemap.sh → data/tiles, nginx phục vụ /tiles/): vector
+// OpenStreetMap vùng Cao Bằng và các tỉnh lân cận, không phụ thuộc Google / CARTO, chạy được khi mất kết nối quốc tế.
+// Nền có `local` dùng tệp này khi máy chủ có; không có (máy dev chưa tải) → nguồn ngoài `url` bên dưới.
+const LOCAL_TILES = '/tiles/caobang.pmtiles';
+// Zoom ≤ 6 (toàn quốc, Biển Đông) luôn dùng nền ngoài — Google tiếng Việt thể hiện đúng Hoàng Sa, Trường Sa; ô zoom
+// thấp của tệp tự lưu trữ (dữ liệu OSM) phủ cả Biển Đông nên không được hiện.
+const LOCAL_MIN_ZOOM = 7;
+
 export const BASEMAPS = {
   street: {
     label: 'Bản đồ Địa lý',
+    local: 'light',
     url: 'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}&hl=vi&gl=vn',
     subdomains: ['0', '1', '2', '3'],
     attr: '© Google Maps',
@@ -31,6 +40,7 @@ export const BASEMAPS = {
   },
   dark: {
     label: 'Chế độ ban đêm',
+    local: 'dark',
     url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
     subdomains: ['a', 'b', 'c', 'd'],
     attr: '© CARTO © OpenStreetMap',
@@ -38,12 +48,79 @@ export const BASEMAPS = {
   },
 };
 
-/** Nền bản đồ chuẩn: Google Maps với tiếng Việt (hl=vi&gl=vn) có sẵn tên Hoàng Sa, Trường Sa, Biển Đông tự nhiên trên bản đồ */
+/**
+ * Tệp bản đồ nền tự lưu trữ: { archive, bounds, maxZoom } đọc từ phần đầu tệp (1 yêu cầu Range ~16 KB); null nếu
+ * máy chủ không có (máy dev Vite trả index.html → sai định dạng); undefined khi đang kiểm tra.
+ */
+function useLocalBasemap() {
+  const { data } = useQuery({
+    queryKey: ['local-basemap'],
+    queryFn: async () => {
+      try {
+        const { PMTiles } = await import('pmtiles');
+        const archive = new PMTiles(LOCAL_TILES);
+        const h = await archive.getHeader();
+        return { archive, bounds: L.latLngBounds([h.minLat, h.minLon], [h.maxLat, h.maxLon]), maxZoom: h.maxZoom };
+      } catch {
+        return null;
+      }
+    },
+    staleTime: Infinity,
+    gcTime: Infinity,
+    structuralSharing: false,
+    retry: 0,
+  });
+  return data;
+}
+
+/**
+ * Lớp nền vector PMTiles, vẽ trên trình duyệt (thư viện tải lười, không nằm trong gói tải lần đầu). Khung nhìn ra
+ * ngoài vùng phủ của tệp hoặc zoom < LOCAL_MIN_ZOOM → hiện thêm nền ngoài `fallback` bên dưới, không để trống.
+ */
+function LocalBaseLayer({ source, flavor, fallback }) {
+  const map = useMap();
+  const covered = () => map.getZoom() >= LOCAL_MIN_ZOOM && source.bounds.contains(map.getBounds());
+  const [inside, setInside] = useState(covered);
+  useMapEvents({ moveend: () => setInside(covered()) });
+  useEffect(() => {
+    let layer;
+    let cancelled = false;
+    import('protomaps-leaflet').then(({ leafletLayer }) => {
+      if (cancelled) return;
+      layer = leafletLayer({
+        url: source.archive,
+        flavor,
+        lang: 'vi',
+        maxDataZoom: source.maxZoom,
+        bounds: source.bounds,
+        minZoom: LOCAL_MIN_ZOOM,
+        maxZoom: 20,
+        zIndex: 2, // trên nền ngoài (zIndex 1)
+      });
+      layer.addTo(map);
+    });
+    return () => {
+      cancelled = true;
+      if (layer) map.removeLayer(layer);
+    };
+  }, [map, source, flavor]);
+  return inside ? null : fallback;
+}
+
+/** Nền bản đồ: Địa lý / Ban đêm ưu tiên bản đồ tự lưu trữ; Vệ tinh / Địa hình là nguồn ngoài (README §6.9). */
 export function BaseLayer({ basemap }) {
+  const map = useMap();
   const theme = useStore((s) => s.theme);
+  const local = useLocalBasemap();
   const key = basemap === 'auto' ? (theme === 'dark' ? 'dark' : 'street') : basemap;
   const b = BASEMAPS[key] || BASEMAPS.street;
-  return (
+  const maxZoom = b.maxZoom || 20;
+  // Đặt maxZoom cho bản đồ trước khi các lớp khác được thêm (layout effect chạy trước effect thêm lớp của
+  // react-leaflet): cụm điểm (markercluster) báo lỗi nếu bản đồ chưa có maxZoom, mà nền tự lưu trữ nạp sau.
+  useLayoutEffect(() => {
+    map.setMaxZoom(maxZoom);
+  }, [map, maxZoom]);
+  const external = (
     <>
       <TileLayer
         key={key}
@@ -55,6 +132,10 @@ export function BaseLayer({ basemap }) {
       {b.labels && <TileLayer key={`${key}-labels`} url={b.labels} maxZoom={b.maxZoom || 19} zIndex={350} />}
     </>
   );
+  if (!b.local) return external;
+  if (local === undefined) return null; // chờ kiểm tra xong, tránh tải nền ngoài rồi lại đổi
+  if (!local) return external;
+  return <LocalBaseLayer key={b.local} source={local} flavor={b.local} fallback={external} />;
 }
 
 /** Radar mưa thời gian thực (RainViewer, ảnh mờ opacity). */

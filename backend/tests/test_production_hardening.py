@@ -27,6 +27,7 @@ STRONG = {
     "smtp_host": "smtp.caobang.gov.vn",
     "turnstile_site_key": "0x4AAA-site",
     "turnstile_secret": "0x4AAA-secret",
+    "totp_required_roles": "super_admin,truong_ban,admin_tinh,chi_huy_cum",
 }
 
 
@@ -123,6 +124,7 @@ def test_rate_limit_rules_for_citizens_and_sessions():
     assert match_rule("POST", "/api/v1/sos/intake").name == "intake"
     assert match_rule("GET", "/api/v1/sos").per_session
     assert not match_rule("POST", "/api/v1/auth/login").per_session
+    assert match_rule("POST", "/api/v1/auth/mfa/verify").name == "mfa"  # chưa có token phiên → đếm theo IP
 
 
 def test_keyed_limit_counts_only_successes(monkeypatch):

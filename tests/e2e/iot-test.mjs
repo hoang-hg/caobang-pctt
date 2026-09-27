@@ -93,8 +93,12 @@ check('ChirpStack event khác "up" được bỏ qua', (await call('POST', '/ing
 // MQTT (publish qua container broker)
 try {
   execSync(`docker exec caobang-pctt-mqtt mosquitto_pub -t caobang/pctt/${MQTT_ID}/readings -m "{\\"value\\": 1.35}"`, { stdio: 'ignore' });
-  await sleep(2500);
-  const tl = (await call('GET', '/stations?type=do_nghieng', null, A)).data.find((s) => s.id === 'CB-TL-02');
+  // danh sách trạm cache theo khung 5 giây (số đo là sự kiện tần suất cao, không làm mới cache ngay) → chờ tới ~10 giây
+  let tl;
+  for (let i = 0; i < 10 && tl?.value !== 1.35; i += 1) {
+    await sleep(1000);
+    tl = (await call('GET', '/stations?type=do_nghieng', null, A)).data.find((s) => s.id === 'CB-TL-02');
+  }
   check('MQTT: cảm biến nghiêng nhận 1,35°', tl?.value === 1.35, String(tl?.value));
   const layers = (await call('GET', '/map/layers', null, A)).data;
   check('Vượt BĐ II qua MQTT → có vùng nguy cơ sạt lở tự động (cảm biến Mẻ Pia)',

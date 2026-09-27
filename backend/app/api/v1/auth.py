@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from app import mfa
 from app.auth import audit, create_token, current_user, hash_secret, password_problem, verify_secret
 from app.config import settings
 from app.db import execute, fetch_all, fetch_one
@@ -37,19 +38,23 @@ async def role_names() -> dict[str, str]:
 
 async def profile(user: dict) -> dict:
     meta = await role_names()
-    email = user.get("email")
-    if email is None:
-        row = await fetch_one(
-            "SELECT email FROM communications.users WHERE id = CAST(:id AS uuid)", {"id": str(user["id"])}
-        )
-        email = row["email"] if row else None
+    extra = await fetch_one(
+        """SELECT email, totp_enabled_at, cardinality(totp_recovery_hashes) AS recovery_left
+             FROM communications.users WHERE id = CAST(:id AS uuid)""",
+        {"id": str(user["id"])},
+    )
     return {
         "id": user["id"],
         "username": user["username"],
         "full_name": user["full_name"],
         "position": user["position"],
-        "email": email,
+        "email": extra["email"],
         "has_pin": bool(user["pin_hash"]),
+        "mfa": {
+            "enabled": extra["totp_enabled_at"] is not None,
+            "required": mfa.required(user["username"]),
+            "recovery_left": extra["recovery_left"],
+        },
         "assignments": [
             {"role": r, "role_name": meta.get(r, r), "domain": d, "domain_label": domains.label(d)}
             for r, d in groupings(user["username"])
@@ -58,27 +63,49 @@ async def profile(user: dict) -> dict:
     }
 
 
+def lock_key(username: str) -> str:
+    """Bộ đếm đăng nhập sai theo TÀI KHOẢN (không theo chuỗi đã gõ): nhập username hay email đều chung 1 bộ đếm; sai
+    mã xác thực 2 lớp cũng đếm vào đây; đặt lại mật khẩu xoá đúng khoá này."""
+    return f"loginfail:{username.lower()}"
+
+
+async def check_lock(key: str) -> None:
+    if await ratelimit.peek(key) >= MAX_FAILED_LOGINS:
+        raise HTTPException(429, "Đăng nhập sai quá nhiều lần — tài khoản tạm khoá 15 phút")
+
+
+async def session(user: dict) -> dict:
+    return {"token": create_token(user), "user": await profile(user)}
+
+
+async def complete_login(user: dict, method: str = "password") -> dict:
+    await ratelimit.clear(lock_key(user["username"]))
+    await audit(user, "auth.login", "user", user["username"], {"method": method})
+    return await session(user)
+
+
 @router.post("/login")
 async def login(body: LoginIn):
+    """Mật khẩu đúng → token; tài khoản có xác thực 2 lớp → {"mfa": "verify" | "setup", "challenge"} (app/mfa.py)."""
     clean_u = body.username.strip()
     user = await fetch_one(
         """SELECT * FROM communications.users
             WHERE lower(username) = lower(:u) OR lower(email) = lower(:u)""",
         {"u": clean_u},
     )
-    # Đếm sai theo TÀI KHOẢN (không theo chuỗi đã gõ) → nhập username hay email đều chung 1 bộ đếm, đặt lại mật khẩu
-    # xoá đúng khoá này (reset_password xoá loginfail:<username>)
-    lock_key = f"loginfail:{(user['username'] if user else clean_u).lower()}"
-    if await ratelimit.peek(lock_key) >= MAX_FAILED_LOGINS:
-        raise HTTPException(429, "Đăng nhập sai quá nhiều lần — tài khoản tạm khoá 15 phút")
+    key = lock_key(user["username"] if user else clean_u)
+    await check_lock(key)
     if not user or not verify_secret(body.password, user["password_hash"]):
-        await ratelimit.hit(lock_key, LOCK_WINDOW_S)
+        await ratelimit.hit(key, LOCK_WINDOW_S)
         raise HTTPException(401, "Sai tên đăng nhập hoặc mật khẩu")
     if not user["is_active"]:
         raise HTTPException(403, "Tài khoản đã bị khoá. Vui lòng liên hệ quản trị viên.")
-    await ratelimit.clear(lock_key)
-    await audit(user, "auth.login", "user", user["username"])
-    return {"token": create_token(user), "user": await profile(user)}
+    # Bộ đếm sai chỉ xoá khi qua đủ các bước (mật khẩu đúng + mã sai liên tục vẫn bị khoá)
+    if user["totp_enabled_at"] is not None:
+        return {"mfa": "verify", "challenge": mfa.challenge_token(user, "verify")}
+    if mfa.required(user["username"]):
+        return {"mfa": "setup", "challenge": mfa.challenge_token(user, "setup")}
+    return await complete_login(user)
 
 
 @router.get("/me")
@@ -112,7 +139,7 @@ async def change_password(body: ChangePasswordIn, user: dict = Depends(current_u
         "SELECT * FROM communications.users WHERE id = CAST(:id AS uuid)", {"id": str(user["id"])}
     )
     # Phiên khác (máy khác) bị đăng xuất; phiên hiện tại nhận token mới
-    return {"token": create_token(fresh), "user": await profile(fresh)}
+    return await session(fresh)
 
 
 class ForgotIn(BaseModel):
@@ -185,7 +212,7 @@ async def reset_password(body: ResetIn):
         "UPDATE communications.password_reset_tokens SET used_at = now() WHERE user_id = :u AND used_at IS NULL",
         {"u": row["user_id"]},
     )
-    await ratelimit.clear(f"loginfail:{row['username'].lower()}")
+    await ratelimit.clear(lock_key(row["username"]))
     await audit(None, "auth.reset_password", "user", row["username"])
     return {"message": "Đã đặt lại mật khẩu — hãy đăng nhập bằng mật khẩu mới"}
 

@@ -65,6 +65,10 @@ export const useStore = create((set, get) => ({
   mobileMenuOpen: false,
   setMobileMenuOpen: (mobileMenuOpen) => set({ mobileMenuOpen }),
 
+  // ---- Cổng công khai đang hiện dữ liệu service worker đã lưu (mất mạng / mạng quá chậm): thời điểm lưu, ISO ----
+  savedAt: null,
+  setSavedAt: (savedAt) => { if (get().savedAt !== savedAt) set({ savedAt }); },
+
   // ---- Thông báo nổi ----
   toasts: [],
   toast: (t) => {

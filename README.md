@@ -83,7 +83,9 @@ Ký hiệu: ✅ chạy thật · 🟡 chạy thật nhưng dựa trên dữ li�
 | Công khai | Điểm đen sạt lở & đường đèo | 🟡 | 12 điểm khai báo trong code (`services/landslides.py`); trạng thái suy ra từ vùng nguy hiểm + cảm biến — **chưa có dữ liệu giám sát thì mọi điểm hiện "bình thường"** |
 | Công khai | Chỉ đường an toàn | 🟡 | Mạng đường là các trục chính vẽ xấp xỉ; ngoài mạng đường chỉ hiện hướng chim bay (nét đứt xám) |
 | Công khai | Phản ánh kèm ảnh, duyệt theo địa bàn, tra cứu tiến độ | ✅ | |
-| Nền tảng | Đăng nhập, RBAC, đổi/quên mật khẩu, nhật ký thao tác, xuất PDF/Excel | ✅ | |
+| Công khai | Bản nhẹ `/ban-nhe` (< 50 KB, không JavaScript), mở lại khi mất mạng (PWA) | ✅ | [9.4](#ban-nhe) |
+| Nền tảng | Bản đồ nền tự lưu trữ (OpenStreetMap) | ✅ | Cần chạy `deploy/fetch-basemap.sh` ([6.9](#ban-do-nen)) |
+| Nền tảng | Đăng nhập, xác thực 2 lớp (TOTP), RBAC, đổi/quên mật khẩu, nhật ký thao tác, xuất PDF/Excel | ✅ | [11.1](#xac-thuc-2-lop) |
 
 ### 2.2. Dữ liệu
 
@@ -107,8 +109,53 @@ vùng nguy hiểm, số điện thoại không có thật.
 | Điểm sơ tán | `resources.evacuation_sites` | ⛔ trống | Phương án ứng phó của từng xã |
 | Danh bạ, đường dây nóng tỉnh | `communications.contacts` | ⛔ trống (cổng chỉ hiện 112/113/114/115) | Văn phòng BCH |
 
-**Chưa có giao diện nhập** trạm, hồ, lực lượng, kho, điểm sơ tán, vùng nguy hiểm, danh bạ. Trong lúc chờ công cụ
-nhập CSV/GeoJSON: nhập bằng SQL theo cấu trúc bảng ở `backend/alembic/sql/`, có người thứ hai đối chiếu.
+Nhập bằng công cụ ở [2.4](#nhap-du-lieu), có người thứ hai đối chiếu với văn bản gốc.
+
+<a id="nhap-du-lieu"></a>
+### 2.4. Nhập dữ liệu chính thức
+
+Trang **Nhập dữ liệu** (`/nhap-du-lieu`, quyền `data.import`: Super admin, Lãnh đạo BCH, Admin tỉnh) hoặc dòng lệnh trên
+máy chủ. Quy trình: **Tải tệp mẫu** → điền → **Kiểm tra** (không ghi gì: báo lỗi theo dòng, số bản ghi thêm / cập nhật /
+xoá, xem trước) → **Nhập** (kiểm tra lại, ghi toàn bộ trong 1 transaction hoặc không ghi gì; ghi nhật ký pháp lý; mọi màn
+hình và cổng công khai cập nhật ngay).
+
+| Loại (mã) | Bảng | Định dạng | Khoá | Thay toàn bộ |
+|---|---|---|---|---|
+| Ranh giới xã/phường (`ranh_gioi_xa`) | `administrative_units` | GeoJSON vùng | mã xã có sẵn — chỉ cập nhật | — |
+| Điểm sơ tán (`diem_so_tan`) 🌐 | `evacuation_sites` | CSV / Excel / GeoJSON điểm | `ma` | ✓ |
+| Vùng nguy hiểm (`vung_nguy_hiem`) 🌐 | `hazard_zones` | GeoJSON vùng | `ma` | ✓ (không xoá vùng do cảm biến tạo) |
+| Điểm nguy hiểm (`diem_nguy_hiem`) 🌐 | `hazard_points` | CSV / Excel / GeoJSON điểm | `ma` | ✓ |
+| Danh bạ & đường dây nóng (`danh_ba`) 🌐 | `contacts` | CSV / Excel | `ma` (+ `ma_cap_tren`) | ✓ |
+| Trạm quan trắc (`tram_quan_trac`) | `monitoring_stations` | CSV / Excel / GeoJSON điểm | `ma` | — |
+| Hồ chứa (`ho_chua`) 🌐 | `reservoirs` | CSV / Excel / GeoJSON điểm | `ma` | — |
+| Kho vật tư (`kho`) | `warehouses` | CSV / Excel / GeoJSON điểm | `ma` | — |
+| Tồn kho (`ton_kho`) | `inventory` | CSV / Excel | `ma_kho` + `ma_vat_tu` | — |
+| Lực lượng (`luc_luong`) | `forces` | CSV / Excel / GeoJSON điểm | `ma` | — |
+| Phương tiện (`phuong_tien`) | `vehicles` | CSV / Excel | `ma` (+ `ma_luc_luong`) | — |
+| Điểm cấp nhiên liệu (`cay_xang`) | `fuel_depots` | CSV / Excel / GeoJSON điểm | `ma` | ✓ |
+
+🌐 = hiện trên cổng công khai. Quy tắc:
+
+- **Mã (`ma`)** là định danh ổn định: nhập lại tệp đã sửa → **cập nhật** đúng bản ghi, không nhân đôi. Ô trống ghi
+  đè thành trống (tệp là nguồn chính), trừ cột ghi "trống = giữ nguyên".
+- **Toạ độ WGS84** (vĩ độ ~22,3–23,1; kinh độ ~105,3–106,9 cho Cao Bằng); điểm ngoài tỉnh bị từ chối. GeoJSON phải là
+  WGS84 (EPSG:4326) — tệp VN-2000 phải chuyển hệ trước. Hình học vùng lỗi tự sửa (`ST_MakeValid`) kèm cảnh báo.
+- **Xã/phường** tự xác định theo vị trí nếu để trống `ma_xa`. Nhập ranh giới xã mới → mọi đối tượng (SOS, phản ánh,
+  điểm sơ tán…) được gán lại xã theo ranh giới mới.
+- **Excel**: dùng trang tính đầu tiên, dòng 1 là tên cột; CSV phải là UTF-8 (Excel: Lưu thành → "CSV UTF-8"). Tên cột
+  và giá trị liệt kê viết có dấu cũng được ("Vĩ độ", "Trường học"). Tối đa 20 MB, 20.000 dòng.
+- **Thay toàn bộ** xoá mọi bản ghi của bảng không có trong tệp (kể cả dữ liệu mẫu) — giao diện báo trước số bản ghi sẽ
+  xoá và bắt buộc tích xác nhận. Chỉ có ở bảng không bị bảng khác tham chiếu.
+- Thứ tự khi nhập lần đầu: ranh giới xã → kho → tồn kho → lực lượng → phương tiện → phần còn lại.
+
+Dòng lệnh (tệp lớn, người vận hành máy chủ):
+
+```bash
+docker compose cp diem_so_tan.csv backend:/tmp/        # chạy thật: dcp cp …
+docker compose exec backend python -m app.services.data_import --list
+docker compose exec backend python -m app.services.data_import diem_so_tan /tmp/diem_so_tan.csv            # kiểm tra
+docker compose exec backend python -m app.services.data_import diem_so_tan /tmp/diem_so_tan.csv --apply    # nhập
+```
 
 ### 2.3. Việc phải xong trước khi mở cho người dân
 
@@ -116,13 +163,15 @@ Bắt buộc:
 
 1. ⛔ Tích hợp ít nhất một kênh cảnh báo thật có báo cáo giao nhận (SMS Brandname hoặc Cell Broadcast qua nhà mạng)
    và gỡ số liệu giao nhận ngẫu nhiên khỏi giao diện.
-2. ⛔ Nhập dữ liệu chính thức mục 2.2 (tối thiểu: ranh giới xã, điểm sơ tán, vùng nguy hiểm, danh bạ đường dây nóng).
-3. ⛔ Bản đồ nền có giấy phép sử dụng ([6.9](#ban-do-nen)).
+2. ⛔ Nhập dữ liệu chính thức mục 2.2 bằng công cụ [2.4](#nhap-du-lieu) (tối thiểu: ranh giới xã, điểm sơ tán, vùng
+   nguy hiểm, danh bạ đường dây nóng).
+3. ⛔ Bản đồ nền: tải bản đồ tự lưu trữ (`sh deploy/fetch-basemap.sh`); nền ngoài (zoom toàn quốc, Vệ tinh, Địa hình)
+   có giấy phép sử dụng ([6.9](#ban-do-nen)).
 4. ⛔ Triển khai theo [mục 10](#trien-khai): `APP_ENV=production`, HTTPS, sao lưu ra ngoài máy chủ, đã diễn tập khôi phục.
 5. ⛔ Hồ sơ cấp độ an toàn thông tin, kiểm thử xâm nhập, thông báo xử lý dữ liệu cá nhân ([mục 11](#bao-mat)).
 6. ⛔ Diễn tập trên một xã thí điểm: soạn → duyệt → phát → người dân nhận được.
 
-Nên có: công cụ nhập dữ liệu CSV/GeoJSON; chính sách xoá SĐT người phản ánh sau thời hạn; Content-Security-Policy;
+Nên có: chính sách xoá SĐT người phản ánh sau thời hạn; Content-Security-Policy;
 máy chủ dự phòng ngoài tỉnh; giám sát số liệu (metrics) + cảnh báo; kiểm thử tải lại trên máy chủ thật ([12.2](#kiem-thu-tai)).
 
 ---
@@ -323,8 +372,10 @@ Mọi biến của backend khai báo ở `backend/app/config.py`. Tệp mẫu: `
 | Biến | Mặc định dev | Chạy thật | Ý nghĩa |
 |---|---|---|---|
 | `JWT_SECRET` | chuỗi mẫu | **bắt buộc** ≥ 32 ký tự ngẫu nhiên | Ký phiên đăng nhập |
-| `SECRET_KEY` | trống (dẫn xuất từ JWT_SECRET) | **bắt buộc**, khác JWT_SECRET | Mã hoá API key đối tác trong CSDL — đổi khoá = nhập lại key |
+| `SECRET_KEY` | trống (dẫn xuất từ JWT_SECRET) | **bắt buộc**, khác JWT_SECRET | Mã hoá API key đối tác và khoá xác thực 2 lớp trong CSDL — đổi khoá = nhập lại key, mọi người cài lại 2 lớp |
 | `JWT_EXPIRE_HOURS` | `12` | tuỳ chọn | Thời hạn phiên |
+| `TOTP_REQUIRED_ROLES` | trống | `super_admin,truong_ban,admin_tinh,chi_huy_cum` | Vai trò bắt buộc xác thực 2 lớp ([11.1](#xac-thuc-2-lop)); trống → cảnh báo khi khởi động |
+| `TOTP_ISSUER` | `BCH PCTT Cao Bằng` | tuỳ chọn | Tên hiện trong ứng dụng xác thực |
 | `POSTGRES_USER` / `_DB` | `pctt` / `caobang_pctt` | tuỳ chọn | |
 | `POSTGRES_PASSWORD` | `pctt_dev_password` | **bắt buộc** (dùng hex, ghép vào URL) | |
 | `POSTGRES_PORT` | `5433` | — | Cổng mở ra máy (chỉ dev) |
@@ -389,7 +440,8 @@ cảnh báo **chưa có code kết nối** — chưa có key nào dùng được
 | Đài KTTV Cao Bằng / Cục KTTV | Mực nước, bản tin | ⛔ | Thoả thuận chia sẻ dữ liệu | Đẩy vào `/ingest/batch` hoặc viết bộ nối ([6.7](#nguon-trong-nuoc)) |
 | VRain, VNDMS, dữ liệu vận hành hồ chứa, cảnh báo sạt lở theo xã | Đo mưa, giám sát thiên tai, xả lũ | ⛔ | Thoả thuận | như trên |
 | SMS Brandname, Cell Broadcast, Zalo ZNS/OA, tổng đài SIP | **Gửi cảnh báo cho dân** | ⛔ (chưa làm) | Hợp đồng nhà mạng / Zalo | Sẽ bổ sung biến khi tích hợp |
-| Bản đồ nền | Nền bản đồ | ⚠️ | Giấy phép / API key ([6.9](#ban-do-nen)) | Frontend `components/map/MapTools.jsx` |
+| Bản đồ nền tự lưu trữ (OSM, Protomaps) | Nền Địa lý, Ban đêm vùng Cao Bằng | ✅ không key | Chạy `deploy/fetch-basemap.sh` ([6.9](#ban-do-nen)) | `data/tiles/` |
+| Bản đồ nền Google / CARTO | Zoom toàn quốc, Vệ tinh, Địa hình, ngoài vùng phủ | ⚠️ | Giấy phép / API key ([6.9](#ban-do-nen)) | Frontend `components/map/MapTools.jsx` |
 | Radar mưa RainViewer | Lớp radar | ✅ không key | Tuân thủ điều khoản RainViewer | — |
 | Cloudflare Turnstile | Chống bot form phản ánh | ✅ | Site key + secret: https://dash.cloudflare.com → Turnstile | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET` |
 | SMTP | Email quên mật khẩu | ✅ | Tài khoản máy chủ thư của tỉnh | `SMTP_*` |
@@ -508,11 +560,32 @@ gửi thật có báo cáo giao nhận từ nhà cung cấp, thay `advance_deliv
 <a id="ban-do-nen"></a>
 ### 6.9. Bản đồ nền
 
-Giao diện hiện lấy nền từ tile trực tiếp của Google Maps (`mt{s}.google.com/vt/…`) và CARTO (`basemaps.cartocdn.com`).
-**Cả hai cần giấy phép khi dùng thật**: điều khoản Google Maps Platform không cho tải tile trực tiếp không qua API có key
-(có thể bị chặn bất cứ lúc nào); CARTO basemap miễn phí có giới hạn sử dụng. Trước khi mở cho người dân: dùng dịch vụ có
-hợp đồng / API key (VD Google Map Tiles API, nhà cung cấp bản đồ trong nước, bản đồ nền của cơ quan nhà nước), bảo đảm
-thể hiện đúng chủ quyền lãnh thổ Việt Nam, và cập nhật `components/map/MapTools.jsx` + dòng ghi công (attribution).
+**Bản đồ nền tự lưu trữ** (nền "Bản đồ Địa lý" và "Chế độ ban đêm"): tệp vector `data/tiles/caobang.pmtiles` (~160 MB,
+dữ liệu OpenStreetMap theo sơ đồ Protomaps) phủ Cao Bằng, các tỉnh giáp ranh và Quảng Tây, zoom tới 15 (đường thôn, tên
+xóm). nginx phục vụ thẳng tệp này tại `/tiles/` (trình duyệt đọc từng ô bằng HTTP Range, không cần máy chủ tile riêng);
+trình duyệt tự vẽ bằng `protomaps-leaflet`, nhãn tiếng Việt. Khung nhìn trong vùng phủ **không gọi dịch vụ ngoài nào** →
+vẫn có bản đồ khi đứt cáp quang quốc tế, và không vướng điều khoản tải tile trực tiếp của Google.
+
+```bash
+sh deploy/fetch-basemap.sh      # cần Internet + Docker; ~1 phút. Chạy lại mỗi quý để cập nhật đường, địa danh
+```
+
+Tải xong là dùng ngay, không cần khởi động lại (thư mục `data/tiles` gắn vào nginx ở cả hai tệp compose). Vùng khác:
+`BBOX=<tây,nam,đông,bắc>`; bản cố định: `BUILD=<ngày>.pmtiles` (danh sách: https://maps.protomaps.com/builds).
+
+Khi nào vẫn dùng nền ngoài (`components/map/MapTools.jsx`, `BASEMAPS`):
+
+| Trường hợp | Nền hiển thị |
+|---|---|
+| Zoom ≤ 6 (nhìn toàn quốc, Biển Đông) | Google Maps tiếng Việt, thể hiện đúng **Hoàng Sa, Trường Sa**. Ô zoom thấp của tệp OSM phủ cả Biển Đông nên không được hiện |
+| Khung nhìn vượt ra ngoài vùng phủ của tệp | Google (Ban đêm: CARTO) vẽ bên dưới phần ngoài vùng |
+| Chưa chạy `fetch-basemap.sh` (máy dev) | Google / CARTO như trước |
+| Nền "Vệ tinh", "Địa hình" | Luôn là Google |
+
+Ghi công OpenStreetMap / Protomaps hiện ở góc bản đồ (bắt buộc theo giấy phép ODbL). **Nền ngoài vẫn cần giấy phép khi
+dùng thật**: điều khoản Google Maps Platform không cho tải tile trực tiếp không qua API có key (có thể bị chặn bất cứ lúc
+nào); CARTO miễn phí có giới hạn sử dụng. Muốn thay: dịch vụ có hợp đồng / API key (Google Map Tiles API, bản đồ nền của
+cơ quan nhà nước) — sửa `url` trong `BASEMAPS`, bảo đảm thể hiện đúng chủ quyền lãnh thổ Việt Nam.
 
 ---
 
@@ -672,9 +745,10 @@ Yêu cầu ở phạm vi toàn tỉnh **không** khớp phân quyền cấp cụ
 | `contact.view` | ✓ | Danh bạ (cấp tỉnh luôn hiện, cấp xã/thôn theo phạm vi) |
 | `hotline.operate` | toàn tỉnh | Tổng đài, phân luồng cuộc gọi |
 | `audit.view` | toàn tỉnh | Nhật ký pháp lý |
-| `user.view` / `user.manage` | ✓ | Xem / tạo tài khoản con, cấp – thu hồi vai trò trong phạm vi |
+| `user.view` / `user.manage` | ✓ | Xem / tạo tài khoản con, cấp – thu hồi vai trò, đặt lại xác thực 2 lớp trong phạm vi |
 | `report.view` / `report.moderate` | ✓ | Xem (kể cả SĐT người gửi) / duyệt – từ chối – chuyển SOS phản ánh |
 | `integration.view` / `integration.manage` | toàn tỉnh | Xem / cấu hình nguồn dữ liệu, thiết bị IoT, cấp khoá |
+| `data.import` | toàn tỉnh | Nhập dữ liệu chính thức từ tệp ([2.4](#nhap-du-lieu)) |
 | `rbac.manage` | toàn tỉnh | Tạo / sửa / xoá định nghĩa vai trò |
 
 ### 8.2. Vai trò hệ thống (đồng bộ mỗi lần khởi động)
@@ -683,7 +757,7 @@ Yêu cầu ở phạm vi toàn tỉnh **không** khớp phân quyền cấp cụ
 |---|---|---|
 | `super_admin` Quản trị hệ thống | ✗ | Tất cả |
 | `truong_ban` Lãnh đạo BCH | ✗ | Tất cả trừ `rbac.manage` |
-| `admin_tinh` Quản trị tỉnh | ✗ | Tài khoản, duyệt phản ánh, xử lý SOS và **điều động** toàn tỉnh; xem nguồn lực, cảnh báo, nhật ký, nguồn dữ liệu. Không soạn/duyệt cảnh báo, không sửa vai trò |
+| `admin_tinh` Quản trị tỉnh | ✗ | Tài khoản, duyệt phản ánh, xử lý SOS và **điều động** toàn tỉnh; xem nguồn lực, cảnh báo, nhật ký, nguồn dữ liệu; **nhập dữ liệu chính thức**. Không soạn/duyệt cảnh báo, không sửa vai trò |
 | `admin_xa` Quản trị xã/phường | ✓ | Tài khoản & duyệt phản ánh trong xã; tiếp nhận – cập nhật SOS của xã |
 | `chi_huy_cum` Chỉ huy cụm | ✓ | Điều hành, xuất kho, soạn + duyệt cảnh báo, tài khoản trong cụm |
 | `truc_ban` Trực ban điều hành | ✓ | Tiếp nhận SOS, điều động, soạn cảnh báo (Maker), tổng đài |
@@ -711,7 +785,7 @@ nhật ký thuộc xã trong phạm vi người dùng.
 vai trò đã chỉnh (gỡ hết vai trò của Superadmin ban đầu thì không bị gán lại). Vô hiệu hoá tài khoản: **khoá** tài khoản.
 
 API quản trị `/api/v1/rbac`: `GET /permissions`, `/roles` (`user.view`) · `GET /scopes` · `POST/PATCH/DELETE /roles…`
-(`rbac.manage`) · `GET/POST /users`, `PATCH /users/{id}`, `POST/DELETE /users/{id}/assignments` (`user.manage` + rào chắn
+(`rbac.manage`) · `GET/POST /users`, `PATCH /users/{id}`, `POST/DELETE /users/{id}/assignments`, `POST /users/{id}/mfa/reset` (`user.manage` + rào chắn
 uỷ quyền) · `GET /audit` (`user.view`, lọc theo phạm vi).
 
 ---
@@ -723,7 +797,8 @@ Người dân mở `/` không cần đăng nhập (đã đăng nhập thì `/` c
 băng trạng thái rủi ro toàn tỉnh · **Tôi đang ở đâu?** (GPS → xã, cảnh báo, điểm sơ tán gần nhất còn chỗ, chỉ đường an toàn) ·
 bản đồ dự báo mưa, vùng nguy hiểm, đường chia cắt, điểm sơ tán, phản ánh đã xác minh · cảnh báo chính thức (chỉ lệnh
 **đã duyệt và phát**, nút chia sẻ Zalo/Facebook, link `?canh-bao=MÃ`) · sông, hồ chứa, điểm đen sạt lở · đường dây nóng
-(trực ban tỉnh + 112/113/114/115, không có SĐT cá nhân cán bộ) · gửi phản ánh · tra cứu tiến độ.
+(trực ban tỉnh + 112/113/114/115, không có SĐT cá nhân cán bộ) · gửi phản ánh · tra cứu tiến độ. Mạng yếu: bản nhẹ
+`/ban-nhe`; mất mạng: mở lại bằng dữ liệu đã lưu ([9.4](#ban-nhe)).
 
 ### 9.1. API công khai `/api/v1/public/*`
 
@@ -739,6 +814,7 @@ MISS / HIT / STALE) — lúc cao điểm, số yêu cầu vào backend gần nh�
 | `GET /locate?lat&lon`, `/route?…` | Xã, cảnh báo, điểm sơ tán gần nhất; đường an toàn | – |
 | `GET /reservoirs`, `/landslides` | Hồ chứa & xả lũ; điểm đen sạt lở & đường đèo | 20 s |
 | `GET /hotlines` | Đường dây nóng | 1 giờ |
+| `GET /lite?xa=` (nginx: `/ban-nhe`) | Trang bản nhẹ HTML < 50 KB ([9.4](#ban-nhe)) | 30 s, xoá khi phát cảnh báo |
 | `GET /reports`, `/reports/{id}/photos/{idx}` | Phản ánh **đã duyệt** + ảnh | 30 s |
 | `GET /report-categories`, `/config` | Loại sự việc; cấu hình công khai (khoá site Turnstile) | – |
 | `POST /reports` | Gửi phản ánh (multipart, ≤ 3 ảnh × 8 MB) | – |
@@ -780,6 +856,36 @@ chặn bằng khoá phụ (SĐT) và Turnstile.
 - Ảnh: xoay theo EXIF rồi **xoá toàn bộ EXIF/GPS**, chặn ảnh bomb (> 40 megapixel), mã hoá lại JPEG 1600 px + ảnh nhỏ 400 px,
   lưu MinIO bucket riêng tư. Ảnh chưa duyệt chỉ xem qua link **có chữ ký HMAC, hết hạn sau 1 giờ**.
 
+<a id="ban-nhe"></a>
+### 9.4. Mạng yếu & mất mạng: bản nhẹ, PWA
+
+Lúc thiên tai, mạng di động thường chập chờn, tắc nghẽn hoặc mất hẳn. Hai cơ chế bổ trợ cho cổng đầy đủ (~0,22 MB):
+
+**Bản nhẹ `/ban-nhe`** — HTML thuần do backend dựng (`backend/app/services/lite.py`), không JavaScript, không ảnh,
+**luôn dưới 50 KB** (thực tế ~7 KB, gzip ~3 KB), mở được trên điện thoại cũ, mạng 2G. Gồm: nút gọi 112/114/115, cảnh báo
+đang hiệu lực 48 giờ (tối đa 8, ưu tiên mức đỏ), sông vượt báo động, đường dây nóng; chọn xã (`?xa=<mã xã>`, form GET)
+→ mức nguy cơ + lời khuyên, vùng nguy hiểm, mưa dự báo 24 giờ, điểm sơ tán của xã (còn chỗ, link chỉ đường). Chỉ dùng
+dữ liệu đã công khai (9.1). nginx đổi `/ban-nhe` → `GET /api/v1/public/lite` và cache như API công khai; cache Redis
+30 giây, xoá ngay khi phê duyệt cảnh báo hoặc nhập dữ liệu. Nên in địa chỉ này trong tin nhắn cảnh báo / trên loa
+truyền thanh: `https://<tên miền>/ban-nhe`. Cổng đầy đủ gợi ý bản nhẹ khi trình duyệt báo mạng 2G hoặc bật tiết kiệm dữ
+liệu, và có link ở chân trang.
+
+**PWA (service worker `frontend/src/sw.js`)** — chỉ bật ở bản build. Lần mở đầu tiên lưu sẵn giao diện cổng công khai;
+mỗi lần xem, bản mới nhất của cảnh báo, bản đồ, tổng quan, dự báo, đường dây nóng, hồ chứa, sạt lở và trang bản nhẹ được
+lưu trên máy. Mất mạng / máy chủ không phản hồi (hoặc chậm quá 6 giây) → hiện bản đã lưu kèm dải báo *"đang hiển thị dữ
+liệu đã lưu lúc …"*. Cài được lên màn hình chính (`manifest.webmanifest`).
+
+| Không bao giờ lưu trên máy | Lý do |
+|---|---|
+| Yêu cầu có đăng nhập (header `Authorization`) — mọi trang cán bộ | Dữ liệu nội bộ |
+| Tra cứu phiếu, "Tôi đang ở đâu?", chỉ đường, ảnh phản ánh, mọi `POST` | Dữ liệu cá nhân / vị trí |
+| `/tiles/` (bản đồ nền, HTTP Range) và nguồn ngoài (Google, radar) | Quá lớn; trình duyệt tự cache |
+
+Mỗi bản build có phiên bản service worker mới (theo mã băm tệp), trình duyệt tự cài và xoá bộ nhớ cũ — không cần làm gì
+khi cập nhật. **Tắt khẩn cấp** (service worker lỗi): thay `dist/sw.js` bằng tệp chỉ gồm
+`self.addEventListener('install', () => self.skipWaiting()); self.addEventListener('activate', () => self.registration.unregister());`
+rồi triển khai lại — trình duyệt tự gỡ ở lần mở sau.
+
 ---
 
 <a id="trien-khai"></a>
@@ -809,7 +915,7 @@ Thiết bị IoT ──► mqtt :8883 (TLS, tài khoản + ACL) — profile "mqt
 |---|---|---|
 | CPU / RAM | 8 vCPU, 16 GB | `API_WORKERS` 4–6. Đo trên máy thử ([12.2](#kiem-thu-tai)): 500 người dân dùng ~2 lõi backend, 60 cán bộ làm mới dashboard liên tục ~1,7 lõi |
 | Ổ đĩa | SSD ≥ 200 GB + nơi riêng cho sao lưu | Số đo 200 trạm × 5 phút ≈ vài MB/ngày; ảnh ≈ 0,4 MB/phản ánh |
-| Băng thông ra | ≥ 100 Mbps | Lần tải đầu ~0,22 MB (gzip) × 55.000 người/giờ ≈ 27 Mbps (chưa tính ảnh, bản đồ nền do nhà cung cấp phục vụ); nên có CDN cho `/assets/` |
+| Băng thông ra | ≥ 200 Mbps | Lần tải đầu ~0,22 MB giao diện (gzip) + ~0,5 MB bản đồ nền tự lưu trữ (khung nhìn toàn tỉnh) ≈ 0,7 MB × 55.000 người/giờ ≈ 90 Mbps, chưa tính ảnh; lần sau trình duyệt dùng lại bản đã lưu. Nên có CDN cho `/assets/` và `/tiles/` |
 | Hệ điều hành | Ubuntu 22.04/24.04 LTS, Docker Engine + Compose v2.24+ | Tường lửa: 22 (giới hạn IP quản trị), 80, 443, (8883) |
 | Vị trí | Trung tâm dữ liệu có UPS/máy phát, **ngoài vùng ngập** | Lũ lớn có thể cắt điện, cáp quang tại Cao Bằng; sao lưu và máy dự phòng nên ở ngoài tỉnh |
 
@@ -826,6 +932,7 @@ cp .env.production.example .env.production && chmod 600 .env.production
 # Điền: DOMAIN, ACME_EMAIL, JWT_SECRET + SECRET_KEY (openssl rand -hex 32, khác nhau), POSTGRES_PASSWORD +
 # MINIO_ROOT_PASSWORD (openssl rand -hex 24), SUPERADMIN_*, SMTP_*, TURNSTILE_*, OPEN_METEO_API_KEY…
 mkdir -p backups
+sh deploy/fetch-basemap.sh              # bản đồ nền tự lưu trữ → data/tiles (mục 6.9)
 alias dcp='docker compose -f docker-compose.prod.yml --env-file .env.production'
 dcp --profile caddy up -d --build
 dcp ps                                  # migrate: Exited (0); các service khác healthy / running
@@ -844,15 +951,17 @@ Kiểm tra:
 curl -sI https://$DOMAIN/ | grep -iE "strict-transport|x-content-type"     # header bảo mật
 curl -s https://$DOMAIN/health                                             # "status":"ok"
 curl -sI https://$DOMAIN/api/v1/public/overview | grep -i x-cache-status    # MISS rồi HIT
+curl -s -o /dev/null -w "%{http_code}\n" -H "Range: bytes=0-99" https://$DOMAIN/tiles/caobang.pmtiles   # 206
+curl -s -o /dev/null -w "%{http_code} %{size_download}\n" https://$DOMAIN/ban-nhe                      # 200, < 50000
 curl -s -o /dev/null -w "%{http_code}\n" https://$DOMAIN/docs              # 404 (Swagger tắt)
 ```
 
 Sau lần chạy đầu:
 
-1. Đăng nhập Superadmin → **đổi mật khẩu và PIN** ngay.
+1. Đăng nhập Superadmin → cài **xác thực 2 lớp** (bắt buộc, [11.1](#xac-thuc-2-lop)) → **đổi mật khẩu và PIN** ngay.
 2. Trang **Phân quyền**: tạo tài khoản đích danh cho từng người; không dùng chung tài khoản; có Superadmin đích danh
    rồi thì **khoá** tài khoản `admin` ban đầu.
-3. Nhập dữ liệu chính thức ([2.2](#hien-trang)) **trước** khi công bố địa chỉ cổng.
+3. Nhập dữ liệu chính thức ([2.4](#nhap-du-lieu)) **trước** khi công bố địa chỉ cổng.
 4. Trang **Nguồn dữ liệu & IoT**: kiểm tra Open-Meteo chạy "OK", đăng ký thiết bị.
 5. Thử "Quên mật khẩu" để xác nhận SMTP.
 
@@ -926,8 +1035,8 @@ Redis Sentinel, MinIO phân tán, cân bằng tải nhiều máy.
 <a id="bao-mat"></a>
 ## 11. Bảo mật & tuân thủ
 
-**Đã có**: HTTPS + HSTS; kiểm tra cấu hình khi khởi động; mật khẩu và PIN băm PBKDF2, khoá tài khoản sau 10 lần sai; PIN
-ký duyệt cảnh báo; RBAC theo địa bàn, chống leo thang; nhật ký thao tác & phân quyền; giới hạn tần suất chống giả mạo IP;
+**Đã có**: HTTPS + HSTS; kiểm tra cấu hình khi khởi động; mật khẩu và PIN băm PBKDF2, khoá tài khoản sau 10 lần sai;
+xác thực 2 lớp TOTP, bắt buộc theo vai trò ([11.1](#xac-thuc-2-lop)); PIN ký duyệt cảnh báo; RBAC theo địa bàn, chống leo thang; nhật ký thao tác & phân quyền; giới hạn tần suất chống giả mạo IP;
 ảnh xoá EXIF/GPS, link ảnh có chữ ký; IP người phản ánh chỉ lưu băm; CSDL / Redis / MinIO không mở cổng, không ra
 Internet; container backend không chạy root; Swagger tắt ở production; log không chứa token, toạ độ; API key đối tác mã
 hoá Fernet (`SECRET_KEY`), khoá thiết bị băm SHA-256, log `httpx` hạ xuống WARNING để không lộ key trong URL; cổng webhook
@@ -943,6 +1052,27 @@ SOS bắt buộc khoá; SĐT được che trước khi gửi tin SOS cho LLM.
 - **Bí mật**: `.env.production` quyền 600, chỉ người vận hành đọc; đổi toàn bộ bí mật khi nhân sự vận hành thay đổi.
 - **Bản đồ nền** có giấy phép, thể hiện đúng chủ quyền ([6.9](#ban-do-nen)).
 - Chưa bật Content-Security-Policy (giao diện tải bản đồ nền, radar, font từ nhiều nguồn) — lập danh sách nguồn, thử rồi bật.
+
+<a id="xac-thuc-2-lop"></a>
+### 11.1. Xác thực 2 lớp (TOTP)
+
+Ngoài mật khẩu, đăng nhập cần mã 6 số từ ứng dụng xác thực trên điện thoại (Google Authenticator, Microsoft
+Authenticator… — chuẩn TOTP RFC 6238, không cần SMS, không cần Internet trên điện thoại). Lộ mật khẩu vẫn không vào được
+tài khoản. Mã nguồn: `backend/app/mfa.py`, `api/v1/mfa.py`, `frontend/src/components/account/Mfa.jsx`.
+
+- **Bắt buộc theo vai trò**: `TOTP_REQUIRED_ROLES` (mặc định production: Quản trị hệ thống, Lãnh đạo BCH, Quản trị tỉnh,
+  Chỉ huy cụm — những người quản lý tài khoản hoặc phê duyệt cảnh báo). Người có vai trò này chưa bật → lần đăng nhập sau
+  phải cài đặt ngay (quét QR, nhập mã, lưu 10 mã khôi phục) mới vào được; phiên cũ bị từ chối. Superadmin cũng cài ở lần
+  đăng nhập đầu tiên sau khi triển khai.
+- **Tự bật** (mọi cán bộ): menu tài khoản → **Xác thực 2 lớp**. Tắt cần mật khẩu + mã; vai trò bắt buộc không tự tắt được.
+- **Mã khôi phục**: 10 mã `xxxx-xxxx`, mỗi mã dùng 1 lần thay mã 6 số khi mất điện thoại; chỉ hiện một lần — in ra giấy.
+  Tạo bộ mới trong menu tài khoản (bộ cũ hết hiệu lực).
+- **Mất điện thoại và hết mã khôi phục**: quản trị có quyền quản lý tài khoản đó vào **Phân quyền** → nút đặt lại xác thực
+  2 lớp (biểu tượng khiên gạch). **Xác minh đúng người trước khi bấm** (gọi lại số đã biết, gặp trực tiếp). Mọi phiên của
+  tài khoản bị đăng xuất; thao tác ghi vào nhật ký phân quyền.
+- **An toàn**: mã đúng trong khung ±30 giây, mỗi mã chỉ dùng 1 lần; sai mã tính chung bộ đếm khoá đăng nhập (10 lần / 15
+  phút); khoá TOTP mã hoá bằng `SECRET_KEY`, mã khôi phục chỉ lưu HMAC. Giờ điện thoại lệch nhiều → mã luôn sai: bật giờ
+  tự động trên điện thoại.
 
 ---
 
@@ -966,8 +1096,11 @@ Kiểm thử API (cần stack dev đang chạy với `DEMO_MODE=true`; tham số
 | IoT HTTP / batch / LoRaWAN / MQTT, dự báo | `node tests/e2e/iot-test.mjs` |
 | Cổng & API công khai, phản ánh, tài khoản, giới hạn tần suất | `node tests/e2e/public-test.mjs [backend] [mailpit]` |
 | Tra cứu tiến độ phiếu | `node tests/e2e/track-test.mjs` |
+| Xác thực 2 lớp: bật / đăng nhập 2 bước / mã khôi phục / tắt / đặt lại / khoá; bắt buộc theo vai trò khi backend có `TOTP_REQUIRED_ROLES=kiem_thu_2fa` (~1,5 phút) | `node tests/e2e/totp-test.mjs` |
 | Hồ chứa & xả lũ | `node tests/e2e/reservoir-test.mjs` |
 | Điểm đen sạt lở & đường đèo | `node tests/e2e/landslide-test.mjs` |
+| Nhập dữ liệu (12 loại, kiểm tra lỗi, cập nhật không trùng, thay toàn bộ) | `node tests/e2e/import-test.mjs` |
+| Bản nhẹ `/ban-nhe`, service worker, manifest — qua nginx (tham số = địa chỉ frontend, mặc định `http://localhost:8080`) | `node tests/e2e/lite-test.mjs` |
 
 Chạy lại nhiều lần liên tiếp: xoá khoá `rl:*` trong Redis trước (lệnh ở 4.5).
 
@@ -1014,7 +1147,7 @@ tăng CPU nếu kịch bản đồng thời chưa đạt.
 
 **CI** (`.github/workflows/ci.yml`, mỗi push / PR): ruff + pytest; build frontend; kiểm tra `docker-compose.prod.yml`
 (thiếu bí mật phải báo lỗi, đủ bí mật phải hợp lệ); dựng stack bằng `docker-compose.yml` với `DEMO_MODE=true`,
-`SIMULATOR=true` và chạy 7 bộ kiểm thử API. **Deploy** (`deploy.yml`): tag `vX.Y.Z` → build & đẩy image lên GitHub
+`SIMULATOR=true`, `TOTP_REQUIRED_ROLES=kiem_thu_2fa` và chạy 10 bộ kiểm thử API. **Deploy** (`deploy.yml`): tag `vX.Y.Z` → build & đẩy image lên GitHub
 Container Registry.
 
 ---
@@ -1028,3 +1161,5 @@ Container Registry.
 - **56 xã/phường** (53 xã, 3 phường): Nghị quyết 1657/NQ-UBTVQH15 (hiệu lực 01/07/2025). Ranh giới xã là **xấp xỉ**
   (Voronoi từ toạ độ tâm, cắt theo ranh giới tỉnh) — thay bằng dữ liệu chính thức ([2.2](#hien-trang)).
 - Dự báo: Open-Meteo (CC BY 4.0, gói miễn phí phi thương mại), dữ liệu ECMWF / NOAA. Radar: RainViewer.
+- Bản đồ nền tự lưu trữ: © OpenStreetMap contributors (ODbL), đóng gói theo sơ đồ Protomaps Basemap
+  (https://protomaps.com); thư viện `protomaps-leaflet`, `pmtiles` (BSD-3-Clause).

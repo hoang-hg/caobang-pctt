@@ -22,6 +22,7 @@ import {
   Info,
   CheckCircle2,
   Layers,
+  ShieldOff,
 } from 'lucide-react';
 import { api } from '../api/client';
 import { useStore } from '../app/store';
@@ -760,6 +761,9 @@ function UsersTab() {
                     <div className="text-[11px] text-muted mt-1">
                       Mã PIN: {u.has_pin ? <span className="text-good font-semibold">Đã cài</span> : 'Chưa cài'}
                     </div>
+                    <div className="text-[11px] text-muted">
+                      Xác thực 2 lớp: {u.mfa_enabled ? <span className="text-good font-semibold">Đã bật</span> : 'Chưa bật'}
+                    </div>
                   </td>
 
                   <td className="whitespace-nowrap text-right">
@@ -779,6 +783,24 @@ function UsersTab() {
                         >
                           <KeyRound size={14} />
                         </button>
+                        {u.mfa_enabled && (
+                          <button
+                            className="btn-ghost p-1.5 text-muted hover:text-warn"
+                            title="Đặt lại xác thực 2 lớp (mất điện thoại)"
+                            onClick={() =>
+                              window.confirm(
+                                `Đặt lại xác thực 2 lớp của ${u.full_name}? Chỉ làm sau khi đã xác minh đúng người yêu cầu. ` +
+                                  'Mọi phiên đăng nhập của tài khoản sẽ bị đăng xuất.'
+                              ) &&
+                              run(
+                                () => api(`/rbac/users/${u.id}/mfa/reset`, { method: 'POST' }),
+                                'Đã đặt lại xác thực 2 lớp'
+                              )
+                            }
+                          >
+                            <ShieldOff size={14} />
+                          </button>
+                        )}
                         <button
                           className={clsx(
                             'btn-ghost p-1.5',

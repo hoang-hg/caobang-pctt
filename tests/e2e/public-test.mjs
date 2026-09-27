@@ -91,7 +91,9 @@ const item = cobaList.items.find((r) => r.code === sub.data.code);
 check('Cán bộ thấy SĐT người gửi (riêng tư)', item.reporter_phone === '0999 555 666');
 const img = await fetch(ROOT + item.photo_urls[0].thumb);
 check('Link ảnh có chữ ký cho cán bộ', img.status === 200 && img.headers.get('content-type') === 'image/jpeg');
-check('Link ảnh sửa chữ ký → 403', (await fetch(ROOT + item.photo_urls[0].thumb.replace(/sig=\w/, 'sig=0'))).status === 403);
+// đổi ký tự đầu của chữ ký thành ký tự KHÁC (ký tự đầu vốn là '0' thì thay '0' không đổi gì → kiểm thử chập chờn)
+const tampered = item.photo_urls[0].thumb.replace(/sig=(\w)/, (_, c) => `sig=${c === '0' ? '1' : '0'}`);
+check('Link ảnh sửa chữ ký → 403', (await fetch(ROOT + tampered)).status === 403);
 check('Quản trị xã không duyệt phản ánh ngoài xã → 403',
   (await call('POST', `/reports/${subTp.data.id}/moderate`, { action: 'approve' }, T.coba)).status === 403);
 check('Tài khoản quan sát không duyệt được → 403',

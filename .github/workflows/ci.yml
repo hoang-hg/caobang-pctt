@@ -2,7 +2,7 @@
 # CI — kiểm tra mỗi lần push / pull request
 #   backend  : ruff (format + lint) + pytest (kiểm thử đơn vị)
 #   frontend : build production
-#   e2e      : dựng toàn bộ stack bằng Docker Compose, chạy 7 bộ kiểm thử API
+#   e2e      : dựng toàn bộ stack bằng Docker Compose, chạy 10 bộ kiểm thử API
 # ==========================================
 name: CI
 
@@ -70,6 +70,8 @@ jobs:
       # Kiểm thử API dùng tài khoản demo + dữ liệu mẫu + bộ mô phỏng
       DEMO_MODE: "true"
       SIMULATOR: "true"
+      # vai trò thử của totp-test.mjs: kiểm tra luồng bắt buộc cài xác thực 2 lớp khi đăng nhập
+      TOTP_REQUIRED_ROLES: kiem_thu_2fa
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -98,7 +100,7 @@ jobs:
           docker compose -f docker-compose.prod.yml --env-file ci.prod.env --profile caddy --profile mqtt config -q
           rm ci.prod.env
       - name: Build & khởi động stack
-        run: docker compose up -d --build --wait --wait-timeout 600 db redis minio mailpit mqtt backend worker
+        run: docker compose up -d --build --wait --wait-timeout 600 db redis minio mailpit mqtt backend worker frontend
       - name: Chờ dữ liệu đầu tiên (mô phỏng + đồng bộ dự báo)
         run: sleep 45
       - name: Kiểm thử luồng nghiệp vụ
@@ -109,6 +111,11 @@ jobs:
         run: node tests/e2e/iot-test.mjs
       - name: Kiểm thử cổng công khai, phản ánh, tài khoản
         run: node tests/e2e/public-test.mjs
+      - name: Kiểm thử xác thực 2 lớp (TOTP)
+        run: |
+          # public-test đăng nhập nhiều lần (cả thử khoá tài khoản) → xoá bộ đếm giới hạn đăng nhập 30/phút/IP
+          docker compose exec -T redis sh -c "redis-cli --scan --pattern 'rl:*' | xargs -r redis-cli del"
+          node tests/e2e/totp-test.mjs
       - name: Kiểm thử tra cứu tiến độ phiếu
         run: |
           docker compose exec -T redis sh -c "redis-cli --scan --pattern 'rl:*' | xargs -r redis-cli del"
@@ -117,9 +124,13 @@ jobs:
         run: |
           node tests/e2e/reservoir-test.mjs
           node tests/e2e/landslide-test.mjs
+      - name: Kiểm thử nhập dữ liệu (có bước thay toàn bộ — chạy sau các bộ dùng dữ liệu mẫu)
+        run: node tests/e2e/import-test.mjs
+      - name: Kiểm thử bản nhẹ /ban-nhe & service worker (qua nginx của frontend)
+        run: node tests/e2e/lite-test.mjs
       - name: Log khi lỗi
         if: failure()
-        run: docker compose logs --tail=300 backend worker
+        run: docker compose logs --tail=300 backend worker frontend
       - name: Dọn dẹp
         if: always()
         run: docker compose down -v

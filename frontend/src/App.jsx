@@ -19,6 +19,7 @@ const Alerts = lazy(() => import('./pages/Alerts'));
 const AccessControl = lazy(() => import('./pages/AccessControl'));
 const DataSources = lazy(() => import('./pages/DataSources'));
 const CitizenReports = lazy(() => import('./pages/CitizenReports'));
+const DataImport = lazy(() => import('./pages/DataImport'));
 const PublicPortal = lazy(() => import('./pages/public/PublicPortal'));
 
 function PageLoading() {
@@ -67,6 +68,7 @@ function Shell() {
               <Route path="/canh-bao" element={<Guard obj="alert" act="view"><Alerts /></Guard>} />
               <Route path="/phan-anh" element={<Guard obj="report" act="view"><CitizenReports /></Guard>} />
               <Route path="/nguon-du-lieu" element={<Guard obj="integration" act="view"><DataSources /></Guard>} />
+              <Route path="/nhap-du-lieu" element={<Guard obj="data" act="import"><DataImport /></Guard>} />
               <Route path="/phan-quyen" element={<Guard obj="user" act="view"><AccessControl /></Guard>} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>

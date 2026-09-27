@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import clsx from 'clsx';
 import { X } from 'lucide-react';
 
@@ -33,9 +34,11 @@ export function Progress({ value, tone = 'accent', className }) {
   );
 }
 
+/** Hộp thoại — gắn thẳng vào <body> (portal): mở từ trong header (backdrop-blur tạo khung chứa cho `position: fixed`)
+ * thì vẫn phủ toàn màn hình, không bị cắt trong dải header. */
 export function Modal({ open, onClose, title, children, wide, footer }) {
   if (!open) return null;
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[1500] flex items-start justify-center overflow-y-auto bg-black/50 p-4 pt-12" onMouseDown={onClose}>
       <div
         className={clsx('card w-full shadow-2xl', wide ? 'max-w-4xl' : 'max-w-lg')}
@@ -52,7 +55,8 @@ export function Modal({ open, onClose, title, children, wide, footer }) {
         <div className="max-h-[75vh] overflow-y-auto p-4 scroll-thin">{children}</div>
         {footer && <div className="flex justify-end gap-2 border-t border-line px-4 py-3">{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

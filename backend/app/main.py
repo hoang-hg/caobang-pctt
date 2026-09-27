@@ -12,10 +12,12 @@ from app.api.v1 import (
     alerts,
     auth,
     dashboard,
+    data_import,
     forecast,
     ingest,
     integrations,
     map_layers,
+    mfa,
     public,
     rbac,
     reports,
@@ -94,6 +96,7 @@ async def db_error(_: Request, exc: DBAPIError):
 
 for r in (
     auth,
+    mfa,
     admin_units,
     search,
     dashboard,
@@ -107,6 +110,7 @@ for r in (
     forecast,
     public,
     reports,
+    data_import,
 ):
     app.include_router(r.router, prefix="/api/v1")
 

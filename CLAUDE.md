@@ -26,6 +26,7 @@ không cần đăng nhập. Sai sót ở đây có thể khiến người dân �
 docker-compose.yml        dev + trình diễn + CI: db redis minio mailpit mqtt backend worker frontend (container_name cố định)
 docker-compose.prod.yml   chạy thật (project caobang-pctt-prod): caddy? frontend backend worker migrate db redis minio backup mqtt?
 deploy/Caddyfile, deploy/backup.sh       HTTPS; sao lưu pg_dump + ảnh hằng ngày
+deploy/fetch-basemap.sh    tải bản đồ nền tự lưu trữ → data/tiles/caobang.pmtiles (không lên git; nginx phục vụ /tiles/)
 mqtt/mosquitto.conf (dev, ẩn danh) · mosquitto.prod.conf + acl.example (thật)
 db/init/01_extensions.sql  postgis, timescaledb, pg_trgm, unaccent
 tests/e2e/*.mjs            kiểm thử API qua HTTP (Node 20+, cần stack dev chạy với DEMO_MODE=true)
@@ -41,14 +42,18 @@ backend/                   Python 3.12, FastAPI, SQLAlchemy async (psycopg3), Ca
   app/worker.py            tiến trình nền (RUN_MODE=worker)
   app/db.py                engine + fetch_all / fetch_one / execute / transaction
   app/auth.py              JWT, băm mật khẩu/PIN (PBKDF2), current_user, audit(), password_problem, bump_token_version
+  app/mfa.py               xác thực 2 lớp TOTP: mã, mã khôi phục, phiếu đăng nhập, required() theo TOTP_REQUIRED_ROLES
   app/area.py              parse_codes, area_clause, unit_clause (bộ lọc địa phương)
-  app/api/v1/*.py          router: admin_units alerts auth dashboard forecast ingest integrations map_layers public
+  app/api/v1/*.py          router: admin_units alerts auth mfa dashboard forecast ingest integrations map_layers public
                            rbac reports resources search sos
   app/rbac/                permissions.py (SSOT quyền + vai trò hệ thống) · authz.py (dependency cho route) ·
                            scope_loaders.py (tài nguyên → domain) · domains.py · enforcer.py · management.py (uỷ quyền,
                            chống leo thang) · seed.py (đồng bộ vai trò, tạo Superadmin / tài khoản demo)
   app/services/            sos, sos_nlp, dispatch_matching, safe_routing, broadcast, reports, tracking, reservoirs,
-                           landslides, events (log_event), simulator, scenario
+                           landslides, events (log_event), simulator, scenario, lite (trang bản nhẹ /ban-nhe, HTML < 50 KB)
+  app/services/data_import/  nhập dữ liệu chính thức từ tệp: specs.py (khai báo 12 loại) · parsing.py (CSV/xlsx/GeoJSON,
+                           chuẩn hoá — thuần) · engine.py (validate / apply 1 transaction) · templates.py · service.py
+                           (nhật ký, sự kiện, xoá cache) · __main__.py (dòng lệnh). API: app/api/v1/data_import.py
   app/integrations/        runner.py (lập lịch nguồn kéo, DEFAULT_SOURCES, ADAPTERS, env_source_keys) · adapters/
                            (open_meteo, openweather) · ingest.py (lõi nhận số đo) · mqtt_bridge.py · crypto.py (Fernet)
   app/infra/               redis.py · cache.py (cached, cached_view, invalidate, bump_data_version) · ratelimit.py
@@ -62,15 +67,19 @@ frontend/                  React 18, Vite 6, Tailwind 3, TanStack Query 5, Zusta
                            Recharts 2, lucide-react. Không có test runner — kiểm tra bằng `npm run build`.
   nginx.conf + nginx/      cấu hình nginx trong image (gzip_static, cache API công khai, real-ip, proxy-headers, security-headers)
   scripts/compress.mjs     chạy sau `vite build`: nén sẵn dist/**/*.gz cho gzip_static
-  vite.config.js           manualChunks dạng hàm: vendor (react, router, query, zustand, clsx) · map (leaflet) · charts
+  vite.config.js           manualChunks dạng hàm: vendor (react, router, query, zustand, clsx) · map (leaflet) · charts;
+                           plugin serviceWorker: src/sw.js → dist/sw.js (điền VERSION + PRECACHE)
+  public/                  favicon, icon-192/512.png, manifest.webmanifest (PWA)
+  src/sw.js                service worker cổng công khai (chỉ đăng ký ở bản build — main.jsx), README §9.4
   src/App.jsx              route + Guard(obj, act), mỗi trang `lazy()`; trang công khai /, /cong-khai, /dang-nhap…
   src/api/                 client.js (api(), useAreaParams) · hooks.js (useAreaQuery, useUnits…) · useSocket.js
-  src/app/store.js         Zustand: theme, filter, focus, alertDraft, gps, auth, wsStatus, soundOn, sidebar, toasts
+  src/app/store.js         Zustand: theme, filter, focus, alertDraft, gps, auth, wsStatus, soundOn, sidebar, savedAt, toasts
   src/rbac/                permissions.js (khớp domain) · usePermission.js (usePermission, useCanAll, useAllowedCodes, Can)
-  src/pages/               trang điều hành; pages/public/ = cổng công khai (PublicPortal, ReportForm, TicketTracker,
-                           ReservoirMonitor, LandslideMonitor)
+  src/pages/               trang điều hành (DataImport = nhập dữ liệu chính thức); pages/public/ = cổng công khai (PublicPortal, ReportForm, TicketTracker,
+                           ReservoirMonitor, LandslideMonitor, NetworkBanner = báo mất mạng / gợi ý bản nhẹ)
   src/components/          common/ (ui.jsx: KpiCard Modal Tabs Section Empty…, Turnstile, DispatchModal…) · layout/ ·
-                           map/ (MapLayers, MapTools = nền bản đồ + công cụ, icons, leafletGlobal) · charts/ (chartTheme)
+                           map/ (MapLayers, MapTools = nền bản đồ + công cụ, icons, leafletGlobal) · charts/ (chartTheme) ·
+                           account/Mfa.jsx (cài đặt / quản lý xác thực 2 lớp — Login import tĩnh, UserMenu lazy)
   src/index.css            biến màu CSS sáng/tối; tailwind.config.js ánh xạ token
 ```
 
@@ -190,6 +199,10 @@ Python trong container.
   Nhớ nginx cache thêm 10 s nên dữ liệu công khai có thể trễ tới ~TTL + 10 s.
 - Thêm trường mới vào phản hồi công khai → cập nhật danh sách trường cấm trong `tests/e2e/public-test.mjs`.
 - Endpoint công khai **tạo dữ liệu** (webhook…) phải có khoá: mẫu `sos.require_intake_key` (`hmac.compare_digest`).
+- Bản nhẹ `/ban-nhe` (`services/lite.py`, `GET /public/lite`): chỉ HTML + CSS nội tuyến, không JS / ảnh / tệp ngoài;
+  mọi giá trị qua `html.escape`; mỗi danh sách có trần `MAX_*` để luôn < `MAX_BYTES` (50 KB) — thêm mục mới thì thêm
+  trần và cập nhật `test_lite.test_worst_case_stays_under_limit`. Tham số `xa` lạ → trang toàn tỉnh (không tạo khoá cache).
+  Phê duyệt cảnh báo gọi `invalidate("public:")` để bản nhẹ / cổng hiện ngay.
 
 **Giới hạn tần suất & IP**
 - Quy tắc ở `RULES` trong `infra/ratelimit.py` (khớp tiền tố, quy tắc cụ thể đặt trước). Nhà mạng dùng chung IP (CGNAT) →
@@ -199,6 +212,13 @@ Python trong container.
 
 **Xác thực & dữ liệu cá nhân**
 - Mật khẩu mới phải qua `auth.password_problem`; PIN ký duyệt băm như mật khẩu. Đổi / đặt lại mật khẩu tăng `token_version`.
+- Xác thực 2 lớp (`app/mfa.py`, `api/v1/mfa.py`, README §11.1): `/auth/login` với tài khoản đã bật / vai trò bắt buộc trả
+  `{"mfa": "verify"|"setup", "challenge"}` thay cho token — client mới phải xử lý bước 2. Phiếu mang `aud=pctt-mfa`, chỉ
+  giải mã qua `mfa.challenge_user` (không bao giờ nhận làm token phiên). Sai mã đếm vào `auth.lock_key` như sai mật khẩu;
+  bộ đếm chỉ xoá trong `complete_login`. Bật / tắt / đặt lại 2 lớp tăng `token_version`. `user_from_token` từ chối người
+  có vai trò trong `TOTP_REQUIRED_ROLES` mà chưa bật. Kiểm mã luôn qua `mfa.check_code` (cập nhật có điều kiện
+  `totp_last_step` / gạch mã khôi phục — chống dùng lại, chống gửi đồng thời). Tài khoản demo / e2e không bị bắt buộc vì
+  `TOTP_REQUIRED_ROLES` trống ở dev.
 - Ảnh: luôn qua `services/reports.process_image` (xoá EXIF, chống bomb, JPEG) rồi `infra.storage.put`; ảnh chưa duyệt chỉ
   phát qua `signed_photo_url`.
 - Log không ghi query string, token, SĐT, toạ độ người dân (`main.DropQueryString` áp cho `uvicorn.access` và `uvicorn.error`).
@@ -234,6 +254,11 @@ Python trong container.
 - **Route**: trang điều hành trong `Shell` bọc `<Guard obj act>`; trang công khai ngoài `Shell`. Trang công khai
   (`pages/public/`) chỉ gọi `/public/*`. Trang mới khai báo `lazy(() => import(...))` trong `App.jsx` (đã có `Suspense`) —
   không import tĩnh trang vào `App.jsx` (kéo cả trang vào gói tải lần đầu của người dân).
+- **Service worker** (`src/sw.js`): chỉ lưu `GET` cùng origin, không `Authorization`, không `Range`; API công khai được
+  lưu phải nằm trong `PUBLIC_API` — không thêm endpoint có dữ liệu cá nhân / vị trí (`locate`, `track`, `route`, ảnh).
+  Trong `.then` của `fetch` phải `res.clone()` **đồng bộ** trước mọi `await` (trang đọc body trước → clone lỗi, bị nuốt
+  lặng lẽ). Bản lưu mang `X-PCTT-Saved-At` → `api()` đặt `store.savedAt` → `NetworkBanner`. Thử thật: build image, mở
+  cổng 2 lần, dừng container frontend, tải lại (README §9.4); máy dev Vite không đăng ký service worker.
 - **Kích thước gói**: thư viện nặng chỉ dùng khi bấm (xuất PDF/Excel: `utils/exportPdf.js`, `exportExcel.js`) phải
   `await import(...)` động. Không thêm thư viện vào `manualChunks` dạng object (kéo theo thư viện phụ thuộc dùng chung
   vào chunk đó); dùng dạng hàm trong `vite.config.js`. Sau khi build, kiểm tra `dist/index.html` không preload chunk nặng.
@@ -244,9 +269,13 @@ Python trong container.
   `border-line`, `bg-danger`, `text-good`, `text-accent`…); màu trạng thái cố định; hỗ trợ cả sáng và tối. Component
   dùng chung trong `components/common/ui.jsx` (KpiCard, Modal, Tabs, Section, Empty, Progress, StatusDot). Icon `lucide-react`.
 - **Biểu đồ** Recharts lấy màu từ `useChartTheme()` (+ `axisProps`, `ChartTooltip`); không dùng 2 trục Y (tách biểu đồ).
-- **Bản đồ**: `leaflet-draw` cần `components/map/leafletGlobal.js` import trước. Nền bản đồ khai báo ở
-  `components/map/MapTools.jsx` — hiện dùng tile Google / CARTO **chưa có giấy phép** (README §6.9); đổi nguồn phải giữ
-  ghi công (attribution) và thể hiện đúng chủ quyền.
+- **Bản đồ**: `leaflet-draw` và `protomaps-leaflet` cần `L` toàn cục → `components/map/leafletGlobal.js` import trước.
+  Nền bản đồ chỉ qua `<BaseLayer>` trong `components/map/MapTools.jsx`: nền có `local` (Địa lý, Ban đêm) vẽ từ
+  `/tiles/caobang.pmtiles` khi máy chủ có tệp (đọc phần đầu tệp lấy vùng phủ); zoom < 7 hoặc khung nhìn ra ngoài vùng phủ
+  → thêm nền Google / CARTO bên dưới (Google thể hiện đúng Hoàng Sa, Trường Sa — không hạ `LOCAL_MIN_ZOOM` xuống ≤ 6).
+  `pmtiles` và `protomaps-leaflet` chỉ `import()` động — không import tĩnh (giữ gói tải đầu cổng công khai ~220 KB).
+  `BaseLayer` đặt `map.setMaxZoom` trong layout effect: `MarkerClusterGroup` lỗi "Map has no maxZoom" nếu chưa có.
+  Nền ngoài chưa có giấy phép (README §6.9); đổi nguồn phải giữ ghi công và thể hiện đúng chủ quyền.
 - **Chống bot**: `components/common/Turnstile.jsx` (khoá site lấy từ `GET /public/config`; token dùng 1 lần — đổi `key` để
   lấy token mới).
 - Trạng thái toàn cục (Zustand `app/store.js`): chỉ thứ dùng chung nhiều trang (auth, bộ lọc vùng, theme, toasts…);
@@ -273,7 +302,9 @@ Python trong container.
 - `tests/e2e/*.mjs` kiểm thử API end-to-end, cần stack dev với `DEMO_MODE=true` (dùng tài khoản demo); tham số 1 = URL backend.
   Chạy lại liên tiếp → xoá khoá `rl:*` trong Redis. `iot-test.mjs` gọi `docker exec caobang-pctt-mqtt` (tên container cố định).
 - CI (`ci.yml`): ruff + pytest → build frontend → kiểm tra `docker-compose.prod.yml` → stack Docker Compose
-  (`DEMO_MODE=true`, `SIMULATOR=true`) + 7 script API. Thay đổi hành vi nghiệp vụ / quyền → cập nhật script tương ứng.
+  (`DEMO_MODE=true`, `SIMULATOR=true`, `TOTP_REQUIRED_ROLES=kiem_thu_2fa`) + 10 script API (`lite-test.mjs` chạy qua
+  nginx: tham số = URL frontend :8080; `totp-test.mjs` tự tính mã TOTP, cần biến trên để thử luồng bắt buộc).
+  Thay đổi hành vi nghiệp vụ / quyền → cập nhật script tương ứng.
 - `tests/load/load.js` (k6, README §12.2): thay đổi đường đi của cổng công khai hoặc dashboard (thêm API, bỏ cache…) →
   chạy lại, so với bảng kết quả trong README; cập nhật bảng khi số liệu đổi đáng kể.
 
@@ -292,6 +323,11 @@ Python trong container.
   config → test hàm phân tích → README §6.1.
 - **Kênh cảnh báo thật** (SMS, Cell Broadcast, Zalo…): bộ gửi trong `services/broadcast.py` (hoặc `services/channels/`),
   trạng thái giao nhận lấy từ nhà cung cấp thay `advance_delivery`, bí mật qua config + preflight, cập nhật README §2.1 / §6.
+- **Loại dữ liệu nhập mới** (README §2.4): thêm `Dataset` vào `data_import/specs.py` (cột CSDL, kiểu, ràng buộc, khoá,
+  `refs`, `insert_only`, `replaceable` chỉ khi bảng không bị tham chiếu); kiểm tra riêng → `engine._row_checks`; bảng
+  chưa có mã ổn định → migration thêm `code` + unique index. `test_data_import` tự nhập thử dòng mẫu của mọi loại;
+  thêm tên vào `ORDER` trong `tests/e2e/import-test.mjs`; cập nhật bảng README §2.4. Không nhập dữ liệu chính thức
+  bằng SQL tay.
 - **Chức năng mô phỏng → thật**: tắt nhánh mô phỏng tương ứng khi có dữ liệu thật (mẫu: trạm `source='iot'`), cập nhật README §2.
 
 ## 11. Bẫy đã biết
@@ -308,8 +344,12 @@ Python trong container.
 - Tệp `.sh`, `.conf`, compose dùng LF (`.gitattributes`); script có CRLF sẽ lỗi trong container.
 - Git Bash trên Windows tự đổi đường dẫn `/x` → đặt `MSYS_NO_PATHCONV=1` khi `docker run -w /src` / `-v`.
 - Mã phiếu `SOS-xxxx` / `PA-xxxx` tăng dần nên đoán được — tra cứu công khai luôn yêu cầu mã + SĐT, trả lỗi giống nhau.
-- Nền bản đồ (`MapTools.jsx`) hiện dùng tile Google / CARTO **chưa có giấy phép** — phải chuyển sang nguồn có giấy phép
-  trước khi mở cho người dân (README §6.9); không thêm nguồn tile mới khi chưa có giấy phép / key.
+- Nền ngoài trong `MapTools.jsx` (Google / CARTO: zoom toàn quốc, Vệ tinh, Địa hình) **chưa có giấy phép** (README §6.9);
+  không thêm nguồn tile mới khi chưa có giấy phép / key. Máy dev không có `data/tiles/caobang.pmtiles` → bản đồ dùng nền
+  ngoài (Vite trả index.html cho `/tiles/…`, đọc phần đầu tệp lỗi → coi như không có); thử nền tự lưu trữ trên stack
+  docker (`sh deploy/fetch-basemap.sh` trước).
+- `location /tiles/` trong nginx phải giữ `gzip off` và `try_files $uri =404` — nén động làm hỏng HTTP Range, còn rơi về
+  index.html thì thư viện pmtiles đọc sai định dạng.
 - Vite cảnh báo "is dynamically imported … but also statically imported" → `lazy()` vô tác dụng với module đó; import tĩnh
   thống nhất hoặc bỏ import tĩnh ở nơi khác.
 - Pool CSDL lớn × nhiều tiến trình → "too many clients" dưới tải (đã gặp khi kiểm thử tải với 6 tiến trình × 20).

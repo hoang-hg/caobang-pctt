@@ -14,12 +14,13 @@ import jwt
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from app import mfa
 from app.config import settings
 from app.db import execute, fetch_one
 
 _bearer = HTTPBearer(auto_error=False)
 
-USER_SELECT = """SELECT id, username, full_name, position, pin_hash, token_version, is_active
+USER_SELECT = """SELECT id, username, full_name, position, pin_hash, token_version, is_active, totp_enabled_at
                    FROM communications.users"""
 
 
@@ -54,6 +55,10 @@ async def user_from_token(token: str) -> dict | None:
         return None
     user = await fetch_one(USER_SELECT + " WHERE id = CAST(:id AS uuid)", {"id": payload["sub"]})
     if not user or not user["is_active"] or user["token_version"] != payload.get("tv"):
+        return None
+    # Vai trò bắt buộc xác thực 2 lớp mà chưa bật (VD vừa được cấp vai trò / vừa đặt TOTP_REQUIRED_ROLES)
+    # → đăng nhập lại để cài đặt
+    if user["totp_enabled_at"] is None and mfa.required(user["username"]):
         return None
     return user
 
