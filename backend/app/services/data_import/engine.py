@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -16,7 +17,14 @@ from sqlalchemy import text
 
 from app.area import IN_PROVINCE_SQL
 from app.db import engine, fetch_all, fetch_one
-from app.services.data_import.parsing import CONVERTERS, ImportFileError, RawRow, read_file, to_enum
+from app.services.data_import.parsing import (
+    CONVERTERS,
+    ImportFileError,
+    RawRow,
+    read_file,
+    strip_accents,
+    to_enum,
+)
 from app.services.data_import.specs import DATASETS, Dataset, Field
 
 log = logging.getLogger(__name__)
@@ -175,8 +183,20 @@ def _geometry(ds: Dataset, raw: RawRow, row: Prepared, report: Report) -> None:
             row.geojson = json.dumps(geom)
 
 
+# Loại đứng trước tên, bỏ khi sinh mã. KHÔNG bỏ "Bản": là một phần tên riêng (Bản Ngắn, Bản Giốc)
+XOM_PREFIX = re.compile(r"^(xom|thon|to dan pho|to|khu|khoi)\s+")
+
+
+def xom_code(ma_xa: str, ten: str) -> str:
+    """Mã xóm tự sinh: <mã xã>-<tên không dấu, bỏ “Xóm/Thôn/Tổ dân phố” đứng trước> — “Xóm Nà Pò” = “Nà Pò”."""
+    name = XOM_PREFIX.sub("", " ".join(strip_accents(ten).lower().split()))
+    return f"{ma_xa}-{re.sub(r'[^A-Za-z0-9]', '', name).upper()[:40]}"
+
+
 def _row_checks(ds: Dataset, row: Prepared, report: Report) -> None:
     v = row.values
+    if ds.name == "xom" and not v.get("ma") and v.get("ma_xa") and v.get("ten"):
+        v["ma"] = xom_code(v["ma_xa"], v["ten"])
     if ds.name == "diem_so_tan" and v.get("dang_o") is not None and v.get("suc_chua") is not None:
         if v["dang_o"] > v["suc_chua"]:
             report.error(row.number, "dang_o", "Số người đang ở lớn hơn sức chứa")
@@ -221,6 +241,8 @@ def check_duplicates(ds: Dataset, rows: list[Prepared], report: Report) -> None:
 
 async def check_database(ds: Dataset, rows: list[Prepared], report: Report, replace: bool) -> None:
     await _check_communes(ds, rows, report)
+    if ds.name == "xom":
+        await _check_xom_codes(rows, report)
     if ds.geometry == "point":
         await _check_points(ds, rows, report)
     elif ds.geometry == "polygon":
@@ -246,6 +268,23 @@ async def _check_communes(ds: Dataset, rows: list[Prepared], report: Report) -> 
             report.error(row.number, "ma_xa", f"Không có xã/phường mã {code}")
 
 
+async def _check_xom_codes(rows: list[Prepared], report: Report) -> None:
+    """Mã xóm trùng mã tỉnh / xã (cùng bảng) → ghi đè đơn vị hành chính khác → chặn."""
+    codes = [r.values["ma"] for r in rows if r.values.get("ma")]
+    taken = await fetch_all(
+        """SELECT code, level FROM spatial_admin.administrative_units
+            WHERE code = ANY(:c) AND level <> 'thon'""",
+        {"c": codes},
+    )
+    clash = {r["code"]: r["level"] for r in taken}
+    for row in rows:
+        code = row.values.get("ma")
+        if code in clash:
+            report.error(
+                row.number, "ma", f"Mã {code} đang là mã {'tỉnh' if clash[code] == 'tinh' else 'xã/phường'}"
+            )
+
+
 async def _check_points(ds: Dataset, rows: list[Prepared], report: Report) -> None:
     located = [r for r in rows if r.lat is not None]
     if not located:
@@ -264,6 +303,13 @@ async def _check_points(ds: Dataset, rows: list[Prepared], report: Report) -> No
         if not res["inside"]:
             report.error(row.number, "vi_do", f"Vị trí ({row.lat}, {row.lon}) nằm ngoài tỉnh Cao Bằng")
             continue
+        if ds.name == "xom" and res["nearest"] and res["nearest"] != row.values.get("ma_xa"):
+            report.warn(
+                row.number,
+                "vi_do",
+                f"Toạ độ nằm trong {res['nearest']}, tệp ghi {row.values.get('ma_xa')} — kiểm tra lại toạ độ "
+                "(ranh giới xã hiện là xấp xỉ nếu chưa nhập ranh giới chính thức)",
+            )
         _assign_commune(ds, row, res["nearest"], report)
 
 
@@ -314,7 +360,8 @@ async def _check_refs(ds: Dataset, rows: list[Prepared], report: Report, replace
         if not codes:
             continue
         found = await fetch_all(
-            f"SELECT {ref.key} AS k FROM {ref.table} WHERE {ref.key} = ANY(:c)", {"c": list(codes)}
+            f"SELECT {ref.key} AS k FROM {ref.table} WHERE {ref.key} = ANY(:c) AND ({ref.where})",
+            {"c": list(codes)},
         )
         known = {r["k"] for r in found}
         for row in rows:
@@ -355,6 +402,17 @@ async def _existing_keys(ds: Dataset, rows: list[Prepared]) -> set[tuple]:
     return {(r["k"],) for r in found}
 
 
+def _replace_filter(ds: Dataset, rows: list[Prepared]) -> tuple[str, dict]:
+    """Điều kiện chọn bản ghi bị xoá khi thay toàn bộ: không có trong tệp + replace_scope (+ replace_within)."""
+    cond = f"({ds.key[0]} IS NULL OR NOT ({ds.key[0]} = ANY(:k))) AND {ds.replace_scope}"
+    params: dict[str, Any] = {"k": [key_of(ds, r)[0] for r in rows]}
+    if ds.replace_within:
+        fld, sql = ds.replace_within
+        cond += f" AND {sql}"
+        params["within"] = sorted({r.values[fld] for r in rows if r.values.get(fld)})
+    return cond, params
+
+
 async def _count_changes(ds: Dataset, rows: list[Prepared], report: Report, replace: bool) -> None:
     existing = await _existing_keys(ds, rows)
     bad = {i.row for i in report.errors}
@@ -369,12 +427,8 @@ async def _count_changes(ds: Dataset, rows: list[Prepared], report: Report, repl
         else:
             report.creates += 1
     if replace:
-        keys = [key_of(ds, r)[0] for r in rows]
-        res = await fetch_one(
-            f"SELECT count(*) AS n FROM {ds.table} WHERE ({ds.key[0]} IS NULL OR NOT ({ds.key[0]} = ANY(:k))) "
-            f"AND {ds.replace_scope}",
-            {"k": keys},
-        )
+        cond, params = _replace_filter(ds, rows)
+        res = await fetch_one(f"SELECT count(*) AS n FROM {ds.table} WHERE {cond}", params)
         report.deletes = res["n"]
 
 
@@ -423,7 +477,7 @@ def _columns(ds: Dataset, row: Prepared) -> tuple[list[str], list[str], dict[str
     for ref in ds.refs:
         name = f"r_{ref.column}"
         cols.append(ref.column)
-        exprs.append(f"(SELECT {ref.value} FROM {ref.table} WHERE {ref.key} = :{name})")
+        exprs.append(f"(SELECT {ref.value} FROM {ref.table} WHERE {ref.key} = :{name} AND ({ref.where}))")
         params[name] = row.values.get(ref.field)
     if ds.admin_unit:
         cols.append("admin_unit_id")
@@ -453,9 +507,10 @@ async def _upsert(conn, ds: Dataset, row: Prepared) -> bool:
     cols, exprs, params = _columns(ds, row)
     no_update = set(ds.key) | set(ds.insert_only) | set(ds.fixed_insert)
     sets = ", ".join(f"{c} = EXCLUDED.{c}" for c in cols if c not in no_update)
+    guard = f" WHERE {ds.conflict_where}" if ds.conflict_where else ""
     sql = (
         f"INSERT INTO {ds.table} ({', '.join(cols)}) VALUES ({', '.join(exprs)}) "
-        f"ON CONFLICT ({', '.join(ds.key)}) DO UPDATE SET {sets} RETURNING (xmax = 0) AS inserted"
+        f"ON CONFLICT ({', '.join(ds.key)}) DO UPDATE SET {sets}{guard} RETURNING (xmax = 0) AS inserted"
     )
     res = await conn.execute(text(sql), params)
     return bool(res.scalar())
@@ -509,13 +564,8 @@ async def apply_rows(ds: Dataset, rows: list[Prepared], replace: bool) -> dict:
                 },
             )
         if replace:
-            res = await conn.execute(
-                text(
-                    f"DELETE FROM {ds.table} WHERE ({ds.key[0]} IS NULL OR NOT ({ds.key[0]} = ANY(:k))) "
-                    f"AND {ds.replace_scope}"
-                ),
-                {"k": [key_of(ds, r)[0] for r in rows]},
-            )
+            cond, params = _replace_filter(ds, rows)
+            res = await conn.execute(text(f"DELETE FROM {ds.table} WHERE {cond}"), params)
             deleted = res.rowcount
         if ds.name == "ranh_gioi_xa":
             from app.seed import (

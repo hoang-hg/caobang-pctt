@@ -7,12 +7,14 @@ hệ thống gọi thêm mô hình ngôn ngữ (API dạng OpenAI-compatible) v�
 import json
 import logging
 import re
+import time
 import unicodedata
 
 import httpx
 
 from app.config import settings
 from app.db import fetch_all
+from app.infra.redis import get_redis
 
 log = logging.getLogger(__name__)
 
@@ -84,12 +86,7 @@ def parse_rules(text: str, gazetteer: list[dict]) -> dict:
             trapped = NUM_WORDS[m.group(1)] * (4 if m.group(2) == "ho" else 1)
             households = m.group(2) == "ho"
 
-    # Địa danh: ưu tiên thôn/địa danh cụ thể (dài hơn) rồi mới đến xã/phường
-    place = None
-    for entry in sorted(gazetteer, key=lambda g: (g["kind"] == "xa", -len(g["norm"]))):
-        if re.search(r"\b" + re.escape(entry["norm"]) + r"\b", t):
-            place = entry
-            break
+    place = _match_place(t, gazetteer)
 
     coords = None
     m = COORD_RE.search(text)
@@ -125,28 +122,94 @@ def parse_rules(text: str, gazetteer: list[dict]) -> dict:
     }
 
 
+def _match_place(t: str, gazetteer: list[dict]) -> dict | None:
+    """Địa danh trong tin (đã chuẩn hoá): ưu tiên xóm / địa danh cụ thể (tên dài hơn) rồi mới đến xã/phường.
+
+    Tên xóm trùng ở nhiều xã (sau sáp nhập có hàng nghìn xóm): tin có nhắc xã → chỉ xét xóm thuộc xã đó; vẫn không
+    phân biệt được (cùng tên, khác xã) → chỉ trả xã nếu có, không đoán bừa xóm.
+    """
+    hits = [g for g in gazetteer if (g.get("re") or _name_re(g["norm"])).search(t)]
+    communes = sorted((g for g in hits if g["kind"] == "xa"), key=lambda g: -len(g["norm"]))
+    places = [g for g in hits if g["kind"] != "xa"]
+    if communes:
+        codes = {g["unit_code"] for g in communes}
+        places = [g for g in places if g["unit_code"] in codes]
+    if places:
+        longest = max(len(g["norm"]) for g in places)
+        top = [g for g in places if len(g["norm"]) == longest]
+        if len({g["unit_code"] for g in top}) == 1:
+            return top[0]
+    return communes[0] if communes else None
+
+
+def _name_re(name_norm: str) -> re.Pattern:
+    return re.compile(r"\b" + re.escape(name_norm) + r"\b")
+
+
+# Tiền tố bỏ khi so tên (“thôn Nà Pồng” trong tin = “Nà Pồng”). Không bỏ “Bản”: một phần tên riêng (Bản Ngắn).
+NAME_PREFIXES = ("Tổ dân phố ", "Thôn ", "Xóm ", "Khu di tích ", "Tổ ")
+GAZETTEER_TTL_S = 300  # dự phòng: tải lại tối đa sau 5 phút kể cả khi không có tín hiệu
+GAZETTEER_VERSION_KEY = "pctt:gazetteer:ver"  # tăng khi nhập xóm / ranh giới xã → mọi tiến trình tải lại ngay
+
 _gazetteer_cache: list[dict] | None = None
+_gazetteer_at = 0.0
+_gazetteer_ver: str | None = None
+_local_ver = 0  # chạy không Redis (1 tiến trình)
+
+
+async def _gazetteer_version() -> str:
+    r = get_redis()
+    if r is not None:
+        try:
+            return await r.get(GAZETTEER_VERSION_KEY) or "0"
+        except Exception:
+            pass
+    return f"local:{_local_ver}"
+
+
+async def invalidate_gazetteer() -> None:
+    global _local_ver
+    _local_ver += 1
+    r = get_redis()
+    if r is not None:
+        try:
+            await r.incr(GAZETTEER_VERSION_KEY)
+        except Exception:
+            pass
 
 
 async def load_gazetteer() -> list[dict]:
-    global _gazetteer_cache
-    if _gazetteer_cache is None:
+    """Xã/phường + xóm / tổ dân phố (administrative_units cấp thôn, unit_code = mã xã cha) + địa danh khác."""
+    global _gazetteer_cache, _gazetteer_at, _gazetteer_ver
+    ver = await _gazetteer_version()
+    if (
+        _gazetteer_cache is None
+        or ver != _gazetteer_ver
+        or time.monotonic() - _gazetteer_at > GAZETTEER_TTL_S
+    ):
         rows = await fetch_all(
             """
             SELECT u.name, u.code AS unit_code, ST_Y(u.center) AS lat, ST_X(u.center) AS lon, 'xa' AS kind
               FROM spatial_admin.administrative_units u WHERE u.level = 'xa'
             UNION ALL
+            SELECT u.name, p.code, ST_Y(COALESCE(u.center, p.center)), ST_X(COALESCE(u.center, p.center)), 'thon'
+              FROM spatial_admin.administrative_units u JOIN spatial_admin.administrative_units p ON p.id = u.parent_id
+             WHERE u.level = 'thon'
+            UNION ALL
             SELECT p.name, u.code, ST_Y(p.geom), ST_X(p.geom), p.kind
               FROM spatial_admin.place_names p JOIN spatial_admin.administrative_units u ON u.id = p.admin_unit_id
+             WHERE p.kind <> 'thon'
             """
         )
         for r in rows:
             base = r["name"]
-            for prefix in ("Thôn ", "Tổ dân phố ", "Khu di tích "):
+            for prefix in NAME_PREFIXES:
                 if base.startswith(prefix):
                     base = base[len(prefix) :]
+                    break
             r["norm"] = norm(base)
-        _gazetteer_cache = rows
+            r["re"] = _name_re(r["norm"])
+        _gazetteer_cache, _gazetteer_at, _gazetteer_ver = rows, time.monotonic(), ver
     return _gazetteer_cache
 
 

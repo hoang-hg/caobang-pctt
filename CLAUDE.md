@@ -327,7 +327,12 @@ Python trong container.
   `refs`, `insert_only`, `replaceable` chỉ khi bảng không bị tham chiếu); kiểm tra riêng → `engine._row_checks`; bảng
   chưa có mã ổn định → migration thêm `code` + unique index. `test_data_import` tự nhập thử dòng mẫu của mọi loại;
   thêm tên vào `ORDER` trong `tests/e2e/import-test.mjs`; cập nhật bảng README §2.4. Không nhập dữ liệu chính thức
-  bằng SQL tay.
+  bằng SQL tay. Bảng dùng chung nhiều loại bản ghi (VD `administrative_units`: tỉnh / xã / xóm): `fixed` cho cột phân
+  loại, `conflict_where` để upsert không ghi đè loại khác, `Ref(where=...)` giới hạn mã tham chiếu, `replace_scope` +
+  `replace_within` để "thay toàn bộ" chỉ xoá trong phạm vi tệp (mẫu: loại `xom`).
+- **Xóm / địa danh cho bộ tách tin SOS** (`sos_nlp.load_gazetteer`): xã + xóm (cấp thôn, `unit_code` = mã xã cha) +
+  `place_names` khác. Cache theo `GAZETTEER_VERSION_KEY` (Redis) + TTL 5 phút — dữ liệu địa danh đổi ngoài công cụ
+  nhập thì gọi `sos_nlp.invalidate_gazetteer()`. Tên xóm trùng giữa các xã: chỉ gán xóm khi tin nhắc cả xã.
 - **Chức năng mô phỏng → thật**: tắt nhánh mô phỏng tương ứng khi có dữ liệu thật (mẫu: trạm `source='iot'`), cập nhật README §2.
 
 ## 11. Bẫy đã biết

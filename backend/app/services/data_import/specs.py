@@ -37,6 +37,7 @@ class Ref:
     table: str  # bảng đích
     key: str = "code"  # cột mã ở bảng đích
     value: str = "id"  # cột lấy giá trị
+    where: str = "TRUE"  # điều kiện SQL tĩnh trên bảng đích (VD chỉ nhận mã cấp xã)
 
 
 @dataclass(frozen=True)
@@ -59,6 +60,12 @@ class Dataset:
     update_only: bool = False  # chỉ cập nhật bản ghi đã có (VD ranh giới 56 xã)
     replaceable: bool = False  # cho phép chế độ "thay toàn bộ" (xoá bản ghi không có trong tệp)
     replace_scope: str = "TRUE"  # điều kiện SQL tĩnh giới hạn dòng bị xoá khi thay toàn bộ
+    # Thay toàn bộ chỉ trong phạm vi các giá trị của 1 cột trong tệp: (tên cột, điều kiện SQL dùng :within)
+    # VD xóm: chỉ xoá xóm cũ của những xã CÓ trong tệp, xã khác giữ nguyên
+    replace_within: tuple[str, str] | None = None
+    conflict_where: str = (
+        ""  # chỉ cập nhật bản ghi trùng mã thoả điều kiện (bảo vệ bản ghi khác loại cùng bảng)
+    )
     public: bool = False  # dữ liệu hiện trên cổng công khai → xoá cache công khai sau khi nhập
 
     def get_field(self, name: str) -> Field | None:
@@ -98,6 +105,56 @@ DATASETS: dict[str, Dataset] = {
             geometry="polygon",
             geometry_columns=("geom",),
             update_only=True,
+            public=True,
+        ),
+        Dataset(
+            "xom",
+            "Xóm / tổ dân phố",
+            "Xóm, tổ dân phố theo nghị quyết sắp xếp của HĐND từng xã / phường — dùng cho tìm kiếm địa danh và nhận "
+            "biết xóm trong tin nhắn SOS. Sau sáp nhập: chọn “Thay toàn bộ” → xóm cũ của các xã CÓ trong tệp bị xoá, "
+            "xã khác giữ nguyên. Mã trống = tự sinh theo mã xã + tên (không phân biệt “Xóm” / “Thôn” đứng trước).",
+            "spatial_admin.administrative_units",
+            ("code",),
+            (
+                Field("ma", "Mã xóm (trống = tự sinh: <mã xã>-<tên không dấu>)", "code", "code", example=""),
+                Field("ma_xa", "Mã xã/phường trực thuộc", None, "code", True, example="CB-PHUCHOA"),
+                Field("ten", "Tên xóm / tổ dân phố", "name", required=True, example="Xóm Nà Pò"),
+                Field(
+                    "loai",
+                    "Loại",
+                    "unit_type",
+                    "enum",
+                    choices=("xom", "to_dan_pho", "thon", "ban"),
+                    default="xom",
+                    example="xom",
+                ),
+                Field("dan_so", "Dân số", "population", "int", min=0, example="320"),
+                Field("so_ho", "Số hộ", "households", "int", min=0, example="80"),
+                Field(
+                    "vi_do", "Vĩ độ trung tâm xóm (tuỳ chọn)", None, "float", min=20, max=25, example="22.505"
+                ),
+                Field(
+                    "kinh_do",
+                    "Kinh độ trung tâm xóm (tuỳ chọn)",
+                    None,
+                    "float",
+                    min=103,
+                    max=108,
+                    example="106.572",
+                ),
+            ),
+            geometry="point",
+            geometry_columns=("center",),
+            geometry_required=False,
+            refs=(Ref("ma_xa", "parent_id", "spatial_admin.administrative_units", where="level = 'xa'"),),
+            fixed={"level": "thon"},
+            conflict_where="spatial_admin.administrative_units.level = 'thon'",
+            replaceable=True,
+            replace_scope="level = 'thon'",
+            replace_within=(
+                "ma_xa",
+                "parent_id IN (SELECT id FROM spatial_admin.administrative_units WHERE code = ANY(:within))",
+            ),
             public=True,
         ),
         Dataset(

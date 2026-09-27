@@ -8,6 +8,7 @@ from app.infra.cache import invalidate
 from app.services.data_import.engine import Report
 from app.services.data_import.specs import DATASETS
 from app.services.events import log_event
+from app.services.sos_nlp import invalidate_gazetteer
 from app.ws.hub import hub
 
 
@@ -25,6 +26,8 @@ async def after_import(
     await hub.publish("data.imported", {"dataset": name, "label": ds.label, **result})
     if ds.public:
         await invalidate("public:")
+    if name in ("xom", "ranh_gioi_xa"):
+        await invalidate_gazetteer()  # bộ tách tin SOS nhận ra xóm / tên xã mới ngay
     who = user["full_name"] if user else "Người vận hành (dòng lệnh)"
     await log_event(
         f"{who} nhập {ds.label}: {result['created']} mới, {result['updated']} cập nhật, {result['deleted']} xoá",

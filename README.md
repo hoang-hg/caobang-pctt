@@ -97,7 +97,8 @@ vùng nguy hiểm, số điện thoại không có thật.
 |---|---|---|---|
 | Ranh giới tỉnh | `spatial_admin.administrative_units` (tinh) | ✅ OpenStreetMap | — |
 | Ranh giới 56 xã/phường | `administrative_units` (xa) | 🟡 **Voronoi xấp xỉ** từ toạ độ tâm | Shapefile ranh giới xã sau 01/07/2025 — Sở NN&MT. Phạm vi RBAC và việc gán SOS/phản ánh vào xã dựa trên ranh giới này |
-| Thôn/tổ, địa danh | `spatial_admin.place_names` | 🟡 mẫu | UBND xã |
+| Xóm / tổ dân phố | `administrative_units` (thon) | ⛔ 8 xóm **mẫu** | Danh sách sau sắp xếp năm 2026 (nghị quyết HĐND từng xã) — UBND xã / Sở Nội vụ; nhập bằng loại `xom` ([2.4](#nhap-du-lieu)) |
+| Địa danh (đèo, di tích, công trình) | `spatial_admin.place_names` | 🟡 mẫu | UBND xã |
 | Mạng đường | `operations.road_nodes`, `road_segments` | 🟡 trục chính vẽ tay | Sở Xây dựng / OSM đã hiệu chỉnh |
 | Mẫu tin cảnh báo | `communications.message_templates` | ✅ | Rà soát lời văn với Văn phòng BCH |
 | Danh mục vật tư | `resources.items` | ✅ | |
@@ -122,6 +123,7 @@ hình và cổng công khai cập nhật ngay).
 | Loại (mã) | Bảng | Định dạng | Khoá | Thay toàn bộ |
 |---|---|---|---|---|
 | Ranh giới xã/phường (`ranh_gioi_xa`) | `administrative_units` | GeoJSON vùng | mã xã có sẵn — chỉ cập nhật | — |
+| Xóm / tổ dân phố (`xom`) | `administrative_units` (cấp thôn) | CSV / Excel / GeoJSON điểm | `ma` — trống = tự sinh `<mã xã>-<tên>` | ✓ chỉ xóm của các xã có trong tệp |
 | Điểm sơ tán (`diem_so_tan`) 🌐 | `evacuation_sites` | CSV / Excel / GeoJSON điểm | `ma` | ✓ |
 | Vùng nguy hiểm (`vung_nguy_hiem`) 🌐 | `hazard_zones` | GeoJSON vùng | `ma` | ✓ (không xoá vùng do cảm biến tạo) |
 | Điểm nguy hiểm (`diem_nguy_hiem`) 🌐 | `hazard_points` | CSV / Excel / GeoJSON điểm | `ma` | ✓ |
@@ -146,7 +148,12 @@ hình và cổng công khai cập nhật ngay).
   và giá trị liệt kê viết có dấu cũng được ("Vĩ độ", "Trường học"). Tối đa 20 MB, 20.000 dòng.
 - **Thay toàn bộ** xoá mọi bản ghi của bảng không có trong tệp (kể cả dữ liệu mẫu) — giao diện báo trước số bản ghi sẽ
   xoá và bắt buộc tích xác nhận. Chỉ có ở bảng không bị bảng khác tham chiếu.
-- Thứ tự khi nhập lần đầu: ranh giới xã → kho → tồn kho → lực lượng → phương tiện → phần còn lại.
+- **Xóm / tổ dân phố** (sau sắp xếp theo nghị quyết HĐND từng xã, 2026): mỗi xã một tệp hoặc gộp nhiều xã; cột bắt buộc
+  `ma_xa`, `ten` ("Xóm Nà Pò" hay "Nà Pò" đều được — cùng mã). Chọn **Thay toàn bộ** để bỏ xóm cũ đã sáp nhập: chỉ
+  xoá xóm của các xã **có trong tệp**. Toạ độ tuỳ chọn (có thì cảnh báo nếu rơi sang xã khác). Dùng cho tìm kiếm địa
+  danh và nhận biết xóm trong tin SOS (tên xóm trùng ở nhiều xã: tin phải nhắc cả xã mới gán đúng xóm). Hiện có 8 xóm
+  **mẫu** — thay bằng danh sách chính thức lấy từ UBND các xã / Sở Nội vụ.
+- Thứ tự khi nhập lần đầu: ranh giới xã → xóm → kho → tồn kho → lực lượng → phương tiện → phần còn lại.
 
 Dòng lệnh (tệp lớn, người vận hành máy chủ):
 
