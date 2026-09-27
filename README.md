@@ -1162,6 +1162,10 @@ Container Registry.
 - **Ranh giới tỉnh**: OpenStreetMap relation [1844412](https://www.openstreetmap.org/relation/1844412) (© OpenStreetMap
   contributors, ODbL), diện tích tính được **6.694 km²**. Cao Bằng là 1 trong 11 tỉnh, thành **không sáp nhập** theo
   Nghị quyết 202/2025/QH15. Tệp: `backend/seed/caobang_province.geojson`.
+  Bản đồ vẽ ranh giới tỉnh **nguyên bản, không rút gọn** (4.923 đỉnh, ~29 KB gzip) nên trùng đường biên của bản đồ nền
+  tự lưu trữ (cùng dữ liệu OSM); ranh giới xã rút gọn ~5 m. Trên nền Google (Vệ tinh, Địa hình) có thể lệch vài chục mét
+  vì Google dùng dữ liệu biên giới riêng. Cần độ chính xác pháp lý → thay bằng dữ liệu địa giới chính thức (Sở Nông nghiệp
+  và Môi trường) khi có.
 - **56 xã/phường** (53 xã, 3 phường): Nghị quyết 1657/NQ-UBTVQH15 (hiệu lực 01/07/2025). Ranh giới xã là **xấp xỉ**
   (Voronoi từ toạ độ tâm, cắt theo ranh giới tỉnh) — thay bằng dữ liệu chính thức ([2.2](#hien-trang)).
 - Dự báo: Open-Meteo (CC BY 4.0, gói miễn phí phi thương mại), dữ liệu ECMWF / NOAA. Radar: RainViewer.
