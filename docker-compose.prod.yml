@@ -198,6 +198,8 @@ services:
     volumes:
       # Cloudflare / proxy khác: trỏ NGINX_REAL_IP_CONF tới tệp real-ip riêng (xem frontend/nginx/real-ip.conf)
       - ${NGINX_REAL_IP_CONF:-./frontend/nginx/real-ip.conf}:/etc/nginx/snippets/real-ip.conf:ro
+      # Bản đồ nền tự lưu trữ: sh deploy/fetch-basemap.sh (thư mục trống → giao diện tự dùng nền ngoài)
+      - ./data/tiles:/usr/share/nginx/html/tiles:ro
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
       interval: 15s

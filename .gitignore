@@ -18,3 +18,6 @@ mqtt/certs/
 
 # Ảnh mẫu kiểm thử tải (tạo bằng tests/load/make_photo.py)
 tests/load/photo.jpg
+
+# Bản đồ nền tự lưu trữ (tải bằng deploy/fetch-basemap.sh, ~160 MB)
+data/tiles/

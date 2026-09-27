@@ -26,6 +26,7 @@ không cần đăng nhập. Sai sót ở đây có thể khiến người dân �
 docker-compose.yml        dev + trình diễn + CI: db redis minio mailpit mqtt backend worker frontend (container_name cố định)
 docker-compose.prod.yml   chạy thật (project caobang-pctt-prod): caddy? frontend backend worker migrate db redis minio backup mqtt?
 deploy/Caddyfile, deploy/backup.sh       HTTPS; sao lưu pg_dump + ảnh hằng ngày
+deploy/fetch-basemap.sh    tải bản đồ nền tự lưu trữ → data/tiles/caobang.pmtiles (không lên git; nginx phục vụ /tiles/)
 mqtt/mosquitto.conf (dev, ẩn danh) · mosquitto.prod.conf + acl.example (thật)
 db/init/01_extensions.sql  postgis, timescaledb, pg_trgm, unaccent
 tests/e2e/*.mjs            kiểm thử API qua HTTP (Node 20+, cần stack dev chạy với DEMO_MODE=true)
@@ -247,9 +248,13 @@ Python trong container.
   `border-line`, `bg-danger`, `text-good`, `text-accent`…); màu trạng thái cố định; hỗ trợ cả sáng và tối. Component
   dùng chung trong `components/common/ui.jsx` (KpiCard, Modal, Tabs, Section, Empty, Progress, StatusDot). Icon `lucide-react`.
 - **Biểu đồ** Recharts lấy màu từ `useChartTheme()` (+ `axisProps`, `ChartTooltip`); không dùng 2 trục Y (tách biểu đồ).
-- **Bản đồ**: `leaflet-draw` cần `components/map/leafletGlobal.js` import trước. Nền bản đồ khai báo ở
-  `components/map/MapTools.jsx` — hiện dùng tile Google / CARTO **chưa có giấy phép** (README §6.9); đổi nguồn phải giữ
-  ghi công (attribution) và thể hiện đúng chủ quyền.
+- **Bản đồ**: `leaflet-draw` và `protomaps-leaflet` cần `L` toàn cục → `components/map/leafletGlobal.js` import trước.
+  Nền bản đồ chỉ qua `<BaseLayer>` trong `components/map/MapTools.jsx`: nền có `local` (Địa lý, Ban đêm) vẽ từ
+  `/tiles/caobang.pmtiles` khi máy chủ có tệp (đọc phần đầu tệp lấy vùng phủ); zoom < 7 hoặc khung nhìn ra ngoài vùng phủ
+  → thêm nền Google / CARTO bên dưới (Google thể hiện đúng Hoàng Sa, Trường Sa — không hạ `LOCAL_MIN_ZOOM` xuống ≤ 6).
+  `pmtiles` và `protomaps-leaflet` chỉ `import()` động — không import tĩnh (giữ gói tải đầu cổng công khai ~220 KB).
+  `BaseLayer` đặt `map.setMaxZoom` trong layout effect: `MarkerClusterGroup` lỗi "Map has no maxZoom" nếu chưa có.
+  Nền ngoài chưa có giấy phép (README §6.9); đổi nguồn phải giữ ghi công và thể hiện đúng chủ quyền.
 - **Chống bot**: `components/common/Turnstile.jsx` (khoá site lấy từ `GET /public/config`; token dùng 1 lần — đổi `key` để
   lấy token mới).
 - Trạng thái toàn cục (Zustand `app/store.js`): chỉ thứ dùng chung nhiều trang (auth, bộ lọc vùng, theme, toasts…);
@@ -316,8 +321,12 @@ Python trong container.
 - Tệp `.sh`, `.conf`, compose dùng LF (`.gitattributes`); script có CRLF sẽ lỗi trong container.
 - Git Bash trên Windows tự đổi đường dẫn `/x` → đặt `MSYS_NO_PATHCONV=1` khi `docker run -w /src` / `-v`.
 - Mã phiếu `SOS-xxxx` / `PA-xxxx` tăng dần nên đoán được — tra cứu công khai luôn yêu cầu mã + SĐT, trả lỗi giống nhau.
-- Nền bản đồ (`MapTools.jsx`) hiện dùng tile Google / CARTO **chưa có giấy phép** — phải chuyển sang nguồn có giấy phép
-  trước khi mở cho người dân (README §6.9); không thêm nguồn tile mới khi chưa có giấy phép / key.
+- Nền ngoài trong `MapTools.jsx` (Google / CARTO: zoom toàn quốc, Vệ tinh, Địa hình) **chưa có giấy phép** (README §6.9);
+  không thêm nguồn tile mới khi chưa có giấy phép / key. Máy dev không có `data/tiles/caobang.pmtiles` → bản đồ dùng nền
+  ngoài (Vite trả index.html cho `/tiles/…`, đọc phần đầu tệp lỗi → coi như không có); thử nền tự lưu trữ trên stack
+  docker (`sh deploy/fetch-basemap.sh` trước).
+- `location /tiles/` trong nginx phải giữ `gzip off` và `try_files $uri =404` — nén động làm hỏng HTTP Range, còn rơi về
+  index.html thì thư viện pmtiles đọc sai định dạng.
 - Vite cảnh báo "is dynamically imported … but also statically imported" → `lazy()` vô tác dụng với module đó; import tĩnh
   thống nhất hoặc bỏ import tĩnh ở nơi khác.
 - Pool CSDL lớn × nhiều tiến trình → "too many clients" dưới tải (đã gặp khi kiểm thử tải với 6 tiến trình × 20).

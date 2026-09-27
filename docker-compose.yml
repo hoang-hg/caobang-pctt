@@ -158,6 +158,8 @@ services:
     container_name: caobang-pctt-frontend
     ports:
       - "8080:80"
+    volumes:
+      - ./data/tiles:/usr/share/nginx/html/tiles:ro  # bản đồ nền tự lưu trữ (deploy/fetch-basemap.sh)
     depends_on:
       - backend
 

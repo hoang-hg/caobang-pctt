@@ -163,7 +163,8 @@ Bắt buộc:
    và gỡ số liệu giao nhận ngẫu nhiên khỏi giao diện.
 2. ⛔ Nhập dữ liệu chính thức mục 2.2 bằng công cụ [2.4](#nhap-du-lieu) (tối thiểu: ranh giới xã, điểm sơ tán, vùng
    nguy hiểm, danh bạ đường dây nóng).
-3. ⛔ Bản đồ nền có giấy phép sử dụng ([6.9](#ban-do-nen)).
+3. ⛔ Bản đồ nền: tải bản đồ tự lưu trữ (`sh deploy/fetch-basemap.sh`); nền ngoài (zoom toàn quốc, Vệ tinh, Địa hình)
+   có giấy phép sử dụng ([6.9](#ban-do-nen)).
 4. ⛔ Triển khai theo [mục 10](#trien-khai): `APP_ENV=production`, HTTPS, sao lưu ra ngoài máy chủ, đã diễn tập khôi phục.
 5. ⛔ Hồ sơ cấp độ an toàn thông tin, kiểm thử xâm nhập, thông báo xử lý dữ liệu cá nhân ([mục 11](#bao-mat)).
 6. ⛔ Diễn tập trên một xã thí điểm: soạn → duyệt → phát → người dân nhận được.
@@ -435,7 +436,8 @@ cảnh báo **chưa có code kết nối** — chưa có key nào dùng được
 | Đài KTTV Cao Bằng / Cục KTTV | Mực nước, bản tin | ⛔ | Thoả thuận chia sẻ dữ liệu | Đẩy vào `/ingest/batch` hoặc viết bộ nối ([6.7](#nguon-trong-nuoc)) |
 | VRain, VNDMS, dữ liệu vận hành hồ chứa, cảnh báo sạt lở theo xã | Đo mưa, giám sát thiên tai, xả lũ | ⛔ | Thoả thuận | như trên |
 | SMS Brandname, Cell Broadcast, Zalo ZNS/OA, tổng đài SIP | **Gửi cảnh báo cho dân** | ⛔ (chưa làm) | Hợp đồng nhà mạng / Zalo | Sẽ bổ sung biến khi tích hợp |
-| Bản đồ nền | Nền bản đồ | ⚠️ | Giấy phép / API key ([6.9](#ban-do-nen)) | Frontend `components/map/MapTools.jsx` |
+| Bản đồ nền tự lưu trữ (OSM, Protomaps) | Nền Địa lý, Ban đêm vùng Cao Bằng | ✅ không key | Chạy `deploy/fetch-basemap.sh` ([6.9](#ban-do-nen)) | `data/tiles/` |
+| Bản đồ nền Google / CARTO | Zoom toàn quốc, Vệ tinh, Địa hình, ngoài vùng phủ | ⚠️ | Giấy phép / API key ([6.9](#ban-do-nen)) | Frontend `components/map/MapTools.jsx` |
 | Radar mưa RainViewer | Lớp radar | ✅ không key | Tuân thủ điều khoản RainViewer | — |
 | Cloudflare Turnstile | Chống bot form phản ánh | ✅ | Site key + secret: https://dash.cloudflare.com → Turnstile | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET` |
 | SMTP | Email quên mật khẩu | ✅ | Tài khoản máy chủ thư của tỉnh | `SMTP_*` |
@@ -554,11 +556,32 @@ gửi thật có báo cáo giao nhận từ nhà cung cấp, thay `advance_deliv
 <a id="ban-do-nen"></a>
 ### 6.9. Bản đồ nền
 
-Giao diện hiện lấy nền từ tile trực tiếp của Google Maps (`mt{s}.google.com/vt/…`) và CARTO (`basemaps.cartocdn.com`).
-**Cả hai cần giấy phép khi dùng thật**: điều khoản Google Maps Platform không cho tải tile trực tiếp không qua API có key
-(có thể bị chặn bất cứ lúc nào); CARTO basemap miễn phí có giới hạn sử dụng. Trước khi mở cho người dân: dùng dịch vụ có
-hợp đồng / API key (VD Google Map Tiles API, nhà cung cấp bản đồ trong nước, bản đồ nền của cơ quan nhà nước), bảo đảm
-thể hiện đúng chủ quyền lãnh thổ Việt Nam, và cập nhật `components/map/MapTools.jsx` + dòng ghi công (attribution).
+**Bản đồ nền tự lưu trữ** (nền "Bản đồ Địa lý" và "Chế độ ban đêm"): tệp vector `data/tiles/caobang.pmtiles` (~160 MB,
+dữ liệu OpenStreetMap theo sơ đồ Protomaps) phủ Cao Bằng, các tỉnh giáp ranh và Quảng Tây, zoom tới 15 (đường thôn, tên
+xóm). nginx phục vụ thẳng tệp này tại `/tiles/` (trình duyệt đọc từng ô bằng HTTP Range, không cần máy chủ tile riêng);
+trình duyệt tự vẽ bằng `protomaps-leaflet`, nhãn tiếng Việt. Khung nhìn trong vùng phủ **không gọi dịch vụ ngoài nào** →
+vẫn có bản đồ khi đứt cáp quang quốc tế, và không vướng điều khoản tải tile trực tiếp của Google.
+
+```bash
+sh deploy/fetch-basemap.sh      # cần Internet + Docker; ~1 phút. Chạy lại mỗi quý để cập nhật đường, địa danh
+```
+
+Tải xong là dùng ngay, không cần khởi động lại (thư mục `data/tiles` gắn vào nginx ở cả hai tệp compose). Vùng khác:
+`BBOX=<tây,nam,đông,bắc>`; bản cố định: `BUILD=<ngày>.pmtiles` (danh sách: https://maps.protomaps.com/builds).
+
+Khi nào vẫn dùng nền ngoài (`components/map/MapTools.jsx`, `BASEMAPS`):
+
+| Trường hợp | Nền hiển thị |
+|---|---|
+| Zoom ≤ 6 (nhìn toàn quốc, Biển Đông) | Google Maps tiếng Việt, thể hiện đúng **Hoàng Sa, Trường Sa**. Ô zoom thấp của tệp OSM phủ cả Biển Đông nên không được hiện |
+| Khung nhìn vượt ra ngoài vùng phủ của tệp | Google (Ban đêm: CARTO) vẽ bên dưới phần ngoài vùng |
+| Chưa chạy `fetch-basemap.sh` (máy dev) | Google / CARTO như trước |
+| Nền "Vệ tinh", "Địa hình" | Luôn là Google |
+
+Ghi công OpenStreetMap / Protomaps hiện ở góc bản đồ (bắt buộc theo giấy phép ODbL). **Nền ngoài vẫn cần giấy phép khi
+dùng thật**: điều khoản Google Maps Platform không cho tải tile trực tiếp không qua API có key (có thể bị chặn bất cứ lúc
+nào); CARTO miễn phí có giới hạn sử dụng. Muốn thay: dịch vụ có hợp đồng / API key (Google Map Tiles API, bản đồ nền của
+cơ quan nhà nước) — sửa `url` trong `BASEMAPS`, bảo đảm thể hiện đúng chủ quyền lãnh thổ Việt Nam.
 
 ---
 
@@ -856,7 +879,7 @@ Thiết bị IoT ──► mqtt :8883 (TLS, tài khoản + ACL) — profile "mqt
 |---|---|---|
 | CPU / RAM | 8 vCPU, 16 GB | `API_WORKERS` 4–6. Đo trên máy thử ([12.2](#kiem-thu-tai)): 500 người dân dùng ~2 lõi backend, 60 cán bộ làm mới dashboard liên tục ~1,7 lõi |
 | Ổ đĩa | SSD ≥ 200 GB + nơi riêng cho sao lưu | Số đo 200 trạm × 5 phút ≈ vài MB/ngày; ảnh ≈ 0,4 MB/phản ánh |
-| Băng thông ra | ≥ 100 Mbps | Lần tải đầu ~0,22 MB (gzip) × 55.000 người/giờ ≈ 27 Mbps (chưa tính ảnh, bản đồ nền do nhà cung cấp phục vụ); nên có CDN cho `/assets/` |
+| Băng thông ra | ≥ 200 Mbps | Lần tải đầu ~0,22 MB giao diện (gzip) + ~0,5 MB bản đồ nền tự lưu trữ (khung nhìn toàn tỉnh) ≈ 0,7 MB × 55.000 người/giờ ≈ 90 Mbps, chưa tính ảnh; lần sau trình duyệt dùng lại bản đã lưu. Nên có CDN cho `/assets/` và `/tiles/` |
 | Hệ điều hành | Ubuntu 22.04/24.04 LTS, Docker Engine + Compose v2.24+ | Tường lửa: 22 (giới hạn IP quản trị), 80, 443, (8883) |
 | Vị trí | Trung tâm dữ liệu có UPS/máy phát, **ngoài vùng ngập** | Lũ lớn có thể cắt điện, cáp quang tại Cao Bằng; sao lưu và máy dự phòng nên ở ngoài tỉnh |
 
@@ -873,6 +896,7 @@ cp .env.production.example .env.production && chmod 600 .env.production
 # Điền: DOMAIN, ACME_EMAIL, JWT_SECRET + SECRET_KEY (openssl rand -hex 32, khác nhau), POSTGRES_PASSWORD +
 # MINIO_ROOT_PASSWORD (openssl rand -hex 24), SUPERADMIN_*, SMTP_*, TURNSTILE_*, OPEN_METEO_API_KEY…
 mkdir -p backups
+sh deploy/fetch-basemap.sh              # bản đồ nền tự lưu trữ → data/tiles (mục 6.9)
 alias dcp='docker compose -f docker-compose.prod.yml --env-file .env.production'
 dcp --profile caddy up -d --build
 dcp ps                                  # migrate: Exited (0); các service khác healthy / running
@@ -891,6 +915,7 @@ Kiểm tra:
 curl -sI https://$DOMAIN/ | grep -iE "strict-transport|x-content-type"     # header bảo mật
 curl -s https://$DOMAIN/health                                             # "status":"ok"
 curl -sI https://$DOMAIN/api/v1/public/overview | grep -i x-cache-status    # MISS rồi HIT
+curl -s -o /dev/null -w "%{http_code}\n" -H "Range: bytes=0-99" https://$DOMAIN/tiles/caobang.pmtiles   # 206
 curl -s -o /dev/null -w "%{http_code}\n" https://$DOMAIN/docs              # 404 (Swagger tắt)
 ```
 
@@ -1076,3 +1101,5 @@ Container Registry.
 - **56 xã/phường** (53 xã, 3 phường): Nghị quyết 1657/NQ-UBTVQH15 (hiệu lực 01/07/2025). Ranh giới xã là **xấp xỉ**
   (Voronoi từ toạ độ tâm, cắt theo ranh giới tỉnh) — thay bằng dữ liệu chính thức ([2.2](#hien-trang)).
 - Dự báo: Open-Meteo (CC BY 4.0, gói miễn phí phi thương mại), dữ liệu ECMWF / NOAA. Radar: RainViewer.
+- Bản đồ nền tự lưu trữ: © OpenStreetMap contributors (ODbL), đóng gói theo sơ đồ Protomaps Basemap
+  (https://protomaps.com); thư viện `protomaps-leaflet`, `pmtiles` (BSD-3-Clause).
