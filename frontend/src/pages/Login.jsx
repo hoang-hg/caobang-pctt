@@ -14,11 +14,83 @@ import {
   AlertCircle,
   Building2,
   KeyRound,
+  Smartphone,
 } from 'lucide-react';
 import { api } from '../api/client';
 import { useStore } from '../app/store';
+import { CodeInput, MfaSetup } from '../components/account/Mfa';
 
 const REMEMBER_KEY = 'cb_pctt_saved_login';
+
+/** Bước 2 của đăng nhập: nhập mã xác thực 2 lớp ("verify") hoặc cài đặt lần đầu khi vai trò bắt buộc ("setup"). */
+function MfaStep({ mfa, onBack, onDone }) {
+  const [code, setCode] = useState('');
+  const [recovery, setRecovery] = useState(false);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  if (mfa.stage === 'setup') {
+    return (
+      <div className="mt-6 flex flex-col gap-3">
+        <div className="rounded-xl border border-accent/30 bg-accent/10 p-3 text-xs leading-relaxed text-ink-2">
+          <b className="text-ink">Vai trò của bạn bắt buộc xác thực 2 lớp.</b> Cài đặt một lần (khoảng 2 phút) để tiếp
+          tục; phiên cài đặt hết hạn sau 5 phút.
+        </div>
+        <MfaSetup challenge={mfa.challenge} onDone={onDone} />
+        <button type="button" className="text-xs text-muted hover:text-accent" onClick={() => onBack()}>
+          ← Đăng nhập tài khoản khác
+        </button>
+      </div>
+    );
+  }
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      onDone(await api('/auth/mfa/verify', { method: 'POST', body: { challenge: mfa.challenge, code } }));
+    } catch (err) {
+      if (err.status === 401 && /hết hạn/.test(err.message)) onBack(err.message);
+      else setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <form className="mt-6 flex flex-col gap-4" onSubmit={submit}>
+      <div className="flex items-start gap-2.5 text-sm text-ink-2">
+        <Smartphone size={18} className="mt-0.5 shrink-0 text-accent" />
+        <span>
+          {recovery
+            ? 'Nhập 1 mã khôi phục (dạng xxxx-xxxx) đã lưu khi bật xác thực 2 lớp. Mỗi mã chỉ dùng được 1 lần.'
+            : 'Mở ứng dụng xác thực trên điện thoại, nhập mã 6 số của tài khoản PCTT Cao Bằng.'}
+        </span>
+      </div>
+      <CodeInput key={String(recovery)} value={code} onChange={setCode} recovery={recovery} />
+      {error && (
+        <div className="flex items-start gap-2 rounded-xl border border-danger/30 bg-danger/10 p-3 text-xs font-medium text-danger">
+          <AlertCircle size={16} className="mt-0.5 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+      <button
+        className="btn-primary justify-center rounded-xl py-2.5 text-sm font-bold"
+        disabled={busy || (recovery ? code.replace(/[\s-]/g, '').length !== 8 : code.length !== 6)}
+      >
+        {busy ? <Loader2 size={18} className="animate-spin" /> : <ShieldCheck size={18} />} XÁC NHẬN
+      </button>
+      <div className="flex items-center justify-between text-xs">
+        <button type="button" className="text-accent hover:underline" onClick={() => { setRecovery(!recovery); setCode(''); setError(''); }}>
+          {recovery ? 'Dùng mã 6 số' : 'Mất điện thoại? Dùng mã khôi phục'}
+        </button>
+        <button type="button" className="text-muted hover:text-ink" onClick={() => onBack()}>
+          ← Quay lại
+        </button>
+      </div>
+    </form>
+  );
+}
 
 /**
  * Màn hình đăng nhập điều hành tác chiến PCTT & TKCN Cao Bằng.
@@ -49,6 +121,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [mfa, setMfa] = useState(null); // { stage: 'verify' | 'setup', challenge }
 
   const handleSubmit = useCallback(
     async (e) => {
@@ -79,8 +152,10 @@ export default function Login() {
           }
         }
 
-        // Cập nhật Auth Store (App.jsx sẽ tự động chuyển hướng theo ?next= hoặc /dashboard)
-        setAuth(data);
+        // Tài khoản có xác thực 2 lớp → bước 2; không thì cập nhật Auth Store (App.jsx tự chuyển hướng theo
+        // ?next= hoặc /dashboard)
+        if (data.mfa) setMfa({ stage: data.mfa, challenge: data.challenge });
+        else setAuth(data);
       } catch (err) {
         setError(err.message || 'Tên đăng nhập hoặc mật khẩu không chính xác.');
       } finally {
@@ -116,7 +191,18 @@ export default function Login() {
             </p>
           </div>
 
-          {/* Form đăng nhập */}
+          {mfa ? (
+            <MfaStep
+              mfa={mfa}
+              onDone={(session) => setAuth({ token: session.token, user: session.user })}
+              onBack={(message) => {
+                setMfa(null);
+                setPassword('');
+                setError(message || '');
+              }}
+            />
+          ) : (
+          /* Form đăng nhập */
           <form className="mt-6 flex flex-col gap-4" onSubmit={handleSubmit}>
             {error && (
               <div className="rounded-xl bg-danger/10 border border-danger/30 p-3 text-xs text-danger font-medium flex items-start gap-2.5 animate-in fade-in slide-in-from-top-1 duration-200">
@@ -218,6 +304,7 @@ export default function Login() {
               )}
             </button>
           </form>
+          )}
 
           {/* Điều hướng ra Cổng công khai cho người dân */}
           <div className="mt-6 pt-4 border-t border-line/60 flex items-center justify-between text-xs text-muted">

@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     jwt_secret: str = DEV_JWT_SECRET
     jwt_expire_hours: int = 12
     cors_origins: str = "http://localhost:5173,http://localhost:8080"
+    # Vai trò BẮT BUỘC xác thực 2 lớp (TOTP), cách nhau dấu phẩy — VD super_admin,truong_ban,admin_tinh,chi_huy_cum.
+    # Trống = không bắt buộc (ai cũng tự bật được). Người có vai trò này chưa bật → lần đăng nhập sau phải cài đặt.
+    totp_required_roles: str = ""
+    totp_issuer: str = (
+        "BCH PCTT Cao Bằng"  # tên hiện trong ứng dụng xác thực (Google / Microsoft Authenticator)
+    )
 
     # Chế độ trình diễn: seed nạp dữ liệu MẪU (trạm, lực lượng, kho, điểm sơ tán, SOS…) + tài khoản demo.
     # Tắt: chỉ nạp dữ liệu nền (địa giới, đường, mẫu tin). BẮT BUỘC tắt khi triển khai thật.
@@ -100,6 +106,10 @@ class Settings(BaseSettings):
     @property
     def docs_enabled(self) -> bool:
         return self.is_dev if self.api_docs is None else self.api_docs
+
+    @property
+    def totp_required_role_set(self) -> frozenset[str]:
+        return frozenset(r.strip() for r in self.totp_required_roles.split(",") if r.strip())
 
 
 settings = Settings()

@@ -38,6 +38,9 @@ SESSION_IP_CEILING = 5  # khi đếm theo phiên, vẫn chặn 1 IP vượt 5× 
 
 RULES: tuple[Rule, ...] = (
     Rule("login", "POST", "/api/v1/auth/login", 30, 60),  # + khoá theo tài khoản sau 10 lần sai (auth.py)
+    Rule(
+        "mfa", "POST", "/api/v1/auth/mfa/", 60, 60
+    ),  # mã 2 lớp: + khoá theo tài khoản như đăng nhập (mfa.py)
     Rule("forgot", "POST", "/api/v1/auth/forgot-password", 5, 3600),
     Rule("reset", "POST", "/api/v1/auth/reset-password", 10, 3600),
     Rule("public_report", "POST", "/api/v1/public/reports", 30, 3600),  # + 5/giờ theo SĐT (public.py)

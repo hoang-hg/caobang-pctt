@@ -42,8 +42,9 @@ backend/                   Python 3.12, FastAPI, SQLAlchemy async (psycopg3), Ca
   app/worker.py            tiến trình nền (RUN_MODE=worker)
   app/db.py                engine + fetch_all / fetch_one / execute / transaction
   app/auth.py              JWT, băm mật khẩu/PIN (PBKDF2), current_user, audit(), password_problem, bump_token_version
+  app/mfa.py               xác thực 2 lớp TOTP: mã, mã khôi phục, phiếu đăng nhập, required() theo TOTP_REQUIRED_ROLES
   app/area.py              parse_codes, area_clause, unit_clause (bộ lọc địa phương)
-  app/api/v1/*.py          router: admin_units alerts auth dashboard forecast ingest integrations map_layers public
+  app/api/v1/*.py          router: admin_units alerts auth mfa dashboard forecast ingest integrations map_layers public
                            rbac reports resources search sos
   app/rbac/                permissions.py (SSOT quyền + vai trò hệ thống) · authz.py (dependency cho route) ·
                            scope_loaders.py (tài nguyên → domain) · domains.py · enforcer.py · management.py (uỷ quyền,
@@ -77,7 +78,8 @@ frontend/                  React 18, Vite 6, Tailwind 3, TanStack Query 5, Zusta
   src/pages/               trang điều hành (DataImport = nhập dữ liệu chính thức); pages/public/ = cổng công khai (PublicPortal, ReportForm, TicketTracker,
                            ReservoirMonitor, LandslideMonitor, NetworkBanner = báo mất mạng / gợi ý bản nhẹ)
   src/components/          common/ (ui.jsx: KpiCard Modal Tabs Section Empty…, Turnstile, DispatchModal…) · layout/ ·
-                           map/ (MapLayers, MapTools = nền bản đồ + công cụ, icons, leafletGlobal) · charts/ (chartTheme)
+                           map/ (MapLayers, MapTools = nền bản đồ + công cụ, icons, leafletGlobal) · charts/ (chartTheme) ·
+                           account/Mfa.jsx (cài đặt / quản lý xác thực 2 lớp — Login import tĩnh, UserMenu lazy)
   src/index.css            biến màu CSS sáng/tối; tailwind.config.js ánh xạ token
 ```
 
@@ -210,6 +212,13 @@ Python trong container.
 
 **Xác thực & dữ liệu cá nhân**
 - Mật khẩu mới phải qua `auth.password_problem`; PIN ký duyệt băm như mật khẩu. Đổi / đặt lại mật khẩu tăng `token_version`.
+- Xác thực 2 lớp (`app/mfa.py`, `api/v1/mfa.py`, README §11.1): `/auth/login` với tài khoản đã bật / vai trò bắt buộc trả
+  `{"mfa": "verify"|"setup", "challenge"}` thay cho token — client mới phải xử lý bước 2. Phiếu mang `aud=pctt-mfa`, chỉ
+  giải mã qua `mfa.challenge_user` (không bao giờ nhận làm token phiên). Sai mã đếm vào `auth.lock_key` như sai mật khẩu;
+  bộ đếm chỉ xoá trong `complete_login`. Bật / tắt / đặt lại 2 lớp tăng `token_version`. `user_from_token` từ chối người
+  có vai trò trong `TOTP_REQUIRED_ROLES` mà chưa bật. Kiểm mã luôn qua `mfa.check_code` (cập nhật có điều kiện
+  `totp_last_step` / gạch mã khôi phục — chống dùng lại, chống gửi đồng thời). Tài khoản demo / e2e không bị bắt buộc vì
+  `TOTP_REQUIRED_ROLES` trống ở dev.
 - Ảnh: luôn qua `services/reports.process_image` (xoá EXIF, chống bomb, JPEG) rồi `infra.storage.put`; ảnh chưa duyệt chỉ
   phát qua `signed_photo_url`.
 - Log không ghi query string, token, SĐT, toạ độ người dân (`main.DropQueryString` áp cho `uvicorn.access` và `uvicorn.error`).
@@ -293,7 +302,8 @@ Python trong container.
 - `tests/e2e/*.mjs` kiểm thử API end-to-end, cần stack dev với `DEMO_MODE=true` (dùng tài khoản demo); tham số 1 = URL backend.
   Chạy lại liên tiếp → xoá khoá `rl:*` trong Redis. `iot-test.mjs` gọi `docker exec caobang-pctt-mqtt` (tên container cố định).
 - CI (`ci.yml`): ruff + pytest → build frontend → kiểm tra `docker-compose.prod.yml` → stack Docker Compose
-  (`DEMO_MODE=true`, `SIMULATOR=true`) + 9 script API (`lite-test.mjs` chạy qua nginx: tham số = URL frontend :8080).
+  (`DEMO_MODE=true`, `SIMULATOR=true`, `TOTP_REQUIRED_ROLES=kiem_thu_2fa`) + 10 script API (`lite-test.mjs` chạy qua
+  nginx: tham số = URL frontend :8080; `totp-test.mjs` tự tính mã TOTP, cần biến trên để thử luồng bắt buộc).
   Thay đổi hành vi nghiệp vụ / quyền → cập nhật script tương ứng.
 - `tests/load/load.js` (k6, README §12.2): thay đổi đường đi của cổng công khai hoặc dashboard (thêm API, bỏ cache…) →
   chạy lại, so với bảng kết quả trong README; cập nhật bảng khi số liệu đổi đáng kể.

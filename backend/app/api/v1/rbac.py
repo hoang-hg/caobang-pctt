@@ -134,6 +134,13 @@ async def revoke(user_id: str, role: str, domain: str, actor: dict = Depends(req
     await svc.revoke(actor, user_id, role, domain)
 
 
+@router.post("/users/{user_id}/mfa/reset")
+async def reset_mfa(user_id: str, actor: dict = Depends(require_any("user", "manage"))):
+    """Đặt lại xác thực 2 lớp (người dùng mất điện thoại và mã khôi phục) — xác minh danh tính trước khi bấm."""
+    await svc.reset_mfa(actor, user_id)
+    return {"ok": True}
+
+
 @router.get("/audit")
 async def audit(limit: int = 200, actor: dict = Depends(require_any("user", "view"))):
     rows = await fetch_all(

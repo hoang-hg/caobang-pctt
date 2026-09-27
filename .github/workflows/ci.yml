@@ -2,7 +2,7 @@
 # CI — kiểm tra mỗi lần push / pull request
 #   backend  : ruff (format + lint) + pytest (kiểm thử đơn vị)
 #   frontend : build production
-#   e2e      : dựng toàn bộ stack bằng Docker Compose, chạy 9 bộ kiểm thử API
+#   e2e      : dựng toàn bộ stack bằng Docker Compose, chạy 10 bộ kiểm thử API
 # ==========================================
 name: CI
 
@@ -70,6 +70,8 @@ jobs:
       # Kiểm thử API dùng tài khoản demo + dữ liệu mẫu + bộ mô phỏng
       DEMO_MODE: "true"
       SIMULATOR: "true"
+      # vai trò thử của totp-test.mjs: kiểm tra luồng bắt buộc cài xác thực 2 lớp khi đăng nhập
+      TOTP_REQUIRED_ROLES: kiem_thu_2fa
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -109,6 +111,11 @@ jobs:
         run: node tests/e2e/iot-test.mjs
       - name: Kiểm thử cổng công khai, phản ánh, tài khoản
         run: node tests/e2e/public-test.mjs
+      - name: Kiểm thử xác thực 2 lớp (TOTP)
+        run: |
+          # public-test đăng nhập nhiều lần (cả thử khoá tài khoản) → xoá bộ đếm giới hạn đăng nhập 30/phút/IP
+          docker compose exec -T redis sh -c "redis-cli --scan --pattern 'rl:*' | xargs -r redis-cli del"
+          node tests/e2e/totp-test.mjs
       - name: Kiểm thử tra cứu tiến độ phiếu
         run: |
           docker compose exec -T redis sh -c "redis-cli --scan --pattern 'rl:*' | xargs -r redis-cli del"

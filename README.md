@@ -85,7 +85,7 @@ Ký hiệu: ✅ chạy thật · 🟡 chạy thật nhưng dựa trên dữ li�
 | Công khai | Phản ánh kèm ảnh, duyệt theo địa bàn, tra cứu tiến độ | ✅ | |
 | Công khai | Bản nhẹ `/ban-nhe` (< 50 KB, không JavaScript), mở lại khi mất mạng (PWA) | ✅ | [9.4](#ban-nhe) |
 | Nền tảng | Bản đồ nền tự lưu trữ (OpenStreetMap) | ✅ | Cần chạy `deploy/fetch-basemap.sh` ([6.9](#ban-do-nen)) |
-| Nền tảng | Đăng nhập, RBAC, đổi/quên mật khẩu, nhật ký thao tác, xuất PDF/Excel | ✅ | |
+| Nền tảng | Đăng nhập, xác thực 2 lớp (TOTP), RBAC, đổi/quên mật khẩu, nhật ký thao tác, xuất PDF/Excel | ✅ | [11.1](#xac-thuc-2-lop) |
 
 ### 2.2. Dữ liệu
 
@@ -372,8 +372,10 @@ Mọi biến của backend khai báo ở `backend/app/config.py`. Tệp mẫu: `
 | Biến | Mặc định dev | Chạy thật | Ý nghĩa |
 |---|---|---|---|
 | `JWT_SECRET` | chuỗi mẫu | **bắt buộc** ≥ 32 ký tự ngẫu nhiên | Ký phiên đăng nhập |
-| `SECRET_KEY` | trống (dẫn xuất từ JWT_SECRET) | **bắt buộc**, khác JWT_SECRET | Mã hoá API key đối tác trong CSDL — đổi khoá = nhập lại key |
+| `SECRET_KEY` | trống (dẫn xuất từ JWT_SECRET) | **bắt buộc**, khác JWT_SECRET | Mã hoá API key đối tác và khoá xác thực 2 lớp trong CSDL — đổi khoá = nhập lại key, mọi người cài lại 2 lớp |
 | `JWT_EXPIRE_HOURS` | `12` | tuỳ chọn | Thời hạn phiên |
+| `TOTP_REQUIRED_ROLES` | trống | `super_admin,truong_ban,admin_tinh,chi_huy_cum` | Vai trò bắt buộc xác thực 2 lớp ([11.1](#xac-thuc-2-lop)); trống → cảnh báo khi khởi động |
+| `TOTP_ISSUER` | `BCH PCTT Cao Bằng` | tuỳ chọn | Tên hiện trong ứng dụng xác thực |
 | `POSTGRES_USER` / `_DB` | `pctt` / `caobang_pctt` | tuỳ chọn | |
 | `POSTGRES_PASSWORD` | `pctt_dev_password` | **bắt buộc** (dùng hex, ghép vào URL) | |
 | `POSTGRES_PORT` | `5433` | — | Cổng mở ra máy (chỉ dev) |
@@ -743,7 +745,7 @@ Yêu cầu ở phạm vi toàn tỉnh **không** khớp phân quyền cấp cụ
 | `contact.view` | ✓ | Danh bạ (cấp tỉnh luôn hiện, cấp xã/thôn theo phạm vi) |
 | `hotline.operate` | toàn tỉnh | Tổng đài, phân luồng cuộc gọi |
 | `audit.view` | toàn tỉnh | Nhật ký pháp lý |
-| `user.view` / `user.manage` | ✓ | Xem / tạo tài khoản con, cấp – thu hồi vai trò trong phạm vi |
+| `user.view` / `user.manage` | ✓ | Xem / tạo tài khoản con, cấp – thu hồi vai trò, đặt lại xác thực 2 lớp trong phạm vi |
 | `report.view` / `report.moderate` | ✓ | Xem (kể cả SĐT người gửi) / duyệt – từ chối – chuyển SOS phản ánh |
 | `integration.view` / `integration.manage` | toàn tỉnh | Xem / cấu hình nguồn dữ liệu, thiết bị IoT, cấp khoá |
 | `data.import` | toàn tỉnh | Nhập dữ liệu chính thức từ tệp ([2.4](#nhap-du-lieu)) |
@@ -783,7 +785,7 @@ nhật ký thuộc xã trong phạm vi người dùng.
 vai trò đã chỉnh (gỡ hết vai trò của Superadmin ban đầu thì không bị gán lại). Vô hiệu hoá tài khoản: **khoá** tài khoản.
 
 API quản trị `/api/v1/rbac`: `GET /permissions`, `/roles` (`user.view`) · `GET /scopes` · `POST/PATCH/DELETE /roles…`
-(`rbac.manage`) · `GET/POST /users`, `PATCH /users/{id}`, `POST/DELETE /users/{id}/assignments` (`user.manage` + rào chắn
+(`rbac.manage`) · `GET/POST /users`, `PATCH /users/{id}`, `POST/DELETE /users/{id}/assignments`, `POST /users/{id}/mfa/reset` (`user.manage` + rào chắn
 uỷ quyền) · `GET /audit` (`user.view`, lọc theo phạm vi).
 
 ---
@@ -956,7 +958,7 @@ curl -s -o /dev/null -w "%{http_code}\n" https://$DOMAIN/docs              # 404
 
 Sau lần chạy đầu:
 
-1. Đăng nhập Superadmin → **đổi mật khẩu và PIN** ngay.
+1. Đăng nhập Superadmin → cài **xác thực 2 lớp** (bắt buộc, [11.1](#xac-thuc-2-lop)) → **đổi mật khẩu và PIN** ngay.
 2. Trang **Phân quyền**: tạo tài khoản đích danh cho từng người; không dùng chung tài khoản; có Superadmin đích danh
    rồi thì **khoá** tài khoản `admin` ban đầu.
 3. Nhập dữ liệu chính thức ([2.4](#nhap-du-lieu)) **trước** khi công bố địa chỉ cổng.
@@ -1033,8 +1035,8 @@ Redis Sentinel, MinIO phân tán, cân bằng tải nhiều máy.
 <a id="bao-mat"></a>
 ## 11. Bảo mật & tuân thủ
 
-**Đã có**: HTTPS + HSTS; kiểm tra cấu hình khi khởi động; mật khẩu và PIN băm PBKDF2, khoá tài khoản sau 10 lần sai; PIN
-ký duyệt cảnh báo; RBAC theo địa bàn, chống leo thang; nhật ký thao tác & phân quyền; giới hạn tần suất chống giả mạo IP;
+**Đã có**: HTTPS + HSTS; kiểm tra cấu hình khi khởi động; mật khẩu và PIN băm PBKDF2, khoá tài khoản sau 10 lần sai;
+xác thực 2 lớp TOTP, bắt buộc theo vai trò ([11.1](#xac-thuc-2-lop)); PIN ký duyệt cảnh báo; RBAC theo địa bàn, chống leo thang; nhật ký thao tác & phân quyền; giới hạn tần suất chống giả mạo IP;
 ảnh xoá EXIF/GPS, link ảnh có chữ ký; IP người phản ánh chỉ lưu băm; CSDL / Redis / MinIO không mở cổng, không ra
 Internet; container backend không chạy root; Swagger tắt ở production; log không chứa token, toạ độ; API key đối tác mã
 hoá Fernet (`SECRET_KEY`), khoá thiết bị băm SHA-256, log `httpx` hạ xuống WARNING để không lộ key trong URL; cổng webhook
@@ -1050,6 +1052,27 @@ SOS bắt buộc khoá; SĐT được che trước khi gửi tin SOS cho LLM.
 - **Bí mật**: `.env.production` quyền 600, chỉ người vận hành đọc; đổi toàn bộ bí mật khi nhân sự vận hành thay đổi.
 - **Bản đồ nền** có giấy phép, thể hiện đúng chủ quyền ([6.9](#ban-do-nen)).
 - Chưa bật Content-Security-Policy (giao diện tải bản đồ nền, radar, font từ nhiều nguồn) — lập danh sách nguồn, thử rồi bật.
+
+<a id="xac-thuc-2-lop"></a>
+### 11.1. Xác thực 2 lớp (TOTP)
+
+Ngoài mật khẩu, đăng nhập cần mã 6 số từ ứng dụng xác thực trên điện thoại (Google Authenticator, Microsoft
+Authenticator… — chuẩn TOTP RFC 6238, không cần SMS, không cần Internet trên điện thoại). Lộ mật khẩu vẫn không vào được
+tài khoản. Mã nguồn: `backend/app/mfa.py`, `api/v1/mfa.py`, `frontend/src/components/account/Mfa.jsx`.
+
+- **Bắt buộc theo vai trò**: `TOTP_REQUIRED_ROLES` (mặc định production: Quản trị hệ thống, Lãnh đạo BCH, Quản trị tỉnh,
+  Chỉ huy cụm — những người quản lý tài khoản hoặc phê duyệt cảnh báo). Người có vai trò này chưa bật → lần đăng nhập sau
+  phải cài đặt ngay (quét QR, nhập mã, lưu 10 mã khôi phục) mới vào được; phiên cũ bị từ chối. Superadmin cũng cài ở lần
+  đăng nhập đầu tiên sau khi triển khai.
+- **Tự bật** (mọi cán bộ): menu tài khoản → **Xác thực 2 lớp**. Tắt cần mật khẩu + mã; vai trò bắt buộc không tự tắt được.
+- **Mã khôi phục**: 10 mã `xxxx-xxxx`, mỗi mã dùng 1 lần thay mã 6 số khi mất điện thoại; chỉ hiện một lần — in ra giấy.
+  Tạo bộ mới trong menu tài khoản (bộ cũ hết hiệu lực).
+- **Mất điện thoại và hết mã khôi phục**: quản trị có quyền quản lý tài khoản đó vào **Phân quyền** → nút đặt lại xác thực
+  2 lớp (biểu tượng khiên gạch). **Xác minh đúng người trước khi bấm** (gọi lại số đã biết, gặp trực tiếp). Mọi phiên của
+  tài khoản bị đăng xuất; thao tác ghi vào nhật ký phân quyền.
+- **An toàn**: mã đúng trong khung ±30 giây, mỗi mã chỉ dùng 1 lần; sai mã tính chung bộ đếm khoá đăng nhập (10 lần / 15
+  phút); khoá TOTP mã hoá bằng `SECRET_KEY`, mã khôi phục chỉ lưu HMAC. Giờ điện thoại lệch nhiều → mã luôn sai: bật giờ
+  tự động trên điện thoại.
 
 ---
 
@@ -1073,6 +1096,7 @@ Kiểm thử API (cần stack dev đang chạy với `DEMO_MODE=true`; tham số
 | IoT HTTP / batch / LoRaWAN / MQTT, dự báo | `node tests/e2e/iot-test.mjs` |
 | Cổng & API công khai, phản ánh, tài khoản, giới hạn tần suất | `node tests/e2e/public-test.mjs [backend] [mailpit]` |
 | Tra cứu tiến độ phiếu | `node tests/e2e/track-test.mjs` |
+| Xác thực 2 lớp: bật / đăng nhập 2 bước / mã khôi phục / tắt / đặt lại / khoá; bắt buộc theo vai trò khi backend có `TOTP_REQUIRED_ROLES=kiem_thu_2fa` (~1,5 phút) | `node tests/e2e/totp-test.mjs` |
 | Hồ chứa & xả lũ | `node tests/e2e/reservoir-test.mjs` |
 | Điểm đen sạt lở & đường đèo | `node tests/e2e/landslide-test.mjs` |
 | Nhập dữ liệu (12 loại, kiểm tra lỗi, cập nhật không trùng, thay toàn bộ) | `node tests/e2e/import-test.mjs` |
@@ -1123,7 +1147,7 @@ tăng CPU nếu kịch bản đồng thời chưa đạt.
 
 **CI** (`.github/workflows/ci.yml`, mỗi push / PR): ruff + pytest; build frontend; kiểm tra `docker-compose.prod.yml`
 (thiếu bí mật phải báo lỗi, đủ bí mật phải hợp lệ); dựng stack bằng `docker-compose.yml` với `DEMO_MODE=true`,
-`SIMULATOR=true` và chạy 9 bộ kiểm thử API. **Deploy** (`deploy.yml`): tag `vX.Y.Z` → build & đẩy image lên GitHub
+`SIMULATOR=true`, `TOTP_REQUIRED_ROLES=kiem_thu_2fa` và chạy 10 bộ kiểm thử API. **Deploy** (`deploy.yml`): tag `vX.Y.Z` → build & đẩy image lên GitHub
 Container Registry.
 
 ---

@@ -17,6 +17,7 @@ x-backend-env: &backend-env
   REDIS_URL: redis://redis:6379/0
   JWT_SECRET: ${JWT_SECRET:-doi-khoa-bi-mat-nay-khi-trien-khai-that}
   SECRET_KEY: ${SECRET_KEY:-}
+  TOTP_REQUIRED_ROLES: ${TOTP_REQUIRED_ROLES:-}
   SIMULATOR: ${SIMULATOR:-false}
   DEMO_MODE: ${DEMO_MODE:-false}
   SUPERADMIN_USERNAME: ${SUPERADMIN_USERNAME:-admin}

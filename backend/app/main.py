@@ -17,6 +17,7 @@ from app.api.v1 import (
     ingest,
     integrations,
     map_layers,
+    mfa,
     public,
     rbac,
     reports,
@@ -95,6 +96,7 @@ async def db_error(_: Request, exc: DBAPIError):
 
 for r in (
     auth,
+    mfa,
     admin_units,
     search,
     dashboard,

@@ -35,6 +35,7 @@ x-backend-env: &backend-env
   REDIS_URL: redis://redis:6379/0
   JWT_SECRET: ${JWT_SECRET:?Đặt JWT_SECRET (openssl rand -hex 32)}
   SECRET_KEY: ${SECRET_KEY:?Đặt SECRET_KEY (openssl rand -hex 32, khác JWT_SECRET)}
+  TOTP_REQUIRED_ROLES: ${TOTP_REQUIRED_ROLES-super_admin,truong_ban,admin_tinh,chi_huy_cum}  # đặt rỗng = không bắt buộc (cảnh báo)
   DEMO_MODE: "false"
   SIMULATOR: "false"
   SUPERADMIN_USERNAME: ${SUPERADMIN_USERNAME:-admin}

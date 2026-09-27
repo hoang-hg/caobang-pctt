@@ -193,7 +193,10 @@ async def assert_can_manage_user(actor: dict, target: dict) -> None:
 
 
 # ---------------------------------------------------------------- users
-USER_COLS = "id, username, full_name, position, email, is_active, created_at, created_by, (pin_hash IS NOT NULL) AS has_pin"
+USER_COLS = (
+    "id, username, full_name, position, email, is_active, created_at, created_by, (pin_hash IS NOT NULL) AS has_pin, "
+    "(totp_enabled_at IS NOT NULL) AS mfa_enabled"
+)
 
 
 async def list_users(actor: dict) -> list[dict]:
@@ -343,3 +346,17 @@ async def revoke(actor, user_id, role, domain) -> None:
     await e.remove_grouping_policy(target["username"], role, domain)
     await bump_token_version(target["id"])
     await rbac_audit(actor, "revoke", target["username"], role, domain)
+
+
+async def reset_mfa(actor, user_id) -> None:
+    """Xoá xác thực 2 lớp của tài khoản (mất điện thoại / hết mã khôi phục) → đăng xuất mọi phiên; vai trò bắt buộc
+    thì lần đăng nhập sau phải cài đặt lại."""
+    target = await get_user(user_id)
+    await assert_can_manage_user(actor, target)
+    await execute(
+        """UPDATE communications.users SET totp_secret_enc = NULL, totp_enabled_at = NULL, totp_last_step = NULL,
+                  totp_recovery_hashes = '{}' WHERE id = CAST(:id AS uuid)""",
+        {"id": str(target["id"])},
+    )
+    await bump_token_version(target["id"])
+    await rbac_audit(actor, "user.mfa_reset", target["username"])
