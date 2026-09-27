@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Circle, CircleMarker, GeoJSON, MapContainer, Marker, Polyline, Popup, Tooltip, useMap } from 'react-leaflet';
@@ -6,7 +6,7 @@ import clsx from 'clsx';
 import {
   ShieldAlert, LocateFixed, Megaphone, Phone, Home, CloudRain, Waves, Camera, LogIn, Moon, Sun, Navigation, AlertTriangle,
   CheckCircle2, Loader2, Share2, Info, BookOpen, ExternalLink, HelpCircle, MapPin, ChevronRight, PhoneCall, Compass, Search,
-  Droplets, Mountain, Ban
+  Droplets, Mountain, Ban, X
 } from 'lucide-react';
 import { api } from '../../api/client';
 import { useUnitsGeo } from '../../api/hooks';
@@ -15,6 +15,9 @@ import { BaseLayer, RAIN_BINS } from '../../components/map/MapTools';
 import { evacIcon, hazardIcon, pinIcon, stationIcon, reservoirIcon } from '../../components/map/icons';
 import { alarmLevel, LEVEL } from '../../utils/labels';
 import { ago, dateTime } from '../../utils/format';
+import L from 'leaflet';
+import MarkerClusterGroup from 'react-leaflet-cluster';
+import MapLegendBox from '../../components/map/MapLegendBox';
 import ReportForm from './ReportForm';
 import TicketTracker from './TicketTracker';
 import ReservoirMonitor from './ReservoirMonitor';
@@ -38,11 +41,41 @@ function FlyTo({ target }) {
   return null;
 }
 
-function PublicMap({ data, forecast, geo, me, route, target, layers }) {
+const createClusterCustomIcon = (cluster) => {
+  const count = cluster.getChildCount();
+  let size = 36;
+  let fontSize = 13;
+  let levelCls = 'cluster-radar-sm';
+  if (count >= 30) {
+    size = 46;
+    fontSize = 15;
+    levelCls = 'cluster-radar-lg';
+  } else if (count >= 10) {
+    size = 40;
+    fontSize = 14;
+    levelCls = 'cluster-radar-md';
+  }
+
+  return L.divIcon({
+    html: `
+      <div class="radar-cluster-wrapper" style="width:${size}px;height:${size}px;" title="Cụm ${count} điểm giám sát (Bấm để phóng to)">
+        <div class="radar-pulse-ring"></div>
+        <div class="radar-cluster-core ${levelCls}" style="width:${size}px;height:${size}px;font-size:${fontSize}px;">
+          ${count}
+        </div>
+      </div>
+    `,
+    className: 'custom-cluster-icon',
+    iconSize: L.point(size, size, true),
+    iconAnchor: [size / 2, size / 2],
+  });
+};
+
+function PublicMap({ data, forecast, geo, me, route, target, layers, basemap = 'street', onSelectPoint }) {
   const byCode = useMemo(() => Object.fromEntries((forecast || []).map((a) => [a.code, a])), [forecast]);
   return (
     <MapContainer center={[22.75, 106.05]} zoom={8.5} zoomSnap={0.25} className="h-full w-full" scrollWheelZoom>
-      <BaseLayer basemap="auto" />
+      <BaseLayer basemap={basemap} />
       <FlyTo target={target} />
       {layers.forecast && geo && forecast?.length > 0 && (
         <GeoJSON
@@ -66,93 +99,196 @@ function PublicMap({ data, forecast, geo, me, route, target, layers }) {
           <Tooltip sticky>{r.road_name} – đoạn đang nguy hiểm, hạn chế đi lại</Tooltip>
         </GeoJSON>
       ))}
-      {layers.hazard && data?.hazard_points.map((p, i) => (
-        <Marker key={`h${i}`} position={[p.lat, p.lon]} icon={hazardIcon(p.type, p.level)}>
-          <Popup><b>{p.name}</b><p className="text-xs">{p.description}</p></Popup>
-        </Marker>
-      ))}
-      {layers.stations && data?.stations.filter((s) => s.type !== 'do_am_dat').map((s) => {
-        const lv = alarmLevel(s.value ?? 0, s.thresholds);
-        return (
-          <Marker key={s.id} position={[s.lat, s.lon]} icon={stationIcon(s.type, lv, s.value == null ? undefined : s.type === 'luong_mua' ? Math.round(s.value) : s.value.toFixed(1))}>
-            <Popup><b>{s.name}</b><div className="text-sm">{s.value ?? '–'} {s.unit}</div></Popup>
+
+      {/* Gom cụm điểm bằng MarkerClusterGroup để chống rối mắt */}
+      <MarkerClusterGroup
+        chunkedLoading
+        iconCreateFunction={createClusterCustomIcon}
+        maxClusterRadius={45}
+        spiderfyOnMaxZoom={true}
+        showCoverageOnHover={false}
+      >
+        {layers.hazard && data?.hazard_points.map((p, i) => (
+          <Marker
+            key={`h${i}`}
+            position={[p.lat, p.lon]}
+            icon={hazardIcon(p.type, p.level)}
+            eventHandlers={{
+              click: () => onSelectPoint?.({
+                id: `hazard-${i}`,
+                name: p.name,
+                sub: p.description,
+                type: 'landslide',
+                raw: p,
+              }),
+            }}
+          >
+            <Popup><b>{p.name}</b><p className="text-xs">{p.description}</p></Popup>
           </Marker>
-        );
-      })}
-      {layers.evac && data?.evacuation_sites.map((e) => (
-        <Marker key={e.id} position={[e.lat, e.lon]} icon={evacIcon(e.current_occupancy / e.capacity)}>
-          <Popup><b>{e.name}</b><div className="text-sm">Còn trống: <b>{Math.max(0, e.capacity - e.current_occupancy)}</b>/{e.capacity} chỗ</div><div className="text-xs text-muted">{e.admin_name}</div></Popup>
-        </Marker>
-      ))}
-      {layers.reservoirs && data?.reservoirs?.map((r) => (
-        <Marker key={r.id} position={[r.lat, r.lon]} icon={reservoirIcon(r.spill_gates_open)}>
-          <Popup>
-            <div className="space-y-1">
-              <div className="font-bold text-sm text-ink">{r.name}</div>
-              <div className="text-xs text-muted">Sông {r.river} · {r.admin_name}</div>
-              <div className="text-xs pt-1 border-t border-line/60">
-                Trạng thái:{' '}
-                <b className={r.status_code === 'xa_khan_cap' ? 'text-danger font-bold' : r.status_code === 'xa_dieu_tiet' ? 'text-serious font-bold' : 'text-good font-bold'}>
-                  {r.status_label}
-                </b>
-              </div>
-              <div className="text-xs">
-                Mực nước: <b>{r.current_level} m</b> (MNDBT {r.normal_level} m, {r.level_diff >= 0 ? '+' : ''}{r.level_diff} m)
-              </div>
-              <div className="text-xs">
-                Lưu lượng xả: <b className="font-mono text-danger font-bold">{r.outflow_m3s} m³/s</b> (Nước về: {r.inflow_m3s} m³/s)
-              </div>
-              {r.spill_gates_open > 0 && (
-                <div className="text-xs text-serious font-semibold">
-                  Mở {r.spill_gates_open}/{r.spill_gates} cửa xả tràn
-                </div>
-              )}
-              <p className="text-[11px] text-ink-2 bg-panel2 p-1.5 rounded mt-1 leading-snug">{r.downstream_warning}</p>
-            </div>
-          </Popup>
-        </Marker>
-      ))}
-      {layers.landslides && data?.landslides?.map((p) => {
-        const isBlocked = p.traffic_status === 'cam_duong';
-        return (
-          <Marker key={p.code} position={[p.lat, p.lon]} icon={hazardIcon(p.category === 'deo_doc' ? 'giao_thong' : 'sat_lo', p.risk_level)}>
+        ))}
+        {layers.stations && data?.stations.filter((s) => s.type !== 'do_am_dat').map((s) => {
+          const lv = alarmLevel(s.value ?? 0, s.thresholds);
+          return (
+            <Marker
+              key={s.id}
+              position={[s.lat, s.lon]}
+              icon={stationIcon(s.type, lv, s.value == null ? undefined : s.type === 'luong_mua' ? Math.round(s.value) : s.value.toFixed(1))}
+              eventHandlers={{
+                click: () => onSelectPoint?.({
+                  id: s.id,
+                  name: s.name,
+                  sub: s.admin_name || 'Cao Bằng',
+                  value: s.type === 'luong_mua' ? `${Math.round(s.value ?? 0)} mm` : `${Number(s.value ?? 0).toFixed(1)} m`,
+                  status: s.type === 'luong_mua' ? ((s.value ?? 0) >= 50 ? 'Mưa to' : 'Bình thường') : (lv === 3 ? 'BĐ III' : lv === 2 ? 'BĐ II' : lv === 1 ? 'BĐ I' : 'An toàn'),
+                  statusColor: lv >= 2 ? 'text-danger' : lv === 1 ? 'text-serious' : 'text-good',
+                  type: s.type === 'luong_mua' ? 'rain' : 'water',
+                  raw: s,
+                }),
+              }}
+            >
+              <Popup><b>{s.name}</b><div className="text-sm">{s.value ?? '–'} {s.unit}</div></Popup>
+            </Marker>
+          );
+        })}
+        {layers.evac && data?.evacuation_sites.map((e) => (
+          <Marker
+            key={e.id}
+            position={[e.lat, e.lon]}
+            icon={evacIcon(e.current_occupancy / e.capacity)}
+            eventHandlers={{
+              click: () => onSelectPoint?.({
+                id: e.id,
+                name: e.name,
+                sub: e.admin_name,
+                value: `Trống ${Math.max(0, e.capacity - e.current_occupancy)} chỗ`,
+                type: 'evac',
+                raw: e,
+              }),
+            }}
+          >
+            <Popup><b>{e.name}</b><div className="text-sm">Còn trống: <b>{Math.max(0, e.capacity - e.current_occupancy)}</b>/{e.capacity} chỗ</div><div className="text-xs text-muted">{e.admin_name}</div></Popup>
+          </Marker>
+        ))}
+        {layers.reservoirs && data?.reservoirs?.map((r) => (
+          <Marker
+            key={r.id}
+            position={[r.lat, r.lon]}
+            icon={reservoirIcon(r.spill_gates_open)}
+            eventHandlers={{
+              click: () => onSelectPoint?.({
+                id: r.id,
+                name: r.name,
+                sub: `${r.river ? `Sông ${r.river} · ` : ''}${r.admin_name}`,
+                type: 'reservoir',
+                raw: r,
+              }),
+            }}
+          >
             <Popup>
               <div className="space-y-1">
-                <div className="font-bold text-sm text-ink">{p.name}</div>
-                <div className="text-xs text-muted">{p.road_name} · {p.admin_name}</div>
+                <div className="font-bold text-sm text-ink">{r.name}</div>
+                <div className="text-xs text-muted">Sông {r.river} · {r.admin_name}</div>
                 <div className="text-xs pt-1 border-t border-line/60">
-                  Lưu thông:{' '}
-                  <b className={isBlocked ? 'text-danger font-bold' : p.traffic_status === 'canh_bao' ? 'text-serious font-bold' : 'text-good font-bold'}>
-                    {p.traffic_label}
+                  Trạng thái:{' '}
+                  <b className={r.status_code === 'xa_khan_cap' ? 'text-danger font-bold' : r.status_code === 'xa_dieu_tiet' ? 'text-serious font-bold' : 'text-good font-bold'}>
+                    {r.status_label}
                   </b>
                 </div>
-                <p className="text-xs text-ink-2 bg-panel2 p-1.5 rounded mt-1 leading-snug">{p.description}</p>
-                {p.tilt_info && (
-                  <div className="text-[11px] text-amber-600 font-semibold">
-                    Độ nghiêng taluy: +{p.tilt_info.current_tilt_deg}° (Ngưỡng {p.tilt_info.alarm_threshold}°)
+                <div className="text-xs">
+                  Mực nước: <b>{r.current_level} m</b> (MNDBT {r.normal_level} m, {r.level_diff >= 0 ? '+' : ''}{r.level_diff} m)
+                </div>
+                <div className="text-xs">
+                  Lưu lượng xả: <b className="font-mono text-danger font-bold">{r.outflow_m3s} m³/s</b> (Nước về: {r.inflow_m3s} m³/s)
+                </div>
+                {r.spill_gates_open > 0 && (
+                  <div className="text-xs text-serious font-semibold">
+                    Mở {r.spill_gates_open}/{r.spill_gates} cửa xả tràn
                   </div>
                 )}
-                {p.bypass_route && (
-                  <div className="text-[11px] text-danger font-medium mt-1">
-                    Đường tránh: {p.bypass_route}
-                  </div>
-                )}
+                <p className="text-[11px] text-ink-2 bg-panel2 p-1.5 rounded mt-1 leading-snug">{r.downstream_warning}</p>
               </div>
             </Popup>
           </Marker>
-        );
-      })}
-      {layers.reports && data?.reports.map((r) => (
-        <CircleMarker key={r.id} center={[r.lat, r.lon]} radius={8} pathOptions={{ color: '#fff', weight: 2, fillColor: '#7c3aed', fillOpacity: 0.9 }}>
-          <Popup>
-            <b>{r.category_label}</b> · <span className="text-xs text-muted">{ago(r.created_at)}</span>
-            <p className="text-xs">{r.description}</p>
-            {r.photos[0] && <img src={r.photos[0].thumb} alt={`Ảnh phản ánh ${r.code}`} className="mt-1 max-h-32 rounded" loading="lazy" />}
-            {r.public_note && <p className="mt-1 text-xs text-good">Cán bộ: {r.public_note}</p>}
-          </Popup>
-        </CircleMarker>
-      ))}
-      {route && <Polyline positions={route.geometry.coordinates.map(([x, y]) => [y, x])} pathOptions={{ color: route.safe ? '#16a34a' : '#f97316', weight: 6, opacity: 0.85 }} />}
+        ))}
+        {layers.landslides && data?.landslides?.map((p) => {
+          const isBlocked = p.traffic_status === 'cam_duong';
+          return (
+            <Marker
+              key={p.code}
+              position={[p.lat, p.lon]}
+              icon={hazardIcon(p.category === 'deo_doc' ? 'giao_thong' : 'sat_lo', p.risk_level)}
+              eventHandlers={{
+                click: () => onSelectPoint?.({
+                  id: p.code,
+                  name: p.name,
+                  sub: `${p.road_name} · ${p.admin_name}`,
+                  statusColor: isBlocked ? 'text-danger' : p.traffic_status === 'canh_bao' ? 'text-serious' : 'text-good',
+                  type: 'landslide',
+                  raw: p,
+                }),
+              }}
+            >
+              <Popup>
+                <div className="space-y-1">
+                  <div className="font-bold text-sm text-ink">{p.name}</div>
+                  <div className="text-xs text-muted">{p.road_name} · {p.admin_name}</div>
+                  <div className="text-xs pt-1 border-t border-line/60">
+                    Lưu thông:{' '}
+                    <b className={isBlocked ? 'text-danger font-bold' : p.traffic_status === 'canh_bao' ? 'text-serious font-bold' : 'text-good font-bold'}>
+                      {p.traffic_label}
+                    </b>
+                  </div>
+                  <p className="text-xs text-ink-2 bg-panel2 p-1.5 rounded mt-1 leading-snug">{p.description}</p>
+                  {p.tilt_info && (
+                    <div className="text-[11px] text-amber-600 font-semibold">
+                      Độ nghiêng taluy: +{p.tilt_info.current_tilt_deg}° (Ngưỡng {p.tilt_info.alarm_threshold}°)
+                    </div>
+                  )}
+                  {p.bypass_route && (
+                    <div className="text-[11px] text-danger font-medium mt-1">
+                      Đường tránh: {p.bypass_route}
+                    </div>
+                  )}
+                </div>
+              </Popup>
+            </Marker>
+          );
+        })}
+        {layers.reports && data?.reports.map((r) => (
+          <Marker
+            key={r.id}
+            position={[r.lat, r.lon]}
+            icon={pinIcon('📸', '#7c3aed')}
+            eventHandlers={{
+              click: () => onSelectPoint?.({
+                id: r.id,
+                name: r.category_label,
+                sub: r.commune_name || 'Hiện trường',
+                type: 'report',
+                raw: r,
+              }),
+            }}
+          >
+            <Popup>
+              <b>{r.category_label}</b> · <span className="text-xs text-muted">{ago(r.created_at)}</span>
+              <p className="text-xs">{r.description}</p>
+              {r.photos[0] && <img src={r.photos[0].thumb} alt={`Ảnh phản ánh ${r.code}`} className="mt-1 max-h-32 rounded" loading="lazy" />}
+              {r.public_note && <p className="mt-1 text-xs text-good">Cán bộ: {r.public_note}</p>}
+            </Popup>
+          </Marker>
+        ))}
+      </MarkerClusterGroup>
+
+      {route && (
+        <Polyline
+          positions={route.geometry.coordinates.map(([x, y]) => [y, x])}
+          pathOptions={
+            route.roads?.length
+              ? { color: route.safe ? '#16a34a' : '#f97316', weight: 6, opacity: 0.85 }
+              : { color: '#64748b', weight: 4, opacity: 0.8, dashArray: '8 8' } // chưa có dữ liệu đường: chỉ là hướng chim bay
+          }
+        />
+      )}
       {me && (
         <>
           <Circle center={[me.lat, me.lon]} radius={me.accuracy || 50} pathOptions={{ color: '#2563eb', weight: 1, fillOpacity: 0.1 }} />
@@ -197,9 +333,13 @@ export default function PublicPortal() {
   const focusAlert = params.get('canh-bao');
   const trackParam = params.get('tra-cuu') || '';
   const [activeTab, setActiveTab] = useState(trackParam ? 'tracuu' : 'bando'); // bando | tracuu | muanuoc | sotan | hotlines | huongdan
+  const [mapSidebarTab, setMapSidebarTab] = useState(focusAlert ? 'alerts' : 'legend'); // legend | alerts | rain
+  const scrolledToAlert = useRef(false);
   // SĐT chỉ giữ trong state (không đưa lên URL)
   const [track, setTrack] = useState({ code: trackParam, phone: '' });
   const [layers, setLayers] = useState({ forecast: true, hazard: true, stations: true, reservoirs: true, landslides: true, evac: true, reports: true });
+  const [basemap, setBasemap] = useState('street');
+  const [selectedPoint, setSelectedPoint] = useState(null);
   const [me, setMe] = useState(null);
   const [locating, setLocating] = useState(false);
   const [locErr, setLocErr] = useState('');
@@ -221,12 +361,39 @@ export default function PublicPortal() {
     retry: 0,
   });
 
+  const totalPoints = useMemo(() => {
+    if (!map) return 0;
+    const rain = (map.stations || []).length;
+    const res = (map.reservoirs || []).length;
+    const ls = (map.landslides || []).length;
+    const evac = (map.evacuation_sites || []).length;
+    const rep = (map.reports || []).length;
+    return rain + res + ls + evac + rep;
+  }, [map]);
+
+  const handleSelectPoint = (pt) => {
+    setSelectedPoint(pt);
+    setMapSidebarTab('legend');
+    if (pt?.lat && pt?.lon) {
+      setTarget({ lat: pt.lat, lon: pt.lon, zoom: 14.5 });
+    }
+  };
+
+  // Link chia sẻ ?canh-bao=MÃ: mở tab cảnh báo, rồi cuộn tới thẻ sau khi tab đã hiển thị (1 lần, không cuộn lại mỗi lần làm mới)
   useEffect(() => {
     if (focusAlert && alerts.length) {
       setActiveTab('bando');
-      document.getElementById(`canh-bao-${focusAlert}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setMapSidebarTab('alerts');
     }
   }, [focusAlert, alerts]);
+  useEffect(() => {
+    if (!focusAlert || scrolledToAlert.current || activeTab !== 'bando' || mapSidebarTab !== 'alerts') return;
+    const card = document.getElementById(`canh-bao-${focusAlert}`);
+    if (card) {
+      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      scrolledToAlert.current = true;
+    }
+  }, [focusAlert, activeTab, mapSidebarTab, alerts]);
 
   useEffect(() => {
     if (trackParam) {
@@ -505,127 +672,17 @@ export default function PublicPortal() {
           </div>
         </div>
 
-        {/* 2 Bảng Chuyên Đề Nổi Bật: Lũ/Hồ Chứa & Sạt Lở/Đường Đèo */}
-        <section className="space-y-2.5">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-muted flex items-center gap-1.5">
-              <span>2 Chuyên đề trọng tâm tỉnh Cao Bằng</span>
-            </h2>
-            <span className="text-[11px] text-muted font-medium hidden sm:inline">
-              Tính từ cảm biến IoT và vùng cảnh báo đang hiệu lực
-            </span>
-          </div>
-
-          <div className="grid gap-3.5 md:grid-cols-2">
-            {/* Bảng Chuyên Đề 1: Lũ lụt & Xả lũ Hồ chứa */}
-            <div
-              onClick={() => {
-                setActiveTab('hochua');
-                window.scrollTo({ top: 400, behavior: 'smooth' });
-              }}
-              className="card p-4 sm:p-5 border-l-4 border-l-sky-500 bg-gradient-to-br from-sky-500/10 via-panel to-panel hover:shadow-lg hover:border-sky-600 transition-all cursor-pointer group"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-md shadow-sky-500/30 group-hover:scale-105 transition-transform">
-                    <Waves size={24} />
-                  </div>
-                  <div>
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400">
-                      Chuyên đề 1
-                    </span>
-                    <h3 className="text-base font-bold text-ink group-hover:text-accent transition-colors">
-                      Hồ Chứa Thủy Điện & Cảnh Báo Xả Lũ
-                    </h3>
-                  </div>
-                </div>
-                <span className="chip bg-sky-500/15 text-sky-600 text-xs font-bold shrink-0">
-                  {overview?.reservoirs?.spill_count ?? '–'} hồ đang xả
-                </span>
-              </div>
-
-              <p className="mt-2.5 text-xs text-ink-2 leading-relaxed">
-                Theo dõi mực nước, lưu lượng về hồ và tổng xả về hạ du sông Bằng Giang và sông Gâm (Thủy điện Hòa Thuận, Bảo Lạc B, Bảo Lâm 1, Bạch Đằng...).
-              </p>
-
-              <div className="mt-3.5 grid grid-cols-2 gap-2 text-xs border-t border-line/60 pt-3">
-                <div className="bg-panel2/60 p-2 rounded-lg border border-line/40">
-                  <span className="text-[11px] text-muted">Tổng lưu lượng xả:</span>
-                  <div className="font-mono text-sm font-bold text-sky-600 mt-0.5">
-                    {overview ? Math.round(overview.reservoirs?.total_outflow ?? 0).toLocaleString('vi-VN') : '–'} m³/s
-                  </div>
-                </div>
-                <div className="bg-panel2/60 p-2 rounded-lg border border-line/40">
-                  <span className="text-[11px] text-muted">Xả lũ lớn:</span>
-                  <div className="font-mono text-sm font-bold text-danger mt-0.5">
-                    {overview?.reservoirs?.emergency_count ?? '–'} hồ xả lũ lớn
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-3 flex items-center justify-between text-xs text-sky-600 font-semibold group-hover:underline">
-                <span>Xem chi tiết từng cửa xả & hạ du</span>
-                <span className="group-hover:translate-x-1 transition-transform">Xem bảng chuyên đề →</span>
-              </div>
-            </div>
-
-            {/* Bảng Chuyên Đề 2: Sạt trượt & Đường đèo */}
-            <div
-              onClick={() => {
-                setActiveTab('satlo');
-                window.scrollTo({ top: 400, behavior: 'smooth' });
-              }}
-              className="card p-4 sm:p-5 border-l-4 border-l-danger bg-gradient-to-br from-danger/10 via-panel to-panel hover:shadow-lg hover:border-red-600 transition-all cursor-pointer group"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 to-rose-700 text-white shadow-md shadow-red-600/30 group-hover:scale-105 transition-transform">
-                    <Mountain size={24} />
-                  </div>
-                  <div>
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-danger">
-                      Chuyên đề 2
-                    </span>
-                    <h3 className="text-base font-bold text-ink group-hover:text-danger transition-colors">
-                      Điểm Đen Sạt Trượt & Đường Đèo
-                    </h3>
-                  </div>
-                </div>
-                <span className="chip bg-danger/15 text-danger text-xs font-bold shrink-0 animate-pulse">
-                  {overview?.landslides?.blocked_count ?? '–'} điểm chia cắt
-                </span>
-              </div>
-
-              <p className="mt-2.5 text-xs text-ink-2 leading-relaxed">
-                Theo dõi các điểm đen trên QL34, QL3, QL4A (Khau Cốc Chà, Mẻ Pia, Mã Phục, Ca Thành…) cùng cảm biến nghiêng taluy và độ ẩm đất.
-              </p>
-
-              <div className="mt-3.5 grid grid-cols-2 gap-2 text-xs border-t border-line/60 pt-3">
-                <div className="bg-panel2/60 p-2 rounded-lg border border-line/40">
-                  <span className="text-[11px] text-muted">Cấm xe / Tắc nghẽn:</span>
-                  <div className="font-mono text-sm font-bold text-danger mt-0.5">
-                    {overview?.landslides?.blocked_count ?? '–'} vị trí chia cắt
-                  </div>
-                </div>
-                <div className="bg-panel2/60 p-2 rounded-lg border border-line/40">
-                  <span className="text-[11px] text-muted">Cảm biến nghiêng lớn nhất:</span>
-                  <div className="font-mono text-sm font-bold text-amber-600 mt-0.5 truncate">
-                    {maxTiltText(map?.landslides)}
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-3 flex items-center justify-between text-xs text-danger font-semibold group-hover:underline">
-                <span>Xem vị trí điểm đen & lộ trình vòng tránh</span>
-                <span className="group-hover:translate-x-1 transition-transform">Xem bảng chuyên đề →</span>
-              </div>
-            </div>
-          </div>
-        </section>
-
         {/* Khối hiển thị kết quả Định vị khi người dân bấm kiểm tra */}
         {(locating || locErr || here) && (
-          <section className="card p-4 bg-panel2/60 border-accent/40 shadow-sm animate-in fade-in duration-200">
+          <section className="card p-4 bg-panel2/60 border-accent/40 shadow-sm animate-in fade-in duration-200 relative">
+            <button
+              type="button"
+              onClick={() => { setMe(null); setLocErr(''); setRoute(null); }}
+              className="absolute top-3 right-3 p-1 rounded-lg text-muted hover:text-ink hover:bg-panel transition-colors z-10"
+              title="Đóng kết quả định vị"
+            >
+              <X size={16} />
+            </button>
             {locating && (
               <div className="flex items-center gap-2 py-3 text-sm text-accent">
                 <Loader2 size={18} className="animate-spin" />
@@ -711,7 +768,11 @@ export default function PublicPortal() {
                         <Compass size={16} className="text-accent shrink-0" />
                         <div>
                           Lộ trình sơ tán: <b>{route.distance_km} km</b> (~{route.duration_min} phút di chuyển). Trạng thái:{' '}
-                          {route.safe ? (
+                          {!route.roads?.length ? (
+                            <span className="font-bold text-amber-500">
+                              Chưa có dữ liệu đường tại khu vực này — nét đứt chỉ là hướng chim bay, không phải đường đi. Hãy đi theo chỉ dẫn của cán bộ địa phương.
+                            </span>
+                          ) : route.safe ? (
                             <span className="font-bold text-good">Đường an toàn, không qua vùng nguy hiểm</span>
                           ) : (
                             <span className="font-bold text-danger">Có đi qua vùng nguy cơ, cần hết sức cẩn thận</span>
@@ -779,88 +840,365 @@ export default function PublicPortal() {
 
         {/* TAB 1: BẢN ĐỒ & CẢNH BÁO */}
         {activeTab === 'bando' && (
-          <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
-            {/* Cột Bản đồ */}
-            <section className="card overflow-hidden flex flex-col">
-              {/* Lớp dữ liệu bản đồ */}
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-line bg-panel2/60 px-3 py-2 text-xs">
-                <span className="font-semibold text-muted">Lớp hiển thị:</span>
-                {[
-                  ['forecast', 'Mưa 24h'],
-                  ['hazard', 'Vùng ngập & điểm sạt lở'],
-                  ['stations', 'Trạm đo mực nước'],
-                  ['reservoirs', 'Hồ chứa & Xả lũ'],
-                  ['landslides', 'Điểm sạt trượt & Đèo dốc'],
-                  ['evac', 'Điểm sơ tán'],
-                  ['reports', 'Phản ánh người dân'],
-                ].map(([k, l]) => (
-                  <label key={k} className="flex cursor-pointer items-center gap-1.5 select-none">
-                    <input
-                      type="checkbox"
-                      checked={layers[k]}
-                      onChange={(e) => setLayers((x) => ({ ...x, [k]: e.target.checked }))}
-                      className="rounded accent-[rgb(var(--accent))]"
-                    />
-                    <span>{l}</span>
-                  </label>
-                ))}
-              </div>
+          <div className="space-y-4">
+            {/* Khung Bản đồ & Bảng tác chiến: Cân đối chiều cao, không có khoảng trắng */}
+            <div className="grid gap-4 lg:grid-cols-[1fr_390px] h-[520px] sm:h-[620px] lg:h-[700px] items-stretch">
+              {/* Cột Bản đồ: Chiếm trọn h-full flex flex-col */}
+              <section className="card overflow-hidden flex flex-col h-full border border-line shadow-sm">
+                {/* Lớp dữ liệu bản đồ & Basemap switcher */}
+                <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-line bg-panel2/60 px-3 py-2 text-xs shrink-0">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <span className="font-semibold text-muted">Lớp hiển thị:</span>
+                    {[
+                      ['forecast', 'Mưa 24h'],
+                      ['hazard', 'Vùng ngập & sạt lở'],
+                      ['stations', 'Trạm mực nước'],
+                      ['reservoirs', 'Hồ chứa & Xả lũ'],
+                      ['landslides', 'Điểm sạt trượt & Đèo'],
+                      ['evac', 'Điểm sơ tán'],
+                      ['reports', 'Phản ánh dân'],
+                    ].map(([k, l]) => (
+                      <label key={k} className="flex cursor-pointer items-center gap-1.5 select-none hover:text-ink">
+                        <input
+                          type="checkbox"
+                          checked={layers[k]}
+                          onChange={(e) => setLayers((x) => ({ ...x, [k]: e.target.checked }))}
+                          className="rounded accent-[rgb(var(--accent))]"
+                        />
+                        <span>{l}</span>
+                      </label>
+                    ))}
+                  </div>
 
-              {/* Khung bản đồ Leaflet */}
-              <div className="h-[55vh] min-h-[380px] w-full">
-                <PublicMap data={map} forecast={forecast} geo={geo} me={me} route={route} target={target} layers={layers} />
-              </div>
-
-              {/* Chú giải lượng mưa */}
-              <div className="flex flex-wrap items-center gap-3 border-t border-line bg-panel2/40 px-3 py-2 text-[11px] text-muted">
-                <span className="font-semibold text-ink">Thang mưa dự báo:</span>
-                {RAIN_BINS.map((b) => (
-                  <span key={b.label} className="flex items-center gap-1">
-                    <span className="h-2.5 w-4 rounded-sm shadow-sm" style={{ background: b.color }} />
-                    <span>{b.label}</span>
-                  </span>
-                ))}
-              </div>
-            </section>
-
-            {/* Cột Cảnh báo & Tin chính thức */}
-            <div className="flex flex-col gap-3">
-              <section className="card p-3.5 flex flex-col max-h-[65vh]">
-                <div className="flex items-center justify-between mb-2 pb-1 border-b border-line/60">
-                  <h2 className="card-title text-sm">
-                    <Megaphone size={16} className="text-danger" /> Cảnh báo chính thức
-                  </h2>
-                  <span className="chip bg-danger/10 text-danger text-[11px] font-bold">{alerts.length} bản tin</span>
+                  {/* Chế độ bản đồ nền Google Maps */}
+                  <div className="flex items-center gap-1 bg-panel border border-line rounded-lg p-0.5 shadow-xs">
+                    {[
+                      ['street', 'Địa lý'],
+                      ['satellite', 'Vệ tinh'],
+                      ['terrain', 'Địa hình'],
+                    ].map(([key, label]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setBasemap(key)}
+                        className={clsx(
+                          'px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer',
+                          basemap === key
+                            ? 'bg-primary text-white shadow-xs'
+                            : 'text-muted hover:text-ink hover:bg-panel2'
+                        )}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
-                <div className="flex flex-1 flex-col gap-2.5 overflow-y-auto pr-1 scroll-thin">
-                  {alerts.map((a) => (
-                    <AlertCard key={a.code} a={a} highlight={a.code === focusAlert} />
+                {/* Khung bản đồ Leaflet: Chiếm 100% diện tích flex-1 min-h-0 */}
+                <div className="flex-1 w-full min-h-0 relative">
+                  <PublicMap
+                    data={map}
+                    forecast={forecast}
+                    geo={geo}
+                    me={me}
+                    route={route}
+                    target={target}
+                    layers={layers}
+                    basemap={basemap}
+                    onSelectPoint={handleSelectPoint}
+                  />
+                </div>
+
+                {/* Chú giải lượng mưa chân bản đồ */}
+                <div className="flex flex-wrap items-center gap-3 border-t border-line bg-panel2/40 px-3 py-2 text-[11px] text-muted shrink-0">
+                  <span className="font-semibold text-ink">Thang mưa dự báo:</span>
+                  {RAIN_BINS.map((b) => (
+                    <span key={b.label} className="flex items-center gap-1">
+                      <span className="h-2.5 w-4 rounded-sm shadow-sm" style={{ background: b.color }} />
+                      <span>{b.label}</span>
+                    </span>
                   ))}
-                  {!alerts.length && (
-                    <div className="text-sm text-muted p-4 text-center">
-                      Không có bản tin cảnh báo khẩn cấp trong 7 ngày qua.
+                </div>
+              </section>
+
+              {/* Cột Bên Phải: Bảng điều hành đa năng 3 trong 1 */}
+              <section className="card overflow-hidden flex flex-col h-full border border-line shadow-sm">
+                {/* Header Tab chuyển đổi tinh gọn */}
+                <div className="flex items-center border-b border-line bg-panel2/70 p-1.5 gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setMapSidebarTab('legend')}
+                    className={clsx(
+                      'flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer',
+                      mapSidebarTab === 'legend'
+                        ? 'bg-panel text-accent shadow-xs'
+                        : 'text-muted hover:text-ink hover:bg-panel/50'
+                    )}
+                  >
+                    <HelpCircle size={14} />
+                    <span className="truncate">Chú thích</span>
+                    <span className="chip text-[10px] py-0 px-1.5 bg-accent/10 text-accent font-mono">
+                      {totalPoints}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setMapSidebarTab('alerts')}
+                    className={clsx(
+                      'flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer relative',
+                      mapSidebarTab === 'alerts'
+                        ? 'bg-panel text-danger shadow-xs'
+                        : 'text-muted hover:text-ink hover:bg-panel/50'
+                    )}
+                  >
+                    <Megaphone size={14} className={alerts.length > 0 ? 'text-danger animate-pulse' : ''} />
+                    <span className="truncate">Cảnh báo</span>
+                    {alerts.length > 0 ? (
+                      <span className="chip text-[10px] py-0 px-1.5 bg-danger text-white font-mono font-bold animate-pulse">
+                        {alerts.length}
+                      </span>
+                    ) : (
+                      <span className="chip text-[10px] py-0 px-1.5 bg-panel text-muted font-mono">0</span>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setMapSidebarTab('rain')}
+                    className={clsx(
+                      'flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer',
+                      mapSidebarTab === 'rain'
+                        ? 'bg-panel text-sky-600 shadow-xs'
+                        : 'text-muted hover:text-ink hover:bg-panel/50'
+                    )}
+                  >
+                    <CloudRain size={14} />
+                    <span className="truncate">Mưa 24h</span>
+                  </button>
+                </div>
+
+                {/* Nội dung Tab Cuộn Nội Bộ Mượt Mà (overflow-y-auto scroll-thin) */}
+                <div className="flex-1 overflow-y-auto scroll-thin p-3 sm:p-3.5">
+                  {/* TAB 1: CHÚ THÍCH & TRA CỨU ĐIỂM (EMBEDDED) */}
+                  {mapSidebarTab === 'legend' && (
+                    <MapLegendBox
+                      data={map}
+                      selectedPoint={selectedPoint}
+                      onSelectPoint={handleSelectPoint}
+                      onClosePoint={() => setSelectedPoint(null)}
+                      embedded={true}
+                    />
+                  )}
+
+                  {/* TAB 2: CẢNH BÁO CHÍNH THỨC */}
+                  {mapSidebarTab === 'alerts' && (
+                    <div className="flex flex-col gap-2.5">
+                      <div className="flex items-center justify-between pb-2 border-b border-line/60">
+                        <div className="text-xs font-bold uppercase tracking-wider text-muted flex items-center gap-1.5">
+                          <Megaphone size={14} className="text-danger" />
+                          <span>Bản tin chỉ đạo điều hành</span>
+                        </div>
+                        <span className="chip bg-danger/10 text-danger text-[11px] font-bold">
+                          {alerts.length} bản tin
+                        </span>
+                      </div>
+
+                      {alerts.map((a) => (
+                        <AlertCard key={a.code} a={a} highlight={a.code === focusAlert} />
+                      ))}
+
+                      {!alerts.length && (
+                        <div className="py-12 px-4 text-center">
+                          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-good/15 text-good mx-auto mb-3">
+                            <CheckCircle2 size={24} />
+                          </div>
+                          <div className="font-bold text-sm text-ink">Tình hình an toàn</div>
+                          <div className="text-xs text-muted mt-1 leading-relaxed max-w-xs mx-auto">
+                            Không có bản tin cảnh báo khẩn cấp nào trong 7 ngày qua trên địa bàn tỉnh Cao Bằng.
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* TAB 3: XÃ CÓ MƯA LỚN NHẤT 24H */}
+                  {mapSidebarTab === 'rain' && (
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center justify-between pb-2 border-b border-line/60">
+                        <div className="text-xs font-bold uppercase tracking-wider text-muted flex items-center gap-1.5">
+                          <CloudRain size={14} className="text-accent" />
+                          <span>Dự báo lượng mưa 24h tới</span>
+                        </div>
+                        <span className="text-[11px] text-muted">Mô hình khí tượng</span>
+                      </div>
+
+                      {/* Tóm tắt nhanh */}
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="bg-panel2/60 p-2.5 rounded-xl border border-line/50">
+                          <div className="text-[11px] text-muted">Mưa TB toàn tỉnh:</div>
+                          <div className="font-mono text-base font-bold text-accent mt-0.5">
+                            {overview?.rain?.avg_24h ?? '–'} mm
+                          </div>
+                        </div>
+                        <div className="bg-panel2/60 p-2.5 rounded-xl border border-line/50">
+                          <div className="text-[11px] text-muted">Dự báo cao nhất:</div>
+                          <div className="font-mono text-base font-bold text-danger mt-0.5">
+                            {overview?.forecast_24h?.max_24h ?? '–'} mm
+                          </div>
+                          <div className="text-[10px] text-muted truncate">{overview?.forecast_24h?.max_name || ''}</div>
+                        </div>
+                      </div>
+
+                      {/* Danh sách các xã mưa nhiều nhất */}
+                      <div className="space-y-1.5 mt-1">
+                        <div className="text-[11px] font-bold text-ink">Xã dự báo mưa nhiều nhất:</div>
+                        {(forecast || []).slice(0, 10).map((f, idx) => {
+                          const maxPossible = Math.max(50, overview?.forecast_24h?.max_24h || 50);
+                          const pctWidth = Math.min(100, Math.round(((f.p50 || 0) / maxPossible) * 100));
+                          return (
+                            <div
+                              key={f.code || idx}
+                              className="p-2 rounded-xl bg-panel2/40 border border-line/40 hover:bg-panel2/80 transition-colors"
+                            >
+                              <div className="flex items-center justify-between text-xs mb-1">
+                                <span className="font-semibold text-ink truncate flex-1">{f.name}</span>
+                                <span className="font-mono font-bold text-accent ml-2">{f.p50} mm</span>
+                                <span className="text-[10px] text-muted ml-1">(tối đa {f.p90})</span>
+                              </div>
+                              <div className="h-1.5 w-full bg-panel rounded-full overflow-hidden">
+                                <div
+                                  className="h-full rounded-full bg-gradient-to-r from-sky-400 to-blue-600 transition-all"
+                                  style={{ width: `${Math.max(5, pctWidth)}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>
               </section>
-
-              {/* Xã có mưa lớn nhất */}
-              <section className="card p-3">
-                <h3 className="card-title text-xs mb-2">
-                  <CloudRain size={14} className="text-accent" /> Xã dự báo mưa to nhất 24h
-                </h3>
-                <div className="flex flex-col gap-1 max-h-48 overflow-y-auto scroll-thin">
-                  {(forecast || []).slice(0, 5).map((f) => (
-                    <div key={f.code} className="flex items-center justify-between text-xs py-1 border-b border-line/40 last:border-0">
-                      <span className="truncate flex-1">{f.name}</span>
-                      <span className="font-mono font-semibold text-accent">{f.p50} mm</span>
-                      <span className="text-[10px] text-muted ml-1.5">(tối đa {f.p90})</span>
-                    </div>
-                  ))}
-                </div>
-              </section>
             </div>
+
+            {/* 2 Bảng Chuyên Đề Nổi Bật: Lũ/Hồ Chứa & Sạt Lở/Đường Đèo */}
+            <section className="space-y-2.5 pt-2">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xs font-bold uppercase tracking-wider text-muted flex items-center gap-1.5">
+                  <span>2 Chuyên đề trọng tâm tỉnh Cao Bằng</span>
+                </h2>
+                <span className="text-[11px] text-muted font-medium hidden sm:inline">
+                  Tính từ cảm biến IoT và vùng cảnh báo đang hiệu lực
+                </span>
+              </div>
+
+              <div className="grid gap-3.5 md:grid-cols-2">
+                {/* Bảng Chuyên Đề 1: Lũ lụt & Xả lũ Hồ chứa */}
+                <div
+                  onClick={() => {
+                    setActiveTab('hochua');
+                    window.scrollTo({ top: 380, behavior: 'smooth' });
+                  }}
+                  className="card p-4 sm:p-5 border-l-4 border-l-sky-500 bg-gradient-to-br from-sky-500/10 via-panel to-panel hover:shadow-lg hover:border-sky-600 transition-all cursor-pointer group"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-md shadow-sky-500/30 group-hover:scale-105 transition-transform">
+                        <Waves size={24} />
+                      </div>
+                      <div>
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400">
+                          Chuyên đề 1
+                        </span>
+                        <h3 className="text-base font-bold text-ink group-hover:text-accent transition-colors">
+                          Hồ Chứa Thủy Điện & Cảnh Báo Xả Lũ
+                        </h3>
+                      </div>
+                    </div>
+                    <span className="chip bg-sky-500/15 text-sky-600 text-xs font-bold shrink-0">
+                      {overview?.reservoirs?.spill_count ?? '–'} hồ đang xả
+                    </span>
+                  </div>
+
+                  <p className="mt-2.5 text-xs text-ink-2 leading-relaxed">
+                    Theo dõi mực nước, lưu lượng về hồ và tổng xả về hạ du sông Bằng Giang và sông Gâm (Thủy điện Hòa Thuận, Bảo Lạc B, Bảo Lâm 1, Bạch Đằng...).
+                  </p>
+
+                  <div className="mt-3.5 grid grid-cols-2 gap-2 text-xs border-t border-line/60 pt-3">
+                    <div className="bg-panel2/60 p-2 rounded-lg border border-line/40">
+                      <span className="text-[11px] text-muted">Tổng lưu lượng xả:</span>
+                      <div className="font-mono text-sm font-bold text-sky-600 mt-0.5">
+                        {overview ? Math.round(overview.reservoirs?.total_outflow ?? 0).toLocaleString('vi-VN') : '–'} m³/s
+                      </div>
+                    </div>
+                    <div className="bg-panel2/60 p-2 rounded-lg border border-line/40">
+                      <span className="text-[11px] text-muted">Xả lũ lớn:</span>
+                      <div className="font-mono text-sm font-bold text-danger mt-0.5">
+                        {overview?.reservoirs?.emergency_count ?? '–'} hồ xả lũ lớn
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between text-xs text-sky-600 font-semibold group-hover:underline">
+                    <span>Xem chi tiết từng cửa xả & hạ du</span>
+                    <span className="group-hover:translate-x-1 transition-transform">Xem bảng chuyên đề →</span>
+                  </div>
+                </div>
+
+                {/* Bảng Chuyên Đề 2: Sạt trượt & Đường đèo */}
+                <div
+                  onClick={() => {
+                    setActiveTab('satlo');
+                    window.scrollTo({ top: 380, behavior: 'smooth' });
+                  }}
+                  className="card p-4 sm:p-5 border-l-4 border-l-danger bg-gradient-to-br from-danger/10 via-panel to-panel hover:shadow-lg hover:border-red-600 transition-all cursor-pointer group"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 to-rose-700 text-white shadow-md shadow-red-600/30 group-hover:scale-105 transition-transform">
+                        <Mountain size={24} />
+                      </div>
+                      <div>
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-danger">
+                          Chuyên đề 2
+                        </span>
+                        <h3 className="text-base font-bold text-ink group-hover:text-danger transition-colors">
+                          Điểm Đen Sạt Trượt & Đường Đèo
+                        </h3>
+                      </div>
+                    </div>
+                    <span className="chip bg-danger/15 text-danger text-xs font-bold shrink-0 animate-pulse">
+                      {overview?.landslides?.blocked_count ?? '–'} điểm chia cắt
+                    </span>
+                  </div>
+
+                  <p className="mt-2.5 text-xs text-ink-2 leading-relaxed">
+                    Theo dõi các điểm đen trên QL34, QL3, QL4A (Khau Cốc Chà, Mẻ Pia, Mã Phục, Ca Thành…) cùng cảm biến nghiêng taluy và độ ẩm đất.
+                  </p>
+
+                  <div className="mt-3.5 grid grid-cols-2 gap-2 text-xs border-t border-line/60 pt-3">
+                    <div className="bg-panel2/60 p-2 rounded-lg border border-line/40">
+                      <span className="text-[11px] text-muted">Cấm xe / Tắc nghẽn:</span>
+                      <div className="font-mono text-sm font-bold text-danger mt-0.5">
+                        {overview?.landslides?.blocked_count ?? '–'} vị trí chia cắt
+                      </div>
+                    </div>
+                    <div className="bg-panel2/60 p-2 rounded-lg border border-line/40">
+                      <span className="text-[11px] text-muted">Cảm biến nghiêng lớn nhất:</span>
+                      <div className="font-mono text-sm font-bold text-amber-600 mt-0.5 truncate">
+                        {maxTiltText(map?.landslides)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between text-xs text-danger font-semibold group-hover:underline">
+                    <span>Xem vị trí điểm đen & lộ trình vòng tránh</span>
+                    <span className="group-hover:translate-x-1 transition-transform">Xem bảng chuyên đề →</span>
+                  </div>
+                </div>
+              </div>
+            </section>
           </div>
         )}
 
@@ -1132,8 +1470,23 @@ export default function PublicPortal() {
               </div>
             ))}
             {!map?.reports?.length && (
-              <div className="col-span-full py-8 text-center text-xs text-muted">
-                Chưa có phản ánh hiện trường nào trong 72 giờ qua.
+              <div className="col-span-full p-4 rounded-2xl bg-good/5 border border-good/20 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-good/15 text-good">
+                    <CheckCircle2 size={20} />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-ink">Địa bàn tỉnh ổn định – Chưa có phản ánh sự cố khẩn cấp</div>
+                    <div className="text-[11px] text-muted mt-0.5">Không ghi nhận ách tắc, sạt lở hoặc ngập úng trong 72 giờ qua. Nếu phát hiện sự cố trên đường, bà con vui lòng chụp ảnh gửi để BCH tỉnh hỗ trợ xử lý kịp thời.</div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setReporting(true)}
+                  className="btn bg-danger/10 text-danger hover:bg-danger hover:text-white border border-danger/30 text-xs px-3 py-1.5 font-bold shrink-0 transition-colors"
+                >
+                  <Camera size={13} /> Gửi phản ánh hiện trường
+                </button>
               </div>
             )}
           </div>

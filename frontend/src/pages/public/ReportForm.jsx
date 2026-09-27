@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { MapContainer, Marker, useMap, useMapEvents } from 'react-leaflet';
 import {
@@ -6,6 +6,7 @@ import {
   ShieldCheck, Sparkles, ImagePlus, Search, Waves, AlertTriangle
 } from 'lucide-react';
 import { Modal } from '../../components/common/ui';
+import Turnstile from '../../components/common/Turnstile';
 import { BaseLayer } from '../../components/map/MapTools';
 import { pinIcon } from '../../components/map/icons';
 import { api } from '../../api/client';
@@ -36,6 +37,15 @@ export default function ReportForm({ onClose, myLocation, onTrack }) {
   const [error, setError] = useState('');
   const [done, setDone] = useState(null);
   const [locating, setLocating] = useState(false);
+  // Chống bot (Cloudflare Turnstile) — chỉ khi backend bật TURNSTILE_SITE_KEY
+  const { data: pubConfig } = useQuery({ queryKey: ['pub-config'], queryFn: () => api('/public/config'), staleTime: Infinity });
+  const siteKey = pubConfig?.turnstile_site_key;
+  const [token, setToken] = useState('');
+  const [tokenRound, setTokenRound] = useState(0);
+  const onTurnstileError = useCallback(
+    () => setError('Không tải được bước xác minh chống spam — hãy thử lại sau ít phút. Nguy hiểm đến tính mạng: gọi ngay 112.'),
+    [],
+  );
 
   useEffect(() => () => files.forEach((x) => URL.revokeObjectURL(x.url)), [files]);
   const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }));
@@ -70,6 +80,7 @@ export default function ReportForm({ onClose, myLocation, onTrack }) {
     form.append('lat', String(pos.lat));
     form.append('lon', String(pos.lon));
     files.forEach((x) => form.append('photos', x.file, x.file.name));
+    if (token) form.append('turnstile_token', token);
     try {
       const res = await fetch('/api/v1/public/reports', { method: 'POST', body: form });
       const data = await res.json().catch(() => ({}));
@@ -77,6 +88,7 @@ export default function ReportForm({ onClose, myLocation, onTrack }) {
       setDone(data);
     } catch (e) {
       setError(e.message);
+      if (siteKey) { setToken(''); setTokenRound((n) => n + 1); } // token đã dùng → lấy token mới
     } finally {
       setBusy(false);
     }
@@ -129,7 +141,8 @@ export default function ReportForm({ onClose, myLocation, onTrack }) {
 
   const validDesc = f.description.trim().length >= 10;
   const validPos = !!pos;
-  const valid = validDesc && validPos;
+  const validToken = !siteKey || !!token;
+  const valid = validDesc && validPos && validToken;
 
   return (
     <Modal
@@ -261,6 +274,7 @@ export default function ReportForm({ onClose, myLocation, onTrack }) {
 
           {/* Honeypot chống bot tự động */}
           <input type="text" name="website" tabIndex={-1} autoComplete="off" className="hidden" value={f.website} onChange={set('website')} aria-hidden="true" />
+          {siteKey && <Turnstile key={tokenRound} siteKey={siteKey} onToken={setToken} onError={onTurnstileError} />}
 
           {/* Đính kèm ảnh */}
           <div>
@@ -320,7 +334,7 @@ export default function ReportForm({ onClose, myLocation, onTrack }) {
 
           <div className="h-72 overflow-hidden rounded-xl border border-line shadow-inner relative">
             <MapContainer center={pos ? [pos.lat, pos.lon] : [22.75, 106.05]} zoom={pos ? 14 : 8.5} zoomSnap={0.25} className="h-full w-full">
-              <BaseLayer basemap="auto" />
+              <BaseLayer basemap="auto" showNav={false} />
               <Picker value={pos} onChange={setPos} />
             </MapContainer>
             {!pos && (
@@ -339,7 +353,7 @@ export default function ReportForm({ onClose, myLocation, onTrack }) {
 
           {!valid && (
             <div className="text-xs text-amber-500 font-medium">
-              Vui lòng hoàn thành: {!validDesc && '• Nhập mô tả ít nhất 10 ký tự '} {!validPos && '• Chấm vị trí sự việc trên bản đồ'}
+              Vui lòng hoàn thành: {!validDesc && '• Nhập mô tả ít nhất 10 ký tự '} {!validPos && '• Chấm vị trí sự việc trên bản đồ '} {!validToken && '• Hoàn tất bước xác minh chống spam'}
             </div>
           )}
         </div>

@@ -278,7 +278,7 @@ export default function Resources() {
               <Section title="Vị trí phương tiện" bodyClass="pb-3">
                 <div className="h-72 overflow-hidden rounded-lg">
                   <MapContainer center={[22.75, 106.05]} zoom={8} className="h-full w-full" scrollWheelZoom={false}>
-                    <BaseLayer basemap="auto" />
+                    <BaseLayer basemap="auto" showNav={false} />
                     {fVehicles.filter((v) => v.lat).map((v) => (
                       <Marker key={v.id} position={[v.lat, v.lon]} icon={vehicleIcon(v)}>
                         <Popup><b>{v.code}</b> {VEHICLE[v.vehicle_type]}<br />{v.force_name}</Popup>
