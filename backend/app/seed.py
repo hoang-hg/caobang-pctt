@@ -31,6 +31,8 @@ from app.services.safe_routing import haversine_km
 PROVINCE_FILE = (
     Path(__file__).resolve().parents[1] / "seed" / "caobang_province.geojson"
 )  # OSM relation 1844412
+# Ranh giới 56 xã/phường sau sắp xếp (nguồn ghi trong tệp; README 13). Cùng định dạng công cụ nhập "ranh_gioi_xa".
+COMMUNES_FILE = Path(__file__).resolve().parents[1] / "seed" / "caobang_communes.geojson"
 rng = random.Random(2025)
 PRESET_TAGS = {"LV_BANG_GIANG": "vung_trung", "VUNG_NUI_CAO": "vung_nui", "BIEN_GIOI": "bien_gioi"}
 
@@ -54,7 +56,6 @@ async def ex(conn: AsyncConnection, sql: str, params=None):
 
 async def seed_admin(conn: AsyncConnection) -> dict[str, dict]:
     province_geojson = json.loads(PROVINCE_FILE.read_text(encoding="utf-8"))["geometry"]
-    total_pop = 0
     await ex(
         conn,
         """INSERT INTO spatial_admin.administrative_units (code, name, level, unit_type, geom, center, population, households)
@@ -70,7 +71,6 @@ async def seed_admin(conn: AsyncConnection) -> dict[str, dict]:
             pop = rng.randint(6_000, 12_000)
         else:
             pop = rng.randint(8_000, 15_000)
-        total_pop += pop
         # một xã có thể thuộc nhiều nhóm đặc thù
         tag_list = sorted({PRESET_TAGS[p[0]] for p in D.PRESETS if name in p[4]})
         await ex(
@@ -91,23 +91,45 @@ async def seed_admin(conn: AsyncConnection) -> dict[str, dict]:
                 "tags": tag_list,
             },
         )
+    # Ranh giới, dân số thật từ tệp (tâm xã = điểm nằm trong ranh giới) — thay toạ độ tâm xấp xỉ trong seed_data
+    if COMMUNES_FILE.exists():
+        for feat in json.loads(COMMUNES_FILE.read_text(encoding="utf-8"))["features"]:
+            p = feat["properties"]
+            await ex(
+                conn,
+                """WITH g AS (SELECT ST_Multi(ST_CollectionExtract(ST_MakeValid(
+                                  ST_SetSRID(ST_GeomFromGeoJSON(:g), 4326)), 3)) AS geom)
+                   UPDATE spatial_admin.administrative_units u
+                      SET geom = g.geom, center = ST_PointOnSurface(g.geom),
+                          population = COALESCE(:pop, u.population), households = COALESCE(:hh, u.households)
+                     FROM g WHERE u.code = :ma AND u.level = 'xa'""",
+                {
+                    "g": json.dumps(feat["geometry"]),
+                    "ma": p["ma"],
+                    "pop": p.get("dan_so"),
+                    "hh": p.get("so_ho"),
+                },
+            )
     await ex(
         conn,
-        "UPDATE spatial_admin.administrative_units SET population = :p, households = :h WHERE code = 'CB'",
-        {"p": total_pop, "h": total_pop // 4},
+        """UPDATE spatial_admin.administrative_units
+              SET population = (SELECT sum(population) FROM spatial_admin.administrative_units WHERE level = 'xa'),
+                  households = (SELECT sum(households) FROM spatial_admin.administrative_units WHERE level = 'xa')
+            WHERE code = 'CB'""",
     )
 
-    # Toạ độ tâm là xấp xỉ: kéo các tâm lọt ra ngoài ranh giới tỉnh vào trong (cách biên ~1 km)
+    # Xã chưa có trong tệp ranh giới (không có tệp): tâm xấp xỉ, kéo tâm lọt ra ngoài tỉnh vào trong (cách biên ~1 km)
     await ex(
         conn,
         """
         WITH prov AS (SELECT geom FROM spatial_admin.administrative_units WHERE code = 'CB')
         UPDATE spatial_admin.administrative_units u
            SET center = ST_ClosestPoint(ST_Buffer((SELECT geom FROM prov), -0.01), u.center)
-         WHERE u.level = 'xa' AND NOT ST_Contains(ST_Buffer((SELECT geom FROM prov), -0.005), u.center)
+         WHERE u.level = 'xa' AND u.geom IS NULL
+           AND NOT ST_Contains(ST_Buffer((SELECT geom FROM prov), -0.005), u.center)
         """,
     )
-    # Ranh giới xã xấp xỉ: Voronoi từ tâm xã, cắt theo ranh giới tỉnh
+    # ... và ranh giới xấp xỉ: Voronoi từ tâm xã, cắt theo ranh giới tỉnh
     await ex(
         conn,
         """
@@ -119,7 +141,7 @@ async def seed_admin(conn: AsyncConnection) -> dict[str, dict]:
         UPDATE spatial_admin.administrative_units u
            SET geom = ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_Intersection(c.cell, (SELECT geom FROM prov))), 3))
           FROM cells c
-         WHERE u.level = 'xa' AND ST_Contains(c.cell, u.center)
+         WHERE u.level = 'xa' AND u.geom IS NULL AND ST_Contains(c.cell, u.center)
         """,
     )
     # Phạm vi RBAC: "<CUM>/<MA_XA>" (cụm = địa bàn huyện cũ)

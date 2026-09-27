@@ -1,7 +1,7 @@
 """Dữ liệu mẫu tỉnh Cao Bằng.
 
-- 56 xã/phường theo Nghị quyết 1657/NQ-UBTVQH15 (hiệu lực 01/07/2025). Toạ độ là TÂM XẤP XỈ;
-  ranh giới xã được sinh bằng Voronoi và cắt theo ranh giới tỉnh → chỉ dùng cho mô phỏng.
+- 56 xã/phường theo Nghị quyết 1657/NQ-UBTVQH15 (hiệu lực 01/07/2025). Ranh giới, dân số, tâm xã lấy từ
+  seed/caobang_communes.geojson; toạ độ tâm dưới đây chỉ dùng khi thiếu tệp đó (ranh giới Voronoi xấp xỉ).
 - Trạm quan trắc, hồ chứa, lực lượng, kho, danh bạ, số điện thoại… là DỮ LIỆU MINH HOẠ,
   cần thay bằng dữ liệu chính thức của Sở NN&MT / BCH PCTT & TKCN tỉnh khi triển khai thật.
 """

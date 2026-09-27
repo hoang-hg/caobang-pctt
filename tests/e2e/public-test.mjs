@@ -23,7 +23,7 @@ const check = (name, cond, extra = '') => {
 const login = async (u, p) => (await call('POST', '/auth/login', { username: u, password: p })).data?.token;
 // Ảnh PNG 2×2 hợp lệ
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGP8z8DAwMDAxMDAwMDAAAANHQEDasKb6QAAAABJRU5ErkJggg==', 'base64');
-const COBA = { lat: 22.905, lon: 105.775 };
+const COBA = { lat: 23.005, lon: 105.718 }; // trong xã Cô Ba theo ranh giới thật (seed/caobang_communes.geojson)
 const TP = { lat: 22.676, lon: 106.25 };
 
 // ---------------------------------------------------------------- Hạ tầng

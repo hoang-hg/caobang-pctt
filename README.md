@@ -96,7 +96,7 @@ vùng nguy hiểm, số điện thoại không có thật.
 | Nhóm dữ liệu | Bảng | Khi `DEMO_MODE=false` | Nguồn chính thức |
 |---|---|---|---|
 | Ranh giới tỉnh | `spatial_admin.administrative_units` (tinh) | ✅ OpenStreetMap | — |
-| Ranh giới 56 xã/phường | `administrative_units` (xa) | 🟡 **Voronoi xấp xỉ** từ toạ độ tâm | Shapefile ranh giới xã sau 01/07/2025 — Sở NN&MT. Phạm vi RBAC và việc gán SOS/phản ánh vào xã dựa trên ranh giới này |
+| Ranh giới, dân số 56 xã/phường | `administrative_units` (xa) | ✅ dữ liệu công khai sau sắp xếp (`backend/seed/caobang_communes.geojson`, [13](#nguon-dia-gioi)); số hộ = dân số / 4 (ước tính) | Có shapefile chính thức của Sở NN&MT thì nhập đè bằng loại `ranh_gioi_xa`. Phạm vi RBAC và việc gán SOS/phản ánh vào xã dựa trên ranh giới này |
 | Xóm / tổ dân phố | `administrative_units` (thon) | ⛔ 8 xóm **mẫu** | Danh sách sau sắp xếp năm 2026 (nghị quyết HĐND từng xã) — UBND xã / Sở Nội vụ; nhập bằng loại `xom` ([2.4](#nhap-du-lieu)) |
 | Địa danh (đèo, di tích, công trình) | `spatial_admin.place_names` | 🟡 mẫu | UBND xã |
 | Mạng đường | `operations.road_nodes`, `road_segments` | 🟡 trục chính vẽ tay | Sở Xây dựng / OSM đã hiệu chỉnh |
@@ -1173,8 +1173,12 @@ Container Registry.
   tự lưu trữ (cùng dữ liệu OSM); ranh giới xã rút gọn ~5 m. Trên nền Google (Vệ tinh, Địa hình) có thể lệch vài chục mét
   vì Google dùng dữ liệu biên giới riêng. Cần độ chính xác pháp lý → thay bằng dữ liệu địa giới chính thức (Sở Nông nghiệp
   và Môi trường) khi có.
-- **56 xã/phường** (53 xã, 3 phường): Nghị quyết 1657/NQ-UBTVQH15 (hiệu lực 01/07/2025). Ranh giới xã là **xấp xỉ**
-  (Voronoi từ toạ độ tâm, cắt theo ranh giới tỉnh) — thay bằng dữ liệu chính thức ([2.2](#hien-trang)).
+- **56 xã/phường** (53 xã, 3 phường): Nghị quyết 1657/NQ-UBTVQH15 (hiệu lực 01/07/2025). Ranh giới, dân số, mã đơn vị
+  hành chính 5 số và danh sách xã cũ đã sáp nhập: `backend/seed/caobang_communes.geojson`, chuyển từ dữ liệu công khai
+  https://caobang.city.com.vn/data/wards.geojson (lấy ngày 27/09/2026; trang không ghi nguồn gốc số liệu). Đã kiểm tra:
+  56 vùng hợp lệ, chồng lấn giữa các xã ~3,5 km², vênh với ranh giới tỉnh OSM ~0,2% diện tích. Số hộ chưa có số liệu →
+  ước tính dân số / 4. CSDL đã cài trước đó (ranh giới Voronoi xấp xỉ): nhập tệp này bằng loại `ranh_gioi_xa` (2.4) —
+  hệ thống tự gán lại xã cho mọi SOS, phản ánh, điểm sơ tán.
 - Dự báo: Open-Meteo (CC BY 4.0, gói miễn phí phi thương mại), dữ liệu ECMWF / NOAA. Radar: RainViewer.
 - Bản đồ nền tự lưu trữ: © OpenStreetMap contributors (ODbL), đóng gói theo sơ đồ Protomaps Basemap
   (https://protomaps.com); thư viện `protomaps-leaflet`, `pmtiles` (BSD-3-Clause).

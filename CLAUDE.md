@@ -13,7 +13,9 @@ không cần đăng nhập. Sai sót ở đây có thể khiến người dân �
   cấu hình / quy trình → cập nhật đúng mục README. Bản đồ mục hay dùng: §2 Hiện trạng · §5 Biến cấu hình · §6 Kết nối
   dữ liệu thật · §8 RBAC · §9 Cổng công khai & giới hạn tần suất · §10 Triển khai · §11 Bảo mật · §12 Kiểm thử.
 - **Hiện trạng (README §2)**: cảnh báo SMS / Cell Broadcast / Zalo **chưa gửi tin thật** (`services/broadcast.py` chỉ mô
-  phỏng tiến độ); trạm, lực lượng, kho, điểm sơ tán, danh bạ là dữ liệu mẫu; ranh giới xã là Voronoi xấp xỉ. Đổi trạng
+  phỏng tiến độ); trạm, lực lượng, kho, điểm sơ tán, danh bạ là dữ liệu mẫu; ranh giới + dân số 56 xã lấy từ
+  `backend/seed/caobang_communes.geojson` (dữ liệu công khai, chưa phải shapefile chính thức; toạ độ trong kiểm thử e2e
+  phải nằm đúng xã theo ranh giới này), xóm là 8 bản ghi mẫu. Đổi trạng
   thái một chức năng (mô phỏng → thật) phải cập nhật README §2. **Không bao giờ hiển thị dữ liệu mẫu / mô phỏng cho
   người dân như dữ liệu thật.**
 - Ngôn ngữ: giao diện, thông báo lỗi API, docstring, comment, commit message đều **tiếng Việt có dấu**. Tên biến, hàm,
