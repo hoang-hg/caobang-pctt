@@ -22,6 +22,7 @@ import ReportForm from './ReportForm';
 import TicketTracker from './TicketTracker';
 import ReservoirMonitor from './ReservoirMonitor';
 import LandslideMonitor, { maxTiltText } from './LandslideMonitor';
+import NetworkBanner from './NetworkBanner';
 
 const REFRESH = 60_000;
 const pub = (path, params) => api(`/public${path}`, { params });
@@ -439,6 +440,7 @@ export default function PublicPortal() {
 
   return (
     <div className="min-h-full bg-bg text-ink pb-20 sm:pb-8">
+      <NetworkBanner />
       {/* Thanh Header chính */}
       <header className="sticky top-0 z-[1100] border-b border-line bg-panel/95 backdrop-blur-md px-3 sm:px-6 py-2.5">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
@@ -1496,6 +1498,7 @@ export default function PublicPortal() {
         <footer className="mt-4 border-t border-line/60 pt-6 pb-4 text-center text-xs text-muted leading-relaxed">
           <div className="font-semibold text-ink">Ban Chỉ huy Phòng chống thiên tai & Tìm kiếm cứu nạn tỉnh Cao Bằng</div>
           <div>Cập nhật dữ liệu thời gian thực · Trực ban tác chiến: <a href="tel:112" className="text-danger font-bold hover:underline">112</a></div>
+          <div>Mạng yếu? Dùng <a href="/ban-nhe" className="text-accent font-semibold hover:underline">bản nhẹ</a> (chỉ chữ, dưới 50 KB)</div>
           <div className="text-[11px] mt-1 text-muted/80">Số liệu quan trắc phục vụ chỉ đạo điều hành và thông tin cảnh báo an toàn cho nhân dân</div>
         </footer>
       </main>

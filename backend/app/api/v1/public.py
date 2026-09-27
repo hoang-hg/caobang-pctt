@@ -21,7 +21,9 @@ from app.config import settings
 from app.db import fetch_all, fetch_one
 from app.infra import ratelimit
 from app.infra.cache import cached, cached_view
+from app.services import lite
 from app.services.landslides import get_landslides_overview
+from app.services.lite import NATIONAL_HOTLINES, RISK_ADVICE, province_hotlines
 from app.services.reports import CATEGORY, ReportError, create_report, public_photo_url, verify_turnstile
 from app.services.reservoirs import get_reservoirs_overview
 from app.services.safe_routing import haversine_km, plan_route
@@ -30,12 +32,6 @@ from app.services.tracking import track_ticket
 
 router = APIRouter(prefix="/public", tags=["Công khai"])
 
-NATIONAL_HOTLINES = [
-    {"number": "112", "name": "Tìm kiếm cứu nạn"},
-    {"number": "114", "name": "Cứu nạn cứu hộ – Phòng cháy chữa cháy"},
-    {"number": "115", "name": "Cấp cứu y tế"},
-    {"number": "113", "name": "Công an"},
-]
 LEVEL_LABEL = ["Dưới báo động I", "Trên báo động I", "Trên báo động II", "Trên báo động III"]
 
 
@@ -321,24 +317,15 @@ async def _locate(lat: float, lon: float) -> dict:
     in_zone = [h for h in hazards if h["distance_m"] == 0]
     near = [h for h in hazards if h["distance_m"] > 0]
     if any(h["level"] == "do" for h in in_zone) or any(a["severity"] == "do" for a in active_alerts):
-        risk, advice = (
-            "cao",
-            "Bạn đang ở trong vùng nguy hiểm. Di chuyển ngay đến điểm sơ tán an toàn gần nhất, gọi 112 nếu cần trợ giúp.",
-        )
+        risk = "cao"
     elif in_zone or near or active_alerts or (fc and (fc["p50"] or 0) >= 50):
-        risk, advice = (
-            "trung_binh",
-            "Theo dõi sát cảnh báo, chuẩn bị đồ dùng thiết yếu, sẵn sàng sơ tán khi có lệnh.",
-        )
+        risk = "trung_binh"
     else:
-        risk, advice = (
-            "thap",
-            "Chưa ghi nhận nguy cơ tại vị trí của bạn. Tiếp tục theo dõi thông tin chính thức.",
-        )
+        risk = "thap"
     return {
         "commune": {"code": unit["code"], "name": unit["name"], "district": unit["old_district"]},
         "risk": risk,
-        "advice": advice,
+        "advice": RISK_ADVICE[risk],
         "hazards": hazards,
         "forecast_24h": fc,
         "evacuation_sites": sites,
@@ -358,14 +345,18 @@ async def route(from_lat: float, from_lon: float, to_lat: float, to_lon: float):
 @router.get("/hotlines")
 async def hotlines():
     async def build():
-        office = await fetch_all(
-            """SELECT org, position, phone FROM communications.contacts
-                WHERE level = 'tinh' AND org IN ('Văn phòng thường trực BCH', 'BCH PCTT & TKCN tỉnh')
-                ORDER BY sort LIMIT 2"""
-        )
-        return {"national": NATIONAL_HOTLINES, "province": office}
+        return {"national": NATIONAL_HOTLINES, "province": await province_hotlines()}
 
     return await cached("public:hotlines", 3600, build)
+
+
+@router.get("/lite", response_class=HTMLResponse)
+async def lite_page(xa: str = Query("", max_length=40)):
+    """Trang bản nhẹ cho mạng yếu (nginx phục vụ tại /ban-nhe): HTML < 50 KB, không JavaScript — app/services/lite.py."""
+    codes = {u["code"] for u in await cached("public:communes", 3600, lite.communes)}
+    code = xa if xa in codes else ""  # mã lạ → trang toàn tỉnh, không tạo khoá cache mới
+    page = await cached(f"public:lite:{code}", 30, lambda: lite.build(code or None))
+    return HTMLResponse(page)
 
 
 @router.get("/reports")

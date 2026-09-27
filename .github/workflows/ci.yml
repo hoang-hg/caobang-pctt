@@ -2,7 +2,7 @@
 # CI — kiểm tra mỗi lần push / pull request
 #   backend  : ruff (format + lint) + pytest (kiểm thử đơn vị)
 #   frontend : build production
-#   e2e      : dựng toàn bộ stack bằng Docker Compose, chạy 8 bộ kiểm thử API
+#   e2e      : dựng toàn bộ stack bằng Docker Compose, chạy 9 bộ kiểm thử API
 # ==========================================
 name: CI
 
@@ -98,7 +98,7 @@ jobs:
           docker compose -f docker-compose.prod.yml --env-file ci.prod.env --profile caddy --profile mqtt config -q
           rm ci.prod.env
       - name: Build & khởi động stack
-        run: docker compose up -d --build --wait --wait-timeout 600 db redis minio mailpit mqtt backend worker
+        run: docker compose up -d --build --wait --wait-timeout 600 db redis minio mailpit mqtt backend worker frontend
       - name: Chờ dữ liệu đầu tiên (mô phỏng + đồng bộ dự báo)
         run: sleep 45
       - name: Kiểm thử luồng nghiệp vụ
@@ -117,11 +117,13 @@ jobs:
         run: |
           node tests/e2e/reservoir-test.mjs
           node tests/e2e/landslide-test.mjs
-      - name: Kiểm thử nhập dữ liệu (chạy cuối — có bước thay toàn bộ)
+      - name: Kiểm thử nhập dữ liệu (có bước thay toàn bộ — chạy sau các bộ dùng dữ liệu mẫu)
         run: node tests/e2e/import-test.mjs
+      - name: Kiểm thử bản nhẹ /ban-nhe & service worker (qua nginx của frontend)
+        run: node tests/e2e/lite-test.mjs
       - name: Log khi lỗi
         if: failure()
-        run: docker compose logs --tail=300 backend worker
+        run: docker compose logs --tail=300 backend worker frontend
       - name: Dọn dẹp
         if: always()
         run: docker compose down -v

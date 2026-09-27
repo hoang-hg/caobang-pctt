@@ -1,0 +1,16 @@
+{
+  "name": "Cảnh báo thiên tai tỉnh Cao Bằng",
+  "short_name": "PCTT Cao Bằng",
+  "description": "Cảnh báo thiên tai, điểm sơ tán, đường dây nóng, gửi phản ánh — Ban Chỉ huy PCTT & TKCN tỉnh Cao Bằng",
+  "lang": "vi",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#b91c1c",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

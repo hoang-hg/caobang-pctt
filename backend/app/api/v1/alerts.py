@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from app.auth import audit, verify_secret
 from app.db import fetch_all, fetch_one
+from app.infra.cache import invalidate
 from app.rbac.authz import allowed_codes, can_all, forbidden, require_any, require_permission
 from app.rbac.scope_loaders import broadcast_domains, targets_to_domains
 from app.services.broadcast import CHANNELS, estimate_audience, init_metrics
@@ -171,6 +172,7 @@ async def approve(broadcast_id: str, body: ApproveIn, user: dict = Depends(requi
     await hub.publish(
         "broadcast.updated", {"id": b["id"], "code": b["code"], "status": "sending", "metrics": metrics}
     )
+    await invalidate("public:")  # cổng công khai + bản nhẹ hiện cảnh báo ngay (còn cache nginx ≤ 10 giây)
     await log_event(
         f"{user['full_name']} PHÊ DUYỆT phát lệnh {b['code']} “{b['title']}” trên {len(b['channels'])} kênh",
         "canh_bao",

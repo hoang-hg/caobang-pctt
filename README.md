@@ -83,6 +83,8 @@ Ký hiệu: ✅ chạy thật · 🟡 chạy thật nhưng dựa trên dữ li�
 | Công khai | Điểm đen sạt lở & đường đèo | 🟡 | 12 điểm khai báo trong code (`services/landslides.py`); trạng thái suy ra từ vùng nguy hiểm + cảm biến — **chưa có dữ liệu giám sát thì mọi điểm hiện "bình thường"** |
 | Công khai | Chỉ đường an toàn | 🟡 | Mạng đường là các trục chính vẽ xấp xỉ; ngoài mạng đường chỉ hiện hướng chim bay (nét đứt xám) |
 | Công khai | Phản ánh kèm ảnh, duyệt theo địa bàn, tra cứu tiến độ | ✅ | |
+| Công khai | Bản nhẹ `/ban-nhe` (< 50 KB, không JavaScript), mở lại khi mất mạng (PWA) | ✅ | [9.4](#ban-nhe) |
+| Nền tảng | Bản đồ nền tự lưu trữ (OpenStreetMap) | ✅ | Cần chạy `deploy/fetch-basemap.sh` ([6.9](#ban-do-nen)) |
 | Nền tảng | Đăng nhập, RBAC, đổi/quên mật khẩu, nhật ký thao tác, xuất PDF/Excel | ✅ | |
 
 ### 2.2. Dữ liệu
@@ -793,7 +795,8 @@ Người dân mở `/` không cần đăng nhập (đã đăng nhập thì `/` c
 băng trạng thái rủi ro toàn tỉnh · **Tôi đang ở đâu?** (GPS → xã, cảnh báo, điểm sơ tán gần nhất còn chỗ, chỉ đường an toàn) ·
 bản đồ dự báo mưa, vùng nguy hiểm, đường chia cắt, điểm sơ tán, phản ánh đã xác minh · cảnh báo chính thức (chỉ lệnh
 **đã duyệt và phát**, nút chia sẻ Zalo/Facebook, link `?canh-bao=MÃ`) · sông, hồ chứa, điểm đen sạt lở · đường dây nóng
-(trực ban tỉnh + 112/113/114/115, không có SĐT cá nhân cán bộ) · gửi phản ánh · tra cứu tiến độ.
+(trực ban tỉnh + 112/113/114/115, không có SĐT cá nhân cán bộ) · gửi phản ánh · tra cứu tiến độ. Mạng yếu: bản nhẹ
+`/ban-nhe`; mất mạng: mở lại bằng dữ liệu đã lưu ([9.4](#ban-nhe)).
 
 ### 9.1. API công khai `/api/v1/public/*`
 
@@ -809,6 +812,7 @@ MISS / HIT / STALE) — lúc cao điểm, số yêu cầu vào backend gần nh�
 | `GET /locate?lat&lon`, `/route?…` | Xã, cảnh báo, điểm sơ tán gần nhất; đường an toàn | – |
 | `GET /reservoirs`, `/landslides` | Hồ chứa & xả lũ; điểm đen sạt lở & đường đèo | 20 s |
 | `GET /hotlines` | Đường dây nóng | 1 giờ |
+| `GET /lite?xa=` (nginx: `/ban-nhe`) | Trang bản nhẹ HTML < 50 KB ([9.4](#ban-nhe)) | 30 s, xoá khi phát cảnh báo |
 | `GET /reports`, `/reports/{id}/photos/{idx}` | Phản ánh **đã duyệt** + ảnh | 30 s |
 | `GET /report-categories`, `/config` | Loại sự việc; cấu hình công khai (khoá site Turnstile) | – |
 | `POST /reports` | Gửi phản ánh (multipart, ≤ 3 ảnh × 8 MB) | – |
@@ -849,6 +853,36 @@ chặn bằng khoá phụ (SĐT) và Turnstile.
   báo realtime (`report.new`) cho đúng những người đó.
 - Ảnh: xoay theo EXIF rồi **xoá toàn bộ EXIF/GPS**, chặn ảnh bomb (> 40 megapixel), mã hoá lại JPEG 1600 px + ảnh nhỏ 400 px,
   lưu MinIO bucket riêng tư. Ảnh chưa duyệt chỉ xem qua link **có chữ ký HMAC, hết hạn sau 1 giờ**.
+
+<a id="ban-nhe"></a>
+### 9.4. Mạng yếu & mất mạng: bản nhẹ, PWA
+
+Lúc thiên tai, mạng di động thường chập chờn, tắc nghẽn hoặc mất hẳn. Hai cơ chế bổ trợ cho cổng đầy đủ (~0,22 MB):
+
+**Bản nhẹ `/ban-nhe`** — HTML thuần do backend dựng (`backend/app/services/lite.py`), không JavaScript, không ảnh,
+**luôn dưới 50 KB** (thực tế ~7 KB, gzip ~3 KB), mở được trên điện thoại cũ, mạng 2G. Gồm: nút gọi 112/114/115, cảnh báo
+đang hiệu lực 48 giờ (tối đa 8, ưu tiên mức đỏ), sông vượt báo động, đường dây nóng; chọn xã (`?xa=<mã xã>`, form GET)
+→ mức nguy cơ + lời khuyên, vùng nguy hiểm, mưa dự báo 24 giờ, điểm sơ tán của xã (còn chỗ, link chỉ đường). Chỉ dùng
+dữ liệu đã công khai (9.1). nginx đổi `/ban-nhe` → `GET /api/v1/public/lite` và cache như API công khai; cache Redis
+30 giây, xoá ngay khi phê duyệt cảnh báo hoặc nhập dữ liệu. Nên in địa chỉ này trong tin nhắn cảnh báo / trên loa
+truyền thanh: `https://<tên miền>/ban-nhe`. Cổng đầy đủ gợi ý bản nhẹ khi trình duyệt báo mạng 2G hoặc bật tiết kiệm dữ
+liệu, và có link ở chân trang.
+
+**PWA (service worker `frontend/src/sw.js`)** — chỉ bật ở bản build. Lần mở đầu tiên lưu sẵn giao diện cổng công khai;
+mỗi lần xem, bản mới nhất của cảnh báo, bản đồ, tổng quan, dự báo, đường dây nóng, hồ chứa, sạt lở và trang bản nhẹ được
+lưu trên máy. Mất mạng / máy chủ không phản hồi (hoặc chậm quá 6 giây) → hiện bản đã lưu kèm dải báo *"đang hiển thị dữ
+liệu đã lưu lúc …"*. Cài được lên màn hình chính (`manifest.webmanifest`).
+
+| Không bao giờ lưu trên máy | Lý do |
+|---|---|
+| Yêu cầu có đăng nhập (header `Authorization`) — mọi trang cán bộ | Dữ liệu nội bộ |
+| Tra cứu phiếu, "Tôi đang ở đâu?", chỉ đường, ảnh phản ánh, mọi `POST` | Dữ liệu cá nhân / vị trí |
+| `/tiles/` (bản đồ nền, HTTP Range) và nguồn ngoài (Google, radar) | Quá lớn; trình duyệt tự cache |
+
+Mỗi bản build có phiên bản service worker mới (theo mã băm tệp), trình duyệt tự cài và xoá bộ nhớ cũ — không cần làm gì
+khi cập nhật. **Tắt khẩn cấp** (service worker lỗi): thay `dist/sw.js` bằng tệp chỉ gồm
+`self.addEventListener('install', () => self.skipWaiting()); self.addEventListener('activate', () => self.registration.unregister());`
+rồi triển khai lại — trình duyệt tự gỡ ở lần mở sau.
 
 ---
 
@@ -916,6 +950,7 @@ curl -sI https://$DOMAIN/ | grep -iE "strict-transport|x-content-type"     # hea
 curl -s https://$DOMAIN/health                                             # "status":"ok"
 curl -sI https://$DOMAIN/api/v1/public/overview | grep -i x-cache-status    # MISS rồi HIT
 curl -s -o /dev/null -w "%{http_code}\n" -H "Range: bytes=0-99" https://$DOMAIN/tiles/caobang.pmtiles   # 206
+curl -s -o /dev/null -w "%{http_code} %{size_download}\n" https://$DOMAIN/ban-nhe                      # 200, < 50000
 curl -s -o /dev/null -w "%{http_code}\n" https://$DOMAIN/docs              # 404 (Swagger tắt)
 ```
 
@@ -1040,7 +1075,8 @@ Kiểm thử API (cần stack dev đang chạy với `DEMO_MODE=true`; tham số
 | Tra cứu tiến độ phiếu | `node tests/e2e/track-test.mjs` |
 | Hồ chứa & xả lũ | `node tests/e2e/reservoir-test.mjs` |
 | Điểm đen sạt lở & đường đèo | `node tests/e2e/landslide-test.mjs` |
-| Nhập dữ liệu (12 loại, kiểm tra lỗi, cập nhật không trùng, thay toàn bộ) — chạy cuối | `node tests/e2e/import-test.mjs` |
+| Nhập dữ liệu (12 loại, kiểm tra lỗi, cập nhật không trùng, thay toàn bộ) | `node tests/e2e/import-test.mjs` |
+| Bản nhẹ `/ban-nhe`, service worker, manifest — qua nginx (tham số = địa chỉ frontend, mặc định `http://localhost:8080`) | `node tests/e2e/lite-test.mjs` |
 
 Chạy lại nhiều lần liên tiếp: xoá khoá `rl:*` trong Redis trước (lệnh ở 4.5).
 
@@ -1087,7 +1123,7 @@ tăng CPU nếu kịch bản đồng thời chưa đạt.
 
 **CI** (`.github/workflows/ci.yml`, mỗi push / PR): ruff + pytest; build frontend; kiểm tra `docker-compose.prod.yml`
 (thiếu bí mật phải báo lỗi, đủ bí mật phải hợp lệ); dựng stack bằng `docker-compose.yml` với `DEMO_MODE=true`,
-`SIMULATOR=true` và chạy 8 bộ kiểm thử API. **Deploy** (`deploy.yml`): tag `vX.Y.Z` → build & đẩy image lên GitHub
+`SIMULATOR=true` và chạy 9 bộ kiểm thử API. **Deploy** (`deploy.yml`): tag `vX.Y.Z` → build & đẩy image lên GitHub
 Container Registry.
 
 ---

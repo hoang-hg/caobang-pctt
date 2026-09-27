@@ -24,6 +24,8 @@ export async function api(path, { method = 'GET', body, params } = {}) {
     if (res.status === 401) useStore.getState().setAuth(null);
     throw new ApiError(res.status, detail);
   }
+  // Service worker trả bản đã lưu kèm X-PCTT-Saved-At (src/sw.js) → cổng công khai báo "dữ liệu lưu lúc…"
+  if (path.startsWith('/public/')) useStore.getState().setSavedAt(res.headers.get('x-pctt-saved-at'));
   return res.json();
 }
 

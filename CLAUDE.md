@@ -49,7 +49,7 @@ backend/                   Python 3.12, FastAPI, SQLAlchemy async (psycopg3), Ca
                            scope_loaders.py (tài nguyên → domain) · domains.py · enforcer.py · management.py (uỷ quyền,
                            chống leo thang) · seed.py (đồng bộ vai trò, tạo Superadmin / tài khoản demo)
   app/services/            sos, sos_nlp, dispatch_matching, safe_routing, broadcast, reports, tracking, reservoirs,
-                           landslides, events (log_event), simulator, scenario
+                           landslides, events (log_event), simulator, scenario, lite (trang bản nhẹ /ban-nhe, HTML < 50 KB)
   app/services/data_import/  nhập dữ liệu chính thức từ tệp: specs.py (khai báo 12 loại) · parsing.py (CSV/xlsx/GeoJSON,
                            chuẩn hoá — thuần) · engine.py (validate / apply 1 transaction) · templates.py · service.py
                            (nhật ký, sự kiện, xoá cache) · __main__.py (dòng lệnh). API: app/api/v1/data_import.py
@@ -66,13 +66,16 @@ frontend/                  React 18, Vite 6, Tailwind 3, TanStack Query 5, Zusta
                            Recharts 2, lucide-react. Không có test runner — kiểm tra bằng `npm run build`.
   nginx.conf + nginx/      cấu hình nginx trong image (gzip_static, cache API công khai, real-ip, proxy-headers, security-headers)
   scripts/compress.mjs     chạy sau `vite build`: nén sẵn dist/**/*.gz cho gzip_static
-  vite.config.js           manualChunks dạng hàm: vendor (react, router, query, zustand, clsx) · map (leaflet) · charts
+  vite.config.js           manualChunks dạng hàm: vendor (react, router, query, zustand, clsx) · map (leaflet) · charts;
+                           plugin serviceWorker: src/sw.js → dist/sw.js (điền VERSION + PRECACHE)
+  public/                  favicon, icon-192/512.png, manifest.webmanifest (PWA)
+  src/sw.js                service worker cổng công khai (chỉ đăng ký ở bản build — main.jsx), README §9.4
   src/App.jsx              route + Guard(obj, act), mỗi trang `lazy()`; trang công khai /, /cong-khai, /dang-nhap…
   src/api/                 client.js (api(), useAreaParams) · hooks.js (useAreaQuery, useUnits…) · useSocket.js
-  src/app/store.js         Zustand: theme, filter, focus, alertDraft, gps, auth, wsStatus, soundOn, sidebar, toasts
+  src/app/store.js         Zustand: theme, filter, focus, alertDraft, gps, auth, wsStatus, soundOn, sidebar, savedAt, toasts
   src/rbac/                permissions.js (khớp domain) · usePermission.js (usePermission, useCanAll, useAllowedCodes, Can)
   src/pages/               trang điều hành (DataImport = nhập dữ liệu chính thức); pages/public/ = cổng công khai (PublicPortal, ReportForm, TicketTracker,
-                           ReservoirMonitor, LandslideMonitor)
+                           ReservoirMonitor, LandslideMonitor, NetworkBanner = báo mất mạng / gợi ý bản nhẹ)
   src/components/          common/ (ui.jsx: KpiCard Modal Tabs Section Empty…, Turnstile, DispatchModal…) · layout/ ·
                            map/ (MapLayers, MapTools = nền bản đồ + công cụ, icons, leafletGlobal) · charts/ (chartTheme)
   src/index.css            biến màu CSS sáng/tối; tailwind.config.js ánh xạ token
@@ -194,6 +197,10 @@ Python trong container.
   Nhớ nginx cache thêm 10 s nên dữ liệu công khai có thể trễ tới ~TTL + 10 s.
 - Thêm trường mới vào phản hồi công khai → cập nhật danh sách trường cấm trong `tests/e2e/public-test.mjs`.
 - Endpoint công khai **tạo dữ liệu** (webhook…) phải có khoá: mẫu `sos.require_intake_key` (`hmac.compare_digest`).
+- Bản nhẹ `/ban-nhe` (`services/lite.py`, `GET /public/lite`): chỉ HTML + CSS nội tuyến, không JS / ảnh / tệp ngoài;
+  mọi giá trị qua `html.escape`; mỗi danh sách có trần `MAX_*` để luôn < `MAX_BYTES` (50 KB) — thêm mục mới thì thêm
+  trần và cập nhật `test_lite.test_worst_case_stays_under_limit`. Tham số `xa` lạ → trang toàn tỉnh (không tạo khoá cache).
+  Phê duyệt cảnh báo gọi `invalidate("public:")` để bản nhẹ / cổng hiện ngay.
 
 **Giới hạn tần suất & IP**
 - Quy tắc ở `RULES` trong `infra/ratelimit.py` (khớp tiền tố, quy tắc cụ thể đặt trước). Nhà mạng dùng chung IP (CGNAT) →
@@ -238,6 +245,11 @@ Python trong container.
 - **Route**: trang điều hành trong `Shell` bọc `<Guard obj act>`; trang công khai ngoài `Shell`. Trang công khai
   (`pages/public/`) chỉ gọi `/public/*`. Trang mới khai báo `lazy(() => import(...))` trong `App.jsx` (đã có `Suspense`) —
   không import tĩnh trang vào `App.jsx` (kéo cả trang vào gói tải lần đầu của người dân).
+- **Service worker** (`src/sw.js`): chỉ lưu `GET` cùng origin, không `Authorization`, không `Range`; API công khai được
+  lưu phải nằm trong `PUBLIC_API` — không thêm endpoint có dữ liệu cá nhân / vị trí (`locate`, `track`, `route`, ảnh).
+  Trong `.then` của `fetch` phải `res.clone()` **đồng bộ** trước mọi `await` (trang đọc body trước → clone lỗi, bị nuốt
+  lặng lẽ). Bản lưu mang `X-PCTT-Saved-At` → `api()` đặt `store.savedAt` → `NetworkBanner`. Thử thật: build image, mở
+  cổng 2 lần, dừng container frontend, tải lại (README §9.4); máy dev Vite không đăng ký service worker.
 - **Kích thước gói**: thư viện nặng chỉ dùng khi bấm (xuất PDF/Excel: `utils/exportPdf.js`, `exportExcel.js`) phải
   `await import(...)` động. Không thêm thư viện vào `manualChunks` dạng object (kéo theo thư viện phụ thuộc dùng chung
   vào chunk đó); dùng dạng hàm trong `vite.config.js`. Sau khi build, kiểm tra `dist/index.html` không preload chunk nặng.
@@ -281,7 +293,8 @@ Python trong container.
 - `tests/e2e/*.mjs` kiểm thử API end-to-end, cần stack dev với `DEMO_MODE=true` (dùng tài khoản demo); tham số 1 = URL backend.
   Chạy lại liên tiếp → xoá khoá `rl:*` trong Redis. `iot-test.mjs` gọi `docker exec caobang-pctt-mqtt` (tên container cố định).
 - CI (`ci.yml`): ruff + pytest → build frontend → kiểm tra `docker-compose.prod.yml` → stack Docker Compose
-  (`DEMO_MODE=true`, `SIMULATOR=true`) + 7 script API. Thay đổi hành vi nghiệp vụ / quyền → cập nhật script tương ứng.
+  (`DEMO_MODE=true`, `SIMULATOR=true`) + 9 script API (`lite-test.mjs` chạy qua nginx: tham số = URL frontend :8080).
+  Thay đổi hành vi nghiệp vụ / quyền → cập nhật script tương ứng.
 - `tests/load/load.js` (k6, README §12.2): thay đổi đường đi của cổng công khai hoặc dashboard (thêm API, bỏ cache…) →
   chạy lại, so với bảng kết quả trong README; cập nhật bảng khi số liệu đổi đáng kể.
 
