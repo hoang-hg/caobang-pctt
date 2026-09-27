@@ -47,6 +47,41 @@ def test_parse_supply_request_is_priority_3():
     assert r["incident_type"] == "tiep_te" and r["priority"] == 3
 
 
+# Sau sáp nhập: hàng nghìn xóm, tên trùng ở nhiều xã
+GAZ_DUP = [
+    *GAZ,
+    {"name": "Phục Hòa", "unit_code": "CB-PHUCHOA", "lat": 22.52, "lon": 106.53, "kind": "xa"},
+    {
+        "name": "Xóm Nà Pò",
+        "unit_code": "CB-PHUCHOA",
+        "lat": 22.505,
+        "lon": 106.572,
+        "kind": "thon",
+        "norm": "na po",
+    },
+    {
+        "name": "Xóm Nà Pò",
+        "unit_code": "CB-HOAAN",
+        "lat": 22.73,
+        "lon": 106.17,
+        "kind": "thon",
+        "norm": "na po",
+    },
+]
+for g in GAZ_DUP:
+    g.setdefault("norm", norm(g["name"].removeprefix("Thôn ")))
+
+
+def test_parse_duplicate_hamlet_uses_commune_in_message():
+    r = parse_rules("Nước ngập nhà ở xóm Nà Pò xã Phục Hòa, 2 hộ cần di dời", GAZ_DUP)
+    assert r["place"]["kind"] == "thon" and r["place"]["unit_code"] == "CB-PHUCHOA"
+
+
+def test_parse_duplicate_hamlet_without_commune_is_not_guessed():
+    r = parse_rules("Nước ngập nhà ở xóm Nà Pò, 2 hộ cần di dời", GAZ_DUP)
+    assert r["place"] is None  # 2 xóm Nà Pò ở 2 xã → không đoán bừa
+
+
 def test_parse_explicit_coordinates():
     r = parse_rules("Kẹt tại 22.6612, 106.2701 nước lên nhanh", GAZ)
     assert r["coords"] == (22.6612, 106.2701)

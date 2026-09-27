@@ -1,23 +1,24 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Circle, CircleMarker, GeoJSON, MapContainer, Marker, Polyline, Popup, Tooltip, useMap } from 'react-leaflet';
+import { Circle, CircleMarker, GeoJSON, MapContainer, Marker, Pane, Polyline, Popup, Tooltip, useMap } from 'react-leaflet';
 import clsx from 'clsx';
 import {
   ShieldAlert, LocateFixed, Megaphone, Phone, Home, CloudRain, Waves, Camera, LogIn, Moon, Sun, Navigation, AlertTriangle,
   CheckCircle2, Loader2, Share2, Info, BookOpen, ExternalLink, HelpCircle, MapPin, ChevronRight, PhoneCall, Compass, Search,
-  Droplets, Mountain, Ban, X
+  Droplets, Mountain, Ban, X, Zap
 } from 'lucide-react';
 import { api } from '../../api/client';
-import { useUnitsGeo } from '../../api/hooks';
+import { useUnitsGeo, useUnits, useProvinceArea } from '../../api/hooks';
 import { useStore } from '../../app/store';
-import { BaseLayer, RAIN_BINS } from '../../components/map/MapTools';
+import { AdminBoundaries, BaseLayer, RAIN_BINS } from '../../components/map/MapTools';
 import { evacIcon, hazardIcon, pinIcon, stationIcon, reservoirIcon } from '../../components/map/icons';
 import { alarmLevel, LEVEL } from '../../utils/labels';
 import { ago, dateTime } from '../../utils/format';
 import L from 'leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import MapLegendBox from '../../components/map/MapLegendBox';
+import TopLegendBar from '../../components/map/TopLegendBar';
 import ReportForm from './ReportForm';
 import TicketTracker from './TicketTracker';
 import ReservoirMonitor from './ReservoirMonitor';
@@ -26,6 +27,7 @@ import NetworkBanner from './NetworkBanner';
 
 const REFRESH = 60_000;
 const pub = (path, params) => api(`/public${path}`, { params });
+const PROVINCE_COLOR = '#dc2626'; // ranh giới tỉnh: một màu cố định
 const RISK = {
   cao: { label: 'Nguy cơ CAO', cls: 'bg-danger text-white', icon: AlertTriangle, tip: 'Bạn đang nằm trong vùng có nguy cơ ngập lụt hoặc sạt lở đất. Hãy chủ động di dời tới điểm an toàn!' },
   trung_binh: { label: 'Cần theo dõi', cls: 'bg-warn text-black', icon: AlertTriangle, tip: 'Khu vực lân cận có nguy cơ hoặc dự báo mưa to. Cần chuẩn bị phương án phòng tránh.' },
@@ -72,17 +74,41 @@ const createClusterCustomIcon = (cluster) => {
   });
 };
 
-function PublicMap({ data, forecast, geo, me, route, target, layers, basemap = 'street', onSelectPoint }) {
+function PublicMap({ data, forecast, geo, me, route, target, layers, basemap = 'street', onSelectPoint, provinceArea }) {
   const byCode = useMemo(() => Object.fromEntries((forecast || []).map((a) => [a.code, a])), [forecast]);
   return (
     <MapContainer center={[22.75, 106.05]} zoom={8.5} zoomSnap={0.25} className="h-full w-full" scrollWheelZoom>
       <BaseLayer basemap={basemap} />
       <FlyTo target={target} />
+
+      {/* Ranh giới xã/phường (luôn hiện) rồi ranh giới tỉnh trên cùng — pane riêng, không bị lớp tô màu che */}
+      <AdminBoundaries geo={geo} basemap={basemap} interactive={false} />
+      {provinceArea?.geometry && (
+        <Pane name="ranh-gioi-tinh" style={{ zIndex: 430 }}>
+          <GeoJSON
+            key={`prov-casing-${basemap}`}
+            data={provinceArea.geometry}
+            style={{ color: basemap === 'satellite' ? '#000000' : '#ffffff', weight: 6, opacity: 0.9, fill: false }}
+            interactive={false}
+          />
+          <GeoJSON
+            key={`prov-line-${basemap}`} // vẽ lại cùng viền nền khi đổi nền → luôn nằm trên viền
+            data={provinceArea.geometry}
+            style={{ color: PROVINCE_COLOR, weight: 3.5, opacity: 1, fill: false, dashArray: '10 4' }}
+            interactive={false}
+          />
+        </Pane>
+      )}
+
       {layers.forecast && geo && forecast?.length > 0 && (
         <GeoJSON
           key={`fc-${forecast.length}-${forecast[0]?.p50}`}
           data={{ ...geo, features: geo.features.filter((f) => byCode[f.properties.code]) }}
-          style={(f) => ({ color: '#fff', weight: 0.8, fillColor: rainColor(byCode[f.properties.code].p50), fillOpacity: 0.55 })}
+          style={(f) => ({
+            stroke: false, // đường biên xã do AdminBoundaries vẽ
+            fillColor: rainColor(byCode[f.properties.code].p50),
+            fillOpacity: 0.55,
+          })}
           onEachFeature={(f, l) => {
             const a = byCode[f.properties.code];
             l.bindTooltip(`<b>${a.name}</b><br/>Mưa 24h tới: <b>${a.p50} mm</b> (có thể tới ${a.p90} mm)`, { sticky: true });
@@ -292,8 +318,13 @@ function PublicMap({ data, forecast, geo, me, route, target, layers, basemap = '
       )}
       {me && (
         <>
-          <Circle center={[me.lat, me.lon]} radius={me.accuracy || 50} pathOptions={{ color: '#2563eb', weight: 1, fillOpacity: 0.1 }} />
-          <Marker position={[me.lat, me.lon]} icon={pinIcon('●', '#2563eb')}><Tooltip permanent direction="top" offset={[0, -12]}>Bạn đang ở đây</Tooltip></Marker>
+          {/* Chọn xã thủ công: điểm là trung tâm xã, không phải vị trí GPS → không vẽ vòng sai số, không ghi "Bạn đang ở đây" */}
+          {!me.isManual && (
+            <Circle center={[me.lat, me.lon]} radius={me.accuracy || 50} pathOptions={{ color: '#2563eb', weight: 1, fillOpacity: 0.1 }} />
+          )}
+          <Marker position={[me.lat, me.lon]} icon={pinIcon('●', '#2563eb')}>
+            <Tooltip permanent direction="top" offset={[0, -12]}>{me.isManual ? `Trung tâm ${me.name}` : 'Bạn đang ở đây'}</Tooltip>
+          </Marker>
         </>
       )}
     </MapContainer>
@@ -336,6 +367,10 @@ export default function PublicPortal() {
   const [activeTab, setActiveTab] = useState(trackParam ? 'tracuu' : 'bando'); // bando | tracuu | muanuoc | sotan | hotlines | huongdan
   const [mapSidebarTab, setMapSidebarTab] = useState(focusAlert ? 'alerts' : 'legend'); // legend | alerts | rain
   const scrolledToAlert = useRef(false);
+  // Cuộn tới thanh tab (ngay trên bản đồ / nội dung tab) — theo phần tử, không theo số pixel cố định: khối phía trên
+  // (kết quả định vị, chú thích ký hiệu) cao thấp khác nhau
+  const tabsRef = useRef(null);
+  const scrollToContent = () => tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   // SĐT chỉ giữ trong state (không đưa lên URL)
   const [track, setTrack] = useState({ code: trackParam, phone: '' });
   const [layers, setLayers] = useState({ forecast: true, hazard: true, stations: true, reservoirs: true, landslides: true, evac: true, reports: true });
@@ -355,6 +390,28 @@ export default function PublicPortal() {
   const { data: forecast } = useQuery({ queryKey: ['pub-forecast'], queryFn: () => pub('/forecast/areas', { hours: 24 }), refetchInterval: 10 * REFRESH });
   const { data: hotlines } = useQuery({ queryKey: ['pub-hotlines'], queryFn: () => pub('/hotlines'), staleTime: Infinity });
   const { data: geo } = useUnitsGeo();
+  const { data: provinceArea } = useProvinceArea();
+  const { data: units = [] } = useUnits();
+  const [selectedCommuneCode, setSelectedCommuneCode] = useState('');
+
+  const sortedUnits = useMemo(() => {
+    return [...units].sort((a, b) => {
+      const dist = (a.old_district || '').localeCompare(b.old_district || '', 'vi');
+      if (dist !== 0) return dist;
+      return (a.name || '').localeCompare(b.name || '', 'vi');
+    });
+  }, [units]);
+
+  const handleSelectCommune = (code) => {
+    const u = units.find((x) => x.code === code);
+    if (!u) return;
+    setSelectedCommuneCode(code);
+    setMe({ lat: u.lat, lon: u.lon, name: u.name, accuracy: 100, isManual: true });
+    setTarget({ lat: u.lat, lon: u.lon, zoom: 13.5 });
+    setLocErr('');
+    setRoute(null);
+  };
+
   const { data: here } = useQuery({
     queryKey: ['pub-locate', me?.lat, me?.lon],
     queryFn: () => pub('/locate', { lat: me.lat, lon: me.lon }),
@@ -405,7 +462,10 @@ export default function PublicPortal() {
 
   const locate = () => {
     setLocErr('');
-    if (!navigator.geolocation) return setLocErr('Trình duyệt của bạn không hỗ trợ định vị GPS');
+    setSelectedCommuneCode('');
+    if (!navigator.geolocation) {
+      return setLocErr('Trình duyệt của bạn không hỗ trợ định vị GPS tự động. Bạn có thể chọn trực tiếp Xã/Phường dưới đây:');
+    }
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (p) => {
@@ -417,7 +477,7 @@ export default function PublicPortal() {
       },
       () => {
         setLocating(false);
-        setLocErr('Không lấy được vị trí. Hãy cho phép quyền truy cập vị trí trên trình duyệt của bạn.');
+        setLocErr('Không lấy được vị trí GPS tự động (chưa cấp quyền hoặc thiết bị không hỗ trợ GPS). Bạn có thể chọn trực tiếp Xã/Phường bên dưới để tra cứu ngay:');
       },
       { enableHighAccuracy: true, timeout: 15_000 },
     );
@@ -429,7 +489,7 @@ export default function PublicPortal() {
       setRoute(r);
       setTarget({ lat: (me.lat + site.lat) / 2, lon: (me.lon + site.lon) / 2, zoom: 12 });
       setActiveTab('bando');
-      window.scrollTo({ top: 350, behavior: 'smooth' });
+      scrollToContent();
     } catch {
       setLocErr('Không tìm được đường đi tới điểm sơ tán này. Hãy liên hệ trực ban xã/phường hoặc gọi 112.');
     }
@@ -459,6 +519,16 @@ export default function PublicPortal() {
           </div>
 
           <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* <a> chứ không phải <Link>: /ban-nhe là trang máy chủ dựng (nginx → backend), không phải route của ứng dụng */}
+            <a
+              href="/ban-nhe"
+              className="btn bg-amber-500/15 hover:bg-amber-500 text-amber-800 hover:text-white dark:text-amber-300 dark:hover:text-black border border-amber-500/35 text-xs px-2 sm:px-2.5 py-1.5 font-bold flex items-center gap-1.5 transition-all shadow-xs group"
+              title="Chuyển sang bản chỉ có chữ (dưới 50 KB) khi mạng 2G/3G yếu"
+            >
+              <Zap size={14} className="text-amber-500 group-hover:text-current animate-pulse shrink-0" />
+              <span>Bản nhẹ</span>
+            </a>
+
             <a
               href="tel:112"
               className="btn bg-danger/10 text-danger hover:bg-danger hover:text-white border border-danger/30 text-xs px-2.5 py-1.5 font-bold"
@@ -546,7 +616,7 @@ export default function PublicPortal() {
           <div
             onClick={() => {
               setActiveTab('hochua');
-              window.scrollTo({ top: 380, behavior: 'smooth' });
+              scrollToContent();
             }}
             className="flex items-center justify-between gap-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs cursor-pointer hover:bg-amber-500/15 transition-all group"
           >
@@ -576,7 +646,7 @@ export default function PublicPortal() {
           <div
             onClick={() => {
               setActiveTab('satlo');
-              window.scrollTo({ top: 380, behavior: 'smooth' });
+              scrollToContent();
             }}
             className="flex items-center justify-between gap-3 p-3 rounded-xl bg-danger/10 border border-danger/30 text-xs cursor-pointer hover:bg-danger/15 transition-all group"
           >
@@ -615,7 +685,7 @@ export default function PublicPortal() {
             </div>
             <div className="mt-3">
               <div className="font-bold text-sm text-ink">Tôi đang ở đâu? Có an toàn không?</div>
-              <div className="text-xs text-muted mt-0.5">Kiểm tra nguy cơ ngập lụt, sạt lở và tìm nơi tránh trú an toàn gần nhất</div>
+              <div className="text-xs text-muted mt-0.5">Kiểm tra nguy cơ ngập lụt, sạt lở theo GPS hoặc chọn theo 56 xã/phường</div>
             </div>
           </div>
 
@@ -623,7 +693,7 @@ export default function PublicPortal() {
           <div
             onClick={() => {
               setActiveTab('tracuu');
-              window.scrollTo({ top: 380, behavior: 'smooth' });
+              scrollToContent();
             }}
             className="card p-4 flex flex-col justify-between cursor-pointer hover:border-amber-500 hover:shadow-md transition-all group border-l-4 border-l-amber-500"
           >
@@ -679,7 +749,7 @@ export default function PublicPortal() {
           <section className="card p-4 bg-panel2/60 border-accent/40 shadow-sm animate-in fade-in duration-200 relative">
             <button
               type="button"
-              onClick={() => { setMe(null); setLocErr(''); setRoute(null); }}
+              onClick={() => { setMe(null); setLocErr(''); setRoute(null); setSelectedCommuneCode(''); }}
               className="absolute top-3 right-3 p-1 rounded-lg text-muted hover:text-ink hover:bg-panel transition-colors z-10"
               title="Đóng kết quả định vị"
             >
@@ -692,9 +762,28 @@ export default function PublicPortal() {
               </div>
             )}
             {locErr && (
-              <div className="flex items-center gap-2 text-sm text-danger py-2">
-                <AlertTriangle size={18} />
-                <span>{locErr}</span>
+              <div className="py-2 space-y-3">
+                <div className="flex items-center gap-2 text-sm text-danger">
+                  <AlertTriangle size={18} className="shrink-0" />
+                  <span>{locErr}</span>
+                </div>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 bg-panel p-3 rounded-xl border border-line">
+                  <label className="text-xs font-semibold text-ink whitespace-nowrap">
+                    Chọn Xã/Phường tra cứu trực tiếp:
+                  </label>
+                  <select
+                    className="select text-xs py-2 px-3 flex-1 bg-panel2 border border-line rounded-lg text-ink"
+                    value={selectedCommuneCode}
+                    onChange={(e) => handleSelectCommune(e.target.value)}
+                  >
+                    <option value="">-- Danh sách 56 Xã/Phường tỉnh Cao Bằng --</option>
+                    {sortedUnits.map((u) => (
+                      <option key={u.code} value={u.code}>
+                        {u.name} (Huyện/TP: {u.old_district})
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             )}
             {here && (() => {
@@ -709,6 +798,36 @@ export default function PublicPortal() {
                       </span>
                       <b className="text-base text-ink">{here.commune.name}</b>
                       <span className="text-xs text-muted">({here.commune.district})</span>
+                      {me?.isManual && (
+                        <span className="chip px-2 py-0.5 text-[11px] bg-accent/10 text-accent border border-accent/30 font-medium">
+                          Đã chọn thủ công
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Hộp chuyển nhanh xã khác hoặc định vị lại */}
+                    <div className="flex items-center gap-2 pt-1 flex-wrap">
+                      <span className="text-[11px] text-muted whitespace-nowrap">Xem xã khác:</span>
+                      <select
+                        className="select text-xs py-1 px-2.5 bg-panel border border-line rounded-lg text-ink max-w-[220px]"
+                        value={selectedCommuneCode}
+                        onChange={(e) => handleSelectCommune(e.target.value)}
+                      >
+                        <option value="">-- Đổi xã/phường khác --</option>
+                        {sortedUnits.map((u) => (
+                          <option key={u.code} value={u.code}>
+                            {u.name} ({u.old_district})
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={locate}
+                        title="Bấm để định vị lại bằng GPS"
+                        className="text-xs text-accent hover:underline flex items-center gap-1 shrink-0 ml-auto"
+                      >
+                        <LocateFixed size={13} /> GPS
+                      </button>
                     </div>
 
                     <p className="text-sm text-ink-2 bg-panel p-3 rounded-xl border border-line leading-relaxed">
@@ -750,12 +869,24 @@ export default function PublicPortal() {
                               <span>Còn <b className="text-good font-mono">{s.capacity - s.current_occupancy}</b>/{s.capacity} chỗ</span>
                             </div>
                           </div>
-                          <button
-                            className="btn-ghost text-xs px-3 py-1.5 text-accent border-accent/40 bg-accent/5 hover:bg-accent/15"
-                            onClick={() => directions(s)}
-                          >
-                            <Navigation size={13} /> Chỉ đường
-                          </button>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {s.hotline && (
+                              <a
+                                href={`tel:${s.hotline.replace(/\s+/g, '')}`}
+                                className="btn-ghost text-xs px-2.5 py-1.5 text-good border border-good/40 bg-good/10 hover:bg-good/20 font-semibold flex items-center gap-1"
+                                title={`Gọi số trực điểm sơ tán: ${s.hotline}`}
+                              >
+                                <PhoneCall size={13} />
+                                <span>{s.hotline}</span>
+                              </a>
+                            )}
+                            <button
+                              className="btn-ghost text-xs px-3 py-1.5 text-accent border-accent/40 bg-accent/5 hover:bg-accent/15"
+                              onClick={() => directions(s)}
+                            >
+                              <Navigation size={13} /> Chỉ đường
+                            </button>
+                          </div>
                         </div>
                       ))}
                       {!here.evacuation_sites.length && (
@@ -789,8 +920,22 @@ export default function PublicPortal() {
           </section>
         )}
 
+        {/* Khối Chú thích Ký hiệu & Tra cứu Điểm Giám sát ở Đầu Trang */}
+        <TopLegendBar
+          data={map}
+          onSelectPoint={handleSelectPoint}
+          onNavigateTab={(tabId) => {
+            setActiveTab(tabId);
+            scrollToContent();
+          }}
+          onFocusMap={() => {
+            setActiveTab('bando');
+            scrollToContent();
+          }}
+        />
+
         {/* Thanh Điều hướng Tabs (Bản đồ / Hồ chứa / Sạt trượt / Tra cứu tiến độ / Mực nước / Điểm sơ tán / Hotline / Cẩm nang) */}
-        <div className="flex border-b border-line gap-2 overflow-x-auto scroll-thin pb-1">
+        <div ref={tabsRef} className="flex scroll-mt-20 border-b border-line gap-1.5 sm:gap-2 overflow-x-auto scroll-thin pb-2 pt-1 scroll-smooth">
           {[
             { id: 'bando', label: 'Bản đồ & Cảnh báo', icon: Compass },
             {
@@ -872,27 +1017,29 @@ export default function PublicPortal() {
                     ))}
                   </div>
 
-                  {/* Chế độ bản đồ nền Google Maps */}
-                  <div className="flex items-center gap-1 bg-panel border border-line rounded-lg p-0.5 shadow-xs">
-                    {[
-                      ['street', 'Địa lý'],
-                      ['satellite', 'Vệ tinh'],
-                      ['terrain', 'Địa hình'],
-                    ].map(([key, label]) => (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => setBasemap(key)}
-                        className={clsx(
-                          'px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer',
-                          basemap === key
-                            ? 'bg-primary text-white shadow-xs'
-                            : 'text-muted hover:text-ink hover:bg-panel2'
-                        )}
-                      >
-                        {label}
-                      </button>
-                    ))}
+                  <div className="flex items-center gap-2">
+                    {/* Chế độ bản đồ nền */}
+                    <div className="flex items-center gap-1 bg-panel border border-line rounded-lg p-0.5 shadow-xs">
+                      {[
+                        ['street', 'Địa lý'],
+                        ['satellite', 'Vệ tinh'],
+                        ['terrain', 'Địa hình'],
+                      ].map(([key, label]) => (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => setBasemap(key)}
+                          className={clsx(
+                            'px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer',
+                            basemap === key
+                              ? 'bg-primary text-white shadow-xs'
+                              : 'text-muted hover:text-ink hover:bg-panel2'
+                          )}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
@@ -908,6 +1055,7 @@ export default function PublicPortal() {
                     layers={layers}
                     basemap={basemap}
                     onSelectPoint={handleSelectPoint}
+                    provinceArea={provinceArea}
                   />
                 </div>
 
@@ -1100,7 +1248,7 @@ export default function PublicPortal() {
                 <div
                   onClick={() => {
                     setActiveTab('hochua');
-                    window.scrollTo({ top: 380, behavior: 'smooth' });
+                    scrollToContent();
                   }}
                   className="card p-4 sm:p-5 border-l-4 border-l-sky-500 bg-gradient-to-br from-sky-500/10 via-panel to-panel hover:shadow-lg hover:border-sky-600 transition-all cursor-pointer group"
                 >
@@ -1152,7 +1300,7 @@ export default function PublicPortal() {
                 <div
                   onClick={() => {
                     setActiveTab('satlo');
-                    window.scrollTo({ top: 380, behavior: 'smooth' });
+                    scrollToContent();
                   }}
                   className="card p-4 sm:p-5 border-l-4 border-l-danger bg-gradient-to-br from-danger/10 via-panel to-panel hover:shadow-lg hover:border-red-600 transition-all cursor-pointer group"
                 >
@@ -1210,7 +1358,7 @@ export default function PublicPortal() {
             onSelectOnMap={(res) => {
               setTarget({ lat: res.lat, lon: res.lon, zoom: 13.5 });
               setActiveTab('bando');
-              window.scrollTo({ top: 350, behavior: 'smooth' });
+              scrollToContent();
             }}
           />
         )}
@@ -1221,7 +1369,7 @@ export default function PublicPortal() {
             onSelectOnMap={(pt) => {
               setTarget({ lat: pt.lat, lon: pt.lon, zoom: 14 });
               setActiveTab('bando');
-              window.scrollTo({ top: 350, behavior: 'smooth' });
+              scrollToContent();
             }}
           />
         )}
@@ -1311,16 +1459,26 @@ export default function PublicPortal() {
                       </div>
                     </div>
 
-                    <div className="mt-4 pt-2 border-t border-line/60 flex items-center justify-between">
+                    <div className="mt-4 pt-2 border-t border-line/60 flex items-center justify-between gap-2">
+                      {site.hotline && (
+                        <a
+                          href={`tel:${site.hotline.replace(/\s+/g, '')}`}
+                          className="btn-ghost text-xs flex-1 justify-center text-good border border-good/40 bg-good/10 hover:bg-good/20 font-semibold py-1.5 flex items-center gap-1.5"
+                          title="Gọi số trực điểm sơ tán"
+                        >
+                          <PhoneCall size={13} />
+                          <span>Gọi {site.hotline}</span>
+                        </a>
+                      )}
                       <button
-                        className="btn-ghost text-xs w-full justify-center text-accent"
+                        className="btn-ghost text-xs flex-1 justify-center text-accent py-1.5 flex items-center gap-1.5"
                         onClick={() => {
                           setTarget({ lat: site.lat, lon: site.lon, zoom: 14 });
                           setActiveTab('bando');
-                          window.scrollTo({ top: 350, behavior: 'smooth' });
+                          scrollToContent();
                         }}
                       >
-                        <Navigation size={13} /> Xem trên bản đồ
+                        <Navigation size={13} /> Xem bản đồ
                       </button>
                     </div>
                   </div>
@@ -1446,7 +1604,7 @@ export default function PublicPortal() {
                 onClick={() => {
                   setTarget({ lat: r.lat, lon: r.lon, zoom: 14 });
                   setActiveTab('bando');
-                  window.scrollTo({ top: 350, behavior: 'smooth' });
+                  scrollToContent();
                 }}
                 className="card p-2.5 cursor-pointer hover:border-accent hover:shadow transition-all flex flex-col justify-between"
               >
@@ -1583,7 +1741,7 @@ export default function PublicPortal() {
           onTrack={(code, phone) => {
             setTrack({ code, phone: phone || '' });
             setActiveTab('tracuu');
-            window.scrollTo({ top: 380, behavior: 'smooth' });
+            scrollToContent();
           }}
         />
       )}

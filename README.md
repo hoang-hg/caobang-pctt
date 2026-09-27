@@ -96,8 +96,9 @@ vùng nguy hiểm, số điện thoại không có thật.
 | Nhóm dữ liệu | Bảng | Khi `DEMO_MODE=false` | Nguồn chính thức |
 |---|---|---|---|
 | Ranh giới tỉnh | `spatial_admin.administrative_units` (tinh) | ✅ OpenStreetMap | — |
-| Ranh giới 56 xã/phường | `administrative_units` (xa) | 🟡 **Voronoi xấp xỉ** từ toạ độ tâm | Shapefile ranh giới xã sau 01/07/2025 — Sở NN&MT. Phạm vi RBAC và việc gán SOS/phản ánh vào xã dựa trên ranh giới này |
-| Thôn/tổ, địa danh | `spatial_admin.place_names` | 🟡 mẫu | UBND xã |
+| Ranh giới, dân số 56 xã/phường | `administrative_units` (xa) | ✅ dữ liệu công khai sau sắp xếp (`backend/seed/caobang_communes.geojson`, [13](#nguon-dia-gioi)); số hộ = dân số / 4 (ước tính) | Có shapefile chính thức của Sở NN&MT thì nhập đè bằng loại `ranh_gioi_xa`. Phạm vi RBAC và việc gán SOS/phản ánh vào xã dựa trên ranh giới này |
+| Xóm / tổ dân phố | `administrative_units` (thon) | ⛔ 8 xóm **mẫu** | Danh sách sau sắp xếp năm 2026 (nghị quyết HĐND từng xã) — UBND xã / Sở Nội vụ; nhập bằng loại `xom` ([2.4](#nhap-du-lieu)) |
+| Địa danh (đèo, di tích, công trình) | `spatial_admin.place_names` | 🟡 mẫu | UBND xã |
 | Mạng đường | `operations.road_nodes`, `road_segments` | 🟡 trục chính vẽ tay | Sở Xây dựng / OSM đã hiệu chỉnh |
 | Mẫu tin cảnh báo | `communications.message_templates` | ✅ | Rà soát lời văn với Văn phòng BCH |
 | Danh mục vật tư | `resources.items` | ✅ | |
@@ -122,6 +123,7 @@ hình và cổng công khai cập nhật ngay).
 | Loại (mã) | Bảng | Định dạng | Khoá | Thay toàn bộ |
 |---|---|---|---|---|
 | Ranh giới xã/phường (`ranh_gioi_xa`) | `administrative_units` | GeoJSON vùng | mã xã có sẵn — chỉ cập nhật | — |
+| Xóm / tổ dân phố (`xom`) | `administrative_units` (cấp thôn) | CSV / Excel / GeoJSON điểm | `ma` — trống = tự sinh `<mã xã>-<tên>` | ✓ chỉ xóm của các xã có trong tệp |
 | Điểm sơ tán (`diem_so_tan`) 🌐 | `evacuation_sites` | CSV / Excel / GeoJSON điểm | `ma` | ✓ |
 | Vùng nguy hiểm (`vung_nguy_hiem`) 🌐 | `hazard_zones` | GeoJSON vùng | `ma` | ✓ (không xoá vùng do cảm biến tạo) |
 | Điểm nguy hiểm (`diem_nguy_hiem`) 🌐 | `hazard_points` | CSV / Excel / GeoJSON điểm | `ma` | ✓ |
@@ -146,7 +148,12 @@ hình và cổng công khai cập nhật ngay).
   và giá trị liệt kê viết có dấu cũng được ("Vĩ độ", "Trường học"). Tối đa 20 MB, 20.000 dòng.
 - **Thay toàn bộ** xoá mọi bản ghi của bảng không có trong tệp (kể cả dữ liệu mẫu) — giao diện báo trước số bản ghi sẽ
   xoá và bắt buộc tích xác nhận. Chỉ có ở bảng không bị bảng khác tham chiếu.
-- Thứ tự khi nhập lần đầu: ranh giới xã → kho → tồn kho → lực lượng → phương tiện → phần còn lại.
+- **Xóm / tổ dân phố** (sau sắp xếp theo nghị quyết HĐND từng xã, 2026): mỗi xã một tệp hoặc gộp nhiều xã; cột bắt buộc
+  `ma_xa`, `ten` ("Xóm Nà Pò" hay "Nà Pò" đều được — cùng mã). Chọn **Thay toàn bộ** để bỏ xóm cũ đã sáp nhập: chỉ
+  xoá xóm của các xã **có trong tệp**. Toạ độ tuỳ chọn (có thì cảnh báo nếu rơi sang xã khác). Dùng cho tìm kiếm địa
+  danh và nhận biết xóm trong tin SOS (tên xóm trùng ở nhiều xã: tin phải nhắc cả xã mới gán đúng xóm). Hiện có 8 xóm
+  **mẫu** — thay bằng danh sách chính thức lấy từ UBND các xã / Sở Nội vụ.
+- Thứ tự khi nhập lần đầu: ranh giới xã → xóm → kho → tồn kho → lực lượng → phương tiện → phần còn lại.
 
 Dòng lệnh (tệp lớn, người vận hành máy chủ):
 
@@ -808,7 +815,7 @@ MISS / HIT / STALE) — lúc cao điểm, số yêu cầu vào backend gần nh�
 | Endpoint | Mô tả | Cache Redis |
 |---|---|---|
 | `GET /overview` | Mưa, sông, cảnh báo, SOS **chỉ đếm theo xã** | 30 s |
-| `GET /map` | GeoJSON vùng nguy hiểm, đường chia cắt, trạm, điểm sơ tán | 30 s |
+| `GET /map` | GeoJSON vùng nguy hiểm, đường chia cắt, trạm, điểm sơ tán (kèm số trực `hotline`) | 30 s |
 | `GET /alerts`, `/alerts/{code}/share` | Cảnh báo đang / đã phát; trang chia sẻ Open Graph | 30 s / – |
 | `GET /forecast/areas?hours=24\|72`, `/forecast/areas/{code}` | Dự báo mưa theo xã P10/P50/P90 | 5 phút |
 | `GET /locate?lat&lon`, `/route?…` | Xã, cảnh báo, điểm sơ tán gần nhất; đường an toàn | – |
@@ -823,6 +830,10 @@ MISS / HIT / STALE) — lúc cao điểm, số yêu cầu vào backend gần nh�
 **Không bao giờ trả ra công khai**: vị trí, quân số lực lượng, kho, phương tiện; nội dung / toạ độ / SĐT trong phiếu SOS;
 danh bạ cán bộ; họ tên, SĐT, IP người phản ánh; phản ánh chưa duyệt / bị từ chối; cảnh báo nháp / chờ duyệt.
 `tests/e2e/public-test.mjs` quét toàn bộ phản hồi công khai để phát hiện các trường này.
+
+**Công khai có chủ đích**: số điện thoại trực của **điểm sơ tán** (`evacuation_sites.contact_phone`, trả ra với tên
+`hotline`) — nút Gọi trên cổng, "Tôi đang ở đâu?" và bản nhẹ. Khi nhập (cột `sdt_lien_he`) chỉ dùng số trực của điểm
+hoặc UBND xã, **không dùng số di động cá nhân**. public-test kiểm tra điểm sơ tán chỉ có đúng các trường được phép.
 
 ### 9.2. Giới hạn tần suất
 
@@ -864,7 +875,7 @@ Lúc thiên tai, mạng di động thường chập chờn, tắc nghẽn hoặc
 **Bản nhẹ `/ban-nhe`** — HTML thuần do backend dựng (`backend/app/services/lite.py`), không JavaScript, không ảnh,
 **luôn dưới 50 KB** (thực tế ~7 KB, gzip ~3 KB), mở được trên điện thoại cũ, mạng 2G. Gồm: nút gọi 112/114/115, cảnh báo
 đang hiệu lực 48 giờ (tối đa 8, ưu tiên mức đỏ), sông vượt báo động, đường dây nóng; chọn xã (`?xa=<mã xã>`, form GET)
-→ mức nguy cơ + lời khuyên, vùng nguy hiểm, mưa dự báo 24 giờ, điểm sơ tán của xã (còn chỗ, link chỉ đường). Chỉ dùng
+→ mức nguy cơ + lời khuyên, vùng nguy hiểm, mưa dự báo 24 giờ, điểm sơ tán của xã (còn chỗ, chỉ đường, gọi số trực). Chỉ dùng
 dữ liệu đã công khai (9.1). nginx đổi `/ban-nhe` → `GET /api/v1/public/lite` và cache như API công khai; cache Redis
 30 giây, xoá ngay khi phê duyệt cảnh báo hoặc nhập dữ liệu. Nên in địa chỉ này trong tin nhắn cảnh báo / trên loa
 truyền thanh: `https://<tên miền>/ban-nhe`. Cổng đầy đủ gợi ý bản nhẹ khi trình duyệt báo mạng 2G hoặc bật tiết kiệm dữ
@@ -872,7 +883,7 @@ liệu, và có link ở chân trang.
 
 **PWA (service worker `frontend/src/sw.js`)** — chỉ bật ở bản build. Lần mở đầu tiên lưu sẵn giao diện cổng công khai;
 mỗi lần xem, bản mới nhất của cảnh báo, bản đồ, tổng quan, dự báo, đường dây nóng, hồ chứa, sạt lở và trang bản nhẹ được
-lưu trên máy. Mất mạng / máy chủ không phản hồi (hoặc chậm quá 6 giây) → hiện bản đã lưu kèm dải báo *"đang hiển thị dữ
+lưu trên máy (cùng danh sách, ranh giới xã / tỉnh). Mất mạng / máy chủ không phản hồi (hoặc chậm quá 6 giây) → hiện bản đã lưu kèm dải báo *"đang hiển thị dữ
 liệu đã lưu lúc …"*. Cài được lên màn hình chính (`manifest.webmanifest`).
 
 | Không bao giờ lưu trên máy | Lý do |
@@ -1158,8 +1169,16 @@ Container Registry.
 - **Ranh giới tỉnh**: OpenStreetMap relation [1844412](https://www.openstreetmap.org/relation/1844412) (© OpenStreetMap
   contributors, ODbL), diện tích tính được **6.694 km²**. Cao Bằng là 1 trong 11 tỉnh, thành **không sáp nhập** theo
   Nghị quyết 202/2025/QH15. Tệp: `backend/seed/caobang_province.geojson`.
-- **56 xã/phường** (53 xã, 3 phường): Nghị quyết 1657/NQ-UBTVQH15 (hiệu lực 01/07/2025). Ranh giới xã là **xấp xỉ**
-  (Voronoi từ toạ độ tâm, cắt theo ranh giới tỉnh) — thay bằng dữ liệu chính thức ([2.2](#hien-trang)).
+  Bản đồ vẽ ranh giới tỉnh **nguyên bản, không rút gọn** (4.923 đỉnh, ~29 KB gzip) nên trùng đường biên của bản đồ nền
+  tự lưu trữ (cùng dữ liệu OSM); ranh giới xã rút gọn ~5 m. Trên nền Google (Vệ tinh, Địa hình) có thể lệch vài chục mét
+  vì Google dùng dữ liệu biên giới riêng. Cần độ chính xác pháp lý → thay bằng dữ liệu địa giới chính thức (Sở Nông nghiệp
+  và Môi trường) khi có.
+- **56 xã/phường** (53 xã, 3 phường): Nghị quyết 1657/NQ-UBTVQH15 (hiệu lực 01/07/2025). Ranh giới, dân số, mã đơn vị
+  hành chính 5 số và danh sách xã cũ đã sáp nhập: `backend/seed/caobang_communes.geojson`, chuyển từ dữ liệu công khai
+  https://caobang.city.com.vn/data/wards.geojson (lấy ngày 27/09/2026; trang không ghi nguồn gốc số liệu). Đã kiểm tra:
+  56 vùng hợp lệ, chồng lấn giữa các xã ~3,5 km², vênh với ranh giới tỉnh OSM ~0,2% diện tích. Số hộ chưa có số liệu →
+  ước tính dân số / 4. CSDL đã cài trước đó (ranh giới Voronoi xấp xỉ): nhập tệp này bằng loại `ranh_gioi_xa` (2.4) —
+  hệ thống tự gán lại xã cho mọi SOS, phản ánh, điểm sơ tán.
 - Dự báo: Open-Meteo (CC BY 4.0, gói miễn phí phi thương mại), dữ liệu ECMWF / NOAA. Radar: RainViewer.
 - Bản đồ nền tự lưu trữ: © OpenStreetMap contributors (ODbL), đóng gói theo sơ đồ Protomaps Basemap
   (https://protomaps.com); thư viện `protomaps-leaflet`, `pmtiles` (BSD-3-Clause).

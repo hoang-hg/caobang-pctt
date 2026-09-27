@@ -51,7 +51,7 @@ const LAYER_GROUPS = [
     ],
   },
   { title: 'Yêu cầu cứu hộ', items: [['sos', 'Điểm SOS từ người dân / cảm biến']] },
-  { title: 'Nền hành chính', items: [['admin', 'Ranh giới xã/phường (xấp xỉ)']] },
+  { title: 'Nền hành chính', items: [['admin', 'Ranh giới xã/phường']] },
 ];
 
 const DEFAULT_LAYERS = {
@@ -124,7 +124,7 @@ export default function MonitoringMap() {
         <ZoomControl position="bottomright" />
         <ScaleControl position="bottomleft" imperial={false} />
         {layers.forecast && <ForecastChoropleth geo={unitsGeo} areas={fcAreas} />}
-        {layers.admin && <AdminBoundaries geo={unitsGeo} />}
+        {layers.admin && <AdminBoundaries geo={unitsGeo} basemap={basemap} />}
         <AreaFocus
           area={area}
           filtered={filter.codes.length > 0}

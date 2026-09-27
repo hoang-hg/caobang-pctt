@@ -113,7 +113,7 @@ check('Kho vật tư không cho thay toàn bộ (có dữ liệu tham chiếu) �
 
 // ---- Mọi loại dữ liệu: nhập tệp mẫu 2 lần (lần 1 thêm, lần 2 cập nhật) — theo thứ tự phụ thuộc
 const ORDER = ['kho', 'ton_kho', 'luc_luong', 'phuong_tien', 'diem_so_tan', 'vung_nguy_hiem', 'diem_nguy_hiem', 'danh_ba',
-  'tram_quan_trac', 'ho_chua', 'cay_xang'];
+  'tram_quan_trac', 'ho_chua', 'cay_xang', 'xom'];
 check('Kiểm thử phủ mọi loại dữ liệu (trừ ranh giới xã, kiểm riêng)',
   list.data.filter((d) => d.name !== 'ranh_gioi_xa').every((d) => ORDER.includes(d.name)));
 for (const name of ORDER) {
@@ -127,6 +127,33 @@ for (const name of ORDER) {
     first.status === 200 && second.status === 200 && r1.created + r1.updated === 1 && r2.updated === 1 && r2.created === 0,
     JSON.stringify(first.data?.report?.errors?.slice(0, 2) || [r1, r2]));
 }
+
+// ---- Xóm / tổ dân phố: thay danh sách xóm của 1 xã sau sáp nhập — xã khác giữ nguyên
+const hamlets = async () => (await call('GET', '/admin-units?level=thon', null, admin)).data || [];
+const before = await hamlets();
+const inPH = (list) => list.filter((u) => u.parent_code === 'CB-PHUCHOA');
+const others = (list) => list.filter((u) => u.parent_code !== 'CB-PHUCHOA').map((u) => u.code).sort().join();
+const xomCsv = `ma_xa,ten,loai,dan_so,so_ho\nCB-PHUCHOA,Xóm Khuổi ${stamp},Xóm,410,95\nCB-PHUCHOA,Pò Tấu ${stamp},xom,380,90\n`;
+const vx = await upload('xom', 'validate', 'xom.csv', xomCsv, admin, 'replace');
+check('Xóm: kiểm tra thay toàn bộ — báo xoá đúng số xóm cũ của xã trong tệp',
+  vx.data?.ok && vx.data.creates === 2 && vx.data.deletes === inPH(before).length && inPH(before).length > 0,
+  `xoá ${vx.data?.deletes}/${inPH(before).length}`);
+const ax = await upload('xom', 'apply', 'xom.csv', xomCsv, admin, 'replace');
+const after = await hamlets();
+check('Xóm: sau khi thay, xã trong tệp chỉ còn xóm mới (mã tự sinh)',
+  ax.status === 200 && inPH(after).map((u) => u.code).sort().join() === [`CB-PHUCHOA-KHUOI${stamp}`, `CB-PHUCHOA-POTAU${stamp}`].sort().join(),
+  inPH(after).map((u) => u.code).join());
+check('Xóm: xóm của các xã khác giữ nguyên', others(after) === others(before));
+const clash = await upload('xom', 'validate', 'xom.csv', 'ma,ma_xa,ten\nCB-HOAAN,CB-PHUCHOA,Xóm Trùng Mã\n', admin);
+check('Xóm: mã trùng mã xã → lỗi (không ghi đè xã)', clash.data?.errors?.some((e) => e.field === 'ma'));
+const notCommune = await upload('xom', 'validate', 'xom.csv', `ma_xa,ten\nCB-PHUCHOA-KHUOI${stamp},Xóm Con\n`, admin);
+check('Xóm: xã trực thuộc phải là mã cấp xã', notCommune.data?.errors?.some((e) => e.field === 'ma_xa'));
+const found = (await call('GET', `/search?q=${encodeURIComponent(`Khuổi ${stamp}`)}`, null, admin)).data || [];
+const hit = found.find((r) => r.ref === `CB-PHUCHOA-KHUOI${stamp}`);
+check('Xóm: tìm kiếm ra xóm mới, kèm xã trực thuộc', hit?.sub === 'Xã Phục Hòa' && hit?.admin_code === 'CB-PHUCHOA', JSON.stringify(hit));
+const sos = (await call('POST', '/sos/parse', { text: `Nước lũ dâng nhanh ở xóm Pò Tấu ${stamp}, 4 người mắc kẹt trên mái nhà` }, admin)).data;
+check('Xóm: tin SOS nhắc xóm mới → nhận ra đúng xã (không cần khởi động lại)',
+  sos?.place?.unit_code === 'CB-PHUCHOA' && sos.place.kind === 'thon', JSON.stringify(sos?.place));
 
 // ---- Ranh giới xã: nhập lại chính ranh giới hiện có + dân số mới
 const units = await call('GET', '/admin-units/geojson?level=xa', null, admin);

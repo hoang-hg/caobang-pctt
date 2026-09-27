@@ -114,7 +114,7 @@ async def _commune(unit: dict, alerts: list[dict]) -> dict:
         params,
     )
     sites = await fetch_all(
-        """SELECT e.name, e.site_type, e.capacity, e.current_occupancy,
+        """SELECT e.name, e.site_type, e.capacity, e.current_occupancy, e.contact_phone AS hotline,
                   round(ST_Y(e.location)::numeric, 5)::float AS lat, round(ST_X(e.location)::numeric, 5)::float AS lon
              FROM resources.evacuation_sites e JOIN spatial_admin.administrative_units u ON u.id = e.admin_unit_id
             WHERE u.code = :code
@@ -231,10 +231,13 @@ def render(*, units, unit, alerts, rivers, commune, hotlines, now) -> str:
         for s in commune["sites"]:
             free = max((s["capacity"] or 0) - (s["current_occupancy"] or 0), 0)
             kind = SITE_TYPE.get(s["site_type"], "")
+            phone = s.get("hotline")  # số trực điểm sơ tán — công khai (README 9.1)
+            call = f' · <a href="tel:{e("".join(phone.split()))}">Gọi {e(phone)}</a>' if phone else ""
             items.append(
                 f"<li><b>{e(s['name'])}</b>{' – ' + kind if kind else ''}"
                 f"<br>{'Còn chỗ ' + str(free) if free else 'Đã đầy'} / sức chứa {s['capacity'] or 0} người · "
-                f'<a href="https://www.google.com/maps/dir/?api=1&amp;destination={s["lat"]},{s["lon"]}">Chỉ đường</a></li>'
+                f'<a href="https://www.google.com/maps/dir/?api=1&amp;destination={s["lat"]},{s["lon"]}">Chỉ đường</a>'
+                f"{call}</li>"
             )
         if items:
             out.append(f"<ul>{''.join(items)}</ul>")

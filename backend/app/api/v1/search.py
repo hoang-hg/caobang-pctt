@@ -43,16 +43,21 @@ async def search(q: str, limit: int = 12, user: dict = Depends(require_any("moni
         """
         WITH q AS (SELECT spatial_admin.norm(:q) AS n)
         SELECT * FROM (
-          SELECT 'hanh_chinh' AS kind, CASE WHEN unit_type = 'phuong' THEN 'Phường ' WHEN unit_type = 'xa' THEN 'Xã '
-                 WHEN unit_type = 'thon' THEN '' ELSE '' END || name AS label,
-                 COALESCE('Địa bàn ' || old_district || ' cũ', 'Tỉnh Cao Bằng') AS sub,
-                 ST_Y(center) AS lat, ST_X(center) AS lon, code AS admin_code, code AS ref,
-                 similarity(spatial_admin.norm(name), (SELECT n FROM q)) AS score
-            FROM spatial_admin.administrative_units
+          -- Xóm / tổ dân phố (cấp thôn): dòng phụ là xã trực thuộc, admin_code = mã xã (lọc, phân quyền theo xã)
+          SELECT 'hanh_chinh' AS kind, CASE WHEN u.unit_type = 'phuong' THEN 'Phường ' WHEN u.unit_type = 'xa' THEN 'Xã '
+                 ELSE '' END || u.name AS label,
+                 CASE WHEN u.level = 'thon' THEN CASE WHEN par.unit_type = 'phuong' THEN 'Phường ' ELSE 'Xã ' END || par.name
+                      ELSE COALESCE('Địa bàn ' || u.old_district || ' cũ', 'Tỉnh Cao Bằng') END AS sub,
+                 ST_Y(COALESCE(u.center, par.center)) AS lat, ST_X(COALESCE(u.center, par.center)) AS lon,
+                 CASE WHEN u.level = 'thon' THEN par.code ELSE u.code END AS admin_code, u.code AS ref,
+                 similarity(spatial_admin.norm(u.name), (SELECT n FROM q)) AS score
+            FROM spatial_admin.administrative_units u
+            LEFT JOIN spatial_admin.administrative_units par ON par.id = u.parent_id
           UNION ALL
           SELECT 'dia_danh', p.name, u.name, ST_Y(p.geom), ST_X(p.geom), u.code, p.id::text,
                  similarity(spatial_admin.norm(p.name), (SELECT n FROM q))
             FROM spatial_admin.place_names p JOIN spatial_admin.administrative_units u ON u.id = p.admin_unit_id
+           WHERE p.kind <> 'thon'  -- xóm đã có ở cấp thôn phía trên
           UNION ALL
           SELECT 'tram', s.name, s.id, ST_Y(s.location), ST_X(s.location), NULL, s.id,
                  greatest(similarity(spatial_admin.norm(s.name), (SELECT n FROM q)), similarity(lower(s.id), lower(:q)))

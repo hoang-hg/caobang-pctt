@@ -8,7 +8,7 @@ import pytest
 from openpyxl import Workbook
 
 from app.services.data_import import parsing
-from app.services.data_import.engine import Report, check_duplicates, convert_rows
+from app.services.data_import.engine import Report, check_duplicates, convert_rows, xom_code
 from app.services.data_import.parsing import ImportFileError, norm_key, read_file
 from app.services.data_import.specs import DATASETS
 from app.services.data_import.templates import template
@@ -116,6 +116,38 @@ def test_defaults_and_derived_values():
     assert not report.errors
     assert rows[0].values["san_sang"] == 40  # trống → bằng quân số
     assert rows[0].values["ky_nang"] == ["cuu_nan", "vuot_lu"]
+
+
+def test_xom_code_ignores_type_prefix_and_accents():
+    assert xom_code("CB-PHUCHOA", "Xóm Nà Pò") == "CB-PHUCHOA-NAPO"
+    assert xom_code("CB-PHUCHOA", "  nà   pò ") == "CB-PHUCHOA-NAPO"
+    assert xom_code("CB-THUCPHAN", "Tổ dân phố 3") == xom_code("CB-THUCPHAN", "Tổ 3") == "CB-THUCPHAN-3"
+    assert xom_code("CB-HOAAN", "Bản Ngắn") == "CB-HOAAN-BANNGAN"  # "Bản" là một phần tên riêng, giữ lại
+    assert xom_code("CB-DAMTHUY", "Xóm Đông Đuốc") == "CB-DAMTHUY-DONGDUOC"
+
+
+def test_xom_rows_derive_code_and_catch_duplicate_names():
+    rows, report = _rows(
+        "xom",
+        "ma,ma_xa,ten,loai,dan_so,so_ho\n"
+        ",CB-PHUCHOA,Xóm Nà Pò,Xóm,320,80\n"
+        ",CB-PHUCHOA,Nà Pò,,,\n"  # cùng xóm viết khác → trùng mã
+        ",CB-DAMTHUY,Nà Pò,Tổ dân phố,,\n"  # cùng tên, xã khác → mã khác
+        "CB-PHUCHOA-KHUOI,CB-PHUCHOA,Xóm Khuổi Lường,xom,,\n"  # mã tự đặt được giữ
+        ",,Xóm Thiếu Xã,,,\n",
+    )
+    assert [r.values["ma"] for r in rows[:4]] == [
+        "CB-PHUCHOA-NAPO",
+        "CB-PHUCHOA-NAPO",
+        "CB-DAMTHUY-NAPO",
+        "CB-PHUCHOA-KHUOI",
+    ]
+    assert rows[0].values["loai"] == "xom" and rows[1].values["loai"] == "xom"  # trống → mặc định
+    assert rows[2].values["loai"] == "to_dan_pho"
+    errors = {(i.row, i.field) for i in report.errors}
+    assert (3, None) in errors  # trùng mã với dòng 2
+    assert (6, "ma_xa") in errors  # thiếu mã xã
+    assert not any(row in (2, 4, 5) for row, _ in errors)
 
 
 def test_inventory_duplicate_key_uses_codes():

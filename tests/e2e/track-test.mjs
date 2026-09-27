@@ -22,7 +22,7 @@ const login = async (u, p) => (await call('POST', '/auth/login', { username: u, 
 const track = (code, phone) => call('POST', '/public/track', { code, phone });
 
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGP8z8DAwMDAxMDAwMDAAAANHQEDasKb6QAAAABJRU5ErkJggg==', 'base64');
-const COBA = { lat: 22.905, lon: 105.775 };
+const COBA = { lat: 23.005, lon: 105.718 }; // trong xã Cô Ba theo ranh giới thật (seed/caobang_communes.geojson)
 const PHONE = `0999${String(Date.now()).slice(-6)}`;
 
 function reportForm({ desc, phone }) {
