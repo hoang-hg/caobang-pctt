@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Circle, CircleMarker, GeoJSON, MapContainer, Marker, Polyline, Popup, Tooltip, useMap } from 'react-leaflet';
+import { Circle, CircleMarker, GeoJSON, MapContainer, Marker, Pane, Polyline, Popup, Tooltip, useMap } from 'react-leaflet';
 import clsx from 'clsx';
 import {
   ShieldAlert, LocateFixed, Megaphone, Phone, Home, CloudRain, Waves, Camera, LogIn, Moon, Sun, Navigation, AlertTriangle,
@@ -11,7 +11,7 @@ import {
 import { api } from '../../api/client';
 import { useUnitsGeo, useUnits, useProvinceArea } from '../../api/hooks';
 import { useStore } from '../../app/store';
-import { BaseLayer, RAIN_BINS } from '../../components/map/MapTools';
+import { AdminBoundaries, BaseLayer, RAIN_BINS } from '../../components/map/MapTools';
 import { evacIcon, hazardIcon, pinIcon, stationIcon, reservoirIcon } from '../../components/map/icons';
 import { alarmLevel, LEVEL } from '../../utils/labels';
 import { ago, dateTime } from '../../utils/format';
@@ -27,12 +27,7 @@ import NetworkBanner from './NetworkBanner';
 
 const REFRESH = 60_000;
 const pub = (path, params) => api(`/public${path}`, { params });
-const BOUNDARY_COLORS = [
-  { id: 'red', name: 'Đỏ PCTT', hex: '#dc2626', bgCls: 'bg-red-600', desc: 'Chuẩn PCTT quốc gia, tương phản mạnh' },
-  { id: 'blue', name: 'Xanh Coban', hex: '#1d4ed8', bgCls: 'bg-blue-600', desc: 'Hài hòa, không trùng màu nguy hiểm' },
-  { id: 'amber', name: 'Cam cháy', hex: '#ea580c', bgCls: 'bg-orange-600', desc: 'Rõ nét trên nền vệ tinh & địa hình' },
-  { id: 'purple', name: 'Tím than', hex: '#7c3aed', bgCls: 'bg-purple-600', desc: 'Màu độc lập, trang nhã' },
-];
+const PROVINCE_COLOR = '#dc2626'; // ranh giới tỉnh: một màu cố định
 const RISK = {
   cao: { label: 'Nguy cơ CAO', cls: 'bg-danger text-white', icon: AlertTriangle, tip: 'Bạn đang nằm trong vùng có nguy cơ ngập lụt hoặc sạt lở đất. Hãy chủ động di dời tới điểm an toàn!' },
   trung_binh: { label: 'Cần theo dõi', cls: 'bg-warn text-black', icon: AlertTriangle, tip: 'Khu vực lân cận có nguy cơ hoặc dự báo mưa to. Cần chuẩn bị phương án phòng tránh.' },
@@ -79,40 +74,30 @@ const createClusterCustomIcon = (cluster) => {
   });
 };
 
-function PublicMap({ data, forecast, geo, me, route, target, layers, basemap = 'street', onSelectPoint, provinceArea, boundaryColor = '#dc2626' }) {
+function PublicMap({ data, forecast, geo, me, route, target, layers, basemap = 'street', onSelectPoint, provinceArea }) {
   const byCode = useMemo(() => Object.fromEntries((forecast || []).map((a) => [a.code, a])), [forecast]);
   return (
     <MapContainer center={[22.75, 106.05]} zoom={8.5} zoomSnap={0.25} className="h-full w-full" scrollWheelZoom>
       <BaseLayer basemap={basemap} />
       <FlyTo target={target} />
 
-      {/* Lớp ranh giới tỉnh Cao Bằng: Casing tương phản cao + Viền chính nổi bật */}
-      {provinceArea?.geometry && layers?.boundary !== false && (
-        <>
+      {/* Ranh giới xã/phường (luôn hiện) rồi ranh giới tỉnh trên cùng — pane riêng, không bị lớp tô màu che */}
+      <AdminBoundaries geo={geo} basemap={basemap} interactive={false} />
+      {provinceArea?.geometry && (
+        <Pane name="ranh-gioi-tinh" style={{ zIndex: 430 }}>
           <GeoJSON
-            key={`prov-casing-${boundaryColor}-${basemap}`}
+            key={`prov-casing-${basemap}`}
             data={provinceArea.geometry}
-            style={{
-              color: basemap === 'satellite' ? '#000000' : '#ffffff',
-              weight: 6,
-              opacity: 0.9,
-              fill: false,
-            }}
+            style={{ color: basemap === 'satellite' ? '#000000' : '#ffffff', weight: 6, opacity: 0.9, fill: false }}
             interactive={false}
           />
           <GeoJSON
-            key={`prov-line-${boundaryColor}`}
+            key={`prov-line-${basemap}`} // vẽ lại cùng viền nền khi đổi nền → luôn nằm trên viền
             data={provinceArea.geometry}
-            style={{
-              color: boundaryColor,
-              weight: 3.5,
-              opacity: 1,
-              fill: false,
-              dashArray: '10 4',
-            }}
+            style={{ color: PROVINCE_COLOR, weight: 3.5, opacity: 1, fill: false, dashArray: '10 4' }}
             interactive={false}
           />
-        </>
+        </Pane>
       )}
 
       {layers.forecast && geo && forecast?.length > 0 && (
@@ -120,11 +105,9 @@ function PublicMap({ data, forecast, geo, me, route, target, layers, basemap = '
           key={`fc-${forecast.length}-${forecast[0]?.p50}`}
           data={{ ...geo, features: geo.features.filter((f) => byCode[f.properties.code]) }}
           style={(f) => ({
-            color: '#475569',
-            weight: 1,
-            opacity: 0.6,
+            stroke: false, // đường biên xã do AdminBoundaries vẽ
             fillColor: rainColor(byCode[f.properties.code].p50),
-            fillOpacity: 0.55
+            fillOpacity: 0.55,
           })}
           onEachFeature={(f, l) => {
             const a = byCode[f.properties.code];
@@ -390,20 +373,7 @@ export default function PublicPortal() {
   const scrollToContent = () => tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   // SĐT chỉ giữ trong state (không đưa lên URL)
   const [track, setTrack] = useState({ code: trackParam, phone: '' });
-  const [layers, setLayers] = useState({ forecast: true, boundary: true, hazard: true, stations: true, reservoirs: true, landslides: true, evac: true, reports: true });
-  const [boundaryColor, setBoundaryColor] = useState(() => {
-    try {
-      return localStorage.getItem('cb_boundary_color') || '#dc2626';
-    } catch {
-      return '#dc2626';
-    }
-  });
-  const handleBoundaryColorChange = (hex) => {
-    setBoundaryColor(hex);
-    try {
-      localStorage.setItem('cb_boundary_color', hex);
-    } catch {}
-  };
+  const [layers, setLayers] = useState({ forecast: true, hazard: true, stations: true, reservoirs: true, landslides: true, evac: true, reports: true });
   const [basemap, setBasemap] = useState('street');
   const [selectedPoint, setSelectedPoint] = useState(null);
   const [me, setMe] = useState(null);
@@ -1028,7 +998,6 @@ export default function PublicPortal() {
                     <span className="font-semibold text-muted">Lớp hiển thị:</span>
                     {[
                       ['forecast', 'Mưa 24h'],
-                      ['boundary', 'Ranh giới tỉnh'],
                       ['hazard', 'Vùng ngập & sạt lở'],
                       ['stations', 'Trạm mực nước'],
                       ['reservoirs', 'Hồ chứa & Xả lũ'],
@@ -1049,31 +1018,7 @@ export default function PublicPortal() {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    {/* Chọn màu ranh giới tỉnh */}
-                    {layers.boundary && (
-                      <div className="flex items-center gap-1.5 bg-panel border border-line rounded-lg px-2 py-0.5 shadow-xs">
-                        <span className="text-[11px] font-semibold text-muted">Viền tỉnh:</span>
-                        <div className="flex items-center gap-1">
-                          {BOUNDARY_COLORS.map((c) => (
-                            <button
-                              key={c.id}
-                              type="button"
-                              title={`Màu ranh giới: ${c.name} (${c.desc})`}
-                              onClick={() => handleBoundaryColorChange(c.hex)}
-                              className={clsx(
-                                'h-4 w-4 rounded-full border border-white shadow-xs transition-all cursor-pointer',
-                                c.bgCls,
-                                boundaryColor === c.hex
-                                  ? 'scale-125 ring-2 ring-primary ring-offset-1 z-10'
-                                  : 'opacity-70 hover:opacity-100 hover:scale-110'
-                              )}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Chế độ bản đồ nền Google Maps */}
+                    {/* Chế độ bản đồ nền */}
                     <div className="flex items-center gap-1 bg-panel border border-line rounded-lg p-0.5 shadow-xs">
                       {[
                         ['street', 'Địa lý'],
@@ -1111,7 +1056,6 @@ export default function PublicPortal() {
                     basemap={basemap}
                     onSelectPoint={handleSelectPoint}
                     provinceArea={provinceArea}
-                    boundaryColor={boundaryColor}
                   />
                 </div>
 

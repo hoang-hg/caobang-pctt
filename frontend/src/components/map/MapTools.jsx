@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { GeoJSON, Marker, Polygon, Polyline, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet';
+import { GeoJSON, Marker, Pane, Polygon, Polyline, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet';
 import L from './leafletGlobal';
 import 'leaflet-draw';
 import { api } from '../../api/client';
@@ -199,16 +199,37 @@ export function FocusHandler() {
   );
 }
 
-export function AdminBoundaries({ geo }) {
+/**
+ * Ranh giới xã/phường: nét liền + viền nền tương phản bên dưới → rõ trên nền sáng, tối, vệ tinh và trên lớp tô màu mưa.
+ * Vẽ trong pane riêng (trên lớp tô màu, dưới điểm đánh dấu) nên không bị che dù dữ liệu tải về theo thứ tự nào.
+ * `basemap` như BaseLayer ('auto' theo theme); `interactive` = tooltip tên xã khi rê chuột lên đường biên.
+ */
+export function AdminBoundaries({ geo, basemap = 'auto', interactive = true }) {
   const theme = useStore((s) => s.theme);
   if (!geo) return null;
+  const dark = basemap === 'satellite' || basemap === 'dark' || (basemap === 'auto' && theme === 'dark');
+  const tone = dark ? 'dark' : 'light';
   return (
-    <GeoJSON
-      key={theme}
-      data={geo}
-      style={{ color: theme === 'dark' ? '#94a3b8' : '#475569', weight: 1, opacity: 0.55, fill: false, dashArray: '3 3' }}
-      onEachFeature={(f, layer) => layer.bindTooltip(`${f.properties.unit_type === 'phuong' ? 'Phường' : 'Xã'} ${f.properties.name}`, { sticky: true })}
-    />
+    <Pane name="ranh-gioi-xa" style={{ zIndex: 420 }}>
+      <GeoJSON
+        key={`halo-${tone}`}
+        data={geo}
+        interactive={false}
+        style={{ color: dark ? '#0f172a' : '#ffffff', weight: 3.5, opacity: dark ? 0.55 : 0.8, fill: false }}
+      />
+      <GeoJSON
+        key={`line-${tone}-${interactive}`}
+        data={geo}
+        interactive={interactive}
+        style={{ color: dark ? '#f8fafc' : '#1e293b', weight: 1.5, opacity: 0.9, fill: false }}
+        onEachFeature={
+          interactive
+            ? (f, layer) =>
+                layer.bindTooltip(`${f.properties.unit_type === 'phuong' ? 'Phường' : 'Xã'} ${f.properties.name}`, { sticky: true })
+            : undefined
+        }
+      />
+    </Pane>
   );
 }
 
