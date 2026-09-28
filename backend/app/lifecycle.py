@@ -17,6 +17,7 @@ from app.config import settings
 from app.db import engine
 from app.infra import storage
 from app.infra.heartbeat import heartbeat
+from app.infra.ops_watch import ops_watch
 from app.infra.redis import close_redis
 from app.integrations.mqtt_bridge import bridge
 from app.integrations.runner import ensure_default_sources, runner
@@ -65,8 +66,11 @@ async def startup() -> None:
     start_policy_watcher()
     if runs_api():
         hub.start_relay()
+    if settings.run_mode == "api":
+        ops_watch.start_api()  # theo dõi ngược nhịp worker chạy riêng
     if runs_worker():
         heartbeat.start()
+        ops_watch.start_worker()
         runner.start()
         bridge.start()
         if settings.simulator:
@@ -76,6 +80,7 @@ async def startup() -> None:
 
 async def shutdown() -> None:
     await heartbeat.stop()
+    await ops_watch.stop()
     await simulator.stop()
     await runner.stop()
     await bridge.stop()

@@ -65,6 +65,11 @@ x-backend-env: &backend-env
   SMTP_PASSWORD: ${SMTP_PASSWORD:-}
   SMTP_FROM: ${SMTP_FROM:-BCH PCTT Cao Bang <no-reply@${DOMAIN}>}
   SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
+  # Cảnh báo sự cố vận hành (README 10.6): trống = gửi SUPERADMIN_EMAIL
+  OPS_ALERT_EMAILS: ${OPS_ALERT_EMAILS:-}
+  OPS_ALERT_WEBHOOK_URL: ${OPS_ALERT_WEBHOOK_URL:-}
+  OPS_ALERT_REPEAT_MIN: ${OPS_ALERT_REPEAT_MIN:-180}
+  OPS_DISK_WARN_PCT: ${OPS_DISK_WARN_PCT:-85}
   TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-}
   TURNSTILE_SECRET: ${TURNSTILE_SECRET:-}
   LLM_API_URL: ${LLM_API_URL:-}
@@ -201,7 +206,11 @@ services:
     environment:
       <<: *backend-env
       RUN_MODE: worker
+      OPS_API_URL: http://backend:8000/health  # tự giám sát: API còn trả lời không
     command: ["python", "-m", "app.worker"]
+    volumes:  # tự giám sát: dung lượng ổ sao lưu, bản sao lưu mới nhất, lần chép ra ngoài gần nhất (chỉ đọc)
+      - ${BACKUP_DIR:-./backups}:/backups:ro
+      - offsite_state:/ops/offsite:ro
     networks: [data, default]
     healthcheck:  # nhịp worker (app/infra/heartbeat.py) ghi mỗi 30 s; quá 2 phút → unhealthy
       test: ["CMD-SHELL", "find /tmp/pctt-worker-heartbeat -mmin -2 | grep -q ."]
@@ -329,9 +338,10 @@ services:
     volumes:
       - ./deploy/backup-offsite.sh:/backup-offsite.sh:ro
       - ${BACKUP_DIR:-./backups}:/backups:ro
+      - offsite_state:/state  # lần chép thành công gần nhất → worker báo sự cố khi ngừng chép
     networks: [default]  # cần ra Internet (mạng "data" không có đường ra)
     healthcheck:  # chép thành công trong 3 chu kỳ gần nhất
-      test: ["CMD-SHELL", "[ -f /tmp/offsite-ok ] && [ $$(( $$(date +%s) - $$(cat /tmp/offsite-ok) )) -lt $$(( 3 * $${BACKUP_OFFSITE_EVERY_S:-3600} )) ]"]
+      test: ["CMD-SHELL", "[ -f /state/offsite-ok ] && [ $(( $(date +%s) - $(cut -d' ' -f1 /state/offsite-ok) )) -lt $(( 3 * ${BACKUP_OFFSITE_EVERY_S:-3600} )) ]"]
       interval: 5m
       timeout: 10s
       retries: 2
@@ -374,3 +384,4 @@ volumes:
   caddy_data:
   caddy_config:
   mqtt_data:
+  offsite_state:

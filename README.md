@@ -421,7 +421,17 @@ Mọi biến của backend khai báo ở `backend/app/config.py`. Tệp mẫu: `
 | `INTAKE_API_KEY` | trống (tắt) | tuỳ chọn, ≥ 32 ký tự | Cổng tiếp nhận SOS tự động |
 | `TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET` | trống | *khuyến nghị* (cả hai) | Chống bot form phản ánh |
 | `LLM_API_URL` / `_KEY` / `_MODEL` | trống | để trống ([11](#bao-mat)) | Bóc tách tin SOS bằng LLM |
-| `SMTP_HOST` / `_PORT` / `_USER` / `_PASSWORD` / `_STARTTLS` / `_FROM` | Mailpit | **bắt buộc** `SMTP_HOST` | Email quên mật khẩu |
+| `SMTP_HOST` / `_PORT` / `_USER` / `_PASSWORD` / `_STARTTLS` / `_FROM` | Mailpit | **bắt buộc** `SMTP_HOST` | Email quên mật khẩu, cảnh báo sự cố |
+
+**Cảnh báo sự cố vận hành** ([10.6](#giam-sat))
+
+| Biến | Mặc định | Chạy thật | Ý nghĩa |
+|---|---|---|---|
+| `OPS_ALERT_EMAILS` | trống = `SUPERADMIN_EMAIL` | *khuyến nghị* (nhóm vận hành) | Người nhận email sự cố, cách nhau dấu phẩy |
+| `OPS_ALERT_WEBHOOK_URL` | trống | *khuyến nghị* | Thêm kênh chat: POST `{"text": …}` (Slack, Mattermost, Google Chat, Telegram) |
+| `OPS_ALERT_REPEAT_MIN` | `180` | tuỳ chọn | Còn lỗi → nhắc lại sau bấy nhiêu phút |
+| `OPS_DISK_WARN_PCT` | `85` | tuỳ chọn | Báo khi ổ đĩa dữ liệu Docker / thư mục sao lưu dùng từ mức này |
+| `OPS_API_URL` | theo service | compose đặt cho worker | Worker gọi kiểm tra API (`http://backend:8000/health`) |
 
 **Sao lưu** (chỉ `docker-compose.prod.yml`): `BACKUP_DIR` (`./backups`), `BACKUP_KEEP_DAYS` (14), `BACKUP_AT` (giờ UTC, mặc định `19:30` = 02:30 giờ VN). Chép ra ngoài máy chủ: `BACKUP_REMOTE`, `OFFSITE_*` ([10.5](#sao-luu)) — trống thì backend cảnh báo khi khởi động.
 
@@ -973,6 +983,7 @@ Kiểm tra:
 ```bash
 curl -sI https://$DOMAIN/ | grep -iE "strict-transport|x-content-type"     # header bảo mật
 curl -s https://$DOMAIN/health                                             # "status":"ok"
+curl -s https://$DOMAIN/health/full                                        # mọi kiểm tra true (sau ~1 phút) → đặt giám sát ngoài (10.6)
 curl -sI https://$DOMAIN/api/v1/public/overview | grep -i x-cache-status    # MISS rồi HIT
 curl -s -o /dev/null -w "%{http_code}\n" -H "Range: bytes=0-99" https://$DOMAIN/tiles/caobang.pmtiles   # 206
 curl -s -o /dev/null -w "%{http_code} %{size_download}\n" https://$DOMAIN/ban-nhe                      # 200, < 50000
@@ -1041,11 +1052,34 @@ Khôi phục ảnh: `dcp stop minio`, rồi
 `docker run --rm -v caobang-pctt-prod_minio_data:/data -v "$PWD/backups/photos:/b" alpine tar -xzf /b/photos_<…>.tar.gz -C /data`,
 rồi `dcp up -d minio`. **Diễn tập khôi phục** ít nhất mỗi quý trên máy khác, ghi lại thời gian thực tế.
 
+<a id="giam-sat"></a>
 ### 10.6. Giám sát & xử lý sự cố
 
-- Dịch vụ giám sát bên ngoài (Uptime Kuma, UptimeRobot…) gọi `https://$DOMAIN/health` mỗi phút, cảnh báo khi không
-  trả 200 hoặc `"status"` khác `"ok"`. `/health` báo `degraded` khi Redis lỗi hoặc **worker mất nhịp quá 2 phút**
-  (`worker_heartbeat_age_s`) — worker chết thì không đồng bộ dự báo, không nhận MQTT, không phát hiện mất tín hiệu.
+**Tự giám sát, báo qua email** (`backend/app/infra/ops_watch.py`): mỗi phút kiểm tra rồi gửi tới `OPS_ALERT_EMAILS`
+(trống = `SUPERADMIN_EMAIL`), thêm webhook chat `OPS_ALERT_WEBHOOK_URL` nếu có.
+
+| Kiểm tra | Báo khi |
+|---|---|
+| CSDL, Redis | không trả lời trong 10 giây |
+| API (worker gọi `/health` của backend) | không trả 200 |
+| Worker (các tiến trình API theo dõi ngược) | mất nhịp quá 2 phút — ngừng đồng bộ dự báo, nhận MQTT, phát hiện mất tín hiệu |
+| Ổ đĩa `/` của container (ổ dữ liệu Docker: CSDL, ảnh) và `/backups` | đã dùng từ `OPS_DISK_WARN_PCT` (85%) |
+| Sao lưu CSDL (`backups/db`) | bản mới nhất quá 26 giờ |
+| Chép ra ngoài máy chủ (khi đặt `BACKUP_REMOTE`) | lần chép thành công gần nhất quá 3 chu kỳ; chưa chép lần nào sau 2 giờ |
+
+- Báo khi lỗi **2 lần liên tiếp** (khởi động lại dịch vụ lúc cập nhật không gây báo nhầm); còn lỗi → nhắc lại mỗi
+  `OPS_ALERT_REPEAT_MIN` phút, gộp mọi sự cố đang có vào 1 email; hết lỗi → email "ĐÃ KHÔI PHỤC". Khởi động lại worker
+  không báo lại sự cố đã báo (trạng thái lưu trong Redis).
+- Mọi sự cố đều ghi log worker (`dcp logs worker | grep "[ops]"`). SMTP lỗi thì email không đi → nên có thêm webhook chat.
+- Thử sau khi cài: đặt `OPS_DISK_WARN_PCT=1` trong `.env.production`, `dcp up -d worker` → email trong ~2 phút; trả lại
+  giá trị cũ, `dcp up -d worker` → email khôi phục.
+
+**Giám sát bên ngoài — vẫn bắt buộc**: máy chủ mất điện, mất mạng, Docker dừng thì không tiến trình nào tự báo được. Dịch
+vụ giám sát đặt ở **nơi khác** (Uptime Kuma trên máy khác, UptimeRobot, hệ thống giám sát của trung tâm dữ liệu) gọi
+`https://$DOMAIN/health/full` mỗi phút, cảnh báo khi không trả **200**: trả 503 khi bất kỳ kiểm tra nào ở bảng trên đang
+lỗi (chỉ tên kiểm tra + đạt / lỗi; chi tiết trong email). `/health` dành cho healthcheck container: luôn 200 khi API chạy,
+`"status": "degraded"` khi Redis lỗi hoặc worker mất nhịp.
+
 - Mọi service có healthcheck (`dcp ps` cột STATUS): db, redis, minio, backend (`/health`), worker (nhịp 30 s), frontend,
   caddy, mqtt, backup (có bản sao lưu trong 26 giờ). `unhealthy` kéo dài → xem `dcp logs <service>`.
 - Trang **Nguồn dữ liệu**: trạng thái đồng bộ, MQTT, thiết bị mất tín hiệu.
@@ -1137,6 +1171,7 @@ Kiểm thử API (cần stack dev đang chạy với `DEMO_MODE=true`; tham số
 | Điểm đen sạt lở & đường đèo | `node tests/e2e/landslide-test.mjs` |
 | Nhập dữ liệu (12 loại, kiểm tra lỗi, cập nhật không trùng, thay toàn bộ) | `node tests/e2e/import-test.mjs` |
 | Bản nhẹ `/ban-nhe`, service worker, manifest — qua nginx (tham số = địa chỉ frontend, mặc định `http://localhost:8080`) | `node tests/e2e/lite-test.mjs` |
+| Tự giám sát: `/health/full`; email cảnh báo sự cố khi backend có `OPS_DISK_WARN_PCT=1` (giả lập ổ đĩa đầy, ~2 phút) | `node tests/e2e/ops-test.mjs [backend] [mailpit]` |
 
 Chạy lại nhiều lần liên tiếp: xoá khoá `rl:*` trong Redis trước (lệnh ở 4.5).
 
@@ -1183,7 +1218,7 @@ tăng CPU nếu kịch bản đồng thời chưa đạt.
 
 **CI** (`.github/workflows/ci.yml`, mỗi push / PR): ruff + pytest; build frontend; kiểm tra `docker-compose.prod.yml`
 (thiếu bí mật phải báo lỗi, đủ bí mật phải hợp lệ); dựng stack bằng `docker-compose.yml` với `DEMO_MODE=true`,
-`SIMULATOR=true`, `TOTP_REQUIRED_ROLES=kiem_thu_2fa` và chạy 10 bộ kiểm thử API. **Deploy** (`deploy.yml`): tag `vX.Y.Z` → build & đẩy image lên GitHub
+`SIMULATOR=true`, `TOTP_REQUIRED_ROLES=kiem_thu_2fa`, `OPS_DISK_WARN_PCT=1` và chạy 11 bộ kiểm thử API. **Deploy** (`deploy.yml`): tag `vX.Y.Z` → build & đẩy image lên GitHub
 Container Registry.
 
 ---
