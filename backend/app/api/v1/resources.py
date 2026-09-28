@@ -7,7 +7,7 @@ from app.area import area_clause
 from app.auth import audit
 from app.db import fetch_all, fetch_one, transaction
 from app.infra.cache import cached_view
-from app.rbac import scope_loaders
+from app.rbac import domains, scope_loaders
 from app.rbac.authz import area_scope, require_permission
 from app.services.events import log_event
 from app.ws.hub import hub
@@ -74,21 +74,25 @@ async def warehouses(codes: list[str] = Depends(RES), level: str | None = None):
     rows = await fetch_all(
         f"""SELECT w.id, w.code, w.name, w.level, w.manager, w.phone, u.name AS admin_name, u.code AS admin_code,
                    ST_Y(w.location) AS lat, ST_X(w.location) AS lon,
-                   json_agg(json_build_object('item_code', inv.item_code, 'name', i.name, 'category', i.category, 'unit', i.unit,
-                            'quantity', inv.quantity, 'safety_quota', inv.safety_quota, 'expiry_date', inv.expiry_date,
-                            'last_updated', inv.last_updated,
+                   COALESCE(json_agg(json_build_object('item_code', inv.item_code, 'name', i.name, 'category', i.category,
+                            'unit', i.unit, 'quantity', inv.quantity, 'safety_quota', inv.safety_quota,
+                            'expiry_date', inv.expiry_date, 'last_updated', inv.last_updated,
                             'pct', round(100.0 * inv.quantity / NULLIF(inv.safety_quota, 0)))
-                            ORDER BY i.category, i.code) AS items
+                            ORDER BY i.category, i.code) FILTER (WHERE inv.item_code IS NOT NULL), '[]') AS items
               FROM resources.warehouses w
               LEFT JOIN spatial_admin.administrative_units u ON u.id = w.admin_unit_id
-              JOIN resources.inventory inv ON inv.warehouse_id = w.id JOIN resources.items i ON i.code = inv.item_code
+              -- LEFT JOIN: kho vừa nhập (loại "kho") chưa có dòng tồn kho vẫn phải hiện
+              LEFT JOIN resources.inventory inv ON inv.warehouse_id = w.id
+              LEFT JOIN resources.items i ON i.code = inv.item_code
              WHERE {area_clause('w.location', codes)} AND (CAST(:level AS text) IS NULL OR w.level = :level)
              GROUP BY w.id, u.name, u.code ORDER BY array_position(ARRAY['tinh', 'cum', 'xa', 'da_chien'], w.level), w.code""",
         {"codes": codes, "level": level},
     )
-    from datetime import date, timedelta
+    from datetime import datetime, timedelta
 
-    soon = (date.today() + timedelta(days=30)).isoformat()
+    from app.services.lite import VN_TZ
+
+    soon = (datetime.now(VN_TZ).date() + timedelta(days=30)).isoformat()  # theo ngày Việt Nam, không theo UTC
     for w in rows:
         w["alerts"] = {
             "critical": [it["item_code"] for it in w["items"] if (it["pct"] or 0) < 20],
@@ -135,7 +139,7 @@ async def evacuation_sites(codes: list[str] = Depends(RES)):
                    ST_Y(e.location) AS lat, ST_X(e.location) AS lon
               FROM resources.evacuation_sites e LEFT JOIN spatial_admin.administrative_units u ON u.id = e.admin_unit_id
              WHERE {area_clause('e.location', codes)}
-             ORDER BY (e.current_occupancy::float / e.capacity) DESC""",
+             ORDER BY (e.current_occupancy::float / NULLIF(e.capacity, 0)) DESC NULLS LAST""",
         {"codes": codes},
     )
 
@@ -169,7 +173,7 @@ async def issue(
             conn,
         )
         await audit(user, "inventory.issue", "warehouse", warehouse_id, body.model_dump(), conn)
-    await hub.publish("inventory.changed", row)
+    await hub.publish("inventory.changed", row, "resource", domains.code_of_unit_id(wh["admin_unit_id"]))
     await log_event(
         f"{wh['name']} xuất {body.quantity} {body.item_code}"
         + (f" cho {body.destination}" if body.destination else ""),

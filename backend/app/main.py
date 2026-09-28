@@ -36,7 +36,7 @@ from app.infra.redis import get_redis
 from app.lifecycle import shutdown, startup
 from app.rbac.authz import allowed_codes
 from app.services.simulator import simulator
-from app.ws.hub import Client, hub
+from app.ws.hub import SCOPE_ACTIONS, Client, hub
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 # httpx ghi cả URL ở mức INFO → lộ API key trong query (Open-Meteo, OpenWeather). Chỉ ghi cảnh báo.
@@ -165,8 +165,8 @@ async def ws_endpoint(ws: WebSocket, token: str = ""):
         await ws.close(code=4401)
         return
     scopes = {}
-    for obj in ("sos", "monitoring", "report"):
-        codes = allowed_codes(user, obj, "view")
+    for obj, act in SCOPE_ACTIONS.items():
+        codes = allowed_codes(user, obj, act)
         scopes[obj] = None if codes is None else set(codes)
     client = Client(ws, user["username"], scopes)
     await hub.connect(client)

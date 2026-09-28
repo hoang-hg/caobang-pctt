@@ -16,7 +16,7 @@ from app.rbac.authz import area_scope, can, forbidden, require_any, require_perm
 from app.services import dispatch_matching
 from app.services.events import log_event
 from app.services.safe_routing import VEHICLE_SPEED, plan_route
-from app.services.sos import TICKET_SELECT, create_ticket, get_ticket
+from app.services.sos import SLA_MINUTES, TICKET_SELECT, create_ticket, get_ticket
 from app.services.sos_nlp import extract
 from app.ws.hub import hub
 
@@ -28,7 +28,6 @@ STATUS_LABEL = {
     "thuc_thi": "Đang thực thi",
     "hoan_thanh": "Hoàn thành",
 }
-SLA_MINUTES = {1: 3, 2: 15, 3: 60}  # thời hạn phản hồi điều phối theo cấp ưu tiên
 
 
 @router.get("/sos")
@@ -55,9 +54,9 @@ class SosIn(BaseModel):
     reporter_phone: str | None = None
     lat: float | None = None
     lon: float | None = None
-    incident_type: str | None = None
+    incident_type: str | None = Field(None, pattern="^(ngap_lut|sat_lo|lu_quet|sap_nha|cap_cuu|tiep_te)$")
     priority: int | None = Field(None, ge=1, le=3)
-    trapped_count: int | None = None
+    trapped_count: int | None = Field(None, ge=0, le=10000)
     vulnerable: list[str] | None = None
     address: str | None = None
 
@@ -168,8 +167,9 @@ async def release_dispatch(ticket_id: str) -> None:
                 conn,
             )
             await execute(
-                "UPDATE resources.vehicles SET status = 'san_sang', mission_ticket_id = NULL, updated_at = now() WHERE id = ANY(:v)",
-                {"v": o["vehicle_ids"]},
+                """UPDATE resources.vehicles SET status = 'san_sang', mission_ticket_id = NULL, updated_at = now()
+                    WHERE id = ANY(:v) AND mission_ticket_id = CAST(:t AS uuid)""",  # xe đã nhận nhiệm vụ khác → giữ
+                {"v": o["vehicle_ids"], "t": ticket_id},
                 conn,
             )
 
@@ -220,17 +220,45 @@ async def dispatch(body: DispatchIn, user: dict = Depends(require_any("dispatch"
         raise HTTPException(404, "Không tìm thấy phiếu SOS hoặc lực lượng")
     if ticket["status"] == "hoan_thanh":
         raise HTTPException(400, "Phiếu đã hoàn thành")
+    if force["personnel_ready"] < 1:
+        raise HTTPException(409, f"{force['name']} không còn người sẵn sàng")
+    vehicle_ids = list(dict.fromkeys(body.vehicle_ids))
     vtypes = await fetch_all(
         "SELECT vehicle_type FROM resources.vehicles WHERE id = ANY(CAST(:v AS uuid[]))",
-        {"v": body.vehicle_ids},
+        {"v": vehicle_ids},
     )
+    if len(vtypes) != len(vehicle_ids):
+        raise HTTPException(404, "Không tìm thấy phương tiện")
     speeds = [VEHICLE_SPEED.get(v["vehicle_type"], 40) for v in vtypes]
     speed_factor = (min(speeds) / 40) if speeds else 1.0
     route = await plan_route(force["lat"], force["lon"], ticket["lat"], ticket["lon"], speed_factor)
-    personnel = min(body.personnel, max(force["personnel_ready"], 1))
+    personnel = min(body.personnel, force["personnel_ready"])
     eta = datetime.now(UTC) + timedelta(minutes=route["duration_min"])
 
     async with transaction() as conn:
+        # Trừ quân số / nhận phương tiện có điều kiện → hai lệnh đồng thời (hai điều phối viên, danh sách cũ trên màn
+        # hình) không làm âm quân số hay gán một phương tiện cho hai nhiệm vụ. Lỗi → rollback cả lệnh.
+        taken = await fetch_one(
+            """UPDATE resources.forces SET personnel_ready = personnel_ready - :p, personnel_on_mission = personnel_on_mission + :p,
+                      status = CASE WHEN personnel_ready - :p <= 0 THEN 'nhiem_vu' ELSE status END, updated_at = now()
+                WHERE id = CAST(:f AS uuid) AND personnel_ready >= :p RETURNING id""",
+            {"p": personnel, "f": body.force_id},
+            conn,
+        )
+        if not taken:
+            raise HTTPException(
+                409, f"{force['name']} vừa được điều động — không đủ {personnel} người sẵn sàng"
+            )
+        busy = await fetch_all(
+            """UPDATE resources.vehicles SET status = 'nhiem_vu', mission_ticket_id = CAST(:t AS uuid), updated_at = now()
+                WHERE id = ANY(CAST(:v AS uuid[])) AND status = 'san_sang' RETURNING id""",
+            {"t": body.ticket_id, "v": vehicle_ids},
+            conn,
+        )
+        if len(busy) != len(vehicle_ids):
+            raise HTTPException(
+                409, "Có phương tiện không còn sẵn sàng (đang làm nhiệm vụ / bảo dưỡng) — chọn lại"
+            )
         order = await fetch_one(
             """INSERT INTO operations.dispatch_orders (ticket_id, force_id, vehicle_ids, personnel, supplies, dispatched_by, eta,
                                                        route_geom, distance_km, route_safe)
@@ -240,7 +268,7 @@ async def dispatch(body: DispatchIn, user: dict = Depends(require_any("dispatch"
             {
                 "t": body.ticket_id,
                 "f": body.force_id,
-                "v": body.vehicle_ids,
+                "v": vehicle_ids,
                 "p": personnel,
                 "s": json.dumps(body.supplies),
                 "by": user["full_name"],
@@ -257,19 +285,6 @@ async def dispatch(body: DispatchIn, user: dict = Depends(require_any("dispatch"
             {"t": body.ticket_id},
             conn,
         )
-        await execute(
-            """UPDATE resources.forces SET personnel_ready = personnel_ready - :p, personnel_on_mission = personnel_on_mission + :p,
-                      status = CASE WHEN personnel_ready - :p <= 0 THEN 'nhiem_vu' ELSE status END, updated_at = now()
-                WHERE id = CAST(:f AS uuid)""",
-            {"p": personnel, "f": body.force_id},
-            conn,
-        )
-        await execute(
-            """UPDATE resources.vehicles SET status = 'nhiem_vu', mission_ticket_id = CAST(:t AS uuid), updated_at = now()
-                WHERE id = ANY(CAST(:v AS uuid[]))""",
-            {"t": body.ticket_id, "v": body.vehicle_ids},
-            conn,
-        )
         await audit(
             user,
             "dispatch.create",
@@ -277,7 +292,7 @@ async def dispatch(body: DispatchIn, user: dict = Depends(require_any("dispatch"
             ticket["code"],
             {
                 "force": force["name"],
-                "vehicles": len(body.vehicle_ids),
+                "vehicles": len(vehicle_ids),
                 "personnel": personnel,
                 "route_km": route["distance_km"],
             },
@@ -290,7 +305,7 @@ async def dispatch(body: DispatchIn, user: dict = Depends(require_any("dispatch"
         "dispatch.updated", {"dispatch_id": order["id"], "ticket_id": body.ticket_id, "status": "dang_di"}
     )
     await log_event(
-        f"LỆNH ĐIỀU ĐỘNG: {force['name']} ({personnel} người, {len(body.vehicle_ids)} phương tiện) → {ticket['code']}, "
+        f"LỆNH ĐIỀU ĐỘNG: {force['name']} ({personnel} người, {len(vehicle_ids)} phương tiện) → {ticket['code']}, "
         f"{route['distance_km']} km, ETA {route['duration_min']} phút"
         + ("" if route["safe"] else " – ⚠ lộ trình qua vùng nguy hiểm"),
         "cuu_ho",
@@ -326,7 +341,7 @@ async def evacuation(codes: list[str] = Depends(area_scope("monitoring", "view")
         f"""SELECT e.id, e.name, e.site_type, e.capacity, e.current_occupancy, u.name AS admin_name
               FROM resources.evacuation_sites e JOIN spatial_admin.administrative_units u ON u.id = e.admin_unit_id
              WHERE {area_clause('e.location', codes)}
-             ORDER BY (e.current_occupancy::float / e.capacity) DESC""",
+             ORDER BY (e.current_occupancy::float / NULLIF(e.capacity, 0)) DESC NULLS LAST""",
         {"codes": codes},
     )
     return {"progress": progress, "sites": sites}

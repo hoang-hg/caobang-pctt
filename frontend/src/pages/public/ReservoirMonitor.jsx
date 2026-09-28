@@ -3,11 +3,13 @@ import { useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
 import {
   Waves, AlertTriangle, ShieldCheck, ArrowDownRight, ArrowUpRight,
-  Gauge, Compass, RefreshCw, Info, Droplets, MapPin, Eye, Zap,
-  CheckCircle2, Search, SlidersHorizontal, ChevronRight, Siren
+  Gauge, Compass, RefreshCw, Info, Droplets, MapPin, Zap,
+  CheckCircle2, Search, SlidersHorizontal, Siren
 } from 'lucide-react';
 import { api } from '../../api/client';
-import { ago, dateTime } from '../../utils/format';
+import { ago } from '../../utils/format';
+
+const EMPTY = [];
 
 const REFRESH_INTERVAL = 20_000;
 
@@ -16,13 +18,13 @@ export default function ReservoirMonitor({ onSelectOnMap }) {
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const { data, isLoading, isFetching, refetch } = useQuery({
+  const { data, isFetching, refetch } = useQuery({
     queryKey: ['pub-reservoirs'],
     queryFn: () => api('/public/reservoirs'),
     refetchInterval: REFRESH_INTERVAL,
   });
 
-  const reservoirs = data?.reservoirs || [];
+  const reservoirs = data?.reservoirs || EMPTY; // mảng cố định: useMemo bên dưới không tính lại mỗi lần vẽ khi chưa có dữ liệu
   const basins = data?.basins || [];
 
   const filteredReservoirs = useMemo(() => {
@@ -305,7 +307,6 @@ export default function ReservoirMonitor({ onSelectOnMap }) {
           const isSpilling = r.status_code === 'xa_dieu_tiet';
           const isNormal = r.status_code === 'binh_thuong';
 
-          const pct = Math.min(100, Math.max(0, r.volume_pct ?? 0));
           const gatesTotal = r.spill_gates || 4;
           const gatesOpen = r.spill_gates_open || 0;
 

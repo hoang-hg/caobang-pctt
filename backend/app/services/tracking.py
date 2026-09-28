@@ -384,9 +384,12 @@ def normalize_code(raw: str) -> str | None:
 
 
 def phone_matches(stored: str | None, given: str | None) -> bool:
-    """So 9 số cuối (bỏ qua 0 / +84 đầu số)."""
+    """So 9 số cuối (bỏ qua 0 / +84 đầu số). Số lưu ngắn hơn 9 chữ số (máy bàn không mã vùng…) → so toàn bộ, để người
+    gửi vẫn tra được phiếu của mình."""
     s, g = re.sub(r"\D", "", stored or ""), re.sub(r"\D", "", given or "")
-    return len(s) >= 9 and len(g) >= 9 and s[-9:] == g[-9:]
+    if len(s) < 9:
+        return len(s) >= 6 and s == g
+    return len(g) >= 9 and s[-9:] == g[-9:]
 
 
 def _empty(code: str) -> dict:

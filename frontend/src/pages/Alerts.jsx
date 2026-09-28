@@ -60,7 +60,9 @@ function Composer() {
   }, [codes, polygon]);
 
   const unfilled = template?.params.filter((p) => !params[p]) || [];
+  const [sending, setSending] = useState(false); // bấm đúp → 2 lệnh cảnh báo trùng chờ duyệt
   const submit = async () => {
+    setSending(true);
     try {
       const res = await api('/alerts/broadcasts', {
         method: 'POST',
@@ -76,6 +78,8 @@ function Composer() {
       setCodes([]);
     } catch (e) {
       toast({ tone: 'danger', title: 'Không gửi được', body: e.message });
+    } finally {
+      setSending(false);
     }
   };
 
@@ -155,7 +159,7 @@ function Composer() {
           </div>
         )}
         {unfilled.length > 0 && <div className="text-xs text-warn">Chưa điền: {unfilled.map((p) => PARAM_LABEL[p]).join(', ')}</div>}
-        <button className="btn-danger justify-center" disabled={!auth || !title || body.length < 10 || !channels.length || (!codes.length && !polygon)} onClick={submit}>
+        <button className="btn-danger justify-center" disabled={sending || !auth || !title || body.length < 10 || !channels.length || (!codes.length && !polygon)} onClick={submit}>
           <Send size={15} /> Gửi Lãnh đạo phê duyệt
         </button>
         {!auth && <div className="text-xs text-danger">Đăng nhập (tài khoản Trực ban) để soạn lệnh.</div>}
@@ -170,7 +174,9 @@ function ApproveModal({ b, onClose }) {
   const [pin, setPin] = useState('');
   const [reason, setReason] = useState('');
   const [mode, setMode] = useState('approve');
+  const [busy, setBusy] = useState(false);
   const run = async () => {
+    setBusy(true);
     try {
       if (mode === 'approve') await api(`/alerts/broadcasts/${b.id}/approve`, { method: 'POST', body: { pin } });
       else await api(`/alerts/broadcasts/${b.id}/reject`, { method: 'POST', body: { reason } });
@@ -179,6 +185,8 @@ function ApproveModal({ b, onClose }) {
       onClose();
     } catch (e) {
       toast({ tone: 'danger', title: 'Không thực hiện được', body: e.message });
+    } finally {
+      setBusy(false);
     }
   };
   return (
@@ -190,8 +198,8 @@ function ApproveModal({ b, onClose }) {
         <>
           <button className="btn-ghost" onClick={onClose}>Đóng</button>
           {mode === 'approve'
-            ? <button className="btn-danger" disabled={pin.length < 4} onClick={run}><ShieldCheck size={15} /> Xác nhận phát lệnh</button>
-            : <button className="btn-ghost text-danger" disabled={reason.length < 3} onClick={run}><XCircle size={15} /> Từ chối</button>}
+            ? <button className="btn-danger" disabled={busy || pin.length < 4} onClick={run}><ShieldCheck size={15} /> Xác nhận phát lệnh</button>
+            : <button className="btn-ghost text-danger" disabled={busy || reason.length < 3} onClick={run}><XCircle size={15} /> Từ chối</button>}
         </>
       }
     >

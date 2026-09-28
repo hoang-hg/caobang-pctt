@@ -65,7 +65,7 @@ def normalize(code: str) -> str:
 def match_step(secret: str, code: str, last_step: int | None, now: float | None = None) -> int | None:
     """Bước thời gian mà mã 6 số khớp (khung ±1 bước) và chưa dùng; None nếu sai / đã dùng."""
     code = normalize(code)
-    if len(code) != 6 or not code.isdigit():
+    if len(code) != 6 or not (code.isascii() and code.isdigit()):  # isdigit() nhận cả chữ số Ả Rập…
         return None
     totp = pyotp.TOTP(secret)
     current = int((time.time() if now is None else now) // STEP_SECONDS)

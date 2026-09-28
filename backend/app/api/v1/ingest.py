@@ -48,9 +48,16 @@ async def _check_source_token(code: str, authorization: str | None) -> None:
     src = await fetch_one(
         "SELECT enabled, secret_enc FROM integrations.data_sources WHERE code = :c", {"c": code}
     )
-    token = (authorization or "").removeprefix("Bearer ").strip()
+    token = (
+        (authorization or "").removeprefix("Bearer ").strip()
+    )  # so bytes: header có ký tự ngoài ASCII → 401, không phải TypeError / 500
     expected = crypto.decrypt(src["secret_enc"]) if src else None
-    if not src or not src["enabled"] or not expected or not hmac.compare_digest(token, expected):
+    if (
+        not src
+        or not src["enabled"]
+        or not expected
+        or not hmac.compare_digest(token.encode(), expected.encode())
+    ):
         raise HTTPException(401, "Token nguồn dữ liệu không hợp lệ hoặc nguồn đang tắt")
 
 

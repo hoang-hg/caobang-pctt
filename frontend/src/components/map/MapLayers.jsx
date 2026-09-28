@@ -58,8 +58,12 @@ function WarehousePopup({ p, onIssue }) {
   return (
     <div className="w-64">
       <div className="font-semibold">{p.name}</div>
-      <div className="text-xs text-muted">Tồn kho trung bình {p.pct}% định mức</div>
-      <div className="flex items-center gap-2">
+      {p.pct == null ? (
+        <div className="text-xs text-muted">Chưa có số liệu tồn kho (nhập bằng loại dữ liệu “Tồn kho”)</div>
+      ) : (
+        <div className="text-xs text-muted">Tồn kho trung bình {p.pct}% định mức</div>
+      )}
+      {p.pct != null && <div className="flex items-center gap-2">
         <div className="h-24 w-24">
           <ResponsiveContainer>
             <PieChart>
@@ -79,7 +83,7 @@ function WarehousePopup({ p, onIssue }) {
             </li>
           ))}
         </ul>
-      </div>
+      </div>}
       <div className="mt-2 flex gap-1">
         <Can I="inventory" a="issue" scope={p.admin_code}>
           <button className="btn-primary px-2 py-1 text-xs" onClick={() => onIssue(p)}><PackageMinus size={12} /> Ra lệnh xuất kho</button>

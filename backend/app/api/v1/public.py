@@ -241,6 +241,10 @@ async def forecast_areas(hours: int = Query(24, description="24 hoặc 72")):
 
 @router.get("/forecast/areas/{code}")
 async def forecast_area(code: str):
+    # Mã lạ → 404 ngay, không tạo khoá cache (gửi hàng loạt mã rác không lấp được Redis)
+    if code not in {u["code"] for u in await cached("public:communes", 3600, lite.communes)}:
+        raise HTTPException(404, "Không tìm thấy xã")
+
     async def build():
         unit = await fetch_one(
             "SELECT id, code, name FROM spatial_admin.administrative_units WHERE code = :c AND level = 'xa'",

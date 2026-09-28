@@ -84,11 +84,14 @@ async def _layers(codes: list[str], res_codes: list[str], sos_codes: list[str]) 
     warehouses = await fetch_all(
         f"""SELECT w.id, w.code, w.name, w.level, w.phone,
                    (SELECT u.code FROM spatial_admin.administrative_units u WHERE u.id = w.admin_unit_id) AS admin_code, ST_Y(w.location) AS lat, ST_X(w.location) AS lon,
-                   json_agg(json_build_object('category', i.category, 'pct',
-                            round(100.0 * inv.quantity / NULLIF(inv.safety_quota, 0)))) AS items,
+                   COALESCE(json_agg(json_build_object('category', i.category, 'pct',
+                            round(100.0 * inv.quantity / NULLIF(inv.safety_quota, 0))))
+                            FILTER (WHERE inv.item_code IS NOT NULL), '[]') AS items,
                    round(100.0 * sum(inv.quantity) / NULLIF(sum(inv.safety_quota), 0))::int AS pct
               FROM resources.warehouses w
-              JOIN resources.inventory inv ON inv.warehouse_id = w.id JOIN resources.items i ON i.code = inv.item_code
+              -- LEFT JOIN: kho chưa có dòng tồn kho vẫn hiện trên bản đồ (pct = null)
+              LEFT JOIN resources.inventory inv ON inv.warehouse_id = w.id
+              LEFT JOIN resources.items i ON i.code = inv.item_code
              WHERE {area_clause('w.location', res_codes)}
              GROUP BY w.id""",
         pr,
@@ -171,7 +174,14 @@ async def timeline(offset_h: int = 0, _: dict = Depends(require_any("monitoring"
     )
     main = next((r["value"] for r in rows if r["id"] == "CB-WL-01"), None)
     flood_factor = None
-    if main is not None:
+    # Trạm nhập lại có thể thiếu ngưỡng / ngưỡng không tăng dần → không tính hệ số ngập (thay vì lỗi 500)
+    if (
+        main is not None
+        and wl
+        and wl["bd1"] is not None
+        and wl["bd3"] is not None
+        and wl["bd3"] - wl["bd1"] + 1 > 0
+    ):
         flood_factor = round(max(0.0, min(1.6, (main - (wl["bd1"] - 1)) / (wl["bd3"] - wl["bd1"] + 1))), 2)
     return {
         "time": at,

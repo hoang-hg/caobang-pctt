@@ -8,6 +8,7 @@ from app.infra.cache import cached_view
 from app.rbac.authz import area_scope, require_any
 from app.services.landslides import get_landslides_overview
 from app.services.reservoirs import get_reservoirs_overview
+from app.services.sos import OVERDUE_SQL
 
 router = APIRouter(tags=["Dashboard"])
 MON = area_scope("monitoring", "view")
@@ -56,7 +57,7 @@ async def _kpis(codes: list[str]) -> dict:
     )
     sos = await fetch_one(
         f"""SELECT count(*) FILTER (WHERE status = 'moi') AS waiting,
-                   count(*) FILTER (WHERE status = 'moi' AND received_at < now() - interval '15 minutes') AS overdue,
+                   count(*) FILTER (WHERE {OVERDUE_SQL}) AS overdue,
                    count(*) FILTER (WHERE status IN ('dieu_phoi', 'thuc_thi')) AS in_progress,
                    count(*) FILTER (WHERE status = 'hoan_thanh' AND resolved_at > now() - interval '24 hours') AS resolved_24h,
                    count(*) FILTER (WHERE status <> 'hoan_thanh' AND priority = 1) AS critical,

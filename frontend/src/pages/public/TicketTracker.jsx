@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
 import {
-  Search, Clock, Truck, ShieldCheck, Check, AlertTriangle, PhoneCall,
-  Loader2, RefreshCw, X, MapPin, Copy, CheckCircle2, ChevronRight, Navigation,
+  Search, Clock, Truck, Check, AlertTriangle, PhoneCall,
+  Loader2, RefreshCw, X, MapPin, Copy, Navigation,
   AlertCircle, Sparkles, FileText, Phone
 } from 'lucide-react';
 import { api } from '../../api/client';

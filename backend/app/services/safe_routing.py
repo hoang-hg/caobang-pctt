@@ -116,6 +116,32 @@ async def plan_route(
     from_lat: float, from_lon: float, to_lat: float, to_lon: float, speed_factor: float = 1.0
 ) -> dict:
     edges, nodes = await load_graph()
+    return build_route(edges, nodes, from_lat, from_lon, to_lat, to_lon, speed_factor)
+
+
+def build_route(
+    edges: list[Edge],
+    nodes: dict[int, tuple[float, float]],
+    from_lat: float,
+    from_lon: float,
+    to_lat: float,
+    to_lon: float,
+    speed_factor: float = 1.0,
+) -> dict:
+    """Tuyến an toàn trên đồ thị đường (hàm thuần). ``roads`` rỗng = không có đường nối → nét thẳng (chim bay)."""
+    if not nodes:  # chưa có mạng đường → đường chim bay, không bảo đảm an toàn
+        km = haversine_km(from_lat, from_lon, to_lat, to_lon)
+        return {
+            "geometry": {
+                "type": "LineString",
+                "coordinates": [[from_lon, from_lat], [to_lon + 1e-5, to_lat + 1e-5]],
+            },
+            "distance_km": round(km, 1),
+            "duration_min": round(km / 15 * 60),
+            "safe": False,
+            "roads": [],
+            "blocked_segments": 0,
+        }
     a = nearest_node(nodes, from_lat, from_lon)
     b = nearest_node(nodes, to_lat, to_lon)
     safe = True
@@ -128,6 +154,12 @@ async def plan_route(
     hours = 0.0
     km = haversine_km(from_lat, from_lon, *nodes[a])
     hours += km / 20  # chặng tiếp cận nút giao gần nhất
+    if not path and a != b:
+        # Hai nút giao không nối với nhau (mạng đường rời) → đoạn giữa chưa có đường: tính theo đường chim bay,
+        # nếu không quãng đường / thời gian bị báo thiếu cả đoạn này
+        gap = haversine_km(*nodes[a], *nodes[b])
+        km += gap
+        hours += gap / 15
     passes_hazard = False
     roads: list[str] = []
     for e, fwd in path:

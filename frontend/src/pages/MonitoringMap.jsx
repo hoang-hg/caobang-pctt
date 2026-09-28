@@ -4,8 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import { MapContainer, ScaleControl, ZoomControl } from 'react-leaflet';
 import clsx from 'clsx';
 import {
-  Layers, Ruler, Route, PenTool, Circle as CircleIcon, Map as MapIcon, X, Siren, Radio, Megaphone, ChevronLeft, ChevronRight, Clock,
-  Search, CheckCheck, RotateCcw, Filter, Navigation, Compass, AlertCircle
+  Layers, Ruler, Route, PenTool, Circle as CircleIcon, Map as MapIcon, X, Siren, Megaphone, ChevronLeft, ChevronRight, Clock,
+  Search, Compass
 } from 'lucide-react';
 import { api } from '../api/client';
 import { useAreaQuery, useUnitsGeo } from '../api/hooks';
@@ -63,7 +63,6 @@ export default function MonitoringMap() {
   const navigate = useNavigate();
   const { filter, setAlertDraft } = useStore();
   const [layers, setLayers] = useState(DEFAULT_LAYERS);
-  const [layerSearch, setLayerSearch] = useState('');
   const [basemap, setBasemap] = useState('auto');
   const [tool, setTool] = useState(null); // measure | route | polygon | circle
   const [offset, setOffset] = useState(0);
@@ -99,7 +98,10 @@ export default function MonitoringMap() {
     setRouteInfo(null);
   };
 
-  const sos = (data?.sos.features.map((f) => f.properties).sort((a, b) => a.priority - b.priority || new Date(a.received_at) - new Date(b.received_at)) || []);
+  const sos = useMemo(
+    () => data?.sos.features.map((f) => f.properties).sort((a, b) => a.priority - b.priority || new Date(a.received_at) - new Date(b.received_at)) || [],
+    [data],
+  );
   const sensorAlerts = data?.stations.features.map((f) => f.properties).filter((p) => alarmLevel(p.value, p.thresholds) > 0) || [];
   const setFocus = useStore((s) => s.setFocus);
   const canDispatch = usePermission('dispatch', 'create');

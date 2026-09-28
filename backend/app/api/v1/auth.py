@@ -193,16 +193,26 @@ class ResetIn(BaseModel):
 
 @router.post("/reset-password")
 async def reset_password(body: ResetIn):
+    invalid = HTTPException(400, "Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn")
+    if problem := password_problem(body.new_password):
+        # Kiểm tra trước khi dùng token: mật khẩu yếu thì liên kết vẫn còn hiệu lực để thử lại
+        if not await fetch_one(
+            """SELECT 1 FROM communications.password_reset_tokens
+                WHERE token_hash = :h AND used_at IS NULL AND expires_at > now()""",
+            {"h": _hash_token(body.token)},
+        ):
+            raise invalid
+        raise HTTPException(422, problem)
+    # Đánh dấu đã dùng NGAY trong 1 câu lệnh → hai yêu cầu đồng thời cùng token chỉ một yêu cầu đổi được mật khẩu
     row = await fetch_one(
-        """SELECT t.id, t.user_id, u.username, u.is_active FROM communications.password_reset_tokens t
-             JOIN communications.users u ON u.id = t.user_id
-            WHERE t.token_hash = :h AND t.used_at IS NULL AND t.expires_at > now()""",
+        """UPDATE communications.password_reset_tokens t SET used_at = now()
+             FROM communications.users u
+            WHERE u.id = t.user_id AND t.token_hash = :h AND t.used_at IS NULL AND t.expires_at > now()
+        RETURNING t.user_id, u.username, u.is_active""",
         {"h": _hash_token(body.token)},
     )
     if not row or not row["is_active"]:
-        raise HTTPException(400, "Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn")
-    if problem := password_problem(body.new_password):
-        raise HTTPException(422, problem)
+        raise invalid
     await execute(
         """UPDATE communications.users SET password_hash = :pw, password_changed_at = now(), token_version = token_version + 1
             WHERE id = :u""",

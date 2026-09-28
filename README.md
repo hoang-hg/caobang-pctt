@@ -672,9 +672,11 @@ graph LR
 > thống làm kênh cảnh báo chính thức cho tới khi tích hợp xong.
 
 1. **Không tự duyệt**: người soạn không phê duyệt được lệnh của chính mình (nguyên tắc 4 mắt).
-2. **Ký duyệt bằng PIN** cá nhân (lưu dạng băm PBKDF2-SHA256).
+2. **Ký duyệt bằng PIN** cá nhân (lưu dạng băm PBKDF2-SHA256). Sai PIN 5 lần trong 15 phút → tạm khoá phê duyệt 15 phút
+   (chống dò PIN khi phiên đăng nhập bị lộ); mỗi lần sai ghi nhật ký `broadcast.approve_failed`.
 3. Người duyệt phải có quyền `alert.approve` trên **tất cả** xã nhận tin (chỉ huy cụm không duyệt được lệnh toàn tỉnh).
-4. Phát theo ranh giới xã/phường hoặc đa giác khoanh trên bản đồ.
+4. Phát theo ranh giới xã/phường hoặc đa giác khoanh trên bản đồ. Có vùng vẽ thì người soạn phải có quyền trên mọi xã
+   vùng vẽ đi qua (không chỉ các xã tự chọn). Mỗi lệnh chỉ được duyệt 1 lần (bấm đúp / hai lãnh đạo cùng duyệt → 1 lần phát).
 
 ### 7.4. Giám sát khí tượng thuỷ văn, IoT & bản đồ tác chiến
 

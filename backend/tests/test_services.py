@@ -6,7 +6,7 @@ from app.api.v1.dashboard import classify_landslide, threshold_intensity
 from app.services import scenario
 from app.services.broadcast import advance_delivery, fill_template, init_metrics
 from app.services.dispatch_matching import score_force, suggest_needs
-from app.services.safe_routing import Edge, dijkstra, haversine_km
+from app.services.safe_routing import Edge, build_route, dijkstra, haversine_km
 from app.services.simulator import alarm_level
 from app.services.sos_nlp import norm, parse_rules
 
@@ -161,3 +161,26 @@ def test_scenario_is_periodic_and_bounded():
     assert scenario.rain_intensity(30, 2) > scenario.rain_intensity(30, 30)
     assert abs(scenario.water_level(178, 3, 7) - scenario.water_level(178, 3, 7 + scenario.PERIOD_H)) < 1e-9
     assert scenario.water_level(178, 3, 7) <= 181.0 + 1e-9
+
+
+def test_route_counts_gap_between_disconnected_road_networks():
+    # 2 mạng đường rời nhau: nút 1–2 và nút 3–4 cách nhau ~40 km → quãng đường phải gồm cả đoạn chim bay 2→3
+    nodes = {1: (22.60, 106.20), 2: (22.61, 106.21), 3: (22.95, 105.70), 4: (22.96, 105.71)}
+    edges = [_edge(1, 1, 2, 1.5), _edge(2, 3, 4, 1.5)]
+    route = build_route(edges, nodes, 22.60, 106.20, 22.96, 105.71)
+    direct = haversine_km(22.60, 106.20, 22.96, 105.71)
+    assert route["roads"] == [] and route["safe"] is False  # không có đường nối → giao diện vẽ nét chim bay
+    assert route["distance_km"] >= direct * 0.95
+
+
+def test_route_without_road_network_is_straight_line():
+    route = build_route([], {}, 22.60, 106.20, 22.70, 106.30)
+    assert route["roads"] == [] and route["safe"] is False and route["distance_km"] > 10
+    assert len(route["geometry"]["coordinates"]) == 2
+
+
+def test_overdue_sql_uses_sla_per_priority():
+    from app.services.sos import OVERDUE_SQL, SLA_MINUTES
+
+    for p, m in SLA_MINUTES.items():
+        assert f"WHEN {p} THEN {m}" in OVERDUE_SQL

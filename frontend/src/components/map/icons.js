@@ -59,7 +59,7 @@ export const reservoirIcon = (gatesOpen) =>
   badge(P.dam, { bg: '#e0f2fe', stroke: '#075985', ring: gatesOpen ? COLORS.cam : '#075985', size: 28, shape: 'square', label: gatesOpen ? `${gatesOpen} cửa` : undefined });
 
 export const warehouseIcon = (pctValue) =>
-  badge(P.box, { bg: '#fff', stroke: '#7c3aed', ring: pctValue < 20 ? COLORS.do : pctValue < 50 ? COLORS.cam : '#7c3aed', size: 26, shape: 'square' });
+  badge(P.box, { bg: '#fff', stroke: '#7c3aed', ring: pctValue == null ? '#7c3aed' : pctValue < 20 ? COLORS.do : pctValue < 50 ? COLORS.cam : '#7c3aed', size: 26, shape: 'square' }); // null = kho chưa có số liệu tồn kho
 
 export const evacIcon = (ratio) =>
   badge(P.home, { bg: '#dcfce7', stroke: '#166534', ring: ratio >= 1 ? COLORS.do : ratio > 0.85 ? COLORS.cam : '#166534', size: 24 });

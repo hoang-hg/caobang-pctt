@@ -2,11 +2,13 @@ import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
 import {
-  AlertTriangle, ShieldAlert, Compass, RefreshCw, Info, CloudRain,
+  AlertTriangle, ShieldAlert, Compass, RefreshCw, CloudRain,
   MapPin, Search, SlidersHorizontal, CheckCircle2, AlertOctagon,
   Ban, ShieldCheck, Navigation, Gauge, Mountain, Milestone, Truck
 } from 'lucide-react';
 import { api } from '../../api/client';
+
+const EMPTY = [];
 
 const REFRESH_INTERVAL = 20_000;
 
@@ -22,13 +24,13 @@ export default function LandslideMonitor({ onSelectOnMap }) {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const { data, isLoading, isFetching, refetch } = useQuery({
+  const { data, isFetching, refetch } = useQuery({
     queryKey: ['pub-landslides'],
     queryFn: () => api('/public/landslides'),
     refetchInterval: REFRESH_INTERVAL,
   });
 
-  const points = data?.points || [];
+  const points = data?.points || EMPTY; // mảng cố định: useMemo bên dưới không tính lại mỗi lần vẽ khi chưa có dữ liệu
   const corridors = data?.corridors || [];
 
   const filteredPoints = useMemo(() => {

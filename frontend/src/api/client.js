@@ -26,6 +26,8 @@ export async function api(path, { method = 'GET', body, params } = {}) {
   }
   // Service worker trả bản đã lưu kèm X-PCTT-Saved-At (src/sw.js) → cổng công khai báo "dữ liệu lưu lúc…"
   if (path.startsWith('/public/')) useStore.getState().setSavedAt(res.headers.get('x-pctt-saved-at'));
+  // 204 No Content (thu hồi vai trò, xoá vai trò / thiết bị): không có JSON — res.json() sẽ báo lỗi dù đã xoá xong
+  if (res.status === 204) return null;
   return res.json();
 }
 

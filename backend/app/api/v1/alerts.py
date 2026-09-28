@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from app.auth import audit, verify_secret
 from app.db import fetch_all, fetch_one
+from app.infra import ratelimit
 from app.infra.cache import invalidate
 from app.rbac.authz import allowed_codes, can_all, forbidden, require_any, require_permission
 from app.rbac.scope_loaders import broadcast_domains, targets_to_domains
@@ -16,6 +17,9 @@ from app.services.sos import create_ticket
 from app.ws.hub import hub
 
 router = APIRouter(prefix="/alerts", tags=["Cảnh báo & Hotline"])
+
+MAX_PIN_FAILS = 5  # sai PIN phê duyệt quá số lần này trong PIN_LOCK_S → tạm khoá phê duyệt
+PIN_LOCK_S = 900
 
 BROADCAST_SELECT = """
 SELECT b.id, b.code, b.title, b.message_body, b.template_code, b.severity, b.target_admin_codes, b.channels, b.status,
@@ -88,7 +92,9 @@ async def create_broadcast(body: BroadcastIn, user: dict = Depends(require_any("
     if bad:
         raise HTTPException(422, f"Kênh không hợp lệ: {', '.join(bad)}")
     aud = await estimate_audience(body.admin_codes, body.polygon)
-    codes = body.admin_codes or aud["admin_codes"]
+    # Có vùng vẽ → tin phát theo VÙNG VẼ (target_polygon, số người nhận): quyền phải bao trùm cả các xã vùng vẽ đi qua,
+    # không chỉ các xã tự chọn — nếu không, cán bộ 1 xã chọn xã mình + vẽ vùng rộng là phát được ra ngoài phạm vi
+    codes = sorted(set(body.admin_codes) | set(aud["admin_codes"])) if body.polygon else body.admin_codes
     if not can_all(user, "alert", "create", targets_to_domains(codes)):
         raise HTTPException(403, "Vùng cảnh báo có xã/phường nằm ngoài phạm vi bạn được giao")
     row = await fetch_one(
@@ -143,9 +149,15 @@ async def approve(broadcast_id: str, body: ApproveIn, user: dict = Depends(requi
         raise HTTPException(404, "Không tìm thấy lệnh")
     if not can_all(user, "alert", "approve", doms):
         raise forbidden()
+    # PIN 6 số: không giới hạn thì phiên bị lộ dò được PIN → khoá thử PIN 15 phút sau 5 lần sai
+    pin_key = f"pinfail:{user['username'].lower()}"
+    if await ratelimit.peek(pin_key) >= MAX_PIN_FAILS:
+        raise HTTPException(429, "Nhập sai mã PIN quá nhiều lần — tạm khoá phê duyệt 15 phút")
     if not verify_secret(body.pin, user["pin_hash"]):
+        await ratelimit.hit(pin_key, PIN_LOCK_S)
         await audit(user, "broadcast.approve_failed", "alert_broadcast", broadcast_id, {"reason": "sai PIN"})
         raise HTTPException(403, "Mã PIN không đúng")
+    await ratelimit.clear(pin_key)
     b = await fetch_one(
         "SELECT id, code, title, status, channels, audience, created_by FROM communications.alert_broadcasts WHERE id = CAST(:id AS uuid)",
         {"id": broadcast_id},
@@ -157,11 +169,13 @@ async def approve(broadcast_id: str, body: ApproveIn, user: dict = Depends(requi
     if b["created_by"] == user["id"]:
         raise HTTPException(403, "Người soạn không được tự phê duyệt (nguyên tắc 4 mắt)")
     metrics = init_metrics(b["channels"], b["audience"])
-    await fetch_one(
+    # Điều kiện trạng thái trong cùng câu lệnh → hai lãnh đạo bấm duyệt cùng lúc (hoặc bấm đúp) chỉ phát 1 lần
+    if not await fetch_one(
         """UPDATE communications.alert_broadcasts SET status = 'sending', approved_by = :u, approved_at = now(), metrics = CAST(:m AS jsonb)
-            WHERE id = CAST(:id AS uuid) RETURNING id""",
+            WHERE id = CAST(:id AS uuid) AND status = 'pending_approval' RETURNING id""",
         {"u": user["id"], "m": json.dumps(metrics), "id": broadcast_id},
-    )
+    ):
+        raise HTTPException(400, "Lệnh không ở trạng thái chờ duyệt")
     await audit(
         user,
         "broadcast.approve",

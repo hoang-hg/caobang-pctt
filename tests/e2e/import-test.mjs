@@ -108,6 +108,14 @@ check('Thay toàn bộ: báo trước số bản ghi sẽ xoá', vr.data?.ok && 
 const ar = await upload('cay_xang', 'apply', 'cay_xang.csv', fuel, admin, 'replace');
 check('Thay toàn bộ: xoá đúng số đã báo, còn đúng 1 bản ghi', ar.data?.result?.deleted === vr.data.deletes &&
   ar.data.result.created === 1, JSON.stringify(ar.data?.result));
+// Kho vừa nhập (loại "kho") chưa có dòng tồn kho vẫn phải hiện — trước đây bị ẩn do JOIN với tồn kho
+const newWh = await upload('kho', 'apply', 'kho.csv', `ma,ten,cap,vi_do,kinh_do\nKHO-MOI-${stamp},Kho mới chưa có hàng,xa,22.66,106.25\n`, admin);
+check('Nhập kho mới (chưa có tồn kho)', newWh.status === 200 && newWh.data.result.created === 1, JSON.stringify(newWh.data?.detail || newWh.data?.result));
+const whList = (await call('GET', '/resources/warehouses', null, admin)).data;
+const whNew = whList.find((w) => w.code === `KHO-MOI-${stamp}`);
+check('Kho chưa có tồn kho vẫn hiện trong danh sách kho (items rỗng)', !!whNew && Array.isArray(whNew.items) && whNew.items.length === 0);
+const whMap = (await call('GET', '/map/layers', null, admin)).data.warehouses.features.find((f) => f.properties.code === `KHO-MOI-${stamp}`);
+check('… và trên bản đồ (pct = null)', !!whMap && whMap.properties.pct === null);
 const noReplace = await upload('kho', 'validate', 'kho.csv', 'ma,ten,cap,vi_do,kinh_do\nK,Kho,tinh,22.66,106.25\n', admin, 'replace');
 check('Kho vật tư không cho thay toàn bộ (có dữ liệu tham chiếu) → 422', noReplace.status === 422);
 

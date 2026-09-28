@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Map, Boxes, Siren, Megaphone, KeyRound, DatabaseZap, Camera, FileUp,
-  ChevronLeft, ChevronRight, Phone, ShieldCheck, X
+  ChevronLeft, ChevronRight, Phone, X
 } from 'lucide-react';
 import clsx from 'clsx';
 import AdminFilter from '../common/AdminFilter';
