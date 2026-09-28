@@ -1,14 +1,20 @@
 """Dashboard tổng quan: KPI thời gian thực và dữ liệu biểu đồ (Phân hệ A)."""
 
+from datetime import UTC, datetime, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 
 from app.area import area_clause, unit_clause
+from app.auth import audit
 from app.db import fetch_all, fetch_one
-from app.infra.cache import cached_view
-from app.rbac.authz import area_scope, require_any
+from app.infra.cache import cached_view, invalidate
+from app.rbac.authz import area_scope, require_any, require_permission
+from app.services.events import log_event
 from app.services.landslides import get_landslides_overview
 from app.services.reservoirs import get_reservoirs_overview
 from app.services.sos import OVERDUE_SQL
+from app.ws.hub import hub
 
 router = APIRouter(tags=["Dashboard"])
 MON = area_scope("monitoring", "view")
@@ -95,10 +101,13 @@ async def _kpis(codes: list[str]) -> dict:
         "vehicles": vehicles,
         "reservoirs": {
             "total": len(reservoirs),
-            "spill_count": sum(r["status_code"] != "binh_thuong" for r in reservoirs),
+            "spill_count": sum(r["status_code"] in ("xa_dieu_tiet", "xa_khan_cap") for r in reservoirs),
             "emergency_count": sum(r["status_code"] == "xa_khan_cap" for r in reservoirs),
-            "total_inflow": round(sum(r["inflow_m3s"] for r in reservoirs), 1),
-            "total_outflow": round(sum(r["outflow_m3s"] for r in reservoirs), 1),
+            "no_data_count": sum(r["status_code"] == "chua_co_so_lieu" for r in reservoirs),
+            "total_inflow": round(
+                sum(r["inflow_m3s"] or 0 for r in reservoirs), 1
+            ),  # None = hồ chưa có số liệu vận hành
+            "total_outflow": round(sum(r["outflow_m3s"] or 0 for r in reservoirs), 1),
             "reservoirs": reservoirs,
         },
         "landslides": {
@@ -281,3 +290,65 @@ async def logs(limit: int = 40, codes: list[str] = Depends(MON)):
              ORDER BY time DESC LIMIT :l""",
         {"l": limit, "codes": codes},
     )
+
+
+class ReservoirOperationIn(BaseModel):
+    current_level: float = Field(ge=-50, le=3000, description="Mực nước hồ (m)")
+    spill_gates_open: int = Field(ge=0, le=50, description="Số cửa xả tràn đang mở")
+    inflow_m3s: float | None = Field(None, ge=0, le=100_000, description="Lưu lượng về hồ (m³/s)")
+    outflow_m3s: float | None = Field(None, ge=0, le=100_000, description="Tổng lưu lượng xả (m³/s)")
+    reported_at: datetime | None = Field(None, description="Thời điểm đơn vị vận hành báo — trống = bây giờ")
+    source: str | None = Field(
+        None, max_length=200, description="Nguồn báo cáo, VD: điện thoại Nhà máy TĐ Bằng Giang"
+    )
+
+
+@router.patch("/reservoirs/{reservoir_id}/operation")
+async def update_reservoir_operation(
+    reservoir_id: str,
+    body: ReservoirOperationIn,
+    user: dict = Depends(require_permission("monitoring", "update")),
+):
+    """Trực ban nhập số liệu vận hành hồ khi đơn vị quản lý hồ báo về (chưa có kết nối tự động) — cổng công khai và
+    trang bản nhẹ hiện ngay; hồ chưa có số liệu hiện "Chưa có số liệu vận hành" thay vì "Chưa xả tràn"."""
+    res = await fetch_one(
+        "SELECT id, name, spill_gates FROM iot_telemetry.reservoirs WHERE id = :id", {"id": reservoir_id}
+    )
+    if not res:
+        raise HTTPException(404, "Không tìm thấy hồ chứa")
+    if res["spill_gates"] and body.spill_gates_open > res["spill_gates"]:
+        raise HTTPException(422, f"Hồ chỉ có {res['spill_gates']} cửa xả")
+    now = datetime.now(UTC)
+    reported = body.reported_at or now
+    if reported.tzinfo is None:
+        raise HTTPException(422, "Thời điểm báo cáo phải kèm múi giờ")
+    if reported > now + timedelta(minutes=5) or reported < now - timedelta(days=2):
+        raise HTTPException(422, "Thời điểm báo cáo không hợp lệ (tương lai hoặc quá 2 ngày)")
+    await fetch_one(
+        """UPDATE iot_telemetry.reservoirs SET current_level = :l, spill_gates_open = :g, inflow_m3s = :i,
+                  outflow_m3s = :o, operating_at = :t, updated_at = now() WHERE id = :id RETURNING id""",
+        {
+            "l": body.current_level,
+            "g": body.spill_gates_open,
+            "i": body.inflow_m3s,
+            "o": body.outflow_m3s,
+            "t": reported,
+            "id": reservoir_id,
+        },
+    )
+    await audit(user, "reservoir.operation", "reservoir", reservoir_id, body.model_dump(mode="json"))
+    await invalidate("public:")  # cổng công khai, bản nhẹ hiện ngay (còn cache nginx ≤ 10 giây)
+    await hub.publish("reservoir.updated", {"id": reservoir_id})
+    gates = (
+        f"mở {body.spill_gates_open}/{res['spill_gates']} cửa xả"
+        if body.spill_gates_open
+        else "chưa mở cửa xả"
+    )
+    await log_event(
+        f"Cập nhật vận hành {res['name']}: mực nước {body.current_level:.2f} m, {gates}"
+        + (f" — nguồn: {body.source}" if body.source else "")
+        + f" ({user['full_name']})",
+        "canh_bao" if body.spill_gates_open else "van_hanh",
+        "warning" if body.spill_gates_open else "info",
+    )
+    return next(r for r in (await get_reservoirs_overview())["reservoirs"] if r["id"] == reservoir_id)

@@ -15,10 +15,11 @@ check('Có danh sách hồ chứa', rs.length >= 6, `${rs.length} hồ`);
 check('Mỗi hồ có mực nước, MNDBT, cửa xả, trạng thái, khuyến cáo', rs.every((r) =>
   r.current_level != null && r.normal_level != null && r.spill_gates != null && r.status_label && r.downstream_warning));
 check('Hồ chưa mở cửa xả → "Chưa xả tràn" (hồ đầy tới MNDBT không phải xả khẩn cấp)',
-  rs.filter((r) => !r.spill_gates_open).every((r) => r.status_code === 'binh_thuong'));
+  rs.filter((r) => !r.spill_gates_open && r.updated_at).every((r) => r.status_code === 'binh_thuong'));
+check('Hồ có số liệu vận hành (dữ liệu mẫu) mang thời điểm số liệu', rs.every((r) => r.updated_at && r.status_code !== 'chua_co_so_lieu'));
 check('Hồ đang mở cửa → trạng thái xả', rs.filter((r) => r.spill_gates_open > 0).every((r) => r.status_code !== 'binh_thuong'));
 check('Khuyến cáo không nói "mở 0 cửa"', !rs.some((r) => /mở 0\//.test(r.downstream_warning)));
-check('Đếm hồ đang xả khớp danh sách', data.spill_count === rs.filter((r) => r.status_code !== 'binh_thuong').length &&
+check('Đếm hồ đang xả khớp danh sách', data.spill_count === rs.filter((r) => r.status_code === 'xa_dieu_tiet' || r.status_code === 'xa_khan_cap').length &&
   data.emergency_count === rs.filter((r) => r.status_code === 'xa_khan_cap').length);
 check('Tổng xả = tổng từng hồ', Math.abs(data.total_outflow_m3s - rs.reduce((s, r) => s + r.outflow_m3s, 0)) < 1);
 check('Nhóm theo lưu vực sông', (data.basins || []).reduce((s, b) => s + b.reservoirs_count, 0) === rs.length);

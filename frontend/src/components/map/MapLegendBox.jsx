@@ -85,14 +85,14 @@ export default function MapLegendBox({
       iconColor: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20',
       badge: '🏛️',
       summary: 'Dung tích, cao trình & trạng thái mở cửa xả hồ đập',
-      desc: 'Giám sát 6 hồ trọng điểm (Bản Viết, Bản Ngà, Nà Tấu...). Cảnh báo sớm cho người dân vùng hạ du khi hồ vận hành xả tràn.',
+      desc: `Giám sát ${reservoirs.length} hồ chứa thuỷ điện, thuỷ lợi theo số liệu vận hành (mực nước, cửa xả). Cảnh báo sớm cho người dân vùng hạ du khi hồ vận hành xả tràn.`,
       items: reservoirs.map((r) => ({
         id: r.id,
         name: r.name,
         sub: `${r.river ? `Sông ${r.river} · ` : ''}${r.admin_name}`,
-        value: r.spill_gates_open > 0 ? `Mở ${r.spill_gates_open} cửa xả` : 'Đóng cửa xả',
+        value: r.status_code === 'chua_co_so_lieu' ? 'Chưa có số liệu' : r.spill_gates_open > 0 ? `Mở ${r.spill_gates_open} cửa xả` : 'Đóng cửa xả',
         status: r.status_label,
-        statusColor: r.status_code === 'xa_khan_cap' ? 'text-danger' : r.status_code === 'xa_dieu_tiet' ? 'text-serious' : 'text-good',
+        statusColor: r.status_code === 'xa_khan_cap' ? 'text-danger' : r.status_code === 'xa_dieu_tiet' ? 'text-serious' : r.status_code === 'chua_co_so_lieu' ? 'text-muted' : 'text-good',
         lat: r.lat,
         lon: r.lon,
         type: 'reservoir',
@@ -106,13 +106,13 @@ export default function MapLegendBox({
       iconColor: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
       badge: '⚠️',
       summary: 'Các vị trí sườn dốc đèo có nguy cơ sạt lở đất đá',
-      desc: 'Theo dõi 12 điểm trọng yếu: Đèo Mã Phục, Khau Liêu, Khau Cốc Chà, Ca Thành... Cập nhật tình trạng lưu thông và tuyến đường tránh.',
+      desc: `Theo dõi ${landslides.length} điểm đèo dốc, taluy, ngầm tràn: trạng thái theo cảm biến và vùng cảnh báo sạt lở / lũ quét đang hiệu lực, kèm tuyến đường tránh.`,
       items: landslides.map((p) => ({
         id: p.code,
         name: p.name,
         sub: `${p.road_name} · ${p.admin_name}`,
         value: p.traffic_label,
-        status: p.traffic_status === 'cam_duong' ? 'Cấm đường' : p.traffic_status === 'canh_bao' ? 'Cảnh báo' : 'Thông xe',
+        status: p.traffic_status === 'cam_duong' ? 'Cấm đường' : p.traffic_status === 'canh_bao' ? 'Cảnh báo' : 'Chưa ghi nhận',
         statusColor: p.traffic_status === 'cam_duong' ? 'text-danger' : p.traffic_status === 'canh_bao' ? 'text-serious' : 'text-good',
         lat: p.lat,
         lon: p.lon,
@@ -210,7 +210,13 @@ export default function MapLegendBox({
           </div>
 
           <div className="mt-2.5 pt-2 border-t border-line/60 space-y-1.5 text-xs">
-            {selectedPoint.type === 'reservoir' && selectedPoint.raw && (
+            {selectedPoint.type === 'reservoir' && selectedPoint.raw && selectedPoint.raw.status_code === 'chua_co_so_lieu' && (
+              <p className="text-[11px] bg-panel2 p-2 rounded text-ink-2 leading-relaxed">
+                Chưa có số liệu vận hành (mực nước, cửa xả) từ đơn vị quản lý hồ. MNDBT {selectedPoint.raw.normal_level ?? '–'} m ·{' '}
+                {selectedPoint.raw.spill_gates || 0} cửa xả tràn.
+              </p>
+            )}
+            {selectedPoint.type === 'reservoir' && selectedPoint.raw && selectedPoint.raw.status_code !== 'chua_co_so_lieu' && (
               <>
                 <div className="flex justify-between">
                   <span className="text-muted">Mực nước hiện tại:</span>
@@ -235,7 +241,7 @@ export default function MapLegendBox({
             {selectedPoint.type === 'landslide' && selectedPoint.raw && (
               <>
                 <div className="flex justify-between">
-                  <span className="text-muted">Tình trạng lưu thông:</span>
+                  <span className="text-muted">Tình trạng:</span>
                   <span className={clsx('font-bold', selectedPoint.statusColor)}>{selectedPoint.raw.traffic_label}</span>
                 </div>
                 {selectedPoint.raw.tilt_info && (

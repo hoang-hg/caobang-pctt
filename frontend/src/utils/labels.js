@@ -42,9 +42,15 @@ export const BROADCAST_STATUS = {
   pending_approval: { label: 'Chờ phê duyệt', cls: 'bg-warn text-black' },
   sending: { label: 'Đang phát', cls: 'bg-accent text-white' },
   sent: { label: 'Đã phát', cls: 'bg-good text-white' },
+  // Đã duyệt nhưng kênh SMS / Zalo / Cell Broadcast chưa tích hợp → chỉ công bố trên cổng công khai & bản nhẹ
+  published: { label: 'Đã công bố trên cổng', cls: 'bg-accent/15 text-accent' },
   rejected: { label: 'Từ chối', cls: 'bg-panel2 text-muted' },
   draft: { label: 'Nháp', cls: 'bg-panel2 text-muted' },
 };
+/** Lệnh đã duyệt mà các kênh chưa nối cổng gửi tin thật (metrics[kênh].integrated === false). */
+export const notIntegrated = (b) => Object.values(b?.metrics || {}).some((v) => v?.integrated === false);
+export const broadcastStatus = (b) => BROADCAST_STATUS[notIntegrated(b) ? 'published' : b.status] || BROADCAST_STATUS.draft;
+
 export const ROLE = { admin: 'Quản trị', maker: 'Trực ban (soạn lệnh)', checker: 'Lãnh đạo (phê duyệt)', viewer: 'Chỉ xem' };
 
 export const alarmLevel = (value, thr = {}) => {

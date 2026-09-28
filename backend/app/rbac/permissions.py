@@ -60,6 +60,12 @@ R, A = Resource, Action
 
 ALL_PERMISSIONS: Final[tuple[Permission, ...]] = (
     Permission(R.MONITORING, A.VIEW, True, "Xem dashboard, bản đồ giám sát, số liệu quan trắc"),
+    Permission(
+        R.MONITORING,
+        A.UPDATE,
+        False,
+        "Cập nhật số liệu vận hành hồ chứa (mực nước, cửa xả, lưu lượng) theo báo cáo",
+    ),
     Permission(R.SOS, A.VIEW, True, "Xem phiếu SOS"),
     Permission(R.SOS, A.CREATE, True, "Tiếp nhận / tạo phiếu SOS"),
     Permission(R.SOS, A.UPDATE, True, "Chuyển trạng thái, đổi mức ưu tiên phiếu SOS"),
@@ -152,6 +158,7 @@ SYSTEM_ROLES: Final[tuple[tuple[str, str, str, bool, list[tuple[str, str]]], ...
             "report.view",
             "report.moderate",
             "data.import",
+            "monitoring.update",
         ),
     ),
     (
@@ -208,6 +215,7 @@ SYSTEM_ROLES: Final[tuple[tuple[str, str, str, bool, list[tuple[str, str]]], ...
             "integration.view",
             "report.view",
             "report.moderate",
+            "monitoring.update",  # nhận báo cáo vận hành từ các hồ
         ),
     ),
     (

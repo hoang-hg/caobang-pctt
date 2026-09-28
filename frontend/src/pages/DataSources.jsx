@@ -30,6 +30,9 @@ const DEV_STATUS = {
   chua_ket_noi: ['Chưa kết nối', 'text-muted', CircleDashed],
 };
 
+// Nguồn số đo của trạm quan trắc (monitoring_stations.source)
+const STATION_SOURCE = { iot: 'IoT thật', simulator: 'mô phỏng', external: 'chờ thiết bị (nhập từ tệp)' };
+
 function useRun() {
   const qc = useQueryClient();
   const toast = useStore((s) => s.toast);
@@ -272,7 +275,7 @@ function DevicesTab() {
                 <tr key={d.id} className={clsx(!d.enabled && 'opacity-50')}>
                   <td><div className="font-medium">{d.name}</div><div className="font-mono text-xs text-muted">{d.id}{d.vendor ? ` · ${d.vendor}` : ''}</div></td>
                   <td className="uppercase">{d.protocol}</td>
-                  <td className="text-sm">{d.station_name}<div className="text-xs text-muted">{d.station_id} · nguồn trạm: {d.station_source === 'iot' ? 'IoT thật' : 'mô phỏng'}</div></td>
+                  <td className="text-sm">{d.station_name}<div className="text-xs text-muted">{d.station_id} · nguồn trạm: {STATION_SOURCE[d.station_source] || d.station_source}</div></td>
                   <td><span className={clsx('flex items-center gap-1 text-sm', cls)}><Icon size={14} /> {label}</span><div className="text-xs text-muted">{d.last_seen_at ? ago(d.last_seen_at) : 'chưa có dữ liệu'}</div></td>
                   <td className="font-mono">{d.last_value ?? '–'}</td>
                   <td className="whitespace-nowrap">
@@ -320,7 +323,7 @@ function MonitorTab() {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiCard label="Thiết bị trực tuyến" value={`${data.devices.online}/${data.devices.total}`} icon={Wifi} tone={data.devices.offline ? 'warn' : undefined}
           sub={`${data.devices.offline} mất tín hiệu · ${data.devices.never} chưa kết nối`} />
-        <KpiCard label="Trạm dùng dữ liệu thật" value={`${st.iot || 0}/${(st.iot || 0) + (st.simulator || 0) + (st.external || 0)}`} icon={Cpu} sub={`${st.simulator || 0} trạm còn mô phỏng`} />
+        <KpiCard label="Trạm dùng dữ liệu thật" value={`${st.iot || 0}/${(st.iot || 0) + (st.simulator || 0) + (st.external || 0)}`} icon={Cpu} sub={[st.simulator && `${st.simulator} trạm còn mô phỏng`, st.external && `${st.external} trạm chờ thiết bị`].filter(Boolean).join(' · ') || 'Mọi trạm đều có thiết bị'} />
         <KpiCard label="Số đo nhận 24 giờ" value={int(data.last24.accepted)} icon={Activity} sub={`${int(data.last24.rejected)} bị loại (sai định dạng, ngoài khoảng, trùng)`} />
         <KpiCard label="Lỗi đồng bộ 24 giờ" value={int(data.last24.errors)} icon={Radio} tone={data.last24.errors ? 'danger' : undefined} sub={`MQTT broker: ${data.mqtt_connected ? 'đã kết nối' : 'chưa kết nối'}`} />
       </div>

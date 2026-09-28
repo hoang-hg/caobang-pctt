@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 
 from app.auth import audit
+from app.config import settings
 from app.db import execute, fetch_all, fetch_one
 from app.integrations import crypto
 from app.integrations.runner import env_source_keys, redact_secrets, run_source
@@ -232,11 +233,14 @@ async def delete_device(device_id: str, user: dict = Depends(MANAGE)):
     )
     if not d:
         raise HTTPException(404, "Không tìm thấy thiết bị")
-    # Trạm không còn thiết bị nào → trở lại chế độ mô phỏng (demo)
+    # Trạm không còn thiết bị nào → trở lại mô phỏng (chỉ khi đang chạy bộ mô phỏng — demo); vận hành thật → "chờ
+    # thiết bị" ('external'): trạm chính thức không bao giờ bị gắn nhãn / sinh số liệu mô phỏng
     await execute(
-        """UPDATE iot_telemetry.monitoring_stations SET source = 'simulator', status = 'online'
+        """UPDATE iot_telemetry.monitoring_stations
+              SET source = CAST(:src AS text),
+                  status = CASE WHEN CAST(:src AS text) = 'simulator' THEN 'online' ELSE status END
             WHERE id = :s AND NOT EXISTS (SELECT 1 FROM integrations.devices WHERE station_id = :s)""",
-        {"s": d["station_id"]},
+        {"s": d["station_id"], "src": "simulator" if settings.simulator else "external"},
     )
     await audit(user, "integration.device.delete", "device", device_id)
 

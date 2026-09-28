@@ -9,12 +9,23 @@ Cung cấp thông tin trực quan theo thời gian thực về:
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
 from app.db import fetch_all
+
+# Số liệu vận hành (mực nước, cửa xả, lưu lượng) cũ hơn chừng này → gắn cờ "đã cũ" trên giao diện
+OPERATING_STALE = timedelta(hours=6)
+NO_DATA = ("chua_co_so_lieu", "Chưa có số liệu vận hành", "gray")
 
 
 def classify_reservoir_status(r: dict) -> tuple[str, str, str]:
     """Phân loại theo số cửa xả tràn đang mở (số liệu vận hành thật), không theo ngưỡng lưu lượng cố định:
-    hồ đầy tới MNDBT mà chưa mở cửa là vận hành bình thường, không phải "xả khẩn cấp"."""
+    hồ đầy tới MNDBT mà chưa mở cửa là vận hành bình thường, không phải "xả khẩn cấp".
+
+    Chưa có số liệu vận hành (hồ mới nhập danh mục, chưa ai báo mực nước / cửa xả) → trạng thái riêng, KHÔNG phải
+    "Chưa xả tràn": cổng công khai không được khẳng định hồ an toàn khi không có số liệu."""
+    if "operating_at" in r and r["operating_at"] is None:
+        return NO_DATA
     gates_open = r.get("spill_gates_open") or 0
     gates_total = r.get("spill_gates") or 0
     diff = (r.get("current_level") or 0.0) - (r.get("normal_level") or 0.0)
@@ -28,6 +39,11 @@ def classify_reservoir_status(r: dict) -> tuple[str, str, str]:
 
 def get_downstream_warning(r: dict, status_code: str) -> str:
     river = r.get("river") or "Bằng Giang"
+    if status_code == NO_DATA[0]:
+        return (
+            "Chưa có báo cáo vận hành của hồ. Khi có mưa lớn trên lưu vực sông "
+            f"{river}, theo dõi thông báo xả lũ của chính quyền và đơn vị quản lý hồ."
+        )
     gates_open = r.get("spill_gates_open", 0) or 0
     gates_total = r.get("spill_gates", 0) or 0
     outflow = int(r.get("outflow_m3s") or 0)
@@ -54,7 +70,7 @@ async def get_reservoirs_overview() -> dict:
     rows = await fetch_all(
         """
         SELECT r.id, r.name, r.river, r.capacity_mw, r.normal_level, r.current_level,
-               r.inflow_m3s, r.outflow_m3s, r.spill_gates_open, r.spill_gates, r.updated_at,
+               r.inflow_m3s, r.outflow_m3s, r.spill_gates_open, r.spill_gates, r.updated_at, r.operating_at,
                u.name as admin_name, u.code as admin_code,
                round(ST_Y(r.location)::numeric, 4)::float as lat,
                round(ST_X(r.location)::numeric, 4)::float as lon
@@ -69,20 +85,27 @@ async def get_reservoirs_overview() -> dict:
     total_outflow = 0.0
     spill_count = 0
     emergency_count = 0
+    no_data_count = 0
+    stale_count = 0
+    now = datetime.now(UTC)
 
     for r in rows:
         st_code, st_label, st_color = classify_reservoir_status(r)
         warning = get_downstream_warning(r, st_code)
+        has_data = r["operating_at"] is not None
+        stale = has_data and now - r["operating_at"] > OPERATING_STALE
+        no_data_count += not has_data
+        stale_count += stale
 
         normal = r.get("normal_level") or 1.0
         current = r.get("current_level") or 0.0
-        pct = round((current / normal) * 100, 1)
-        diff = round(current - normal, 2)
+        pct = round((current / normal) * 100, 1) if has_data else None
+        diff = round(current - normal, 2) if has_data else None
 
-        inflow = round(r.get("inflow_m3s") or 0.0, 1)
-        outflow = round(r.get("outflow_m3s") or 0.0, 1)
-        total_inflow += inflow
-        total_outflow += outflow
+        inflow = round(r.get("inflow_m3s") or 0.0, 1) if has_data else None
+        outflow = round(r.get("outflow_m3s") or 0.0, 1) if has_data else None
+        total_inflow += inflow or 0.0
+        total_outflow += outflow or 0.0
 
         if st_code == "xa_khan_cap":
             emergency_count += 1
@@ -110,7 +133,9 @@ async def get_reservoirs_overview() -> dict:
                 "status_label": st_label,
                 "status_color": st_color,
                 "downstream_warning": warning,
-                "updated_at": r["updated_at"].isoformat() if r.get("updated_at") else None,
+                # thời điểm của SỐ LIỆU VẬN HÀNH (không phải lần nhập danh mục); None = chưa có
+                "updated_at": r["operating_at"].isoformat() if has_data else None,
+                "stale": stale,
                 "lat": r["lat"],
                 "lon": r["lon"],
             }
@@ -129,8 +154,8 @@ async def get_reservoirs_overview() -> dict:
                 "spilling_count": 0,
             }
         basins[basin_name]["reservoirs_count"] += 1
-        basins[basin_name]["total_inflow"] += it["inflow_m3s"]
-        basins[basin_name]["total_outflow"] += it["outflow_m3s"]
+        basins[basin_name]["total_inflow"] += it["inflow_m3s"] or 0.0
+        basins[basin_name]["total_outflow"] += it["outflow_m3s"] or 0.0
         if it["status_code"] in ("xa_dieu_tiet", "xa_khan_cap"):
             basins[basin_name]["spilling_count"] += 1
 
@@ -138,6 +163,8 @@ async def get_reservoirs_overview() -> dict:
         "total_reservoirs": len(items),
         "spill_count": spill_count,
         "emergency_count": emergency_count,
+        "no_data_count": no_data_count,  # hồ chưa có số liệu vận hành
+        "stale_count": stale_count,  # hồ có số liệu vận hành cũ hơn OPERATING_STALE
         "total_inflow_m3s": round(total_inflow, 1),
         "total_outflow_m3s": round(total_outflow, 1),
         "basins": list(basins.values()),

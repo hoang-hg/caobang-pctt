@@ -4,8 +4,10 @@ Luật khai báo tập trung ở ``RULES`` — khớp theo (method, tiền tố 
 Vượt ngưỡng → 429 kèm ``Retry-After``. IP lấy từ ``request.client`` — ProxyHeadersMiddleware (app/main.py) đã thay
 bằng IP người dùng khi kết nối đến từ TRUSTED_PROXIES; nginx ghi đè X-Forwarded-For nên không giả mạo được.
 
-Lưu ý CGNAT: nhà mạng di động dùng chung 1 IP công cộng cho rất nhiều thuê bao → ngưỡng theo IP của các thao tác
-của người dân phải đủ rộng; chặn lạm dụng bằng khoá phụ (VD theo SĐT: ``limit()``) và Turnstile thay vì siết IP.
+Lưu ý CGNAT: nhà mạng di động dùng chung 1 IP công cộng cho rất nhiều thuê bao (cả huyện có thể ra Internet qua vài
+IP) → ngưỡng theo IP của các thao tác của người dân phải đủ rộng cho HÀNG TRĂM người sau 1 IP; chặn lạm dụng bằng khoá
+phụ (VD theo SĐT: ``check_limit()``) và Turnstile thay vì siết IP. GET công khai phần lớn do cache nginx 10 giây trả
+(không tới backend, không bị đếm) — ngưỡng dưới đây chủ yếu áp cho yêu cầu không cache được.
 """
 
 from __future__ import annotations
@@ -43,11 +45,14 @@ RULES: tuple[Rule, ...] = (
     ),  # mã 2 lớp: + khoá theo tài khoản như đăng nhập (mfa.py)
     Rule("forgot", "POST", "/api/v1/auth/forgot-password", 5, 3600),
     Rule("reset", "POST", "/api/v1/auth/reset-password", 10, 3600),
-    Rule("public_report", "POST", "/api/v1/public/reports", 30, 3600),  # + 5/giờ theo SĐT (public.py)
-    Rule("public_route", "GET", "/api/v1/public/route", 20, 60),
-    Rule("public_locate", "GET", "/api/v1/public/locate", 30, 60),
-    Rule("public_track", "POST", "/api/v1/public/track", 20, 60),  # chống dò SĐT / mã phiếu
-    Rule("public", "*", "/api/v1/public", 120, 60),
+    # + 5/giờ theo SĐT (public.py) + Turnstile nếu cấu hình; phản ánh chờ cán bộ duyệt mới công khai
+    Rule("public_report", "POST", "/api/v1/public/reports", 200, 3600),
+    Rule("public_route", "GET", "/api/v1/public/route", 60, 60),  # tìm đường tốn CPU nhất trong API công khai
+    # Kết quả cache theo toạ độ làm tròn ~11 m
+    Rule("public_locate", "GET", "/api/v1/public/locate", 240, 60),
+    # Trang tra cứu tự làm mới 15 giây (4 lần/phút/người). Dò không khả thi: phiếu có SĐT phải khớp đủ 9 số cuối
+    Rule("public_track", "POST", "/api/v1/public/track", 120, 60),
+    Rule("public", "*", "/api/v1/public", 600, 60),
     Rule(
         "intake", "POST", "/api/v1/sos/intake", 300, 60
     ),  # webhook từ vài IP cổng Zalo/app, đã xác thực khoá

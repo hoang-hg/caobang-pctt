@@ -2,7 +2,8 @@
 # CI — kiểm tra mỗi lần push / pull request
 #   backend  : ruff (format + lint) + pytest (kiểm thử đơn vị)
 #   frontend : ESLint (bắt lỗi: biến chưa khai báo, hook React, mã chết) + build production
-#   e2e      : dựng toàn bộ stack bằng Docker Compose, chạy 11 bộ kiểm thử API
+#   e2e      : dựng toàn bộ stack bằng Docker Compose (dữ liệu mẫu + mô phỏng), chạy 11 bộ kiểm thử API
+#   prod     : dựng docker-compose.prod.yml trên CSDL trống (không demo, không mô phỏng, bắt buộc 2 lớp), thử trọn luồng
 # ==========================================
 name: CI
 
@@ -142,3 +143,76 @@ jobs:
       - name: Dọn dẹp
         if: always()
         run: docker compose down -v
+
+  prod:
+    name: Production – CSDL trống, không demo / mô phỏng
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    timeout-minutes: 40
+    env:
+      DC: docker compose -f docker-compose.prod.yml -f ci.prod.override.yml --env-file ci.prod.env
+      SUPERADMIN_PIN: "480193"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Cấu hình production thử (bí mật ngẫu nhiên, email vào Mailpit)
+        run: |
+          SUPERADMIN_PASSWORD="Ci-Prod-$(openssl rand -hex 8)-9"
+          echo "::add-mask::${SUPERADMIN_PASSWORD}"
+          echo "SUPERADMIN_PASSWORD=${SUPERADMIN_PASSWORD}" >> "$GITHUB_ENV"
+          # dòng sau ghi đè dòng cùng tên trong tệp mẫu; tài nguyên thu nhỏ cho máy CI (16 GB)
+          cp .env.production.example ci.prod.env
+          cat >> ci.prod.env <<EOF
+          DOMAIN=pctt.ci.local
+          ACME_EMAIL=ci@ci.local
+          JWT_SECRET=$(openssl rand -hex 32)
+          SECRET_KEY=$(openssl rand -hex 32)
+          SUPERADMIN_EMAIL=ci@ci.local
+          SUPERADMIN_PASSWORD=${SUPERADMIN_PASSWORD}
+          SUPERADMIN_PIN=${SUPERADMIN_PIN}
+          POSTGRES_PASSWORD=$(openssl rand -hex 16)
+          MINIO_ROOT_PASSWORD=$(openssl rand -hex 16)
+          SMTP_HOST=mailpit
+          SMTP_PORT=1025
+          SMTP_STARTTLS=false
+          OPS_ALERT_EMAILS=van-hanh@ci.local
+          OPS_DISK_WARN_PCT=99
+          BACKUP_DIR=./ci-backups
+          BACKUP_REMOTE=offsite:pctt/ci
+          POSTGRES_SHARED_BUFFERS=512MB
+          POSTGRES_EFFECTIVE_CACHE_SIZE=2GB
+          POSTGRES_MAINTENANCE_WORK_MEM=128MB
+          DB_MEM_LIMIT=3g
+          BACKEND_MEM_LIMIT=2g
+          API_WORKERS=2
+          EOF
+          # Mailpit chỉ có ở CI: bắt email đặt lại mật khẩu / cảnh báo sự cố (không có trong docker-compose.prod.yml)
+          cat > ci.prod.override.yml <<'EOF'
+          services:
+            mailpit:
+              image: axllent/mailpit:latest
+              networks: [default]
+              ports: ["127.0.0.1:8025:8025"]
+          EOF
+      - name: Build & khởi động stack production (CSDL trống)
+        run: |
+          $DC up -d --build backend worker frontend backup mailpit
+          # migrate chạy 1 lần (alembic + dữ liệu nền) → backend healthy → worker, frontend
+          for i in $(seq 1 90); do
+            w=$(docker inspect --format '{{.State.Health.Status}}' caobang-pctt-prod-worker-1 2>/dev/null || true)
+            if [ "$w" = "healthy" ] && curl -fsS -o /dev/null http://127.0.0.1:8080/api/v1/public/config; then
+              echo "Stack sẵn sàng sau ~$((i * 10)) giây"; exit 0
+            fi
+            sleep 10
+          done
+          echo "Stack không sẵn sàng sau 15 phút"; $DC ps; exit 1
+      - name: Kiểm thử luồng vận hành thật
+        run: node tests/e2e/prod-flow.mjs http://127.0.0.1:8080 http://127.0.0.1:8025
+      - name: Log khi lỗi
+        if: failure()
+        run: $DC logs --tail=300 migrate backend worker frontend backup
+      - name: Dọn dẹp
+        if: always()
+        run: $DC down -v

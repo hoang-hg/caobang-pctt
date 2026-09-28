@@ -307,8 +307,8 @@ async def seed_telemetry(conn: AsyncConnection, units: dict[str, dict], now: dat
         await ex(
             conn,
             """INSERT INTO iot_telemetry.reservoirs (id, name, river, admin_unit_id, capacity_mw, normal_level, current_level,
-                               inflow_m3s, outflow_m3s, spill_gates_open, spill_gates, location)
-                          VALUES (:id,:n,:r,:a,:mw,:nl,:cl,:inf,:out,:go,:g, ST_SetSRID(ST_MakePoint(:lon,:lat),4326))""",
+                               inflow_m3s, outflow_m3s, spill_gates_open, spill_gates, location, operating_at)
+                          VALUES (:id,:n,:r,:a,:mw,:nl,:cl,:inf,:out,:go,:g, ST_SetSRID(ST_MakePoint(:lon,:lat),4326), now())""",
             {
                 "id": rid,
                 "n": name,

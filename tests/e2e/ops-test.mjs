@@ -1,6 +1,8 @@
 // Kiểm thử tự giám sát vận hành (cần stack đang chạy). CI đặt OPS_DISK_WARN_PCT=1 → giả lập ổ đĩa đầy để thử trọn
 // luồng cảnh báo: worker phát hiện → email tới người vận hành (Mailpit) → /health/full trả 503.
 //   node tests/e2e/ops-test.mjs [http://localhost:8000] [http://localhost:8025 (Mailpit)]
+import { execFileSync } from 'node:child_process';
+
 const ROOT = process.argv[2] || 'http://localhost:8000';
 const MAILPIT = process.argv[3] || 'http://localhost:8025';
 let failures = 0;
@@ -48,6 +50,28 @@ if (checks['disk:/'] === false) {
   }
 } else {
   console.log('SKIP  Email cảnh báo sự cố (ổ đĩa chưa vượt ngưỡng — chạy stack với OPS_DISK_WARN_PCT=1 để thử)');
+}
+
+// ---------------------------------------------------------------- Giữ nhật ký có thời hạn (worker dọn mỗi giờ)
+// Cần Docker (stack dev: container caobang-pctt-db / caobang-pctt-worker)
+const sql = (q) => execFileSync('docker', ['exec', 'caobang-pctt-db', 'psql', '-U', 'pctt', '-d', 'caobang_pctt', '-tAc', q], { encoding: 'utf8' }).trim();
+let dockerOk = true;
+try { sql('SELECT 1'); } catch { dockerOk = false; }
+if (dockerOk) {
+  const tag = `e2e-retention-${Date.now()}`;
+  sql(`INSERT INTO integrations.ingest_log (time, source, message) VALUES
+         (now() - interval '40 days', 'E2E', '${tag}-cu'), (now() - interval '2 days', 'E2E', '${tag}-moi')`);
+  sql(`INSERT INTO operations.event_logs (time, category, message) VALUES
+         (now() - interval '800 days', 'he_thong', '${tag}-cu'), (now() - interval '2 days', 'he_thong', '${tag}-moi')`);
+  const out = execFileSync('docker', ['exec', 'caobang-pctt-worker', 'python', '-c',
+    'import asyncio; from app.services.retention import purge_old_logs; print(asyncio.run(purge_old_logs()))'], { encoding: 'utf8' });
+  const left = (t) => sql(`SELECT string_agg(message, ',' ORDER BY message) FROM ${t} WHERE message LIKE '${tag}%'`);
+  check('Dọn nhật ký tiếp nhận IoT quá 30 ngày, giữ bản ghi mới', left('integrations.ingest_log') === `${tag}-moi`, out.trim());
+  check('Dọn dòng sự kiện vận hành quá 730 ngày, giữ bản ghi mới', left('operations.event_logs') === `${tag}-moi`);
+  sql(`DELETE FROM integrations.ingest_log WHERE message LIKE '${tag}%'`);
+  sql(`DELETE FROM operations.event_logs WHERE message LIKE '${tag}%'`);
+} else {
+  console.log('SKIP  Giữ nhật ký có thời hạn (không gọi được docker exec)');
 }
 
 console.log(failures ? `\n${failures} kiểm tra THẤT BẠI` : '\nTất cả kiểm tra tự giám sát vận hành đạt');

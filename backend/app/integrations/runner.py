@@ -8,6 +8,7 @@ import asyncio
 import json
 import logging
 import re
+import time
 from datetime import UTC, datetime
 
 from app.config import settings
@@ -15,6 +16,7 @@ from app.db import execute, fetch_all, fetch_one
 from app.integrations import crypto
 from app.integrations.adapters import open_meteo, openweather
 from app.integrations.ingest import ingest_log, mark_stale_devices
+from app.services import retention
 from app.services.broadcast import fill_template
 from app.services.simulator import simulator
 from app.ws.hub import hub
@@ -31,6 +33,9 @@ def redact_secrets(text: str) -> str:
 
 
 ADAPTERS = {"open_meteo": open_meteo.run, "openweather": openweather.run}
+
+PURGE_EVERY_S = 3600  # dọn nhật ký cũ (retention) mỗi giờ
+_last_purge: float | None = None
 
 DEFAULT_SOURCES = [
     {
@@ -218,6 +223,10 @@ async def tick() -> None:
         except Exception as exc:  # không in traceback: chuỗi lỗi có thể chứa khoá API
             log.warning("source %s failed: %s", s["code"], redact_secrets(f"{type(exc).__name__}: {exc}"))
     await mark_stale_devices()
+    global _last_purge
+    if _last_purge is None or time.monotonic() - _last_purge >= PURGE_EVERY_S:
+        _last_purge = time.monotonic()
+        await retention.purge_old_logs()
 
 
 class Runner:

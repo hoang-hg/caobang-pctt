@@ -184,10 +184,12 @@ check('Đổi mật khẩu → nhận token mới, token cũ hết hiệu lực'
 let lastStatus;
 for (let i = 0; i < 11; i++) lastStatus = (await call('POST', '/auth/login', { username: `do.mat.khau.${stamp}`, password: 'sai' })).status;
 check('Sai mật khẩu 10 lần → tạm khoá đăng nhập 15 phút (429)', lastStatus === 429);
-let rl;
-// Cửa sổ cố định theo phút đồng hồ: 62 lần bảo đảm có 1 cửa sổ > 30 dù chạy vắt qua ranh giới phút
-for (let i = 0; i < 62 && rl?.status !== 429; i++) rl = await call('GET', `/public/locate?lat=${TP.lat}&lon=${TP.lon}`);
-check('Giới hạn tần suất API công khai (30 lần/phút) → 429 + Retry-After', rl.status === 429 && !!rl.headers.get('retry-after'));
+let rl = await call('GET', `/public/locate?lat=${TP.lat}&lon=${TP.lon}`);
+const locLimit = Number(rl.headers.get('x-ratelimit-limit'));
+check('Giới hạn định vị công khai đủ rộng cho CGNAT (≥ 200 lần/phút/IP)', locLimit >= 200);
+// Cửa sổ cố định theo phút đồng hồ: 2×ngưỡng + 2 lần bảo đảm có 1 cửa sổ vượt ngưỡng dù chạy vắt qua ranh giới phút
+for (let i = 0; i < 2 * locLimit + 2 && rl?.status !== 429; i++) rl = await call('GET', `/public/locate?lat=${TP.lat}&lon=${TP.lon}`);
+check(`Giới hạn tần suất API công khai (${locLimit} lần/phút) → 429 + Retry-After`, rl.status === 429 && !!rl.headers.get('retry-after'));
 
 console.log(failures ? `\n${failures} kiểm tra THẤT BẠI` : '\nTất cả kiểm tra cổng công khai, phản ánh & tài khoản đạt');
 process.exit(failures ? 1 : 0);

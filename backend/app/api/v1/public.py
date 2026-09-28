@@ -91,6 +91,7 @@ async def overview():
             "reservoirs": {
                 "total": res_overview["total_reservoirs"],
                 "spill_count": res_overview["spill_count"],
+                "no_data_count": res_overview["no_data_count"],
                 "emergency_count": res_overview["emergency_count"],
                 "total_outflow": res_overview["total_outflow_m3s"],
             },

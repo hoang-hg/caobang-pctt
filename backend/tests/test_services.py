@@ -6,6 +6,7 @@ from app.api.v1.dashboard import classify_landslide, threshold_intensity
 from app.services import scenario
 from app.services.broadcast import advance_delivery, fill_template, init_metrics
 from app.services.dispatch_matching import score_force, suggest_needs
+from app.services.reservoirs import NO_DATA, classify_reservoir_status, get_downstream_warning
 from app.services.safe_routing import Edge, build_route, dijkstra, haversine_km
 from app.services.simulator import alarm_level
 from app.services.sos_nlp import norm, parse_rules
@@ -148,6 +149,24 @@ def test_delivery_simulation_converges_and_never_exceeds_target():
             break
     assert done
     assert metrics["SMS"]["delivered"] == round(1000 * 0.965)
+
+
+def test_metrics_not_integrated_are_flagged_per_channel():
+    """Vận hành thật (chưa nối cổng gửi tin): từng kênh mang cờ integrated=False → giao diện không hiện "đang phát"."""
+    aud = {"subscribers": 1000, "zalo_followers": 300}
+    assert all("integrated" not in m for m in init_metrics(["SMS", "ZALO_OA"], aud).values())
+    off = init_metrics(["SMS", "ZALO_OA"], aud, integrated=False)
+    assert all(m["integrated"] is False and m["sent"] == 0 for m in off.values())
+
+
+def test_reservoir_without_operating_data_is_not_reported_safe():
+    base = {"normal_level": 100.0, "current_level": 100.0, "spill_gates": 3, "spill_gates_open": 0}
+    assert classify_reservoir_status({**base, "operating_at": None}) == NO_DATA
+    assert (
+        classify_reservoir_status({**base, "operating_at": "2026-09-28T00:00:00+00:00"})[0] == "binh_thuong"
+    )
+    assert classify_reservoir_status(base)[0] == "binh_thuong"  # bản ghi không kèm cột operating_at
+    assert "Chưa có báo cáo vận hành" in get_downstream_warning({"river": "Gâm"}, NO_DATA[0])
 
 
 def test_fill_template():
