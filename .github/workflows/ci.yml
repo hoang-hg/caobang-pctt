@@ -1,7 +1,7 @@
 # ==========================================
 # CI — kiểm tra mỗi lần push / pull request
 #   backend  : ruff (format + lint) + pytest (kiểm thử đơn vị)
-#   frontend : build production
+#   frontend : ESLint (bắt lỗi: biến chưa khai báo, hook React, mã chết) + build production
 #   e2e      : dựng toàn bộ stack bằng Docker Compose, chạy 11 bộ kiểm thử API
 # ==========================================
 name: CI
@@ -42,7 +42,7 @@ jobs:
         run: pytest -q
 
   frontend:
-    name: Frontend – build
+    name: Frontend – lint + build
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -56,6 +56,8 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci --no-audit --no-fund
+      - name: ESLint
+        run: npm run lint
       - run: npm run build
 
   e2e:

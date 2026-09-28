@@ -6,16 +6,28 @@ POST /ingest/lorawan    — webhook ChirpStack v4 / The Things Network v3, ``Aut
 """
 
 import hmac
+import time
 from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from app.db import fetch_one
+from app.infra import ratelimit
 from app.integrations import crypto
 from app.integrations.ingest import IngestError, get_device, ingest_log, ingest_readings
 
 router = APIRouter(prefix="/ingest", tags=["Tiếp nhận IoT"])
+
+# Yêu cầu CHƯA xác thực bị từ chối (thiết bị lạ, sai khoá) chỉ ghi nhật ký tối đa chừng này dòng / phút cho cả hệ thống:
+# đủ để người vận hành thấy thiết bị cấu hình sai, nhưng gửi rác hàng loạt không làm phình bảng ingest_log.
+REJECTED_LOG_PER_MIN = 30
+
+
+async def _log_rejected(source: str, message: str) -> None:
+    window = int(time.time() // 60)
+    if await ratelimit.hit(f"ingestlog:rejected:{window}", 60) <= REJECTED_LOG_PER_MIN:
+        await ingest_log(source, message, level="warning", rejected=1)
 
 
 class Reading(BaseModel):
@@ -39,7 +51,7 @@ def _items(body) -> list[dict]:
 async def _device_or_404(device_id: str) -> dict:
     device = await get_device(device_id)
     if device is None:
-        await ingest_log("IOT_HTTP", f"Thiết bị chưa đăng ký: {device_id}", level="warning", rejected=1)
+        await _log_rejected("IOT_HTTP", f"Thiết bị chưa đăng ký: {device_id[:80]}")
         raise HTTPException(404, "Thiết bị chưa đăng ký")
     return device
 
@@ -48,9 +60,8 @@ async def _check_source_token(code: str, authorization: str | None) -> None:
     src = await fetch_one(
         "SELECT enabled, secret_enc FROM integrations.data_sources WHERE code = :c", {"c": code}
     )
-    token = (
-        (authorization or "").removeprefix("Bearer ").strip()
-    )  # so bytes: header có ký tự ngoài ASCII → 401, không phải TypeError / 500
+    # So sánh bytes: header có ký tự ngoài ASCII → 401, không phải TypeError / 500
+    token = (authorization or "").removeprefix("Bearer ").strip()
     expected = crypto.decrypt(src["secret_enc"]) if src else None
     if (
         not src
@@ -65,9 +76,7 @@ async def _check_source_token(code: str, authorization: str | None) -> None:
 async def device_readings(body: DeviceReadingsIn, x_device_key: str | None = Header(None)):
     device = await _device_or_404(body.device_id)
     if device["protocol"] != "http" or not crypto.key_matches(x_device_key, device["api_key_hash"]):
-        await ingest_log(
-            f"device:{body.device_id}", "Sai khoá thiết bị (X-Device-Key)", level="warning", rejected=1
-        )
+        await _log_rejected(f"device:{body.device_id[:80]}", "Sai khoá thiết bị (X-Device-Key)")
         raise HTTPException(401, "Khoá thiết bị không hợp lệ")
     try:
         return await ingest_readings(device, _items(body), "http")

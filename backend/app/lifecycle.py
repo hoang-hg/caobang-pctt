@@ -51,6 +51,13 @@ def runs_worker() -> bool:
     return settings.run_mode in ("worker", "all")
 
 
+async def _reload_units_after_import(data: dict) -> None:
+    """Nhập "ranh giới xã" có thể đổi tên xã → mọi tiến trình API nạp lại danh sách xã (nhãn phạm vi, tên xã trong
+    phản ánh…). Mã xã / phạm vi phân quyền không đổi khi nhập (loại dữ liệu này chỉ cập nhật xã đã có)."""
+    if data.get("dataset") == "ranh_gioi_xa":
+        await domains.load_units(force=True)
+
+
 async def startup() -> None:
     preflight.enforce()  # staging/production: dừng ngay nếu cấu hình không an toàn
     await domains.load_units()
@@ -65,6 +72,7 @@ async def startup() -> None:
     await reload_policy()  # tiến trình khác có thể vừa seed xong
     start_policy_watcher()
     if runs_api():
+        hub.on("data.imported", _reload_units_after_import)
         hub.start_relay()
     if settings.run_mode == "api":
         ops_watch.start_api()  # theo dõi ngược nhịp worker chạy riêng
