@@ -167,8 +167,10 @@ try {
 check('Email đặt lại mật khẩu tới hộp thư (Mailpit)', !!token);
 check('Token sai → 400', (await call('POST', '/auth/reset-password', { token: 'x'.repeat(40), new_password: 'MoiMoi2026' })).status === 400);
 check('Mật khẩu mới yếu → 422', (await call('POST', '/auth/reset-password', { token, new_password: 'abcdefgh' })).status === 422);
-const rs = await call('POST', '/auth/reset-password', { token, new_password: 'MoiMoi2026' });
-check('Đặt lại mật khẩu bằng link email', rs.status === 200);
+// Hai yêu cầu đồng thời cùng một link (bấm đúp / bị lộ link) → chỉ một yêu cầu đổi được mật khẩu
+const resets = await Promise.all([1, 2].map(() => call('POST', '/auth/reset-password', { token, new_password: 'MoiMoi2026' })));
+check('Đặt lại mật khẩu bằng link email — 2 yêu cầu đồng thời chỉ 1 thành công',
+  resets.map((r) => r.status).sort().join() === '200,400', resets.map((r) => r.status).join());
 check('Token đã dùng không dùng lại được → 400', (await call('POST', '/auth/reset-password', { token, new_password: 'KhacNua2026' })).status === 400);
 check('Phiên cũ bị đăng xuất sau khi đặt lại → 401', (await call('GET', '/auth/me', null, pwTok)).status === 401);
 check('Mật khẩu cũ không đăng nhập được', !(await login(pwUser, 'BanDau2026')));

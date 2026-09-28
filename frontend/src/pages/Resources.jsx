@@ -209,6 +209,7 @@ export default function Resources() {
                       </Can>
                     </div>
                   </div>
+                  {!w.items.length && <p className="mt-2 text-xs text-muted">Chưa có số liệu tồn kho — nhập bằng loại dữ liệu “Tồn kho”.</p>}
                   <table className="mt-2 w-full text-xs">
                     <tbody>
                       {w.items.map((i) => {

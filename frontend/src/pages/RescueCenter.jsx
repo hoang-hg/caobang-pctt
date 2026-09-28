@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import {
   Bot, CheckCircle2, Clock, MapPin, Phone, Send, Sparkles, Timer, Inbox, Loader2, Navigation, Home,
-  Search, AlertTriangle, User, ShieldAlert, ArrowRight, Mountain, Waves
+  Search
 } from 'lucide-react';
 import { api } from '../api/client';
 import { useAreaQuery } from '../api/hooks';
@@ -12,7 +12,7 @@ import { useStore } from '../app/store';
 import { Empty, Progress, Section } from '../components/common/ui';
 import DispatchModal from '../components/common/DispatchModal';
 import { Can, usePermission } from '../rbac/usePermission';
-import { INCIDENT, PRIORITY, SOS_STATUS, SOURCE, VULNERABLE } from '../utils/labels';
+import { INCIDENT, PRIORITY, SOURCE, VULNERABLE } from '../utils/labels';
 import { int, pct, time } from '../utils/format';
 
 const COLUMNS = [
@@ -177,6 +177,7 @@ function Intake() {
   const [phone, setPhone] = useState('');
   const [parsed, setParsed] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [creating, setCreating] = useState(false); // chống bấm đúp → 2 phiếu SOS trùng
 
   const analyze = async () => {
     setBusy(true);
@@ -188,6 +189,7 @@ function Intake() {
   };
 
   const create = async () => {
+    setCreating(true);
     try {
       const t = await api('/sos', { method: 'POST', body: { raw_message: text, source, reporter_phone: phone || null } });
       toast({ tone: 'good', title: `Đã tạo phiếu ${t.code}`, body: `${INCIDENT[t.incident_type]} – ${t.address}` });
@@ -197,6 +199,8 @@ function Intake() {
       qc.invalidateQueries({ queryKey: ['sos'] });
     } catch (e) {
       toast({ tone: 'danger', title: 'Không tạo được phiếu', body: e.message });
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -240,7 +244,7 @@ function Intake() {
           </button>
           <button
             className="btn-danger ml-auto text-xs px-3 py-1.5 font-semibold"
-            disabled={text.length < 8}
+            disabled={text.length < 8 || creating}
             onClick={create}
           >
             <Inbox size={13} />

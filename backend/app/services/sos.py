@@ -9,6 +9,14 @@ from app.services.events import log_event
 from app.services.sos_nlp import extract
 from app.ws.hub import hub
 
+# Thời hạn phản hồi điều phối (phút) theo cấp ưu tiên — trung tâm cứu hộ và KPI "quá hạn" của dashboard dùng chung
+SLA_MINUTES = {1: 3, 2: 15, 3: 60}
+OVERDUE_SQL = (
+    "t.status = 'moi' AND t.received_at < now() - make_interval(mins => CASE t.priority "
+    + " ".join(f"WHEN {p} THEN {m}" for p, m in SLA_MINUTES.items())
+    + " ELSE 15 END)"
+)
+
 INCIDENT_LABEL = {
     "ngap_lut": "Ngập lụt",
     "sat_lo": "Sạt lở",

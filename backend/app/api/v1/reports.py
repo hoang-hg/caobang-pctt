@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 from app.area import area_clause
 from app.auth import audit
-from app.db import execute, fetch_all, fetch_one
+from app.db import execute, fetch_all, fetch_one, transaction
 from app.infra import storage
 from app.infra.cache import invalidate
 from app.rbac import scope_loaders
@@ -148,29 +148,38 @@ async def to_sos(
     body: ToSosIn,
     user: dict = Depends(require_permission("report", "moderate", scope_loaders.citizen_report)),
 ):
-    r = await fetch_one(REPORT_SELECT + " WHERE r.id = CAST(:id AS uuid)", {"id": report_id})
-    if r["sos_ticket_id"]:
-        raise HTTPException(409, f"Đã chuyển thành phiếu {r['sos_code']}")
-    ticket = await create_ticket(
-        raw_message=None,
-        source="APP",
-        reporter_name=r["reporter_name"],
-        reporter_phone=r["reporter_phone"],
-        lat=r["lat"],
-        lon=r["lon"],
-        incident_type=body.incident_type,
-        priority=body.priority,
-        trapped_count=body.trapped_count,
-        address=r["address"] or r["admin_name"],
-        notes=f"Từ phản ánh người dân {r['code']}: {r['description'][:300]}",
-    )
-    await execute(
-        """UPDATE community.citizen_reports SET sos_ticket_id = CAST(:t AS uuid), moderated_by = :u, moderated_at = now(),
-                  status = CASE WHEN status = 'cho_duyet' THEN 'da_duyet' ELSE status END,
-                  public_note = COALESCE(public_note, 'Đã chuyển lực lượng cứu hộ xử lý')
-            WHERE id = CAST(:id AS uuid)""",
-        {"t": str(ticket["id"]), "u": user["id"], "id": report_id},
-    )
+    # Khoá dòng phản ánh tới khi gắn xong phiếu → bấm đúp / hai cán bộ cùng chuyển chỉ tạo 1 phiếu SOS
+    # (yêu cầu sau chờ khoá, rồi thấy phản ánh đã có phiếu → 409)
+    async with transaction() as conn:
+        await fetch_one(
+            "SELECT 1 FROM community.citizen_reports WHERE id = CAST(:id AS uuid) FOR UPDATE",
+            {"id": report_id},
+            conn,
+        )
+        r = await fetch_one(REPORT_SELECT + " WHERE r.id = CAST(:id AS uuid)", {"id": report_id}, conn)
+        if r["sos_ticket_id"]:
+            raise HTTPException(409, f"Đã chuyển thành phiếu {r['sos_code']}")
+        ticket = await create_ticket(
+            raw_message=None,
+            source="APP",
+            reporter_name=r["reporter_name"],
+            reporter_phone=r["reporter_phone"],
+            lat=r["lat"],
+            lon=r["lon"],
+            incident_type=body.incident_type,
+            priority=body.priority,
+            trapped_count=body.trapped_count,
+            address=r["address"] or r["admin_name"],
+            notes=f"Từ phản ánh người dân {r['code']}: {r['description'][:300]}",
+        )
+        await execute(
+            """UPDATE community.citizen_reports SET sos_ticket_id = CAST(:t AS uuid), moderated_by = :u, moderated_at = now(),
+                      status = CASE WHEN status = 'cho_duyet' THEN 'da_duyet' ELSE status END,
+                      public_note = COALESCE(public_note, 'Đã chuyển lực lượng cứu hộ xử lý')
+                WHERE id = CAST(:id AS uuid)""",
+            {"t": str(ticket["id"]), "u": user["id"], "id": report_id},
+            conn,
+        )
     await audit(user, "report.to_sos", "citizen_report", r["code"], {"sos": ticket["code"]})
     await invalidate("public:")
     return {"sos_code": ticket["code"], "sos_id": ticket["id"]}

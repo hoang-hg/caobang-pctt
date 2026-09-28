@@ -360,6 +360,12 @@ Python trong container.
 - `DEMO_MODE` chỉ có tác dụng khi CSDL trống; đổi giữa chừng cần `python -m app.seed --reset` (xoá dữ liệu nghiệp vụ).
 - gunicorn `--forwarded-allow-ips` không nhận CIDR (uvicorn thì nhận) → xử lý IP ở `ProxyHeadersMiddleware` trong app;
   không đặt biến môi trường `FORWARDED_ALLOW_IPS` (gunicorn đọc và kiểm tra nó).
+- **Thao tác ghi bị bấm đúp / hai người làm cùng lúc** (điều động, duyệt cảnh báo, chuyển phản ánh → SOS, đặt lại mật
+  khẩu…): không "đọc rồi kiểm tra rồi ghi". Dùng `UPDATE … WHERE <điều kiện trạng thái / số lượng> RETURNING` (không có
+  dòng → 409/400) hoặc `SELECT … FOR UPDATE` trong `transaction()`. Frontend khoá nút khi đang gửi (`busy`).
+- WebSocket: sự kiện không gắn mã xã phải có nhóm quyền — thêm loại sự kiện mới thì khai báo ở `EVENT_SCOPE`
+  (`ws/hub.py`), thêm nhóm quyền mới ở `SCOPE_ACTIONS`. Không gắn gì = gửi mọi tài khoản đăng nhập.
+- `api()` (frontend) trả `null` cho 204 — route xoá trả 204, không trả JSON rỗng.
 - `/health/full` (503 khi có sự cố) chỉ cho giám sát bên ngoài — **không** dùng làm healthcheck container (ổ đĩa đầy,
   thiếu sao lưu mà khởi động lại backend thì hỏng thêm). Worker đọc `/backups` và `/ops/offsite` chỉ đọc (compose prod).
 - Content-Security-Policy ở `frontend/nginx/security-headers.conf`: thêm nguồn ngoài (tile, API gọi từ trình duyệt, script,

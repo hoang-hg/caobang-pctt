@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Circle, CircleMarker, GeoJSON, MapContainer, Marker, Pane, Polyline, Popup, Tooltip, useMap } from 'react-leaflet';
+import { Circle, GeoJSON, MapContainer, Marker, Pane, Polyline, Popup, Tooltip, useMap } from 'react-leaflet';
 import clsx from 'clsx';
 import {
   ShieldAlert, LocateFixed, Megaphone, Phone, Home, CloudRain, Waves, Camera, LogIn, Moon, Sun, Navigation, AlertTriangle,
-  CheckCircle2, Loader2, Share2, Info, BookOpen, ExternalLink, HelpCircle, MapPin, ChevronRight, PhoneCall, Compass, Search,
-  Droplets, Mountain, Ban, X, Zap
+  CheckCircle2, Loader2, Share2, BookOpen, HelpCircle, MapPin, ChevronRight, PhoneCall, Compass, Search,
+  Droplets, Mountain, X, Zap
 } from 'lucide-react';
 import { api } from '../../api/client';
 import { useUnitsGeo, useUnits, useProvinceArea } from '../../api/hooks';
@@ -750,10 +750,11 @@ export default function PublicPortal() {
             <button
               type="button"
               onClick={() => { setMe(null); setLocErr(''); setRoute(null); setSelectedCommuneCode(''); }}
-              className="absolute top-3 right-3 p-1 rounded-lg text-muted hover:text-ink hover:bg-panel transition-colors z-10"
-              title="Đóng kết quả định vị"
+              className="absolute top-3 right-3 px-2.5 py-1 rounded-lg text-xs font-semibold text-muted hover:text-danger hover:bg-danger/10 border border-line bg-panel shadow-xs transition-colors z-10 flex items-center gap-1 cursor-pointer"
+              title="Đóng kết quả tra cứu vị trí"
             >
-              <X size={16} />
+              <X size={14} />
+              <span>Đóng tra cứu</span>
             </button>
             {locating && (
               <div className="flex items-center gap-2 py-3 text-sm text-accent">
@@ -897,19 +898,41 @@ export default function PublicPortal() {
                     </div>
 
                     {route && (
-                      <div className="mt-3 p-2.5 rounded-xl bg-panel border border-line text-xs flex items-center gap-2">
-                        <Compass size={16} className="text-accent shrink-0" />
-                        <div>
-                          Lộ trình sơ tán: <b>{route.distance_km} km</b> (~{route.duration_min} phút di chuyển). Trạng thái:{' '}
-                          {!route.roads?.length ? (
-                            <span className="font-bold text-amber-500">
-                              Chưa có dữ liệu đường tại khu vực này — nét đứt chỉ là hướng chim bay, không phải đường đi. Hãy đi theo chỉ dẫn của cán bộ địa phương.
-                            </span>
-                          ) : route.safe ? (
-                            <span className="font-bold text-good">Đường an toàn, không qua vùng nguy hiểm</span>
-                          ) : (
-                            <span className="font-bold text-danger">Có đi qua vùng nguy cơ, cần hết sức cẩn thận</span>
-                          )}
+                      <div className="mt-3 p-3 rounded-xl bg-panel border border-accent/40 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-xs">
+                        <div className="flex items-center gap-2">
+                          <Compass size={16} className="text-accent shrink-0" />
+                          <div>
+                            Lộ trình sơ tán: <b>{route.distance_km} km</b> (~{route.duration_min} phút di chuyển). Trạng thái:{' '}
+                            {!route.roads?.length ? (
+                              <span className="font-bold text-amber-500">
+                                Chưa có dữ liệu đường tại khu vực này — nét đứt chỉ là hướng chim bay, không phải đường đi. Hãy đi theo chỉ dẫn của cán bộ địa phương.
+                              </span>
+                            ) : route.safe ? (
+                              <span className="font-bold text-good">Đường an toàn, không qua vùng nguy hiểm</span>
+                            ) : (
+                              <span className="font-bold text-danger">Có đi qua vùng nguy cơ, cần hết sức cẩn thận</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveTab('bando');
+                              scrollToContent();
+                            }}
+                            className="btn-ghost text-xs px-2.5 py-1 text-accent border border-accent/40 bg-accent/5 hover:bg-accent/15 rounded-lg flex items-center gap-1 cursor-pointer font-medium"
+                          >
+                            <Navigation size={13} /> Xem bản đồ
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setRoute(null)}
+                            className="btn-ghost text-xs px-2.5 py-1 text-danger border border-danger/40 bg-danger/5 hover:bg-danger/15 rounded-lg flex items-center gap-1 font-semibold cursor-pointer"
+                            title="Tắt hiển thị đường đi trên bản đồ"
+                          >
+                            <X size={13} /> Tắt đường đi
+                          </button>
                         </div>
                       </div>
                     )}
@@ -917,6 +940,18 @@ export default function PublicPortal() {
                 </div>
               );
             })()}
+
+            {/* Thanh chân trang đóng tra cứu */}
+            <div className="mt-4 pt-3 border-t border-line/60 flex flex-wrap items-center justify-between gap-2 text-xs">
+              <span className="text-muted">Đang xem phân tích vị trí{here?.commune?.name ? `: ${here.commune.name}` : ''}.</span>
+              <button
+                type="button"
+                onClick={() => { setMe(null); setLocErr(''); setRoute(null); setSelectedCommuneCode(''); }}
+                className="px-3 py-1.5 rounded-lg bg-panel hover:bg-danger/10 text-muted hover:text-danger border border-line font-medium transition-colors flex items-center gap-1.5 cursor-pointer ml-auto"
+              >
+                <X size={14} /> Thoát tra cứu vị trí & trở về mặc định
+              </button>
+            </div>
           </section>
         )}
 
@@ -1045,6 +1080,43 @@ export default function PublicPortal() {
 
                 {/* Khung bản đồ Leaflet: Chiếm 100% diện tích flex-1 min-h-0 */}
                 <div className="flex-1 w-full min-h-0 relative">
+                  {/* Thanh điều khiển lộ trình & vị trí nổi trên bản đồ — left-14: bên phải nút phóng to / thu nhỏ của Leaflet */}
+                  {(route || me) && (
+                    <div className="absolute top-3 left-14 z-[1000] flex flex-wrap items-center gap-2 bg-panel/95 backdrop-blur-md border border-line shadow-lg px-3 py-1.5 rounded-xl text-xs max-w-[calc(100%-7rem)] animate-in fade-in">
+                      {route ? (
+                        <>
+                          <div className="flex items-center gap-1.5 font-semibold text-ink truncate">
+                            <Compass size={15} className="text-accent shrink-0" />
+                            <span className="truncate">Tuyến sơ tán: <b className="text-accent">{route.distance_km} km</b> (~{route.duration_min} phút)</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setRoute(null)}
+                            className="px-2.5 py-1 rounded-lg bg-danger/10 text-danger hover:bg-danger/20 font-bold text-[11px] transition-colors flex items-center gap-1 cursor-pointer shrink-0 ml-auto"
+                            title="Tắt đường chỉ đường trên bản đồ"
+                          >
+                            <X size={13} /> Hủy chỉ đường
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-1.5 font-semibold text-ink truncate">
+                            <MapPin size={15} className="text-primary shrink-0" />
+                            <span className="truncate">Vị trí của bạn: <b>{me.name || here?.commune?.name || 'Đã chọn'}</b></span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => { setMe(null); setRoute(null); setSelectedCommuneCode(''); }}
+                            className="px-2 py-0.5 rounded-lg bg-panel2 text-muted hover:text-danger hover:bg-danger/10 font-medium text-[11px] transition-colors flex items-center gap-1 cursor-pointer shrink-0 ml-auto"
+                            title="Bỏ ghim vị trí này"
+                          >
+                            <X size={12} /> Bỏ ghim vị trí
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+
                   <PublicMap
                     data={map}
                     forecast={forecast}

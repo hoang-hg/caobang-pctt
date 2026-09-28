@@ -18,9 +18,9 @@ import {
   Crown,
   Building2,
   MapPin,
-  ShieldAlert,
-  Info,
-  CheckCircle2,
+  
+  
+  
   Layers,
   ShieldOff,
 } from 'lucide-react';

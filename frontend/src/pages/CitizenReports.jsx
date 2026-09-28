@@ -26,9 +26,11 @@ function ActionModal({ report, action, onClose }) {
   const [incident, setIncident] = useState(report.category === 'sat_lo' ? 'sat_lo' : report.category === 'lu_quet' ? 'lu_quet' : 'ngap_lut');
   const [priority, setPriority] = useState(report.category === 'mac_ket' ? 1 : 2);
   const [trapped, setTrapped] = useState(0);
+  const [busy, setBusy] = useState(false); // bấm đúp “Chuyển thành SOS” → 2 phiếu
   const title = { approve: 'Duyệt & công khai phản ánh', reject: 'Từ chối phản ánh', resolve: 'Đánh dấu đã xử lý', sos: 'Chuyển thành phiếu SOS' }[action];
 
   const submit = async () => {
+    setBusy(true);
     try {
       if (action === 'sos') {
         const r = await api(`/reports/${report.id}/to-sos`, { method: 'POST', body: { incident_type: incident, priority, trapped_count: Number(trapped) } });
@@ -41,6 +43,8 @@ function ActionModal({ report, action, onClose }) {
       onClose();
     } catch (e) {
       toast({ tone: 'danger', title: 'Không thực hiện được', body: e.message });
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -54,7 +58,7 @@ function ActionModal({ report, action, onClose }) {
           <button className="btn-ghost" onClick={onClose}>Huỷ</button>
           <button
             className={action === 'reject' ? 'btn-ghost text-danger' : 'btn-primary'}
-            disabled={action === 'reject' && reason.length < 3}
+            disabled={busy || (action === 'reject' && reason.length < 3)}
             onClick={submit}
           >
             Xác nhận

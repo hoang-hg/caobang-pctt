@@ -16,10 +16,12 @@ export default function IssueModal({ warehouse, onClose }) {
   const [item, setItem] = useState('');
   const [qty, setQty] = useState(10);
   const [dest, setDest] = useState('');
+  const [busy, setBusy] = useState(false); // bấm đúp = xuất kho 2 lần (mỗi lần đều hợp lệ nếu còn đủ hàng)
   if (!warehouse) return null;
   const selected = wh?.items.find((i) => i.item_code === item);
 
   const submit = async () => {
+    setBusy(true);
     try {
       await api(`/resources/warehouses/${warehouse.id}/issue`, { method: 'POST', body: { item_code: item, quantity: Number(qty), destination: dest || null } });
       toast({ tone: 'good', title: `Đã xuất ${qty} ${selected?.unit || ''} ${selected?.name || item}`, body: warehouse.name });
@@ -28,6 +30,8 @@ export default function IssueModal({ warehouse, onClose }) {
       onClose();
     } catch (e) {
       toast({ tone: 'danger', title: 'Không xuất được kho', body: e.message });
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -40,7 +44,7 @@ export default function IssueModal({ warehouse, onClose }) {
         <>
           {!allowed && <span className="mr-auto self-center text-xs text-danger">Bạn không có quyền xuất kho này</span>}
           <button className="btn-ghost" onClick={onClose}>Huỷ</button>
-          <button className="btn-primary" disabled={!allowed || !item || qty < 1} onClick={submit}><PackageMinus size={15} /> Xuất kho</button>
+          <button className="btn-primary" disabled={!allowed || !item || qty < 1 || busy} onClick={submit}><PackageMinus size={15} /> Xuất kho</button>
         </>
       }
     >

@@ -62,6 +62,29 @@ const match = (await call('GET', `/sos/${inCoba.data.id}/match`, null, T.baolac)
 const disp = await call('POST', '/dispatch', { ticket_id: inCoba.data.id, force_id: match.forces[0].id, vehicle_ids: [], personnel: 3 }, T.baolac);
 check('Chỉ huy cụm điều động SOS trong cụm', disp.status === 200, `${disp.data?.route?.distance_km} km`);
 
+// Tranh chấp điều động: 2 điều phối viên cùng lúc / danh sách cũ trên màn hình
+const inCoba2 = await call('POST', '/sos', { raw_message: 'Sạt lở đất vùi nhà ở xã Cô Ba, 2 người mắc kẹt', source: 'CAN_BO' }, T.coba);
+const m2 = (await call('GET', `/sos/${inCoba2.data.id}/match`, null, T.baolac)).data;
+const f0 = m2.forces[0];
+if (m2.vehicles.length && f0) {
+  const veh = m2.vehicles[0].id;
+  const twin = await Promise.all([1, 2].map(() => call('POST', '/dispatch',
+    { ticket_id: inCoba2.data.id, force_id: f0.id, vehicle_ids: [veh], personnel: 1 }, T.baolac)));
+  check('2 lệnh đồng thời cùng 1 phương tiện: chỉ 1 lệnh nhận được xe (409)',
+    twin.map((r) => r.status).sort().join() === '200,409', twin.map((r) => r.data?.detail || r.status).join(' | '));
+} else {
+  console.log('SKIP  Tranh chấp phương tiện (không có phương tiện rảnh gần Cô Ba)');
+}
+const all = await call('POST', '/dispatch', { ticket_id: inCoba2.data.id, force_id: f0.id, vehicle_ids: [], personnel: 10000 }, T.baolac);
+check('Điều động toàn bộ quân số còn sẵn sàng', all.status === 200);
+const none = await call('POST', '/dispatch', { ticket_id: inCoba2.data.id, force_id: f0.id, vehicle_ids: [], personnel: 1 }, T.baolac);
+check('Lực lượng hết người sẵn sàng → 409 (không trừ âm quân số)', none.status === 409, none.data?.detail);
+const forceOf = async () => (await call('GET', '/resources/forces', null, T.chihuy)).data.find((x) => x.id === f0.id);
+check('Quân số sẵn sàng không âm', (await forceOf()).personnel_ready === 0);
+await call('POST', `/sos/${inCoba2.data.id}/resolve`, null, T.chihuy);
+const back = await forceOf();
+check('Hoàn thành phiếu → lực lượng trở lại sẵn sàng', back.personnel_ready > 0 && back.personnel_on_mission >= 0, `${back.personnel_ready} sẵn sàng`);
+
 // Cảnh báo: maker–checker theo phạm vi
 const brCoba = await call('POST', '/alerts/broadcasts', {
   title: 'Thử cảnh báo Cô Ba', message_body: 'Nội dung thử nghiệm cảnh báo sạt lở xã Cô Ba', admin_codes: ['CB-COBA'], channels: ['SMS'], severity: 'do',
@@ -78,6 +101,30 @@ check('Chỉ huy cụm không duyệt lệnh ngoài cụm → 403', (await call(
 const list = (await call('GET', '/alerts/broadcasts', null, T.baolac)).data;
 check('Danh sách cảnh báo của chỉ huy cụm không có lệnh ngoài cụm', !list.some((b) => b.id === brTp.data.id));
 check('Lãnh đạo tỉnh duyệt lệnh của cụm', (await call('POST', `/alerts/broadcasts/${brCoba.data.id}/approve`, { pin: '2468' }, T.chihuy)).status === 200);
+// Vùng vẽ là vùng nhận tin thật → chọn xã trong cụm + vẽ vùng phủ cả tỉnh không được lọt quyền
+const bigPoly = { type: 'Polygon', coordinates: [[[105.2, 22.3], [106.9, 22.3], [106.9, 23.1], [105.2, 23.1], [105.2, 22.3]]] };
+check('Chọn xã trong cụm + vẽ vùng ra ngoài cụm → 403', (await call('POST', '/alerts/broadcasts', {
+  title: 'Thử vùng vẽ', message_body: 'Nội dung thử vùng vẽ vượt phạm vi cụm', admin_codes: ['CB-COBA'], polygon: bigPoly, channels: ['SMS'],
+}, T.baolac)).status === 403);
+const newBr = async () => (await call('POST', '/alerts/broadcasts', {
+  title: 'Thử duyệt', message_body: 'Nội dung thử nghiệm phê duyệt cảnh báo xã Cô Ba', admin_codes: ['CB-COBA'], channels: ['SMS'],
+}, T.baolac)).data;
+const br2 = await newBr();
+const twinApprove = await Promise.all([1, 2].map(() => call('POST', `/alerts/broadcasts/${br2.id}/approve`, { pin: '2468' }, T.chihuy)));
+check('2 lần duyệt đồng thời (bấm đúp) chỉ phát 1 lần', twinApprove.map((r) => r.status).sort().join() === '200,400',
+  twinApprove.map((r) => r.status).join());
+// Khoá PIN: tài khoản duyệt riêng cho kiểm thử (không khoá tài khoản demo các bộ khác dùng)
+const approver = `duyet.${stamp}`;
+await call('POST', '/rbac/users', {
+  username: approver, full_name: 'Người duyệt thử', password: 'matkhau123', pin: '2580', role: 'chi_huy_cum', domain: 'BAOLAC/*',
+}, T.admin);
+const apTok = await login(approver, 'matkhau123');
+const br3 = await newBr();
+const wrong = [];
+for (let i = 0; i < 5; i++) wrong.push((await call('POST', `/alerts/broadcasts/${br3.id}/approve`, { pin: '0000' }, apTok)).status);
+check('Sai PIN 5 lần → 403', wrong.every((s) => s === 403), wrong.join());
+const locked = await call('POST', `/alerts/broadcasts/${br3.id}/approve`, { pin: '2580' }, apTok);
+check('Sau 5 lần sai, PIN đúng cũng bị tạm khoá → 429 (chống dò PIN)', locked.status === 429, locked.data?.detail);
 
 // Uỷ quyền & chống leo thang
 const sub = await call('POST', '/rbac/users', {
@@ -129,6 +176,23 @@ const wsResult = await new Promise((resolve) => {
   setTimeout(() => resolve('timeout'), 5000);
 });
 check('WebSocket không token bị từ chối', wsResult === 'rejected');
+
+// Sự kiện realtime theo quyền: cuộc gọi đường dây nóng có SĐT người gọi → chỉ người có quyền tổng đài nhận
+const listen = (tok) => new Promise((resolve) => {
+  const ws = new WebSocket(`${wsBase}?token=${encodeURIComponent(tok)}`);
+  const got = [];
+  ws.onmessage = (e) => got.push(JSON.parse(e.data).event);
+  ws.onopen = () => resolve({ ws, got });
+  ws.onerror = () => resolve(null);
+});
+const kho = await listen(T.thukho);
+const tb = await listen(T.trucban);
+await call('POST', '/alerts/ivr', { caller: '0912345678', key: '0' }, T.trucban);
+await new Promise((r) => setTimeout(r, 2000));
+check('call.new tới trực ban (có quyền tổng đài)', tb?.got.includes('call.new'), tb?.got.join(','));
+check('call.new KHÔNG tới thủ kho (không có quyền tổng đài)', kho && !kho.got.includes('call.new'), kho?.got.join(','));
+kho?.ws.close();
+tb?.ws.close();
 
 console.log(failures ? `\n${failures} kiểm tra THẤT BẠI` : '\nTất cả kiểm tra RBAC đạt');
 process.exit(failures ? 1 : 0);

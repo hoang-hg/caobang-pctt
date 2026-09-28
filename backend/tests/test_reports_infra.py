@@ -112,3 +112,26 @@ def test_track_code_and_phone_matching():
     assert phone_matches("0999 555 666", "+84999555666")
     assert not phone_matches("0999555666", "555666")  # đuôi ngắn không đủ
     assert not phone_matches(None, "0999555666")
+    # số lưu ngắn (máy bàn không mã vùng) → so toàn bộ; trước đây không bao giờ khớp → người gửi không tra được
+    assert phone_matches("3852 123", "3852123")
+    assert not phone_matches("3852123", "3852124")
+    assert not phone_matches("12345", "12345")  # quá ngắn để làm bằng chứng
+
+
+def test_ws_events_reach_only_clients_with_permission():
+    from app.ws.hub import EVENT_SCOPE, Client
+
+    province = Client(None, "chihuy", {"sos": None, "hotline": None, "monitoring": None})
+    commune = Client(None, "coba", {"sos": {"CB-COBA"}, "hotline": set(), "monitoring": {"CB-COBA"}})
+    storekeeper = Client(
+        None, "thukho", {"sos": set(), "hotline": set(), "resource": None, "monitoring": set()}
+    )
+    # Sự kiện của xã → chỉ phạm vi chứa xã đó
+    assert province.sees("sos", "CB-COBA") and commune.sees("sos", "CB-COBA")
+    assert not commune.sees("sos", "CB-THUCPHAN") and not storekeeper.sees("sos", "CB-COBA")
+    # Không gắn xã (VD SĐT người gọi đường dây nóng, nhật ký hệ thống) → cần có quyền nhóm đó; trước đây gửi cho TẤT CẢ
+    assert EVENT_SCOPE["call.new"] == "hotline"
+    assert province.sees("hotline", None)
+    assert not commune.sees("hotline", None) and not storekeeper.sees("hotline", None)
+    assert commune.sees("monitoring", None) and not storekeeper.sees("monitoring", None)
+    assert storekeeper.sees(None, None)  # sự kiện chung (data.imported)

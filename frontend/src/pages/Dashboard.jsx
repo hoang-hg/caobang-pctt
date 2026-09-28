@@ -2,8 +2,8 @@ import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import clsx from 'clsx';
 import {
-  CloudRain, Waves, Home, Siren, Users, Ship, FileDown, Loader2, MapPin, X, ArrowUpRight, BarChart3, Activity,
-  Droplets, Mountain, Ban, LayoutDashboard
+  CloudRain, Waves, Home, Siren, Users, Ship, FileDown, Loader2, MapPin, X, ArrowUpRight,
+  Droplets, Mountain, LayoutDashboard
 } from 'lucide-react';
 import { useAreaQuery } from '../api/hooks';
 import { useStore } from '../app/store';
@@ -15,7 +15,7 @@ import LandslideScatter from '../components/charts/LandslideScatter';
 import SuppliesChart from '../components/charts/SuppliesChart';
 import AreaForecastChart from '../components/charts/AreaForecastChart';
 import { ALARM, alarmLevel } from '../utils/labels';
-import { int, minutesSince, num, pct } from '../utils/format';
+import { int, num, pct } from '../utils/format';
 import { exportSnapshotPdf } from '../utils/exportPdf';
 import ReservoirMonitor from './public/ReservoirMonitor';
 import LandslideMonitor, { maxTiltText } from './public/LandslideMonitor';
@@ -299,7 +299,7 @@ export default function Dashboard() {
               blink={waitOverdue}
               sub={
                 waitOverdue
-                  ? <span className="font-semibold text-danger">{k.sos.overdue} phiếu quá hạn (&gt;15′)</span>
+                  ? <span className="font-semibold text-danger">{k.sos.overdue} phiếu quá hạn SLA (cấp 1: 3′, cấp 2: 15′, cấp 3: 60′)</span>
                   : `${int(k?.sos?.in_progress)} đang điều phối · ${int(k?.sos?.resolved_24h)} hoàn thành`
               }
             />

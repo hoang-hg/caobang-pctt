@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { MapContainer, Marker, useMap, useMapEvents } from 'react-leaflet';
 import {
-  Camera, CheckCircle2, LocateFixed, Loader2, Send, Trash2, MapPin, AlertCircle,
-  ShieldCheck, Sparkles, ImagePlus, Search, Waves, AlertTriangle
+  CheckCircle2, LocateFixed, Loader2, Send, Trash2, MapPin, AlertCircle,
+  ShieldCheck, ImagePlus, Search, Waves, AlertTriangle
 } from 'lucide-react';
 import { Modal } from '../../components/common/ui';
 import Turnstile from '../../components/common/Turnstile';
@@ -66,7 +66,11 @@ export default function ReportForm({ onClose, myLocation, onTrack }) {
     [],
   );
 
-  useEffect(() => () => files.forEach((x) => URL.revokeObjectURL(x.url)), [files]);
+  // Thu hồi URL xem trước khi đóng biểu mẫu (ảnh bị xoá thì thu hồi ngay lúc xoá). KHÔNG thu hồi mỗi lần danh sách đổi:
+  // như vậy thu hồi cả ảnh vẫn đang hiển thị.
+  const filesRef = useRef(files);
+  filesRef.current = files;
+  useEffect(() => () => filesRef.current.forEach((x) => URL.revokeObjectURL(x.url)), []);
   const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }));
 
   const addFiles = (list) => {
@@ -307,7 +311,7 @@ export default function ReportForm({ onClose, myLocation, onTrack }) {
                   <img src={x.url} alt={`Ảnh ${i + 1}`} className="h-20 w-20 rounded-xl object-cover border border-line shadow-sm" />
                   <button
                     className="absolute -right-1.5 -top-1.5 rounded-full bg-danger p-1 text-white shadow hover:scale-110 transition-transform"
-                    onClick={() => setFiles(files.filter((_, j) => j !== i))}
+                    onClick={() => { URL.revokeObjectURL(x.url); setFiles(files.filter((_, j) => j !== i)); }}
                     aria-label="Xoá ảnh này"
                     title="Xoá ảnh"
                   >

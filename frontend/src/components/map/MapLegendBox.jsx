@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import clsx from 'clsx';
 import {
-  HelpCircle, ChevronDown, ChevronRight, CloudRain, Droplets, Mountain, Home, Camera,
-  MapPin, AlertTriangle, ShieldCheck, Waves, X, ExternalLink, ArrowRight
+  HelpCircle, ChevronDown, ChevronRight,
+  X
 } from 'lucide-react';
-import { alarmLevel, LEVEL } from '../../utils/labels';
+import { alarmLevel } from '../../utils/labels';
 
 /** Ô Chú thích các biểu tượng trên bản đồ & Tra cứu thông tin chi tiết */
 export default function MapLegendBox({

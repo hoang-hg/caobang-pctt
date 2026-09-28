@@ -25,6 +25,30 @@ from app.infra.redis import get_redis
 log = logging.getLogger(__name__)
 CHANNEL = "pctt:events"
 
+# Nhóm quyền (obj → act) mỗi kết nối được tính phạm vi khi mở WebSocket (app/main.py)
+SCOPE_ACTIONS = {
+    "sos": "view",
+    "monitoring": "view",
+    "report": "view",
+    "resource": "view",
+    "alert": "view",
+    "hotline": "operate",
+    "integration": "view",
+}
+# Sự kiện không tự gắn phạm vi → nhóm quyền mặc định: chỉ người có quyền đó (ở bất kỳ xã nào) nhận.
+# VD call.new chứa SĐT người gọi đường dây nóng — không gửi cho tài khoản chỉ có quyền kho / quan sát.
+EVENT_SCOPE = {
+    "call.new": "hotline",
+    "inventory.changed": "resource",
+    "gps.update": "resource",
+    "broadcast.updated": "alert",
+    "reading.new": "monitoring",
+    "hazard.new": "monitoring",
+    "dispatch.updated": "sos",
+    "source.updated": "integration",
+    "ingest.log": "integration",
+}
+
 
 @dataclass(eq=False)
 class Client:
@@ -33,10 +57,14 @@ class Client:
     scopes: dict[str, set[str] | None] = field(default_factory=dict)
 
     def sees(self, scope: str | None, code: str | None) -> bool:
-        if scope is None or code is None:
+        """Sự kiện gắn nhóm quyền: cần quyền đó; có mã xã → xã phải trong phạm vi; không có mã xã (sự kiện chung của
+        nhóm, VD nhật ký hệ thống) → chỉ cần có quyền ở một phạm vi nào đó — giống API REST."""
+        if scope is None:
             return True
         allowed = self.scopes.get(scope, set())
-        return allowed is None or code in allowed
+        if allowed is None:
+            return True
+        return code in allowed if code is not None else bool(allowed)
 
 
 class Hub:
@@ -61,6 +89,7 @@ class Hub:
     async def publish(self, event: str, data, scope: str | None = None, code: str | None = None) -> None:
         # Dữ liệu nghiệp vụ đổi → cache màn hình điều hành (cached_view) hết hiệu lực; bỏ qua sự kiện tần suất cao
         await bump_data_version(event)
+        scope = scope or EVENT_SCOPE.get(event)
         envelope = json.dumps(
             {"event": event, "data": data, "ts": datetime.now(UTC).isoformat(), "scope": scope, "code": code},
             ensure_ascii=False,

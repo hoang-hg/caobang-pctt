@@ -323,8 +323,15 @@ async def update_user(
     return await get_user(user_id)
 
 
+def _assert_not_super_target(actor: dict, target: dict) -> None:
+    """Chỉ Quản trị hệ thống thay đổi vai trò của tài khoản Quản trị hệ thống (như update_user / reset_mfa)."""
+    if not is_super(actor) and any(r == SUPER_ADMIN_ROLE for r, _ in groupings(target["username"])):
+        raise HTTPException(403, "Không quản lý được tài khoản Quản trị hệ thống")
+
+
 async def grant(actor, user_id, role, domain) -> dict:
     target = await get_user(user_id)
+    _assert_not_super_target(actor, target)
     await assert_can_delegate(actor, role, domain)
     e = get_enforcer()
     if e.has_grouping_policy(target["username"], role, domain):
@@ -340,6 +347,7 @@ async def revoke(actor, user_id, role, domain) -> None:
     e = get_enforcer()
     if not e.has_grouping_policy(target["username"], role, domain):
         raise HTTPException(404, "Không có phân quyền này")
+    _assert_not_super_target(actor, target)
     await assert_can_delegate(actor, role, domain)
     if target["id"] == actor["id"] and role == SUPER_ADMIN_ROLE:
         raise HTTPException(400, "Không tự thu hồi quyền Quản trị hệ thống của mình")

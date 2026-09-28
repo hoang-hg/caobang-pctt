@@ -97,7 +97,9 @@ def signed_photo_url(report_id: str, idx: int, thumb: bool = False) -> str:
 
 
 def verify_photo_signature(report_id: str, idx: int, thumb: bool, exp: int, sig: str) -> bool:
-    return exp >= time.time() and hmac.compare_digest(_sign(report_id, idx, thumb, exp), sig)
+    return exp >= time.time() and hmac.compare_digest(
+        _sign(report_id, idx, thumb, exp).encode(), sig.encode()
+    )
 
 
 def public_photo_url(report_id: str, idx: int, thumb: bool = False) -> str:
