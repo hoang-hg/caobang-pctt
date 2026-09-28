@@ -149,9 +149,21 @@ async def create_report(
     reporter_phone: str | None,
     photos: list[bytes],
     client_ip: str | None,
+    hamlet: str | None = None,
 ) -> dict:
     if category not in CATEGORY:
         raise ReportError("Loại phản ánh không hợp lệ")
+    hamlet_name = None
+    if hamlet:  # mã xóm người dân chọn (GET /public/hamlets) → lưu tên kèm xã tại thời điểm gửi
+        h = await fetch_one(
+            """SELECT c.name, p.name AS commune, p.unit_type FROM spatial_admin.administrative_units c
+                 JOIN spatial_admin.administrative_units p ON p.id = c.parent_id
+                WHERE c.code = :h AND c.level = 'thon'""",
+            {"h": hamlet},
+        )
+        if not h:
+            raise ReportError("Xóm / tổ dân phố không có trong danh sách — chọn lại hoặc để trống")
+        hamlet_name = f"{h['name']}, {'phường' if h['unit_type'] == 'phuong' else 'xã'} {h['commune']}"
     if len(photos) > MAX_PHOTOS:
         raise ReportError(f"Tối đa {MAX_PHOTOS} ảnh")
     inside = await fetch_one(
@@ -175,9 +187,9 @@ async def create_report(
         meta.append({"key": key, "thumb_key": tkey, "width": w, "height": h})
 
     row = await fetch_one(
-        """INSERT INTO community.citizen_reports (id, category, description, location, address, admin_unit_id,
-                 reporter_name, reporter_phone, photos, client_ip_hash)
-           VALUES (CAST(:id AS uuid), :c, :d, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326), :addr,
+        """INSERT INTO community.citizen_reports (id, category, description, location, address, hamlet_name,
+                 admin_unit_id, reporter_name, reporter_phone, photos, client_ip_hash)
+           VALUES (CAST(:id AS uuid), :c, :d, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326), :addr, :hamlet,
                    (SELECT id FROM spatial_admin.administrative_units WHERE level = 'xa'
                      ORDER BY geom <-> ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) LIMIT 1),
                    :rn, :rp, CAST(:ph AS jsonb), :ip)
@@ -189,6 +201,7 @@ async def create_report(
             "lat": lat,
             "lon": lon,
             "addr": address,
+            "hamlet": hamlet_name,
             "rn": reporter_name,
             "rp": reporter_phone,
             "ph": json.dumps(meta),

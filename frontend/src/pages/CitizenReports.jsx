@@ -167,7 +167,7 @@ function ReportCard({ r, onAction, onPhoto }) {
           className="flex items-center gap-1 text-accent font-medium hover:underline"
           onClick={() => { setFocus({ lat: r.lat, lon: r.lon, zoom: 15, label: r.code }); navigate('/ban-do'); }}
         >
-          <MapPin size={12} /> {r.address ? `${r.address}, ` : ''}{r.admin_name}
+          <MapPin size={12} /> {r.hamlet_name ? `${r.hamlet_name} · ` : ''}{r.address ? `${r.address}, ` : ''}{r.admin_name}
         </button>
         {(r.reporter_name || r.reporter_phone) && (
           <span className="flex items-center gap-1 text-muted">
