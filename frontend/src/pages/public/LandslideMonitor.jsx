@@ -7,6 +7,7 @@ import {
   Ban, ShieldCheck, Navigation, Gauge, Mountain, Milestone, Truck
 } from 'lucide-react';
 import { api } from '../../api/client';
+import { BackButton } from '../../components/common/ui';
 
 const EMPTY = [];
 
@@ -18,7 +19,7 @@ export const maxTiltText = (points = []) => {
   return top ? `+${top.tilt_info.current_tilt_deg}° (${top.name})` : '–';
 };
 
-export default function LandslideMonitor({ onSelectOnMap }) {
+export default function LandslideMonitor({ onSelectOnMap, onBackToMap }) {
   const [corridorFilter, setCorridorFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -80,6 +81,7 @@ export default function LandslideMonitor({ onSelectOnMap }) {
         </div>
 
         <div className="flex items-center gap-2 self-start md:self-auto">
+          {onBackToMap && <BackButton onClick={onBackToMap} />}
           <button
             onClick={() => refetch()}
             disabled={isFetching}

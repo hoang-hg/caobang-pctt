@@ -7,13 +7,14 @@ import {
   CheckCircle2, Search, SlidersHorizontal, Siren
 } from 'lucide-react';
 import { api } from '../../api/client';
+import { BackButton } from '../../components/common/ui';
 import { ago } from '../../utils/format';
 
 const EMPTY = [];
 
 const REFRESH_INTERVAL = 20_000;
 
-export default function ReservoirMonitor({ onSelectOnMap }) {
+export default function ReservoirMonitor({ onSelectOnMap, onBackToMap }) {
   const [basinFilter, setBasinFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -83,6 +84,7 @@ export default function ReservoirMonitor({ onSelectOnMap }) {
         </div>
 
         <div className="flex items-center gap-2 self-start md:self-auto">
+          {onBackToMap && <BackButton onClick={onBackToMap} />}
           <button
             onClick={() => refetch()}
             disabled={isFetching}

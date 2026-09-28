@@ -6,7 +6,7 @@ import clsx from 'clsx';
 import {
   ShieldAlert, LocateFixed, Megaphone, Phone, Home, CloudRain, Waves, Camera, LogIn, Moon, Sun, Navigation, AlertTriangle,
   CheckCircle2, Loader2, Share2, BookOpen, HelpCircle, MapPin, ChevronRight, PhoneCall, Compass, Search,
-  Droplets, Mountain, X, Zap
+  Droplets, Mountain, X, Zap, ArrowLeft
 } from 'lucide-react';
 import { api } from '../../api/client';
 import { useUnitsGeo, useUnits, useProvinceArea } from '../../api/hooks';
@@ -17,7 +17,8 @@ import { alarmLevel, LEVEL } from '../../utils/labels';
 import { ago, dateTime } from '../../utils/format';
 import L from 'leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
-import MapLegendBox from '../../components/map/MapLegendBox';
+import MapLegendBox, { POINT_EMOJI } from '../../components/map/MapLegendBox';
+import { BackButton, useEscapeToClose } from '../../components/common/ui';
 import TopLegendBar from '../../components/map/TopLegendBar';
 import ReportForm from './ReportForm';
 import TicketTracker from './TicketTracker';
@@ -25,6 +26,7 @@ import ReservoirMonitor from './ReservoirMonitor';
 import LandslideMonitor, { maxTiltText } from './LandslideMonitor';
 import NetworkBanner from './NetworkBanner';
 
+const SOURCE_TAB_LABEL = { hochua: 'Quay lại Hồ chứa', satlo: 'Quay lại Sạt trượt', sotan: 'Quay lại Điểm sơ tán' };
 const REFRESH = 60_000;
 const pub = (path, params) => api(`/public${path}`, { params });
 const PROVINCE_COLOR = '#dc2626'; // ranh giới tỉnh: một màu cố định
@@ -371,6 +373,10 @@ export default function PublicPortal() {
   // (kết quả định vị, chú thích ký hiệu) cao thấp khác nhau
   const tabsRef = useRef(null);
   const scrollToContent = () => tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const goToMap = () => {
+    setActiveTab('bando');
+    scrollToContent();
+  };
   // SĐT chỉ giữ trong state (không đưa lên URL)
   const [track, setTrack] = useState({ code: trackParam, phone: '' });
   const [layers, setLayers] = useState({ forecast: true, hazard: true, stations: true, reservoirs: true, landslides: true, evac: true, reports: true });
@@ -383,6 +389,8 @@ export default function PublicPortal() {
   const [target, setTarget] = useState(null);
   const [reporting, setReporting] = useState(false);
   const [showSosModal, setShowSosModal] = useState(false);
+
+  useEscapeToClose(showSosModal, () => setShowSosModal(false));
 
   const { data: overview } = useQuery({ queryKey: ['pub-overview'], queryFn: () => pub('/overview'), refetchInterval: REFRESH });
   const { data: map } = useQuery({ queryKey: ['pub-map'], queryFn: () => pub('/map'), refetchInterval: REFRESH });
@@ -1080,8 +1088,8 @@ export default function PublicPortal() {
 
                 {/* Khung bản đồ Leaflet: Chiếm 100% diện tích flex-1 min-h-0 */}
                 <div className="flex-1 w-full min-h-0 relative">
-                  {/* Thanh điều khiển lộ trình & vị trí nổi trên bản đồ — left-14: bên phải nút phóng to / thu nhỏ của Leaflet */}
-                  {(route || me) && (
+                  {/* Thanh điều khiển lộ trình, vị trí & điểm chọn nổi trên bản đồ — left-14: bên phải nút phóng to / thu nhỏ của Leaflet */}
+                  {(route || me || selectedPoint) && (
                     <div className="absolute top-3 left-14 z-[1000] flex flex-wrap items-center gap-2 bg-panel/95 backdrop-blur-md border border-line shadow-lg px-3 py-1.5 rounded-xl text-xs max-w-[calc(100%-7rem)] animate-in fade-in">
                       {route ? (
                         <>
@@ -1098,7 +1106,7 @@ export default function PublicPortal() {
                             <X size={13} /> Hủy chỉ đường
                           </button>
                         </>
-                      ) : (
+                      ) : !selectedPoint ? (
                         <>
                           <div className="flex items-center gap-1.5 font-semibold text-ink truncate">
                             <MapPin size={15} className="text-primary shrink-0" />
@@ -1112,6 +1120,38 @@ export default function PublicPortal() {
                           >
                             <X size={12} /> Bỏ ghim vị trí
                           </button>
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-1.5 font-semibold text-ink truncate">
+                            <span className="text-sm shrink-0">{POINT_EMOJI[selectedPoint.type] || '📍'}</span>
+                            <span className="truncate">Đang xem: <b>{selectedPoint.name}</b></span>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0 ml-auto">
+                            {selectedPoint.sourceTab && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const targetTab = selectedPoint.sourceTab;
+                                  setSelectedPoint(null);
+                                  setActiveTab(targetTab);
+                                  scrollToContent();
+                                }}
+                                className="px-2 py-0.5 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 font-semibold text-[11px] transition-colors cursor-pointer flex items-center gap-1"
+                                title="Quay lại danh sách chuyên đề"
+                              >
+                                <ArrowLeft size={12} /> {SOURCE_TAB_LABEL[selectedPoint.sourceTab] || 'Quay lại chuyên đề'}
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setSelectedPoint(null)}
+                              className="px-2 py-0.5 rounded-lg bg-panel2 text-muted hover:text-danger hover:bg-danger/10 font-medium text-[11px] transition-colors flex items-center gap-1 cursor-pointer"
+                              title="Bỏ chọn điểm này"
+                            >
+                              <X size={12} /> Bỏ chọn
+                            </button>
+                          </div>
                         </>
                       )}
                     </div>
@@ -1427,7 +1467,22 @@ export default function PublicPortal() {
         {/* TAB GIÁM SÁT HỒ CHỨA & CẢNH BÁO XẢ LŨ */}
         {activeTab === 'hochua' && (
           <ReservoirMonitor
+            onBackToMap={goToMap}
             onSelectOnMap={(res) => {
+              setSelectedPoint({
+                id: res.id,
+                name: res.name,
+                sub: `${res.river ? `Sông ${res.river} · ` : ''}${res.admin_name}`,
+                value: res.spill_gates_open > 0 ? `Mở ${res.spill_gates_open} cửa xả` : 'Đóng cửa xả',
+                status: res.status_label,
+                statusColor: res.status_code === 'xa_khan_cap' ? 'text-danger' : res.status_code === 'xa_dieu_tiet' ? 'text-amber-500' : 'text-good',
+                lat: res.lat,
+                lon: res.lon,
+                type: 'reservoir',
+                raw: res,
+                sourceTab: 'hochua',
+              });
+              setMapSidebarTab('legend');
               setTarget({ lat: res.lat, lon: res.lon, zoom: 13.5 });
               setActiveTab('bando');
               scrollToContent();
@@ -1438,7 +1493,22 @@ export default function PublicPortal() {
         {/* TAB GIÁM SÁT ĐIỂM ĐEN SẠT TRƯỢT & ĐƯỜNG ĐÈO */}
         {activeTab === 'satlo' && (
           <LandslideMonitor
+            onBackToMap={goToMap}
             onSelectOnMap={(pt) => {
+              setSelectedPoint({
+                id: pt.id,
+                name: pt.name,
+                sub: `${pt.road_name} · ${pt.admin_name}`,
+                value: pt.traffic_label,
+                status: pt.traffic_label,
+                statusColor: pt.traffic_status === 'cam_duong' ? 'text-danger' : pt.traffic_status === 'canh_bao' ? 'text-amber-500' : 'text-good',
+                lat: pt.lat,
+                lon: pt.lon,
+                type: 'landslide',
+                raw: pt,
+                sourceTab: 'satlo',
+              });
+              setMapSidebarTab('legend');
               setTarget({ lat: pt.lat, lon: pt.lon, zoom: 14 });
               setActiveTab('bando');
               scrollToContent();
@@ -1452,17 +1522,21 @@ export default function PublicPortal() {
             initialCode={track.code}
             initialPhone={track.phone}
             onQueryChange={setTrack}
+            onBackToMap={goToMap}
           />
         )}
 
         {/* TAB 2: MỰC NƯỚC SÔNG SUỐI */}
         {activeTab === 'muanuoc' && (
           <section className="card p-4 sm:p-6">
-            <div className="mb-4">
-              <h2 className="text-base sm:text-lg font-bold flex items-center gap-2">
-                <Waves size={20} className="text-accent" /> Mực nước các lưu vực sông tại Cao Bằng
-              </h2>
-              <p className="text-xs text-muted mt-0.5">Số liệu trạm thủy văn tự động cập nhật liên tục</p>
+            <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h2 className="text-base sm:text-lg font-bold flex items-center gap-2">
+                  <Waves size={20} className="text-accent" /> Mực nước các lưu vực sông tại Cao Bằng
+                </h2>
+                <p className="text-xs text-muted mt-0.5">Số liệu trạm thủy văn tự động cập nhật liên tục</p>
+              </div>
+              <BackButton onClick={goToMap} className="self-start sm:self-auto" />
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -1499,9 +1573,12 @@ export default function PublicPortal() {
                 </h2>
                 <p className="text-xs text-muted mt-0.5">Các địa điểm kiên cố (nhà văn hóa, trường học, trạm y tế) được chuẩn bị sẵn lương thực, nước sạch</p>
               </div>
-              <button onClick={locate} className="btn-primary text-xs self-start sm:self-auto">
-                <LocateFixed size={14} /> Tìm điểm gần vị trí của tôi
-              </button>
+              <div className="flex items-center gap-2 self-start sm:self-auto">
+                <BackButton onClick={goToMap} />
+                <button onClick={locate} className="btn-primary text-xs">
+                  <LocateFixed size={14} /> Tìm điểm gần tôi
+                </button>
+              </div>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -1545,6 +1622,20 @@ export default function PublicPortal() {
                       <button
                         className="btn-ghost text-xs flex-1 justify-center text-accent py-1.5 flex items-center gap-1.5"
                         onClick={() => {
+                          setSelectedPoint({
+                            id: site.id,
+                            name: site.name,
+                            sub: site.admin_name,
+                            value: `Còn ${Math.max(0, site.capacity - site.current_occupancy)}/${site.capacity} chỗ`,
+                            status: site.current_occupancy >= site.capacity ? 'Hết chỗ' : 'Còn chỗ',
+                            statusColor: site.current_occupancy >= site.capacity ? 'text-danger' : 'text-good',
+                            lat: site.lat,
+                            lon: site.lon,
+                            type: 'evac',
+                            raw: site,
+                            sourceTab: 'sotan',
+                          });
+                          setMapSidebarTab('legend');
                           setTarget({ lat: site.lat, lon: site.lon, zoom: 14 });
                           setActiveTab('bando');
                           scrollToContent();
@@ -1563,11 +1654,14 @@ export default function PublicPortal() {
         {/* TAB 4: ĐƯỜNG DÂY NÓNG */}
         {activeTab === 'hotlines' && (
           <section className="card p-4 sm:p-6 space-y-6">
-            <div>
-              <h2 className="text-base sm:text-lg font-bold flex items-center gap-2">
-                <Phone size={20} className="text-danger" /> Đường dây nóng ứng phó thiên tai tỉnh Cao Bằng
-              </h2>
-              <p className="text-xs text-muted mt-0.5">Trực ban tác chiến 24/24. Khi gặp tình huống khẩn cấp nguy hiểm đến tính mạng, vui lòng gọi ngay!</p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h2 className="text-base sm:text-lg font-bold flex items-center gap-2">
+                  <Phone size={20} className="text-danger" /> Đường dây nóng ứng phó thiên tai tỉnh Cao Bằng
+                </h2>
+                <p className="text-xs text-muted mt-0.5">Trực ban tác chiến 24/24. Khi gặp tình huống khẩn cấp nguy hiểm đến tính mạng, vui lòng gọi ngay!</p>
+              </div>
+              <BackButton onClick={goToMap} className="self-start sm:self-auto" />
             </div>
 
             {/* Số khẩn cấp quốc gia */}
@@ -1618,11 +1712,14 @@ export default function PublicPortal() {
         {/* TAB 5: CẨM NANG AN TOÀN */}
         {activeTab === 'huongdan' && (
           <section className="card p-4 sm:p-6 space-y-4">
-            <div>
-              <h2 className="text-base sm:text-lg font-bold flex items-center gap-2">
-                <BookOpen size={20} className="text-accent" /> Hướng dẫn kỹ năng an toàn khi xảy ra thiên tai
-              </h2>
-              <p className="text-xs text-muted mt-0.5">Những điều cần nhớ để bảo vệ an toàn cho bản thân và gia đình</p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h2 className="text-base sm:text-lg font-bold flex items-center gap-2">
+                  <BookOpen size={20} className="text-accent" /> Hướng dẫn kỹ năng an toàn khi xảy ra thiên tai
+                </h2>
+                <p className="text-xs text-muted mt-0.5">Những điều cần nhớ để bảo vệ an toàn cho bản thân và gia đình</p>
+              </div>
+              <BackButton onClick={goToMap} className="self-start sm:self-auto" />
             </div>
 
             <div className="grid gap-4 md:grid-cols-3">
@@ -1674,6 +1771,19 @@ export default function PublicPortal() {
               <div
                 key={r.id}
                 onClick={() => {
+                  setSelectedPoint({
+                    id: r.id,
+                    name: r.category_label,
+                    sub: r.address || '',
+                    value: r.description,
+                    status: r.status === 'da_xu_ly' ? 'Đã xử lý' : 'Đã xác minh',
+                    statusColor: 'text-good',
+                    lat: r.lat,
+                    lon: r.lon,
+                    type: 'report',
+                    raw: r,
+                  });
+                  setMapSidebarTab('legend');
                   setTarget({ lat: r.lat, lon: r.lon, zoom: 14 });
                   setActiveTab('bando');
                   scrollToContent();
@@ -1735,12 +1845,29 @@ export default function PublicPortal() {
 
       {/* Modal Cứu nạn khẩn cấp */}
       {showSosModal && (
-        <div className="fixed inset-0 z-[1500] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-          <div className="card w-full max-w-md p-5 shadow-2xl border-danger/40">
-            <div className="flex items-center gap-3 text-danger pb-3 border-b border-line">
+        <div
+          className="fixed inset-0 z-[1500] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150 cursor-pointer"
+          onMouseDown={() => setShowSosModal(false)}
+        >
+          <div
+            className="card w-full max-w-md p-5 shadow-2xl border-danger/40 cursor-default relative"
+            onMouseDown={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="sos-modal-title"
+          >
+            <button
+              type="button"
+              onClick={() => setShowSosModal(false)}
+              className="absolute top-4 right-4 p-1 rounded-lg text-muted hover:text-ink hover:bg-panel2 transition-colors cursor-pointer"
+              title="Đóng hộp thoại"
+            >
+              <X size={18} />
+            </button>
+            <div className="flex items-center gap-3 text-danger pb-3 border-b border-line pr-8">
               <ShieldAlert size={28} />
               <div>
-                <h3 className="text-base font-bold text-ink">Yêu Cầu Cứu Nạn Khẩn Cấp</h3>
+                <h3 id="sos-modal-title" className="text-base font-bold text-ink">Yêu Cầu Cứu Nạn Khẩn Cấp</h3>
                 <p className="text-xs text-muted">Bạn đang trong tình huống nguy hiểm cần hỗ trợ ngay?</p>
               </div>
             </div>
@@ -1773,7 +1900,7 @@ export default function PublicPortal() {
             </div>
 
             <div className="flex justify-end gap-2 border-t border-line pt-3">
-              <button className="btn-ghost text-xs" onClick={() => setShowSosModal(false)}>
+              <button className="btn-ghost text-xs cursor-pointer" onClick={() => setShowSosModal(false)}>
                 Đóng
               </button>
             </div>
