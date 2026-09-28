@@ -45,6 +45,7 @@ EVENT_SCOPE = {
     "broadcast.updated": "alert",
     "reading.new": "monitoring",
     "hazard.new": "monitoring",
+    "reservoir.updated": "monitoring",
     "dispatch.updated": "sos",
     "source.updated": "integration",
     "ingest.log": "integration",

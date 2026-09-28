@@ -327,7 +327,8 @@ DATASETS: dict[str, Dataset] = {
         Dataset(
             "ho_chua",
             "Hồ chứa",
-            "Hồ thuỷ điện / thuỷ lợi. Mực nước, lưu lượng vận hành cập nhật qua nguồn dữ liệu, không nhập ở đây.",
+            "Hồ thuỷ điện / thuỷ lợi (thông số tĩnh). Mực nước, cửa xả, lưu lượng vận hành: trực ban cập nhật ở Dashboard → "
+            "chuyên đề Hồ chứa & Xả lũ (nút “Cập nhật vận hành”), không nhập ở đây.",
             "iot_telemetry.reservoirs",
             ("id",),
             (

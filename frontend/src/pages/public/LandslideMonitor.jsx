@@ -180,20 +180,20 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap }) {
           </div>
         </div>
 
-        {/* Card 4: Lưu thông an toàn */}
+        {/* Card 4: Chưa ghi nhận nguy cơ — KHÔNG khẳng định đường an toàn (chỉ là cảm biến / vùng cảnh báo chưa báo gì) */}
         <div className="card p-4 flex flex-col justify-between border-l-4 border-l-good">
           <div className="flex items-center justify-between text-muted text-xs">
-            <span>Đoạn đèo lưu thông bình thường</span>
+            <span>Chưa ghi nhận nguy cơ</span>
             <div className="h-8 w-8 rounded-lg bg-good/10 text-good flex items-center justify-center font-bold">
               <CheckCircle2 size={16} />
             </div>
           </div>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-2xl font-black font-mono text-good">{safeCount}</span>
-            <span className="text-xs text-muted">cung đèo thông suốt</span>
+            <span className="text-xs text-muted">điểm chưa có cảnh báo</span>
           </div>
           <div className="text-[11px] text-muted mt-2 border-t border-line/60 pt-1.5">
-            Được lực lượng duy tu tuần tra liên tục
+            Theo cảm biến và vùng cảnh báo đang hiệu lực — vẫn chú ý khi trời mưa
           </div>
         </div>
       </div>
@@ -244,7 +244,7 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap }) {
               <option value="all">Tất cả trạng thái</option>
               <option value="cam_duong">⛔ Cấm lưu thông / Tắc đường</option>
               <option value="canh_bao">⚠️ Cảnh báo / Hạn chế xe</option>
-              <option value="thong_suot">✅ Lưu thông bình thường</option>
+              <option value="thong_suot">✅ Chưa ghi nhận nguy cơ</option>
             </select>
 
             <span className="text-xs text-muted ml-1">Loại hình:</span>

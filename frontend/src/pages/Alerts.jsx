@@ -8,7 +8,7 @@ import { api } from '../api/client';
 import { usePresets, useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
 import { Empty, Modal, Section, Tabs } from '../components/common/ui';
-import { BROADCAST_STATUS, CHANNEL, LEVEL } from '../utils/labels';
+import { CHANNEL, LEVEL, broadcastStatus, notIntegrated } from '../utils/labels';
 import { Can, useAllowedCodes, usePermission } from '../rbac/usePermission';
 import { dateTime, int, pct } from '../utils/format';
 
@@ -178,9 +178,15 @@ function ApproveModal({ b, onClose }) {
   const run = async () => {
     setBusy(true);
     try {
-      if (mode === 'approve') await api(`/alerts/broadcasts/${b.id}/approve`, { method: 'POST', body: { pin } });
-      else await api(`/alerts/broadcasts/${b.id}/reject`, { method: 'POST', body: { reason } });
-      toast({ tone: mode === 'approve' ? 'good' : 'info', title: mode === 'approve' ? `Đã phê duyệt – bắt đầu phát ${b.code}` : `Đã từ chối ${b.code}` });
+      if (mode === 'approve') {
+        const res = await api(`/alerts/broadcasts/${b.id}/approve`, { method: 'POST', body: { pin } });
+        toast(notIntegrated(res)
+          ? { tone: 'good', title: `Đã phê duyệt ${b.code} – đã công bố trên cổng công khai`, body: 'Kênh SMS / Zalo / Cell Broadcast chưa tích hợp: tin CHƯA gửi tới điện thoại người dân.' }
+          : { tone: 'good', title: `Đã phê duyệt – bắt đầu phát ${b.code}` });
+      } else {
+        await api(`/alerts/broadcasts/${b.id}/reject`, { method: 'POST', body: { reason } });
+        toast({ tone: 'info', title: `Đã từ chối ${b.code}` });
+      }
       qc.invalidateQueries({ queryKey: ['broadcasts'] });
       onClose();
     } catch (e) {
@@ -217,7 +223,7 @@ function ApproveModal({ b, onClose }) {
       </div>
       {mode === 'approve' ? (
         <label className="block text-sm">
-          <span className="flex items-center gap-1"><KeyRound size={14} /> Mã PIN Lãnh đạo (demo: 2468)</span>
+          <span className="flex items-center gap-1"><KeyRound size={14} /> Mã PIN ký duyệt của bạn</span>
           <input type="password" inputMode="numeric" autoFocus className="input mt-1 w-40 font-mono tracking-widest" value={pin} onChange={(e) => setPin(e.target.value)} />
         </label>
       ) : (
@@ -229,6 +235,15 @@ function ApproveModal({ b, onClose }) {
 
 function Delivery({ b }) {
   const m = b.metrics || {};
+  if (notIntegrated(b)) {
+    return (
+      <div className="rounded-lg border border-dashed border-warn/60 bg-warn/5 p-2 text-xs text-ink-2">
+        <b className="text-ink">Chưa gửi tới điện thoại người dân.</b> Kênh {Object.keys(m).map((c) => CHANNEL[c]).join(', ')} chưa
+        tích hợp cổng gửi tin — lệnh chỉ được công bố trên cổng công khai và bản nhẹ. Phát qua kênh chính thức (loa,
+        nhà mạng, Zalo của tỉnh) theo quy trình hiện hành.
+      </div>
+    );
+  }
   return (
     <div className="flex flex-col gap-2">
       {Object.entries(m).map(([ch, v]) => (
@@ -295,7 +310,7 @@ function Broadcasts() {
             <div key={b.id} className="rounded-lg border border-line p-2.5">
               <div className="mb-1 flex items-center gap-2">
                 <b className="text-sm">{b.code}</b>
-                <span className={clsx('chip', BROADCAST_STATUS[b.status].cls)}>{BROADCAST_STATUS[b.status].label}</span>
+                <span className={clsx('chip', broadcastStatus(b).cls)}>{broadcastStatus(b).label}</span>
                 <span className="truncate text-xs">{b.title}</span>
                 <span className="ml-auto whitespace-nowrap text-[11px] text-muted">{dateTime(b.sent_at || b.approved_at)}</span>
               </div>

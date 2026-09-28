@@ -103,7 +103,7 @@ vùng nguy hiểm, số điện thoại không có thật.
 | Mẫu tin cảnh báo | `communications.message_templates` | ✅ | Rà soát lời văn với Văn phòng BCH |
 | Danh mục vật tư | `resources.items` | ✅ | |
 | Trạm quan trắc, ngưỡng báo động | `iot_telemetry.monitoring_stations` | ⛔ trống | Đài KTTV Cao Bằng, VRain |
-| Hồ chứa, quy trình xả | `iot_telemetry.reservoirs` | ⛔ trống | Chủ đập / Sở Công Thương |
+| Hồ chứa, quy trình xả | `iot_telemetry.reservoirs` | ⛔ trống | Chủ đập / Sở Công Thương. Số liệu vận hành (mực nước, cửa xả): trực ban nhập theo báo cáo của hồ ([7.4](#giam-sat-kttv)) tới khi có nguồn tự động |
 | Vùng nguy hiểm, điểm sạt lở | `iot_telemetry.hazard_zones`, `hazard_points` | ⛔ trống | Bản đồ phân vùng rủi ro sạt lở, lũ quét |
 | Lực lượng, phương tiện | `resources.forces`, `vehicles` | ⛔ trống | BCH Quân sự, Công an, đội xung kích |
 | Kho, tồn kho, nhiên liệu | `resources.warehouses`, `inventory`, `fuel_depots` | ⛔ trống | Văn phòng BCH |
@@ -669,7 +669,9 @@ graph LR
 ```
 
 > ⚠️ Bước soạn, duyệt bằng PIN, nhật ký chạy thật; bước **phát chưa gửi tin thật** ([2.1](#hien-trang)). Không dùng hệ
-> thống làm kênh cảnh báo chính thức cho tới khi tích hợp xong.
+> thống làm kênh cảnh báo chính thức cho tới khi tích hợp xong. Khi vận hành thật (`SIMULATOR=false`), lệnh đã duyệt
+> được **công bố ngay trên cổng công khai và bản nhẹ**, trạng thái "Đã công bố trên cổng"; bảng giao nhận ghi rõ các kênh
+> chưa tích hợp, tin **chưa** tới điện thoại người dân — vẫn phát qua kênh chính thức (loa, nhà mạng) theo quy trình hiện hành.
 
 1. **Không tự duyệt**: người soạn không phê duyệt được lệnh của chính mình (nguyên tắc 4 mắt).
 2. **Ký duyệt bằng PIN** cá nhân (lưu dạng băm PBKDF2-SHA256). Sai PIN 5 lần trong 15 phút → tạm khoá phê duyệt 15 phút
@@ -678,6 +680,7 @@ graph LR
 4. Phát theo ranh giới xã/phường hoặc đa giác khoanh trên bản đồ. Có vùng vẽ thì người soạn phải có quyền trên mọi xã
    vùng vẽ đi qua (không chỉ các xã tự chọn). Mỗi lệnh chỉ được duyệt 1 lần (bấm đúp / hai lãnh đạo cùng duyệt → 1 lần phát).
 
+<a id="giam-sat-kttv"></a>
 ### 7.4. Giám sát khí tượng thuỷ văn, IoT & bản đồ tác chiến
 
 - Trạm đo mưa, mực nước, cảm biến sạt lở gửi qua HTTP / MQTT / LoRaWAN; số đo dị thường bị loại ([6.4](#thiet-bi-iot)).
@@ -685,6 +688,11 @@ graph LR
   tự khoanh vùng nguy cơ, tạo phiếu SOS nguồn cảm biến và nháp cảnh báo. Âm báo tại trung tâm khi có SOS cấp 1–2.
 - Dự báo tổ hợp ECMWF + GEFS mỗi 3 giờ, mưa theo xã 24h / 72h (P10 – P50 – P90).
 - Công cụ GIS: thanh thời gian (12 giờ qua, 24 giờ tới), đo khoảng cách, hồ đập xung yếu, sức chứa điểm sơ tán.
+- **Hồ chứa**: chưa có nguồn số liệu vận hành tự động ([6](#ket-noi-du-lieu)). Hồ mới nhập danh mục hiện **"Chưa có số
+  liệu vận hành"** (cổng công khai không khẳng định "chưa xả tràn" khi không có số liệu). Người có quyền
+  `monitoring.update` (trực ban, quản trị tỉnh) bấm **Cập nhật vận hành** ở Dashboard → chuyên đề **Hồ chứa & Xả lũ**, nhập mực nước, số cửa xả đang
+  mở, lưu lượng theo báo cáo của đơn vị quản lý hồ (`PATCH /api/v1/reservoirs/{mã}/operation`, ghi nhật ký thao tác) →
+  cổng công khai và bản nhẹ cập nhật ngay, kèm thời điểm số liệu; số liệu cũ hơn 6 giờ gắn nhãn **"Số liệu cũ"**.
 
 ### 7.5. Kịch bản lũ & ngập lụt
 
@@ -757,6 +765,7 @@ Yêu cầu ở phạm vi toàn tỉnh **không** khớp phân quyền cấp cụ
 | Quyền | Theo phạm vi | Mô tả |
 |---|---|---|
 | `monitoring.view` | ✓ | Dashboard, bản đồ, số liệu quan trắc |
+| `monitoring.update` | toàn tỉnh | Cập nhật số liệu vận hành hồ chứa (mực nước, cửa xả, lưu lượng) theo báo cáo của đơn vị quản lý hồ |
 | `sos.view` / `.create` / `.update` / `.resolve` | ✓ | Xem / tiếp nhận / chuyển trạng thái / xác nhận đã cứu |
 | `dispatch.create` | ✓ | Điều động (theo xã của điểm SOS; được điều lực lượng ngoài xã) |
 | `resource.view` | ✓ | Lực lượng, kho, phương tiện, điểm sơ tán |
@@ -778,10 +787,10 @@ Yêu cầu ở phạm vi toàn tỉnh **không** khớp phân quyền cấp cụ
 |---|---|---|
 | `super_admin` Quản trị hệ thống | ✗ | Tất cả |
 | `truong_ban` Lãnh đạo BCH | ✗ | Tất cả trừ `rbac.manage` |
-| `admin_tinh` Quản trị tỉnh | ✗ | Tài khoản, duyệt phản ánh, xử lý SOS và **điều động** toàn tỉnh; xem nguồn lực, cảnh báo, nhật ký, nguồn dữ liệu; **nhập dữ liệu chính thức**. Không soạn/duyệt cảnh báo, không sửa vai trò |
+| `admin_tinh` Quản trị tỉnh | ✗ | Tài khoản, duyệt phản ánh, xử lý SOS và **điều động** toàn tỉnh; xem nguồn lực, cảnh báo, nhật ký, nguồn dữ liệu; **nhập dữ liệu chính thức**; cập nhật vận hành hồ chứa. Không soạn/duyệt cảnh báo, không sửa vai trò |
 | `admin_xa` Quản trị xã/phường | ✓ | Tài khoản & duyệt phản ánh trong xã; tiếp nhận – cập nhật SOS của xã |
 | `chi_huy_cum` Chỉ huy cụm | ✓ | Điều hành, xuất kho, soạn + duyệt cảnh báo, tài khoản trong cụm |
-| `truc_ban` Trực ban điều hành | ✓ | Tiếp nhận SOS, điều động, soạn cảnh báo (Maker), tổng đài |
+| `truc_ban` Trực ban điều hành | ✓ | Tiếp nhận SOS, điều động, soạn cảnh báo (Maker), tổng đài; cập nhật vận hành hồ chứa (khi được giao toàn tỉnh) |
 | `can_bo_xa` Cán bộ PCTT xã | ✓ | Tiếp nhận & cập nhật SOS, xem nguồn lực trong xã |
 | `thu_kho` Thủ kho | ✓ | Xem & xuất kho |
 | `quan_sat` Quan sát | ✓ | Chỉ xem |
@@ -853,14 +862,15 @@ hoặc UBND xã, **không dùng số di động cá nhân**. public-test kiểm 
 ### 9.2. Giới hạn tần suất
 
 Cửa sổ cố định, đếm trong Redis (`backend/app/infra/ratelimit.py`), vượt → **429** kèm `Retry-After`. Nhà mạng di động
-dùng chung một IP cho rất nhiều thuê bao (CGNAT) nên ngưỡng theo IP cho thao tác của người dân để rộng; lạm dụng được
-chặn bằng khoá phụ (SĐT) và Turnstile.
+dùng chung một IP cho rất nhiều thuê bao (CGNAT — cả huyện có thể ra Internet qua vài IP) nên ngưỡng theo IP cho thao
+tác của người dân để đủ cho hàng trăm người sau 1 IP; lạm dụng được chặn bằng khoá phụ (SĐT) và Turnstile. GET công khai
+phần lớn do cache nginx 10 giây trả (không tới backend, không bị đếm).
 
 | Quy tắc | Giới hạn |
 |---|---|
-| Gửi phản ánh | 30 / giờ / IP + 5 phản ánh **thành công** / giờ / SĐT người gửi (gửi lỗi không mất lượt) |
-| Chỉ đường · Định vị · Tra cứu tiến độ | 20 · 30 · 20 / phút |
-| API công khai khác | 120 / phút |
+| Gửi phản ánh | 200 / giờ / IP + 5 phản ánh **thành công** / giờ / SĐT người gửi (gửi lỗi không mất lượt) |
+| Chỉ đường · Định vị · Tra cứu tiến độ | 60 · 240 · 120 / phút |
+| API công khai khác | 600 / phút |
 | Đăng nhập | 30 / phút (+ khoá tài khoản 15′ sau 10 lần sai) |
 | Quên mật khẩu · Đặt lại | 5 · 10 / giờ |
 | Tiếp nhận SOS tự động | 300 / phút (bắt buộc `X-Intake-Key`) |
@@ -1086,6 +1096,10 @@ lỗi (chỉ tên kiểm tra + đạt / lỗi; chi tiết trong email). `/health
   caddy, mqtt, backup (có bản sao lưu trong 26 giờ). `unhealthy` kéo dài → xem `dcp logs <service>`.
 - Trang **Nguồn dữ liệu**: trạng thái đồng bộ, MQTT, thiết bị mất tín hiệu.
 - Log: `dcp logs -f backend worker frontend` (xoay vòng 10 × 20 MB mỗi service; không chứa query string).
+- **Giữ nhật ký có thời hạn** (`backend/app/services/retention.py`, worker chạy mỗi giờ, xoá từng lô): nhật ký tiếp nhận
+  IoT / đồng bộ `INGEST_LOG_RETENTION_DAYS` (30 ngày — mỗi lần thiết bị gửi là 1 dòng), dòng sự kiện vận hành
+  `EVENT_LOG_RETENTION_DAYS` (730 ngày), link đặt lại mật khẩu 30 ngày; `0` = giữ mãi. **Không** xoá nhật ký thao tác
+  (audit), phiếu SOS, phản ánh, lệnh cảnh báo, số đo cảm biến.
 - **Không chạy pytest trong container production** (kiểm thử ghi vào Redis / CSDL thật).
 
 | Hiện tượng | Kiểm tra |
@@ -1180,7 +1194,15 @@ Kiểm thử API (cần stack dev đang chạy với `DEMO_MODE=true`; tham số
 | Điểm đen sạt lở & đường đèo | `node tests/e2e/landslide-test.mjs` |
 | Nhập dữ liệu (12 loại, kiểm tra lỗi, cập nhật không trùng, thay toàn bộ) | `node tests/e2e/import-test.mjs` |
 | Bản nhẹ `/ban-nhe`, service worker, manifest — qua nginx (tham số = địa chỉ frontend, mặc định `http://localhost:8080`) | `node tests/e2e/lite-test.mjs` |
-| Tự giám sát: `/health/full`; email cảnh báo sự cố khi backend có `OPS_DISK_WARN_PCT=1` (giả lập ổ đĩa đầy, ~2 phút) | `node tests/e2e/ops-test.mjs [backend] [mailpit]` |
+| Tự giám sát: `/health/full`; email cảnh báo sự cố khi backend có `OPS_DISK_WARN_PCT=1` (giả lập ổ đĩa đầy, ~2 phút); dọn nhật ký cũ | `node tests/e2e/ops-test.mjs [backend] [mailpit]` |
+
+**Luồng vận hành thật** (`tests/e2e/prod-flow.mjs`, CI job `prod`): dựng `docker-compose.prod.yml` trên **CSDL trống**
+(`DEMO_MODE=false`, `SIMULATOR=false`, bắt buộc xác thực 2 lớp), gọi qua nginx như người dùng thật: CSP & cấu hình an
+toàn, mọi API công khai / nội bộ trên dữ liệu rỗng không lỗi 5xx, superadmin cài TOTP, nhập tệp mẫu của mọi loại dữ liệu,
+hồ chứa chưa có số liệu → cập nhật vận hành, phản ánh → duyệt → SOS → điều động → tra cứu, cảnh báo Maker–Checker (chốt
+"đã công bố", kênh chưa tích hợp), thiết bị IoT, email đặt lại mật khẩu, `/health/full` = 200 (có bản sao lưu).
+**Không chạy trên hệ thống đang phục vụ** (nhập dữ liệu mẫu, tạo tài khoản, phát cảnh báo thử):
+`SUPERADMIN_PASSWORD=… SUPERADMIN_PIN=… node tests/e2e/prod-flow.mjs http://127.0.0.1:8080 http://127.0.0.1:8025`.
 
 Chạy lại nhiều lần liên tiếp: xoá khoá `rl:*` trong Redis trước (lệnh ở 4.5).
 

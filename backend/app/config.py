@@ -67,6 +67,11 @@ class Settings(BaseSettings):
     # Khoá cho cổng tiếp nhận SOS tự động POST /api/v1/sos/intake (webhook Zalo OA / app) — trống = tắt cổng
     intake_api_key: str = ""
 
+    # Thời hạn giữ nhật ký (ngày) — worker xoá bản ghi cũ hơn mỗi giờ (app/services/retention.py); 0 = giữ mãi.
+    # Nhật ký thao tác (audit), phiếu SOS, phản ánh, lệnh cảnh báo, số đo cảm biến không bị xoá.
+    ingest_log_retention_days: int = 30  # nhật ký tiếp nhận IoT / đồng bộ (mỗi lần thiết bị gửi = 1 dòng)
+    event_log_retention_days: int = 730  # dòng sự kiện vận hành trên bảng điều hành
+
     # Hạ tầng chạy thật
     redis_url: str = ""  # VD redis://redis:6379/0 — trống = chạy 1 tiến trình, dùng bộ nhớ trong
     run_mode: str = "all"  # all | api | worker — tách tác vụ nền (mô phỏng, đồng bộ, MQTT) khỏi API

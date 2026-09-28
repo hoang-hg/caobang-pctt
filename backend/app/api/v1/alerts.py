@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from app.auth import audit, verify_secret
+from app.config import settings
 from app.db import fetch_all, fetch_one
 from app.infra import ratelimit
 from app.infra.cache import invalidate
@@ -168,12 +169,18 @@ async def approve(broadcast_id: str, body: ApproveIn, user: dict = Depends(requi
         raise HTTPException(400, "Lệnh không ở trạng thái chờ duyệt")
     if b["created_by"] == user["id"]:
         raise HTTPException(403, "Người soạn không được tự phê duyệt (nguyên tắc 4 mắt)")
-    metrics = init_metrics(b["channels"], b["audience"])
+    # Các kênh SMS / Cell Broadcast / Zalo / Push / loa CHƯA nối cổng gửi tin thật — chỉ bộ mô phỏng tiến triển giao nhận.
+    # Vận hành thật: lệnh đã duyệt được công bố ngay trên cổng công khai & bản nhẹ → chốt "sent" (không treo mãi ở
+    # "Đang phát" với 0 tin), từng kênh gắn "integrated": False để giao diện ghi rõ chưa gửi tới điện thoại người dân
+    simulated = settings.simulator
+    status = "sending" if simulated else "sent"
+    metrics = init_metrics(b["channels"], b["audience"], integrated=simulated)
     # Điều kiện trạng thái trong cùng câu lệnh → hai lãnh đạo bấm duyệt cùng lúc (hoặc bấm đúp) chỉ phát 1 lần
     if not await fetch_one(
-        """UPDATE communications.alert_broadcasts SET status = 'sending', approved_by = :u, approved_at = now(), metrics = CAST(:m AS jsonb)
+        """UPDATE communications.alert_broadcasts SET status = :st, approved_by = :u, approved_at = now(),
+                  sent_at = CASE WHEN :done THEN now() END, metrics = CAST(:m AS jsonb)
             WHERE id = CAST(:id AS uuid) AND status = 'pending_approval' RETURNING id""",
-        {"u": user["id"], "m": json.dumps(metrics), "id": broadcast_id},
+        {"st": status, "done": not simulated, "u": user["id"], "m": json.dumps(metrics), "id": broadcast_id},
     ):
         raise HTTPException(400, "Lệnh không ở trạng thái chờ duyệt")
     await audit(
@@ -184,11 +191,14 @@ async def approve(broadcast_id: str, body: ApproveIn, user: dict = Depends(requi
         {"title": b["title"], "channels": b["channels"]},
     )
     await hub.publish(
-        "broadcast.updated", {"id": b["id"], "code": b["code"], "status": "sending", "metrics": metrics}
+        "broadcast.updated", {"id": b["id"], "code": b["code"], "status": status, "metrics": metrics}
     )
     await invalidate("public:")  # cổng công khai + bản nhẹ hiện cảnh báo ngay (còn cache nginx ≤ 10 giây)
     await log_event(
-        f"{user['full_name']} PHÊ DUYỆT phát lệnh {b['code']} “{b['title']}” trên {len(b['channels'])} kênh",
+        f"{user['full_name']} PHÊ DUYỆT phát lệnh {b['code']} “{b['title']}” trên {len(b['channels'])} kênh"
+        if simulated
+        else f"{user['full_name']} PHÊ DUYỆT lệnh {b['code']} “{b['title']}” — đã công bố trên cổng công khai "
+        "(kênh SMS / Zalo / Cell Broadcast chưa tích hợp)",
         "canh_bao",
         "danger",
     )

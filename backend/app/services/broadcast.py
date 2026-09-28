@@ -78,13 +78,16 @@ def channel_target(channel: str, audience: dict) -> int:
     }[channel]
 
 
-def init_metrics(channels: list[str], audience: dict) -> dict:
+def init_metrics(channels: list[str], audience: dict, integrated: bool = True) -> dict:
+    """Số liệu giao nhận ban đầu từng kênh. ``integrated=False``: kênh chưa nối cổng gửi tin thật — giao diện hiện
+    "chưa tích hợp" thay cho thanh tiến độ (không để trực ban tưởng tin đã tới điện thoại người dân)."""
     return {
         ch: {
             "target": channel_target(ch, audience),
             "sent": 0,
             "delivered": 0,
             **({"read": 0} if "read" in FINAL_RATES[ch] else {}),
+            **({} if integrated else {"integrated": False}),
         }
         for ch in channels
     }

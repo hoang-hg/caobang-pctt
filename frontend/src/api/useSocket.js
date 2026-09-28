@@ -61,6 +61,9 @@ export function useSocket() {
             toast({ tone: 'warn', title: `Lệnh cảnh báo ${data.code} chờ phê duyệt`, body: data.title || '' });
           }
           break;
+        case 'reservoir.updated': // trực ban nhập số liệu vận hành hồ
+          inv('pub-reservoirs', 'kpis', 'map-layers');
+          break;
         case 'hazard.new':
           inv('map-layers');
           toast({ tone: 'danger', title: 'Cảm biến vượt ngưỡng', body: data.name });

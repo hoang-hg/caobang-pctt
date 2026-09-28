@@ -215,7 +215,8 @@ Python trong container.
 
 **Giới hạn tần suất & IP**
 - Quy tắc ở `RULES` trong `infra/ratelimit.py` (khớp tiền tố, quy tắc cụ thể đặt trước). Nhà mạng dùng chung IP (CGNAT) →
-  không siết thao tác của người dân theo IP; dùng `await ratelimit.limit(tên, khoá, số_lần, giây)` theo SĐT / khoá phụ.
+  không siết thao tác của người dân theo IP; dùng `await ratelimit.check_limit(tên, khoá, số_lần, giây)` trước thao tác
+  + `await ratelimit.count_hit(tên, khoá, giây)` sau khi thành công, theo SĐT / khoá phụ.
   API đã đăng nhập đếm theo phiên (`per_session=True`).
 - IP người dùng: luôn `request.client.host`. **Không** dùng `--forwarded-allow-ips=*`, không tự đọc `X-Forwarded-For`.
 
@@ -314,11 +315,16 @@ Python trong container.
 - Test phải **độc lập môi trường**: `Settings.model_construct(**kw)` thay vì đọc env; `monkeypatch.setattr(cache, "get_redis",
   lambda: None)` khi kiểm cache bộ nhớ. **Không chạy pytest trong container production** (ghi vào Redis/CSDL thật).
 - `tests/e2e/*.mjs` kiểm thử API end-to-end, cần stack dev với `DEMO_MODE=true` (dùng tài khoản demo); tham số 1 = URL backend.
-  Chạy lại liên tiếp → xoá khoá `rl:*` trong Redis. `iot-test.mjs` gọi `docker exec caobang-pctt-mqtt` (tên container cố định).
+  Chạy lại liên tiếp → xoá khoá `rl:*` trong Redis. `iot-test.mjs` gọi `docker exec caobang-pctt-mqtt`, `ops-test.mjs` gọi
+  `docker exec caobang-pctt-db` / `-worker` (tên container cố định). Ngoại lệ: `prod-flow.mjs` chạy trên stack production.
 - CI (`ci.yml`): ruff + pytest → ESLint + build frontend → kiểm tra `docker-compose.prod.yml` → stack Docker Compose
   (`DEMO_MODE=true`, `SIMULATOR=true`, `TOTP_REQUIRED_ROLES=kiem_thu_2fa`, `OPS_DISK_WARN_PCT=1`) + 11 script API (`lite-test.mjs`
   chạy qua nginx: tham số = URL frontend :8080; `totp-test.mjs` tự tính mã TOTP, cần biến trên để thử luồng bắt buộc;
   `ops-test.mjs` chạy cuối: ngưỡng ổ đĩa 1% → chờ email sự cố trong Mailpit + `/health/full` 503).
+  Job `prod` song song: dựng `docker-compose.prod.yml` (+ Mailpit qua tệp override chỉ có trong CI) trên CSDL trống,
+  `DEMO_MODE=false`, `SIMULATOR=false`, TOTP bắt buộc như thật → `prod-flow.mjs` qua nginx :8080 (cài 2 lớp cho superadmin,
+  nhập mọi tệp mẫu, hồ chứa chưa có số liệu → cập nhật vận hành, phản ánh → SOS → điều động, Maker–Checker, IoT, email,
+  `/health/full` = 200). Luồng chỉ bộ mô phỏng làm (giao nhận tin, xe di chuyển) phải có đường đi riêng khi `SIMULATOR=false`.
   Thay đổi hành vi nghiệp vụ / quyền → cập nhật script tương ứng.
 - `tests/load/load.js` (k6, README §12.2): thay đổi đường đi của cổng công khai hoặc dashboard (thêm API, bỏ cache…) →
   chạy lại, so với bảng kết quả trong README; cập nhật bảng khi số liệu đổi đáng kể.

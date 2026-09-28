@@ -434,7 +434,7 @@ class Simulator:
             outflow = round(inflow * 0.55 + gates * 180)
             await execute(
                 """UPDATE iot_telemetry.reservoirs SET inflow_m3s = :i, outflow_m3s = :o, current_level = :l, spill_gates_open = :g,
-                          updated_at = now() WHERE id = :id""",
+                          updated_at = now(), operating_at = now() WHERE id = :id""",
                 {
                     "i": inflow,
                     "o": outflow,

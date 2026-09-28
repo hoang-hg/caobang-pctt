@@ -219,16 +219,22 @@ function PublicMap({ data, forecast, geo, me, route, target, layers, basemap = '
                 <div className="text-xs text-muted">Sông {r.river} · {r.admin_name}</div>
                 <div className="text-xs pt-1 border-t border-line/60">
                   Trạng thái:{' '}
-                  <b className={r.status_code === 'xa_khan_cap' ? 'text-danger font-bold' : r.status_code === 'xa_dieu_tiet' ? 'text-serious font-bold' : 'text-good font-bold'}>
+                  <b className={r.status_code === 'xa_khan_cap' ? 'text-danger font-bold' : r.status_code === 'xa_dieu_tiet' ? 'text-serious font-bold' : r.status_code === 'chua_co_so_lieu' ? 'text-muted font-bold' : 'text-good font-bold'}>
                     {r.status_label}
                   </b>
                 </div>
-                <div className="text-xs">
-                  Mực nước: <b>{r.current_level} m</b> (MNDBT {r.normal_level} m, {r.level_diff >= 0 ? '+' : ''}{r.level_diff} m)
-                </div>
-                <div className="text-xs">
-                  Lưu lượng xả: <b className="font-mono text-danger font-bold">{r.outflow_m3s} m³/s</b> (Nước về: {r.inflow_m3s} m³/s)
-                </div>
+                {r.status_code === 'chua_co_so_lieu' ? (
+                  <div className="text-xs text-muted">Chưa có số liệu vận hành từ đơn vị quản lý hồ.</div>
+                ) : (
+                  <>
+                    <div className="text-xs">
+                      Mực nước: <b>{r.current_level} m</b> (MNDBT {r.normal_level} m, {r.level_diff >= 0 ? '+' : ''}{r.level_diff} m)
+                    </div>
+                    <div className="text-xs">
+                      Lưu lượng xả: <b className="font-mono text-danger font-bold">{r.outflow_m3s} m³/s</b> (Nước về: {r.inflow_m3s} m³/s)
+                    </div>
+                  </>
+                )}
                 {r.spill_gates_open > 0 && (
                   <div className="text-xs text-serious font-semibold">
                     Mở {r.spill_gates_open}/{r.spill_gates} cửa xả tràn
@@ -262,7 +268,7 @@ function PublicMap({ data, forecast, geo, me, route, target, layers, basemap = '
                   <div className="font-bold text-sm text-ink">{p.name}</div>
                   <div className="text-xs text-muted">{p.road_name} · {p.admin_name}</div>
                   <div className="text-xs pt-1 border-t border-line/60">
-                    Lưu thông:{' '}
+                    Tình trạng:{' '}
                     <b className={isBlocked ? 'text-danger font-bold' : p.traffic_status === 'canh_bao' ? 'text-serious font-bold' : 'text-good font-bold'}>
                       {p.traffic_label}
                     </b>
@@ -1473,9 +1479,9 @@ export default function PublicPortal() {
                 id: res.id,
                 name: res.name,
                 sub: `${res.river ? `Sông ${res.river} · ` : ''}${res.admin_name}`,
-                value: res.spill_gates_open > 0 ? `Mở ${res.spill_gates_open} cửa xả` : 'Đóng cửa xả',
+                value: res.status_code === 'chua_co_so_lieu' ? 'Chưa có số liệu vận hành' : res.spill_gates_open > 0 ? `Mở ${res.spill_gates_open} cửa xả` : 'Đóng cửa xả',
                 status: res.status_label,
-                statusColor: res.status_code === 'xa_khan_cap' ? 'text-danger' : res.status_code === 'xa_dieu_tiet' ? 'text-amber-500' : 'text-good',
+                statusColor: res.status_code === 'xa_khan_cap' ? 'text-danger' : res.status_code === 'xa_dieu_tiet' ? 'text-amber-500' : res.status_code === 'chua_co_so_lieu' ? 'text-muted' : 'text-good',
                 lat: res.lat,
                 lon: res.lon,
                 type: 'reservoir',
