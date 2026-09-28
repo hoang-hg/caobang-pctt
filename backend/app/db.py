@@ -13,11 +13,16 @@ from sqlalchemy.ext.asyncio import AsyncConnection, create_async_engine
 
 from app.config import settings
 
+# Tiến trình API: câu lệnh chạy quá DB_STATEMENT_TIMEOUT_MS bị Postgres huỷ (lỗi 500) thay vì giữ kết nối trong pool
+# — một truy vấn chậm không kéo chậm cả hệ thống. Worker / migrate / seed (tác vụ dài) không giới hạn. Việc dài có chủ
+# đích trong API (nhập dữ liệu) tự nới bằng SET LOCAL statement_timeout trong transaction.
+_timeout_ms = settings.db_statement_timeout_ms if settings.run_mode == "api" else 0
 engine = create_async_engine(
     settings.database_url,
     pool_size=settings.db_pool_size,
     max_overflow=settings.db_max_overflow,
     pool_pre_ping=True,
+    connect_args={"options": f"-c statement_timeout={_timeout_ms}"} if _timeout_ms > 0 else {},
 )
 
 

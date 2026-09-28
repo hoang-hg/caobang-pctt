@@ -106,6 +106,13 @@ def check(s: Settings) -> tuple[list[str], list[str]]:
             "chi_huy_cum (quản trị tài khoản, phê duyệt cảnh báo)"
         )
 
+    # Sao lưu
+    if not s.backup_remote:
+        warnings.append(
+            "Bản sao lưu chỉ nằm trên máy chủ này (chưa đặt BACKUP_REMOTE + --profile offsite) — hỏng ổ đĩa / máy chủ là "
+            "mất cả dữ liệu lẫn bản sao lưu (README 10.5)"
+        )
+
     # Dịch vụ phụ
     if s.smtp_host in ("", "mailpit"):
         warnings.append(

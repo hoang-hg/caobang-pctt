@@ -96,8 +96,9 @@ jobs:
           POSTGRES_PASSWORD=$(openssl rand -hex 16)
           MINIO_ROOT_PASSWORD=$(openssl rand -hex 16)
           SMTP_HOST=smtp.ci.local
+          BACKUP_REMOTE=offsite:pctt/ci
           EOF
-          docker compose -f docker-compose.prod.yml --env-file ci.prod.env --profile caddy --profile mqtt config -q
+          docker compose -f docker-compose.prod.yml --env-file ci.prod.env --profile caddy --profile mqtt --profile offsite config -q
           rm ci.prod.env
       - name: Build & khởi động stack
         run: docker compose up -d --build --wait --wait-timeout 600 db redis minio mailpit mqtt backend worker frontend

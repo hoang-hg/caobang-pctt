@@ -59,6 +59,8 @@ export default defineConfig({
   },
   build: {
     chunkSizeWarningLimit: 1600,
+    // Không nhúng font vào CSS dạng base64 (to hơn ~33%, không cache riêng được) — tải riêng từ /assets/
+    assetsInlineLimit: (file) => (/\.(woff2?|ttf)$/.test(file) ? false : undefined),
     rollupOptions: {
       output: {
         // Chỉ gom đúng gói thư viện lớn (không kéo theo thư viện phụ thuộc dùng chung như clsx — dạng object của
