@@ -143,3 +143,15 @@ def test_env_source_keys(monkeypatch):
     monkeypatch.setattr(settings, "openweather_api_key", " ow-key ")
     monkeypatch.setattr(settings, "open_meteo_api_key", "om-key")
     assert env_source_keys() == {"OPEN_METEO_ENS": "om-key", "OPENWEATHER": "ow-key"}
+
+
+def test_sync_errors_do_not_leak_api_keys():
+    from app.integrations.runner import redact_secrets
+
+    msg = (
+        "HTTPStatusError: Client error '401 Unauthorized' for url "
+        "'https://customer-ensemble-api.open-meteo.com/v1/ensemble?latitude=22.6&apikey=om-SECRET-123&models=ecmwf'"
+    )
+    out = redact_secrets(msg)
+    assert "om-SECRET-123" not in out and "apikey=***" in out and "latitude=22.6" in out
+    assert "ow-key" not in redact_secrets("…/onecall?lat=22&appid=ow-key&units=metric")

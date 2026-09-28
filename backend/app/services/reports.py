@@ -45,6 +45,9 @@ MAX_PHOTOS = 3
 MAX_BYTES = 8 * 1024 * 1024
 MAX_PIXELS = 40_000_000  # chống "ảnh bom" giải nén
 ALLOWED_FORMATS = {"JPEG", "PNG", "WEBP", "MPO"}
+# Bộ đọc Pillow được chạy (Image.open(formats=…)). Không có "MPO": ảnh nhiều khung của iPhone do bộ đọc JPEG mở rồi
+# gán img.format = "MPO" — Pillow không có bộ đọc tên MPO (truyền vào → KeyError)
+OPEN_FORMATS = ["JPEG", "PNG", "WEBP"]
 FULL_SIZE = 1600
 THUMB_SIZE = 400
 PHOTO_URL_TTL = 3600
@@ -61,18 +64,18 @@ def process_image(data: bytes) -> tuple[bytes, bytes, int, int]:
     with warnings.catch_warnings():
         warnings.simplefilter("error", Image.DecompressionBombWarning)
         try:
-            img = Image.open(io.BytesIO(data))
+            # formats=: chỉ chạy bộ đọc JPEG / PNG / WebP — ảnh người dân tải lên không bao giờ đi qua bộ đọc PSD, FITS,
+            # font… (nơi Pillow hay có lỗi bộ nhớ). Kiểm tra img.format bên dưới vẫn giữ.
+            img = Image.open(io.BytesIO(data), formats=OPEN_FORMATS)
             if img.format not in ALLOWED_FORMATS:
                 raise ReportError("Chỉ nhận ảnh JPEG, PNG hoặc WebP")
             if img.width * img.height > MAX_PIXELS:
                 raise ReportError("Ảnh có kích thước quá lớn")
             img.load()
-        except (
-            UnidentifiedImageError,
-            Image.DecompressionBombWarning,
-            Image.DecompressionBombError,
-            OSError,
-        ) as exc:
+        # Không bộ đọc nào trong formats= nhận tệp (GIF, BMP… hoặc không phải ảnh)
+        except UnidentifiedImageError as exc:
+            raise ReportError("Chỉ nhận ảnh JPEG, PNG hoặc WebP") from exc
+        except (Image.DecompressionBombWarning, Image.DecompressionBombError, OSError) as exc:
             raise ReportError("Tệp không phải ảnh hợp lệ") from exc
     img = ImageOps.exif_transpose(img).convert("RGB")  # xoay đúng chiều rồi bỏ EXIF khi lưu lại
     full = img.copy()

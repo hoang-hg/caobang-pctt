@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import math
 import re
 import unicodedata
 from dataclasses import dataclass, field
@@ -86,7 +87,13 @@ def read_xlsx(data: bytes) -> list[RawRow]:
     except Exception as exc:  # zip hỏng, không phải xlsx…
         raise ImportFileError("Không đọc được tệp Excel (.xlsx)") from exc
     ws = wb.worksheets[0]
-    rows = list(ws.iter_rows(values_only=True))
+    # Dừng khi quá giới hạn: .xlsx là zip — vài MB có thể giải nén ra hàng triệu dòng (kể cả dòng trống do định dạng kéo
+    # tới cuối trang tính); đọc hết vào bộ nhớ rồi mới đếm thì tiến trình API cạn RAM. Dòng dữ liệu đứng trước dòng trống.
+    rows = []
+    for row in ws.iter_rows(values_only=True):
+        rows.append(row)
+        if len(rows) > MAX_ROWS + 1:
+            break
     wb.close()
     if not rows:
         raise ImportFileError("Trang tính đầu tiên trống")
@@ -153,7 +160,7 @@ def to_int(value: Any) -> int:
 
 
 def to_float(value: Any) -> float:
-    if isinstance(value, int | float):
+    if isinstance(value, int | float) and math.isfinite(value):
         return float(value)
     s = str(value).strip().replace(" ", "")
     if "," in s and "." in s:
@@ -161,9 +168,12 @@ def to_float(value: Any) -> float:
             f"“{s}” có cả dấu chấm và dấu phẩy — dùng dấu chấm thập phân, không dùng dấu ngăn nghìn"
         )
     try:
-        return float(s.replace(",", "."))
+        value = float(s.replace(",", "."))
     except ValueError as exc:
         raise ValueError(f"“{s}” không phải số") from exc
+    if not math.isfinite(value):  # float() nhận "nan", "inf" — NaN làm mọi phép so ngưỡng báo động sai
+        raise ValueError(f"“{s}” không phải số")
+    return value
 
 
 def to_date(value: Any) -> date:

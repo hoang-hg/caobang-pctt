@@ -7,6 +7,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 from datetime import UTC, datetime
 
 from app.config import settings
@@ -19,6 +20,15 @@ from app.services.simulator import simulator
 from app.ws.hub import hub
 
 log = logging.getLogger(__name__)
+
+# Lỗi HTTP của httpx ghi nguyên URL, kể cả khoá trong query (Open-Meteo "apikey", OpenWeather "appid"). Chuỗi lỗi được
+# lưu last_error (trang Nguồn dữ liệu — cả tài khoản chỉ xem), nhật ký tiếp nhận, sự kiện realtime → phải che khoá.
+_SECRET_PARAM_RE = re.compile(r"(?i)\b(apikey|api_key|appid|key|token|access_token|secret)=([^&\s'\"]+)")
+
+
+def redact_secrets(text: str) -> str:
+    return _SECRET_PARAM_RE.sub(r"\1=***", text)
+
 
 ADAPTERS = {"open_meteo": open_meteo.run, "openweather": openweather.run}
 
@@ -132,7 +142,7 @@ async def run_source(source: dict) -> dict:
     try:
         result = await adapter(source, crypto.decrypt(source["secret_enc"]))
     except Exception as exc:
-        msg = f"{type(exc).__name__}: {exc}"[:400]
+        msg = redact_secrets(f"{type(exc).__name__}: {exc}")[:400]
         await execute(
             "UPDATE integrations.data_sources SET status = 'loi', last_error = :e, updated_at = now() WHERE id = :id",
             {"e": msg, "id": source["id"]},
@@ -205,8 +215,8 @@ async def tick() -> None:
     for s in due:
         try:
             await run_source(s)
-        except Exception:
-            log.warning("source %s failed", s["code"], exc_info=True)
+        except Exception as exc:  # không in traceback: chuỗi lỗi có thể chứa khoá API
+            log.warning("source %s failed: %s", s["code"], redact_secrets(f"{type(exc).__name__}: {exc}"))
     await mark_stale_devices()
 
 

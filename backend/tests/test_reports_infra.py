@@ -190,3 +190,13 @@ async def test_rejected_ingest_logging_is_capped(monkeypatch):
     for i in range(ingest_api.REJECTED_LOG_PER_MIN + 20):
         await ingest_api._log_rejected("IOT_HTTP", f"Thiết bị chưa đăng ký: rac-{i}")
     assert len(written) == ingest_api.REJECTED_LOG_PER_MIN
+
+
+def test_process_image_accepts_png_webp_and_iphone_mpo():
+    # Image.open(formats=JPEG/PNG/WebP): ảnh nhiều khung của iPhone (MPO) do bộ đọc JPEG mở → vẫn phải nhận
+    second = Image.new("RGB", (40, 30), (1, 2, 3))
+    for fmt, extra in (("PNG", {}), ("WEBP", {}), ("MPO", {"save_all": True, "append_images": [second]})):
+        buf = io.BytesIO()
+        Image.new("RGB", (40, 30), (200, 10, 10)).save(buf, fmt, **extra)
+        full, _thumb, w, h = process_image(buf.getvalue())
+        assert (w, h) == (40, 30) and full[:2] == b"\xff\xd8", fmt

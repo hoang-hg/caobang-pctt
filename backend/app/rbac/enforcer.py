@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
+import uuid
 from pathlib import Path
 
 from casbin import AsyncEnforcer
@@ -28,7 +28,9 @@ CHANNEL = "pctt:casbin"
 _enforcer: AsyncEnforcer | None = None
 _lock: asyncio.Lock | None = None
 _watcher: asyncio.Task | None = None
-_PROCESS_ID = f"{os.getpid()}"
+# Định danh tiến trình để bỏ qua thông báo của chính mình. KHÔNG dùng PID: mỗi container đánh PID từ đầu → worker
+# gunicorn ở 2 bản backend (--scale backend=N) trùng PID, bản kia bỏ qua thông báo đổi quyền và giữ quyền cũ
+_PROCESS_ID = uuid.uuid4().hex
 
 
 async def init_enforcer() -> AsyncEnforcer:
@@ -84,6 +86,8 @@ async def _watch() -> None:
         try:
             pubsub = get_redis().pubsub()
             await pubsub.subscribe(CHANNEL)
+            # Vừa (kết nối lại) đăng ký: thay đổi quyền trong lúc mất kết nối Redis không nhận được thông báo → nạp lại
+            await reload_policy()
             async for msg in pubsub.listen():
                 if msg.get("type") == "message" and msg.get("data") != _PROCESS_ID:
                     await reload_policy()

@@ -15,11 +15,14 @@ import asyncio
 import json
 import logging
 import random
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
+
+from sqlalchemy import text
 
 from app import seed_data as D
 from app.config import settings
 from app.db import execute, fetch_all, fetch_one, transaction
+from app.infra.redis import get_redis
 from app.services import scenario
 from app.services.broadcast import advance_delivery, estimate_audience, fill_template
 from app.services.events import log_event
@@ -32,6 +35,15 @@ rng = random.Random()
 STATION_PARAMS = {s[0]: (s[2], s[9], s[8], s[1]) for s in D.STATIONS}  # id → (type, params, thresholds, name)
 DEMO_SPEEDUP = 20  # lực lượng di chuyển nhanh gấp 20 lần thực tế để thấy rõ trên bản đồ
 LEVEL_NAMES = {1: "I", 2: "II", 3: "III"}
+# Mức báo động gần nhất của trạm mực nước — dùng chung giữa các tiến trình: số đo HTTP / LoRaWAN rơi vào nhiều worker
+# gunicorn, giữ trong bộ nhớ từng tiến trình thì sự kiện "vượt báo động" bị lặp hoặc bỏ sót
+WL_LEVEL_KEY = "pctt:wl_levels"
+# Mẫu tin dự phòng khi mẫu SAT_LO bị xoá khỏi CSDL — vẫn phải soạn được bản nháp cho lãnh đạo duyệt
+SAT_LO_FALLBACK = (
+    "[KHẨN CẤP] Nguy cơ sạt lở đất RẤT CAO tại {dia_diem}. Lượng mưa tích lũy {luong_mua} mm. Yêu cầu các hộ dân dưới "
+    "taluy, sườn đồi di dời ngay đến {diem_so_tan} trước {thoi_gian}. Hotline: 112."
+)
+VN_TZ = timezone(timedelta(hours=7))
 
 
 def alarm_level(value: float, thr: dict) -> int:
@@ -51,6 +63,23 @@ class Simulator:
 
     def start(self) -> None:
         self._task = asyncio.create_task(self._run())
+
+    async def _wl_prev(self, sid: str) -> int | None:
+        if (r := get_redis()) is not None:
+            try:
+                value = await r.hget(WL_LEVEL_KEY, sid)
+                return None if value is None else int(value)
+            except Exception:  # Redis lỗi → trạng thái trong tiến trình
+                log.warning("Không đọc được mức báo động của %s từ Redis", sid, exc_info=True)
+        return self.wl_levels.get(sid)
+
+    async def _wl_set(self, sid: str, level: int) -> None:
+        self.wl_levels[sid] = level
+        if (r := get_redis()) is not None:
+            try:
+                await r.hset(WL_LEVEL_KEY, sid, level)
+            except Exception:
+                log.warning("Không ghi được mức báo động của %s vào Redis", sid, exc_info=True)
 
     async def stop(self) -> None:
         if self._task:
@@ -147,38 +176,51 @@ class Simulator:
             name = r.get("name") or STATION_PARAMS.get(sid, (None, None, {}, sid))[3]
             if stype == "muc_nuoc":
                 # Trễ (hysteresis) 0,15 m: không báo lặp khi mực nước dao động quanh vạch báo động
-                prev = self.wl_levels.get(sid)
+                prev = await self._wl_prev(sid)
                 if prev is None:
-                    self.wl_levels[sid] = level
+                    await self._wl_set(sid, level)
                 elif level > prev:
                     await log_event(
                         f"{name}: mực nước {value:.2f} m, vượt Báo động {LEVEL_NAMES[level]}",
                         "canh_bao",
                         "danger" if level >= 2 else "warning",
                     )
-                    self.wl_levels[sid] = level
-                elif level < prev and value < thr[f"bd{prev}"] - 0.15:
-                    self.wl_levels[sid] = level
+                    await self._wl_set(sid, level)
+                elif level < prev and value < thr.get(f"bd{prev}", float("inf")) - 0.15:
+                    await self._wl_set(sid, level)
             elif stype in ("do_nghieng", "do_am_dat") and level >= 2:
                 await self.sensor_hotspot(sid, name, value, level, thr, stype)
 
     async def sensor_hotspot(
         self, sid: str, name: str, value: float, level: int, thr: dict, stype: str = "do_nghieng"
     ) -> None:
-        active = await fetch_one(
-            "SELECT id FROM iot_telemetry.hazard_zones WHERE station_id = :s AND valid_until > now()",
-            {"s": sid},
-        )
-        if active:
-            return
-        st = await fetch_one(
-            """SELECT s.admin_unit_id, u.name AS commune, u.code, ST_Y(s.location) AS lat, ST_X(s.location) AS lon
-                 FROM iot_telemetry.monitoring_stations s JOIN spatial_admin.administrative_units u ON u.id = s.admin_unit_id
-                WHERE s.id = :s""",
-            {"s": sid},
-        )
+        # Khoá theo trạm tới khi ghi xong vùng nguy hiểm: thiết bị gửi lại số đo (mạng chập chờn) vào 2 tiến trình API cùng
+        # lúc → trước đây tạo 2 vùng, 2 phiếu SOS cấp 1, 2 bản nháp cảnh báo
+        async with transaction() as conn:
+            await conn.execute(text("SELECT pg_advisory_xact_lock(hashtext(:k))"), {"k": f"hotspot:{sid}"})
+            active = await fetch_one(
+                "SELECT id FROM iot_telemetry.hazard_zones WHERE station_id = :s AND valid_until > now()",
+                {"s": sid},
+                conn,
+            )
+            if active:
+                return
+            st = await fetch_one(
+                """SELECT s.admin_unit_id, u.name AS commune, u.code, ST_Y(s.location) AS lat, ST_X(s.location) AS lon
+                     FROM iot_telemetry.monitoring_stations s JOIN spatial_admin.administrative_units u ON u.id = s.admin_unit_id
+                    WHERE s.id = :s""",
+                {"s": sid},
+                conn,
+            )
+            if st is None:
+                log.warning("Trạm %s chưa gắn xã — không khoanh được vùng nguy cơ tự động", sid)
+                return
+            zone = await self._insert_sensor_zone(conn, sid, name, level, st)
+        await self._after_hotspot(sid, name, value, level, thr, stype, st, zone)
+
+    async def _insert_sensor_zone(self, conn, sid: str, name: str, level: int, st: dict) -> dict:
         zone_level = "do" if level >= 3 else "cam"
-        zone = await fetch_one(
+        return await fetch_one(
             """INSERT INTO iot_telemetry.hazard_zones (type, level, name, source, station_id, admin_unit_id, valid_until, geom)
                VALUES ('sat_lo', :l, :n, 'sensor', :s, :a, now() + interval '12 hours',
                        ST_Multi(ST_Buffer(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography, 1000)::geometry))
@@ -191,7 +233,12 @@ class Simulator:
                 "lat": st["lat"],
                 "lon": st["lon"],
             },
+            conn,
         )
+
+    async def _after_hotspot(
+        self, sid: str, name: str, value: float, level: int, thr: dict, stype: str, st: dict, zone: dict
+    ) -> None:
         await hub.publish("hazard.new", zone)
         unit = "°" if stype == "do_nghieng" else "%"
         await log_event(
@@ -232,12 +279,15 @@ class Simulator:
             title=f"[Tự động] Di dời khẩn cấp – {name}",
             template="SAT_LO",
             body=fill_template(
-                tpl["body"],
+                tpl["body"] if tpl else SAT_LO_FALLBACK,
                 {
                     "dia_diem": f"khu vực {name.split('–')[-1].strip()}, xã {st['commune']}",
                     "luong_mua": str(int(rain["mm"])),
-                    "diem_so_tan": site["name"],
-                    "thoi_gian": (datetime.now(UTC) + timedelta(hours=9)).strftime("%Hh%M"),
+                    # Máy chủ mới chưa nhập điểm sơ tán: trước đây lỗi → mất bản nháp cảnh báo (vùng + phiếu SOS đã tạo)
+                    "diem_so_tan": site["name"] if site else "nơi an toàn theo hướng dẫn của chính quyền xã",
+                    "thoi_gian": (datetime.now(VN_TZ) + timedelta(hours=2)).strftime(
+                        "%Hh%M"
+                    ),  # hạn di dời: 2 giờ
                 },
             ),
             severity="do",
@@ -290,7 +340,7 @@ class Simulator:
                 GROUP BY s.id, s.name, s.river, s.alarm_thresholds, u.name, u.code"""
         )
         for r in rows:
-            if r["peak"] < r["thr"].get("bd3", 1e9):
+            if r["peak"] < (r["thr"] or {}).get("bd3", 1e9):
                 continue
             recent = await fetch_one(
                 """SELECT 1 FROM communications.alert_broadcasts WHERE trigger_source = :t AND created_at > now() - interval '12 hours'""",
