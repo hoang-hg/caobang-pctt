@@ -26,7 +26,6 @@ export function useChartTheme() {
       serious: '#ec835a',
       danger: '#d03b3b',
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [theme]);
 }
 

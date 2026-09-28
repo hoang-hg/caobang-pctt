@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --host",
     "build": "vite build && node scripts/compress.mjs",
+    "lint": "eslint --max-warnings 0 .",
     "preview": "vite preview --port 4173"
   },
   "dependencies": {
@@ -32,6 +33,10 @@
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "globals": "^17.12.0",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.16",
     "vite": "^6.0.3"

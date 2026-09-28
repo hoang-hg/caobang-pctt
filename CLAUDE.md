@@ -67,7 +67,7 @@ backend/                   Python 3.12, FastAPI, SQLAlchemy async (psycopg3), Ca
   tests/                   pytest không cần CSDL (kiểm thử đơn vị backend)
 
 frontend/                  React 18, Vite 6, Tailwind 3, TanStack Query 5, Zustand 5, React Router 6, react-leaflet 4,
-                           Recharts 2, lucide-react. Không có test runner — kiểm tra bằng `npm run build`.
+                           Recharts 2, lucide-react. Không có test runner — kiểm tra bằng `npm run lint` + `npm run build`.
   nginx.conf + nginx/      cấu hình nginx trong image (gzip_static, cache API công khai, real-ip, proxy-headers, security-headers)
   scripts/compress.mjs     chạy sau `vite build`: nén sẵn dist/**/*.gz cho gzip_static
   vite.config.js           manualChunks dạng hàm: vendor (react, router, query, zustand, clsx) · map (leaflet) · charts;
@@ -99,13 +99,15 @@ docker compose exec backend sh -c "ruff format app tests alembic && ruff check a
 MSYS_NO_PATHCONV=1 docker run --rm -u 0 -v "$(pwd -W)/backend:/src" -w /src caobang-pctt-backend \
   sh -c "ruff format app tests alembic && ruff check app tests alembic && pytest -q -p no:cacheprovider"
 
-cd frontend && npm run build                                # kiểm tra frontend
+cd frontend && npm run lint && npm run build                # ESLint (0 cảnh báo) + build
 node tests/e2e/smoke.mjs && node tests/e2e/rbac-test.mjs    # kiểm thử API (README §12.1), cần DEMO_MODE=true
 docker run --rm --network caobang-pctt_default -v "$PWD/tests/load:/load" grafana/k6 run /load/load.js   # tải (§12.2)
 docker compose -f docker-compose.prod.yml --env-file .env.production config -q   # kiểm tra compose chạy thật
 ```
 
-CI chạy `ruff format --check` — luôn format trước khi xong việc. Máy host Windows có thể không có Python: chạy công cụ
+CI chạy `ruff format --check` và `npm run lint --max-warnings 0` — luôn format / lint trước khi xong việc. ESLint
+(`frontend/eslint.config.js`) chỉ bật quy tắc bắt lỗi: biến chưa khai báo (Vite build KHÔNG báo — lỗi chỉ lộ khi chạy),
+hook React, biến / import không dùng; `exhaustive-deps` là lỗi — cố ý bỏ phụ thuộc thì ghi `eslint-disable-line` kèm lý do. Máy host Windows có thể không có Python: chạy công cụ
 Python trong container.
 
 ## 4. Kiến trúc & vòng đời
@@ -308,7 +310,7 @@ Python trong container.
   lambda: None)` khi kiểm cache bộ nhớ. **Không chạy pytest trong container production** (ghi vào Redis/CSDL thật).
 - `tests/e2e/*.mjs` kiểm thử API end-to-end, cần stack dev với `DEMO_MODE=true` (dùng tài khoản demo); tham số 1 = URL backend.
   Chạy lại liên tiếp → xoá khoá `rl:*` trong Redis. `iot-test.mjs` gọi `docker exec caobang-pctt-mqtt` (tên container cố định).
-- CI (`ci.yml`): ruff + pytest → build frontend → kiểm tra `docker-compose.prod.yml` → stack Docker Compose
+- CI (`ci.yml`): ruff + pytest → ESLint + build frontend → kiểm tra `docker-compose.prod.yml` → stack Docker Compose
   (`DEMO_MODE=true`, `SIMULATOR=true`, `TOTP_REQUIRED_ROLES=kiem_thu_2fa`, `OPS_DISK_WARN_PCT=1`) + 11 script API (`lite-test.mjs`
   chạy qua nginx: tham số = URL frontend :8080; `totp-test.mjs` tự tính mã TOTP, cần biến trên để thử luồng bắt buộc;
   `ops-test.mjs` chạy cuối: ngưỡng ổ đĩa 1% → chờ email sự cố trong Mailpit + `/health/full` 503).

@@ -14,6 +14,7 @@ Sự kiện gắn ``scope`` + ``code`` chỉ gửi tới kết nối có phạm 
 import asyncio
 import json
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
@@ -72,6 +73,12 @@ class Hub:
         self._clients: set[Client] = set()
         self._lock = asyncio.Lock()
         self._relay: asyncio.Task | None = None
+        self._listeners: dict[str, list[Callable[[dict], Awaitable[None]]]] = {}
+
+    def on(self, event: str, fn: Callable[[dict], Awaitable[None]]) -> None:
+        """Việc mọi tiến trình API phải làm khi có sự kiện (kể cả sự kiện do tiến trình khác phát, qua Redis) — VD nạp lại
+        danh sách xã trong bộ nhớ sau khi nhập ranh giới xã. ``fn(data)`` lỗi không chặn việc phát tới WebSocket."""
+        self._listeners.setdefault(event, []).append(fn)
 
     async def connect(self, client: Client) -> None:
         await client.ws.accept()
@@ -105,9 +112,14 @@ class Hub:
         await self._deliver(envelope)
 
     async def _deliver(self, envelope: str) -> None:
+        meta = json.loads(envelope)
+        for fn in self._listeners.get(meta["event"], []):
+            try:
+                await fn(meta["data"])
+            except Exception:
+                log.warning("Xử lý sự kiện %s lỗi", meta["event"], exc_info=True)
         if not self._clients:
             return
-        meta = json.loads(envelope)
         message = json.dumps({k: meta[k] for k in ("event", "data", "ts")}, ensure_ascii=False)
         dead = []
         for c in list(self._clients):

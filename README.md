@@ -1162,6 +1162,7 @@ tài khoản. Mã nguồn: `backend/app/mfa.py`, `api/v1/mfa.py`, `frontend/src/
 ```bash
 docker compose exec backend ruff format --check app tests alembic && docker compose exec backend ruff check app tests alembic
 docker compose exec backend pytest -q        # kiểm thử đơn vị (không cần stack)
+cd frontend && npm run lint               # ESLint: biến chưa khai báo, hook React, mã chết (0 cảnh báo)
 cd frontend && npm run build              # build + nén sẵn tệp tĩnh (scripts/compress.mjs)
 ```
 
@@ -1224,7 +1225,7 @@ tăng CPU nếu kịch bản đồng thời chưa đạt.
 
 ### 12.3. CI
 
-**CI** (`.github/workflows/ci.yml`, mỗi push / PR): ruff + pytest; build frontend; kiểm tra `docker-compose.prod.yml`
+**CI** (`.github/workflows/ci.yml`, mỗi push / PR): ruff + pytest; ESLint + build frontend; kiểm tra `docker-compose.prod.yml`
 (thiếu bí mật phải báo lỗi, đủ bí mật phải hợp lệ); dựng stack bằng `docker-compose.yml` với `DEMO_MODE=true`,
 `SIMULATOR=true`, `TOTP_REQUIRED_ROLES=kiem_thu_2fa`, `OPS_DISK_WARN_PCT=1` và chạy 11 bộ kiểm thử API. **Deploy** (`deploy.yml`): tag `vX.Y.Z` → build & đẩy image lên GitHub
 Container Registry.

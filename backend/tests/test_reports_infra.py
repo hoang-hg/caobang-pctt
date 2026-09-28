@@ -135,3 +135,58 @@ def test_ws_events_reach_only_clients_with_permission():
     assert not commune.sees("hotline", None) and not storekeeper.sees("hotline", None)
     assert commune.sees("monitoring", None) and not storekeeper.sees("monitoring", None)
     assert storekeeper.sees(None, None)  # sự kiện chung (data.imported)
+
+
+async def test_hub_listeners_run_without_clients_and_errors_do_not_block():
+    import json
+
+    from app.ws.hub import Hub
+
+    hub = Hub()
+    seen = []
+
+    async def boom(data):
+        raise RuntimeError("lỗi xử lý")
+
+    async def record(data):
+        seen.append(data["dataset"])
+
+    hub.on("data.imported", boom)
+    hub.on("data.imported", record)
+    envelope = json.dumps(
+        {"event": "data.imported", "data": {"dataset": "ranh_gioi_xa"}, "ts": "", "scope": None}
+    )
+    await hub._deliver(envelope)  # tiến trình không có kết nối WebSocket nào vẫn phải xử lý
+    assert seen == ["ranh_gioi_xa"]
+
+
+async def test_units_reload_only_after_boundary_import(monkeypatch):
+    from app import lifecycle
+    from app.rbac import domains
+
+    calls = []
+
+    async def fake_load(force=False):
+        calls.append(force)
+
+    monkeypatch.setattr(domains, "load_units", fake_load)
+    await lifecycle._reload_units_after_import({"dataset": "xom"})
+    await lifecycle._reload_units_after_import({"dataset": "ranh_gioi_xa"})
+    assert calls == [True]
+
+
+async def test_rejected_ingest_logging_is_capped(monkeypatch):
+    from app.api.v1 import ingest as ingest_api
+    from app.infra import ratelimit
+
+    monkeypatch.setattr(ratelimit, "get_redis", lambda: None)
+    monkeypatch.setattr(ratelimit, "_memory", {})
+    written = []
+
+    async def fake_log(source, message, accepted=0, rejected=0, level="info"):
+        written.append(source)
+
+    monkeypatch.setattr(ingest_api, "ingest_log", fake_log)
+    for i in range(ingest_api.REJECTED_LOG_PER_MIN + 20):
+        await ingest_api._log_rejected("IOT_HTTP", f"Thiết bị chưa đăng ký: rac-{i}")
+    assert len(written) == ingest_api.REJECTED_LOG_PER_MIN
