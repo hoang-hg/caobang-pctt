@@ -79,11 +79,22 @@ function Shell() {
   );
 }
 
-/** Đã đăng nhập mà mở /dang-nhap → về trang định vào (?next=) hoặc Tổng quan. Chỉ nhận đường dẫn nội bộ. */
+/** ?next= chỉ nhận đường dẫn nội bộ. Kiểm tra bằng cách phân giải như trình duyệt: "/\evil.com" (trình duyệt đổi \ thành /
+ * → "//evil.com") hay "/<tab>/evil.com" đều ra origin khác → bị loại. Chỉ chặn chuỗi bắt đầu "//" là chưa đủ. */
+function safeNext(next) {
+  if (!next || !next.startsWith('/')) return null;
+  try {
+    const u = new URL(next, window.location.origin);
+    return u.origin === window.location.origin ? u.pathname + u.search + u.hash : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Đã đăng nhập mà mở /dang-nhap → về trang định vào (?next=) hoặc Tổng quan. */
 function AfterLogin() {
   const [params] = useSearchParams();
-  const next = params.get('next');
-  return <Navigate to={next && next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard'} replace />;
+  return <Navigate to={safeNext(params.get('next')) || '/dashboard'} replace />;
 }
 
 function RequireLogin() {

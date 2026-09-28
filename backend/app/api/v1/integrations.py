@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from app.auth import audit
 from app.db import execute, fetch_all, fetch_one
 from app.integrations import crypto
-from app.integrations.runner import env_source_keys, run_source
+from app.integrations.runner import env_source_keys, redact_secrets, run_source
 from app.rbac.authz import require_permission
 
 router = APIRouter(prefix="/integrations", tags=["Nguồn dữ liệu & IoT"])
@@ -98,7 +98,7 @@ async def run_now(source_id: str, user: dict = Depends(MANAGE)):
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(502, f"Đồng bộ thất bại: {exc}") from exc
+        raise HTTPException(502, f"Đồng bộ thất bại: {redact_secrets(str(exc))}") from exc
     await audit(user, "integration.source.run", "data_source", src["code"], result)
     return result
 

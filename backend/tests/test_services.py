@@ -184,3 +184,38 @@ def test_overdue_sql_uses_sla_per_priority():
 
     for p, m in SLA_MINUTES.items():
         assert f"WHEN {p} THEN {m}" in OVERDUE_SQL
+
+
+def test_number_words_do_not_misread_common_phrases():
+    # Bỏ dấu rồi mới so: "phía sau hộ" = "sáu hộ" (24 người), "tin từ người dân" = "tư người" (4 người)
+    assert (
+        parse_rules("Sạt lở phía sau hộ gia đình ông Nông Văn A, đất đá tràn vào bếp", [])["trapped_count"]
+        == 0
+    )
+    assert parse_rules("Tin từ người dân xã Bảo Lâm: nước suối dâng cao", [])["trapped_count"] == 0
+    r = parse_rules("Sáu hộ bị cô lập do lũ", [])
+    assert r["trapped_count"] == 24 and r["counted_households"]
+    assert parse_rules("Có năm người mắc kẹt trên mái nhà", [])["trapped_count"] == 5
+    assert parse_rules("Nhà bà Hoàng Thị B bị ngập, có ba người trên gác", [])["trapped_count"] == 3
+    assert parse_rules("co bon nguoi mac ket tren mai nha", [])["trapped_count"] == 4  # tin gõ không dấu
+    # chữ tổ hợp (NFD) từ một số bàn phím
+    import unicodedata
+
+    assert parse_rules(unicodedata.normalize("NFD", "Bảy người mắc kẹt"), [])["trapped_count"] == 7
+
+
+def test_llm_output_is_validated():
+    from app.services.sos_nlp import clean_llm
+
+    assert (
+        clean_llm({"incident_type": "lu_lut", "priority": 4, "trapped_count": -3, "vulnerable": "tre_em"})
+        == {}
+    )
+    assert clean_llm(
+        {"incident_type": "sat_lo", "priority": "1", "trapped_count": "5", "vulnerable": ["tre_em", "x"]}
+    ) == {
+        "incident_type": "sat_lo",
+        "priority": 1,
+        "trapped_count": 5,
+        "vulnerable": ["tre_em"],
+    }

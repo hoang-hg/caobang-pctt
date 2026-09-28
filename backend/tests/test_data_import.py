@@ -184,3 +184,23 @@ def test_every_dataset_is_consistent_and_template_is_valid(name):
     assert not report.errors, f"{name}: dòng mẫu lỗi {report.errors}"
     if filename.endswith(".csv"):
         assert body.startswith(b"\xef\xbb\xbf")  # BOM để Excel hiện đúng tiếng Việt
+
+
+def test_float_rejects_nan_and_infinity():
+    for bad in ("nan", "NaN", "inf", "-inf", float("nan")):
+        with pytest.raises(ValueError):
+            parsing.to_float(bad)
+    assert parsing.to_float("185,2") == 185.2
+
+
+def test_xlsx_stops_reading_past_row_limit(monkeypatch):
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["ma", "ten"])
+    for i in range(50):
+        ws.append([f"X{i}", f"Tên {i}"])
+    buf = io.BytesIO()
+    wb.save(buf)
+    monkeypatch.setattr(parsing, "MAX_ROWS", 5)
+    with pytest.raises(parsing.ImportFileError, match="Quá 5 dòng"):
+        parsing.read_file("tep.xlsx", buf.getvalue())

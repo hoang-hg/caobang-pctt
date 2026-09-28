@@ -3,7 +3,7 @@
  *
  * - Cài đặt: lưu sẵn index.html + các tệp cổng công khai cần khi mở lần đầu → lần sau mở được khi mất mạng.
  * - /assets/* (tên có mã băm, không bao giờ đổi): lấy từ bộ nhớ trước (cache-first).
- * - Trang (điều hướng) và API công khai trong PUBLIC_API: mạng trước; mạng lỗi, lỗi 5xx hoặc chậm quá TIMEOUT → bản
+ * - Trang (điều hướng) và API công khai trong PUBLIC_API: mạng trước; mạng lỗi, lỗi 5xx / 429 hoặc chậm quá TIMEOUT → bản
  *   đã lưu. Bản lưu của API mang header X-PCTT-Saved-At (thời điểm lưu) → giao diện báo "dữ liệu lưu lúc…".
  * - KHÔNG BAO GIỜ lưu: yêu cầu có Authorization (cán bộ), khác GET, khác origin, HTTP Range (/tiles/), API khác
  *   (tra cứu phiếu, vị trí người dân, đường đi…).
@@ -82,7 +82,8 @@ function networkFirst(event, store, fallback) {
     (async () => {
       try {
         const res = await withTimeout(network, TIMEOUT);
-        return res.status < 500 ? res : (await saved()) || res;
+        // 5xx hoặc 429 (vượt giới hạn tần suất — lúc thiên tai nhiều người chung IP nhà mạng) → bản đã lưu nếu có
+        return res.status < 500 && res.status !== 429 ? res : (await saved()) || res;
       } catch {
         return (await saved()) || network; // chưa có bản lưu → chờ tiếp mạng / báo lỗi mạng
       }

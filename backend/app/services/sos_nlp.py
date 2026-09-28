@@ -42,23 +42,29 @@ VULNERABLE_KEYWORDS = {
     "thai_phu": ["ba bau", "mang thai", "sap sinh", "thai phu"],
 }
 
-NUM_WORDS = {
-    "mot": 1,
+# Số viết bằng chữ — so trên chữ CÒN DẤU: bỏ dấu thì "phía sau hộ ông A" = "sáu hộ" (24 người), "tin từ người dân" =
+# "tư người" (4 người). Tin gõ không dấu: chỉ nhận "<số> nguoi" với từ không mơ hồ (không "tu", "sau"; không "ho" —
+# hộ / họ / hồ).
+NUM_WORDS_VI = {
+    "một": 1,
     "hai": 2,
     "ba": 3,
-    "bon": 4,
-    "tu": 4,
-    "nam": 5,
-    "sau": 6,
-    "bay": 7,
-    "tam": 8,
-    "chin": 9,
-    "muoi": 10,
+    "bốn": 4,
+    "tư": 4,
+    "năm": 5,
+    "sáu": 6,
+    "bảy": 7,
+    "bẩy": 7,
+    "tám": 8,
+    "chín": 9,
+    "mười": 10,
 }
+NUM_WORDS_ASCII = {"mot": 1, "hai": 2, "ba": 3, "bon": 4, "nam": 5, "bay": 7, "tam": 8, "chin": 9, "muoi": 10}
 
 COORD_RE = re.compile(r"(2[23]\.\d{3,})\s*[,; ]\s*(10[56]\.\d{3,})")
 PEOPLE_RE = re.compile(r"(\d{1,3})\s*(nguoi|nhan khau|ho|chau|em|cu)\b")
-WORD_PEOPLE_RE = re.compile(r"\b(" + "|".join(NUM_WORDS) + r")\s+(nguoi|ho)\b")
+WORD_PEOPLE_VI_RE = re.compile(r"(?<!\w)(" + "|".join(NUM_WORDS_VI) + r")\s+(người|hộ)(?!\w)")
+WORD_PEOPLE_ASCII_RE = re.compile(r"\b(" + "|".join(NUM_WORDS_ASCII) + r")\s+nguoi\b")
 
 
 def parse_rules(text: str, gazetteer: list[dict]) -> dict:
@@ -81,10 +87,13 @@ def parse_rules(text: str, gazetteer: list[dict]) -> dict:
             n *= 4  # quy đổi hộ → nhân khẩu (bình quân ~4 người/hộ)
         trapped = max(trapped, n)
     if trapped == 0:
-        m = WORD_PEOPLE_RE.search(t)
-        if m:
-            trapped = NUM_WORDS[m.group(1)] * (4 if m.group(2) == "ho" else 1)
-            households = m.group(2) == "ho"
+        # Một số bàn phím gửi chữ tổ hợp (NFD) → đưa về dạng dựng sẵn (NFC) trước khi so
+        low = unicodedata.normalize("NFC", text).lower()
+        if m := WORD_PEOPLE_VI_RE.search(low):
+            households = m.group(2) == "hộ"
+            trapped = NUM_WORDS_VI[m.group(1)] * (4 if households else 1)
+        elif m := WORD_PEOPLE_ASCII_RE.search(t):
+            trapped = NUM_WORDS_ASCII[m.group(1)]
 
     place = _match_place(t, gazetteer)
 
@@ -251,15 +260,37 @@ async def _parse_llm(text: str) -> dict | None:
         return None
 
 
+INCIDENT_TYPES = {code for code, _ in INCIDENT_KEYWORDS}
+
+
+def clean_llm(llm: dict) -> dict:
+    """Chỉ giữ giá trị LLM hợp lệ — mô hình có thể trả loại sự cố lạ, ưu tiên "1" / 4, số người âm… → CSDL từ chối
+    (ràng buộc CHECK) và phiếu SOS không tạo được. Giá trị không hợp lệ → giữ kết quả bộ luật."""
+    out: dict = {}
+    if llm.get("incident_type") in INCIDENT_TYPES:
+        out["incident_type"] = llm["incident_type"]
+    try:
+        if 1 <= (p := int(llm["priority"])) <= 3:
+            out["priority"] = p
+    except (KeyError, TypeError, ValueError):
+        pass
+    try:
+        if 0 <= (n := int(llm["trapped_count"])) <= 10000:
+            out["trapped_count"] = n
+    except (KeyError, TypeError, ValueError):
+        pass
+    if isinstance(llm.get("vulnerable"), list):
+        out["vulnerable"] = [v for v in llm["vulnerable"] if v in VULNERABLE_KEYWORDS]
+    return out
+
+
 async def extract(text: str) -> dict:
     gaz = await load_gazetteer()
     result = parse_rules(text, gaz)
     llm = await _parse_llm(text)
-    if llm:
-        result.update(
-            {k: llm[k] for k in ("incident_type", "priority", "trapped_count", "vulnerable") if k in llm}
-        )
-        if llm.get("place_name"):
+    if isinstance(llm, dict):
+        result.update(clean_llm(llm))
+        if isinstance(llm.get("place_name"), str) and llm["place_name"]:
             match = parse_rules(llm["place_name"], gaz)["place"]
             if match:
                 result["place"] = match

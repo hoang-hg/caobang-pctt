@@ -299,6 +299,11 @@ Python trong container.
 - [ ] Thao tác ghi có `audit(...)`; thao tác đổi quyền tăng `token_version`.
 - [ ] Không làm yếu `preflight`, giới hạn tần suất, `TRUSTED_PROXIES`, xử lý ảnh, Maker–Checker (người soạn không tự duyệt,
       người duyệt cần quyền trên mọi xã nhận tin, bắt buộc PIN).
+- [ ] Chuỗi lỗi từ dịch vụ ngoài (httpx ghi nguyên URL kèm `apikey=` / `appid=`) qua `redact_secrets` trước khi lưu CSDL,
+      ghi log hay trả về giao diện (`integrations/runner.py`).
+- [ ] Đọc ảnh người dân: `Image.open(…, formats=…)` chỉ các định dạng cho phép — không để Pillow thử mọi bộ đọc.
+- [ ] Chuyển hướng theo tham số URL (`?next=`): phân giải bằng `new URL(…)` và so origin (`safeNext`, `App.jsx`);
+      chặn chuỗi bắt đầu `//` là chưa đủ (`/\evil.com`).
 
 ## 9. Kiểm thử
 
