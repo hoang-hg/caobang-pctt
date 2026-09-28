@@ -270,7 +270,11 @@ for (let i = 0; i < 12 && st?.value !== 179.35; i++) {
   st = ((await call('GET', '/stations?type=muc_nuoc', null, admin)).data || []).find((s) => s.id === 'CB-WL-BANGGIANG');
   if (st?.value !== 179.35) await sleep(2500);
 }
-check('Trạm hiện số đo thật của thiết bị', st?.value === 179.35 && st?.source === 'iot', `${st?.value} ${st?.source}`);
+check('Trạm hiện số đo thật của thiết bị, chuyển nguồn "chờ thiết bị" → IoT', st?.value === 179.35 && st?.source === 'iot', `${st?.value} ${st?.source}`);
+check('Xoá thiết bị', (await call('DELETE', `/integrations/devices/${DEV}`, null, admin)).status === 204);
+const bySource = Object.fromEntries(((await call('GET', '/integrations/monitor', null, admin)).data?.stations || []).map((s) => [s.source, s.n]));
+check('Trạm hết thiết bị → về "chờ thiết bị", không thành trạm mô phỏng (không chạy bộ mô phỏng)',
+  bySource.external === 1 && !bySource.simulator && !bySource.iot, JSON.stringify(bySource));
 check('Cổng SOS tự động chưa cấp khoá → 503 (không nhận phiếu giả)',
   (await call('POST', '/sos/intake', { text: 'thử' }, null, { 'X-Intake-Key': 'x' })).status === 503);
 

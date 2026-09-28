@@ -3,7 +3,8 @@
 Mỗi số đo đi qua: quy đổi (scale/offset) → kiểm tra hợp lệ (khoảng giá trị theo loại trạm, thời gian,
 trùng lặp) → ghi ``sensor_readings`` → cập nhật trạng thái thiết bị → đẩy WebSocket → chạy cảnh báo tự động
 (mực nước vượt báo động, cảm biến nghiêng/độ ẩm đất vượt BĐ II…) như với dữ liệu mô phỏng.
-Trạm nhận số đo thật đầu tiên tự chuyển ``source = 'iot'`` → bộ mô phỏng ngừng sinh dữ liệu cho trạm đó.
+Trạm nhận số đo thật đầu tiên tự chuyển ``source = 'iot'`` (từ 'simulator' — bộ mô phỏng ngừng sinh dữ liệu cho trạm
+đó — hoặc 'external' — trạm nhập từ tệp đang chờ thiết bị).
 """
 
 from __future__ import annotations
@@ -130,8 +131,8 @@ async def ingest_readings(device: dict, items: list[dict], channel: str) -> dict
             await log_event(
                 f"Thiết bị {device['name']} ({device['id']}) có tín hiệu trở lại", "he_thong", "info"
             )
-        if device["station_source"] == "simulator":
-            # Trạm chuyển sang dữ liệu thật: bộ mô phỏng ngừng sinh số đo cho trạm này
+        if device["station_source"] != "iot":
+            # Trạm chuyển sang dữ liệu thật: bộ mô phỏng ngừng sinh số đo cho trạm này; trạm nhập từ tệp hết "chờ thiết bị"
             await execute(
                 "UPDATE iot_telemetry.monitoring_stations SET source = 'iot', status = 'online' WHERE id = :s",
                 {"s": device["station_id"]},
