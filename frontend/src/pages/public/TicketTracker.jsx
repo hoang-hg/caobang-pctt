@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { api } from '../../api/client';
 import { useStore } from '../../app/store';
+import { BackButton } from '../../components/common/ui';
 
 const STEP_COLORS = {
   yellow: {
@@ -42,7 +43,7 @@ const STEP_COLORS = {
   },
 };
 
-export default function TicketTracker({ initialCode = '', initialPhone = '', onQueryChange }) {
+export default function TicketTracker({ initialCode = '', initialPhone = '', onQueryChange, onBackToMap }) {
   const toast = useStore((s) => s.toast);
   const [code, setCode] = useState(initialCode);
   const [phone, setPhone] = useState(initialPhone);
@@ -93,18 +94,22 @@ export default function TicketTracker({ initialCode = '', initialPhone = '', onQ
     <div className="flex flex-col gap-5">
       {/* Khung tìm kiếm chính */}
       <div className="card p-4 sm:p-6 bg-gradient-to-br from-panel via-panel to-panel2 border-line shadow-sm">
-        <div className="max-w-2xl">
-          <div className="flex items-center gap-2 text-accent font-bold text-xs uppercase tracking-wider mb-1">
-            <Sparkles size={14} />
-            <span>Tra cứu trực tuyến 24/7</span>
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+          <div className="max-w-2xl">
+            <div className="flex items-center gap-2 text-accent font-bold text-xs uppercase tracking-wider mb-1">
+              <Sparkles size={14} />
+              <span>Tra cứu trực tuyến 24/7</span>
+            </div>
+            <h2 className="text-lg sm:text-xl font-bold text-ink">
+              Tra cứu tiến độ cứu hộ & phản ánh hiện trường
+            </h2>
+            <p className="text-xs sm:text-sm text-ink-2 mt-1 leading-relaxed">
+              Nhập <b>mã phiếu</b> (dạng <code className="font-mono text-accent">SOS-1080</code>, <code className="font-mono text-accent">PA-1017</code>) và <b>số điện thoại đã dùng khi gửi</b>.
+              Phản ánh gửi ẩn danh (không để lại SĐT) chỉ cần mã phiếu và chỉ xem được các mốc tiến độ.
+            </p>
           </div>
-          <h2 className="text-lg sm:text-xl font-bold text-ink">
-            Tra cứu tiến độ cứu hộ & phản ánh hiện trường
-          </h2>
-          <p className="text-xs sm:text-sm text-ink-2 mt-1 leading-relaxed">
-            Nhập <b>mã phiếu</b> (dạng <code className="font-mono text-accent">SOS-1080</code>, <code className="font-mono text-accent">PA-1017</code>) và <b>số điện thoại đã dùng khi gửi</b>.
-            Phản ánh gửi ẩn danh (không để lại SĐT) chỉ cần mã phiếu và chỉ xem được các mốc tiến độ.
-          </p>
+
+          {onBackToMap && <BackButton onClick={onBackToMap} className="self-start" />}
         </div>
 
         <form onSubmit={handleSearch} className="mt-4 flex flex-col sm:flex-row gap-2 max-w-2xl">
@@ -458,6 +463,12 @@ export default function TicketTracker({ initialCode = '', initialPhone = '', onQ
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {onBackToMap && (
+        <div className="flex justify-center pt-2">
+          <BackButton onClick={onBackToMap}>Quay lại Bản đồ & Cảnh báo</BackButton>
         </div>
       )}
     </div>

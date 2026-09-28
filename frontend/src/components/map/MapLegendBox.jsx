@@ -6,6 +6,9 @@ import {
 } from 'lucide-react';
 import { alarmLevel } from '../../utils/labels';
 
+/** Biểu tượng theo loại điểm đang chọn — dùng chung cho thẻ chi tiết (chú giải) và thanh nổi trên bản đồ công khai. */
+export const POINT_EMOJI = { rain: '🌧️', water: '💧', reservoir: '🏛️', landslide: '⚠️', evac: '🏠', report: '📸' };
+
 /** Ô Chú thích các biểu tượng trên bản đồ & Tra cứu thông tin chi tiết */
 export default function MapLegendBox({
   data,
@@ -195,7 +198,7 @@ export default function MapLegendBox({
 
           <div className="flex items-start gap-2 pr-6">
             <span className="text-xl shrink-0 mt-0.5">
-              {selectedPoint.type === 'rain' ? '🌧️' : selectedPoint.type === 'water' ? '💧' : selectedPoint.type === 'reservoir' ? '🏛️' : selectedPoint.type === 'landslide' ? '⚠️' : selectedPoint.type === 'evac' ? '🏠' : '📸'}
+              {POINT_EMOJI[selectedPoint.type] || '📍'}
             </span>
             <div className="min-w-0 flex-1">
               <span className="text-[10px] font-bold uppercase tracking-wider text-primary">

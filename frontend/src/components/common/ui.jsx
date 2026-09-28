@@ -1,6 +1,7 @@
+import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import clsx from 'clsx';
-import { X } from 'lucide-react';
+import { ArrowLeft, X } from 'lucide-react';
 
 export function KpiCard({ label, value, unit, sub, tone, icon: Icon, blink, children }) {
   const toneCls = {
@@ -34,9 +35,51 @@ export function Progress({ value, tone = 'accent', className }) {
   );
 }
 
+const openDialogs = []; // hộp thoại đang mở theo thứ tự mở — cái mở sau cùng ở cuối
+
+/**
+ * Esc đóng hộp thoại. Hộp thoại lồng nhau → chỉ đóng cái mở sau cùng. Bỏ qua Esc khi đang gõ bằng bộ gõ (Unikey /
+ * bàn phím tiếng Việt trên điện thoại): lúc đó Esc chỉ huỷ ký tự đang ghép.
+ */
+export function useEscapeToClose(open, onClose) {
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose; // onClose thường là hàm viết tại chỗ — không đăng ký lại (sẽ đảo thứ tự hộp thoại)
+  useEffect(() => {
+    if (!open) return undefined;
+    const id = Symbol('dialog');
+    openDialogs.push(id);
+    const onKeyDown = (e) => {
+      if (e.key !== 'Escape' || e.isComposing || openDialogs[openDialogs.length - 1] !== id) return;
+      onCloseRef.current?.();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      openDialogs.splice(openDialogs.indexOf(id), 1);
+    };
+  }, [open]);
+}
+
+/** Nút quay lại (VD các tab chuyên đề của cổng công khai → tab Bản đồ). */
+export function BackButton({ onClick, children = 'Quay lại Bản đồ', className }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={clsx(
+        'btn-ghost flex shrink-0 cursor-pointer items-center gap-1 rounded-xl border border-line bg-panel2/50 px-2.5 py-1.5 text-xs text-muted transition-colors hover:bg-panel2 hover:text-ink',
+        className,
+      )}
+    >
+      <ArrowLeft size={14} /> {children}
+    </button>
+  );
+}
+
 /** Hộp thoại — gắn thẳng vào <body> (portal): mở từ trong header (backdrop-blur tạo khung chứa cho `position: fixed`)
  * thì vẫn phủ toàn màn hình, không bị cắt trong dải header. */
 export function Modal({ open, onClose, title, children, wide, footer }) {
+  useEscapeToClose(open, onClose);
   if (!open) return null;
   return createPortal(
     <div className="fixed inset-0 z-[1500] flex items-start justify-center overflow-y-auto bg-black/50 p-4 pt-12" onMouseDown={onClose}>
