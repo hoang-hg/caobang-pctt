@@ -340,6 +340,15 @@ Python trong container.
 ## 11. Bẫy đã biết
 
 - `:param::type` trong `text()` không bind — dùng `CAST`.
+- Tiến trình API có `statement_timeout` 30 s (`DB_STATEMENT_TIMEOUT_MS`, `app/db.py`); việc dài có chủ đích chạy trong
+  API phải tự nới trong transaction: `SET LOCAL statement_timeout = '10min'` (mẫu `data_import.engine.apply_rows`).
+  Worker / migrate / seed không giới hạn.
+- Font tự lưu trữ qua `@fontsource/*` (chỉ bảng mã `latin-*` + `vietnamese-*`, `main.jsx`) — không thêm liên kết Google
+  Fonts / CDN vào `index.html` (chặn hiển thị khi đứt kết nối quốc tế). `vite.config.js` không nhúng font vào CSS.
+- Dockerfile ghim image nền theo mã băm; ghi chú phải ở dòng riêng (`FROM … # …` làm build lỗi). Cập nhật: `docker pull`
+  rồi lấy `RepoDigests`, build + chạy đủ kiểm thử.
+- `sensor_readings` nén sau 7 ngày (migration 0008): INSERT / DELETE vào đoạn đã nén vẫn được, nhưng chậm hơn — tránh
+  UPDATE hàng loạt số đo cũ.
 - `docker-compose.yml` đặt `container_name` cố định → không chạy được 2 stack dev song song (dùng `-p <tên>` + tệp
   override `container_name: !reset null` nếu cần stack thử nghiệm riêng); `docker-compose.prod.yml` đặt tên project riêng.
 - `DEMO_MODE` chỉ có tác dụng khi CSDL trống; đổi giữa chừng cần `python -m app.seed --reset` (xoá dữ liệu nghiệp vụ).

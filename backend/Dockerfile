@@ -1,4 +1,5 @@
-FROM python:3.12-slim
+# Python 3.12.14 — ghim mã băm: build lại ra đúng image đã kiểm thử (cập nhật: docker pull rồi thay mã băm)
+FROM python:3.12-slim@sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
     RUFF_CACHE_DIR=/tmp/.ruff_cache PYTEST_ADDOPTS="-p no:cacheprovider"
 WORKDIR /app

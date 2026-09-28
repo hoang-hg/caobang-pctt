@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     # Backend async giữ kết nối rất ngắn nên 5 + 5 là đủ; tăng quá mức → Postgres báo "too many clients" khi tăng tải
     db_pool_size: int = 5
     db_max_overflow: int = 5
+    # Thời gian tối đa của 1 câu lệnh SQL ở tiến trình API (ms); 0 = không giới hạn. Worker / migrate không áp dụng
+    db_statement_timeout_ms: int = 30_000
+    # Nơi chép bản sao lưu ra ngoài máy chủ (service backup-offsite, README 10.5) — backend chỉ dùng để cảnh báo
+    backup_remote: str = ""
     jwt_secret: str = DEV_JWT_SECRET
     jwt_expire_hours: int = 12
     cors_origins: str = "http://localhost:5173,http://localhost:8080"

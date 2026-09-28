@@ -82,7 +82,12 @@ const up = await call('POST', '/ingest/lorawan?event=up', {
   deviceInfo: { devEui: LORA_ID.toLowerCase() }, time: new Date().toISOString(), object: { level_cm: 450 },
 }, auth(ltok));
 check('LoRaWAN ChirpStack: quy đổi 450 cm × 0,01 + 180 = 184,5 m', up.data?.accepted === 1, JSON.stringify(up.data));
-const wl = (await call('GET', '/stations?type=muc_nuoc', null, A)).data.find((s) => s.id === 'CB-WL-02');
+// danh sách trạm cache theo khung 5 giây (như kiểm tra MQTT bên dưới) → chờ tới ~10 giây
+let wl;
+for (let i = 0; i < 10 && wl?.value !== 184.5; i += 1) {
+  if (i) await sleep(1000);
+  wl = (await call('GET', '/stations?type=muc_nuoc', null, A)).data.find((s) => s.id === 'CB-WL-02');
+}
 check('Giá trị mực nước sau quy đổi', wl?.value === 184.5, String(wl?.value));
 const ttn = await call('POST', '/ingest/lorawan', {
   end_device_ids: { dev_eui: LORA_ID }, uplink_message: { decoded_payload: { level_cm: 460 }, received_at: new Date().toISOString() },

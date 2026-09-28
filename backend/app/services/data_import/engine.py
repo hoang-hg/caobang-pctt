@@ -541,6 +541,8 @@ async def apply_rows(ds: Dataset, rows: list[Prepared], replace: bool) -> dict:
         await conn.execute(
             text("SELECT pg_advisory_xact_lock(hashtext(:k))"), {"k": f"data_import:{ds.name}"}
         )
+        # Tệp lớn (20.000 dòng, ranh giới xã + gán lại xã cho mọi đối tượng) có thể quá giới hạn 30 s của tiến trình API
+        await conn.execute(text("SET LOCAL statement_timeout = '10min'"))
         for row in rows:
             if ds.update_only:
                 await _update_commune(conn, row)

@@ -391,6 +391,8 @@ Mọi biến của backend khai báo ở `backend/app/config.py`. Tệp mẫu: `
 | `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` | `5` / `5` | tuỳ chọn | Kết nối CSDL mỗi tiến trình ([10.2](#trien-khai-may-chu)); đặt lớn → "too many clients" khi tăng tải |
 | `API_WORKERS` | `2` | `4` | Số tiến trình API |
 | `REDIS_MAXMEMORY` | — | `512mb` | |
+| `DB_STATEMENT_TIMEOUT_MS` | `30000` | `30000` | Câu lệnh SQL chạy quá thời gian này ở tiến trình API bị huỷ (worker, migrate không áp dụng; nhập dữ liệu tự nới 10 phút) |
+| `DB_MEM_LIMIT` / `BACKEND_MEM_LIMIT` | — | `12g` / `3g` | Giới hạn RAM container CSDL / mỗi bản backend ([10.2](#trien-khai-may-chu)) |
 | `MINIO_ROOT_USER` / `_PASSWORD` | `pctt_minio` / `pctt_minio_dev_password` | **bắt buộc** mật khẩu | Kho ảnh |
 
 **Mạng & truy cập**
@@ -421,7 +423,7 @@ Mọi biến của backend khai báo ở `backend/app/config.py`. Tệp mẫu: `
 | `LLM_API_URL` / `_KEY` / `_MODEL` | trống | để trống ([11](#bao-mat)) | Bóc tách tin SOS bằng LLM |
 | `SMTP_HOST` / `_PORT` / `_USER` / `_PASSWORD` / `_STARTTLS` / `_FROM` | Mailpit | **bắt buộc** `SMTP_HOST` | Email quên mật khẩu |
 
-**Sao lưu** (chỉ `docker-compose.prod.yml`): `BACKUP_DIR` (`./backups`), `BACKUP_KEEP_DAYS` (14), `BACKUP_AT` (giờ UTC, mặc định `19:30` = 02:30 giờ VN).
+**Sao lưu** (chỉ `docker-compose.prod.yml`): `BACKUP_DIR` (`./backups`), `BACKUP_KEEP_DAYS` (14), `BACKUP_AT` (giờ UTC, mặc định `19:30` = 02:30 giờ VN). Chép ra ngoài máy chủ: `BACKUP_REMOTE`, `OFFSITE_*` ([10.5](#sao-luu)) — trống thì backend cảnh báo khi khởi động.
 
 Thêm biến mới: `config.py` + `docker-compose.yml` + `docker-compose.prod.yml` + hai tệp mẫu + bảng này.
 
@@ -913,7 +915,7 @@ rồi triển khai lại — trình duyệt tự gỡ ở lần mở sau.
 Internet ──► Caddy :443 (HTTPS, Let's Encrypt, HSTS)          ← hoặc proxy / HTTPS của trung tâm dữ liệu
                ▼  bỏ X-Forwarded-For client tự gửi, đặt IP thật
            frontend (nginx) ──► backend × N ──► mạng "data" (internal: không mở cổng, không ra Internet)
-           worker × 1         migrate (1 lần)      db · redis · minio · backup
+           worker × 1         migrate (1 lần)      db · redis · minio · backup ──► backup-offsite ──► kho S3 ngoài máy chủ
 Thiết bị IoT ──► mqtt :8883 (TLS, tài khoản + ACL) — profile "mqtt"
 ```
 
@@ -935,6 +937,11 @@ Thiết bị IoT ──► mqtt :8883 (TLS, tài khoản + ACL) — profile "mqt
 | Hệ điều hành | Ubuntu 22.04/24.04 LTS, Docker Engine + Compose v2.24+ | Tường lửa: 22 (giới hạn IP quản trị), 80, 443, (8883) |
 | Vị trí | Trung tâm dữ liệu có UPS/máy phát, **ngoài vùng ngập** | Lũ lớn có thể cắt điện, cáp quang tại Cao Bằng; sao lưu và máy dự phòng nên ở ngoài tỉnh |
 
+Mỗi container có giới hạn RAM (`deploy.resources.limits` trong `docker-compose.prod.yml`; CSDL `DB_MEM_LIMIT` 12 GB, mỗi
+bản backend `BACKEND_MEM_LIMIT` 3 GB — chỉnh theo RAM máy chủ) → một dịch vụ rò bộ nhớ chỉ tự khởi động lại, không
+kéo sập CSDL. Số đo quan trắc cũ hơn 7 ngày tự nén (TimescaleDB, migration 0008 — thường giảm ~10 lần dung lượng),
+không tự xoá: thời hạn lưu do đơn vị chủ quản quyết định.
+
 Tổng kết nối CSDL ≈ (`API_WORKERS` × số bản backend + 1) × (`DB_POOL_SIZE` + `DB_MAX_OVERFLOW`) phải nhỏ hơn
 `POSTGRES_MAX_CONNECTIONS` (mặc định 6 × 1 + 1 = 7 tiến trình × 10 = 70 < 200). Vượt → Postgres trả "too many clients"
 (đã gặp khi kiểm thử tải với pool 10 + 10) → giảm pool hoặc thêm PgBouncer. Bộ nhớ Postgres đặt theo RAM:
@@ -950,7 +957,7 @@ cp .env.production.example .env.production && chmod 600 .env.production
 mkdir -p backups
 sh deploy/fetch-basemap.sh              # bản đồ nền tự lưu trữ → data/tiles (mục 6.9)
 alias dcp='docker compose -f docker-compose.prod.yml --env-file .env.production'
-dcp --profile caddy up -d --build
+dcp --profile caddy --profile offsite up -d --build   # offsite: chép sao lưu ra ngoài (10.5) — cấu hình trước
 dcp ps                                  # migrate: Exited (0); các service khác healthy / running
 dcp logs migrate backend | tail -50     # đọc các dòng "[cấu hình] …" (cảnh báo) nếu có
 ```
@@ -999,12 +1006,24 @@ hoặc khi có cảnh báo): `docker pull <image:tag>` → `docker image inspect
 thay digest, chạy thử ở máy staging (kiểm thử API + khôi phục sao lưu) rồi mới triển khai. Image nền trong Dockerfile
 (python, node, nginx) theo tag phụ nên mỗi lần build nhận bản vá mới.
 
+<a id="sao-luu"></a>
 ### 10.5. Sao lưu & khôi phục
 
 Service `backup` chạy khi khởi động (sau `migrate`) và hằng ngày lúc `BACKUP_AT`, giữ `BACKUP_KEEP_DAYS` ngày:
 `backups/db/pctt_<ngày_giờ>.dump` (pg_dump -Fc) và `backups/photos/photos_<ngày_giờ>.tar.gz` (ảnh MinIO).
 
-**Bắt buộc** chép `backups/` ra nơi khác mỗi ngày (VD cron `rsync -a --delete backups/ backup@<máy khác>:/srv/pctt/`).
+**Bắt buộc chép ra ngoài máy chủ** (hỏng ổ đĩa, cháy, ngập phòng máy là mất cả dữ liệu lẫn bản sao lưu): service
+`backup-offsite` (profile `offsite`, `deploy/backup-offsite.sh`, rclone) chép `backups/` lên kho lưu trữ S3 / MinIO ở nơi
+khác mỗi giờ (`BACKUP_OFFSITE_EVERY_S`), bỏ qua tệp đang ghi dở; healthy khi chép thành công trong 3 chu kỳ gần nhất.
+
+1. Tạo bucket ở kho ngoài (khác trung tâm dữ liệu / khác tỉnh) + khoá **chỉ có quyền ghi bucket đó**; đặt thời hạn giữ
+   (lifecycle, VD 90 ngày) trên kho — dịch vụ dùng `rclone copy`, không xoá gì trên kho.
+2. `.env.production`: `BACKUP_REMOTE=offsite:<bucket>/caobang`, `OFFSITE_ENDPOINT`, `OFFSITE_REGION`, `OFFSITE_ACCESS_KEY_ID`,
+   `OFFSITE_SECRET_ACCESS_KEY` (kiểu khác S3, VD SFTP: `OFFSITE_TYPE=sftp` + biến `RCLONE_CONFIG_OFFSITE_*` trong `.env.offsite`).
+3. `dcp --profile caddy --profile offsite up -d` → `dcp logs --tail 5 backup-offsite` phải có "đã chép".
+
+Lấy bản sao lưu từ kho ngoài về (máy mới): `docker run --rm -v "$PWD/backups:/backups" --env-file .env.production -e
+RCLONE_CONFIG_OFFSITE_TYPE=s3 … rclone/rclone copy offsite:<bucket>/caobang /backups` (hoặc tải bằng giao diện của kho).
 Sao lưu ngay: `dcp restart backup` rồi `dcp logs --tail 5 backup`.
 
 Khôi phục CSDL (đã thử nghiệm với TimescaleDB):
@@ -1056,7 +1075,8 @@ xác thực 2 lớp TOTP, bắt buộc theo vai trò ([11.1](#xac-thuc-2-lop)); 
 ảnh xoá EXIF/GPS, link ảnh có chữ ký; IP người phản ánh chỉ lưu băm; CSDL / Redis / MinIO không mở cổng, không ra
 Internet; container backend không chạy root; Swagger tắt ở production; log không chứa token, toạ độ; API key đối tác mã
 hoá Fernet (`SECRET_KEY`), khoá thiết bị băm SHA-256, log `httpx` hạ xuống WARNING để không lộ key trong URL; cổng webhook
-SOS bắt buộc khoá; SĐT được che trước khi gửi tin SOS cho LLM.
+SOS bắt buộc khoá; SĐT được che trước khi gửi tin SOS cho LLM; font chữ và bản đồ nền tự lưu trữ (không gửi IP người dân
+cho Google khi mở trang, vẫn hiển thị khi đứt kết nối quốc tế); câu lệnh SQL ở API giới hạn 30 giây; image ghim mã băm.
 
 **Việc của đơn vị chủ quản** (xác nhận với Sở Khoa học và Công nghệ):
 

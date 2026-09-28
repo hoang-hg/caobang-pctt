@@ -28,6 +28,7 @@ STRONG = {
     "turnstile_site_key": "0x4AAA-site",
     "turnstile_secret": "0x4AAA-secret",
     "totp_required_roles": "super_admin,truong_ban,admin_tinh,chi_huy_cum",
+    "backup_remote": "offsite:pctt-sao-luu/caobang",
 }
 
 
@@ -76,6 +77,13 @@ def test_preflight_accepts_hardened_production():
 def test_preflight_production_errors(override, needle):
     errors, _ = preflight.check(make(app_env="production", **{**STRONG, **override}))
     assert any(needle in e for e in errors), errors
+
+
+def test_preflight_warns_when_backups_stay_on_server():
+    _, warnings = preflight.check(make(app_env="production", **{**STRONG, "backup_remote": ""}))
+    assert any("BACKUP_REMOTE" in w for w in warnings)
+    _, warnings = preflight.check(make(app_env="production", **STRONG))
+    assert not any("BACKUP_REMOTE" in w for w in warnings)
 
 
 def test_preflight_staging_allows_demo_with_warning():
