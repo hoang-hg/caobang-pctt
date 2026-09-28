@@ -362,6 +362,10 @@ Python trong container.
   không đặt biến môi trường `FORWARDED_ALLOW_IPS` (gunicorn đọc và kiểm tra nó).
 - `/health/full` (503 khi có sự cố) chỉ cho giám sát bên ngoài — **không** dùng làm healthcheck container (ổ đĩa đầy,
   thiếu sao lưu mà khởi động lại backend thì hỏng thêm). Worker đọc `/backups` và `/ops/offsite` chỉ đọc (compose prod).
+- Content-Security-Policy ở `frontend/nginx/security-headers.conf`: thêm nguồn ngoài (tile, API gọi từ trình duyệt, script,
+  iframe) phải thêm vào CSP, không thì bị chặn âm thầm ở bản chạy thật (dev qua Vite không có CSP → không thấy lỗi).
+  Không thêm `<script>` nội tuyến / `on…=` / `eval`; script theme trong `index.html` theo mã băm — sửa nó thì build báo mã
+  băm mới (plugin `cspInlineScripts` trong `vite.config.js`). `lite-test.mjs` kiểm tra header này.
 - nginx: `add_header` trong `location` xoá header kế thừa từ `server` → luôn `include` lại `security-headers.conf`.
 - Image backend chạy user `app` (không root): ghi tệp chỉ trong `/app/storage` hoặc `/tmp`; `docker run` với mã nguồn
   mount cần `-u 0` nếu công cụ cần ghi.

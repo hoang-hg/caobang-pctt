@@ -178,8 +178,8 @@ Bắt buộc:
 5. ⛔ Hồ sơ cấp độ an toàn thông tin, kiểm thử xâm nhập, thông báo xử lý dữ liệu cá nhân ([mục 11](#bao-mat)).
 6. ⛔ Diễn tập trên một xã thí điểm: soạn → duyệt → phát → người dân nhận được.
 
-Nên có: chính sách xoá SĐT người phản ánh sau thời hạn; Content-Security-Policy;
-máy chủ dự phòng ngoài tỉnh; giám sát số liệu (metrics) + cảnh báo; kiểm thử tải lại trên máy chủ thật ([12.2](#kiem-thu-tai)).
+Nên có: chính sách xoá SĐT người phản ánh sau thời hạn; máy chủ dự phòng ngoài tỉnh; giám sát số liệu (metrics: tải,
+thời gian phản hồi); kiểm thử tải lại trên máy chủ thật ([12.2](#kiem-thu-tai)).
 
 ---
 
@@ -1110,7 +1110,14 @@ xác thực 2 lớp TOTP, bắt buộc theo vai trò ([11.1](#xac-thuc-2-lop)); 
 Internet; container backend không chạy root; Swagger tắt ở production; log không chứa token, toạ độ; API key đối tác mã
 hoá Fernet (`SECRET_KEY`), khoá thiết bị băm SHA-256, log `httpx` hạ xuống WARNING để không lộ key trong URL; cổng webhook
 SOS bắt buộc khoá; SĐT được che trước khi gửi tin SOS cho LLM; font chữ và bản đồ nền tự lưu trữ (không gửi IP người dân
-cho Google khi mở trang, vẫn hiển thị khi đứt kết nối quốc tế); câu lệnh SQL ở API giới hạn 30 giây; image ghim mã băm.
+cho Google khi mở trang, vẫn hiển thị khi đứt kết nối quốc tế); câu lệnh SQL ở API giới hạn 30 giây; image ghim mã băm; Content-Security-Policy.
+
+**Content-Security-Policy** (`frontend/nginx/security-headers.conf`): trình duyệt chỉ chạy script của trang (và Cloudflare
+Turnstile), chỉ tải ảnh / kết nối tới nguồn liệt kê — nền bản đồ Google / CARTO, radar RainViewer. Mã độc chèn được vào
+trang (XSS) cũng không tải thêm script lạ, không chạy `eval`, không gửi dữ liệu ra máy chủ khác. Khi thêm nguồn ngoài mới
+(nền bản đồ, API gọi từ trình duyệt, script) phải thêm vào CSP — nếu không, trình duyệt chặn (Console: "Refused to
+load…"); thử lại mọi trang bằng Chrome. Script đặt theme nội tuyến trong `index.html` được phép theo mã băm SHA-256: sửa
+script thì `npm run build` dừng và in mã băm mới cần thay.
 
 **Việc của đơn vị chủ quản** (xác nhận với Sở Khoa học và Công nghệ):
 
@@ -1121,7 +1128,6 @@ cho Google khi mở trang, vẫn hiển thị khi đứt kết nối quốc tế
   vụ ở nước ngoài** khi chưa đánh giá chuyển dữ liệu ra nước ngoài.
 - **Bí mật**: `.env.production` quyền 600, chỉ người vận hành đọc; đổi toàn bộ bí mật khi nhân sự vận hành thay đổi.
 - **Bản đồ nền** có giấy phép, thể hiện đúng chủ quyền ([6.9](#ban-do-nen)).
-- Chưa bật Content-Security-Policy (giao diện tải bản đồ nền, radar, font từ nhiều nguồn) — lập danh sách nguồn, thử rồi bật.
 
 <a id="xac-thuc-2-lop"></a>
 ### 11.1. Xác thực 2 lớp (TOTP)
