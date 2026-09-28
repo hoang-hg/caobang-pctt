@@ -94,6 +94,15 @@ class Settings(BaseSettings):
     smtp_from: str = "BCH PCTT Cao Bang <no-reply@caobang-pctt.local>"
     smtp_starttls: bool = True
 
+    # Cảnh báo sự cố vận hành (app/infra/ops_watch.py, README 10.6): CSDL / Redis / API / worker ngừng, ổ đĩa sắp đầy,
+    # thiếu bản sao lưu. Email người nhận cách nhau dấu phẩy; trống = SUPERADMIN_EMAIL
+    ops_alert_emails: str = ""
+    # Tuỳ chọn: POST {"text": …} tới webhook chat (Slack, Mattermost, Google Chat, Telegram …/sendMessage?chat_id=…)
+    ops_alert_webhook_url: str = ""
+    ops_alert_repeat_min: int = 180  # còn lỗi → nhắc lại sau bao nhiêu phút
+    ops_disk_warn_pct: int = 85  # báo khi ổ đĩa (dữ liệu Docker, thư mục sao lưu) đã dùng từ mức này
+    ops_api_url: str = ""  # worker gọi kiểm tra API, VD http://backend:8000/health — trống = bỏ qua
+
     # Chống spam form công khai (Cloudflare Turnstile) — cần CẢ HAI khoá; trống = chỉ giới hạn tần suất + honeypot
     turnstile_site_key: str = ""  # khoá công khai, frontend lấy qua GET /api/v1/public/config
     turnstile_secret: str = ""

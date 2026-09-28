@@ -60,6 +60,7 @@ backend/                   Python 3.12, FastAPI, SQLAlchemy async (psycopg3), Ca
                            (open_meteo, openweather) · ingest.py (lõi nhận số đo) · mqtt_bridge.py · crypto.py (Fernet)
   app/infra/               redis.py · cache.py (cached, cached_view, invalidate, bump_data_version) · ratelimit.py
                            (RULES, limit()) · storage.py (MinIO / thư mục) · mailer.py · heartbeat.py (nhịp worker)
+                           · ops_watch.py (tự giám sát: kiểm tra hạ tầng, email sự cố, /health/full)
   app/ws/hub.py            WebSocket hub + relay Redis
   app/seed.py, seed_data.py  seed dữ liệu nền / mẫu; seed_data.USERS = tài khoản demo (mật khẩu công khai)
   alembic/sql/000N_*.sql   cấu trúc CSDL (nguồn thật) · alembic/versions/000N_*.py đọc tệp SQL tương ứng
@@ -116,12 +117,16 @@ Python trong container.
   cache/fallback bộ nhớ khi không có Redis, chỉ dùng cho máy đơn).
 - **Redis**: `pctt:events` (sự kiện WebSocket — mọi tiến trình publish, mọi tiến trình api relay), `pctt:casbin` (báo thay
   đổi policy để nạp lại), `pctt:dataver` (phiên bản dữ liệu, tăng ở `hub.publish` trừ sự kiện tần suất cao), `pctt:worker:heartbeat` (nhịp
-  worker, `/health` đọc), khoá `rl:*` (giới hạn tần suất), `loginfail:*`, `cache:public:*` / `cache:view:*` (cache).
+  worker, `/health` đọc), `pctt:ops:*` (kết quả tự giám sát, trạng thái đã báo sự cố, khoá kiểm tra của API), khoá `rl:*` (giới hạn tần suất), `loginfail:*`, `cache:public:*` / `cache:view:*` (cache).
 - **Chịu tải** (README §3, §12.2): cổng công khai = nginx cache 10 s + `cached("public:…")`; màn hình điều hành =
   `cached_view` theo phiên bản dữ liệu + gộp yêu cầu trùng; việc tốn CPU (ảnh) chạy `asyncio.to_thread`; frontend tách
   chunk theo trang, tệp tĩnh nén sẵn. Giữ các cơ chế này khi thêm tính năng.
 - **Worker** ghi nhịp mỗi 30 s (`infra/heartbeat.py`): tệp `/tmp/pctt-worker-heartbeat` cho healthcheck container, Redis
   cho `/health` (báo `degraded` nếu mất nhịp > 2 phút).
+- **Tự giám sát** (`infra/ops_watch.py`, README §10.6): worker kiểm tra mỗi phút (`WORKER_CHECKS`: CSDL, Redis, API, ổ đĩa,
+  sao lưu, offsite) → email / webhook khi lỗi 2 lần liên tiếp, nhắc lại, báo khôi phục; API (`RUN_MODE=api`) theo dõi
+  ngược nhịp worker, mỗi phút 1 tiến trình (khoá Redis). Thêm kiểm tra hạ tầng: hàm trả `list[Check]` (rỗng = bỏ qua
+  khi không áp dụng), thêm vào `WORKER_CHECKS`, không tự bắt lỗi (`run_checks` biến lỗi / quá 10 s thành sự cố).
 - **Middleware** (ngoài → trong): `ProxyHeadersMiddleware` (tin `TRUSTED_PROXIES`) → `CORSMiddleware` → `RateLimitMiddleware`
   → router. Thêm middleware phải giữ ProxyHeaders ngoài cùng.
 - **Chạy thật**: service `migrate` chạy `alembic upgrade head && python -m app.seed` một lần; backend/worker khởi động sau.
@@ -304,8 +309,9 @@ Python trong container.
 - `tests/e2e/*.mjs` kiểm thử API end-to-end, cần stack dev với `DEMO_MODE=true` (dùng tài khoản demo); tham số 1 = URL backend.
   Chạy lại liên tiếp → xoá khoá `rl:*` trong Redis. `iot-test.mjs` gọi `docker exec caobang-pctt-mqtt` (tên container cố định).
 - CI (`ci.yml`): ruff + pytest → build frontend → kiểm tra `docker-compose.prod.yml` → stack Docker Compose
-  (`DEMO_MODE=true`, `SIMULATOR=true`, `TOTP_REQUIRED_ROLES=kiem_thu_2fa`) + 10 script API (`lite-test.mjs` chạy qua
-  nginx: tham số = URL frontend :8080; `totp-test.mjs` tự tính mã TOTP, cần biến trên để thử luồng bắt buộc).
+  (`DEMO_MODE=true`, `SIMULATOR=true`, `TOTP_REQUIRED_ROLES=kiem_thu_2fa`, `OPS_DISK_WARN_PCT=1`) + 11 script API (`lite-test.mjs`
+  chạy qua nginx: tham số = URL frontend :8080; `totp-test.mjs` tự tính mã TOTP, cần biến trên để thử luồng bắt buộc;
+  `ops-test.mjs` chạy cuối: ngưỡng ổ đĩa 1% → chờ email sự cố trong Mailpit + `/health/full` 503).
   Thay đổi hành vi nghiệp vụ / quyền → cập nhật script tương ứng.
 - `tests/load/load.js` (k6, README §12.2): thay đổi đường đi của cổng công khai hoặc dashboard (thêm API, bỏ cache…) →
   chạy lại, so với bảng kết quả trong README; cập nhật bảng khi số liệu đổi đáng kể.
@@ -354,6 +360,8 @@ Python trong container.
 - `DEMO_MODE` chỉ có tác dụng khi CSDL trống; đổi giữa chừng cần `python -m app.seed --reset` (xoá dữ liệu nghiệp vụ).
 - gunicorn `--forwarded-allow-ips` không nhận CIDR (uvicorn thì nhận) → xử lý IP ở `ProxyHeadersMiddleware` trong app;
   không đặt biến môi trường `FORWARDED_ALLOW_IPS` (gunicorn đọc và kiểm tra nó).
+- `/health/full` (503 khi có sự cố) chỉ cho giám sát bên ngoài — **không** dùng làm healthcheck container (ổ đĩa đầy,
+  thiếu sao lưu mà khởi động lại backend thì hỏng thêm). Worker đọc `/backups` và `/ops/offsite` chỉ đọc (compose prod).
 - nginx: `add_header` trong `location` xoá header kế thừa từ `server` → luôn `include` lại `security-headers.conf`.
 - Image backend chạy user `app` (không root): ghi tệp chỉ trong `/app/storage` hoặc `/tmp`; `docker run` với mã nguồn
   mount cần `-u 0` nếu công cụ cần ghi.

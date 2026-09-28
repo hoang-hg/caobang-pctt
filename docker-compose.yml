@@ -48,6 +48,8 @@ x-backend-env: &backend-env
   SMTP_USER: ${SMTP_USER:-}
   SMTP_PASSWORD: ${SMTP_PASSWORD:-}
   SMTP_STARTTLS: ${SMTP_STARTTLS:-false}
+  OPS_ALERT_EMAILS: ${OPS_ALERT_EMAILS:-}
+  OPS_DISK_WARN_PCT: ${OPS_DISK_WARN_PCT:-85}  # CI đặt 1 → giả lập ổ đĩa đầy để thử email cảnh báo sự cố
   TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-}
   TURNSTILE_SECRET: ${TURNSTILE_SECRET:-}
   LLM_API_URL: ${LLM_API_URL:-}
@@ -147,6 +149,7 @@ services:
     environment:
       <<: *backend-env
       RUN_MODE: worker
+      OPS_API_URL: http://backend:8000/health
     command: python -m app.worker
     depends_on:
       backend:

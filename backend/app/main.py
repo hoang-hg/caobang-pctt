@@ -30,6 +30,7 @@ from app.config import settings
 from app.db import fetch_one
 from app.infra import storage
 from app.infra.heartbeat import STALE_S, worker_age_s
+from app.infra.ops_watch import ops_watch
 from app.infra.ratelimit import RateLimitMiddleware
 from app.infra.redis import get_redis
 from app.lifecycle import shutdown, startup
@@ -142,6 +143,18 @@ async def health():
         "simulator": settings.simulator,
         "tick": simulator.tick,
     }
+
+
+@app.get("/health/full")
+async def health_full():
+    """Cho giám sát bên ngoài (Uptime Kuma, UptimeRobot…): 503 khi có bất kỳ kiểm tra nào lỗi — CSDL, Redis, worker, API,
+    ổ đĩa, sao lưu (app/infra/ops_watch.py). Chỉ trả tên kiểm tra + đạt / lỗi; chi tiết gửi trong email cảnh báo.
+    Không dùng cho healthcheck của container: ổ đĩa đầy không phải lý do khởi động lại backend."""
+    checks = await ops_watch.snapshot()
+    ok = all(checks.values())
+    return JSONResponse(
+        status_code=200 if ok else 503, content={"status": "ok" if ok else "degraded", "checks": checks}
+    )
 
 
 @app.websocket("/ws")

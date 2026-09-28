@@ -2,7 +2,7 @@
 # CI — kiểm tra mỗi lần push / pull request
 #   backend  : ruff (format + lint) + pytest (kiểm thử đơn vị)
 #   frontend : build production
-#   e2e      : dựng toàn bộ stack bằng Docker Compose, chạy 10 bộ kiểm thử API
+#   e2e      : dựng toàn bộ stack bằng Docker Compose, chạy 11 bộ kiểm thử API
 # ==========================================
 name: CI
 
@@ -72,6 +72,9 @@ jobs:
       SIMULATOR: "true"
       # vai trò thử của totp-test.mjs: kiểm tra luồng bắt buộc cài xác thực 2 lớp khi đăng nhập
       TOTP_REQUIRED_ROLES: kiem_thu_2fa
+      # ops-test.mjs: ngưỡng ổ đĩa 1% → giả lập ổ đĩa đầy, thử trọn luồng cảnh báo sự cố (email tới Mailpit, 503)
+      OPS_DISK_WARN_PCT: "1"
+      OPS_ALERT_EMAILS: van-hanh@ci.local
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -129,6 +132,8 @@ jobs:
         run: node tests/e2e/import-test.mjs
       - name: Kiểm thử bản nhẹ /ban-nhe & service worker (qua nginx của frontend)
         run: node tests/e2e/lite-test.mjs
+      - name: Kiểm thử tự giám sát vận hành (/health/full, email cảnh báo sự cố)
+        run: node tests/e2e/ops-test.mjs
       - name: Log khi lỗi
         if: failure()
         run: docker compose logs --tail=300 backend worker frontend
