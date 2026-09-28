@@ -45,6 +45,9 @@ MAX_PHOTOS = 3
 MAX_BYTES = 8 * 1024 * 1024
 MAX_PIXELS = 40_000_000  # chống "ảnh bom" giải nén
 ALLOWED_FORMATS = {"JPEG", "PNG", "WEBP", "MPO"}
+# Bộ đọc Pillow được chạy (Image.open(formats=…)). Không có "MPO": ảnh nhiều khung của iPhone do bộ đọc JPEG mở rồi
+# gán img.format = "MPO" — Pillow không có bộ đọc tên MPO (truyền vào → KeyError)
+OPEN_FORMATS = ["JPEG", "PNG", "WEBP"]
 FULL_SIZE = 1600
 THUMB_SIZE = 400
 PHOTO_URL_TTL = 3600
@@ -63,7 +66,7 @@ def process_image(data: bytes) -> tuple[bytes, bytes, int, int]:
         try:
             # formats=: chỉ chạy bộ đọc JPEG / PNG / WebP — ảnh người dân tải lên không bao giờ đi qua bộ đọc PSD, FITS,
             # font… (nơi Pillow hay có lỗi bộ nhớ). Kiểm tra img.format bên dưới vẫn giữ.
-            img = Image.open(io.BytesIO(data), formats=sorted(ALLOWED_FORMATS))
+            img = Image.open(io.BytesIO(data), formats=OPEN_FORMATS)
             if img.format not in ALLOWED_FORMATS:
                 raise ReportError("Chỉ nhận ảnh JPEG, PNG hoặc WebP")
             if img.width * img.height > MAX_PIXELS:
