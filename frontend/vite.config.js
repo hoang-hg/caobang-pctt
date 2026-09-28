@@ -45,8 +45,37 @@ function serviceWorker() {
   };
 }
 
+/**
+ * Script nội tuyến trong index.html (đặt theme trước khi React nạp) chỉ chạy được khi Content-Security-Policy cho phép
+ * đúng mã băm SHA-256 của nó (nginx/security-headers.conf). Sửa script mà quên đổi mã băm → trình duyệt chặn → dừng build.
+ */
+function cspInlineScripts() {
+  const conf = new URL('./nginx/security-headers.conf', import.meta.url);
+  return {
+    name: 'pctt-csp-inline-scripts',
+    apply: 'build',
+    transformIndexHtml: {
+      order: 'post',
+      handler(html) {
+        const csp = fs.readFileSync(conf, 'utf8');
+        for (const [, attrs, body] of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)) {
+          if (/\bsrc=/.test(attrs)) continue;
+          const hash = `'sha256-${createHash('sha256').update(body).digest('base64')}'`;
+          if (!csp.includes(hash)) {
+            throw new Error(
+              `Script nội tuyến trong index.html chưa được CSP cho phép: đổi mã băm 'sha256-…' trong script-src của ` +
+                `frontend/nginx/security-headers.conf thành ${hash}`,
+            );
+          }
+        }
+        return html;
+      },
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react(), serviceWorker()],
+  plugins: [react(), serviceWorker(), cspInlineScripts()],
   server: {
     port: 5173,
     proxy: {

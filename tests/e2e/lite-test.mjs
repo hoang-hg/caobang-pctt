@@ -1,6 +1,8 @@
 // Kiểm thử bản nhẹ /ban-nhe, service worker và manifest (PWA) — chạy qua nginx của frontend (cần service frontend).
 //   node tests/e2e/lite-test.mjs [http://localhost:8080]
 // Cần DEMO_MODE=true (tài khoản trucban / chihuy để phát 1 cảnh báo thử).
+import { createHash } from 'node:crypto';
+
 const ROOT = process.argv[2] || 'http://localhost:8080';
 const API = ROOT + '/api/v1';
 let failures = 0;
@@ -76,6 +78,16 @@ const manifest = await (await fetch(`${ROOT}/manifest.webmanifest`)).json().catc
 check('manifest hợp lệ', manifest?.start_url === '/' && manifest?.icons?.some((i) => i.sizes === '512x512'));
 const index = await (await fetch(`${ROOT}/`)).text();
 check('index.html gắn manifest', index.includes('rel="manifest"'));
+
+// ---------------------------------------------------------------- Content-Security-Policy (nginx/security-headers.conf)
+const csp = (await fetch(`${ROOT}/`)).headers.get('content-security-policy') || '';
+check('Có CSP: chỉ nguồn của trang, cấm plugin / nhúng trang, script không unsafe-inline / eval',
+  ["default-src 'self'", "object-src 'none'", "frame-ancestors 'self'", "base-uri 'self'"].every((d) => csp.includes(d)) &&
+  !/script-src[^;]*'unsafe-(inline|eval)'/.test(csp), csp.slice(0, 80));
+const inlineHashes = [...index.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => `'sha256-${createHash('sha256').update(m[1]).digest('base64')}'`);
+check('Script nội tuyến của index.html được CSP cho phép (đúng mã băm)', inlineHashes.length > 0 && inlineHashes.every((h) => csp.includes(h)), inlineHashes.join(' '));
+check('Bản nhẹ, API công khai (location có add_header riêng) cũng có CSP',
+  !!all.headers.get('content-security-policy') && !!(await fetch(`${API}/public/overview`)).headers.get('content-security-policy'));
 
 console.log(failures ? `\n${failures} kiểm thử LỖI` : '\nTất cả kiểm thử bản nhẹ / PWA đều PASS');
 process.exit(failures ? 1 : 0);
