@@ -35,6 +35,7 @@ SCOPE_ACTIONS = {
     "alert": "view",
     "hotline": "operate",
     "integration": "view",
+    "data": "import",  # người duyệt hồ sơ dữ liệu xã/phường gửi
 }
 # Sự kiện không tự gắn phạm vi → nhóm quyền mặc định: chỉ người có quyền đó (ở bất kỳ xã nào) nhận.
 # VD call.new chứa SĐT người gọi đường dây nóng — không gửi cho tài khoản chỉ có quyền kho / quan sát.
@@ -49,6 +50,7 @@ EVENT_SCOPE = {
     "dispatch.updated": "sos",
     "source.updated": "integration",
     "ingest.log": "integration",
+    "submission.updated": "data",
 }
 
 

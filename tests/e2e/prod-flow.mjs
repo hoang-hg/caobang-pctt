@@ -195,6 +195,25 @@ check('Cán bộ xã không cập nhật được vận hành hồ → 403',
 const { token: checker, mfa: chkMfa } = await loginWithSetup(chkUser, PW, 'Lãnh đạo');
 check('Lãnh đạo BCH: bắt buộc cài 2 lớp khi đăng nhập lần đầu', !!checker && chkMfa === true);
 
+// ---- Xã/phường gửi dữ liệu → cấp tỉnh phê duyệt rồi mới hiển thị
+const qtxa = `qtxa.${stamp}`;
+check('Tạo tài khoản quản trị xã (Cô Ba)', (await mk(qtxa, 'admin_xa', 'BAOLAC/CB-COBA', { email: `${qtxa}@ci.local` })).status === 201);
+const xaTok = (await call('POST', '/auth/login', { username: qtxa, password: PW })).data?.token;
+const coba = ((await call('GET', '/admin-units?level=xa')).data || []).find((u) => u.code === 'CB-COBA');
+const SITE = `Nhà văn hoá xã gửi ${stamp}`;
+const subForm = new FormData();
+subForm.append('name', 'diem_so_tan');
+subForm.append('mode', 'upsert');
+subForm.append('file', new Blob([`ma,ten,loai,suc_chua,vi_do,kinh_do\nHS-${stamp},${SITE},nha_van_hoa,150,${coba?.lat},${coba?.lon}\n`]), 'diem.csv');
+const sub = await call('POST', '/data-import/submissions', subForm, xaTok);
+check('Quản trị xã gửi hồ sơ điểm sơ tán → chờ duyệt', sub.status === 201 && sub.data?.status === 'cho_duyet',
+  `HTTP ${sub.status} ${sub.data?.code || JSON.stringify(sub.data).slice(0, 200)}`);
+const sites = async () => ((await call('GET', fresh('/public/map'))).data?.evacuation_sites || []).map((e) => e.name);
+check('Hồ sơ chờ duyệt chưa hiện trên cổng công khai', !(await sites()).includes(SITE));
+const subOk = await call('POST', `/data-import/submissions/${sub.data?.code}/approve`, {}, admin);
+check('Superadmin phê duyệt → ghi dữ liệu', subOk.status === 200 && subOk.data?.result?.created === 1, JSON.stringify(subOk.data).slice(0, 160));
+check('Sau khi duyệt: hiện trên cổng công khai', (await sites()).includes(SITE));
+
 // ================================================================ 7. Phản ánh → duyệt → chuyển SOS → điều động
 const PHONE = '0912 345 678';
 const f = new FormData();
@@ -294,6 +313,10 @@ if (mail) {
   const body = await (await fetch(`${MAILPIT}/api/v1/message/${mail.ID}`)).json();
   check('Link trong email dùng PUBLIC_BASE_URL https://', /https:\/\/[^\s"]+\/dat-lai-mat-khau\?token=/.test(body.Text || ''));
 }
+const inbox = (await (await fetch(`${MAILPIT}/api/v1/messages?limit=200`)).json().catch(() => ({}))).messages || [];
+check('Email báo cấp tỉnh có hồ sơ xã gửi chờ duyệt', inbox.some((m) => m.Subject.includes(`${sub.data?.code} chờ phê duyệt`)));
+check('Email báo quản trị xã hồ sơ đã được phê duyệt',
+  inbox.some((m) => m.Subject.includes(`${sub.data?.code} đã được phê duyệt`) && m.To?.some((t) => t.Address === `${qtxa}@ci.local`)));
 // Worker kiểm tra mỗi phút; bản sao lưu đầu tiên chạy ngay khi service backup khởi động
 let full;
 for (let i = 0; i < 40; i++) {

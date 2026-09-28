@@ -1,32 +1,67 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { AlertTriangle, CheckCircle2, Download, FileSpreadsheet, Globe2, Loader2, ShieldCheck, Upload } from 'lucide-react';
+import { CheckCircle2, Download, FileSpreadsheet, FileUp, Globe2, Inbox, Loader2, PencilLine, Send, ShieldCheck, Upload } from 'lucide-react';
 import { api, apiDownload, apiUpload } from '../api/client';
+import { useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
-import { Empty, KpiCard } from '../components/common/ui';
+import { Empty, KpiCard, Tabs } from '../components/common/ui';
+import { useAllowedCodes, usePermission } from '../rbac/usePermission';
+import RecordForm from './DataImportForm';
+import Submissions, { IssueTable, PreviewTable } from './DataSubmissions';
 
 const GEOMETRY = { point: 'Điểm (vĩ độ, kinh độ)', polygon: 'Vùng — chỉ GeoJSON', none: 'Không có vị trí' };
 
-/** Nhập dữ liệu chính thức từ tệp: chọn loại → tải mẫu → kiểm tra (không ghi gì) → nhập (1 transaction). */
+/**
+ * Nhập dữ liệu chính thức. Cấp tỉnh (data.import): nhập thẳng + duyệt hồ sơ xã gửi. Xã/phường (data.submit): gửi dữ
+ * liệu của xã mình → cấp tỉnh phê duyệt rồi mới ghi / hiển thị. Nhập bằng tệp (CSV / Excel / GeoJSON) hoặc điền trực
+ * tiếp trên web; luôn "Kiểm tra" trước — không ghi gì khi còn lỗi.
+ */
 export default function DataImport() {
+  const canImport = usePermission('data', 'import', '*');
+  const [params, setParams] = useSearchParams();
+  const code = params.get('ho-so');
+  const [tab, setTab] = useState(code ? 'ho-so' : 'nhap');
   const { data: datasets = [], isLoading } = useQuery({
     queryKey: ['import-datasets'],
     queryFn: () => api('/data-import/datasets'),
     staleTime: Infinity,
   });
+  const { data: subs } = useQuery({
+    queryKey: ['submissions', 'counts'],
+    queryFn: () => api('/data-import/submissions', { params: { limit: 1 } }),
+    refetchInterval: 60_000,
+  });
+  const pending = subs?.counts?.cho_duyet || 0;
   const [name, setName] = useState(null);
   const ds = datasets.find((d) => d.name === name) || datasets[0];
+  const open = (c) => {
+    setParams(c ? { 'ho-so': c } : {}, { replace: true });
+    setTab('ho-so');
+  };
+
   return (
     <div className="flex flex-col gap-3 p-3">
       <div>
-        <h1 className="text-lg font-bold">Nhập dữ liệu chính thức</h1>
+        <h1 className="text-lg font-bold">{canImport ? 'Nhập dữ liệu chính thức' : 'Gửi dữ liệu của xã/phường'}</h1>
         <p className="text-xs text-muted">
-          Điểm sơ tán, vùng nguy hiểm, danh bạ, trạm quan trắc, kho, lực lượng… từ tệp CSV / Excel (.xlsx) / GeoJSON. Bấm
-          “Kiểm tra” trước — hệ thống chỉ ghi khi tệp không còn lỗi, và ghi toàn bộ hoặc không ghi gì.
+          {canImport
+            ? 'Điểm sơ tán, vùng nguy hiểm, danh bạ, trạm quan trắc, kho, lực lượng… từ tệp CSV / Excel (.xlsx) / GeoJSON hoặc điền trực tiếp. Bấm “Kiểm tra” trước — hệ thống chỉ ghi khi dữ liệu không còn lỗi, và ghi toàn bộ hoặc không ghi gì. Hồ sơ xã/phường gửi được duyệt ở tab bên cạnh.'
+            : 'Điểm sơ tán, xóm, danh bạ, kho, lực lượng… của xã/phường bạn phụ trách. Dữ liệu được gửi lên cấp tỉnh phê duyệt; chỉ sau khi được duyệt mới hiển thị trên hệ thống và cổng công khai.'}
         </p>
       </div>
-      {isLoading ? (
+      <Tabs
+        value={tab}
+        onChange={setTab}
+        tabs={[
+          { value: 'nhap', label: canImport ? 'Nhập dữ liệu' : 'Gửi dữ liệu', icon: FileUp },
+          { value: 'ho-so', label: canImport ? 'Hồ sơ xã/phường gửi' : 'Hồ sơ đã gửi', icon: Inbox, count: pending || null },
+        ]}
+      />
+      {tab === 'ho-so' ? (
+        <Submissions canImport={canImport} code={code} onOpen={open} />
+      ) : isLoading ? (
         <Empty>Đang tải…</Empty>
       ) : (
         <div className="grid gap-3 lg:grid-cols-[260px_minmax(0,1fr)]">
@@ -45,37 +80,46 @@ export default function DataImport() {
               </button>
             ))}
           </nav>
-          {ds && <DatasetPanel key={ds.name} ds={ds} />}
+          {ds && <DatasetPanel key={ds.name} ds={ds} submitMode={!canImport} onSubmitted={open} />}
         </div>
       )}
     </div>
   );
 }
 
-function DatasetPanel({ ds }) {
+function DatasetPanel({ ds, submitMode, onSubmitted }) {
   const toast = useStore((s) => s.toast);
   const qc = useQueryClient();
+  const [method, setMethod] = useState('file'); // file | form
   const [file, setFile] = useState(null);
   const [mode, setMode] = useState('upsert');
   const [report, setReport] = useState(null);
   const [result, setResult] = useState(null);
   const [busy, setBusy] = useState('');
   const [confirmed, setConfirmed] = useState(false);
+  const [note, setNote] = useState('');
+  // Xã/phường được chọn trong form: hồ sơ của xã chỉ các xã mình phụ trách; cấp tỉnh: mọi xã
+  const { data: units = [] } = useUnits();
+  const allowed = useAllowedCodes('data', submitMode ? 'submit' : 'import');
+  const communes = useMemo(
+    () => units.filter((u) => !allowed || allowed.includes(u.code)).sort((a, b) => a.name.localeCompare(b.name, 'vi')),
+    [units, allowed],
+  );
 
   const clear = () => { setReport(null); setResult(null); setConfirmed(false); };
-  const form = () => {
-    const f = new FormData();
-    f.append('file', file);
-    f.append('mode', mode);
-    return f;
+  const form = (f = file) => {
+    const fd = new FormData();
+    fd.append('file', f);
+    fd.append('mode', mode);
+    return fd;
   };
-  const check = async () => {
+  const check = async (f = file) => {
     setBusy('validate');
     clear();
     try {
-      setReport(await apiUpload(`/data-import/datasets/${ds.name}/validate`, form()));
+      setReport(await apiUpload(`/data-import/datasets/${ds.name}/validate`, form(f)));
     } catch (e) {
-      toast({ tone: 'danger', title: 'Không đọc được tệp', body: e.message, duration: 9000 });
+      toast({ tone: 'danger', title: 'Không đọc được dữ liệu', body: e.message, duration: 9000 });
     } finally {
       setBusy('');
     }
@@ -99,8 +143,25 @@ function DatasetPanel({ ds }) {
       setBusy('');
     }
   };
+  const submit = async () => {
+    setBusy('submit');
+    try {
+      const fd = form();
+      fd.append('name', ds.name);
+      if (note.trim()) fd.append('note', note.trim());
+      const res = await apiUpload('/data-import/submissions', fd);
+      qc.invalidateQueries({ queryKey: ['submissions'] });
+      toast({ tone: 'good', title: `Đã gửi hồ sơ ${res.code}`, body: 'Chờ cấp tỉnh phê duyệt — dữ liệu hiển thị sau khi được duyệt.' });
+      onSubmitted(res.code);
+    } catch (e) {
+      if (e.data?.report) setReport(e.data.report);
+      toast({ tone: 'danger', title: 'Chưa gửi', body: e.message, duration: 9000 });
+    } finally {
+      setBusy('');
+    }
+  };
   const destructive = mode === 'replace' && report?.deletes > 0;
-  const canApply = report?.ok && !result && (!destructive || confirmed) && !busy;
+  const ready = report?.ok && !result && (!destructive || confirmed) && !busy;
 
   return (
     <section className="card flex min-w-0 flex-col gap-3 p-3">
@@ -111,6 +172,7 @@ function DatasetPanel({ ds }) {
           <p className="mt-1 text-xs text-muted">
             Vị trí: {GEOMETRY[ds.geometry]} · Định dạng: {ds.formats.join(', ')}
             {ds.update_only && ' · Chỉ cập nhật bản ghi đã có'}
+            {!submitMode && ds.submittable && ' · Xã/phường gửi được (cấp tỉnh duyệt)'}
           </p>
         </div>
         <button
@@ -142,49 +204,81 @@ function DatasetPanel({ ds }) {
         </div>
       </details>
 
-      <div className="flex flex-wrap items-end gap-3">
-        <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm">
-          Tệp dữ liệu
-          <input
-            type="file"
-            className="input"
-            accept={ds.formats.join(',')}
-            onChange={(e) => { setFile(e.target.files?.[0] || null); clear(); }}
-          />
-        </label>
-        {ds.replaceable && (
-          <fieldset className="flex flex-col gap-1 text-sm">
-            <legend className="mb-1">Chế độ</legend>
-            <label className="flex items-center gap-2">
-              <input type="radio" name="mode" checked={mode === 'upsert'} onChange={() => { setMode('upsert'); clear(); }} />
-              Thêm mới & cập nhật
-            </label>
-            <label className="flex items-center gap-2">
-              <input type="radio" name="mode" checked={mode === 'replace'} onChange={() => { setMode('replace'); clear(); }} />
-              Thay toàn bộ (xoá bản ghi không có trong tệp)
-            </label>
-          </fieldset>
-        )}
-        <button className="btn-primary" disabled={!file || !!busy} onClick={check}>
-          {busy === 'validate' ? <Loader2 size={15} className="animate-spin" /> : <FileSpreadsheet size={15} />} Kiểm tra tệp
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <span className="text-muted">Cách nhập:</span>
+        <button className={clsx('chip px-3 py-1', method === 'file' ? 'bg-accent text-white' : 'bg-panel2')} onClick={() => { setMethod('file'); clear(); }}>
+          <FileSpreadsheet size={13} /> Tải tệp lên
+        </button>
+        <button className={clsx('chip px-3 py-1', method === 'form' ? 'bg-accent text-white' : 'bg-panel2')} onClick={() => { setMethod('form'); clear(); }}>
+          <PencilLine size={13} /> Điền trực tiếp
         </button>
       </div>
+
+      {ds.replaceable && (
+        <fieldset className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+          <legend className="mb-1">Chế độ</legend>
+          <label className="flex items-center gap-2">
+            <input type="radio" name="mode" checked={mode === 'upsert'} onChange={() => { setMode('upsert'); clear(); }} />
+            Thêm mới & cập nhật
+          </label>
+          <label className="flex items-center gap-2">
+            <input type="radio" name="mode" checked={mode === 'replace'} onChange={() => { setMode('replace'); clear(); }} />
+            Thay toàn bộ{submitMode ? ' trong xã mình' : ''} (xoá bản ghi không có trong dữ liệu gửi)
+          </label>
+        </fieldset>
+      )}
+
+      {method === 'file' ? (
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm">
+            Tệp dữ liệu
+            <input
+              type="file"
+              className="input"
+              accept={ds.formats.join(',')}
+              onChange={(e) => { setFile(e.target.files?.[0] || null); clear(); }}
+            />
+          </label>
+          <button className="btn-primary" disabled={!file || !!busy} onClick={() => check()}>
+            {busy === 'validate' ? <Loader2 size={15} className="animate-spin" /> : <FileSpreadsheet size={15} />} Kiểm tra tệp
+          </button>
+        </div>
+      ) : (
+        <RecordForm ds={ds} communes={communes} onReady={(f) => { setFile(f); check(f); }} />
+      )}
 
       {report && <ReportView report={report} />}
 
       {report?.ok && !result && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line p-3">
-          {destructive ? (
-            <label className="flex items-center gap-2 text-sm text-danger">
-              <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
-              Tôi hiểu {report.deletes} bản ghi hiện có sẽ bị xoá
+        <div className="flex flex-col gap-3 rounded-lg border border-line p-3">
+          {submitMode && (
+            <label className="flex flex-col gap-1 text-sm">
+              Ghi chú gửi cấp tỉnh (không bắt buộc)
+              <textarea className="input min-h-[56px]" maxLength={500} value={note} onChange={(e) => setNote(e.target.value)}
+                placeholder="VD: Cập nhật theo phương án ứng phó năm 2026 của UBND xã" />
             </label>
-          ) : (
-            <span className="flex items-center gap-2 text-sm text-good"><ShieldCheck size={16} /> Tệp hợp lệ — sẵn sàng nhập</span>
           )}
-          <button className={destructive ? 'btn-danger' : 'btn-primary'} disabled={!canApply} onClick={apply}>
-            {busy === 'apply' ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />} Nhập vào hệ thống
-          </button>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {destructive ? (
+              <label className="flex items-center gap-2 text-sm text-danger">
+                <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
+                Tôi hiểu {report.deletes} bản ghi hiện có sẽ bị xoá{submitMode ? ' khi được duyệt' : ''}
+              </label>
+            ) : (
+              <span className="flex items-center gap-2 text-sm text-good">
+                <ShieldCheck size={16} /> Dữ liệu hợp lệ — sẵn sàng {submitMode ? 'gửi' : 'nhập'}
+              </span>
+            )}
+            {submitMode ? (
+              <button className={destructive ? 'btn-danger' : 'btn-primary'} disabled={!ready} onClick={submit}>
+                {busy === 'submit' ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} Gửi cấp tỉnh phê duyệt
+              </button>
+            ) : (
+              <button className={destructive ? 'btn-danger' : 'btn-primary'} disabled={!ready} onClick={apply}>
+                {busy === 'apply' ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />} Nhập vào hệ thống
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -199,7 +293,6 @@ function DatasetPanel({ ds }) {
 }
 
 function ReportView({ report }) {
-  const columns = report.preview.length ? Object.keys(report.preview[0]) : [];
   return (
     <div className="flex flex-col gap-3">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
@@ -210,61 +303,12 @@ function ReportView({ report }) {
         <KpiCard label="Xoá" value={report.deletes} tone={report.deletes ? 'danger' : undefined} />
       </div>
       {report.error_count > 0 && (
-        <IssueTable title={`${report.error_count} lỗi — sửa tệp rồi kiểm tra lại`} tone="danger" issues={report.errors} total={report.error_count} />
+        <IssueTable title={`${report.error_count} lỗi — sửa dữ liệu rồi kiểm tra lại`} tone="danger" issues={report.errors} total={report.error_count} />
       )}
       {report.warning_count > 0 && (
         <IssueTable title={`${report.warning_count} cảnh báo`} tone="warn" issues={report.warnings} total={report.warning_count} />
       )}
-      {columns.length > 0 && (
-        <details className="text-xs">
-          <summary className="cursor-pointer font-medium">Xem trước {report.preview.length} dòng đầu (giá trị sau chuẩn hoá)</summary>
-          <div className="mt-2 max-h-72 overflow-auto rounded-lg border border-line">
-            <table className="w-full text-left">
-              <thead className="sticky top-0 bg-panel text-muted">
-                <tr>{columns.map((c) => <th key={c} className="px-2 py-1 font-mono">{c}</th>)}</tr>
-              </thead>
-              <tbody>
-                {report.preview.map((row) => (
-                  <tr key={row.dong} className="border-t border-line">
-                    {columns.map((c) => <td key={c} className="whitespace-nowrap px-2 py-1">{formatCell(row[c])}</td>)}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </details>
-      )}
+      <PreviewTable rows={report.preview} title={`Xem trước ${report.preview.length} dòng đầu (giá trị sau chuẩn hoá)`} />
     </div>
   );
-}
-
-function IssueTable({ title, tone, issues, total }) {
-  return (
-    <div className={clsx('rounded-lg border p-2 text-xs', tone === 'danger' ? 'border-danger/50 bg-danger/5' : 'border-warn/50 bg-warn/5')}>
-      <div className={clsx('mb-1 flex items-center gap-1.5 font-semibold', tone === 'danger' ? 'text-danger' : 'text-warn')}>
-        <AlertTriangle size={14} /> {title}
-      </div>
-      <div className="max-h-60 overflow-auto">
-        <table className="w-full text-left">
-          <tbody>
-            {issues.map((i, k) => (
-              <tr key={k} className="border-t border-line/60 align-top">
-                <td className="w-16 py-1 pr-2 text-muted">{i.row ? `Dòng ${i.row}` : 'Tệp'}</td>
-                <td className="w-28 pr-2 font-mono">{i.field || ''}</td>
-                <td>{i.message}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      {total > issues.length && <div className="mt-1 text-muted">… và {total - issues.length} mục khác</div>}
-    </div>
-  );
-}
-
-function formatCell(value) {
-  if (value === null || value === undefined) return '';
-  if (Array.isArray(value)) return value.join(', ');
-  if (typeof value === 'boolean') return value ? 'có' : 'không';
-  return String(value);
 }

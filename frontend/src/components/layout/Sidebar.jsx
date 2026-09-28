@@ -4,7 +4,9 @@ import {
   ChevronLeft, ChevronRight, Phone, X
 } from 'lucide-react';
 import clsx from 'clsx';
+import { useQuery } from '@tanstack/react-query';
 import AdminFilter from '../common/AdminFilter';
+import { api } from '../../api/client';
 import { useAreaQuery } from '../../api/hooks';
 import { useStore } from '../../app/store';
 import { hasPermission } from '../../rbac/permissions';
@@ -17,7 +19,8 @@ const NAV = [
   { to: '/nguon-luc', label: 'Vật tư & Lực lượng', icon: Boxes, perm: ['resource', 'view'] },
   { to: '/canh-bao', label: 'Cảnh báo & Hotline', icon: Megaphone, perm: ['alert', 'view'] },
   { to: '/nguon-du-lieu', label: 'Nguồn dữ liệu & IoT', icon: DatabaseZap, perm: ['integration', 'view'] },
-  { to: '/nhap-du-lieu', label: 'Nhập dữ liệu', icon: FileUp, perm: ['data', 'import'] },
+  // Cấp tỉnh nhập thẳng + duyệt hồ sơ; xã/phường gửi dữ liệu chờ duyệt
+  { to: '/nhap-du-lieu', label: 'Nhập dữ liệu', icon: FileUp, perm: ['data', 'import'], alt: ['data', 'submit'], badgeKey: 'submissions' },
   { to: '/phan-quyen', label: 'Phân quyền', icon: KeyRound, perm: ['user', 'view'] },
 ];
 
@@ -28,9 +31,17 @@ export default function Sidebar() {
   const waiting = data?.sos?.waiting || 0;
   const canReports = hasPermission(perms, 'report', 'view');
   const { data: rep } = useAreaQuery('reports', '/reports', { status: 'cho_duyet', limit: 1 }, { enabled: canReports, refetchInterval: 60_000 });
-  const badges = { sos: waiting, reports: rep?.counts?.cho_duyet || 0 };
+  // Hồ sơ dữ liệu xã gửi chờ duyệt — chỉ đếm cho người có quyền duyệt (toàn tỉnh)
+  const canReview = hasPermission(perms, 'data', 'import', '*');
+  const { data: subs } = useQuery({
+    queryKey: ['submissions', 'cho_duyet', 'badge'],
+    queryFn: () => api('/data-import/submissions', { params: { status: 'cho_duyet', limit: 1 } }),
+    enabled: canReview,
+    refetchInterval: 60_000,
+  });
+  const badges = { sos: waiting, reports: rep?.counts?.cho_duyet || 0, submissions: canReview ? subs?.counts?.cho_duyet || 0 : 0 };
 
-  const navItems = NAV.filter((n) => hasPermission(perms, ...n.perm));
+  const navItems = NAV.filter((n) => hasPermission(perms, ...n.perm) || (n.alt && hasPermission(perms, ...n.alt)));
 
   const renderNavLinks = (isMobile = false) => (
     <div className="flex flex-col gap-1 px-2">
@@ -68,7 +79,7 @@ export default function Sidebar() {
                   <span
                     className={clsx(
                       'chip font-bold text-[10px] text-white',
-                      badgeKey === 'reports' ? 'bg-amber-600' : 'bg-danger animate-pulse',
+                      badgeKey === 'reports' || badgeKey === 'submissions' ? 'bg-amber-600' : 'bg-danger animate-pulse',
                       isCollapsed ? 'absolute right-1.5 top-1 px-1 py-0 min-w-4 text-center' : 'ml-auto'
                     )}
                   >

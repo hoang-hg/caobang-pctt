@@ -42,6 +42,7 @@ class Action(StrEnum):
     MANAGE = "manage"
     MODERATE = "moderate"
     IMPORT = "import"
+    SUBMIT = "submit"
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,7 +89,16 @@ ALL_PERMISSIONS: Final[tuple[Permission, ...]] = (
     Permission(R.INTEGRATION, A.VIEW, False, "Xem nguồn dữ liệu, thiết bị IoT, giám sát kết nối"),
     Permission(R.INTEGRATION, A.MANAGE, False, "Cấu hình nguồn dữ liệu, đăng ký thiết bị IoT, cấp khoá"),
     Permission(
-        R.DATA, A.IMPORT, False, "Nhập dữ liệu chính thức từ tệp (điểm sơ tán, vùng nguy hiểm, danh bạ…)"
+        R.DATA,
+        A.IMPORT,
+        False,
+        "Nhập dữ liệu chính thức từ tệp (điểm sơ tán, vùng nguy hiểm, danh bạ…); phê duyệt hồ sơ xã/phường gửi",
+    ),
+    Permission(
+        R.DATA,
+        A.SUBMIT,
+        True,
+        "Gửi dữ liệu của xã/phường (điểm sơ tán, danh bạ, lực lượng…) chờ cấp tỉnh phê duyệt",
     ),
 )
 
@@ -179,6 +189,7 @@ SYSTEM_ROLES: Final[tuple[tuple[str, str, str, bool, list[tuple[str, str]]], ...
             "user.manage",
             "report.view",
             "report.moderate",
+            "data.submit",  # dữ liệu của xã → cấp tỉnh duyệt rồi mới hiển thị
         ),
     ),
     (

@@ -2,7 +2,7 @@
 # CI — kiểm tra mỗi lần push / pull request
 #   backend  : ruff (format + lint) + pytest (kiểm thử đơn vị)
 #   frontend : ESLint (bắt lỗi: biến chưa khai báo, hook React, mã chết) + build production
-#   e2e      : dựng toàn bộ stack bằng Docker Compose (dữ liệu mẫu + mô phỏng), chạy 11 bộ kiểm thử API
+#   e2e      : dựng toàn bộ stack bằng Docker Compose (dữ liệu mẫu + mô phỏng), chạy 12 bộ kiểm thử API
 #   prod     : dựng docker-compose.prod.yml trên CSDL trống (không demo, không mô phỏng, bắt buộc 2 lớp), thử trọn luồng
 # ==========================================
 name: CI
@@ -133,6 +133,8 @@ jobs:
           node tests/e2e/landslide-test.mjs
       - name: Kiểm thử nhập dữ liệu (có bước thay toàn bộ — chạy sau các bộ dùng dữ liệu mẫu)
         run: node tests/e2e/import-test.mjs
+      - name: Kiểm thử xã/phường gửi dữ liệu → cấp tỉnh phê duyệt
+        run: node tests/e2e/submission-test.mjs
       - name: Kiểm thử bản nhẹ /ban-nhe & service worker (qua nginx của frontend)
         run: node tests/e2e/lite-test.mjs
       - name: Kiểm thử tự giám sát vận hành (/health/full, email cảnh báo sự cố)

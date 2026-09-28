@@ -3,6 +3,9 @@
 Hai bước: ``validate`` (không ghi gì — trả báo cáo lỗi theo dòng, số bản ghi thêm / cập nhật / xoá) rồi ``apply``
 (kiểm tra lại, ghi trong MỘT transaction có khoá theo loại dữ liệu — lỗi giữa chừng thì không ghi gì).
 Tên bảng / cột trong SQL chỉ lấy từ khai báo; mọi giá trị người dùng đi qua tham số bind.
+
+``scope`` (danh sách mã xã, ``None`` = toàn tỉnh): hồ sơ do xã/phường gửi — mọi bản ghi phải thuộc các xã này, đúng
+cấp (``SUBMITTABLE``), không ghi đè bản ghi của xã khác / cấp tỉnh; "thay toàn bộ" chỉ xoá trong các xã này.
 """
 
 from __future__ import annotations
@@ -11,6 +14,8 @@ import json
 import logging
 import re
 from dataclasses import dataclass, field
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import text
@@ -25,12 +30,13 @@ from app.services.data_import.parsing import (
     strip_accents,
     to_enum,
 )
-from app.services.data_import.specs import DATASETS, Dataset, Field
+from app.services.data_import.specs import DATASETS, SCOPED_REPLACE_EXTRA, SUBMITTABLE, Dataset, Field
 
 log = logging.getLogger(__name__)
 
 MAX_ISSUES = 300
 PREVIEW_ROWS = 20
+CHANGE_LIMIT = 300  # số dòng tối đa mỗi nhóm (thêm / sửa / xoá) trong bản xem trước cho người duyệt
 POINT_EXPR = "ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)"
 POLYGON_EXPR = "ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SetSRID(ST_GeomFromGeoJSON(:geom), 4326)), 3))"
 
@@ -49,7 +55,8 @@ class Prepared:
     lat: float | None = None
     lon: float | None = None
     geojson: str | None = None
-    ma_xa: str | None = None
+    ma_xa: str | None = None  # xã ghi vào admin_unit_id (theo tệp, trống = theo vị trí)
+    located_xa: str | None = None  # xã chứa vị trí / vùng (kiểm tra phạm vi hồ sơ của xã)
 
 
 @dataclass
@@ -245,7 +252,9 @@ def check_duplicates(ds: Dataset, rows: list[Prepared], report: Report) -> None:
 # ------------------------------------------------------------------ bước 2: kiểm tra với CSDL
 
 
-async def check_database(ds: Dataset, rows: list[Prepared], report: Report, replace: bool) -> None:
+async def check_database(
+    ds: Dataset, rows: list[Prepared], report: Report, replace: bool, scope: list[str] | None = None
+) -> None:
     await _check_communes(ds, rows, report)
     if ds.name == "xom":
         await _check_xom_codes(rows, report)
@@ -253,8 +262,13 @@ async def check_database(ds: Dataset, rows: list[Prepared], report: Report, repl
         await _check_points(ds, rows, report)
     elif ds.geometry == "polygon":
         await _check_polygons(ds, rows, report)
-    await _check_refs(ds, rows, report, replace)
-    await _count_changes(ds, rows, report, replace)
+    elif ds.admin_unit:  # không có vị trí (danh bạ): xã lấy theo cột ma_xa
+        for row in rows:
+            row.ma_xa = row.values.get("ma_xa")
+    await _check_refs(ds, rows, report, replace, scope)
+    if scope is not None:
+        await _check_scope(ds, rows, report, scope)
+    await _count_changes(ds, rows, report, replace, scope)
 
 
 async def _check_communes(ds: Dataset, rows: list[Prepared], report: Report) -> None:
@@ -345,6 +359,7 @@ async def _check_polygons(ds: Dataset, rows: list[Prepared], report: Report) -> 
 
 
 def _assign_commune(ds: Dataset, row: Prepared, nearest: str | None, report: Report) -> None:
+    row.located_xa = nearest
     if not ds.admin_unit:
         return
     given = row.values.get("ma_xa")
@@ -353,7 +368,9 @@ def _assign_commune(ds: Dataset, row: Prepared, nearest: str | None, report: Rep
     row.ma_xa = given or nearest
 
 
-async def _check_refs(ds: Dataset, rows: list[Prepared], report: Report, replace: bool) -> None:
+async def _check_refs(
+    ds: Dataset, rows: list[Prepared], report: Report, replace: bool, scope: list[str] | None = None
+) -> None:
     for ref in ds.refs:
         codes = {r.values[ref.field] for r in rows if r.values.get(ref.field)}
         if not codes:
@@ -371,12 +388,20 @@ async def _check_refs(ds: Dataset, rows: list[Prepared], report: Report, replace
         in_file = {r.values.get("ma") for r in rows}
         parents = {r.values["ma_cap_tren"] for r in rows if r.values.get("ma_cap_tren")}
         in_db = set()
-        if parents - in_file and not replace:
+        if parents - in_file:
             found = await fetch_all(
-                "SELECT code FROM communications.contacts WHERE code = ANY(:c)",
+                """SELECT c.code, c.level, u.code AS xa FROM communications.contacts c
+                     LEFT JOIN spatial_admin.administrative_units u ON u.id = c.admin_unit_id
+                    WHERE c.code = ANY(:c)""",
                 {"c": list(parents - in_file)},
             )
-            in_db = {r["code"] for r in found}
+            # Thay toàn bộ: dòng cấp trên không có trong tệp sẽ bị xoá — trừ khi nằm ngoài phần bị thay (hồ sơ của
+            # xã chỉ thay danh bạ cấp xã / thôn của xã mình → cấp trên là dòng cấp tỉnh / xã khác vẫn còn)
+            in_db = {
+                r["code"]
+                for r in found
+                if not replace or (scope is not None and (r["level"] == "tinh" or r["xa"] not in scope))
+            }
         for row in rows:
             parent = row.values.get("ma_cap_tren")
             if parent and parent == row.values.get("ma"):
@@ -384,6 +409,101 @@ async def _check_refs(ds: Dataset, rows: list[Prepared], report: Report, replace
             elif parent and parent not in in_file and parent not in in_db:
                 hint = " (chế độ thay toàn bộ: cấp trên phải có trong tệp)" if replace else ""
                 report.error(row.number, "ma_cap_tren", f"Không có dòng cấp trên mã {parent}{hint}")
+
+
+# Chủ sở hữu (xã, cấp) của bản ghi đã có cùng mã — hồ sơ của xã không được ghi đè bản ghi xã khác / cấp tỉnh
+_OWNER_SQL = {
+    "xom": """SELECT c.code AS k, p.code AS xa, 'xa' AS level FROM spatial_admin.administrative_units c
+                LEFT JOIN spatial_admin.administrative_units p ON p.id = c.parent_id WHERE c.code = ANY(:k)""",
+    "phuong_tien": """SELECT v.code AS k, u.code AS xa, f.level FROM resources.vehicles v
+                        LEFT JOIN resources.forces f ON f.id = v.force_id
+                        LEFT JOIN spatial_admin.administrative_units u ON u.id = f.admin_unit_id
+                       WHERE v.code = ANY(:k)""",
+}
+
+
+def _owner_sql(ds: Dataset) -> str | None:
+    if ds.name in _OWNER_SQL:
+        return _OWNER_SQL[ds.name]
+    if not ds.admin_unit:
+        return None
+    cap = ds.get_field("cap")
+    level = f"t.{cap.column}" if cap else "NULL"
+    return f"""SELECT t.{ds.key[0]} AS k, u.code AS xa, {level} AS level FROM {ds.table} t
+                 LEFT JOIN spatial_admin.administrative_units u ON u.id = t.admin_unit_id
+                WHERE t.{ds.key[0]} = ANY(:k)"""
+
+
+async def _check_scope(ds: Dataset, rows: list[Prepared], report: Report, scope: list[str]) -> None:
+    """Hồ sơ của xã/phường: loại dữ liệu được gửi, đúng cấp, mọi bản ghi (vị trí + mã xã) thuộc phạm vi người gửi,
+    tham chiếu (kho, lực lượng) là của xã mình, không ghi đè bản ghi đã có của xã khác / cấp tỉnh."""
+    rules = SUBMITTABLE.get(ds.name)
+    if rules is None:
+        report.error(0, None, f"{ds.label} do cấp tỉnh nhập — xã/phường không gửi được")
+        return
+    allowed = set(scope)
+    bad = {i.row for i in report.errors}
+    for row in rows:
+        if row.number in bad:
+            continue
+        v = row.values
+        for fld, ok in rules.items():
+            if v.get(fld) is not None and v[fld] not in ok:
+                report.error(row.number, fld, f"Xã/phường chỉ gửi {ds.label.lower()} cấp: {', '.join(ok)}")
+        own = v.get("ma_xa") if ds.name == "xom" else row.ma_xa
+        if ds.admin_unit or ds.name == "xom":
+            if not own:
+                report.error(row.number, "ma_xa", "Thiếu mã xã/phường — ghi mã xã bạn phụ trách")
+            elif own not in allowed:
+                report.error(row.number, "ma_xa", f"Xã {own} ngoài phạm vi bạn phụ trách")
+        if row.located_xa and row.located_xa not in allowed:
+            report.error(
+                row.number,
+                "geometry" if ds.geometry == "polygon" else "vi_do",
+                f"Vị trí thuộc {row.located_xa} — ngoài phạm vi bạn phụ trách",
+            )
+    # Tham chiếu phải là của xã mình, cấp xã: tồn kho → kho, phương tiện → lực lượng quản lý
+    for ref_field, table, label in (
+        ("ma_kho", "resources.warehouses", "Kho"),
+        ("ma_luc_luong", "resources.forces", "Lực lượng"),
+    ):
+        if not ds.get_field(ref_field):
+            continue
+        codes = {r.values[ref_field] for r in rows if r.values.get(ref_field)}
+        found = await fetch_all(
+            f"""SELECT t.code, t.level, u.code AS xa FROM {table} t
+                  LEFT JOIN spatial_admin.administrative_units u ON u.id = t.admin_unit_id
+                 WHERE t.code = ANY(:c)""",
+            {"c": list(codes)},
+        )
+        owner = {r["code"]: r for r in found}
+        for row in rows:
+            code = row.values.get(ref_field)
+            if not code:
+                report.error(row.number, ref_field, f"Ghi mã {label.lower()} cấp xã của xã bạn phụ trách")
+            elif code in owner and (owner[code]["level"] != "xa" or owner[code]["xa"] not in allowed):
+                report.error(
+                    row.number,
+                    ref_field,
+                    f"{label} {code} không phải {label.lower()} cấp xã thuộc phạm vi bạn phụ trách",
+                )
+    sql = _owner_sql(ds)
+    if sql:
+        keys = [key_of(ds, r)[0] for r in rows if key_of(ds, r)[0] is not None]
+        existing = {r["k"]: r for r in await fetch_all(sql, {"k": keys})}
+        for row in rows:
+            old = existing.get(key_of(ds, row)[0])
+            if old is None:
+                continue
+            level_ok = not rules.get("cap") or old["level"] in rules["cap"]
+            if ds.name == "phuong_tien":
+                level_ok = old["level"] == "xa"
+            if old["xa"] not in allowed or not level_ok:
+                report.error(
+                    row.number,
+                    ds.fields[0].name,
+                    f"Mã {key_of(ds, row)[0]} đã có và thuộc {old['xa'] or 'cấp tỉnh'} — không sửa được, dùng mã khác",
+                )
 
 
 async def _existing_keys(ds: Dataset, rows: list[Prepared]) -> set[tuple]:
@@ -401,18 +521,30 @@ async def _existing_keys(ds: Dataset, rows: list[Prepared]) -> set[tuple]:
     return {(r["k"],) for r in found}
 
 
-def _replace_filter(ds: Dataset, rows: list[Prepared]) -> tuple[str, dict]:
-    """Điều kiện chọn bản ghi bị xoá khi thay toàn bộ: không có trong tệp + replace_scope (+ replace_within)."""
+def _replace_filter(ds: Dataset, rows: list[Prepared], scope: list[str] | None = None) -> tuple[str, dict]:
+    """Điều kiện chọn bản ghi bị xoá khi thay toàn bộ: không có trong tệp + replace_scope (+ replace_within)
+    (+ hồ sơ của xã: chỉ bản ghi thuộc các xã trong ``scope``)."""
     cond = f"({ds.key[0]} IS NULL OR NOT ({ds.key[0]} = ANY(:k))) AND {ds.replace_scope}"
     params: dict[str, Any] = {"k": [key_of(ds, r)[0] for r in rows]}
     if ds.replace_within:
         fld, sql = ds.replace_within
         cond += f" AND {sql}"
         params["within"] = sorted({r.values[fld] for r in rows if r.values.get(fld)})
+    if scope is not None:
+        owner = "admin_unit_id" if ds.admin_unit else "parent_id" if ds.name == "xom" else None
+        if owner is None:  # không biết bản ghi thuộc xã nào → không cho xã xoá gì
+            cond += " AND FALSE"
+        else:
+            cond += f" AND {owner} IN (SELECT id FROM spatial_admin.administrative_units WHERE code = ANY(:scope))"
+            params["scope"] = list(scope)
+        if ds.name in SCOPED_REPLACE_EXTRA:
+            cond += f" AND {SCOPED_REPLACE_EXTRA[ds.name]}"
     return cond, params
 
 
-async def _count_changes(ds: Dataset, rows: list[Prepared], report: Report, replace: bool) -> None:
+async def _count_changes(
+    ds: Dataset, rows: list[Prepared], report: Report, replace: bool, scope: list[str] | None = None
+) -> None:
     existing = await _existing_keys(ds, rows)
     bad = {i.row for i in report.errors}
     for row in rows:
@@ -426,7 +558,7 @@ async def _count_changes(ds: Dataset, rows: list[Prepared], report: Report, repl
         else:
             report.creates += 1
     if replace:
-        cond, params = _replace_filter(ds, rows)
+        cond, params = _replace_filter(ds, rows, scope)
         res = await fetch_one(f"SELECT count(*) AS n FROM {ds.table} WHERE {cond}", params)
         report.deletes = res["n"]
 
@@ -534,56 +666,189 @@ async def _update_commune(conn, row: Prepared) -> None:
     )
 
 
-async def apply_rows(ds: Dataset, rows: list[Prepared], replace: bool) -> dict:
-    created = updated = deleted = 0
-    async with engine.begin() as conn:
-        # Hai lần nhập cùng loại dữ liệu cùng lúc → lần sau chờ lần trước xong
-        await conn.execute(
-            text("SELECT pg_advisory_xact_lock(hashtext(:k))"), {"k": f"data_import:{ds.name}"}
-        )
-        # Tệp lớn (20.000 dòng, ranh giới xã + gán lại xã cho mọi đối tượng) có thể quá giới hạn 30 s của tiến trình API
-        await conn.execute(text("SET LOCAL statement_timeout = '10min'"))
-        for row in rows:
-            if ds.update_only:
-                await _update_commune(conn, row)
-                updated += 1
-            elif await _upsert(conn, ds, row):
-                created += 1
-            else:
-                updated += 1
-        if ds.name == "danh_ba":
-            await conn.execute(
-                text(
-                    """UPDATE communications.contacts c SET parent_id = p.id
-                         FROM unnest(CAST(:codes AS text[]), CAST(:parents AS text[])) AS t(code, parent)
-                         LEFT JOIN communications.contacts p ON p.code = t.parent
-                        WHERE c.code = t.code"""
-                ),
-                {
-                    "codes": [r.values["ma"] for r in rows],
-                    "parents": [r.values.get("ma_cap_tren") for r in rows],
-                },
-            )
-        if replace:
-            cond, params = _replace_filter(ds, rows)
-            res = await conn.execute(text(f"DELETE FROM {ds.table} WHERE {cond}"), params)
-            deleted = res.rowcount
-        if ds.name == "ranh_gioi_xa":
-            from app.seed import (
-                reconcile_admin_units,
-            )  # ranh giới đổi → gán lại xã cho mọi đối tượng theo vị trí
+async def apply_rows(
+    ds: Dataset, rows: list[Prepared], replace: bool, scope: list[str] | None = None, conn=None
+) -> dict:
+    """Ghi trong MỘT transaction. ``conn``: transaction của nơi gọi (phê duyệt hồ sơ: ghi dữ liệu + đổi trạng thái hồ
+    sơ cùng lúc); không truyền → tự mở."""
+    if conn is None:
+        async with engine.begin() as own:
+            return await _apply_rows(own, ds, rows, replace, scope)
+    return await _apply_rows(conn, ds, rows, replace, scope)
 
-            await reconcile_admin_units(conn)
+
+async def _apply_rows(
+    conn, ds: Dataset, rows: list[Prepared], replace: bool, scope: list[str] | None
+) -> dict:
+    created = updated = deleted = 0
+    # Hai lần nhập cùng loại dữ liệu cùng lúc → lần sau chờ lần trước xong
+    await conn.execute(text("SELECT pg_advisory_xact_lock(hashtext(:k))"), {"k": f"data_import:{ds.name}"})
+    # Tệp lớn (20.000 dòng, ranh giới xã + gán lại xã cho mọi đối tượng) có thể quá giới hạn 30 s của tiến trình API
+    await conn.execute(text("SET LOCAL statement_timeout = '10min'"))
+    for row in rows:
+        if ds.update_only:
+            await _update_commune(conn, row)
+            updated += 1
+        elif await _upsert(conn, ds, row):
+            created += 1
+        else:
+            updated += 1
+    if ds.name == "danh_ba":
+        await conn.execute(
+            text(
+                """UPDATE communications.contacts c SET parent_id = p.id
+                     FROM unnest(CAST(:codes AS text[]), CAST(:parents AS text[])) AS t(code, parent)
+                     LEFT JOIN communications.contacts p ON p.code = t.parent
+                    WHERE c.code = t.code"""
+            ),
+            {
+                "codes": [r.values["ma"] for r in rows],
+                "parents": [r.values.get("ma_cap_tren") for r in rows],
+            },
+        )
+    if replace:
+        cond, params = _replace_filter(ds, rows, scope)
+        res = await conn.execute(text(f"DELETE FROM {ds.table} WHERE {cond}"), params)
+        deleted = res.rowcount
+    if ds.name == "ranh_gioi_xa":
+        from app.seed import (
+            reconcile_admin_units,
+        )  # ranh giới đổi → gán lại xã cho mọi đối tượng theo vị trí
+
+        await reconcile_admin_units(conn)
     return {"created": created, "updated": updated, "deleted": deleted}
+
+
+# ------------------------------------------------------------------ xem trước thay đổi (người duyệt hồ sơ)
+
+
+def _plain(value: Any) -> Any:
+    if isinstance(value, datetime | date):
+        return value.isoformat()
+    if isinstance(value, Decimal):
+        return float(value)
+    return value
+
+
+def _same(old: Any, new: Any) -> bool:
+    if isinstance(old, int | float) and isinstance(new, int | float) and not isinstance(old, bool):
+        return abs(float(old) - float(new)) < 1e-9
+    if isinstance(old, list | tuple) or isinstance(new, list | tuple):
+        return list(old or []) == list(new or [])
+    return old == new
+
+
+async def _existing_values(ds: Dataset, rows: list[Prepared]) -> dict[tuple, dict]:
+    """Giá trị hiện có của các bản ghi cùng mã, theo tên trường trong tệp (+ _lat/_lon của vị trí)."""
+    if ds.table == "resources.inventory":
+        found = await fetch_all(
+            """SELECT w.code AS _a, i.item_code AS _b, i.quantity AS so_luong, i.safety_quota AS dinh_muc,
+                      i.expiry_date AS han_su_dung
+                 FROM resources.inventory i JOIN resources.warehouses w ON w.id = i.warehouse_id
+                WHERE (w.code, i.item_code) IN (SELECT * FROM unnest(CAST(:a AS text[]), CAST(:b AS text[])))""",
+            {"a": [r.values.get("ma_kho") for r in rows], "b": [r.values.get("ma_vat_tu") for r in rows]},
+        )
+        return {(r.pop("_a"), r.pop("_b")): r for r in found}
+    skip = set(ds.insert_only) | set(ds.fixed_insert) | set(ds.key)
+    cols = [f"t.{f.column} AS {f.name}" for f in ds.fields if f.column and f.column not in skip]
+    for ref in ds.refs:  # mã tham chiếu (xã của xóm, lực lượng của phương tiện)
+        cols.append(
+            f"(SELECT r.{ref.key} FROM {ref.table} r WHERE r.{ref.value} = t.{ref.column}) AS {ref.field}"
+        )
+    if ds.admin_unit:
+        cols.append(
+            "(SELECT u.code FROM spatial_admin.administrative_units u WHERE u.id = t.admin_unit_id) AS ma_xa"
+        )
+    if ds.name == "danh_ba":
+        cols.append("(SELECT p.code FROM communications.contacts p WHERE p.id = t.parent_id) AS ma_cap_tren")
+    if ds.geometry == "point" and ds.geometry_columns[0] not in ds.insert_only:
+        g = ds.geometry_columns[0]
+        cols += [f"ST_Y(t.{g}) AS _lat", f"ST_X(t.{g}) AS _lon"]
+    key = ds.key[0]
+    keys = [key_of(ds, r)[0] for r in rows if key_of(ds, r)[0] is not None]
+    found = await fetch_all(
+        f"SELECT t.{key} AS _k, {', '.join(cols)} FROM {ds.table} t WHERE t.{key} = ANY(:k)", {"k": keys}
+    )
+    return {(r.pop("_k"),): r for r in found}
+
+
+async def describe_changes(
+    ds: Dataset, rows: list[Prepared], replace: bool = False, scope: list[str] | None = None
+) -> dict:
+    """Những gì sẽ ghi, để người duyệt xem trước: thêm mới, sửa (giá trị cũ → mới), xoá — kèm vị trí / vùng."""
+    existing = await _existing_values(ds, rows)
+    labels = {f.name: f.label for f in ds.fields}
+    dates = {f.name for f in ds.fields if f.kind == "date"}  # tệp ghi ngày, CSDL có thể lưu timestamptz
+    creates, updates = [], []
+    for row in rows:
+        key = key_of(ds, row)
+        item: dict[str, Any] = {
+            "dong": row.number,
+            "ma": " / ".join(str(k) for k in key),
+            "ten": row.values.get("ten") or row.values.get("ho_ten") or row.values.get("ma_vat_tu"),
+            "ma_xa": row.ma_xa or row.values.get("ma_xa"),
+            "lat": row.lat,
+            "lon": row.lon,
+        }
+        if row.geojson:
+            item["geometry"] = json.loads(row.geojson)
+        old = existing.get(key)
+        if old is None:
+            creates.append(item)
+            continue
+        changes = []
+        for name, prev in old.items():
+            if name.startswith("_"):
+                continue
+            new = _plain(row.values.get(name) if name != "ma_xa" else item["ma_xa"])
+            prev = _plain(prev)
+            if name in dates:
+                new, prev = (str(v)[:10] if v is not None else None for v in (new, prev))
+            if not _same(prev, new):
+                changes.append({"field": name, "label": labels.get(name, name), "old": prev, "new": new})
+        if old.get("_lat") is not None and row.lat is not None:
+            if abs(old["_lat"] - row.lat) > 1e-5 or abs(old["_lon"] - row.lon) > 1e-5:
+                changes.append(
+                    {
+                        "field": "vi_tri",
+                        "label": "Vị trí",
+                        "old": f"{old['_lat']:.5f}, {old['_lon']:.5f}",
+                        "new": f"{row.lat:.5f}, {row.lon:.5f}",
+                    }
+                )
+        if ds.geometry == "polygon":
+            changes.append(
+                {"field": "geometry", "label": "Hình học vùng", "old": "(vùng cũ)", "new": "(vùng mới)"}
+            )
+        item["changes"] = changes
+        updates.append(item)
+    deletes: list[dict] = []
+    if replace:
+        cond, params = _replace_filter(ds, rows, scope)
+        name_fld = ds.get_field("ten") or ds.get_field("ho_ten")
+        name_col = name_fld.column if name_fld else ds.key[0]
+        deletes = await fetch_all(
+            f"SELECT {ds.key[0]} AS ma, {name_col} AS ten FROM {ds.table} WHERE {cond} ORDER BY 1 LIMIT {CHANGE_LIMIT}",
+            params,
+        )
+    return {
+        "creates": creates[:CHANGE_LIMIT],
+        "updates": updates[:CHANGE_LIMIT],
+        "deletes": deletes,
+        "unchanged": sum(1 for u in updates if not u["changes"]),
+        "truncated": len(creates) > CHANGE_LIMIT or len(updates) > CHANGE_LIMIT,
+    }
 
 
 # ------------------------------------------------------------------ điểm vào
 
 
 async def validate(
-    name: str, filename: str, data: bytes, replace: bool = False
+    name: str, filename: str, data: bytes, replace: bool = False, scope: list[str] | None = None
 ) -> tuple[Report, list[Prepared]]:
     ds = get_dataset(name)
+    if scope is not None and ds.name not in SUBMITTABLE:
+        raise ImportFileError(f"{ds.label} do cấp tỉnh nhập — xã/phường không gửi được")
     if replace and not ds.replaceable:
         raise ImportFileError(f"{ds.label} không hỗ trợ chế độ thay toàn bộ")
     if ds.geometry == "polygon" and not filename.lower().endswith((".geojson", ".json")):
@@ -592,7 +857,7 @@ async def validate(
     report = Report(ds.name, total=len(rows))
     prepared = convert_rows(ds, rows, report)
     check_duplicates(ds, prepared, report)
-    await check_database(ds, prepared, report, replace)
+    await check_database(ds, prepared, report, replace, scope)
     report.preview = _preview(ds, prepared)
     return report, prepared
 

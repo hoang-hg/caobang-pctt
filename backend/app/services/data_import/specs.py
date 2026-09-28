@@ -515,3 +515,20 @@ DATASETS: dict[str, Dataset] = {
         ),
     )
 }
+
+# Loại dữ liệu xã/phường được GỬI (quyền data.submit) → chờ cấp tỉnh (data.import) phê duyệt rồi mới ghi / hiển thị.
+# Giá trị: giới hạn cấp {trường: các giá trị được phép} — VD xã chỉ gửi danh bạ cấp xã / thôn, kho & lực lượng cấp xã.
+# Loại không có ở đây (ranh giới xã, trạm quan trắc, hồ chứa, cây xăng) chỉ cấp tỉnh nhập.
+SUBMITTABLE: dict[str, dict[str, tuple[str, ...]]] = {
+    "xom": {},
+    "diem_so_tan": {},
+    "vung_nguy_hiem": {},
+    "diem_nguy_hiem": {},
+    "danh_ba": {"cap": ("xa", "thon")},
+    "kho": {"cap": ("xa",)},
+    "ton_kho": {},
+    "luc_luong": {"cap": ("xa",)},
+    "phuong_tien": {},
+}
+# Xã gửi "thay toàn bộ": chỉ xoá bản ghi thuộc xã mình, thêm điều kiện riêng (SQL tĩnh) từng loại
+SCOPED_REPLACE_EXTRA: dict[str, str] = {"danh_ba": "level IN ('xa', 'thon')"}
