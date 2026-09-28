@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { MapContainer, Marker, useMap, useMapEvents } from 'react-leaflet';
 import {
@@ -10,6 +10,8 @@ import Turnstile from '../../components/common/Turnstile';
 import { BaseLayer } from '../../components/map/MapTools';
 import { pinIcon } from '../../components/map/icons';
 import { api } from '../../api/client';
+import { useUnits, useUnitsGeo } from '../../api/hooks';
+import { communeAt } from '../../utils/geo';
 import clsx from 'clsx';
 
 const MAX_PHOTOS = 3;
@@ -30,8 +32,25 @@ function Picker({ value, onChange }) {
 /** Người dân gửi phản ánh hiện trường kèm ảnh — hiển thị công khai sau khi cán bộ xác minh. */
 export default function ReportForm({ onClose, myLocation, onTrack }) {
   const { data: categories = [] } = useQuery({ queryKey: ['pub-cats'], queryFn: () => api('/public/report-categories'), staleTime: Infinity });
-  const [f, setF] = useState({ category: 'ngap', description: '', address: '', reporter_name: '', reporter_phone: '', website: '' });
+  const [f, setF] = useState({ category: 'ngap', description: '', address: '', hamlet: '', reporter_name: '', reporter_phone: '', website: '' });
   const [pos, setPos] = useState(myLocation ? { lat: myLocation.lat, lon: myLocation.lon } : null);
+  // Xã / phường: tự xác định theo điểm đã chấm (ranh giới xã đã tải sẵn, không gọi máy chủ); người dân đổi được
+  const { data: geo } = useUnitsGeo();
+  const { data: units = [] } = useUnits();
+  const communes = useMemo(() => [...units].sort((a, b) => a.name.localeCompare(b.name, 'vi')), [units]);
+  const [xa, setXa] = useState('');
+  const [xaManual, setXaManual] = useState(false);
+  useEffect(() => {
+    if (pos && geo && !xaManual) setXa(communeAt(geo, pos.lat, pos.lon) || '');
+  }, [pos, geo, xaManual]);
+  useEffect(() => setF((x) => (x.hamlet ? { ...x, hamlet: '' } : x)), [xa]); // đổi xã → chọn lại xóm
+  // Tên xóm / tổ dân phố mới của xã (nhập bằng công cụ "Xóm / tổ dân phố")
+  const { data: hamlets = [] } = useQuery({
+    queryKey: ['pub-hamlets', xa],
+    queryFn: () => api('/public/hamlets', { params: { xa } }),
+    enabled: !!xa,
+    staleTime: 10 * 60_000,
+  });
   const [files, setFiles] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -349,6 +368,34 @@ export default function ReportForm({ onClose, myLocation, onTrack }) {
           <div className="rounded-xl bg-panel2/70 p-2.5 text-xs text-muted flex items-start gap-2 border border-line/60">
             <AlertCircle size={15} className="text-accent shrink-0 mt-0.5" />
             <span>Hãy chấm đúng điểm xảy ra ngập hoặc sạt trượt trên bản đồ. Điều này giúp lực lượng cứu hộ và cán bộ địa bàn định vị chính xác nhất.</span>
+          </div>
+
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div>
+              <label className="block text-xs font-semibold uppercase text-muted mb-1">Xã / phường</label>
+              <select
+                className="input"
+                value={xa}
+                onChange={(e) => { setXa(e.target.value); setXaManual(true); }}
+              >
+                <option value="">— Chọn xã / phường —</option>
+                {communes.map((u) => (
+                  <option key={u.code} value={u.code}>{u.unit_type === 'phuong' ? 'Phường' : 'Xã'} {u.name}</option>
+                ))}
+              </select>
+              {xa && !xaManual && <div className="mt-1 text-[11px] text-muted">Tự xác định theo điểm đã chấm — sai thì chọn lại</div>}
+            </div>
+            <div>
+              <label className="block text-xs font-semibold uppercase text-muted mb-1">Xóm / tổ dân phố (tuỳ chọn)</label>
+              <select className="input" value={f.hamlet} onChange={set('hamlet')} disabled={!xa || !hamlets.length}>
+                <option value="">
+                  {!xa ? '— Chọn xã / phường trước —' : hamlets.length ? '— Không rõ / không có trong danh sách —' : 'Xã chưa có danh sách xóm'}
+                </option>
+                {hamlets.map((h) => (
+                  <option key={h.code} value={h.code}>{h.name}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {!valid && (

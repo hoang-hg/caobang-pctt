@@ -74,8 +74,16 @@ function reportForm({ lat, lon, desc = 'Nước ngập qua đường liên thôn
 check('Honeypot (bot điền trường ẩn) → 400', (await call('POST', '/public/reports', reportForm({ ...COBA, extra: { website: 'http://spam' } }))).status === 400);
 check('Tệp không phải ảnh → 422', (await call('POST', '/public/reports', reportForm({ ...COBA, photos: [Buffer.from('<?php echo 1; ?>')] }))).status === 422);
 check('Vị trí ngoài tỉnh → 422', (await call('POST', '/public/reports', reportForm({ lat: 21.02, lon: 105.85 }))).status === 422);
-const sub = await call('POST', '/public/reports', reportForm(COBA));
-check('Người dân gửi phản ánh kèm ảnh', sub.status === 201 && sub.data.photos === 1, sub.data?.code);
+// Xóm / tổ dân phố người dân chọn (danh sách nhập bằng loại "xom"; dữ liệu mẫu: Thôn Bản Ngắn – Hòa An)
+const hamletList = await call('GET', '/public/hamlets?xa=CB-HOAAN');
+const hamlet = hamletList.data?.find((h) => h.name.includes('Bản Ngắn'));
+check('Danh sách xóm của xã (công khai, không cần đăng nhập)', hamletList.status === 200 && !!hamlet,
+  (hamletList.data || []).map((h) => h.name).join(', '));
+check('Xã không tồn tại → 404', (await call('GET', '/public/hamlets?xa=CB-KHONGCO')).status === 404);
+check('Mã xóm không có trong danh sách → 422',
+  (await call('POST', '/public/reports', reportForm({ ...COBA, extra: { hamlet: 'CB-HOAAN-KHONGCO' } }))).status === 422);
+const sub = await call('POST', '/public/reports', reportForm({ ...COBA, extra: { hamlet: hamlet?.code || '' } }));
+check('Người dân gửi phản ánh kèm ảnh + xóm', sub.status === 201 && sub.data.photos === 1, sub.data?.code);
 const subTp = await call('POST', '/public/reports', reportForm({ ...TP, desc: 'Cây đổ chắn ngang đường trong nội thị' }));
 
 let pub = (await call('GET', '/public/reports')).data;
@@ -94,6 +102,7 @@ const cobaList = (await call('GET', '/reports?status=cho_duyet', null, T.coba)).
 check('Quản trị xã chỉ thấy phản ánh trong xã Cô Ba', cobaList.items.some((r) => r.code === sub.data.code) && cobaList.items.every((r) => r.admin_code === 'CB-COBA'));
 const item = cobaList.items.find((r) => r.code === sub.data.code);
 check('Cán bộ thấy SĐT người gửi (riêng tư)', item.reporter_phone === '0999 555 666');
+check('Cán bộ thấy xóm người dân chọn (kèm xã)', item.hamlet_name === 'Thôn Bản Ngắn, xã Hòa An', item.hamlet_name);
 const img = await fetch(ROOT + item.photo_urls[0].thumb);
 check('Link ảnh có chữ ký cho cán bộ', img.status === 200 && img.headers.get('content-type') === 'image/jpeg');
 // đổi ký tự đầu của chữ ký thành ký tự KHÁC (ký tự đầu vốn là '0' thì thay '0' không đổi gì → kiểm thử chập chờn)

@@ -110,9 +110,9 @@ DATASETS: dict[str, Dataset] = {
         Dataset(
             "xom",
             "Xóm / tổ dân phố",
-            "Xóm, tổ dân phố theo nghị quyết sắp xếp của HĐND từng xã / phường — dùng cho tìm kiếm địa danh và nhận "
-            "biết xóm trong tin nhắn SOS. Sau sáp nhập: chọn “Thay toàn bộ” → xóm cũ của các xã CÓ trong tệp bị xoá, "
-            "xã khác giữ nguyên. Mã trống = tự sinh theo mã xã + tên (không phân biệt “Xóm” / “Thôn” đứng trước).",
+            "Tên xóm, tổ dân phố theo nghị quyết sắp xếp của HĐND từng xã / phường — người dân chọn khi gửi phản ánh; "
+            "dùng cho tìm kiếm và nhận biết xóm trong tin nhắn SOS. Không cần toạ độ. Sau sáp nhập: chọn “Thay toàn "
+            "bộ” → xóm cũ của các xã CÓ trong tệp bị xoá, xã khác giữ nguyên. Mã trống = tự sinh theo mã xã + tên.",
             "spatial_admin.administrative_units",
             ("code",),
             (
@@ -130,22 +130,7 @@ DATASETS: dict[str, Dataset] = {
                 ),
                 Field("dan_so", "Dân số", "population", "int", min=0, example="320"),
                 Field("so_ho", "Số hộ", "households", "int", min=0, example="80"),
-                Field(
-                    "vi_do", "Vĩ độ trung tâm xóm (tuỳ chọn)", None, "float", min=20, max=25, example="22.505"
-                ),
-                Field(
-                    "kinh_do",
-                    "Kinh độ trung tâm xóm (tuỳ chọn)",
-                    None,
-                    "float",
-                    min=103,
-                    max=108,
-                    example="106.572",
-                ),
             ),
-            geometry="point",
-            geometry_columns=("center",),
-            geometry_required=False,
             refs=(Ref("ma_xa", "parent_id", "spatial_admin.administrative_units", where="level = 'xa'"),),
             fixed={"level": "thon"},
             conflict_where="spatial_admin.administrative_units.level = 'thon'",

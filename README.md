@@ -123,7 +123,7 @@ hình và cổng công khai cập nhật ngay).
 | Loại (mã) | Bảng | Định dạng | Khoá | Thay toàn bộ |
 |---|---|---|---|---|
 | Ranh giới xã/phường (`ranh_gioi_xa`) | `administrative_units` | GeoJSON vùng | mã xã có sẵn — chỉ cập nhật | — |
-| Xóm / tổ dân phố (`xom`) | `administrative_units` (cấp thôn) | CSV / Excel / GeoJSON điểm | `ma` — trống = tự sinh `<mã xã>-<tên>` | ✓ chỉ xóm của các xã có trong tệp |
+| Xóm / tổ dân phố (`xom`) | `administrative_units` (cấp thôn) | CSV / Excel | `ma` — trống = tự sinh `<mã xã>-<tên>` | ✓ chỉ xóm của các xã có trong tệp |
 | Điểm sơ tán (`diem_so_tan`) 🌐 | `evacuation_sites` | CSV / Excel / GeoJSON điểm | `ma` | ✓ |
 | Vùng nguy hiểm (`vung_nguy_hiem`) 🌐 | `hazard_zones` | GeoJSON vùng | `ma` | ✓ (không xoá vùng do cảm biến tạo) |
 | Điểm nguy hiểm (`diem_nguy_hiem`) 🌐 | `hazard_points` | CSV / Excel / GeoJSON điểm | `ma` | ✓ |
@@ -149,10 +149,10 @@ hình và cổng công khai cập nhật ngay).
 - **Thay toàn bộ** xoá mọi bản ghi của bảng không có trong tệp (kể cả dữ liệu mẫu) — giao diện báo trước số bản ghi sẽ
   xoá và bắt buộc tích xác nhận. Chỉ có ở bảng không bị bảng khác tham chiếu.
 - **Xóm / tổ dân phố** (sau sắp xếp theo nghị quyết HĐND từng xã, 2026): mỗi xã một tệp hoặc gộp nhiều xã; cột bắt buộc
-  `ma_xa`, `ten` ("Xóm Nà Pò" hay "Nà Pò" đều được — cùng mã). Chọn **Thay toàn bộ** để bỏ xóm cũ đã sáp nhập: chỉ
-  xoá xóm của các xã **có trong tệp**. Toạ độ tuỳ chọn (có thì cảnh báo nếu rơi sang xã khác). Dùng cho tìm kiếm địa
-  danh và nhận biết xóm trong tin SOS (tên xóm trùng ở nhiều xã: tin phải nhắc cả xã mới gán đúng xóm). Hiện có 8 xóm
-  **mẫu** — thay bằng danh sách chính thức lấy từ UBND các xã / Sở Nội vụ.
+  `ma_xa`, `ten` ("Xóm Nà Pò" hay "Nà Pò" đều được — cùng mã); không cần toạ độ. Chọn **Thay toàn bộ** để bỏ xóm cũ
+  đã sáp nhập: chỉ xoá xóm của các xã **có trong tệp**. Dùng cho: người dân **chọn xóm khi gửi phản ánh** (danh sách
+  theo xã, [9](#cong-cong-khai)), tìm kiếm địa danh, nhận biết xóm trong tin SOS (tên xóm trùng ở nhiều xã: tin phải
+  nhắc cả xã mới gán đúng xóm). Hiện có 8 xóm **mẫu** — thay bằng danh sách chính thức lấy từ UBND các xã / Sở Nội vụ.
 - Thứ tự khi nhập lần đầu: ranh giới xã → xóm → kho → tồn kho → lực lượng → phương tiện → phần còn lại.
 
 Dòng lệnh (tệp lớn, người vận hành máy chủ):
@@ -824,7 +824,8 @@ MISS / HIT / STALE) — lúc cao điểm, số yêu cầu vào backend gần nh�
 | `GET /lite?xa=` (nginx: `/ban-nhe`) | Trang bản nhẹ HTML < 50 KB ([9.4](#ban-nhe)) | 30 s, xoá khi phát cảnh báo |
 | `GET /reports`, `/reports/{id}/photos/{idx}` | Phản ánh **đã duyệt** + ảnh | 30 s |
 | `GET /report-categories`, `/config` | Loại sự việc; cấu hình công khai (khoá site Turnstile) | – |
-| `POST /reports` | Gửi phản ánh (multipart, ≤ 3 ảnh × 8 MB) | – |
+| `GET /hamlets?xa=` | Xóm / tổ dân phố của 1 xã (người dân chọn khi gửi phản ánh) | 1 giờ, xoá khi nhập xóm |
+| `POST /reports` | Gửi phản ánh (multipart, ≤ 3 ảnh × 8 MB; `hamlet` = mã xóm, tuỳ chọn) | – |
 | `POST /track` `{code, phone}` | Tra cứu tiến độ phiếu (POST để SĐT không nằm trên URL / log) | – |
 
 **Không bao giờ trả ra công khai**: vị trí, quân số lực lượng, kho, phương tiện; nội dung / toạ độ / SĐT trong phiếu SOS;
@@ -858,6 +859,10 @@ chặn bằng khoá phụ (SĐT) và Turnstile.
 
 ### 9.3. Phản ánh: chống spam & xử lý ảnh
 
+- Vị trí: người dân chấm điểm trên bản đồ; **xã/phường** tự xác định theo điểm chấm (ranh giới xã tải sẵn, tính trên
+  trình duyệt) và đổi được; **xóm / tổ dân phố** chọn từ danh sách tên xóm mới của xã (`GET /public/hamlets`, nhập ở
+  2.4) hoặc "không rõ". Lưu **tên** xóm kèm xã tại thời điểm gửi (`citizen_reports.hamlet_name`) → xóm sau này sáp nhập /
+  đổi tên, phản ánh cũ vẫn đúng. Xã dùng để phân quyền duyệt vẫn lấy theo vị trí điểm chấm.
 - Chống spam: honeypot, giới hạn tần suất, vị trí phải trong tỉnh, chỉ JPEG/PNG/WebP, **Cloudflare Turnstile** (đặt cả
   `TURNSTILE_SITE_KEY` và `TURNSTILE_SECRET` → form hiện ô xác minh, không cần build lại giao diện). Backend không gọi
   được Cloudflare (mất kết nối quốc tế) → cho qua và ghi cảnh báo, để người dân vẫn gửi được lúc thiên tai; trình duyệt

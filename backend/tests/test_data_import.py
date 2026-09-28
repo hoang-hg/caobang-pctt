@@ -8,7 +8,7 @@ import pytest
 from openpyxl import Workbook
 
 from app.services.data_import import parsing
-from app.services.data_import.engine import Report, check_duplicates, convert_rows, xom_code
+from app.services.data_import.engine import Report, check_duplicates, convert_rows, xom_code, xom_sort_key
 from app.services.data_import.parsing import ImportFileError, norm_key, read_file
 from app.services.data_import.specs import DATASETS
 from app.services.data_import.templates import template
@@ -124,6 +124,18 @@ def test_xom_code_ignores_type_prefix_and_accents():
     assert xom_code("CB-THUCPHAN", "Tổ dân phố 3") == xom_code("CB-THUCPHAN", "Tổ 3") == "CB-THUCPHAN-3"
     assert xom_code("CB-HOAAN", "Bản Ngắn") == "CB-HOAAN-BANNGAN"  # "Bản" là một phần tên riêng, giữ lại
     assert xom_code("CB-DAMTHUY", "Xóm Đông Đuốc") == "CB-DAMTHUY-DONGDUOC"
+
+
+def test_xom_sort_key_orders_like_people_read():
+    names = ["Xóm Đại Tiến 2", "Tổ dân phố 10", "Xóm An Bình", "Tổ 2", "Xóm Đại Tiến 1", "Xóm Bản Sẩy"]
+    assert sorted(names, key=xom_sort_key) == [
+        "Tổ 2",
+        "Tổ dân phố 10",
+        "Xóm An Bình",
+        "Xóm Bản Sẩy",
+        "Xóm Đại Tiến 1",
+        "Xóm Đại Tiến 2",
+    ]
 
 
 def test_xom_rows_derive_code_and_catch_duplicate_names():

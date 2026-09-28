@@ -22,7 +22,7 @@ from app.ws.hub import hub
 router = APIRouter(prefix="/reports", tags=["Phản ánh người dân"])
 
 REPORT_SELECT = """
-SELECT r.id, r.code, r.category, r.description, r.address, r.reporter_name, r.reporter_phone, r.photos, r.status,
+SELECT r.id, r.code, r.category, r.description, r.address, r.hamlet_name, r.reporter_name, r.reporter_phone, r.photos, r.status,
        r.public_note, r.reject_reason, r.moderated_at, r.created_at, r.sos_ticket_id,
        ST_Y(r.location) AS lat, ST_X(r.location) AS lon, u.code AS admin_code, u.name AS admin_name,
        m.full_name AS moderated_by_name, t.code AS sos_code

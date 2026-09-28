@@ -22,6 +22,7 @@ from app.db import fetch_all, fetch_one
 from app.infra import ratelimit
 from app.infra.cache import cached, cached_view
 from app.services import lite
+from app.services.data_import.engine import xom_sort_key
 from app.services.landslides import get_landslides_overview
 from app.services.lite import NATIONAL_HOTLINES, RISK_ADVICE, province_hotlines
 from app.services.reports import CATEGORY, ReportError, create_report, public_photo_url, verify_turnstile
@@ -394,6 +395,7 @@ async def submit_report(
     lat: float = Form(...),
     lon: float = Form(...),
     address: str | None = Form(None, max_length=200),
+    hamlet: str | None = Form(None, max_length=80),  # mã xóm / tổ dân phố (GET /hamlets)
     reporter_name: str | None = Form(None, max_length=100),
     reporter_phone: str | None = Form(None, pattern=r"^[0-9 +().-]{8,20}$"),
     website: str | None = Form(None),  # honeypot — người thật không điền
@@ -425,6 +427,7 @@ async def submit_report(
             reporter_phone=reporter_phone,
             photos=blobs,
             client_ip=ip,
+            hamlet=hamlet or None,
         )
     except ReportError as exc:
         raise HTTPException(422, str(exc)) from exc
@@ -435,6 +438,25 @@ async def submit_report(
         "message": "Đã tiếp nhận phản ánh. Cán bộ sẽ xác minh trước khi hiển thị công khai. "
         "Trường hợp nguy hiểm đến tính mạng, hãy gọi ngay 112.",
     }
+
+
+@router.get("/hamlets")
+async def hamlets(xa: str = Query(..., max_length=40)):
+    """Xóm / tổ dân phố của 1 xã — người dân chọn khi gửi phản ánh. Nhập / cập nhật bằng loại dữ liệu "xom"."""
+    codes = {u["code"] for u in await cached("public:communes", 3600, lite.communes)}
+    if xa not in codes:
+        raise HTTPException(404, "Không có xã/phường này")
+
+    async def build():
+        rows = await fetch_all(
+            """SELECT c.code, c.name FROM spatial_admin.administrative_units c
+                 JOIN spatial_admin.administrative_units p ON p.id = c.parent_id
+                WHERE p.code = :xa AND c.level = 'thon'""",
+            {"xa": xa},
+        )
+        return sorted(rows, key=lambda r: xom_sort_key(r["name"]))
+
+    return await cached(f"public:hamlets:{xa}", 3600, build)
 
 
 class TrackIn(BaseModel):

@@ -187,6 +187,12 @@ def _geometry(ds: Dataset, raw: RawRow, row: Prepared, report: Report) -> None:
 XOM_PREFIX = re.compile(r"^(xom|thon|to dan pho|to|khu|khoi)\s+")
 
 
+def xom_sort_key(ten: str) -> str:
+    """Sắp xếp tên xóm: không dấu, bỏ "Xóm/Thôn/Tổ" đứng trước, số theo giá trị (Tổ 2 trước Tổ 10)."""
+    name = XOM_PREFIX.sub("", " ".join(strip_accents(ten).lower().split()))
+    return re.sub(r"\d+", lambda m: m.group().zfill(6), name)
+
+
 def xom_code(ma_xa: str, ten: str) -> str:
     """Mã xóm tự sinh: <mã xã>-<tên không dấu, bỏ “Xóm/Thôn/Tổ dân phố” đứng trước> — “Xóm Nà Pò” = “Nà Pò”."""
     name = XOM_PREFIX.sub("", " ".join(strip_accents(ten).lower().split()))
@@ -303,13 +309,6 @@ async def _check_points(ds: Dataset, rows: list[Prepared], report: Report) -> No
         if not res["inside"]:
             report.error(row.number, "vi_do", f"Vị trí ({row.lat}, {row.lon}) nằm ngoài tỉnh Cao Bằng")
             continue
-        if ds.name == "xom" and res["nearest"] and res["nearest"] != row.values.get("ma_xa"):
-            report.warn(
-                row.number,
-                "vi_do",
-                f"Toạ độ nằm trong {res['nearest']}, tệp ghi {row.values.get('ma_xa')} — kiểm tra lại toạ độ "
-                "(ranh giới xã hiện là xấp xỉ nếu chưa nhập ranh giới chính thức)",
-            )
         _assign_commune(ds, row, res["nearest"], report)
 
 
