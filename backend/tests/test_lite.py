@@ -62,7 +62,10 @@ def test_worst_case_stays_under_limit():
         ]
         * lite.MAX_SITES,
     }
-    rivers = [{"name": "Trạm " * 8, "unit": "m", "value": 180.25, "level": 3}] * 12
+    # Đủ trần số sông, mọi trạm mất tín hiệu (thêm chú thích thời điểm → dài nhất)
+    rivers = [
+        {"name": "Trạm " * 8, "unit": "m", "value": 180.25, "level": 3, "time": NOW, "stale": True}
+    ] * lite.MAX_RIVERS
     html = page(
         unit=unit,
         alerts=[alert(i, "do") for i in range(40)],
@@ -74,6 +77,9 @@ def test_worst_case_stays_under_limit():
     assert html.count('class="b do"') == lite.MAX_ALERTS + 1  # + khung mức nguy cơ của xã
     assert "NGUY CƠ CAO" in html and "Chỉ đường" in html
     assert html.count('href="tel:02063852111"') == lite.MAX_SITES  # số trực điểm sơ tán (công khai)
+    assert (
+        html.count("trạm mất tín hiệu") == lite.MAX_RIVERS
+    )  # số đo cũ ghi rõ thời điểm, không như số hiện tại
 
 
 def test_commune_filter_and_counts():

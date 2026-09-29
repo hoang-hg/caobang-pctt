@@ -223,7 +223,7 @@ def render(*, units, unit, alerts, rivers, commune, hotlines, now) -> str:
     if rivers:
         items = "".join(
             f"<li><b>{e(r['name'])}</b>: {_num(r['value'])} {e(r['unit'] or 'm')} – {RIVER_LEVEL[r['level']]}"
-            + (f" (số đo lúc {_time(r['time'])}, trạm mất tín hiệu)" if r["stale"] else "")
+            + (f" (số đo lúc {_time(r['time'])}, trạm mất tín hiệu)" if r.get("stale") else "")
             + "</li>"
             for r in rivers
         )
