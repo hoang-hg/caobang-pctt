@@ -320,6 +320,11 @@ Python trong container.
 - [ ] Không khẳng định điều hệ thống không biết: thiếu / cũ số liệu (trạm `stationView`, hồ `chua_co_so_lieu`) → xám,
       không "an toàn / bình thường"; tuyến chỉ "không qua vùng nguy hiểm đã ghi nhận"; việc chưa tích hợp (SMS, Push,
       Cell Broadcast) → giao diện nói rõ **chưa gửi**, không mô phỏng như đã gửi khi `SIMULATOR=false`.
+- [ ] Dữ liệu mẫu / tài khoản demo mới phải để `app/golive.py` nhận ra được (SĐT `DEMO_PHONE_PREFIX`, email
+      `DEMO_EMAIL_DOMAIN`, mã ví dụ tệp mẫu `…-001`); trường nhạy cảm mới của phản ánh / bản đồ công khai → thêm vào
+      `REPORT_PRIVATE` / `MAP_PRIVATE` (`app/golive_web.py`, kịch bản T1 / T2).
+- [ ] Giao diện: màn hình mới vào `tests/ui/ui-test.mjs`; điện thoại không tràn ngang (lưới `grid-cols-1`, hàng nút
+      `flex-wrap`, hàng tab cuộn trong hàng), khung bản đồ có chiều cao riêng trên điện thoại.
 
 ## 9. Kiểm thử
 

@@ -271,7 +271,8 @@ tests/e2e/          kiểm thử API qua HTTP (Node) — cần stack dev chạy 
 tests/ui/           kiểm thử giao diện bằng trình duyệt thật (Playwright) — máy tính + điện thoại
 tests/load/         kiểm thử tải (k6)
 scripts/maintenance/  script bảo trì CSDL máy dev (có chặn production)
-deploy/             Caddyfile, backup.sh (chạy thật)
+deploy/             Caddyfile, backup.sh (chạy thật); golive-check.sh, restore-drill.sh, external-monitor.sh
+docs/GO-LIVE.md     kiểm tra trước khi mở cổng cho người dân (Go / No-Go) + biên bản
 mqtt/  db/init/     cấu hình Mosquitto (dev + thật); extension PostgreSQL khi khởi tạo
 docker-compose.yml  dev / trình diễn / CI     docker-compose.prod.yml  chạy thật
 .env.example        mẫu dev                    .env.production.example  mẫu chạy thật
@@ -1028,6 +1029,10 @@ Tổng kết nối CSDL ≈ (`API_WORKERS` × số bản backend + 1) × (`DB_PO
 
 ### 10.3. Cài đặt lần đầu
 
+> Trước khi công bố địa chỉ cổng: đi hết **[docs/GO-LIVE.md](docs/GO-LIVE.md)** (7 điều kiện Go / No-Go) —
+> `sh deploy/golive-check.sh <tên miền>` tự kiểm cấu hình, dữ liệu mẫu còn sót, tài khoản 2 lớp / người duyệt, sao lưu,
+> HTTPS và 5 kịch bản đối kháng; các mục còn lại có hướng dẫn và biên bản ký xác nhận.
+
 ```bash
 git clone <kho mã> /opt/caobang-pctt && cd /opt/caobang-pctt
 cp .env.production.example .env.production && chmod 600 .env.production
@@ -1119,7 +1124,9 @@ dcp up -d
 
 Khôi phục ảnh: `dcp stop minio`, rồi
 `docker run --rm -v caobang-pctt-prod_minio_data:/data -v "$PWD/backups/photos:/b" alpine tar -xzf /b/photos_<…>.tar.gz -C /data`,
-rồi `dcp up -d minio`. **Diễn tập khôi phục** ít nhất mỗi quý trên máy khác, ghi lại thời gian thực tế.
+rồi `dcp up -d minio`. **Diễn tập khôi phục** ít nhất mỗi quý trên máy khác, ghi lại thời gian thực tế:
+`sh deploy/restore-drill.sh backups/db/pctt_<ngày_giờ>.dump [backups/photos/photos_<…>.tar.gz]` — dựng CSDL tạm (chỉ
+cần Docker, tự xoá), khôi phục đúng các bước trên, in số bản ghi các bảng chính, dữ liệu mới nhất và thời gian khôi phục.
 
 <a id="giam-sat"></a>
 ### 10.6. Giám sát & xử lý sự cố
@@ -1143,7 +1150,9 @@ rồi `dcp up -d minio`. **Diễn tập khôi phục** ít nhất mỗi quý tr�
 - Thử sau khi cài: đặt `OPS_DISK_WARN_PCT=1` trong `.env.production`, `dcp up -d worker` → email trong ~2 phút; trả lại
   giá trị cũ, `dcp up -d worker` → email khôi phục.
 
-**Giám sát bên ngoài — vẫn bắt buộc**: máy chủ mất điện, mất mạng, Docker dừng thì không tiến trình nào tự báo được. Dịch
+**Giám sát bên ngoài — vẫn bắt buộc** (không có dịch vụ nào: `deploy/external-monitor.sh` chạy cron mỗi phút trên máy
+khác, báo qua webhook / email khi lỗi 2 lần liên tiếp và khi khôi phục): máy chủ mất điện, mất mạng, Docker dừng thì
+không tiến trình nào tự báo được. Dịch
 vụ giám sát đặt ở **nơi khác** (Uptime Kuma trên máy khác, UptimeRobot, hệ thống giám sát của trung tâm dữ liệu) gọi
 `https://$DOMAIN/health/full` mỗi phút, cảnh báo khi không trả **200**: trả 503 khi bất kỳ kiểm tra nào ở bảng trên đang
 lỗi (chỉ tên kiểm tra + đạt / lỗi; chi tiết trong email). `/health` dành cho healthcheck container: luôn 200 khi API chạy,
