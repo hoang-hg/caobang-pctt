@@ -268,6 +268,7 @@ backend/            API + worker (Python, FastAPI) — app/ (api/v1, rbac, servi
 frontend/           giao diện (React, Vite) — src/ (pages, components, api, rbac, app), nginx.conf + nginx/ (snippet),
                     scripts/compress.mjs (nén sẵn khi build), Dockerfile
 tests/e2e/          kiểm thử API qua HTTP (Node) — cần stack dev chạy với DEMO_MODE=true
+tests/ui/           kiểm thử giao diện bằng trình duyệt thật (Playwright) — máy tính + điện thoại
 tests/load/         kiểm thử tải (k6)
 scripts/maintenance/  script bảo trì CSDL máy dev (có chặn production)
 deploy/             Caddyfile, backup.sh (chạy thật)
@@ -1262,6 +1263,25 @@ hồ chứa chưa có số liệu → cập nhật vận hành, phản ánh → 
 `SUPERADMIN_PASSWORD=… SUPERADMIN_PIN=… node tests/e2e/prod-flow.mjs http://127.0.0.1:8080 http://127.0.0.1:8025`.
 
 Chạy lại nhiều lần liên tiếp: xoá khoá `rl:*` trong Redis trước (lệnh ở 4.5).
+
+**Giao diện** (`tests/ui/ui-test.mjs`, CI job E2E): Chromium thật bấm thử như người dùng, trên khổ **máy tính** (1366 px)
+và **điện thoại** (Pixel 7, GPS giả lập ở TP Cao Bằng):
+- cổng công khai: bản đồ thật sự có chỗ hiển thị (không bị ép còn 0 px), mọi tab, gửi phản ánh (chấm bản đồ / nút "Lấy
+  vị trí của tôi") → mã tra cứu → theo dõi tiến độ, tra cứu mã không tồn tại, `/ban-nhe`;
+- cán bộ: đăng nhập, mọi trang ở thanh menu, menu trên điện thoại, điều động (chọn lực lượng → phát lệnh → báo chưa gửi
+  cho đội), duyệt phản ánh (nội dung công khai gợi ý sẵn, không chọn sẵn vị trí chính xác), nhập dữ liệu bằng form +
+  chọn vị trí trên bản đồ.
+
+Mỗi bước **lỗi** khi trang có lỗi JavaScript (màn hình trắng), API trả 5xx, hoặc **tràn ngang trên điện thoại** (phải kéo
+ngang mới đọc hết). Ảnh chụp bước lỗi: artifact `ui-shots` của CI.
+
+```bash
+cd tests/ui && npm ci && npx playwright install chromium
+node ui-test.mjs http://localhost:8080                 # stack dev có dữ liệu mẫu (gửi phản ánh, điều động, duyệt thử)
+UI_READONLY=1 UI_USER=… UI_PASS=… node ui-test.mjs https://pctt.caobang.gov.vn   # máy thật trước go-live: chỉ xem
+```
+`UI_READONLY=1` chỉ mở trang / hộp thoại, không gửi, không điều động, không duyệt — dùng được trên hệ thống đang phục vụ
+(tài khoản bắt buộc 2 lớp không dùng được: tạo tài khoản xem riêng, khoá sau khi thử).
 
 <a id="kiem-thu-tai"></a>
 ### 12.2. Kiểm thử tải

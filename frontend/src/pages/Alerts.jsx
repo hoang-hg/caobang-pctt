@@ -102,9 +102,9 @@ function Composer() {
         )}
         <input className="input" placeholder="Tiêu đề lệnh" value={title} onChange={(e) => setTitle(e.target.value)} />
         <textarea className="input min-h-[110px]" value={body} onChange={(e) => setBody(e.target.value)} placeholder="Nội dung tin nhắn" />
-        <div className="flex items-center justify-between text-xs text-muted">
+        <div className="flex flex-wrap items-center justify-between gap-1 text-xs text-muted">
           <span>{body.length} ký tự · {Math.max(1, Math.ceil(body.length / 70))} SMS (Unicode)</span>
-          <span className="flex gap-1">
+          <span className="flex flex-wrap gap-1">
             {['do', 'cam', 'vang'].map((s) => (
               <button key={s} className={clsx('chip', severity === s ? SEV_CLS[s] : 'bg-panel2')} onClick={() => setSeverity(s)}>{LEVEL[s].label}</button>
             ))}
@@ -487,7 +487,7 @@ export default function Alerts() {
         ]}
       />
       {tab === 'broadcast' && (
-        <div className={clsx('grid gap-3', canCreate && 'xl:grid-cols-[420px_1fr]')}>
+        <div className={clsx('grid grid-cols-1 gap-3', canCreate && 'xl:grid-cols-[420px_1fr]')}>
           <Can I="alert" a="create"><Composer /></Can>
           <Broadcasts />
         </div>

@@ -1054,10 +1054,11 @@ export default function PublicPortal() {
         {/* TAB 1: BẢN ĐỒ & CẢNH BÁO */}
         {activeTab === 'bando' && (
           <div className="space-y-4">
-            {/* Khung Bản đồ & Bảng tác chiến: Cân đối chiều cao, không có khoảng trắng */}
-            <div className="grid gap-4 lg:grid-cols-[1fr_390px] h-[520px] sm:h-[620px] lg:h-[700px] items-stretch">
+            {/* Khung Bản đồ & Bảng tác chiến. Điện thoại: 2 khung xếp chồng, mỗi khung cao riêng — chung 1 lưới cao cố định thì
+                bảng bên phải chiếm hết chiều cao, bản đồ còn 0px. Máy tính (lg): 2 cột cao 700px */}
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_390px] lg:h-[700px] items-stretch">
               {/* Cột Bản đồ: Chiếm trọn h-full flex flex-col */}
-              <section className="card overflow-hidden flex flex-col h-full border border-line shadow-sm">
+              <section className="card overflow-hidden flex flex-col h-[520px] sm:h-[620px] lg:h-full border border-line shadow-sm">
                 {/* Lớp dữ liệu bản đồ & Basemap switcher */}
                 <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-line bg-panel2/60 px-3 py-2 text-xs shrink-0">
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -1098,7 +1099,7 @@ export default function PublicPortal() {
                           className={clsx(
                             'px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer',
                             basemap === key
-                              ? 'bg-primary text-white shadow-xs'
+                              ? 'bg-accent text-white shadow-sm'
                               : 'text-muted hover:text-ink hover:bg-panel2'
                           )}
                         >
@@ -1132,7 +1133,7 @@ export default function PublicPortal() {
                       ) : !selectedPoint ? (
                         <>
                           <div className="flex items-center gap-1.5 font-semibold text-ink truncate">
-                            <MapPin size={15} className="text-primary shrink-0" />
+                            <MapPin size={15} className="text-accent shrink-0" />
                             <span className="truncate">Vị trí của bạn: <b>{me.name || here?.commune?.name || 'Đã chọn'}</b></span>
                           </div>
                           <button
@@ -1207,7 +1208,7 @@ export default function PublicPortal() {
               </section>
 
               {/* Cột Bên Phải: Bảng điều hành đa năng 3 trong 1 */}
-              <section className="card overflow-hidden flex flex-col h-full border border-line shadow-sm">
+              <section className="card overflow-hidden flex flex-col h-[480px] sm:h-[560px] lg:h-full border border-line shadow-sm">
                 {/* Header Tab chuyển đổi tinh gọn */}
                 <div className="flex items-center border-b border-line bg-panel2/70 p-1.5 gap-1 shrink-0">
                   <button

@@ -105,13 +105,13 @@ export function Modal({ open, onClose, title, children, wide, footer }) {
 
 export function Tabs({ tabs, value, onChange }) {
   return (
-    <div className="flex gap-1 border-b border-line">
+    <div className="scroll-thin flex gap-1 overflow-x-auto border-b border-line">
       {tabs.map((t) => (
         <button
           key={t.value}
           onClick={() => onChange(t.value)}
           className={clsx(
-            '-mb-px flex items-center gap-2 border-b-2 px-4 py-2 text-sm font-medium',
+            'flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium',
             value === t.value ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-ink',
           )}
         >
