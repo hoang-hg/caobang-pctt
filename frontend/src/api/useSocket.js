@@ -71,6 +71,10 @@ export function useSocket() {
         case 'data.imported': // nhập dữ liệu chính thức → mọi màn hình tải lại
           qc.invalidateQueries();
           break;
+        case 'submission.updated': // hồ sơ dữ liệu xã gửi (chỉ người có quyền duyệt nhận)
+          inv('submissions', 'submission');
+          if (data.status === 'cho_duyet') toast({ tone: 'warn', title: `Hồ sơ dữ liệu ${data.code} chờ phê duyệt` });
+          break;
         case 'source.updated':
           inv('int-sources', 'int-monitor', 'forecast-areas', 'forecast-series', 'rainfall');
           break;

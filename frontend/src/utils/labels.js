@@ -47,6 +47,14 @@ export const BROADCAST_STATUS = {
   rejected: { label: 'Từ chối', cls: 'bg-panel2 text-muted' },
   draft: { label: 'Nháp', cls: 'bg-panel2 text-muted' },
 };
+// Hồ sơ dữ liệu xã/phường gửi chờ cấp tỉnh phê duyệt (operations.data_submissions)
+export const SUBMISSION_STATUS = {
+  cho_duyet: { label: 'Chờ duyệt', cls: 'bg-warn text-black' },
+  da_duyet: { label: 'Đã duyệt', cls: 'bg-good text-white' },
+  tu_choi: { label: 'Từ chối', cls: 'bg-danger text-white' },
+  da_rut: { label: 'Đã rút', cls: 'bg-panel2 text-muted' },
+};
+
 /** Lệnh đã duyệt mà các kênh chưa nối cổng gửi tin thật (metrics[kênh].integrated === false). */
 export const notIntegrated = (b) => Object.values(b?.metrics || {}).some((v) => v?.integrated === false);
 export const broadcastStatus = (b) => BROADCAST_STATUS[notIntegrated(b) ? 'published' : b.status] || BROADCAST_STATUS.draft;

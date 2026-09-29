@@ -100,6 +100,16 @@ def require_any(obj: str, act: str):
     return _any
 
 
+def usernames_with(obj: str, act: str, domain: str = GLOBAL_SCOPE) -> set[str]:
+    """Tài khoản được cấp (obj, act) đúng tại phạm vi ``domain`` (mặc định toàn tỉnh) — VD người nhận email báo có hồ
+    sơ chờ duyệt."""
+    out = set()
+    for g in get_enforcer().get_grouping_policy():
+        if len(g) >= 3 and g[2] == domain and (g[1] == SUPER_ADMIN_ROLE or _role_grants(g[1], obj, act)):
+            out.add(g[0])
+    return out
+
+
 def restrict_codes(requested: list[str], allowed: list[str] | None) -> list[str]:
     """Giao vùng đang lọc với phạm vi được phép. [] = toàn tỉnh (không lọc)."""
     if allowed is None:

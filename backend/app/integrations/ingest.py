@@ -101,6 +101,16 @@ async def ingest_readings(device: dict, items: list[dict], channel: str) -> dict
     """Ghi số đo của một thiết bị. ``channel``: http | mqtt | lorawan | batch."""
     if not device["enabled"]:
         raise IngestError("thiết bị đang bị vô hiệu hoá")
+    # Trạm chuyển sang dữ liệu thật TRƯỚC khi ghi số đo (và trước khi lấy giờ hiện tại): bộ mô phỏng chọn các trạm
+    # 'simulator' đầu mỗi nhịp rồi mới ghi. Chuyển sau khi ghi → nhịp mô phỏng chen giữa ghi một số đo mới hơn số đo
+    # thật, trạm hiện số mô phỏng mãi (không nhịp nào ghi đè nữa). Trạm nhập từ tệp ('external') hết "chờ thiết bị".
+    switched = False
+    if items and device["station_source"] != "iot":
+        await execute(
+            "UPDATE iot_telemetry.monitoring_stations SET source = 'iot', status = 'online' WHERE id = :s",
+            {"s": device["station_id"]},
+        )
+        switched = True
     now = datetime.now(UTC)
     station = {"type": device["station_type"], "thresholds": device["thresholds"]}
     good, errors = normalize(items, device, station, now)
@@ -131,12 +141,7 @@ async def ingest_readings(device: dict, items: list[dict], channel: str) -> dict
             await log_event(
                 f"Thiết bị {device['name']} ({device['id']}) có tín hiệu trở lại", "he_thong", "info"
             )
-        if device["station_source"] != "iot":
-            # Trạm chuyển sang dữ liệu thật: bộ mô phỏng ngừng sinh số đo cho trạm này; trạm nhập từ tệp hết "chờ thiết bị"
-            await execute(
-                "UPDATE iot_telemetry.monitoring_stations SET source = 'iot', status = 'online' WHERE id = :s",
-                {"s": device["station_id"]},
-            )
+        if switched:
             await log_event(
                 f"{device['station_name']} chuyển sang dữ liệu thật từ thiết bị {device['id']} ({channel.upper()})",
                 "he_thong",

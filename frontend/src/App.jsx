@@ -26,8 +26,10 @@ function PageLoading() {
   return <div className="flex h-full min-h-[40vh] items-center justify-center text-sm text-muted">Đang tải…</div>;
 }
 
-function Guard({ obj, act, children }) {
-  return usePermission(obj, act) ? children : <NoAccess />;
+function Guard({ obj, act, or, children }) {
+  const main = usePermission(obj, act);
+  const alt = usePermission(or?.[0], or?.[1]); // quyền thay thế (VD nhập dữ liệu: nhập thẳng HOẶC gửi chờ duyệt)
+  return main || (or && alt) ? children : <NoAccess />;
 }
 
 function NoAccess() {
@@ -68,7 +70,7 @@ function Shell() {
               <Route path="/canh-bao" element={<Guard obj="alert" act="view"><Alerts /></Guard>} />
               <Route path="/phan-anh" element={<Guard obj="report" act="view"><CitizenReports /></Guard>} />
               <Route path="/nguon-du-lieu" element={<Guard obj="integration" act="view"><DataSources /></Guard>} />
-              <Route path="/nhap-du-lieu" element={<Guard obj="data" act="import"><DataImport /></Guard>} />
+              <Route path="/nhap-du-lieu" element={<Guard obj="data" act="import" or={['data', 'submit']}><DataImport /></Guard>} />
               <Route path="/phan-quyen" element={<Guard obj="user" act="view"><AccessControl /></Guard>} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>

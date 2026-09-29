@@ -56,6 +56,7 @@ backend/                   Python 3.12, FastAPI, SQLAlchemy async (psycopg3), Ca
   app/services/data_import/  nhập dữ liệu chính thức từ tệp: specs.py (khai báo 12 loại) · parsing.py (CSV/xlsx/GeoJSON,
                            chuẩn hoá — thuần) · engine.py (validate / apply 1 transaction) · templates.py · service.py
                            (nhật ký, sự kiện, xoá cache) · __main__.py (dòng lệnh). API: app/api/v1/data_import.py
+                           (+ hồ sơ xã gửi – tỉnh duyệt: /data-import/submissions, bảng operations.data_submissions)
   app/integrations/        runner.py (lập lịch nguồn kéo, DEFAULT_SOURCES, ADAPTERS, env_source_keys) · adapters/
                            (open_meteo, openweather) · ingest.py (lõi nhận số đo) · mqtt_bridge.py · crypto.py (Fernet)
   app/infra/               redis.py · cache.py (cached, cached_view, invalidate, bump_data_version) · ratelimit.py
@@ -318,7 +319,7 @@ Python trong container.
   Chạy lại liên tiếp → xoá khoá `rl:*` trong Redis. `iot-test.mjs` gọi `docker exec caobang-pctt-mqtt`, `ops-test.mjs` gọi
   `docker exec caobang-pctt-db` / `-worker` (tên container cố định). Ngoại lệ: `prod-flow.mjs` chạy trên stack production.
 - CI (`ci.yml`): ruff + pytest → ESLint + build frontend → kiểm tra `docker-compose.prod.yml` → stack Docker Compose
-  (`DEMO_MODE=true`, `SIMULATOR=true`, `TOTP_REQUIRED_ROLES=kiem_thu_2fa`, `OPS_DISK_WARN_PCT=1`) + 11 script API (`lite-test.mjs`
+  (`DEMO_MODE=true`, `SIMULATOR=true`, `TOTP_REQUIRED_ROLES=kiem_thu_2fa`, `OPS_DISK_WARN_PCT=1`) + 12 script API (`lite-test.mjs`
   chạy qua nginx: tham số = URL frontend :8080; `totp-test.mjs` tự tính mã TOTP, cần biến trên để thử luồng bắt buộc;
   `ops-test.mjs` chạy cuối: ngưỡng ổ đĩa 1% → chờ email sự cố trong Mailpit + `/health/full` 503).
   Job `prod` song song: dựng `docker-compose.prod.yml` (+ Mailpit qua tệp override chỉ có trong CI) trên CSDL trống,
@@ -350,7 +351,13 @@ Python trong container.
   thêm tên vào `ORDER` trong `tests/e2e/import-test.mjs`; cập nhật bảng README §2.4. Không nhập dữ liệu chính thức
   bằng SQL tay. Bảng dùng chung nhiều loại bản ghi (VD `administrative_units`: tỉnh / xã / xóm): `fixed` cho cột phân
   loại, `conflict_where` để upsert không ghi đè loại khác, `Ref(where=...)` giới hạn mã tham chiếu, `replace_scope` +
-  `replace_within` để "thay toàn bộ" chỉ xoá trong phạm vi tệp (mẫu: loại `xom`).
+  `replace_within` để "thay toàn bộ" chỉ xoá trong phạm vi tệp (mẫu: loại `xom`). Cho xã/phường gửi (`data.submit`):
+  thêm vào `SUBMITTABLE` (+ giới hạn cấp); `engine._check_scope` / `_owner_sql` phải xác định được xã của bản ghi mới
+  **và** bản ghi đã có cùng mã; `_replace_filter(scope)` giới hạn xoá theo xã (không xác định được xã → không xoá gì).
+- **Hồ sơ xã gửi** (`data.submit` → `data.import` duyệt): dữ liệu chờ duyệt chỉ nằm trong `data_submissions.content`
+  (tệp gốc) — KHÔNG ghi tạm vào bảng nghiệp vụ. Duyệt = `validate` lại với `scope_codes` đã lưu + `apply_rows(conn=…)`
+  trong CÙNG transaction với `SELECT … FOR UPDATE` hồ sơ. Form "Điền trực tiếp" trên web sinh CSV / GeoJSON rồi đi
+  đúng đường tải tệp — không thêm đường ghi riêng.
 - **Xóm / địa danh cho bộ tách tin SOS** (`sos_nlp.load_gazetteer`): xã + xóm (cấp thôn, `unit_code` = mã xã cha) +
   `place_names` khác. Cache theo `GAZETTEER_VERSION_KEY` (Redis) + TTL 5 phút — dữ liệu địa danh đổi ngoài công cụ
   nhập thì gọi `sos_nlp.invalidate_gazetteer()`. Tên xóm trùng giữa các xã: chỉ gán xóm khi tin nhắc cả xã.

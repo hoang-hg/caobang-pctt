@@ -13,24 +13,31 @@ from app.ws.hub import hub
 
 
 async def after_import(
-    user: dict | None, name: str, filename: str, replace: bool, report: Report, result: dict
+    user: dict | None,
+    name: str,
+    filename: str,
+    replace: bool,
+    report: Report,
+    result: dict,
+    submission: dict | None = None,
 ) -> None:
+    """``submission``: hồ sơ xã gửi vừa được ``user`` phê duyệt (mã hồ sơ, người gửi) — ghi vào nhật ký."""
     ds = DATASETS[name]
-    await audit(
-        user,
-        "data.import",
-        "dataset",
-        name,
-        {"file": filename, "mode": "replace" if replace else "upsert", "rows": report.total, **result},
-    )
+    meta = {"file": filename, "mode": "replace" if replace else "upsert", "rows": report.total, **result}
+    if submission:
+        meta.update(submission=submission["code"], submitted_by=submission["submitted_by_name"])
+    await audit(user, "data.import", "dataset", name, meta)
     await hub.publish("data.imported", {"dataset": name, "label": ds.label, **result})
     if ds.public:
         await invalidate("public:")
     if name in ("xom", "ranh_gioi_xa"):
         await invalidate_gazetteer()  # bộ tách tin SOS nhận ra xóm / tên xã mới ngay
     who = user["full_name"] if user else "Người vận hành (dòng lệnh)"
+    what = f"{ds.label}: {result['created']} mới, {result['updated']} cập nhật, {result['deleted']} xoá"
     await log_event(
-        f"{who} nhập {ds.label}: {result['created']} mới, {result['updated']} cập nhật, {result['deleted']} xoá",
+        f"{who} duyệt hồ sơ {submission['code']} của {submission['submitted_by_name']} — {what}"
+        if submission
+        else f"{who} nhập {what}",
         "he_thong",
         "info",
     )

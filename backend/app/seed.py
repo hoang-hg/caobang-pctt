@@ -1023,12 +1023,13 @@ TRUNCATE communications.audit_logs, communications.rbac_audit_log, communication
          iot_telemetry.sensor_readings, iot_telemetry.forecasts, iot_telemetry.hazard_zones, iot_telemetry.hazard_points,
          iot_telemetry.cameras, iot_telemetry.reservoirs, iot_telemetry.monitoring_stations,
          operations.dispatch_orders, operations.sos_tickets, operations.event_logs, operations.evacuation_progress,
-         operations.road_segments, operations.road_nodes, operations.system_settings,
+         operations.road_segments, operations.road_nodes, operations.system_settings, operations.data_submissions,
          resources.inventory, resources.items, resources.warehouses, resources.vehicles, resources.forces,
          resources.fuel_depots, resources.evacuation_sites,
          spatial_admin.place_names, spatial_admin.presets, spatial_admin.administrative_units RESTART IDENTITY CASCADE;
 ALTER SEQUENCE operations.sos_code_seq RESTART WITH 1001;
 ALTER SEQUENCE communications.broadcast_code_seq RESTART WITH 101;
+ALTER SEQUENCE operations.data_submission_code_seq RESTART WITH 1001;
 DELETE FROM public.casbin_rule WHERE ptype = 'g'
 """
 

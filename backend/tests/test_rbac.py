@@ -52,6 +52,14 @@ def test_permission_catalog_and_system_roles_consistent():
     }
 
 
+def test_account_managers_hold_every_permission_of_commune_admin():
+    """Chống leo thang: người cấp vai trò phải có mọi quyền của vai trò đó. Quản trị tỉnh và chỉ huy cụm tạo tài khoản
+    admin xã → thêm quyền mới cho admin_xa thì phải thêm cho cả hai (nếu không: 403 khi tạo admin xã)."""
+    roles = {r[0]: set(r[4]) for r in SYSTEM_ROLES}
+    for manager in ("admin_tinh", "chi_huy_cum"):
+        assert roles["admin_xa"] <= roles[manager], f"{manager} thiếu {roles['admin_xa'] - roles[manager]}"
+
+
 def _enforcer():
     e = casbin.Enforcer(MODEL)
     e.add_named_domain_matching_func("g", key_match_func)

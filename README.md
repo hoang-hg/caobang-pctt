@@ -116,9 +116,34 @@ Nhập bằng công cụ ở [2.4](#nhap-du-lieu), có người thứ hai đối
 ### 2.4. Nhập dữ liệu chính thức
 
 Trang **Nhập dữ liệu** (`/nhap-du-lieu`, quyền `data.import`: Super admin, Lãnh đạo BCH, Admin tỉnh) hoặc dòng lệnh trên
-máy chủ. Quy trình: **Tải tệp mẫu** → điền → **Kiểm tra** (không ghi gì: báo lỗi theo dòng, số bản ghi thêm / cập nhật /
-xoá, xem trước) → **Nhập** (kiểm tra lại, ghi toàn bộ trong 1 transaction hoặc không ghi gì; ghi nhật ký pháp lý; mọi màn
-hình và cổng công khai cập nhật ngay).
+máy chủ. Quy trình: **Tải tệp mẫu** → điền (hoặc **Điền trực tiếp** trên web: từng bản ghi, chọn vị trí / vẽ vùng trên bản
+đồ) → **Kiểm tra** (không ghi gì: báo lỗi theo dòng, số bản ghi thêm / cập nhật / xoá, xem trước) → **Nhập** (kiểm tra
+lại, ghi toàn bộ trong 1 transaction hoặc không ghi gì; ghi nhật ký pháp lý; mọi màn hình và cổng công khai cập nhật ngay).
+
+**Xã/phường gửi — cấp tỉnh phê duyệt** (quyền `data.submit` theo phạm vi xã, mặc định vai trò Admin xã/phường):
+
+```mermaid
+graph LR
+    X[Admin xã: điền form / tải tệp] --> K[Kiểm tra: đúng xã, đúng cấp] --> H[Hồ sơ HS-…: chờ duyệt<br/>CHƯA hiển thị ở đâu]
+    H --> T[Admin tỉnh: xem thêm / sửa cũ → mới / xoá + bản đồ] -->|Phê duyệt| G[Ghi dữ liệu → hiện trên hệ thống & cổng]
+    T -->|Từ chối + lý do| X
+```
+
+- Xã chỉ gửi: xóm, điểm sơ tán, điểm & vùng nguy hiểm, danh bạ **cấp xã / thôn**, kho & lực lượng **cấp xã**, tồn kho
+  của kho cấp xã, phương tiện của lực lượng cấp xã (`SUBMITTABLE` trong `specs.py`). Ranh giới xã, trạm quan trắc, hồ
+  chứa, danh bạ cấp tỉnh, cây xăng: chỉ cấp tỉnh nhập.
+- Mọi bản ghi phải thuộc xã người gửi phụ trách (mã xã **và** vị trí / vùng); không sửa được bản ghi đã có của xã khác
+  hay cấp tỉnh (cùng mã); "thay toàn bộ" chỉ xoá bản ghi **trong xã mình**. Tệp mẫu tải về đã điền sẵn mã xã, vị trí
+  trong xã.
+- Hồ sơ lưu tệp gốc (`operations.data_submissions`), **chưa ghi** vào bảng nghiệp vụ → không hiện trên màn hình điều
+  hành, cổng công khai. Người duyệt mở hồ sơ: hệ thống **kiểm tra lại với dữ liệu hiện tại** và hiện đúng những gì sẽ
+  ghi (thêm mới, giá trị cũ → mới, bản ghi bị xoá, vị trí trên bản đồ).
+- **Phê duyệt**: ghi dữ liệu + đổi trạng thái trong 1 transaction, khoá hồ sơ (hai người bấm cùng lúc → ghi 1 lần). Người
+  gửi không tự duyệt; **Từ chối** bắt buộc ghi lý do; người gửi **rút** được hồ sơ đang chờ. Tối đa 20 hồ sơ chờ / người.
+- Thông báo: số hồ sơ chờ duyệt trên menu + email cho người có `data.import` toàn tỉnh; người gửi nhận email kết quả.
+  Mọi bước ghi nhật ký pháp lý (`data.submit`, `data.import` kèm mã hồ sơ, `data.submission.reject` / `.withdraw`).
+- Admin tỉnh vẫn nhập thẳng (không qua duyệt) như trên. Tình huống khẩn (sạt lở mới giữa bão) không đi qua luồng này:
+  xã dùng SOS, phản ánh, soạn cảnh báo.
 
 | Loại (mã) | Bảng | Định dạng | Khoá | Thay toàn bộ |
 |---|---|---|---|---|
@@ -778,7 +803,8 @@ Yêu cầu ở phạm vi toàn tỉnh **không** khớp phân quyền cấp cụ
 | `user.view` / `user.manage` | ✓ | Xem / tạo tài khoản con, cấp – thu hồi vai trò, đặt lại xác thực 2 lớp trong phạm vi |
 | `report.view` / `report.moderate` | ✓ | Xem (kể cả SĐT người gửi) / duyệt – từ chối – chuyển SOS phản ánh |
 | `integration.view` / `integration.manage` | toàn tỉnh | Xem / cấu hình nguồn dữ liệu, thiết bị IoT, cấp khoá |
-| `data.import` | toàn tỉnh | Nhập dữ liệu chính thức từ tệp ([2.4](#nhap-du-lieu)) |
+| `data.import` | toàn tỉnh | Nhập dữ liệu chính thức từ tệp; phê duyệt / từ chối hồ sơ xã gửi ([2.4](#nhap-du-lieu)) |
+| `data.submit` | ✓ | Gửi dữ liệu của xã mình chờ cấp tỉnh phê duyệt ([2.4](#nhap-du-lieu)) |
 | `rbac.manage` | toàn tỉnh | Tạo / sửa / xoá định nghĩa vai trò |
 
 ### 8.2. Vai trò hệ thống (đồng bộ mỗi lần khởi động)
@@ -788,8 +814,8 @@ Yêu cầu ở phạm vi toàn tỉnh **không** khớp phân quyền cấp cụ
 | `super_admin` Quản trị hệ thống | ✗ | Tất cả |
 | `truong_ban` Lãnh đạo BCH | ✗ | Tất cả trừ `rbac.manage` |
 | `admin_tinh` Quản trị tỉnh | ✗ | Tài khoản, duyệt phản ánh, xử lý SOS và **điều động** toàn tỉnh; xem nguồn lực, cảnh báo, nhật ký, nguồn dữ liệu; **nhập dữ liệu chính thức**; cập nhật vận hành hồ chứa. Không soạn/duyệt cảnh báo, không sửa vai trò |
-| `admin_xa` Quản trị xã/phường | ✓ | Tài khoản & duyệt phản ánh trong xã; tiếp nhận – cập nhật SOS của xã |
-| `chi_huy_cum` Chỉ huy cụm | ✓ | Điều hành, xuất kho, soạn + duyệt cảnh báo, tài khoản trong cụm |
+| `admin_xa` Quản trị xã/phường | ✓ | Tài khoản & duyệt phản ánh trong xã; tiếp nhận – cập nhật SOS của xã; gửi dữ liệu của xã chờ tỉnh duyệt |
+| `chi_huy_cum` Chỉ huy cụm | ✓ | Điều hành, xuất kho, soạn + duyệt cảnh báo, tài khoản trong cụm; gửi dữ liệu các xã trong cụm chờ tỉnh duyệt |
 | `truc_ban` Trực ban điều hành | ✓ | Tiếp nhận SOS, điều động, soạn cảnh báo (Maker), tổng đài; cập nhật vận hành hồ chứa (khi được giao toàn tỉnh) |
 | `can_bo_xa` Cán bộ PCTT xã | ✓ | Tiếp nhận & cập nhật SOS, xem nguồn lực trong xã |
 | `thu_kho` Thủ kho | ✓ | Xem & xuất kho |
@@ -1193,6 +1219,7 @@ Kiểm thử API (cần stack dev đang chạy với `DEMO_MODE=true`; tham số
 | Hồ chứa & xả lũ | `node tests/e2e/reservoir-test.mjs` |
 | Điểm đen sạt lở & đường đèo | `node tests/e2e/landslide-test.mjs` |
 | Nhập dữ liệu (12 loại, kiểm tra lỗi, cập nhật không trùng, thay toàn bộ) | `node tests/e2e/import-test.mjs` |
+| Xã gửi – tỉnh duyệt: phạm vi xã, chờ duyệt không hiện, cũ → mới, duyệt / từ chối / rút, email | `node tests/e2e/submission-test.mjs [backend] [mailpit]` |
 | Bản nhẹ `/ban-nhe`, service worker, manifest — qua nginx (tham số = địa chỉ frontend, mặc định `http://localhost:8080`) | `node tests/e2e/lite-test.mjs` |
 | Tự giám sát: `/health/full`; email cảnh báo sự cố khi backend có `OPS_DISK_WARN_PCT=1` (giả lập ổ đĩa đầy, ~2 phút); dọn nhật ký cũ | `node tests/e2e/ops-test.mjs [backend] [mailpit]` |
 

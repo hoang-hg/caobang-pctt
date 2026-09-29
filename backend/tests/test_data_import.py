@@ -7,10 +7,20 @@ from datetime import date, datetime
 import pytest
 from openpyxl import Workbook
 
+from app.rbac.permissions import SYSTEM_ROLES, get_permission
 from app.services.data_import import parsing
-from app.services.data_import.engine import Report, check_duplicates, convert_rows, xom_code, xom_sort_key
+from app.services.data_import.engine import (
+    Report,
+    _plain,
+    _replace_filter,
+    _same,
+    check_duplicates,
+    convert_rows,
+    xom_code,
+    xom_sort_key,
+)
 from app.services.data_import.parsing import ImportFileError, norm_key, read_file
-from app.services.data_import.specs import DATASETS
+from app.services.data_import.specs import DATASETS, SCOPED_REPLACE_EXTRA, SUBMITTABLE
 from app.services.data_import.templates import template
 
 
@@ -184,6 +194,59 @@ def test_every_dataset_is_consistent_and_template_is_valid(name):
     assert not report.errors, f"{name}: dòng mẫu lỗi {report.errors}"
     if filename.endswith(".csv"):
         assert body.startswith(b"\xef\xbb\xbf")  # BOM để Excel hiện đúng tiếng Việt
+
+
+def test_submittable_datasets_and_level_rules_are_consistent():
+    """Loại xã được gửi phải tồn tại; giới hạn cấp phải là tập con lựa chọn của trường; loại chỉ tỉnh nhập không có."""
+    assert set(SUBMITTABLE) <= set(DATASETS)
+    assert not {"ranh_gioi_xa", "tram_quan_trac", "ho_chua", "cay_xang"} & set(SUBMITTABLE)
+    for name, rules in SUBMITTABLE.items():
+        for fld, ok in rules.items():
+            field = DATASETS[name].get_field(fld)
+            assert field is not None and set(ok) <= set(field.choices), f"{name}.{fld}"
+    for name in SCOPED_REPLACE_EXTRA:
+        assert DATASETS[name].replaceable and name in SUBMITTABLE
+
+
+def test_scoped_replace_only_deletes_inside_submitter_communes():
+    rows, _ = _rows("danh_ba", "ma,cap,co_quan,ho_ten,chuc_vu,sdt\nD1,xa,UBND,A,Chủ tịch,0912000001\n")
+    cond, params = _replace_filter(DATASETS["danh_ba"], rows, ["CB-COBA"])
+    assert "admin_unit_id IN" in cond and ":scope" in cond and "level IN ('xa', 'thon')" in cond
+    assert params["scope"] == ["CB-COBA"]
+    full, full_params = _replace_filter(DATASETS["danh_ba"], rows)  # cấp tỉnh: không giới hạn xã
+    assert "scope" not in full and "scope" not in full_params
+    xom, _ = _rows("xom", "ma_xa,ten\nCB-COBA,Xóm A\n")
+    assert "parent_id IN" in _replace_filter(DATASETS["xom"], xom, ["CB-COBA"])[0]
+    # Không xác định được xã của bản ghi (phương tiện) → xã không xoá được gì
+    pt, _ = _rows("phuong_tien", "ma,ten,loai,nhom\nP1,Xuồng,xuong,duong_thuy\n")
+    assert _replace_filter(DATASETS["phuong_tien"], pt, ["CB-COBA"])[0].endswith("AND FALSE")
+
+
+def test_commune_template_uses_own_commune_and_location():
+    body, filename, _ = template(DATASETS["kho"], {"cap": "xa", "ma_xa": "CB-COBA"}, center=(22.9, 105.8))
+    report = Report("kho")
+    rows = convert_rows(DATASETS["kho"], read_file(filename, body), report)
+    assert not report.errors
+    assert rows[0].values["cap"] == "xa" and rows[0].values["ma_xa"] == "CB-COBA"
+    assert (rows[0].lat, rows[0].lon) == (22.9, 105.8)
+    body, filename, _ = template(DATASETS["vung_nguy_hiem"], {"ma_xa": "CB-COBA"}, center=(22.9, 105.8))
+    ring = json.loads(body)["features"][0]["geometry"]["coordinates"][0]
+    assert min(p[0] for p in ring) < 105.8 < max(p[0] for p in ring)
+    assert min(p[1] for p in ring) < 22.9 < max(p[1] for p in ring)
+
+
+def test_change_comparison_normalises_values():
+    assert _same(300, 300.0) and not _same(300, 450)
+    assert _same(None, None) and not _same(None, 0)
+    assert _same(["cuu_nan"], ("cuu_nan",)) and _same(None, [])
+    assert _plain(date(2027, 6, 30)) == "2027-06-30"
+
+
+def test_submit_permission_is_scoped_and_given_to_commune_admins():
+    assert get_permission("data.submit").scopable and not get_permission("data.import").scopable
+    roles = {r[0]: {f"{o}.{a}" for o, a in r[4]} for r in SYSTEM_ROLES}
+    assert "data.submit" in roles["admin_xa"] and "data.import" not in roles["admin_xa"]
+    assert "data.import" in roles["admin_tinh"]
 
 
 def test_float_rejects_nan_and_infinity():
