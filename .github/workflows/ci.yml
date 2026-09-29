@@ -129,6 +129,21 @@ jobs:
         run: |
           docker compose exec -T redis sh -c "redis-cli --scan --pattern 'rl:*' | xargs -r redis-cli del"
           node tests/e2e/track-test.mjs
+      # Trước các bộ thay dữ liệu (import-test): cần lực lượng, phiếu SOS, phản ánh của dữ liệu mẫu
+      - name: Kiểm thử giao diện bằng trình duyệt (máy tính + điện thoại)
+        run: |
+          docker compose exec -T redis sh -c "redis-cli --scan --pattern 'rl:*' | xargs -r redis-cli del"
+          cd tests/ui
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+          UI_SHOTS=shots node ui-test.mjs http://localhost:8080
+      - name: Ảnh chụp bước giao diện lỗi
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-shots
+          path: tests/ui/shots
+          if-no-files-found: ignore
       - name: Kiểm thử hồ chứa & điểm đen sạt lở
         run: |
           node tests/e2e/reservoir-test.mjs

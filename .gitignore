@@ -21,3 +21,4 @@ tests/load/photo.jpg
 
 # Bản đồ nền tự lưu trữ (tải bằng deploy/fetch-basemap.sh, ~160 MB)
 data/tiles/
+tests/ui/shots/

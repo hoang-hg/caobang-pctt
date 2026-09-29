@@ -173,7 +173,7 @@ export default function MapLegendBox({
       {!embedded && (
         <div className="flex items-center justify-between border-b border-line/60 pb-2">
           <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent/10 text-accent">
               <HelpCircle size={16} />
             </div>
             <div>
@@ -181,7 +181,7 @@ export default function MapLegendBox({
               <p className="text-[11px] text-muted">Nhấn vào từng mục để xem chi tiết điểm</p>
             </div>
           </div>
-          <span className="chip bg-primary/10 text-primary text-[10px] font-bold">
+          <span className="chip bg-accent/10 text-accent text-[10px] font-bold">
             {CATEGORIES.reduce((s, c) => s + c.count, 0)} điểm
           </span>
         </div>
@@ -189,7 +189,7 @@ export default function MapLegendBox({
 
       {/* Thẻ Chi tiết điểm đang chọn (Nếu người dùng click vào 1 điểm trên bản đồ hoặc trong list) */}
       {selectedPoint && (
-        <div className="rounded-xl border-2 border-primary/40 bg-primary/5 p-3 relative transition-all animate-fadeIn">
+        <div className="rounded-xl border-2 border-accent/40 bg-accent/5 p-3 relative transition-all animate-fadeIn">
           <button
             type="button"
             onClick={onClosePoint}
@@ -204,7 +204,7 @@ export default function MapLegendBox({
               {POINT_EMOJI[selectedPoint.type] || '📍'}
             </span>
             <div className="min-w-0 flex-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-primary">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-accent">
                 Chi tiết điểm đang chọn
               </span>
               <h3 className="font-bold text-sm text-ink leading-tight mt-0.5">{selectedPoint.name}</h3>
@@ -344,7 +344,7 @@ export default function MapLegendBox({
               key={cat.id}
               className={clsx(
                 'rounded-xl border transition-all overflow-hidden',
-                isExpanded ? 'border-primary/40 bg-panel shadow-sm' : 'border-line/70 bg-panel2/40 hover:bg-panel2/80'
+                isExpanded ? 'border-accent/40 bg-panel shadow-sm' : 'border-line/70 bg-panel2/40 hover:bg-panel2/80'
               )}
             >
               {/* Header của từng mục chú thích */}
@@ -392,7 +392,7 @@ export default function MapLegendBox({
                         className={clsx(
                           'w-full flex items-center justify-between p-1.5 rounded-lg text-left transition-all cursor-pointer',
                           selectedPoint?.id === item.id
-                            ? 'bg-primary/10 border border-primary/30 text-primary font-bold'
+                            ? 'bg-accent/10 border border-accent/30 text-accent font-bold'
                             : 'hover:bg-panel2/80 text-ink'
                         )}
                       >

@@ -1,0 +1,12 @@
+{
+  "name": "caobang-pctt-ui-tests",
+  "private": true,
+  "type": "module",
+  "description": "Kiểm thử giao diện bằng trình duyệt thật (Playwright): cổng công khai + màn hình cán bộ, khổ máy tính và điện thoại",
+  "scripts": {
+    "test": "node ui-test.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.63.0"
+  }
+}
