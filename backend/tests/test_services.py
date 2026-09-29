@@ -219,6 +219,36 @@ def test_river_level_never_claims_safe_without_fresh_data():
     assert river_level(179.0, False, thr) == (0, "Dưới báo động I")
 
 
+def test_track_items_never_include_address_or_description():
+    """Tra cứu công khai: kể cả đúng mã + SĐT cũng không trả địa chỉ / nội dung — lỡ bị dò trúng không lộ nơi người
+    đang mắc kẹt (người gửi đã biết địa chỉ của mình)."""
+    from datetime import UTC, datetime
+
+    from app.services.tracking import PRIVATE_FIELDS, format_report_item, format_sos_item
+
+    now = datetime(2026, 9, 29, 8, 0, tzinfo=UTC)
+    sos = format_sos_item(
+        {
+            "code": "SOS-1001", "status": "thuc_thi", "incident_type": "ngap_lut", "received_at": now,
+            "acknowledged_at": now, "dispatched_at": now, "resolved_at": None, "eta": now, "force_name": "Đội 1",
+            "dispatch_status": "dang_di", "admin_name": "Cô Ba", "reporter_phone": "0912345678",
+            "address": "Nhà ông A, xóm Nà Rì",
+        },
+        now,
+    )  # fmt: skip
+    report = format_report_item(
+        {
+            "code": "PA-1001", "status": "da_duyet", "category": "ngap", "description": "Nhà ông A ngập sâu",
+            "created_at": now, "moderated_at": now, "public_note": None, "address": "xóm Nà Rì",
+            "admin_name": "Cô Ba", "reporter_phone": "0912345678", "force_name": None, "sos_status": None,
+        }
+    )  # fmt: skip
+    for item in (sos, report):
+        assert "address" not in item and "description" not in item
+        assert "Nà Rì" not in str(item) and "ông A" not in str(item)
+    assert "address" not in PRIVATE_FIELDS and "description" not in PRIVATE_FIELDS
+
+
 def test_overdue_sql_uses_sla_per_priority():
     from app.services.sos import OVERDUE_SQL, SLA_MINUTES
 

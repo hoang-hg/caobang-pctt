@@ -30,7 +30,7 @@ from app.services.reports import CATEGORY, ReportError, create_report, public_ph
 from app.services.reservoirs import get_reservoirs_overview
 from app.services.safe_routing import haversine_km, plan_route
 from app.services.simulator import alarm_level
-from app.services.tracking import track_ticket
+from app.services.tracking import normalize_code, track_ticket
 
 router = APIRouter(prefix="/public", tags=["Công khai"])
 
@@ -478,13 +478,33 @@ class TrackIn(BaseModel):
     phone: str | None = Field(None, max_length=20, description="SĐT người gửi — bắt buộc nếu phiếu có SĐT")
 
 
+TRACK_MAX_FAILS = 10  # tra cứu không ra kết quả / giờ, theo SĐT và theo mã phiếu
+TRACK_WINDOW_S = 3600
+
+
 @router.post("/track")
 async def track_public(body: TrackIn):
     """Tra cứu tiến độ 1 phiếu SOS / phản ánh.
 
     POST (không phải GET) để SĐT không nằm trong URL và log truy cập. Không cache (dữ liệu theo từng người).
+
+    Chống dò: mã phiếu tăng dần → biết SĐT một người là thử lần lượt SOS-1001, 1002… để tìm phiếu của họ; biết mã là
+    thử SĐT từ nhiều IP. Giới hạn theo IP chưa đủ → thêm giới hạn số lần KHÔNG ra kết quả theo SĐT và theo mã (đếm cả
+    mã không tồn tại → không lộ mã nào có thật). Người thật hiếm khi gõ sai 10 lần trong 1 giờ.
     """
-    return await track_ticket(body.code, body.phone)
+    phone = phone_key(body.phone) if body.phone else None
+    code = normalize_code(body.code)
+    if phone:
+        await ratelimit.check_limit("track_phone", phone, TRACK_MAX_FAILS, TRACK_WINDOW_S)
+    if code:
+        await ratelimit.check_limit("track_code", code, TRACK_MAX_FAILS, TRACK_WINDOW_S)
+    result = await track_ticket(body.code, body.phone)
+    if not result["total"]:
+        if phone:
+            await ratelimit.count_hit("track_phone", phone, TRACK_WINDOW_S)
+        if code:
+            await ratelimit.count_hit("track_code", code, TRACK_WINDOW_S)
+    return result
 
 
 @router.get("/reservoirs")

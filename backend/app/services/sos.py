@@ -3,7 +3,7 @@
 import random
 from collections.abc import Callable
 
-from app.db import fetch_one
+from app.db import fetch_all, fetch_one
 from app.rbac import domains
 from app.services.events import log_event
 from app.services.sos_nlp import extract
@@ -41,8 +41,47 @@ SELECT t.id, t.code, t.reporter_name, t.reporter_phone, t.source, t.raw_message,
 """
 
 
-async def get_ticket(ticket_id) -> dict | None:
-    return await fetch_one(TICKET_SELECT + " WHERE t.id = CAST(:id AS uuid)", {"id": str(ticket_id)})
+async def get_ticket(ticket_id, conn=None) -> dict | None:
+    return await fetch_one(TICKET_SELECT + " WHERE t.id = CAST(:id AS uuid)", {"id": str(ticket_id)}, conn)
+
+
+# Phiếu "có thể trùng": cùng SĐT (9 số cuối) hoặc cách nhau dưới DUPLICATE_RADIUS_M, trong DUPLICATE_WINDOW_MIN, chưa
+# hoàn thành — một người gọi hotline 2 lần / nhiều người báo cùng một chỗ → trực ban gộp, không điều 2 đội
+DUPLICATE_WINDOW_MIN = 30
+DUPLICATE_RADIUS_M = 200
+
+
+async def possible_duplicates(ticket_id, conn=None) -> list[str]:
+    rows = await fetch_all(
+        r"""SELECT o.code FROM operations.sos_tickets t
+              JOIN operations.sos_tickets o ON o.id <> t.id
+             WHERE t.id = CAST(:id AS uuid) AND o.status <> 'hoan_thanh'
+               AND o.received_at > t.received_at - make_interval(mins => :w)
+               AND ((length(regexp_replace(coalesce(t.reporter_phone, ''), '\D', '', 'g')) >= 6
+                     AND right(regexp_replace(coalesce(o.reporter_phone, ''), '\D', '', 'g'), 9)
+                       = right(regexp_replace(t.reporter_phone, '\D', '', 'g'), 9))
+                    OR ST_DWithin(o.location::geography, t.location::geography, :r))
+             ORDER BY o.received_at DESC LIMIT 5""",
+        {"id": str(ticket_id), "w": DUPLICATE_WINDOW_MIN, "r": DUPLICATE_RADIUS_M},
+        conn,
+    )
+    return [r["code"] for r in rows]
+
+
+async def announce_ticket(ticket: dict, source: str) -> None:
+    """Sự kiện realtime + nhật ký cho phiếu mới. Phiếu tạo trong transaction của nơi gọi (``create_ticket(conn=…)``) →
+    nơi gọi gọi hàm này SAU khi commit (không báo một phiếu có thể còn bị rollback)."""
+    await hub.publish("sos.new", ticket, "sos", ticket["admin_code"])
+    dups = ticket.get("possible_duplicates") or []
+    await log_event(
+        f"{ticket['code']} – {INCIDENT_LABEL[ticket['incident_type']]} tại {ticket['address'] or ticket['admin_name']}"
+        f" ({ticket['trapped_count']} người) qua {source}"
+        + (f" — có thể trùng {', '.join(dups)}" if dups else ""),
+        "nguoi_dan",
+        "danger" if ticket["priority"] == 1 else "warning",
+        lat=ticket["lat"],
+        lon=ticket["lon"],
+    )
 
 
 async def create_ticket(
@@ -60,7 +99,12 @@ async def create_ticket(
     address: str | None = None,
     notes: str | None = None,
     authorize: Callable[[str], None] | None = None,
+    external_id: str | None = None,
+    conn=None,
 ) -> dict:
+    """Tạo phiếu SOS. ``external_id``: mã tin gốc của hệ thống gửi — gửi lại cùng (nguồn, mã) trả phiếu đã có
+    (``duplicate: True``), không tạo / báo lại. ``conn``: tạo trong transaction của nơi gọi — khi đó KHÔNG phát sự
+    kiện / ghi nhật ký; nơi gọi gọi ``announce_ticket`` sau khi commit. Kết quả kèm ``possible_duplicates``."""
     parsed = await extract(raw_message) if raw_message else {}
     place = parsed.get("place")
     if lat is None or lon is None:
@@ -84,12 +128,14 @@ async def create_ticket(
     row = await fetch_one(
         """
         INSERT INTO operations.sos_tickets (reporter_name, reporter_phone, source, raw_message, address, admin_unit_id, location,
-                                            incident_type, priority, trapped_count, vulnerable, notes)
+                                            incident_type, priority, trapped_count, vulnerable, notes, external_id)
         VALUES (:rn, :rp, :src, :msg, :addr, :unit,
-                ST_SetSRID(ST_MakePoint(:lon, :lat), 4326), :it, :pr, :tc, :vu, :notes)
+                ST_SetSRID(ST_MakePoint(:lon, :lat), 4326), :it, :pr, :tc, :vu, :notes, :ext)
+        ON CONFLICT (source, external_id) WHERE external_id IS NOT NULL DO NOTHING
         RETURNING id
         """,
         {
+            "ext": external_id,
             "rn": reporter_name,
             "rp": reporter_phone,
             "src": source,
@@ -104,16 +150,20 @@ async def create_ticket(
             "vu": vulnerable if vulnerable is not None else parsed.get("vulnerable", []),
             "notes": notes,
         },
+        conn,
     )
-    ticket = await get_ticket(row["id"])
+    if row is None:  # webhook gửi lại cùng mã tin → phiếu đã có, không tạo mới, không báo lại
+        existing = await fetch_one(
+            "SELECT id FROM operations.sos_tickets WHERE source = :s AND external_id = :e",
+            {"s": source, "e": external_id},
+            conn,
+        )
+        ticket = await get_ticket(existing["id"], conn)
+        ticket["duplicate"] = True
+        return ticket
+    ticket = await get_ticket(row["id"], conn)
     ticket["parsed"] = parsed or None
-    await hub.publish("sos.new", ticket, "sos", ticket["admin_code"])
-    await log_event(
-        f"{ticket['code']} – {INCIDENT_LABEL[ticket['incident_type']]} tại {ticket['address'] or ticket['admin_name']}"
-        f" ({ticket['trapped_count']} người) qua {source}",
-        "nguoi_dan",
-        "danger" if ticket["priority"] == 1 else "warning",
-        lat=lat,
-        lon=lon,
-    )
+    ticket["possible_duplicates"] = await possible_duplicates(row["id"], conn)
+    if conn is None:
+        await announce_ticket(ticket, source)
     return ticket

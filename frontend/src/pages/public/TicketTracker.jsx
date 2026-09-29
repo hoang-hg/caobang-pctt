@@ -70,7 +70,10 @@ export default function TicketTracker({ initialCode = '', initialPhone = '', onQ
     // POST: SĐT không nằm trên URL / log truy cập
     queryFn: () => api('/public/track', { method: 'POST', body: { code: activeQuery.code, phone: activeQuery.phone || null } }),
     enabled: !!activeQuery && activeQuery.code.trim().length >= 3,
-    refetchInterval: 15_000, // Tự động làm mới mỗi 15s để người dân thấy tiến độ thời gian thực
+    // Làm mới mỗi 15s để thấy tiến độ — CHỈ khi đã tìm thấy phiếu: tra cứu không ra kết quả bị đếm để chống dò mã / SĐT,
+    // tự làm mới lúc gõ nhầm sẽ tự khoá SĐT của chính người dân sau vài phút
+    refetchInterval: (query) => (query.state.data?.total ? 15_000 : false),
+    retry: (count, err) => err?.status !== 429 && count < 2,
   });
 
   const handleSearch = (e) => {
@@ -178,13 +181,23 @@ export default function TicketTracker({ initialCode = '', initialPhone = '', onQ
           <AlertCircle size={22} className="text-danger shrink-0 mt-0.5" />
           <div>
             <div className="font-bold text-danger text-sm">Không thể hoàn tất tra cứu</div>
-            <div className="text-xs text-ink-2 mt-1">Đã có lỗi xảy ra hoặc mạng gián đoạn. Vui lòng thử lại.</div>
-            <button
-              onClick={() => refetch()}
-              className="btn-ghost text-xs px-3 py-1.5 mt-3 border border-danger/30 text-danger hover:bg-danger/10"
-            >
-              Thử lại
-            </button>
+            {error.status === 429 ? (
+              // Chống dò mã phiếu / SĐT: quá nhiều lần tra cứu không ra kết quả với mã hoặc SĐT này
+              <div className="text-xs text-ink-2 mt-1">
+                Đã tra cứu sai quá nhiều lần với mã phiếu hoặc số điện thoại này — thử lại sau 1 giờ. Cần gấp: gọi 112 hoặc
+                đường dây nóng của tỉnh.
+              </div>
+            ) : (
+              <>
+                <div className="text-xs text-ink-2 mt-1">Đã có lỗi xảy ra hoặc mạng gián đoạn. Vui lòng thử lại.</div>
+                <button
+                  onClick={() => refetch()}
+                  className="btn-ghost text-xs px-3 py-1.5 mt-3 border border-danger/30 text-danger hover:bg-danger/10"
+                >
+                  Thử lại
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}

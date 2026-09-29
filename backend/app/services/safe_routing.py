@@ -12,6 +12,17 @@ import math
 from dataclasses import dataclass
 
 from app.db import fetch_all
+from app.services.readings import LATEST_COLS, LATEST_JOIN, vn_time
+from app.services.simulator import alarm_level
+
+# Cảnh báo kèm tuyến (không chặn đường — chưa có mô hình ngập): trạm mực nước gần tuyến, điểm nguy hiểm sát tuyến,
+# xã có mưa rất to theo dự báo
+NEAR_STATION_M = 2000
+NEAR_POINT_M = 200
+HEAVY_RAIN_24H_MM = 100
+MAX_WARNINGS = 8
+LEVEL_VI = {"do": "đỏ", "cam": "cam", "vang": "vàng"}
+ALARM_VI = ["dưới báo động I", "vượt báo động I", "vượt báo động II", "vượt báo động III"]
 
 
 @dataclass
@@ -133,7 +144,66 @@ async def plan_route(
     route["hazards"] = [h["name"] for h in hits]
     if hits:
         route["safe"] = False
+    route["warnings"] = await route_warnings(route["geometry"])
     return route
+
+
+async def route_warnings(geometry: dict) -> list[str]:
+    """Nguy cơ quanh tuyến mà vùng nguy hiểm chưa thể hiện — dự phòng khi số liệu trễ / thiếu:
+    trạm mực nước trong NEAR_STATION_M đang vượt BĐ II hoặc MẤT TÍN HIỆU (không xác nhận được nước), điểm nguy hiểm đã
+    nhập trong NEAR_POINT_M, xã tuyến đi qua có mưa dự báo 24 giờ ≥ HEAVY_RAIN_24H_MM."""
+    g = json.dumps(geometry)
+    out: list[str] = []
+    stations = await fetch_all(
+        f"""WITH r AS (SELECT ST_SetSRID(ST_GeomFromGeoJSON(:g), 4326)::geography AS g)
+            SELECT s.name, s.river, s.alarm_thresholds AS thr, {LATEST_COLS}
+              FROM r, iot_telemetry.monitoring_stations s {LATEST_JOIN}
+             WHERE s.type = 'muc_nuoc' AND ST_DWithin(s.location::geography, r.g, :d)
+             ORDER BY s.name""",
+        {"g": g, "d": NEAR_STATION_M},
+    )
+    for s in stations:
+        if s["value"] is None:  # trạm chưa từng có số đo: không có thông tin để cảnh báo
+            continue
+        river = f" (sông {s['river']})" if s["river"] else ""
+        level = alarm_level(s["value"], s["thr"] or {})
+        if level >= 2:
+            out.append(
+                f"{s['name']}{river} gần tuyến: {ALARM_VI[level]}"
+                + (f" — mất tín hiệu từ {vn_time(s['time'])}" if s["stale"] else "")
+                + " — không qua ngầm tràn, bãi bồi"
+            )
+        elif s["stale"]:
+            out.append(
+                f"{s['name']}{river} gần tuyến mất tín hiệu từ {vn_time(s['time'])} — "
+                "không xác nhận được mực nước, hỏi địa phương trước khi qua sông suối"
+            )
+    points = await fetch_all(
+        """WITH r AS (SELECT ST_SetSRID(ST_GeomFromGeoJSON(:g), 4326)::geography AS g)
+           SELECT p.name, p.level FROM r, iot_telemetry.hazard_points p
+            WHERE p.active AND ST_DWithin(p.location::geography, r.g, :d)
+            ORDER BY (p.level = 'do') DESC, p.name LIMIT 5""",
+        {"g": g, "d": NEAR_POINT_M},
+    )
+    out += [
+        f"Điểm nguy hiểm sát tuyến: {p['name']} (mức {LEVEL_VI.get(p['level'], p['level'])})" for p in points
+    ]
+    rain = await fetch_all(
+        """WITH r AS (SELECT ST_SetSRID(ST_GeomFromGeoJSON(:g), 4326) AS g)
+           SELECT u.name, round(sum(a.precip_p50))::int AS mm
+             FROM r, spatial_admin.administrative_units u
+             JOIN iot_telemetry.area_forecasts a ON a.admin_unit_id = u.id
+            WHERE u.level = 'xa' AND ST_Intersects(u.geom, r.g)
+              AND a.model = 'BLEND' AND a.time > now() AND a.time <= now() + interval '24 hours'
+            GROUP BY u.name HAVING sum(a.precip_p50) >= :mm
+            ORDER BY 2 DESC LIMIT 3""",
+        {"g": g, "mm": HEAVY_RAIN_24H_MM},
+    )
+    out += [
+        f"Xã {r['name']}: dự báo mưa rất to 24 giờ tới (~{r['mm']} mm) — đề phòng ngập, sạt lở trên tuyến"
+        for r in rain
+    ]
+    return out[:MAX_WARNINGS]
 
 
 def build_route(

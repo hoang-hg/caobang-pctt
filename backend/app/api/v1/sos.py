@@ -59,6 +59,8 @@ class SosIn(BaseModel):
     trapped_count: int | None = Field(None, ge=0, le=10000)
     vulnerable: list[str] | None = None
     address: str | None = None
+    # Mã tin gốc của hệ thống gửi (Zalo OA / app): gửi lại cùng mã → trả phiếu đã có, không tạo phiếu thứ hai
+    external_id: str | None = Field(None, min_length=1, max_length=120)
 
 
 @router.post("/sos")
@@ -236,6 +238,28 @@ async def dispatch(body: DispatchIn, user: dict = Depends(require_any("dispatch"
     eta = datetime.now(UTC) + timedelta(minutes=route["duration_min"])
 
     async with transaction() as conn:
+        # Khoá phiếu tới hết transaction, kiểm tra lại trạng thái TRONG khoá (bước tính lộ trình ở trên mất vài trăm
+        # ms): người khác vừa xác nhận "Đã cứu" → không mở lại phiếu đã xong, không trừ quân số cho lệnh không bao giờ
+        # được trả. "Đã cứu" (update_sos) ghi dòng phiếu nên chờ khoá này → lệnh vừa tạo cũng được giải phóng.
+        locked = await fetch_one(
+            "SELECT status FROM operations.sos_tickets WHERE id = CAST(:t AS uuid) FOR UPDATE",
+            {"t": body.ticket_id},
+            conn,
+        )
+        if locked["status"] == "hoan_thanh":
+            raise HTTPException(
+                409, f"Phiếu {ticket['code']} vừa được xác nhận hoàn thành — không điều động thêm"
+            )
+        # Hai trực ban cùng chọn một lực lượng / bấm đúp → không tạo 2 lệnh, không trừ quân số 2 lần
+        if await fetch_one(
+            """SELECT 1 FROM operations.dispatch_orders WHERE ticket_id = CAST(:t AS uuid) AND force_id = CAST(:f AS uuid)
+                  AND status IN ('dang_di', 'da_den')""",
+            {"t": body.ticket_id, "f": body.force_id},
+            conn,
+        ):
+            raise HTTPException(
+                409, f"{force['name']} đã được điều tới phiếu {ticket['code']} và đang làm nhiệm vụ"
+            )
         # Trừ quân số / nhận phương tiện có điều kiện → hai lệnh đồng thời (hai điều phối viên, danh sách cũ trên màn
         # hình) không làm âm quân số hay gán một phương tiện cho hai nhiệm vụ. Lỗi → rollback cả lệnh.
         taken = await fetch_one(

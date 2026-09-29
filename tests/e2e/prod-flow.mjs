@@ -270,6 +270,8 @@ if (force) {
 const pr = (await call('GET', '/public/route?from_lat=22.6700&from_lon=106.2400&to_lat=22.6657&to_lon=106.2522')).data;
 check('Chỉ đường công khai tới điểm trong vùng nguy hiểm → không báo "an toàn"', pr?.safe === false &&
   pr?.hazards?.includes('Khu dân cư xóm Nà Rì') && typeof pr?.offroad_km === 'number', JSON.stringify({ safe: pr?.safe, hazards: pr?.hazards }));
+// Điểm nguy hiểm đã nhập (tệp mẫu: "Taluy Km 12 QL34" tại điểm đến) → cảnh báo kèm tuyến
+check('Cảnh báo kèm tuyến: điểm nguy hiểm sát tuyến', pr?.warnings?.some((w) => w.includes('Taluy Km 12 QL34')), JSON.stringify(pr?.warnings));
 await call('GET', '/public/hotlines?_=lan-1');
 const hit = await call('GET', '/public/hotlines?_=lan-2');
 // Khoá cache bỏ tham số lạ → lần 2 không thể là MISS (HIT, hoặc STALE/UPDATING nếu vừa hết 10 giây)
@@ -319,6 +321,12 @@ for (let i = 0; i < 12 && st?.value !== 179.35; i++) {
   if (st?.value !== 179.35) await sleep(2500);
 }
 check('Trạm hiện số đo thật của thiết bị, chuyển nguồn "chờ thiết bị" → IoT', st?.value === 179.35 && st?.source === 'iot', `${st?.value} ${st?.source}`);
+// Mực nước vượt BĐ II (ngưỡng mẫu 180 / 181 / 182) → chỉ đường qua gần trạm phải kèm cảnh báo
+await call('POST', '/ingest/readings', { device_id: DEV, value: 181.4 }, null, { 'X-Device-Key': key || 'x' });
+const rw = await until('/public/route?from_lat=22.6700&from_lon=106.2400&to_lat=22.6657&to_lon=106.2522',
+  (d) => d?.warnings?.some((w) => w.includes('vượt báo động II')));
+check('Cảnh báo kèm tuyến: trạm mực nước gần tuyến vượt báo động II', rw?.warnings?.some((w) => w.includes('Trạm thuỷ văn Cao Bằng') &&
+  w.includes('vượt báo động II')), JSON.stringify(rw?.warnings));
 check('Xoá thiết bị', (await call('DELETE', `/integrations/devices/${DEV}`, null, admin)).status === 204);
 const bySource = Object.fromEntries(((await call('GET', '/integrations/monitor', null, admin)).data?.stations || []).map((s) => [s.source, s.n]));
 check('Trạm hết thiết bị → về "chờ thiết bị", không thành trạm mô phỏng (không chạy bộ mô phỏng)',

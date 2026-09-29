@@ -16,7 +16,7 @@ from app.db import execute, fetch_all, fetch_one
 from app.integrations import crypto
 from app.integrations.adapters import open_meteo, openweather
 from app.integrations.ingest import ingest_log, mark_stale_devices
-from app.services import retention
+from app.services import retention, sensor_zones
 from app.services.broadcast import fill_template
 from app.services.simulator import simulator
 from app.ws.hub import hub
@@ -223,6 +223,9 @@ async def tick() -> None:
         except Exception as exc:  # không in traceback: chuỗi lỗi có thể chứa khoá API
             log.warning("source %s failed: %s", s["code"], redact_secrets(f"{type(exc).__name__}: {exc}"))
     await mark_stale_devices()
+    await (
+        sensor_zones.hold_stale_sensor_zones()
+    )  # cảm biến mất tín hiệu lúc báo động → vùng nguy cơ không tự hết hạn
     global _last_purge
     if _last_purge is None or time.monotonic() - _last_purge >= PURGE_EVERY_S:
         _last_purge = time.monotonic()

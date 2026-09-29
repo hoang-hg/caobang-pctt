@@ -584,10 +584,12 @@ Thêm / đổi mật khẩu thiết bị: sửa `mqtt/passwd` rồi `… restart
 
 `POST /api/v1/sos/intake` cho Zalo OA / app / tổng đài chuyển tin cầu cứu thành phiếu SOS (nguồn `ZALO`, `APP`, `HOTLINE`).
 **Tắt** mặc định; bật bằng `INTAKE_API_KEY`, bên gửi đặt header `X-Intake-Key`. Thiếu khoá → 503, sai khoá → 401.
+Bên gửi **nên** gửi `external_id` (mã tin gốc, VD message id của Zalo): webhook gửi lại cùng (nguồn, `external_id`) —
+khi mất mạng / hết thời gian chờ — nhận lại đúng phiếu đã có (`"duplicate": true`), không tạo phiếu thứ hai.
 
 ```bash
 curl -X POST https://<máy chủ>/api/v1/sos/intake -H "X-Intake-Key: $INTAKE_API_KEY" -H "Content-Type: application/json" \
-  -d '{"source":"ZALO","raw_message":"Nhà ngập sâu, có 2 người già","reporter_phone":"09xx","lat":22.66,"lon":106.25}'
+  -d '{"source":"ZALO","external_id":"zalo-msg-123","raw_message":"Nhà ngập sâu, có 2 người già","reporter_phone":"09xx","lat":22.66,"lon":106.25}'
 ```
 
 <a id="nguon-trong-nuoc"></a>
@@ -664,7 +666,11 @@ sequenceDiagram
 2. **Phân cấp & SLA**: **Cấp 1** nguy hiểm tính mạng tức thì (vùi lấp, lũ cuốn, mắc kẹt trên mái) — phản hồi < 3 phút;
    **Cấp 2** nước dâng, cô lập, có người già / trẻ nhỏ — < 15 phút; **Cấp 3** ngập cục bộ, thiếu lương thực — < 60 phút.
 3. **Khớp lực lượng & lộ trình**: lọc đơn vị ứng trực gần nhất (dân quân, quân đội, công an PCCC & CNCH), cảnh báo nếu
-   lộ trình buộc đi qua vùng nguy hiểm đang hiệu lực.
+   lộ trình buộc đi qua vùng nguy hiểm đang hiệu lực, kèm **cảnh báo quanh tuyến** (không chặn đường): trạm mực nước
+   trong 2 km đang vượt BĐ II hoặc mất tín hiệu, điểm nguy hiểm đã nhập trong 200 m, xã có mưa dự báo ≥ 100 mm / 24 giờ.
+   **Phiếu có thể trùng** (cùng SĐT hoặc cách < 200 m trong 30 phút, chưa hoàn thành) được báo ngay khi tạo.
+   **Nhiều trực ban cùng xử lý 1 phiếu**: lệnh điều động khoá phiếu tới khi ghi xong — phiếu vừa được xác nhận "Đã cứu"
+   không bị mở lại; cùng một lực lượng không điều 2 lần cho cùng phiếu (409); quân số / phương tiện trừ có điều kiện.
 4. **Thực thi & hoàn tất**: theo dõi vị trí lực lượng trên bản đồ; đưa người về điểm sơ tán rồi đánh dấu **Đã cứu an toàn**.
 
 ### 7.2. Phản ánh hiện trường & tra cứu tiến độ
@@ -684,7 +690,10 @@ graph TD
 - **Tra cứu tiến độ** (`/cong-khai`, không cần đăng nhập): nhập mã `SOS-xxxx` / `PA-xxxx` **và** SĐT đã dùng khi gửi.
   Không tìm gần đúng, không tìm chỉ bằng SĐT; sai SĐT trả kết quả như "không tồn tại"; phản ánh ẩn danh chỉ cần mã nhưng
   chỉ xem mốc tiến độ; SOS do cán bộ tạo (không có SĐT người báo) không tra được. Không bao giờ trả ghi chú nội bộ,
-  toạ độ, vị trí lực lượng; SĐT hiện dạng che `099***666`. 4 mốc: **Đã tiếp nhận → Đã điều động → Đang trên đường đến
+  toạ độ, **địa chỉ, nội dung** (kể cả khi đúng SĐT — lỡ bị dò trúng cũng không lộ nơi người đang mắc kẹt), vị trí lực
+  lượng; SĐT hiện dạng che `099***666`. **Chống dò** (mã phiếu tăng dần): ngoài giới hạn theo IP, quá 10 lần tra cứu
+  không ra kết quả / giờ với cùng **SĐT** hoặc cùng **mã** → tạm chặn (429) — dò mã bằng SĐT của một người, hay dò SĐT
+  của một mã từ nhiều IP đều bị chặn; trang tra cứu chỉ tự làm mới khi đã tìm thấy phiếu. 4 mốc: **Đã tiếp nhận → Đã điều động → Đang trên đường đến
   (ETA, tự làm mới 15 giây) → Đã cứu an toàn / Khắc phục xong** — giảm cuộc gọi dồn dập vào 112/114.
 
 ### 7.3. Soạn, duyệt & phát cảnh báo (Maker – Checker)
@@ -712,7 +721,11 @@ graph LR
 
 - Trạm đo mưa, mực nước, cảm biến sạt lở gửi qua HTTP / MQTT / LoRaWAN; số đo dị thường bị loại ([6.4](#thiet-bi-iot)).
 - Vượt BĐ I / II / III: trạm đổi màu vàng / cam / đỏ, vào danh sách "Cảm biến vượt ngưỡng"; cảm biến sạt lở vượt BĐ II
-  tự khoanh vùng nguy cơ, tạo phiếu SOS nguồn cảm biến và nháp cảnh báo. Âm báo tại trung tâm khi có SOS cấp 1–2.
+  tự khoanh vùng nguy cơ (1 km, 12 giờ), tạo phiếu SOS nguồn cảm biến và nháp cảnh báo. Âm báo tại trung tâm khi có SOS
+  cấp 1–2. **Cảm biến mất tín hiệu khi đang báo động** (bị vùi, mất điện) → vùng **không tự hết hạn**: worker gia hạn từng
+  giờ, ghi "trạm mất tín hiệu — giữ cảnh báo" cho tới khi có số đo mới (`services/sensor_zones.py`).
+- Trạm mực nước vượt báo động **không** tự tạo vùng ngập (chưa có mô hình ngập): vùng ngập lấy từ bản đồ phân vùng đã nhập;
+  trạm vượt BĐ II / mất tín hiệu gần tuyến được nêu trong cảnh báo kèm tuyến.
 - Dự báo tổ hợp ECMWF + GEFS mỗi 3 giờ, mưa theo xã 24h / 72h (P10 – P50 – P90).
 - Công cụ GIS: thanh thời gian (12 giờ qua, 24 giờ tới), đo khoảng cách, hồ đập xung yếu, sức chứa điểm sơ tán.
 - **Hồ chứa**: chưa có nguồn số liệu vận hành tự động ([6](#ket-noi-du-lieu)). Hồ mới nhập danh mục hiện **"Chưa có số
@@ -902,7 +915,7 @@ phần lớn do cache nginx 10 giây trả (không tới backend, không bị đ
 | Quy tắc | Giới hạn |
 |---|---|
 | Gửi phản ánh | 200 / giờ / IP + 5 phản ánh **thành công** / giờ / SĐT người gửi (gửi lỗi không mất lượt) |
-| Chỉ đường · Định vị · Tra cứu tiến độ | 60 · 240 · 120 / phút |
+| Chỉ đường · Định vị · Tra cứu tiến độ | 60 · 240 · 120 / phút; tra cứu thêm: 10 lần không ra kết quả / giờ theo SĐT và theo mã phiếu |
 | API công khai khác | 600 / phút |
 | Đăng nhập | 30 / phút. Sai mật khẩu 10 lần → khoá 15′ **theo tài khoản + IP** (kẻ xấu biết tên đăng nhập của lãnh đạo chỉ tự khoá IP của mình); 100 lần từ mọi IP → khoá tài khoản **chưa bật 2 lớp**; sai mã 2 lớp 10 lần → khoá cả tài khoản |
 | Quên mật khẩu · Đặt lại | 5 · 10 / giờ |

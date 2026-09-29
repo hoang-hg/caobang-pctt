@@ -9,7 +9,16 @@ Dùng: ``SELECT …, {LATEST_COLS} FROM iot_telemetry.monitoring_stations s {LAT
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+
 STALE_MINUTES = 60
+VN_TZ = timezone(timedelta(hours=7))
+
+
+def vn_time(t: datetime) -> str:
+    """Giờ Việt Nam cho người đọc, VD "14:05 28/09"."""
+    return t.astimezone(VN_TZ).strftime("%H:%M %d/%m")
+
 
 LATEST_JOIN = """LEFT JOIN LATERAL (
     SELECT round(r.value::numeric, 2)::float AS value, r.time FROM iot_telemetry.sensor_readings r

@@ -35,6 +35,9 @@ function ActionModal({ report, action, onClose }) {
       if (action === 'sos') {
         const r = await api(`/reports/${report.id}/to-sos`, { method: 'POST', body: { incident_type: incident, priority, trapped_count: Number(trapped) } });
         toast({ tone: 'good', title: `Đã tạo phiếu ${r.sos_code}`, body: 'Theo dõi tại Điều hành cứu hộ' });
+        if (r.possible_duplicates?.length) {
+          toast({ tone: 'warn', title: `${r.sos_code} có thể trùng với ${r.possible_duplicates.join(', ')}`, body: 'Kiểm tra trước khi điều động — tránh điều 2 đội tới cùng một nơi.', duration: 12000 });
+        }
       } else {
         await api(`/reports/${report.id}/moderate`, { method: 'POST', body: { action, public_note: note || null, reject_reason: reason || null } });
         toast({ tone: 'good', title: `${title}: ${report.code}` });
