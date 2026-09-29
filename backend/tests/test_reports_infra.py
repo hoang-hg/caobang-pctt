@@ -101,6 +101,27 @@ def test_memory_cache_hits_and_invalidates(monkeypatch):
     assert a == b == {"v": 1} and c == {"v": 2}
 
 
+def test_compute_started_before_invalidate_is_not_cached(monkeypatch):
+    """Phép tính đọc CSDL trước khi dữ liệu mới commit, xong sau invalidate → không ghi đè cache bằng dữ liệu cũ."""
+    monkeypatch.setattr(cache, "get_redis", lambda: None)
+    calls = {"n": 0}
+
+    async def slow_producer():
+        calls["n"] += 1
+        if calls["n"] == 1:
+            await cache.invalidate("public:")  # lúc đang tính: duyệt xong, xoá cache
+        return {"v": calls["n"]}
+
+    async def run():
+        a = await cache.cached("public:race", 60, slow_producer)  # kết quả cũ trả cho yêu cầu này
+        b = await cache.cached("public:race", 60, slow_producer)  # không lấy lại kết quả cũ từ cache
+        c = await cache.cached("public:race", 60, slow_producer)
+        return a, b, c
+
+    a, b, c = asyncio.run(run())
+    assert a == {"v": 1} and b == {"v": 2} and c == {"v": 2}
+
+
 def test_track_code_and_phone_matching():
     from app.services.tracking import normalize_code, phone_matches
 

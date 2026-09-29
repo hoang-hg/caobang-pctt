@@ -10,6 +10,9 @@
   trúng cache (~20 ms với 76 KB).
 - Mã hoá JSON bằng ``jsonable_encoder`` của FastAPI → cùng định dạng với phản hồi không cache (Decimal → số,
   datetime → ISO 8601).
+- ``invalidate`` tăng **thế hệ cache** trước khi xoá khoá. Phép tính bắt đầu TRƯỚC lần xoá (đọc CSDL lúc dữ liệu mới
+  chưa commit) không được ghi kết quả vào cache — nếu không, dữ liệu cũ quay lại cache thêm cả TTL ngay sau khi duyệt
+  (CI bắt được: yêu cầu làm mới nền của nginx chạy đúng lúc duyệt hồ sơ → cổng thiếu điểm sơ tán vừa duyệt ~40 giây).
 """
 
 from __future__ import annotations
@@ -31,6 +34,10 @@ _memory: OrderedDict[str, tuple[float, str]] = OrderedDict()
 _MAX_MEMORY_KEYS = 500
 _inflight: dict[str, asyncio.Future[str | None]] = {}
 _memory_version = 0
+_memory_gen = 0
+
+# Thế hệ cache (tăng ở mỗi invalidate) — ngoài tiền tố "cache:" để invalidate("") không xoá mất
+CACHE_GEN_KEY = "pctt:cachegen"
 
 DATA_VERSION_KEY = "pctt:dataver"
 VIEW_TTL = 15  # giới hạn trên cho thao tác ghi không phát sự kiện realtime
@@ -55,12 +62,35 @@ async def _read(r, key: str) -> str | None:
     return item[1] if item and item[0] > time.monotonic() else None
 
 
-async def _write(r, key: str, payload: str, ttl: int) -> None:
+async def _generation(r) -> str | None:
+    """Thế hệ cache hiện tại; None = không đọc được (Redis lỗi) → ghi như trước, không kiểm thế hệ."""
+    if r is None:
+        return str(_memory_gen)
+    try:
+        return await r.get(CACHE_GEN_KEY) or "0"
+    except Exception:
+        return None
+
+
+async def _write(r, key: str, payload: str, ttl: int, gen: str | None = None) -> None:
+    """Ghi cache; ``gen``: thế hệ lúc BẮT ĐẦU tính — đã có invalidate xen giữa thì bỏ, không ghi dữ liệu cũ."""
     if r is not None:
         try:
-            await r.set(key, payload, ex=ttl)
-        except Exception:
+            if gen is None:
+                await r.set(key, payload, ex=ttl)
+                return
+            # So thế hệ và ghi nguyên tử (WATCH): invalidate chen vào giữa → EXEC huỷ, không ghi
+            async with r.pipeline(transaction=True) as pipe:
+                await pipe.watch(CACHE_GEN_KEY)
+                if (await pipe.get(CACHE_GEN_KEY) or "0") != gen:
+                    return
+                pipe.multi()
+                pipe.set(key, payload, ex=ttl)
+                await pipe.execute()
+        except Exception:  # WatchError (vừa invalidate) hoặc Redis lỗi → bỏ qua, lần sau tính lại
             pass
+        return
+    if gen is not None and gen != str(_memory_gen):
         return
     _memory[key] = (time.monotonic() + ttl, payload)
     _memory.move_to_end(key)
@@ -83,8 +113,9 @@ async def _compute(r, key: str, ttl: int, producer: Callable[[], Awaitable[Any]]
                 if (hit := await _read(r, key)) is not None:
                     return hit
     try:
+        gen = await _generation(r)  # đọc TRƯỚC khi truy vấn CSDL
         payload = _dumps(await producer())
-        await _write(r, key, payload, ttl)
+        await _write(r, key, payload, ttl, gen)
         return payload
     finally:
         if r is not None and locked:
@@ -123,10 +154,13 @@ async def _cached_payload(key: str, ttl: int, producer: Callable[[], Awaitable[A
 
 
 async def invalidate(prefix: str) -> None:
+    global _memory_gen
     prefix = f"cache:{prefix}"
+    _memory_gen += 1
     r = get_redis()
     if r is not None:
         try:
+            await r.incr(CACHE_GEN_KEY)  # TRƯỚC khi xoá: phép tính đang chạy dở không ghi lại dữ liệu cũ
             async for k in r.scan_iter(match=f"{prefix}*"):
                 await r.delete(k)
         except Exception:
