@@ -23,5 +23,5 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.execute(
         """ALTER TABLE community.citizen_reports DROP COLUMN IF EXISTS public_description,
-               DROP COLUMN IF EXISTS public_location, DROP COLUMN IF EXISTS public_photos, DROP COLUMN IF EXISTS track_key"""
+               DROP COLUMN IF EXISTS public_exact, DROP COLUMN IF EXISTS public_photos, DROP COLUMN IF EXISTS track_key"""
     )

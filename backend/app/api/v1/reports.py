@@ -21,7 +21,6 @@ from app.rbac import scope_loaders
 from app.rbac.authz import area_scope, require_permission
 from app.services.reports import (
     CATEGORY,
-    PUBLIC_GRID_DEG,
     redact_public_text,
     signed_photo_url,
     verify_photo_signature,
@@ -34,7 +33,7 @@ router = APIRouter(prefix="/reports", tags=["Phản ánh người dân"])
 REPORT_SELECT = """
 SELECT r.id, r.code, r.category, r.description, r.address, r.hamlet_name, r.reporter_name, r.reporter_phone, r.photos, r.status,
        r.public_note, r.reject_reason, r.moderated_at, r.created_at, r.sos_ticket_id,
-       r.public_description, r.public_photos, ST_Equals(r.public_location, r.location) AS exact_location,
+       r.public_description, r.public_photos, r.public_exact AS exact_location,
        ST_Y(r.location) AS lat, ST_X(r.location) AS lon, u.code AS admin_code, u.name AS admin_name,
        m.full_name AS moderated_by_name, t.code AS sos_code
   FROM community.citizen_reports r
@@ -110,13 +109,10 @@ class ModerateIn(BaseModel):
 
 STATUS_BY_ACTION = {"approve": "da_duyet", "reject": "tu_choi", "resolve": "da_xu_ly", "reopen": "cho_duyet"}
 # Ghi phần công khai (tham số :pd, :auto, :exact, :pp). Không chọn gì → giữ lựa chọn trước; lần đầu → nội dung gốc đã
-# che (:auto), vị trí làm tròn
-PUBLIC_FIELDS_SQL = f"""
+# che (:auto), vị trí làm tròn (public_exact mặc định false)
+PUBLIC_FIELDS_SQL = """
     public_description = COALESCE(CAST(:pd AS text), public_description, CAST(:auto AS text)),
-    public_location = CASE WHEN CAST(:exact AS boolean) THEN location
-                           WHEN CAST(:exact AS boolean) = false OR public_location IS NULL
-                           THEN ST_SnapToGrid(location, {PUBLIC_GRID_DEG})
-                           ELSE public_location END,
+    public_exact = COALESCE(CAST(:exact AS boolean), public_exact),
     public_photos = COALESCE(CAST(:pp AS boolean), public_photos),"""
 
 

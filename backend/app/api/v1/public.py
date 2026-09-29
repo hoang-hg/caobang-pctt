@@ -170,13 +170,13 @@ async def public_map():
 
 
 async def _approved_reports(hours: int) -> list[dict]:
-    # Chỉ PHẦN CÔNG KHAI cán bộ đã duyệt: nội dung công khai (chưa có → mô tả gốc), vị trí công khai (chưa có → làm
-    # tròn), ảnh khi được phép. Luôn che SĐT / email / số giấy tờ lần nữa khi trả ra (phòng cán bộ sót).
+    # Chỉ PHẦN CÔNG KHAI cán bộ đã duyệt: nội dung công khai (chưa có → mô tả gốc), vị trí (làm tròn trừ khi cán bộ chọn
+    # chính xác), ảnh khi được phép. Luôn che SĐT / email / số giấy tờ lần nữa khi trả ra (phòng cán bộ sót).
     rows = await fetch_all(
         f"""SELECT r.id, r.code, r.category, COALESCE(r.public_description, r.description) AS description,
                   r.public_note, r.status, r.created_at, u.name AS admin_name,
                   CASE WHEN r.public_photos THEN jsonb_array_length(r.photos) ELSE 0 END AS n_photos,
-                  ST_Y(p.pt) AS lat, ST_X(p.pt) AS lon, ST_Equals(p.pt, r.location) AS exact_location
+                  ST_Y(p.pt) AS lat, ST_X(p.pt) AS lon, r.public_exact AS exact_location
              FROM community.citizen_reports r LEFT JOIN spatial_admin.administrative_units u ON u.id = r.admin_unit_id
             CROSS JOIN LATERAL (SELECT {PUBLIC_POINT_SQL} AS pt) p
             WHERE r.status IN ('da_duyet', 'da_xu_ly') AND r.created_at > now() - make_interval(hours => :h)

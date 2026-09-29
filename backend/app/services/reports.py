@@ -61,8 +61,11 @@ PHOTO_URL_TTL = 3600
 # là nhà họ). Làm tròn cố định (không cộng nhiễu ngẫu nhiên): nhiễu mới mỗi lần có thể lấy trung bình để tìm lại điểm gốc.
 PUBLIC_GRID_DEG = 0.002
 PUBLIC_APPROX_M = 150
-# Biểu thức SQL (bảng phản ánh đặt tên r): vị trí công khai đã chọn khi duyệt, chưa có → làm tròn vị trí gốc
-PUBLIC_POINT_SQL = f"COALESCE(r.public_location, ST_SnapToGrid(r.location, {PUBLIC_GRID_DEG}))"
+# Biểu thức SQL (bảng phản ánh đặt tên r): đúng điểm khi cán bộ xác nhận là điểm công cộng, còn lại làm tròn. Tính khi
+# trả ra (không lưu toạ độ công khai) → đổi độ làm tròn áp dụng cho mọi phản ánh.
+PUBLIC_POINT_SQL = (
+    f"(CASE WHEN r.public_exact THEN r.location ELSE ST_SnapToGrid(r.location, {PUBLIC_GRID_DEG}) END)"
+)
 _EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 REDACTED = "[đã ẩn]"
 
