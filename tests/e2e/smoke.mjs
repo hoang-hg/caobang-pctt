@@ -45,6 +45,42 @@ const disp = await call('POST', '/dispatch', {
 check('Phát lệnh điều động + lộ trình', disp.status === 200 && disp.data.route.geometry.coordinates.length > 2,
   disp.status === 200 ? `${disp.data.route.distance_km} km, ${disp.data.route.duration_min} phút, an toàn=${disp.data.route.safe}` : JSON.stringify(disp.data));
 check('Phiếu chuyển sang Đang thực thi', disp.data.ticket?.status === 'thuc_thi');
+const again2 = await call('POST', '/dispatch', { ticket_id: ticket.id, force_id: match.forces[0].id, personnel: 1 }, maker);
+check('Điều lại cùng lực lượng cho cùng phiếu (bấm đúp / 2 trực ban) → 409, không trừ quân số 2 lần', again2.status === 409, again2.data?.detail);
+
+// Điều động song song với "Đã cứu an toàn": phiếu đã xong không bị mở lại, không còn lệnh treo giữ quân số
+for (let i = 0; i < 3; i++) {
+  const t = (await call('POST', '/sos', { raw_message: `Kiểm thử tranh chấp điều động ${i}`, lat: 22.676, lon: 106.25, incident_type: 'ngap_lut', priority: 2 }, maker)).data;
+  const f = (await call('GET', `/sos/${t.id}/match`, null, maker)).data?.forces?.[0];
+  const [d, r] = await Promise.all([
+    call('POST', '/dispatch', { ticket_id: t.id, force_id: f.id, personnel: 1 }, maker),
+    call('POST', `/sos/${t.id}/resolve`, null, maker),
+  ]);
+  const after = (await call('GET', '/sos', null, maker)).data.find((x) => x.id === t.id);
+  check(`Điều động ‖ "Đã cứu" (lần ${i + 1}): phiếu vẫn hoàn thành, lệnh (nếu có) đã được giải phóng`,
+    r.status === 200 && after?.status === 'hoan_thanh' && (after.dispatch_status == null || after.dispatch_status === 'hoan_thanh'),
+    `dispatch ${d.status}, phiếu ${after?.status}, lệnh ${after?.dispatch_status}`);
+}
+
+// Phiếu có thể trùng: cùng SĐT trong 30 phút
+const dupPhone = `0966${String(Date.now()).slice(-6)}`;
+const s1 = (await call('POST', '/sos', { raw_message: 'Nhà ngập, cần xuồng', reporter_phone: dupPhone, lat: 22.60, lon: 106.10, incident_type: 'ngap_lut' }, maker)).data;
+const s2 = (await call('POST', '/sos', { raw_message: 'Gọi lại: nhà ngập, cần xuồng', reporter_phone: dupPhone, lat: 22.70, lon: 106.30, incident_type: 'ngap_lut' }, maker)).data;
+check('Phiếu thứ 2 cùng SĐT → báo "có thể trùng" phiếu trước', s2.possible_duplicates?.includes(s1.code), JSON.stringify(s2.possible_duplicates));
+
+// Webhook (Zalo / app) gửi lại cùng mã tin → không tạo phiếu thứ hai
+if (process.env.INTAKE_API_KEY) {
+  const intake = (body) => fetch(`${BASE}/sos/intake`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Intake-Key': process.env.INTAKE_API_KEY }, body: JSON.stringify(body),
+  }).then(async (res) => ({ status: res.status, data: await res.json() }));
+  const msg = { raw_message: 'Sạt lở vùi nhà ở xã Yên Thổ', source: 'ZALO', external_id: `zalo-msg-${Date.now()}` };
+  const [i1, i2] = await Promise.all([intake(msg), intake(msg)]);  // gửi lại gần như cùng lúc
+  const i3 = await intake(msg);
+  check('Webhook gửi lại cùng mã tin → cùng 1 phiếu', i1.status === 200 && i2.data.code === i1.data.code && i3.data.code === i1.data.code && i3.data.duplicate === true,
+    `${i1.data?.code} ${i2.data?.code} ${i3.data?.code}`);
+} else {
+  console.log('SKIP  Webhook gửi lại (chưa đặt INTAKE_API_KEY)');
+}
 
 const route = (await call('POST', '/map/route', { from_lat: 22.676, from_lon: 106.25, to_lat: 22.95, to_lon: 105.672 }, maker)).data;
 check('Định tuyến TP → Bảo Lạc', route.distance_km > 50, `${route.distance_km} km, an toàn=${route.safe}, ${route.roads.join(' → ')}`);

@@ -176,7 +176,7 @@ def format_sos_item(t: dict, now: datetime) -> dict:
         "status": status,
         "status_label": SOS_STATUS_LABELS.get(status, status),
         "created_at": t["received_at"].isoformat() if t.get("received_at") else None,
-        "address": t.get("address"),
+        # KHÔNG trả địa chỉ / nội dung: người gửi đã biết; lỡ bị dò trúng mã + SĐT cũng không lộ nơi người đang mắc kẹt
         "admin_name": t.get("admin_name"),
         "reporter_phone_masked": mask_phone(t.get("reporter_phone")),
         "force_name": force_name,
@@ -329,11 +329,10 @@ def format_report_item(r: dict) -> dict:
         "type_label": "Phản ánh hiện trường",
         "category": r["category"],
         "category_label": CATEGORY.get(r["category"], r["category"]),
-        "description": r["description"],
         "status": status,
         "status_label": REPORT_STATUS_LABELS.get(status, status),
         "created_at": created_at.isoformat() if created_at else None,
-        "address": r.get("address"),
+        # Không trả mô tả / địa chỉ (xem format_sos_item)
         "admin_name": r.get("admin_name"),
         "reporter_phone_masked": mask_phone(r.get("reporter_phone")),
         "force_name": force_name,
@@ -374,7 +373,7 @@ REPORT_SQL = """
 """
 
 # Trường chỉ trả khi người tra cứu chứng minh là người gửi (nhập đúng SĐT)
-PRIVATE_FIELDS = ("description", "address", "reporter_phone_masked", "force_name")
+PRIVATE_FIELDS = ("reporter_phone_masked", "force_name")  # chỉ trả khi khớp SĐT người gửi
 
 
 def normalize_code(raw: str) -> str | None:

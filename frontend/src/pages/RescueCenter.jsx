@@ -193,6 +193,10 @@ function Intake() {
     try {
       const t = await api('/sos', { method: 'POST', body: { raw_message: text, source, reporter_phone: phone || null } });
       toast({ tone: 'good', title: `Đã tạo phiếu ${t.code}`, body: `${INCIDENT[t.incident_type]} – ${t.address}` });
+      if (t.possible_duplicates?.length) {
+        // Cùng SĐT hoặc cách < 200 m trong 30 phút, chưa hoàn thành → kiểm tra trước khi điều thêm đội
+        toast({ tone: 'warn', title: `${t.code} có thể trùng với ${t.possible_duplicates.join(', ')}`, body: 'Kiểm tra trước khi điều động — tránh điều 2 đội tới cùng một nơi.', duration: 12000 });
+      }
       setText('');
       setParsed(null);
       setPhone('');

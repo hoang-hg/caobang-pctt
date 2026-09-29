@@ -113,6 +113,11 @@ export default function DispatchModal({ ticket, presetForceId, onClose }) {
             Tuyến: {result.route.roads.join(' → ') || 'đường địa phương'}
             {result.route.offroad_km >= 0.5 && ` · ${result.route.offroad_km} km chưa có dữ liệu đường`}
           </div>
+          {result.route.warnings?.length > 0 && (
+            <ul className="list-inside list-disc rounded-lg border border-warn/50 bg-warn/5 p-2 text-xs text-ink-2">
+              {result.route.warnings.map((w) => <li key={w}>{w}</li>)}
+            </ul>
+          )}
           {result.notification.sent ? (
             <div className="rounded-lg border border-accent/40 bg-accent/10 p-3 text-sm">
               <div className="text-xs font-semibold text-accent">Đã gửi lệnh tới trưởng nhóm {result.notification.to}</div>

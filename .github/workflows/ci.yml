@@ -78,6 +78,8 @@ jobs:
       # ops-test.mjs: ngưỡng ổ đĩa 1% → giả lập ổ đĩa đầy, thử trọn luồng cảnh báo sự cố (email tới Mailpit, 503)
       OPS_DISK_WARN_PCT: "1"
       OPS_ALERT_EMAILS: van-hanh@ci.local
+      # smoke.mjs: webhook SOS (Zalo / app) gửi lại cùng mã tin → không tạo phiếu thứ hai
+      INTAKE_API_KEY: ci-intake-key-${{ github.run_id }}-khoa-thu-nghiem
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5

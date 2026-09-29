@@ -936,6 +936,12 @@ export default function PublicPortal() {
                                 Có khoảng {route.offroad_km} km chưa có dữ liệu đường (đoạn nối tới / từ đường chính) — tự quan sát khi di chuyển, không đi qua suối, ngầm tràn đang ngập.
                               </span>
                             )}
+                            {/* Trạm mực nước vượt báo động / mất tín hiệu, điểm nguy hiểm, mưa rất to quanh tuyến */}
+                            {route.warnings?.length > 0 && (
+                              <ul className="mt-1 list-inside list-disc text-amber-700 dark:text-amber-400">
+                                {route.warnings.map((w) => <li key={w}>{w}</li>)}
+                              </ul>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">

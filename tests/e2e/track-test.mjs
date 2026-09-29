@@ -49,7 +49,9 @@ await call('PATCH', `/sos/${sos.data.id}`, { notes: 'GHI_CHU_NOI_BO_KHONG_CONG_K
 // ---- Người gửi tra cứu đúng mã + SĐT
 const r1 = await track(mine.data.code, PHONE);
 const it1 = r1.data?.results?.[0];
-check('Đúng mã + đúng SĐT → thấy phiếu và nội dung', r1.status === 200 && r1.data.total === 1 && r1.data.verified && it1.description?.includes('taluy'));
+check('Đúng mã + đúng SĐT → thấy phiếu, loại sự việc, tiến độ', r1.status === 200 && r1.data.total === 1 && r1.data.verified && it1.category_label === 'Sạt lở đất đá');
+// Kể cả đúng SĐT cũng không trả nội dung / địa chỉ: lỡ bị dò trúng mã + SĐT không lộ nơi người đang ở
+check('Không trả mô tả / địa chỉ (kể cả đúng SĐT)', it1.description === undefined && it1.address === undefined && !JSON.stringify(r1.data).includes('taluy'));
 check('Có 4 mốc tiến độ, mốc 1 đã xong', it1?.timeline?.length === 4 && it1.timeline[0].state === 'done');
 check('Nhập mã không gạch nối, chữ thường, SĐT dạng +84 vẫn khớp', (await track(mine.data.code.toLowerCase().replace('-', ' '), '+84' + PHONE.slice(1))).data?.total === 1);
 
@@ -83,6 +85,19 @@ const leaked = SENSITIVE.filter((k) => JSON.stringify([r1.data, r2.data, r3.data
 check('Không trả trường nhạy cảm', leaked.length === 0, leaked.join(', '));
 
 check('Mã không tồn tại → rỗng', (await track('SOS-9999999', PHONE)).data?.total === 0);
+check('SOS: không trả địa chỉ nơi người mắc kẹt', !JSON.stringify(r4.data).includes('Thôn thử nghiệm'));
+
+// ---- Chống dò: giới hạn số lần KHÔNG ra kết quả theo SĐT và theo mã (ngoài giới hạn theo IP)
+// Biết SĐT → thử lần lượt mã tăng dần
+const P2 = `0988${String(Date.now()).slice(-6)}`;
+let st = 0;
+for (let i = 0; i < 12 && st !== 429; i++) st = (await track(`SOS-${8000000 + i}`, P2)).status;
+check('Dò mã bằng 1 SĐT: sau 10 lần không ra kết quả → 429', st === 429);
+// Biết mã → thử nhiều SĐT (kể cả từ nhiều IP: đếm theo mã, không theo IP)
+st = 0;
+for (let i = 0; i < 12 && st !== 429; i++) st = (await track(sos.data.code, `0977${String(100000 + i)}`)).status;
+check('Dò SĐT của 1 mã: sau 10 lần sai → khoá tra cứu mã đó', st === 429);
+check('Mã khác, SĐT khác vẫn tra cứu bình thường', (await track(mine.data.code, PHONE)).data?.total === 1);
 
 console.log(failed ? `\n${failed} kiểm tra KHÔNG đạt` : '\nTất cả kiểm tra tra cứu tiến độ đạt');
 process.exit(failed ? 1 : 0);

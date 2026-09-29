@@ -16,7 +16,7 @@ from app.infra.cache import invalidate
 from app.rbac import scope_loaders
 from app.rbac.authz import area_scope, require_permission
 from app.services.reports import CATEGORY, signed_photo_url, verify_photo_signature
-from app.services.sos import create_ticket
+from app.services.sos import announce_ticket, create_ticket
 from app.ws.hub import hub
 
 router = APIRouter(prefix="/reports", tags=["Phản ánh người dân"])
@@ -171,6 +171,7 @@ async def to_sos(
             trapped_count=body.trapped_count,
             address=r["address"] or r["admin_name"],
             notes=f"Từ phản ánh người dân {r['code']}: {r['description'][:300]}",
+            conn=conn,  # cùng transaction với việc gắn phiếu vào phản ánh → lỗi giữa chừng không để lại phiếu mồ côi
         )
         await execute(
             """UPDATE community.citizen_reports SET sos_ticket_id = CAST(:t AS uuid), moderated_by = :u, moderated_at = now(),
@@ -180,6 +181,11 @@ async def to_sos(
             {"t": str(ticket["id"]), "u": user["id"], "id": report_id},
             conn,
         )
+    await announce_ticket(ticket, "APP")  # sau khi commit
     await audit(user, "report.to_sos", "citizen_report", r["code"], {"sos": ticket["code"]})
     await invalidate("public:")
-    return {"sos_code": ticket["code"], "sos_id": ticket["id"]}
+    return {
+        "sos_code": ticket["code"],
+        "sos_id": ticket["id"],
+        "possible_duplicates": ticket.get("possible_duplicates") or [],
+    }

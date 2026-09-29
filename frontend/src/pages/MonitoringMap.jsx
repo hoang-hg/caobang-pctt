@@ -251,6 +251,7 @@ export default function MonitoringMap() {
                 {routeInfo.safe ? <b className="text-good">Né vùng nguy hiểm đã ghi nhận</b> : <b className="text-danger">Đi qua vùng nguy hiểm{routeInfo.hazards?.length ? `: ${routeInfo.hazards.join(', ')}` : ''}</b>}
                 {routeInfo.offroad_km >= 0.5 && <span className="text-amber-600"> · {routeInfo.offroad_km} km chưa có dữ liệu đường</span>}
                 <br /><span className="text-muted">{routeInfo.roads.join(' → ')}</span>
+                {routeInfo.warnings?.map((w) => <span key={w} className="block text-amber-600">⚠ {w}</span>)}
               </span>
             ) : (
               'Chạm chọn điểm A (vị trí lực lượng) rồi điểm B (nơi cần cứu hộ).'

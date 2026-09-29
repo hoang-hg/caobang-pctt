@@ -70,6 +70,26 @@ if (dockerOk) {
   check('Dọn dòng sự kiện vận hành quá 730 ngày, giữ bản ghi mới', left('operations.event_logs') === `${tag}-moi`);
   sql(`DELETE FROM integrations.ingest_log WHERE message LIKE '${tag}%'`);
   sql(`DELETE FROM operations.event_logs WHERE message LIKE '${tag}%'`);
+
+  // ---- Vùng nguy cơ do cảm biến: cảm biến mất tín hiệu lúc báo động → vùng không tự hết hạn (chỉ đường không báo an toàn)
+  const z = `E2E-TL-${Date.now()}`;
+  const station = (id) => sql(`INSERT INTO iot_telemetry.monitoring_stations (id, name, type, unit, source, location)
+    VALUES ('${id}', 'Cảm biến thử ${id}', 'do_nghieng', '°', 'external', ST_SetSRID(ST_MakePoint(106.25, 22.66), 4326))`);
+  const zone = (id) => sql(`INSERT INTO iot_telemetry.hazard_zones (type, level, name, source, station_id, valid_until, geom)
+    VALUES ('sat_lo', 'do', 'Vùng thử ${id}', 'sensor', '${id}', now() + interval '5 minutes',
+            ST_Multi(ST_Buffer(ST_SetSRID(ST_MakePoint(106.25, 22.66), 4326)::geography, 300)::geometry))`);
+  station(`${z}-A`); zone(`${z}-A`);  // không có số đo trong 60 phút → mất tín hiệu
+  station(`${z}-B`); zone(`${z}-B`);
+  sql(`INSERT INTO iot_telemetry.sensor_readings (time, station_id, value) VALUES (now(), '${z}-B', 3.5)`);  // còn tín hiệu
+  execFileSync('docker', ['exec', 'caobang-pctt-worker', 'python', '-c',
+    'import asyncio; from app.services.sensor_zones import hold_stale_sensor_zones as h; print(asyncio.run(h()))'], { encoding: 'utf8' });
+  const zoneState = (id) => sql(`SELECT (valid_until > now() + interval '50 minutes') || '|' || name FROM iot_telemetry.hazard_zones WHERE station_id = '${id}'`);
+  const [heldA, nameA] = zoneState(`${z}-A`).split('|');
+  check('Cảm biến mất tín hiệu → vùng nguy cơ được giữ, ghi rõ "trạm mất tín hiệu"', heldA === 'true' && nameA.includes('trạm mất tín hiệu'), nameA);
+  check('Cảm biến còn gửi số đo → vùng hết hạn bình thường', zoneState(`${z}-B`).split('|')[0] === 'false');
+  sql(`DELETE FROM iot_telemetry.hazard_zones WHERE station_id LIKE '${z}%'`);
+  sql(`DELETE FROM iot_telemetry.sensor_readings WHERE station_id LIKE '${z}%'`);
+  sql(`DELETE FROM iot_telemetry.monitoring_stations WHERE id LIKE '${z}%'`);
 } else {
   console.log('SKIP  Giữ nhật ký có thời hạn (không gọi được docker exec)');
 }

@@ -311,6 +311,9 @@ Python trong container.
 - [ ] Đọc ảnh người dân: `Image.open(…, formats=…)` chỉ các định dạng cho phép — không để Pillow thử mọi bộ đọc.
 - [ ] Chuyển hướng theo tham số URL (`?next=`): phân giải bằng `new URL(…)` và so origin (`safeNext`, `App.jsx`);
       chặn chuỗi bắt đầu `//` là chưa đủ (`/\evil.com`).
+- [ ] Thao tác nhiều người cùng làm trên 1 phiếu / tài nguyên: khoá dòng (`FOR UPDATE`) rồi kiểm tra trạng thái TRONG
+      transaction (mẫu `/dispatch` khoá phiếu SOS), ghi có điều kiện (`UPDATE … WHERE status = … RETURNING`). Tạo phiếu
+      trong transaction khác: `create_ticket(conn=…)` rồi `announce_ticket` sau commit.
 - [ ] Không khẳng định điều hệ thống không biết: thiếu / cũ số liệu (trạm `stationView`, hồ `chua_co_so_lieu`) → xám,
       không "an toàn / bình thường"; tuyến chỉ "không qua vùng nguy hiểm đã ghi nhận"; việc chưa tích hợp (SMS, Push,
       Cell Broadcast) → giao diện nói rõ **chưa gửi**, không mô phỏng như đã gửi khi `SIMULATOR=false`.
