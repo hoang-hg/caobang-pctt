@@ -1,6 +1,10 @@
 """Duyệt phản ánh của người dân (cán bộ): /api/v1/reports/*
 
 Quyền ``report.view`` / ``report.moderate`` theo phạm vi xã — Quản trị xã chỉ duyệt phản ánh trong xã mình.
+
+Duyệt = chọn PHẦN CÔNG KHAI: nội dung (mặc định mô tả gốc đã che SĐT / email / số giấy tờ — cán bộ bỏ tiếp tên người,
+số nhà…), vị trí (mặc định làm tròn ~150 m; chính xác khi là điểm công cộng: đường, cầu, taluy), có công khai ảnh không.
+Mô tả / vị trí gốc chỉ cán bộ xem.
 """
 
 from typing import Literal
@@ -15,7 +19,12 @@ from app.infra import storage
 from app.infra.cache import invalidate
 from app.rbac import scope_loaders
 from app.rbac.authz import area_scope, require_permission
-from app.services.reports import CATEGORY, signed_photo_url, verify_photo_signature
+from app.services.reports import (
+    CATEGORY,
+    redact_public_text,
+    signed_photo_url,
+    verify_photo_signature,
+)
 from app.services.sos import announce_ticket, create_ticket
 from app.ws.hub import hub
 
@@ -24,6 +33,7 @@ router = APIRouter(prefix="/reports", tags=["Phản ánh người dân"])
 REPORT_SELECT = """
 SELECT r.id, r.code, r.category, r.description, r.address, r.hamlet_name, r.reporter_name, r.reporter_phone, r.photos, r.status,
        r.public_note, r.reject_reason, r.moderated_at, r.created_at, r.sos_ticket_id,
+       r.public_description, r.public_photos, r.public_exact AS exact_location,
        ST_Y(r.location) AS lat, ST_X(r.location) AS lon, u.code AS admin_code, u.name AS admin_name,
        m.full_name AS moderated_by_name, t.code AS sos_code
   FROM community.citizen_reports r
@@ -40,6 +50,8 @@ def _with_urls(r: dict) -> dict:
         for i in range(len(r.pop("photos") or []))
     ]
     r["category_label"] = CATEGORY.get(r["category"], r["category"])
+    # Gợi ý nội dung công khai cho màn hình duyệt (cán bộ sửa tiếp: bỏ tên người, số nhà…)
+    r["public_description_suggested"] = redact_public_text(r["description"])
     return r
 
 
@@ -71,11 +83,12 @@ async def photo(report_id: str, idx: int, exp: int, sig: str, thumb: int = 0):
 
 async def _serve_photo(report_id: str, idx: int, thumb: bool, public: bool) -> Response:
     row = await fetch_one(
-        "SELECT photos, status FROM community.citizen_reports WHERE id = CAST(:id AS uuid)", {"id": report_id}
+        "SELECT photos, status, public_photos FROM community.citizen_reports WHERE id = CAST(:id AS uuid)",
+        {"id": report_id},
     )
     if not row or idx < 0 or idx >= len(row["photos"]):
         raise HTTPException(404, "Không tìm thấy ảnh")
-    if public and row["status"] not in ("da_duyet", "da_xu_ly"):
+    if public and (row["status"] not in ("da_duyet", "da_xu_ly") or not row["public_photos"]):
         raise HTTPException(404, "Không tìm thấy ảnh")
     item = row["photos"][idx]
     data = await storage.get(item["thumb_key"] if thumb else item["key"])
@@ -84,13 +97,34 @@ async def _serve_photo(report_id: str, idx: int, thumb: bool, public: bool) -> R
 
 
 class ModerateIn(BaseModel):
-    action: Literal["approve", "reject", "resolve", "reopen"]
+    # edit_public: sửa phần công khai của phản ánh đã duyệt, giữ nguyên trạng thái
+    action: Literal["approve", "reject", "resolve", "reopen", "edit_public"]
     public_note: str | None = Field(None, max_length=500)
     reject_reason: str | None = Field(None, max_length=500)
     category: str | None = None
+    public_description: str | None = Field(None, min_length=10, max_length=1000)
+    exact_location: bool | None = None  # true: công khai đúng điểm người dân chấm (điểm công cộng)
+    public_photos: bool | None = None
 
 
 STATUS_BY_ACTION = {"approve": "da_duyet", "reject": "tu_choi", "resolve": "da_xu_ly", "reopen": "cho_duyet"}
+# Ghi phần công khai (tham số :pd, :auto, :exact, :pp). Không chọn gì → giữ lựa chọn trước; lần đầu → nội dung gốc đã
+# che (:auto), vị trí làm tròn (public_exact mặc định false)
+PUBLIC_FIELDS_SQL = """
+    public_description = COALESCE(CAST(:pd AS text), public_description, CAST(:auto AS text)),
+    public_exact = COALESCE(CAST(:exact AS boolean), public_exact),
+    public_photos = COALESCE(CAST(:pp AS boolean), public_photos),"""
+
+
+def _public_params(
+    public_description: str | None, description: str, exact: bool | None = None, photos: bool | None = None
+) -> dict:
+    return {
+        "pd": public_description.strip() if public_description else None,
+        "auto": redact_public_text(description),
+        "exact": exact,
+        "pp": photos,
+    }
 
 
 @router.post("/{report_id}/moderate")
@@ -103,15 +137,31 @@ async def moderate(
         raise HTTPException(422, "Cần nêu lý do từ chối")
     if body.category and body.category not in CATEGORY:
         raise HTTPException(422, "Loại phản ánh không hợp lệ")
-    status = STATUS_BY_ACTION[body.action]
+    current = await fetch_one(
+        "SELECT status, description FROM community.citizen_reports WHERE id = CAST(:id AS uuid)",
+        {"id": report_id},
+    )
+    if not current:
+        raise HTTPException(404, "Không tìm thấy phản ánh")
+    if body.action == "edit_public" and current["status"] not in ("da_duyet", "da_xu_ly"):
+        raise HTTPException(409, "Chỉ sửa phần công khai của phản ánh đã duyệt")
+    status = STATUS_BY_ACTION.get(body.action, current["status"])
+    publish = status in ("da_duyet", "da_xu_ly")  # công khai → ghi phần công khai (lần đầu: mặc định an toàn)
     await execute(
-        """UPDATE community.citizen_reports SET status = :s, public_note = COALESCE(CAST(:n AS text), public_note),
+        f"""UPDATE community.citizen_reports SET status = :s, public_note = COALESCE(CAST(:n AS text), public_note),
                   reject_reason = CASE WHEN :s = 'tu_choi' THEN :rr ELSE NULL END,
-                  category = COALESCE(CAST(:c AS text), category),
+                  category = COALESCE(CAST(:c AS text), category), {PUBLIC_FIELDS_SQL if publish else ""}
                   moderated_by = :u, moderated_at = now()
             WHERE id = CAST(:id AS uuid)""",
         {
             "s": status,
+            **(
+                _public_params(
+                    body.public_description, current["description"], body.exact_location, body.public_photos
+                )
+                if publish
+                else {}
+            ),
             "n": body.public_note,
             "rr": body.reject_reason,
             "c": body.category,
@@ -173,12 +223,19 @@ async def to_sos(
             notes=f"Từ phản ánh người dân {r['code']}: {r['description'][:300]}",
             conn=conn,  # cùng transaction với việc gắn phiếu vào phản ánh → lỗi giữa chừng không để lại phiếu mồ côi
         )
+        # Chuyển SOS cũng công khai phản ánh (người dân thấy đã có lực lượng xử lý) → phần công khai mặc định an toàn:
+        # nội dung đã che, vị trí làm tròn. Cán bộ sửa sau bằng "Sửa phần công khai".
         await execute(
-            """UPDATE community.citizen_reports SET sos_ticket_id = CAST(:t AS uuid), moderated_by = :u, moderated_at = now(),
-                      status = CASE WHEN status = 'cho_duyet' THEN 'da_duyet' ELSE status END,
+            f"""UPDATE community.citizen_reports SET sos_ticket_id = CAST(:t AS uuid), moderated_by = :u, moderated_at = now(),
+                      status = CASE WHEN status = 'cho_duyet' THEN 'da_duyet' ELSE status END, {PUBLIC_FIELDS_SQL}
                       public_note = COALESCE(public_note, 'Đã chuyển lực lượng cứu hộ xử lý')
                 WHERE id = CAST(:id AS uuid)""",
-            {"t": str(ticket["id"]), "u": user["id"], "id": report_id},
+            {
+                "t": str(ticket["id"]),
+                "u": user["id"],
+                "id": report_id,
+                **_public_params(None, r["description"]),
+            },
             conn,
         )
     await announce_ticket(ticket, "APP")  # sau khi commit

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { Camera, Check, X, Siren, MapPin, Phone, RotateCcw, CheckCheck, Inbox, Search, ZoomIn } from 'lucide-react';
+import { Camera, Check, X, Siren, MapPin, Phone, RotateCcw, CheckCheck, Inbox, Search, ZoomIn, Pencil } from 'lucide-react';
 import { api } from '../api/client';
 import { useAreaQuery } from '../api/hooks';
 import { useStore } from '../app/store';
@@ -27,7 +27,18 @@ function ActionModal({ report, action, onClose }) {
   const [priority, setPriority] = useState(report.category === 'mac_ket' ? 1 : 2);
   const [trapped, setTrapped] = useState(0);
   const [busy, setBusy] = useState(false); // bấm đúp “Chuyển thành SOS” → 2 phiếu
-  const title = { approve: 'Duyệt & công khai phản ánh', reject: 'Từ chối phản ánh', resolve: 'Đánh dấu đã xử lý', sos: 'Chuyển thành phiếu SOS' }[action];
+  // Phần công khai: nội dung gợi ý đã che SĐT / email / số giấy tờ; vị trí mặc định làm tròn; ảnh mặc định công khai
+  const publishing = action === 'approve' || action === 'resolve' || action === 'edit_public';
+  const [pubDesc, setPubDesc] = useState(report.public_description || report.public_description_suggested || '');
+  const [exact, setExact] = useState(!!report.exact_location);
+  const [pubPhotos, setPubPhotos] = useState(report.public_photos ?? true);
+  const title = {
+    approve: 'Duyệt & công khai phản ánh',
+    reject: 'Từ chối phản ánh',
+    resolve: 'Đánh dấu đã xử lý',
+    edit_public: 'Sửa phần công khai',
+    sos: 'Chuyển thành phiếu SOS',
+  }[action];
 
   const submit = async () => {
     setBusy(true);
@@ -39,7 +50,8 @@ function ActionModal({ report, action, onClose }) {
           toast({ tone: 'warn', title: `${r.sos_code} có thể trùng với ${r.possible_duplicates.join(', ')}`, body: 'Kiểm tra trước khi điều động — tránh điều 2 đội tới cùng một nơi.', duration: 12000 });
         }
       } else {
-        await api(`/reports/${report.id}/moderate`, { method: 'POST', body: { action, public_note: note || null, reject_reason: reason || null } });
+        const pub = publishing ? { public_description: pubDesc.trim(), exact_location: exact, public_photos: pubPhotos } : {};
+        await api(`/reports/${report.id}/moderate`, { method: 'POST', body: { action, public_note: note || null, reject_reason: reason || null, ...pub } });
         toast({ tone: 'good', title: `${title}: ${report.code}` });
       }
       qc.invalidateQueries({ queryKey: ['reports'] });
@@ -61,7 +73,7 @@ function ActionModal({ report, action, onClose }) {
           <button className="btn-ghost" onClick={onClose}>Huỷ</button>
           <button
             className={action === 'reject' ? 'btn-ghost text-danger' : 'btn-primary'}
-            disabled={busy || (action === 'reject' && reason.length < 3)}
+            disabled={busy || (action === 'reject' && reason.length < 3) || (publishing && pubDesc.trim().length < 10)}
             onClick={submit}
           >
             Xác nhận
@@ -70,9 +82,44 @@ function ActionModal({ report, action, onClose }) {
       }
     >
       <div className="flex flex-col gap-3 text-sm">
-        <p className="rounded-xl bg-panel2 p-3 italic text-ink border border-line/60">
-          “{report.description}”
-        </p>
+        <div>
+          {publishing && <span className="font-semibold text-xs text-muted uppercase">Nội dung người dân gửi (chỉ cán bộ xem)</span>}
+          <p className="rounded-xl bg-panel2 p-3 italic text-ink border border-line/60 mt-1">
+            “{report.description}”
+          </p>
+        </div>
+
+        {publishing && (
+          <>
+            <label className="space-y-1">
+              <span className="font-semibold text-xs text-muted uppercase">Nội dung công khai (người dân sẽ thấy trên cổng)</span>
+              <textarea
+                className="input mt-1 min-h-[80px] leading-relaxed"
+                maxLength={1000}
+                value={pubDesc}
+                onChange={(e) => setPubDesc(e.target.value)}
+              />
+              <span className="block text-[11px] text-muted">
+                Hệ thống đã tự che SĐT, email, số giấy tờ. Hãy bỏ tiếp <b>tên người, số nhà</b> và thông tin cá nhân khác.
+              </span>
+            </label>
+            <label className="flex items-start gap-2 text-xs">
+              <input type="checkbox" className="mt-0.5" checked={exact} onChange={(e) => setExact(e.target.checked)} />
+              <span>
+                <b>Công khai vị trí chính xác</b> — chỉ chọn khi là điểm công cộng (đường, cầu, taluy, bờ sông). Không chọn:
+                vị trí trên cổng được làm tròn, lệch tối đa khoảng 150 m (điểm chấm có thể là nhà người báo).
+              </span>
+            </label>
+            {report.photo_urls.length > 0 && (
+              <label className="flex items-start gap-2 text-xs">
+                <input type="checkbox" className="mt-0.5" checked={pubPhotos} onChange={(e) => setPubPhotos(e.target.checked)} />
+                <span>
+                  <b>Công khai ảnh</b> — bỏ chọn nếu ảnh có mặt người, biển số xe, số nhà.
+                </span>
+              </label>
+            )}
+          </>
+        )}
 
         {(action === 'approve' || action === 'resolve') && (
           <label className="space-y-1">
@@ -151,6 +198,16 @@ function ReportCard({ r, onAction, onPhoto }) {
         {r.description}
       </p>
 
+      {(r.status === 'da_duyet' || r.status === 'da_xu_ly') && (
+        <div className="text-xs bg-good/5 border border-good/20 p-2 rounded-lg">
+          <span className="font-semibold text-good">Trên cổng công khai:</span> {r.public_description || r.public_description_suggested}
+          <div className="text-[11px] text-muted mt-0.5">
+            Vị trí {r.exact_location ? 'chính xác' : 'làm tròn (lệch tối đa ~150 m)'}
+            {r.photo_urls.length > 0 && ` · ${r.public_photos ? 'có' : 'không'} công khai ảnh`}
+          </div>
+        </div>
+      )}
+
       {r.photo_urls.length > 0 && (
         <div className="flex gap-2">
           {r.photo_urls.map((p, i) => (
@@ -208,6 +265,11 @@ function ReportCard({ r, onAction, onPhoto }) {
           {r.status === 'da_duyet' && (
             <button className="btn-ghost px-2.5 py-1 text-xs text-good" onClick={() => onAction(r, 'resolve')}>
               <CheckCheck size={12} /> Đã xử lý
+            </button>
+          )}
+          {(r.status === 'da_duyet' || r.status === 'da_xu_ly') && (
+            <button className="btn-ghost px-2.5 py-1 text-xs" onClick={() => onAction(r, 'edit_public')}>
+              <Pencil size={12} /> Sửa phần công khai
             </button>
           )}
           {!r.sos_ticket_id && r.status !== 'tu_choi' && (

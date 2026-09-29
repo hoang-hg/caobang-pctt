@@ -309,6 +309,7 @@ function PublicMap({ data, forecast, geo, me, route, target, layers, basemap = '
             <Popup>
               <b>{r.category_label}</b> · <span className="text-xs text-muted">{ago(r.created_at)}</span>
               <p className="text-xs">{r.description}</p>
+              {r.approx_m && <p className="text-[11px] text-muted">Vị trí gần đúng (lệch tối đa ~{r.approx_m} m)</p>}
               {r.photos[0] && <img src={r.photos[0].thumb} alt={`Ảnh phản ánh ${r.code}`} className="mt-1 max-h-32 rounded" loading="lazy" />}
               {r.public_note && <p className="mt-1 text-xs text-good">Cán bộ: {r.public_note}</p>}
             </Popup>
@@ -1826,6 +1827,7 @@ export default function PublicPortal() {
                     <span className="text-[11px] text-muted">{ago(r.created_at)}</span>
                   </div>
                   <p className="text-xs line-clamp-2 mt-1 text-ink-2">{r.description}</p>
+                  {r.approx_m && <div className="text-[10px] text-muted mt-0.5">Vị trí gần đúng (~{r.approx_m} m)</div>}
                   {r.public_note && (
                     <div className="text-[11px] text-good mt-1 font-medium bg-good/10 px-2 py-0.5 rounded">
                       Cán bộ: {r.public_note}

@@ -280,6 +280,8 @@ const tr = await call('POST', '/public/track', { code: rep.data?.code, phone: PH
 check('Người dân tra cứu tiến độ bằng mã + SĐT', tr.status === 200 && tr.data?.total === 1 && tr.data?.verified === true);
 check('Tra cứu sai SĐT → như không tồn tại',
   (await call('POST', '/public/track', { code: rep.data?.code, phone: '0987 000 111' })).data?.total === 0);
+check('Mã tra cứu cấp khi gửi (PA-…-XXXXXX) tra được không cần SĐT', /^PA-\d+-[A-Z]{6}$/.test(rep.data?.track_code || '') &&
+  (await call('POST', '/public/track', { code: rep.data.track_code })).data?.total === 1, rep.data?.track_code);
 const resolved = await call('POST', `/sos/${ticket?.id}/resolve`, null, admin);
 check('Xác nhận đã cứu an toàn', resolved.data?.status === 'hoan_thanh', `HTTP ${resolved.status}`);
 

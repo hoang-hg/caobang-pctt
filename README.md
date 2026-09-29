@@ -679,7 +679,7 @@ sequenceDiagram
 graph TD
     A[Người dân mở cổng công khai] -->|Ảnh + vị trí + mô tả| B[Phản ánh PA-xxxx: cho_duyet]
     B --> D{Cán bộ đúng địa bàn kiểm tra tại /phan-anh}
-    D -->|Thông tin chính xác| E[Duyệt: da_duyet + ghi chú công khai]
+    D -->|Thông tin chính xác| E[Duyệt: chọn nội dung / vị trí / ảnh công khai + ghi chú]
     D -->|Sai, trùng, tin giả| F[Từ chối: tu_choi + lý do nội bộ]
     D -->|Có người đang gặp nguy hiểm| G[Chuyển thành phiếu SOS]
     E --> H[Hiện trên bản đồ công khai] --> I[Đã xử lý: da_xu_ly]
@@ -687,13 +687,23 @@ graph TD
 
 - Ảnh bị xoá EXIF/GPS, họ tên và SĐT người gửi chỉ cán bộ có `report.view` tại địa bàn đó xem được, IP chỉ lưu dạng băm.
 - Khi duyệt, cán bộ ghi chú kết quả (VD "Đã cử dân quân cắm biển cảnh báo") để người dân yên tâm.
+- **Duyệt = chọn phần công khai** — cổng công khai không bao giờ trả mô tả / toạ độ gốc người dân gửi:
+  - **Nội dung**: gợi ý sẵn mô tả gốc đã **tự che SĐT, email, số giấy tờ**; cán bộ bỏ tiếp tên người, số nhà. API công khai
+    che lại lần nữa khi trả ra (phòng sót).
+  - **Vị trí**: mặc định **làm tròn** về lưới 0,002° (lệch tối đa ~150 m, cổng ghi "vị trí gần đúng") — điểm chấm có thể là
+    nhà người báo. Cán bộ chọn **vị trí chính xác** khi là điểm công cộng (đường, cầu, taluy, bờ sông). Làm tròn cố định,
+    không cộng nhiễu ngẫu nhiên (nhiễu mới mỗi lần lấy trung bình được).
+  - **Ảnh**: bỏ chọn "công khai ảnh" khi ảnh có mặt người, biển số, số nhà → cổng không có ảnh, link ảnh công khai 404.
+  - "Chuyển SOS" cũng công khai phản ánh → dùng mặc định an toàn ở trên. Sửa sau bằng **"Sửa phần công khai"**.
 - **Tra cứu tiến độ** (`/cong-khai`, không cần đăng nhập): nhập mã `SOS-xxxx` / `PA-xxxx` **và** SĐT đã dùng khi gửi.
-  Không tìm gần đúng, không tìm chỉ bằng SĐT; sai SĐT trả kết quả như "không tồn tại"; phản ánh ẩn danh chỉ cần mã nhưng
-  chỉ xem mốc tiến độ; SOS do cán bộ tạo (không có SĐT người báo) không tra được. Không bao giờ trả ghi chú nội bộ,
+  Không tìm gần đúng, không tìm chỉ bằng SĐT; sai SĐT trả kết quả như "không tồn tại". Gửi phản ánh xong, người dân nhận
+  **mã tra cứu** `PA-xxxx-XXXXXX` (đuôi 6 chữ cái ngẫu nhiên, chỉ hiện 1 lần, cán bộ không thấy) — tra được không cần SĐT;
+  phản ánh **không để lại SĐT chỉ tra được bằng mã tra cứu** (mã `PA-…` tăng dần, đoán được). SOS do cán bộ tạo (không
+  có SĐT người báo) không tra được. Không bao giờ trả ghi chú nội bộ,
   toạ độ, **địa chỉ, nội dung** (kể cả khi đúng SĐT — lỡ bị dò trúng cũng không lộ nơi người đang mắc kẹt), vị trí lực
   lượng; SĐT hiện dạng che `099***666`. **Chống dò** (mã phiếu tăng dần): ngoài giới hạn theo IP, quá 10 lần tra cứu
   không ra kết quả / giờ với cùng **SĐT** hoặc cùng **mã** → tạm chặn (429) — dò mã bằng SĐT của một người, hay dò SĐT
-  của một mã từ nhiều IP đều bị chặn; trang tra cứu chỉ tự làm mới khi đã tìm thấy phiếu. 4 mốc: **Đã tiếp nhận → Đã điều động → Đang trên đường đến
+  (hoặc đuôi mã tra cứu) của một mã từ nhiều IP đều bị chặn; trang tra cứu chỉ tự làm mới khi đã tìm thấy phiếu. 4 mốc: **Đã tiếp nhận → Đã điều động → Đang trên đường đến
   (ETA, tự làm mới 15 giây) → Đã cứu an toàn / Khắc phục xong** — giảm cuộc gọi dồn dập vào 112/114.
 
 ### 7.3. Soạn, duyệt & phát cảnh báo (Maker – Checker)

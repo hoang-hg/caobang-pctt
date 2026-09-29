@@ -118,6 +118,40 @@ def test_track_code_and_phone_matching():
     assert not phone_matches("12345", "12345")  # quá ngắn để làm bằng chứng
 
 
+def test_track_code_with_key():
+    """Mã tra cứu phản ánh = mã phiếu + đuôi 6 chữ cái; đếm giới hạn dò theo mã phiếu (bỏ đuôi)."""
+    from app.services.reports import TRACK_KEY_ALPHABET, TRACK_KEY_LEN, new_track_key
+    from app.services.tracking import normalize_code, parse_code
+
+    assert parse_code("PA-1017-KXMPQR") == ("PA-1017", "KXMPQR")
+    assert parse_code("pa1017kxmpqr") == ("PA-1017", "KXMPQR")  # chữ thường, không gạch nối
+    assert parse_code("PA-1017") == ("PA-1017", None)
+    assert parse_code("PA-1017-KXM") is None  # đuôi thiếu → không tìm gần đúng
+    assert parse_code("PA-1017-123456") is None  # đuôi chỉ có chữ (không lẫn với số phiếu)
+    assert normalize_code("PA-1017-KXMPQR") == "PA-1017"  # giới hạn dò đếm theo phiếu, không theo đuôi
+    keys = {new_track_key() for _ in range(200)}
+    assert len(keys) == 200
+    assert all(len(k) == TRACK_KEY_LEN and set(k) <= set(TRACK_KEY_ALPHABET) for k in keys)
+    assert not set("IO") & set(TRACK_KEY_ALPHABET)  # dễ nhầm với 1, 0
+    assert parse_code(f"PA-1017-{next(iter(keys))}")[1] in keys
+
+
+def test_public_report_text_hides_contact_details():
+    from app.services.reports import REDACTED, redact_public_text
+
+    text = (
+        "Ngập trước nhà ông A, gọi 0912 345 678 hoặc +84 988.111.222, email a.b@gmail.com, CCCD 001203004005"
+    )
+    out = redact_public_text(text)
+    for secret in ("345 678", "988.111.222", "a.b@gmail.com", "001203004005"):
+        assert secret not in out
+    assert out.count(REDACTED) == 4
+    # Số liệu hiện trường giữ nguyên: mực nước, cột mốc, năm, độ sâu
+    kept = "Nước ngập 40cm tại Km 12 QL34, mực nước 181.4 m, lũ lớn nhất từ 2008"
+    assert redact_public_text(kept) == kept
+    assert redact_public_text(None) == ""
+
+
 def test_ws_events_reach_only_clients_with_permission():
     from app.ws.hub import EVENT_SCOPE, Client
 

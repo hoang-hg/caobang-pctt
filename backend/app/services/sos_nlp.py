@@ -224,12 +224,12 @@ async def load_gazetteer() -> list[dict]:
 
 # SĐT / số giấy tờ (CCCD) Việt Nam: bắt đầu bằng 0, 84 hoặc +84, tổng 9–12 chữ số, cho phép 1 dấu cách, chấm, gạch
 # giữa các chữ số. Không bắt số thập phân như toạ độ "106.123456" (không bắt đầu bằng 0/84) — LLM cần vị trí.
-_PHONE_RE = re.compile(r"(?<![\d.])(?:\+?84|0)(?:[ .\-]?\d){8,11}(?!\d)")
+PHONE_RE = re.compile(r"(?<![\d.])(?:\+?84|0)(?:[ .\-]?\d){8,11}(?!\d)")
 
 
 def redact_for_llm(text: str) -> str:
     """Che SĐT / số giấy tờ trước khi gửi ra dịch vụ LLM bên ngoài — LLM không cần chúng để phân loại."""
-    return _PHONE_RE.sub("[SỐ]", text)
+    return PHONE_RE.sub("[SỐ]", text)
 
 
 async def _parse_llm(text: str) -> dict | None:

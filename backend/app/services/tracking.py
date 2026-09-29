@@ -3,12 +3,15 @@
 Nguyên tắc bảo vệ dữ liệu (endpoint công khai, không đăng nhập — mã phiếu tăng dần nên đoán được):
 - Chỉ tra đúng 1 mã phiếu; không tìm gần đúng, không tìm theo SĐT (tránh liệt kê phiếu của người khác).
 - Phiếu có lưu SĐT → phải nhập SĐT trùng khớp mới thấy; sai SĐT trả kết quả giống "không tồn tại".
-- Phiếu phản ánh gửi ẩn danh (không SĐT) → chỉ trả mốc tiến độ, không trả mô tả / địa chỉ.
+- Phiếu phản ánh: đúng SĐT người gửi HOẶC đúng mã tra cứu đầy đủ (PA-1003-KXMPQR — đuôi ngẫu nhiên cấp khi gửi).
+  Phản ánh không để lại SĐT chỉ tra được bằng mã đầy đủ (mã PA-… tăng dần, đoán được).
+- Không trả mô tả / địa chỉ kể cả khi đúng SĐT / mã (lỡ bị dò trúng cũng không lộ nơi người đang mắc kẹt).
 - Không bao giờ trả ghi chú nội bộ của phiếu SOS, lý do từ chối nội bộ, vị trí lực lượng.
 """
 
 from __future__ import annotations
 
+import hmac
 import re
 from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
@@ -341,7 +344,8 @@ def format_report_item(r: dict) -> dict:
     }
 
 
-CODE_RE = re.compile(r"^(SOS|PA)-?(\d{3,7})$")
+# Mã phiếu + đuôi tra cứu tuỳ chọn (chỉ chữ cái → không lẫn với số phiếu): "PA-1003-KXMPQR", "pa1003kxmpqr"
+CODE_RE = re.compile(r"^(SOS|PA)-?(\d{3,7})(?:-?([A-Z]{6}))?$")
 
 SOS_SQL = """
     SELECT t.code, t.status, t.incident_type, t.received_at, t.acknowledged_at, t.resolved_at,
@@ -360,7 +364,7 @@ SOS_SQL = """
 
 REPORT_SQL = """
     SELECT r.code, r.category, r.description, r.status, r.public_note, r.created_at, r.moderated_at,
-           r.address, r.reporter_phone, u.name AS admin_name, f.name AS force_name
+           r.address, r.reporter_phone, r.track_key, u.name AS admin_name, f.name AS force_name
       FROM community.citizen_reports r
       LEFT JOIN spatial_admin.administrative_units u ON u.id = r.admin_unit_id
       LEFT JOIN LATERAL (
@@ -372,14 +376,17 @@ REPORT_SQL = """
      WHERE r.code = :code
 """
 
-# Trường chỉ trả khi người tra cứu chứng minh là người gửi (nhập đúng SĐT)
-PRIVATE_FIELDS = ("reporter_phone_masked", "force_name")  # chỉ trả khi khớp SĐT người gửi
+
+def parse_code(raw: str) -> tuple[str, str | None] | None:
+    """'pa 1017' / 'PA1017' / 'SOS-1021' / 'PA-1017-KXMPQR' → (mã chuẩn, đuôi tra cứu | None); chuỗi khác → None."""
+    m = CODE_RE.match(re.sub(r"\s", "", raw or "").upper())
+    return (f"{m[1]}-{m[2]}", m[3]) if m else None
 
 
 def normalize_code(raw: str) -> str | None:
-    """'pa 1017' / 'PA1017' / 'SOS-1021' → mã chuẩn; chuỗi khác → None."""
-    m = CODE_RE.match(re.sub(r"\s", "", raw or "").upper())
-    return f"{m[1]}-{m[2]}" if m else None
+    """Mã phiếu chuẩn (bỏ đuôi tra cứu) — dùng đếm giới hạn tra cứu theo phiếu: dò đuôi cũng bị chặn sau 10 lần."""
+    parsed = parse_code(raw)
+    return parsed[0] if parsed else None
 
 
 def phone_matches(stored: str | None, given: str | None) -> bool:
@@ -396,23 +403,23 @@ def _empty(code: str) -> dict:
 
 
 async def track_ticket(code_raw: str, phone: str | None = None) -> dict:
-    """Tra cứu tiến độ 1 phiếu SOS / phản ánh theo đúng mã (+ SĐT người gửi nếu phiếu có SĐT)."""
-    code = normalize_code(code_raw)
-    if not code:
+    """Tra cứu tiến độ 1 phiếu SOS / phản ánh theo đúng mã + SĐT người gửi (phản ánh: hoặc mã tra cứu đầy đủ)."""
+    parsed = parse_code(code_raw)
+    if not parsed:
         return _empty(code_raw.strip())
+    code, key = parsed
     is_sos = code.startswith("SOS-")
     rows = await fetch_all(SOS_SQL if is_sos else REPORT_SQL, {"code": code})
     if not rows:
         return _empty(code)
     row = rows[0]
     has_phone = bool(re.sub(r"\D", "", row.get("reporter_phone") or ""))
-    verified = has_phone and phone_matches(row["reporter_phone"], phone)
-    # Phiếu có SĐT mà nhập sai / không nhập → trả như không tồn tại (không tiết lộ mã có thật).
-    # Phiếu SOS không có SĐT (cán bộ tạo) → người dân không tra được.
-    if (has_phone and not verified) or (is_sos and not has_phone):
+    # Đuôi tra cứu chỉ cấp cho phản ánh (phiếu SOS do cán bộ / tổng đài / webhook tạo → người dân tra bằng SĐT)
+    key_ok = bool(not is_sos and key and row.get("track_key") and hmac.compare_digest(key, row["track_key"]))
+    verified = key_ok or (has_phone and phone_matches(row["reporter_phone"], phone))
+    # Sai / thiếu SĐT và mã tra cứu → trả như không tồn tại (không tiết lộ mã có thật). Phiếu SOS không có SĐT (cán bộ
+    # tạo), phản ánh cũ không SĐT (chưa từng được cấp mã tra cứu) → người dân không tra được.
+    if not verified:
         return _empty(code)
     item = format_sos_item(row, datetime.now(UTC)) if is_sos else format_report_item(row)
-    if not verified:
-        for k in PRIVATE_FIELDS:
-            item[k] = None
-    return {"query": code, "total": 1, "results": [item], "verified": verified}
+    return {"query": code, "total": 1, "results": [item], "verified": True}
