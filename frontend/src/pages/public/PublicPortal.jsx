@@ -13,8 +13,9 @@ import { useUnitsGeo, useUnits, useProvinceArea } from '../../api/hooks';
 import { useStore } from '../../app/store';
 import { AdminBoundaries, BaseLayer, RAIN_BINS } from '../../components/map/MapTools';
 import { evacIcon, hazardIcon, pinIcon, stationIcon, reservoirIcon } from '../../components/map/icons';
-import { alarmLevel, LEVEL } from '../../utils/labels';
+import { LEVEL } from '../../utils/labels';
 import { ago, dateTime } from '../../utils/format';
+import { stationView } from '../../utils/stations';
 import L from 'leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import MapLegendBox, { POINT_EMOJI } from '../../components/map/MapLegendBox';
@@ -156,26 +157,27 @@ function PublicMap({ data, forecast, geo, me, route, target, layers, basemap = '
           </Marker>
         ))}
         {layers.stations && data?.stations.filter((s) => s.type !== 'do_am_dat').map((s) => {
-          const lv = alarmLevel(s.value ?? 0, s.thresholds);
+          // Chưa có số đo / mất tín hiệu → biểu tượng xám, không bao giờ hiện "An toàn"
+          const view = stationView(s);
           return (
             <Marker
               key={s.id}
               position={[s.lat, s.lon]}
-              icon={stationIcon(s.type, lv, s.value == null ? undefined : s.type === 'luong_mua' ? Math.round(s.value) : s.value.toFixed(1))}
+              icon={stationIcon(s.type, view.level, view.marker)}
               eventHandlers={{
                 click: () => onSelectPoint?.({
                   id: s.id,
                   name: s.name,
                   sub: s.admin_name || 'Cao Bằng',
-                  value: s.type === 'luong_mua' ? `${Math.round(s.value ?? 0)} mm` : `${Number(s.value ?? 0).toFixed(1)} m`,
-                  status: s.type === 'luong_mua' ? ((s.value ?? 0) >= 50 ? 'Mưa to' : 'Bình thường') : (lv === 3 ? 'BĐ III' : lv === 2 ? 'BĐ II' : lv === 1 ? 'BĐ I' : 'An toàn'),
-                  statusColor: lv >= 2 ? 'text-danger' : lv === 1 ? 'text-serious' : 'text-good',
+                  value: view.value,
+                  status: view.status,
+                  statusColor: view.statusColor,
                   type: s.type === 'luong_mua' ? 'rain' : 'water',
                   raw: s,
                 }),
               }}
             >
-              <Popup><b>{s.name}</b><div className="text-sm">{s.value ?? '–'} {s.unit}</div></Popup>
+              <Popup><b>{s.name}</b><div className="text-sm">{view.value}</div><div className={clsx('text-xs', view.statusColor)}>{view.status}</div></Popup>
             </Marker>
           );
         })}
@@ -922,9 +924,17 @@ export default function PublicPortal() {
                                 Chưa có dữ liệu đường tại khu vực này — nét đứt chỉ là hướng chim bay, không phải đường đi. Hãy đi theo chỉ dẫn của cán bộ địa phương.
                               </span>
                             ) : route.safe ? (
-                              <span className="font-bold text-good">Đường an toàn, không qua vùng nguy hiểm</span>
+                              // Chỉ khẳng định điều hệ thống biết: không cắt vùng nguy hiểm ĐÃ GHI NHẬN (không phải "an toàn")
+                              <span className="font-bold text-good">Không đi qua vùng nguy hiểm đã được ghi nhận</span>
                             ) : (
-                              <span className="font-bold text-danger">Có đi qua vùng nguy cơ, cần hết sức cẩn thận</span>
+                              <span className="font-bold text-danger">
+                                Tuyến đi qua vùng nguy cơ{route.hazards?.length ? `: ${route.hazards.join(', ')}` : ''} — hết sức cẩn thận, hỏi cán bộ địa phương hoặc gọi 112
+                              </span>
+                            )}
+                            {route.roads?.length > 0 && route.offroad_km >= 0.5 && (
+                              <span className="block text-amber-600">
+                                Có khoảng {route.offroad_km} km chưa có dữ liệu đường (đoạn nối tới / từ đường chính) — tự quan sát khi di chuyển, không đi qua suối, ngầm tràn đang ngập.
+                              </span>
                             )}
                           </div>
                         </div>
@@ -1547,7 +1557,8 @@ export default function PublicPortal() {
 
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {(overview?.rivers || []).map((r) => {
-                const badgeCls = ['bg-good text-white', 'bg-warn text-black', 'bg-serious text-white', 'bg-danger text-white'][r.level] || 'bg-good text-white';
+                // level null = chưa có số liệu / mất tín hiệu (máy chủ tính) → xám, không "Dưới báo động"
+                const badgeCls = r.level == null ? 'bg-panel2 text-muted' : ['bg-good text-white', 'bg-warn text-black', 'bg-serious text-white', 'bg-danger text-white'][r.level];
                 return (
                   <div key={r.name} className="card p-4 border border-line hover:shadow-md transition-all">
                     <div className="flex items-center justify-between mb-2">
@@ -1555,12 +1566,12 @@ export default function PublicPortal() {
                       <span className={clsx('chip text-xs font-bold', badgeCls)}>{r.level_label}</span>
                     </div>
                     <div className="flex items-baseline gap-1 my-1">
-                      <span className="font-mono text-2xl font-bold text-ink">{r.value}</span>
-                      <span className="text-xs text-muted">mét</span>
+                      <span className={clsx('font-mono text-2xl font-bold', r.stale ? 'text-muted' : 'text-ink')}>{r.value ?? '–'}</span>
+                      {r.value != null && <span className="text-xs text-muted">mét</span>}
                     </div>
-                    <div className="text-xs text-muted mt-2 border-t border-line/60 pt-2 flex justify-between">
+                    <div className="text-xs text-muted mt-2 border-t border-line/60 pt-2 flex justify-between gap-2">
                       <span>Trạm quan trắc: {r.name}</span>
-                      <span className="text-ink-2">{r.trend || 'Ổn định'}</span>
+                      <span className={r.stale ? 'text-serious' : 'text-ink-2'}>{r.time ? `Số đo lúc ${dateTime(r.time)}` : 'Chưa có số đo'}</span>
                     </div>
                   </div>
                 );

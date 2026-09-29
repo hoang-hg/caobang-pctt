@@ -69,9 +69,11 @@ Ký hiệu: ✅ chạy thật · 🟡 chạy thật nhưng dựa trên dữ li�
 | Phân hệ | Chức năng | Trạng thái | Ghi chú |
 |---|---|---|---|
 | Cảnh báo | Soạn lệnh từ mẫu, khoanh vùng, Maker–Checker + PIN, nhật ký pháp lý | ✅ | |
-| Cảnh báo | **Gửi tin tới người dân** (SMS Brandname, Cell Broadcast, Zalo OA/ZNS, Push, loa) | ⛔ | Chưa có code gửi. `SIMULATOR=true`: số "đã gửi / đã nhận" là **số ngẫu nhiên**; `SIMULATOR=false`: lệnh đã duyệt nằm ở "đang gửi" |
+| Cảnh báo | **Gửi tin tới người dân** (SMS Brandname, Cell Broadcast, Zalo OA/ZNS, Push, loa) | ⛔ | Chưa có code gửi. `SIMULATOR=true`: số "đã gửi / đã nhận" là **số ngẫu nhiên**; `SIMULATOR=false`: lệnh đã duyệt chốt "Đã công bố trên cổng", ghi rõ **chưa** tới điện thoại người dân |
 | Cảnh báo | Tổng đài IVR, nút gọi `tel:` | 🔶 / ⛔ | Nhật ký cuộc gọi là mô phỏng; chưa nối tổng đài SIP |
 | Cứu hộ | Phiếu SOS, Kanban, SLA, điều động, khớp lực lượng gần nhất | ✅ | Phụ thuộc dữ liệu lực lượng (2.2) |
+| Cứu hộ | **Báo lệnh điều động tới trưởng nhóm** (SMS / Push) | ⛔ | Chưa gửi: hộp thoại điều động ghi rõ "hệ thống chưa gửi tin cho đội", có nút gọi và sao chép nội dung lệnh để trực ban báo qua điện thoại / Zalo |
+| Cứu hộ | Vị trí lực lượng, phương tiện theo thời gian thực | ⛔ | Chưa có thiết bị định vị; khi chạy thật vị trí đứng yên tại nơi đóng quân (chỉ bộ mô phỏng làm di chuyển) |
 | Cứu hộ | Bóc tách tin nhắn SOS | ✅ | Bộ luật offline; LLM tuỳ chọn (SĐT được che trước khi gửi) |
 | Cứu hộ | Tiếp nhận SOS tự động từ Zalo OA / app (`POST /api/v1/sos/intake`) | ⛔ | Cổng có sẵn, **tắt** tới khi đặt `INTAKE_API_KEY` và có bên gửi |
 | Giám sát | Dự báo mưa tổ hợp ECMWF + GFS theo 56 xã (Open-Meteo) | ✅ | Gói miễn phí chỉ cho mục đích phi thương mại ([6.2](#open-meteo)) |
@@ -81,7 +83,7 @@ Ký hiệu: ✅ chạy thật · 🟡 chạy thật nhưng dựa trên dữ li�
 | Giám sát | Cảnh báo tự động (vượt báo động, cảm biến sạt lở) | ✅ | Chạy trên số đo thật lẫn mô phỏng |
 | Công khai | Cổng thông tin, "Tôi đang ở đâu?", dự báo, chia sẻ cảnh báo | ✅ / 🟡 | Điểm sơ tán, vùng nguy hiểm, đường chia cắt hiện cho dân → **bắt buộc dữ liệu chính thức** |
 | Công khai | Điểm đen sạt lở & đường đèo | 🟡 | 12 điểm khai báo trong code (`services/landslides.py`); trạng thái suy ra từ vùng nguy hiểm + cảm biến — **chưa có dữ liệu giám sát thì mọi điểm hiện "bình thường"** |
-| Công khai | Chỉ đường an toàn | 🟡 | Mạng đường là các trục chính vẽ xấp xỉ; ngoài mạng đường chỉ hiện hướng chim bay (nét đứt xám) |
+| Công khai | Chỉ đường an toàn | 🟡 | Mạng đường là các trục chính vẽ xấp xỉ; ngoài mạng đường chỉ hiện hướng chim bay (nét đứt xám). Toàn tuyến (kể cả chặng chim bay) được kiểm tra với **mọi** vùng nguy hiểm đang hiệu lực; chỉ báo "không đi qua vùng nguy hiểm **đã ghi nhận**", nêu tên vùng nếu cắt qua và số km chưa có dữ liệu đường |
 | Công khai | Phản ánh kèm ảnh, duyệt theo địa bàn, tra cứu tiến độ | ✅ | |
 | Công khai | Bản nhẹ `/ban-nhe` (< 50 KB, không JavaScript), mở lại khi mất mạng (PWA) | ✅ | [9.4](#ban-nhe) |
 | Nền tảng | Bản đồ nền tự lưu trữ (OpenStreetMap) | ✅ | Cần chạy `deploy/fetch-basemap.sh` ([6.9](#ban-do-nen)) |
@@ -153,7 +155,7 @@ graph LR
 | Vùng nguy hiểm (`vung_nguy_hiem`) 🌐 | `hazard_zones` | GeoJSON vùng | `ma` | ✓ (không xoá vùng do cảm biến tạo) |
 | Điểm nguy hiểm (`diem_nguy_hiem`) 🌐 | `hazard_points` | CSV / Excel / GeoJSON điểm | `ma` | ✓ |
 | Danh bạ & đường dây nóng (`danh_ba`) 🌐 | `contacts` | CSV / Excel | `ma` (+ `ma_cap_tren`) | ✓ |
-| Trạm quan trắc (`tram_quan_trac`) | `monitoring_stations` | CSV / Excel / GeoJSON điểm | `ma` | — |
+| Trạm quan trắc (`tram_quan_trac`) 🌐 | `monitoring_stations` | CSV / Excel / GeoJSON điểm | `ma` | — |
 | Hồ chứa (`ho_chua`) 🌐 | `reservoirs` | CSV / Excel / GeoJSON điểm | `ma` | — |
 | Kho vật tư (`kho`) | `warehouses` | CSV / Excel / GeoJSON điểm | `ma` | — |
 | Tồn kho (`ton_kho`) | `inventory` | CSV / Excel | `ma_kho` + `ma_vat_tu` | — |
@@ -851,7 +853,9 @@ uỷ quyền) · `GET /audit` (`user.view`, lọc theo phạm vi).
 
 Người dân mở `/` không cần đăng nhập (đã đăng nhập thì `/` chuyển tới `/dashboard`; vẫn xem cổng ở `/cong-khai`):
 băng trạng thái rủi ro toàn tỉnh · **Tôi đang ở đâu?** (GPS → xã, cảnh báo, điểm sơ tán gần nhất còn chỗ, chỉ đường an toàn) ·
-bản đồ dự báo mưa, vùng nguy hiểm, đường chia cắt, điểm sơ tán, phản ánh đã xác minh · cảnh báo chính thức (chỉ lệnh
+bản đồ dự báo mưa, vùng nguy hiểm, đường chia cắt, điểm sơ tán, phản ánh đã xác minh, trạm quan trắc (trạm chưa có số
+đo hiện xám **"Chưa có số liệu"**, số đo cũ hơn 60 phút hiện **"Mất tín hiệu"** kèm thời điểm — không bao giờ tô xanh
+"an toàn" khi thiếu số liệu; `app/services/readings.py`) · cảnh báo chính thức (chỉ lệnh
 **đã duyệt và phát**, nút chia sẻ Zalo/Facebook, link `?canh-bao=MÃ`) · sông, hồ chứa, điểm đen sạt lở · đường dây nóng
 (trực ban tỉnh + 112/113/114/115, không có SĐT cá nhân cán bộ) · gửi phản ánh · tra cứu tiến độ. Mạng yếu: bản nhẹ
 `/ban-nhe`; mất mạng: mở lại bằng dữ liệu đã lưu ([9.4](#ban-nhe)).
@@ -859,7 +863,10 @@ bản đồ dự báo mưa, vùng nguy hiểm, đường chia cắt, điểm sơ
 ### 9.1. API công khai `/api/v1/public/*`
 
 Mọi `GET` công khai được nginx cache thêm **10 giây** và trả bản gần nhất khi backend lỗi (`X-Cache-Status`:
-MISS / HIT / STALE) — lúc cao điểm, số yêu cầu vào backend gần như không tăng theo số người xem.
+MISS / HIT / STALE) — lúc cao điểm, số yêu cầu vào backend gần như không tăng theo số người xem. Khoá cache chỉ gồm các
+tham số API thật sự dùng (`frontend/nginx/public-cache.conf`): thêm tham số lạ (`?_=ngẫu_nhiên`) không né được cache để
+dồn tải vào backend. **Thêm tham số GET mới cho API công khai → thêm vào `proxy_cache_key`** (pytest kiểm tra), nếu không
+các giá trị khác nhau dùng chung một bản cache.
 
 | Endpoint | Mô tả | Cache Redis |
 |---|---|---|
@@ -897,7 +904,7 @@ phần lớn do cache nginx 10 giây trả (không tới backend, không bị đ
 | Gửi phản ánh | 200 / giờ / IP + 5 phản ánh **thành công** / giờ / SĐT người gửi (gửi lỗi không mất lượt) |
 | Chỉ đường · Định vị · Tra cứu tiến độ | 60 · 240 · 120 / phút |
 | API công khai khác | 600 / phút |
-| Đăng nhập | 30 / phút (+ khoá tài khoản 15′ sau 10 lần sai) |
+| Đăng nhập | 30 / phút. Sai mật khẩu 10 lần → khoá 15′ **theo tài khoản + IP** (kẻ xấu biết tên đăng nhập của lãnh đạo chỉ tự khoá IP của mình); 100 lần từ mọi IP → khoá tài khoản **chưa bật 2 lớp**; sai mã 2 lớp 10 lần → khoá cả tài khoản |
 | Quên mật khẩu · Đặt lại | 5 · 10 / giờ |
 | Tiếp nhận SOS tự động | 300 / phút (bắt buộc `X-Intake-Key`) |
 | Nhận số đo IoT `/ingest/*` | 1.200 / phút |
@@ -1146,7 +1153,7 @@ Redis Sentinel, MinIO phân tán, cân bằng tải nhiều máy.
 <a id="bao-mat"></a>
 ## 11. Bảo mật & tuân thủ
 
-**Đã có**: HTTPS + HSTS; kiểm tra cấu hình khi khởi động; mật khẩu và PIN băm PBKDF2, khoá tài khoản sau 10 lần sai;
+**Đã có**: HTTPS + HSTS; kiểm tra cấu hình khi khởi động; mật khẩu và PIN băm PBKDF2, khoá đăng nhập sai theo tài khoản + IP (không khoá được người duyệt cảnh báo từ xa);
 xác thực 2 lớp TOTP, bắt buộc theo vai trò ([11.1](#xac-thuc-2-lop)); PIN ký duyệt cảnh báo; RBAC theo địa bàn, chống leo thang; nhật ký thao tác & phân quyền; giới hạn tần suất chống giả mạo IP;
 ảnh xoá EXIF/GPS, link ảnh có chữ ký; IP người phản ánh chỉ lưu băm; CSDL / Redis / MinIO không mở cổng, không ra
 Internet; container backend không chạy root; Swagger tắt ở production; log không chứa token, toạ độ; API key đối tác mã

@@ -4,7 +4,7 @@ import {
   HelpCircle, ChevronDown, ChevronRight,
   X
 } from 'lucide-react';
-import { alarmLevel } from '../../utils/labels';
+import { stationView } from '../../utils/stations';
 
 /** Biểu tượng theo loại điểm đang chọn — dùng chung cho thẻ chi tiết (chú giải) và thanh nổi trên bản đồ công khai. */
 export const POINT_EMOJI = { rain: '🌧️', water: '💧', reservoir: '🏛️', landslide: '⚠️', evac: '🏠', report: '📸' };
@@ -41,18 +41,21 @@ export default function MapLegendBox({
       badge: '🌧️',
       summary: 'Quan trắc lượng mưa tự động thời gian thực (mm)',
       desc: 'Màu sắc biểu tượng thay đổi theo cường độ: Xanh lá (<20mm - Mưa nhỏ) → Vàng (20-50mm - Mưa vừa) → Cam (50-100mm - Mưa to) → Đỏ (>100mm - Mưa rất to).',
-      items: rainStations.map((s) => ({
-        id: s.id,
-        name: s.name,
-        sub: s.admin_name || 'Cao Bằng',
-        value: `${Math.round(s.value ?? 0)} mm`,
-        status: (s.value ?? 0) >= 50 ? 'Mưa to' : 'Bình thường',
-        statusColor: (s.value ?? 0) >= 100 ? 'text-danger' : (s.value ?? 0) >= 50 ? 'text-serious' : 'text-good',
-        lat: s.lat,
-        lon: s.lon,
-        type: 'rain',
-        raw: s,
-      })),
+      items: rainStations.map((s) => {
+        const view = stationView(s); // chưa có số đo / mất tín hiệu → không "Bình thường"
+        return {
+          id: s.id,
+          name: s.name,
+          sub: s.admin_name || 'Cao Bằng',
+          value: view.value,
+          status: view.status,
+          statusColor: view.statusColor,
+          lat: s.lat,
+          lon: s.lon,
+          type: 'rain',
+          raw: s,
+        };
+      }),
     },
     {
       id: 'water',
@@ -63,14 +66,14 @@ export default function MapLegendBox({
       summary: 'Cảm biến radar đo mực nước sông suối tự động',
       desc: 'Theo dõi mực nước sông Gâm, sông Bằng, sông Quây Sơn. Cảnh báo khi vượt mức Báo động I, Báo động II hoặc Báo động III.',
       items: waterStations.map((s) => {
-        const lv = alarmLevel(s.value ?? 0, s.thresholds);
+        const view = stationView(s); // chưa có số đo / mất tín hiệu → không "An toàn"
         return {
           id: s.id,
           name: s.name,
           sub: s.admin_name || 'Cao Bằng',
-          value: `${Number(s.value ?? 0).toFixed(1)} m`,
-          status: lv === 3 ? 'BĐ III' : lv === 2 ? 'BĐ II' : lv === 1 ? 'BĐ I' : 'An toàn',
-          statusColor: lv >= 2 ? 'text-danger' : lv === 1 ? 'text-serious' : 'text-good',
+          value: view.value,
+          status: view.status,
+          statusColor: view.statusColor,
           lat: s.lat,
           lon: s.lon,
           type: 'water',
@@ -265,7 +268,7 @@ export default function MapLegendBox({
               <>
                 <div className="flex justify-between">
                   <span className="text-muted">Lượng mưa đo được:</span>
-                  <span className="font-mono font-bold text-base text-emerald-600">{Math.round(selectedPoint.raw.value ?? 0)} mm</span>
+                  <span className="font-mono font-bold text-base text-emerald-600">{selectedPoint.value}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted">Đánh giá nguy cơ:</span>
@@ -278,7 +281,7 @@ export default function MapLegendBox({
               <>
                 <div className="flex justify-between">
                   <span className="text-muted">Mực nước quan trắc:</span>
-                  <span className="font-mono font-bold text-base text-blue-600">{Number(selectedPoint.raw.value ?? 0).toFixed(2)} m</span>
+                  <span className="font-mono font-bold text-base text-blue-600">{selectedPoint.value}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted">Cấp báo động:</span>

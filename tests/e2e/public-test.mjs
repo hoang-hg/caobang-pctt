@@ -184,6 +184,15 @@ check('Đổi mật khẩu → nhận token mới, token cũ hết hiệu lực'
 let lastStatus;
 for (let i = 0; i < 11; i++) lastStatus = (await call('POST', '/auth/login', { username: `do.mat.khau.${stamp}`, password: 'sai' })).status;
 check('Sai mật khẩu 10 lần → tạm khoá đăng nhập 15 phút (429)', lastStatus === 429);
+// Khoá theo (tài khoản, IP): kẻ xấu gõ sai liên tục chỉ tự khoá IP của mình, không khoá được chủ tài khoản ở nơi khác.
+// Backend tin X-Forwarded-For từ mạng nội bộ docker (TRUSTED_PROXIES) → giả lập 2 IP khác nhau.
+const loginFrom = (ip, password) => fetch(BASE + '/auth/login', {
+  method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': ip }, body: JSON.stringify({ username: pwUser, password }),
+});
+for (let i = 0; i < 10; i++) await loginFrom('203.0.113.10', 'KeXau2026sai');
+check('IP kẻ xấu bị khoá (kể cả gõ đúng mật khẩu)', (await loginFrom('203.0.113.10', 'LanHai2026')).status === 429);
+const owner = await loginFrom('198.51.100.20', 'LanHai2026');
+check('Chủ tài khoản ở IP khác vẫn đăng nhập được', owner.status === 200 && !!(await owner.json()).token);
 let rl = await call('GET', `/public/locate?lat=${TP.lat}&lon=${TP.lon}`);
 const locLimit = Number(rl.headers.get('x-ratelimit-limit'));
 check('Giới hạn định vị công khai đủ rộng cho CGNAT (≥ 200 lần/phút/IP)', locLimit >= 200);

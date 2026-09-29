@@ -198,6 +198,27 @@ def test_route_without_road_network_is_straight_line():
     assert len(route["geometry"]["coordinates"]) == 2
 
 
+def test_route_reports_offroad_distance_to_and_from_road_network():
+    # Mạng đường nhỏ; điểm đi / đến cách nút giao gần nhất ~4,4 km → phải báo phần chim bay (chưa có dữ liệu đường):
+    # giao diện không được khẳng định cả tuyến an toàn khi chỉ kiểm tra được đoạn trên đường
+    nodes = {1: (22.60, 106.20), 2: (22.61, 106.21)}
+    route = build_route([_edge(1, 1, 2, 1.5)], nodes, 22.56, 106.20, 22.65, 106.21)
+    legs = haversine_km(22.56, 106.20, 22.60, 106.20) + haversine_km(22.61, 106.21, 22.65, 106.21)
+    assert route["roads"] and abs(route["offroad_km"] - legs) <= 0.1 and route["offroad_km"] > 8
+    straight = build_route([], {}, 22.60, 106.20, 22.70, 106.30)
+    assert straight["offroad_km"] == straight["distance_km"]  # không có mạng đường: cả tuyến là chim bay
+
+
+def test_river_level_never_claims_safe_without_fresh_data():
+    from app.api.v1.public import river_level
+
+    thr = {"bd1": 180, "bd2": 181, "bd3": 182}
+    assert river_level(None, False, thr) == (None, "Chưa có số liệu")
+    assert river_level(179.0, True, thr) == (None, "Mất tín hiệu")  # số cũ dưới báo động → không khẳng định
+    assert river_level(181.5, True, thr) == (2, "Trên báo động II · mất tín hiệu")  # nguy cơ đã biết vẫn báo
+    assert river_level(179.0, False, thr) == (0, "Dưới báo động I")
+
+
 def test_overdue_sql_uses_sla_per_priority():
     from app.services.sos import OVERDUE_SQL, SLA_MINUTES
 

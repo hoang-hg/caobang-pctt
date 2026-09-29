@@ -98,6 +98,43 @@ def test_preflight_unknown_env_and_enforce_raises():
         preflight.enforce(make(app_env="production"))
 
 
+def test_login_lock_is_per_ip_and_spares_mfa_accounts():
+    from app.api.v1.auth import ACCOUNT_MAX_FAILED, MAX_FAILED_LOGINS, login_blocked, password_fail_keys
+
+    # Sai nhiều lần từ 1 IP → chỉ IP đó bị chặn
+    assert login_blocked(MAX_FAILED_LOGINS, MAX_FAILED_LOGINS, mfa_enabled=True)
+    assert not login_blocked(0, MAX_FAILED_LOGINS, mfa_enabled=False)  # chủ tài khoản ở IP khác
+    # Dò phân tán nhiều IP: chặn tài khoản chưa có 2 lớp; tài khoản có 2 lớp (người duyệt cảnh báo) KHÔNG bị khoá từ xa
+    assert login_blocked(0, ACCOUNT_MAX_FAILED, mfa_enabled=False)
+    assert not login_blocked(0, ACCOUNT_MAX_FAILED * 10, mfa_enabled=True)
+    ip_a, all_a = password_fail_keys("ChiHuy", "203.0.113.1")
+    ip_b, all_b = password_fail_keys("chihuy", "198.51.100.2")
+    assert ip_a != ip_b and all_a == all_b  # cùng tài khoản (không phân biệt hoa thường), khác IP
+    assert "203.0.113.1" not in ip_a  # không lưu IP thô trong khoá Redis
+
+
+def test_public_cache_key_covers_every_public_query_param():
+    """nginx cache API công khai theo khoá chỉ gồm tham số được liệt kê (tham số lạ không né được cache). Tham số GET
+    nào của /api/v1/public/* thiếu trong khoá → các giá trị khác nhau dùng chung 1 bản cache → trả SAI dữ liệu."""
+    import re
+    from pathlib import Path
+
+    conf = Path(__file__).resolve().parents[2] / "frontend" / "nginx" / "public-cache.conf"
+    if not conf.exists():
+        pytest.skip("không có mã frontend (chạy trong container backend)")
+    keyed = set(re.findall(r"\$arg_(\w+)", conf.read_text(encoding="utf-8")))
+    from app.api.v1.public import router
+
+    params = {
+        p.alias
+        for r in router.routes
+        if "GET" in getattr(r, "methods", set())
+        for p in r.dependant.query_params
+    }
+    assert params, "không đọc được tham số của router công khai"
+    assert params <= keyed, f"thêm vào proxy_cache_key (frontend/nginx/public-cache.conf): {params - keyed}"
+
+
 def test_weak_pin():
     for pin in ("0000", "1234", "123456", "654321", "111111", "12a456"):
         assert preflight.weak_pin(pin), pin

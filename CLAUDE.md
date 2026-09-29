@@ -220,6 +220,11 @@ Python trong container.
   + `await ratelimit.count_hit(tên, khoá, giây)` sau khi thành công, theo SĐT / khoá phụ.
   API đã đăng nhập đếm theo phiên (`per_session=True`).
 - IP người dùng: luôn `request.client.host`. **Không** dùng `--forwarded-allow-ips=*`, không tự đọc `X-Forwarded-For`.
+- Khoá đăng nhập sai (`auth.login_blocked`): mật khẩu theo (tài khoản, IP) + tổng theo tài khoản chỉ chặn tài khoản chưa
+  bật 2 lớp; sai mã 2 lớp theo tài khoản (`lock_key`). Không quay lại khoá chỉ theo tài khoản — ai biết tên đăng nhập
+  cũng khoá được người duyệt cảnh báo giữa lúc thiên tai.
+- Cache nginx API công khai: `proxy_cache_key` liệt kê từng `$arg_…` — thêm tham số GET công khai mới phải thêm vào đó
+  (`test_public_cache_key_covers_every_public_query_param`).
 
 **Xác thực & dữ liệu cá nhân**
 - Mật khẩu mới phải qua `auth.password_problem`; PIN ký duyệt băm như mật khẩu. Đổi / đặt lại mật khẩu tăng `token_version`.
@@ -306,6 +311,9 @@ Python trong container.
 - [ ] Đọc ảnh người dân: `Image.open(…, formats=…)` chỉ các định dạng cho phép — không để Pillow thử mọi bộ đọc.
 - [ ] Chuyển hướng theo tham số URL (`?next=`): phân giải bằng `new URL(…)` và so origin (`safeNext`, `App.jsx`);
       chặn chuỗi bắt đầu `//` là chưa đủ (`/\evil.com`).
+- [ ] Không khẳng định điều hệ thống không biết: thiếu / cũ số liệu (trạm `stationView`, hồ `chua_co_so_lieu`) → xám,
+      không "an toàn / bình thường"; tuyến chỉ "không qua vùng nguy hiểm đã ghi nhận"; việc chưa tích hợp (SMS, Push,
+      Cell Broadcast) → giao diện nói rõ **chưa gửi**, không mô phỏng như đã gửi khi `SIMULATOR=false`.
 
 ## 9. Kiểm thử
 

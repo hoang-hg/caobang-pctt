@@ -317,10 +317,11 @@ async def dispatch(body: DispatchIn, user: dict = Depends(require_any("dispatch"
         "order": order,
         "route": route,
         "ticket": updated,
-        # Mô phỏng Push Notification tới điện thoại trưởng nhóm
+        # Nội dung lệnh cho trưởng nhóm. CHƯA tích hợp SMS / Push → hệ thống KHÔNG gửi (sent = False): giao diện yêu cầu
+        # trực ban gọi / nhắn trực tiếp — không được để trực ban tưởng đội đã nhận lệnh
         "notification": {
             "to": force["contact_phone"],
-            "channel": "PUSH+SMS",
+            "sent": False,
             "message": f"[LỆNH KHẨN] {ticket['code']}: {ticket['address'] or ticket['admin_name']} – "
             f"toạ độ {ticket['lat']:.5f},{ticket['lon']:.5f}. ETA {route['duration_min']} phút.",
         },
