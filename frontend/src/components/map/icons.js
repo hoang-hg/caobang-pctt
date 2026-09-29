@@ -50,9 +50,11 @@ export const vehicleIcon = (v) =>
   });
 
 const ALARM_COLOR = [COLORS.good, COLORS.vang, COLORS.cam, COLORS.do];
+/** level null = chưa có số liệu / mất tín hiệu → xám (không dùng màu xanh "an toàn"). */
 export const stationIcon = (type, level, value) => {
   const path = { luong_mua: P.rain, muc_nuoc: P.drop, do_nghieng: P.tilt, do_am_dat: P.drop }[type];
-  return badge(path, { bg: '#fff', stroke: ALARM_COLOR[level] === COLORS.good ? COLORS.blue : ALARM_COLOR[level], ring: ALARM_COLOR[level], size: 26, label: value });
+  const ring = level == null ? COLORS.gray : ALARM_COLOR[level];
+  return badge(path, { bg: '#fff', stroke: ring === COLORS.good ? COLORS.blue : ring, ring, size: 26, label: value });
 };
 
 export const reservoirIcon = (gatesOpen) =>

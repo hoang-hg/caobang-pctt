@@ -12,6 +12,7 @@ from html import escape
 
 from app.db import fetch_all, fetch_one
 from app.services.data_import.parsing import strip_accents
+from app.services.readings import LATEST_COLS, LATEST_JOIN
 from app.services.simulator import alarm_level
 
 MAX_ALERTS = 8
@@ -80,12 +81,15 @@ async def build(code: str | None) -> str:
     else:
         alerts = await fetch_all(ACTIVE_ALERTS_SQL.format(extra=", true AS here"))
     rivers = await fetch_all(
-        """SELECT s.name, s.unit, s.alarm_thresholds AS thr,
-                  (SELECT round(value::numeric, 2)::float FROM iot_telemetry.sensor_readings r
-                    WHERE r.station_id = s.id ORDER BY time DESC LIMIT 1) AS value
-             FROM iot_telemetry.monitoring_stations s WHERE s.type = 'muc_nuoc' ORDER BY s.name"""
+        f"""SELECT s.name, s.unit, s.alarm_thresholds AS thr, {LATEST_COLS}
+              FROM iot_telemetry.monitoring_stations s {LATEST_JOIN}
+             WHERE s.type = 'muc_nuoc' ORDER BY s.name"""
     )
-    rivers = [r | {"level": alarm_level(r["value"] or 0, r["thr"] or {})} for r in rivers]
+    # Chỉ liệt kê sông vượt báo động (không khẳng định "an toàn"); chưa có số đo → không liệt kê
+    rivers = [
+        r | {"level": alarm_level(r["value"], r["thr"] or {}) if r["value"] is not None else 0}
+        for r in rivers
+    ]
     now = (await fetch_one("SELECT now() AS t"))["t"]
     commune = await _commune(unit, alerts) if unit else None
     return render(
@@ -218,7 +222,9 @@ def render(*, units, unit, alerts, rivers, commune, hotlines, now) -> str:
 
     if rivers:
         items = "".join(
-            f"<li><b>{e(r['name'])}</b>: {_num(r['value'])} {e(r['unit'] or 'm')} – {RIVER_LEVEL[r['level']]}</li>"
+            f"<li><b>{e(r['name'])}</b>: {_num(r['value'])} {e(r['unit'] or 'm')} – {RIVER_LEVEL[r['level']]}"
+            + (f" (số đo lúc {_time(r['time'])}, trạm mất tín hiệu)" if r["stale"] else "")
+            + "</li>"
             for r in rivers
         )
         out.append(f"<h2>Sông suối vượt báo động</h2><ul>{items}</ul>")

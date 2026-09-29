@@ -98,17 +98,52 @@ export default function DispatchModal({ ticket, presetForceId, onClose }) {
 
       {result ? (
         <div className="flex flex-col gap-3">
-          <div className="flex items-center gap-2 text-good"><CheckCircle2 size={20} /> <b>Đã phát lệnh – lực lượng đang di chuyển</b></div>
+          <div className="flex items-center gap-2 text-good"><CheckCircle2 size={20} /> <b>Đã ghi lệnh điều động {ticket.code}</b></div>
           <div className="grid gap-2 text-sm sm:grid-cols-3">
             <div className="card p-2"><div className="text-xs text-muted">Quãng đường</div><b className="font-mono">{result.route.distance_km} km</b></div>
             <div className="card p-2"><div className="text-xs text-muted">Thời gian tiếp cận (ETA)</div><b className="font-mono">{result.route.duration_min} phút</b></div>
-            <div className="card p-2"><div className="text-xs text-muted">Lộ trình</div><b>{result.route.safe ? 'An toàn – né vùng nguy hiểm' : '⚠ Buộc đi qua vùng nguy hiểm'}</b></div>
+            <div className="card p-2">
+              <div className="text-xs text-muted">Lộ trình</div>
+              <b className={result.route.safe ? 'text-good' : 'text-danger'}>
+                {result.route.safe ? 'Né vùng nguy hiểm đã ghi nhận' : `⚠ Đi qua vùng nguy hiểm${result.route.hazards?.length ? `: ${result.route.hazards.join(', ')}` : ''}`}
+              </b>
+            </div>
           </div>
-          <div className="text-xs text-muted">Tuyến: {result.route.roads.join(' → ') || 'đường địa phương'}</div>
-          <div className="rounded-lg border border-accent/40 bg-accent/10 p-3 text-sm">
-            <div className="text-xs font-semibold text-accent">Push Notification + SMS gửi tới trưởng nhóm {result.notification.to}</div>
-            <div className="mt-1 font-mono text-[13px]">{result.notification.message}</div>
+          <div className="text-xs text-muted">
+            Tuyến: {result.route.roads.join(' → ') || 'đường địa phương'}
+            {result.route.offroad_km >= 0.5 && ` · ${result.route.offroad_km} km chưa có dữ liệu đường`}
           </div>
+          {result.notification.sent ? (
+            <div className="rounded-lg border border-accent/40 bg-accent/10 p-3 text-sm">
+              <div className="text-xs font-semibold text-accent">Đã gửi lệnh tới trưởng nhóm {result.notification.to}</div>
+              <div className="mt-1 font-mono text-[13px]">{result.notification.message}</div>
+            </div>
+          ) : (
+            // Chưa tích hợp SMS / Push: hệ thống KHÔNG tự báo cho đội — trực ban phải gọi / nhắn ngay
+            <div className="rounded-lg border-2 border-warn bg-warn/10 p-3 text-sm">
+              <div className="flex items-center gap-1.5 font-semibold text-ink">
+                <TriangleAlert size={15} className="text-warn" /> Hệ thống chưa gửi tin cho đội — gọi hoặc nhắn trưởng nhóm ngay
+              </div>
+              <div className="mt-1 font-mono text-[13px]">{result.notification.message}</div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {result.notification.to && (
+                  <a className="btn-primary px-3 py-1 text-xs" href={`tel:${result.notification.to.replace(/\s/g, '')}`}>
+                    <Phone size={13} /> Gọi {result.notification.to}
+                  </a>
+                )}
+                <button
+                  type="button"
+                  className="btn-ghost px-3 py-1 text-xs"
+                  onClick={() => navigator.clipboard?.writeText(result.notification.message).then(
+                    () => toast({ tone: 'good', title: 'Đã sao chép nội dung lệnh — dán vào Zalo / SMS' }),
+                    () => toast({ tone: 'danger', title: 'Không sao chép được — chép tay nội dung trên' }),
+                  )}
+                >
+                  <Send size={13} /> Sao chép nội dung lệnh
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       ) : isLoading || !match ? (
         <div className="flex items-center gap-2 py-8 text-muted"><Loader2 className="animate-spin" size={16} /> Đang quét lực lượng trong bán kính…</div>

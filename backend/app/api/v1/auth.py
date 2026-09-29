@@ -18,7 +18,12 @@ from app.rbac.authz import groupings, user_permissions
 router = APIRouter(prefix="/auth", tags=["Xác thực"])
 log = logging.getLogger(__name__)
 
-MAX_FAILED_LOGINS = 10  # sai quá số lần này trong 15 phút → tạm khoá đăng nhập tài khoản
+MAX_FAILED_LOGINS = (
+    10  # sai quá số lần này trong 15 phút (cùng tài khoản, cùng IP; hoặc sai mã 2 lớp) → tạm khoá
+)
+ACCOUNT_MAX_FAILED = (
+    100  # tổng sai mật khẩu của 1 tài khoản từ MỌI IP (dò phân tán) → chặn tài khoản chưa bật 2 lớp
+)
 LOCK_WINDOW_S = 900
 RESET_TTL = timedelta(minutes=30)
 FORGOT_MESSAGE = (
@@ -64,9 +69,23 @@ async def profile(user: dict) -> dict:
 
 
 def lock_key(username: str) -> str:
-    """Bộ đếm đăng nhập sai theo TÀI KHOẢN (không theo chuỗi đã gõ): nhập username hay email đều chung 1 bộ đếm; sai
-    mã xác thực 2 lớp cũng đếm vào đây; đặt lại mật khẩu xoá đúng khoá này."""
+    """Bộ đếm sai MÃ XÁC THỰC 2 LỚP theo tài khoản (tới được bước này là đã biết mật khẩu → khoá cả tài khoản đúng
+    ý). Nhập username hay email đều chung 1 bộ đếm; đặt lại mật khẩu xoá khoá này."""
     return f"loginfail:{username.lower()}"
+
+
+def password_fail_keys(username: str, ip: str) -> tuple[str, str]:
+    """(theo tài khoản + IP, tổng theo tài khoản) cho sai MẬT KHẨU."""
+    ip_tag = hashlib.sha256(ip.encode()).hexdigest()[:16]
+    return f"pwfail:{username.lower()}:{ip_tag}", f"pwfail:{username.lower()}:all"
+
+
+def login_blocked(ip_fails: int, account_fails: int, mfa_enabled: bool) -> bool:
+    """Chặn bước mật khẩu? Sai mật khẩu chỉ khoá (tài khoản, IP) đó → kẻ xấu biết tên đăng nhập của lãnh đạo gõ sai
+    liên tục chỉ tự khoá IP của mình, KHÔNG khoá được người duyệt cảnh báo giữa lúc thiên tai. Tổng theo tài khoản (dò
+    từ nhiều IP) chỉ chặn tài khoản CHƯA bật 2 lớp; đã bật thì vẫn cho qua bước mật khẩu — còn phải đoán mã TOTP (bộ
+    đếm ``lock_key`` theo tài khoản)."""
+    return ip_fails >= MAX_FAILED_LOGINS or (account_fails >= ACCOUNT_MAX_FAILED and not mfa_enabled)
 
 
 async def check_lock(key: str) -> None:
@@ -85,7 +104,7 @@ async def complete_login(user: dict, method: str = "password") -> dict:
 
 
 @router.post("/login")
-async def login(body: LoginIn):
+async def login(body: LoginIn, request: Request):
     """Mật khẩu đúng → token; tài khoản có xác thực 2 lớp → {"mfa": "verify" | "setup", "challenge"} (app/mfa.py)."""
     clean_u = body.username.strip()
     user = await fetch_one(
@@ -93,11 +112,18 @@ async def login(body: LoginIn):
             WHERE lower(username) = lower(:u) OR lower(email) = lower(:u)""",
         {"u": clean_u},
     )
-    key = lock_key(user["username"] if user else clean_u)
-    await check_lock(key)
+    uname = user["username"] if user else clean_u
+    ip_key, all_key = password_fail_keys(uname, request.client.host if request.client else "")
+    await check_lock(lock_key(uname))  # sai mã 2 lớp quá nhiều (đã lộ mật khẩu) → khoá cả tài khoản
+    if login_blocked(
+        await ratelimit.peek(ip_key), await ratelimit.peek(all_key), bool(user and user["totp_enabled_at"])
+    ):
+        raise HTTPException(429, "Đăng nhập sai quá nhiều lần — tạm khoá 15 phút")
     if not user or not verify_secret(body.password, user["password_hash"]):
-        await ratelimit.hit(key, LOCK_WINDOW_S)
+        await ratelimit.hit(ip_key, LOCK_WINDOW_S)
+        await ratelimit.hit(all_key, LOCK_WINDOW_S)
         raise HTTPException(401, "Sai tên đăng nhập hoặc mật khẩu")
+    await ratelimit.clear(ip_key)
     if not user["is_active"]:
         raise HTTPException(403, "Tài khoản đã bị khoá. Vui lòng liên hệ quản trị viên.")
     # Bộ đếm sai chỉ xoá khi qua đủ các bước (mật khẩu đúng + mã sai liên tục vẫn bị khoá)
@@ -223,6 +249,7 @@ async def reset_password(body: ResetIn):
         {"u": row["user_id"]},
     )
     await ratelimit.clear(lock_key(row["username"]))
+    await ratelimit.clear(password_fail_keys(row["username"], "")[1])  # tổng sai mật khẩu của tài khoản
     await audit(None, "auth.reset_password", "user", row["username"])
     return {"message": "Đã đặt lại mật khẩu — hãy đăng nhập bằng mật khẩu mới"}
 

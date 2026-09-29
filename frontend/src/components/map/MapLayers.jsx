@@ -43,8 +43,15 @@ function StationPopup({ p }) {
       <div className="font-semibold">{p.name}</div>
       <div className="mb-1 text-xs text-muted">{STATION_TYPE[p.type]} · {p.id}</div>
       <div className="mb-1 flex items-center gap-2">
-        <span className="font-mono text-lg">{num(p.value, p.type === 'muc_nuoc' ? 2 : 1)} {p.unit}</span>
-        {p.thresholds?.bd1 != null && <span className={clsx('chip', ALARM[lv].cls)}>{ALARM[lv].label}</span>}
+        {p.value == null ? (
+          // API điều hành chỉ lấy số đo trong 2 giờ qua: không có = chưa có thiết bị / mất tín hiệu, KHÔNG phải "dưới BĐ I"
+          <span className="chip bg-panel2 text-muted">Không có số đo trong 2 giờ qua</span>
+        ) : (
+          <>
+            <span className="font-mono text-lg">{num(p.value, p.type === 'muc_nuoc' ? 2 : 1)} {p.unit}</span>
+            {p.thresholds?.bd1 != null && <span className={clsx('chip', ALARM[lv].cls)}>{ALARM[lv].label}</span>}
+          </>
+        )}
       </div>
       {p.type === 'muc_nuoc' ? <Hydrograph stationId={p.id} height={130} hours={24} compact /> : <MiniSeries stationId={p.id} unit={p.unit} />}
     </div>
@@ -198,7 +205,7 @@ export default function MapLayers({ data, layers, timeline, onDispatch, onCamera
         data.stations.features.map((f) => {
           const p = f.properties;
           const value = timeline?.values?.[p.id] ?? p.value;
-          const lv = alarmLevel(value, p.thresholds);
+          const lv = value == null ? null : alarmLevel(value, p.thresholds); // null → biểu tượng xám (không có số đo)
           const label = value == null ? undefined : p.type === 'muc_nuoc' ? value.toFixed(1) : p.type === 'luong_mua' ? Math.round(value) : value.toFixed(1);
           return (
             <Marker key={p.id} position={ll(f)} icon={stationIcon(p.type, lv, label)}>

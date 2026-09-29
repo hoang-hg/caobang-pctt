@@ -246,7 +246,12 @@ export default function MonitoringMap() {
             </div>
             {tool === 'measure' && 'Chạm lên bản đồ để thêm các điểm đo khoảng cách. Bấm lại nút thước để xoá.'}
             {tool === 'route' && (routeInfo ? (
-              <span>Lộ trình: <b>{routeInfo.distance_km} km</b> (~{routeInfo.duration_min}′) · {routeInfo.safe ? <b className="text-good">An toàn</b> : <b className="text-danger">Buộc qua vùng nguy hiểm</b>}<br /><span className="text-muted">{routeInfo.roads.join(' → ')}</span></span>
+              <span>
+                Lộ trình: <b>{routeInfo.distance_km} km</b> (~{routeInfo.duration_min}′) ·{' '}
+                {routeInfo.safe ? <b className="text-good">Né vùng nguy hiểm đã ghi nhận</b> : <b className="text-danger">Đi qua vùng nguy hiểm{routeInfo.hazards?.length ? `: ${routeInfo.hazards.join(', ')}` : ''}</b>}
+                {routeInfo.offroad_km >= 0.5 && <span className="text-amber-600"> · {routeInfo.offroad_km} km chưa có dữ liệu đường</span>}
+                <br /><span className="text-muted">{routeInfo.roads.join(' → ')}</span>
+              </span>
             ) : (
               'Chạm chọn điểm A (vị trí lực lượng) rồi điểm B (nơi cần cứu hộ).'
             ))}

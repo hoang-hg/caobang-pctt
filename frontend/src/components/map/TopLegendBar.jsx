@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import clsx from 'clsx';
 import { HelpCircle, ChevronDown, ChevronUp, X, MapPin, PhoneCall } from 'lucide-react';
-import { alarmLevel } from '../../utils/labels';
+import { stationView } from '../../utils/stations';
 
 /**
  * Thanh Chú thích Ký hiệu & Tra cứu Điểm Giám sát ở Đầu Trang
@@ -34,18 +34,21 @@ export default function TopLegendBar({
       tabId: 'bando',
       summary: 'Quan trắc lượng mưa tự động thời gian thực (mm)',
       desc: 'Màu sắc biểu tượng thay đổi theo lượng mưa: Xanh (<20mm) → Vàng (20-50mm) → Cam (50-100mm) → Đỏ (>100mm mưa rất to).',
-      items: rainStations.map((s) => ({
-        id: s.id,
-        name: s.name,
-        sub: s.admin_name || 'Cao Bằng',
-        value: `${Math.round(s.value ?? 0)} mm`,
-        status: (s.value ?? 0) >= 50 ? 'Mưa to' : 'Bình thường',
-        statusColor: (s.value ?? 0) >= 100 ? 'text-danger' : (s.value ?? 0) >= 50 ? 'text-amber-500' : 'text-good',
-        lat: s.lat,
-        lon: s.lon,
-        type: 'rain',
-        raw: s,
-      })),
+      items: rainStations.map((s) => {
+        const view = stationView(s); // chưa có số đo / mất tín hiệu → không "Bình thường"
+        return {
+          id: s.id,
+          name: s.name,
+          sub: s.admin_name || 'Cao Bằng',
+          value: view.value,
+          status: view.status,
+          statusColor: view.statusColor,
+          lat: s.lat,
+          lon: s.lon,
+          type: 'rain',
+          raw: s,
+        };
+      }),
     },
     {
       id: 'water',
@@ -58,14 +61,14 @@ export default function TopLegendBar({
       summary: 'Cảm biến radar đo mực nước sông suối tự động',
       desc: 'Theo dõi mực nước các sông chính trong tỉnh. Báo động khi vượt cấp BĐ I, BĐ II, BĐ III.',
       items: waterStations.map((s) => {
-        const lv = alarmLevel(s.value ?? 0, s.thresholds);
+        const view = stationView(s); // chưa có số đo / mất tín hiệu → không "An toàn"
         return {
           id: s.id,
           name: s.name,
           sub: s.admin_name || 'Cao Bằng',
-          value: `${Number(s.value ?? 0).toFixed(1)} m`,
-          status: lv === 3 ? 'BĐ III (Nguy hiểm)' : lv === 2 ? 'BĐ II' : lv === 1 ? 'BĐ I' : 'An toàn',
-          statusColor: lv >= 2 ? 'text-danger' : lv === 1 ? 'text-amber-500' : 'text-good',
+          value: view.value,
+          status: view.status,
+          statusColor: view.statusColor,
           lat: s.lat,
           lon: s.lon,
           type: 'water',

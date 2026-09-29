@@ -38,8 +38,18 @@ async function call(method, path, body, token, headers = {}) {
   try { data = JSON.parse(raw); } catch { /* HTML / văn bản */ }
   return { status: res.status, data, headers: res.headers };
 }
-// API công khai qua nginx được cache 10 giây theo URL → thêm tham số lạ để đọc bản mới nhất sau khi ghi
-const fresh = (path) => `${path}${path.includes('?') ? '&' : '?'}_=${Date.now()}`;
+// API công khai qua nginx được cache 10 giây; khoá cache chỉ gồm tham số thật (thêm ?_= KHÔNG né được — chống dồn tải).
+// Sau khi ghi: chờ tối đa 15 giây cho tới khi thấy dữ liệu mới — đồng thời kiểm tra cam kết "hiện trên cổng ≤ 10 giây".
+async function until(path, ok, { raw = false } = {}) {
+  let data;
+  for (let i = 0; i < 16; i++) {
+    data = raw ? await (await fetch(ROOT + path)).text() : (await call('GET', path)).data;
+    if (ok(data)) return data;
+    await sleep(1000);
+  }
+  return data;
+}
+const hasPhone = (d) => JSON.stringify(d).includes('0206 3852 000') || JSON.stringify(d).includes('02063852000');
 
 // ---------------------------------------------------------------- TOTP (RFC 6238) — như totp-test.mjs
 function base32(s) {
@@ -152,20 +162,27 @@ for (const ds of datasets) {
   check(`Nhập tệp mẫu "${ds.label}"`, a.status === 200 && (a.data?.result?.created ?? 0) + (a.data?.result?.updated ?? 0) >= 1,
     `HTTP ${a.status} ${JSON.stringify(a.data?.result || a.data).slice(0, 120)}`);
 }
-const hot = (await call('GET', fresh('/public/hotlines'))).data;
-check('Danh bạ cấp tỉnh vừa nhập → đường dây nóng trên cổng công khai', JSON.stringify(hot).includes('0206 3852 000') ||
-  JSON.stringify(hot).includes('02063852000'));
+check('Danh bạ cấp tỉnh vừa nhập → đường dây nóng trên cổng công khai', hasPhone(await until('/public/hotlines', hasPhone)));
 
 // ================================================================ 5. Hồ chứa: chưa có số liệu → trực ban cập nhật vận hành
 const HO = 'HO-BANGGIANG';
-let res = (await call('GET', fresh('/public/reservoirs'))).data;
+let res = await until('/public/reservoirs', (d) => d?.reservoirs?.some((r) => r.id === HO));
 let ho = res?.reservoirs?.find((r) => r.id === HO);
 check('Hồ mới nhập: "Chưa có số liệu vận hành" (không khẳng định chưa xả)', ho?.status_code === 'chua_co_so_lieu' &&
   ho?.updated_at === null && res.no_data_count === 1 && res.spill_count === 0, `${ho?.status_code} ${ho?.status_label}`);
-const ov = (await call('GET', fresh('/public/overview'))).data;
+const ov = await until('/public/overview', (d) => d?.reservoirs?.no_data_count === 1);
 check('Tổng quan công khai đếm hồ chưa có số liệu', ov?.reservoirs?.no_data_count === 1 && ov?.reservoirs?.spill_count === 0);
+// Trạm vừa nhập, chưa có thiết bị: không được báo "dưới báo động" / "an toàn"
+const river = ov?.rivers?.find((r) => r.name === 'Trạm thuỷ văn Cao Bằng');
+check('Trạm chưa có số liệu: "Chưa có số liệu" (không báo dưới báo động)', river?.level === null && river?.level_label === 'Chưa có số liệu' &&
+  river?.value === null, JSON.stringify(river));
+const st0 = ((await call('GET', '/public/map')).data?.stations || []).find((x) => x.id === 'CB-WL-BANGGIANG');
+check('Bản đồ công khai: trạm chưa có số đo trả value = null, kèm thời điểm / cờ mất tín hiệu', st0 && st0.value === null &&
+  'time' in st0 && st0.stale === false, JSON.stringify(st0));
 check('Số cửa mở vượt số cửa của hồ → 422',
   (await call('PATCH', `/reservoirs/${HO}/operation`, { current_level: 189, spill_gates_open: 9 }, admin)).status === 422);
+check('Gõ nhầm mực nước (1900 m, MNDBT 190 m) → 422, không báo "xả lũ lớn" giả',
+  (await call('PATCH', `/reservoirs/${HO}/operation`, { current_level: 1900, spill_gates_open: 1 }, admin)).status === 422);
 check('Hồ không tồn tại → 404',
   (await call('PATCH', '/reservoirs/HO-KHONG-CO/operation', { current_level: 189, spill_gates_open: 0 }, admin)).status === 404);
 const op = await call('PATCH', `/reservoirs/${HO}/operation`, {
@@ -173,7 +190,7 @@ const op = await call('PATCH', `/reservoirs/${HO}/operation`, {
 }, admin);
 check('Cập nhật vận hành: mở 1/3 cửa → "Đang xả điều tiết"', op.status === 200 && op.data?.status_code === 'xa_dieu_tiet' && !!op.data?.updated_at,
   `HTTP ${op.status} ${op.data?.status_code || JSON.stringify(op.data).slice(0, 100)}`);
-res = (await call('GET', fresh('/public/reservoirs'))).data;
+res = await until('/public/reservoirs', (d) => d?.reservoirs?.find((r) => r.id === HO)?.status_code === 'xa_dieu_tiet');
 ho = res?.reservoirs?.find((r) => r.id === HO);
 check('Cổng công khai hiện ngay số liệu mới', ho?.status_code === 'xa_dieu_tiet' && res.spill_count === 1 && res.no_data_count === 0 &&
   ho?.stale === false);
@@ -208,11 +225,11 @@ subForm.append('file', new Blob([`ma,ten,loai,suc_chua,vi_do,kinh_do\nHS-${stamp
 const sub = await call('POST', '/data-import/submissions', subForm, xaTok);
 check('Quản trị xã gửi hồ sơ điểm sơ tán → chờ duyệt', sub.status === 201 && sub.data?.status === 'cho_duyet',
   `HTTP ${sub.status} ${sub.data?.code || JSON.stringify(sub.data).slice(0, 200)}`);
-const sites = async () => ((await call('GET', fresh('/public/map'))).data?.evacuation_sites || []).map((e) => e.name);
-check('Hồ sơ chờ duyệt chưa hiện trên cổng công khai', !(await sites()).includes(SITE));
+const names = (d) => (d?.evacuation_sites || []).map((e) => e.name);
+check('Hồ sơ chờ duyệt chưa hiện trên cổng công khai', !names((await call('GET', '/public/map')).data).includes(SITE));
 const subOk = await call('POST', `/data-import/submissions/${sub.data?.code}/approve`, {}, admin);
 check('Superadmin phê duyệt → ghi dữ liệu', subOk.status === 200 && subOk.data?.result?.created === 1, JSON.stringify(subOk.data).slice(0, 160));
-check('Sau khi duyệt: hiện trên cổng công khai', (await sites()).includes(SITE));
+check('Sau khi duyệt: hiện trên cổng công khai (≤ 15 giây)', names(await until('/public/map', (d) => names(d).includes(SITE))).includes(SITE));
 
 // ================================================================ 7. Phản ánh → duyệt → chuyển SOS → điều động
 const PHONE = '0912 345 678';
@@ -226,11 +243,11 @@ f.append('reporter_phone', PHONE);
 const rep = await call('POST', '/public/reports', f);
 check('Người dân gửi phản ánh (không đăng nhập)', rep.status === 201 && !!rep.data?.code, `HTTP ${rep.status} ${rep.data?.code || JSON.stringify(rep.data).slice(0, 100)}`);
 const repId = rep.data?.id;
-const pending = (await call('GET', fresh('/public/reports'))).data;
+const pending = (await call('GET', '/public/reports')).data;
 check('Phản ánh chưa duyệt không hiện công khai', !JSON.stringify(pending).includes(rep.data?.code));
 const mod = await call('POST', `/reports/${repId}/moderate`, { action: 'approve', public_note: 'Đã cử lực lượng kiểm tra' }, admin);
 check('Duyệt phản ánh', mod.status === 200, `HTTP ${mod.status}`);
-const pubRep = (await call('GET', fresh('/public/reports'))).data;
+const pubRep = await until('/public/reports', (d) => JSON.stringify(d).includes(rep.data?.code));
 check('Phản ánh đã duyệt hiện công khai, không lộ SĐT người gửi',
   JSON.stringify(pubRep).includes(rep.data?.code) && !JSON.stringify(pubRep).includes('345 678') && !JSON.stringify(pubRep).includes('345678'));
 const toSos = await call('POST', `/reports/${repId}/to-sos`, { incident_type: 'ngap_lut', priority: 2, trapped_count: 3 }, admin);
@@ -244,7 +261,19 @@ if (force) {
   const disp = await call('POST', '/dispatch', { ticket_id: ticket.id, force_id: force.id, personnel: 6 }, admin);
   check('Phát lệnh điều động + lộ trình', disp.status === 200 && disp.data?.ticket?.status === 'thuc_thi' && !!disp.data?.route,
     disp.status === 200 ? `${disp.data.route?.distance_km} km, an toàn=${disp.data.route?.safe}` : JSON.stringify(disp.data).slice(0, 160));
+  // Lực lượng đóng quân trong vùng sạt lở đỏ vừa nhập (tệp mẫu) → tuyến phải báo đi qua vùng nguy hiểm, nêu tên vùng
+  check('Tuyến điều động xuất phát trong vùng nguy hiểm → safe = false, nêu tên vùng',
+    disp.data?.route?.safe === false && disp.data?.route?.hazards?.includes('Khu dân cư xóm Nà Rì'), JSON.stringify(disp.data?.route?.hazards));
+  check('Không có SMS / Push: lệnh điều động báo rõ CHƯA gửi cho đội (trực ban phải gọi)',
+    disp.data?.notification?.sent === false && !!disp.data?.notification?.message);
 }
+const pr = (await call('GET', '/public/route?from_lat=22.6700&from_lon=106.2400&to_lat=22.6657&to_lon=106.2522')).data;
+check('Chỉ đường công khai tới điểm trong vùng nguy hiểm → không báo "an toàn"', pr?.safe === false &&
+  pr?.hazards?.includes('Khu dân cư xóm Nà Rì') && typeof pr?.offroad_km === 'number', JSON.stringify({ safe: pr?.safe, hazards: pr?.hazards }));
+await call('GET', '/public/hotlines?_=lan-1');
+const hit = await call('GET', '/public/hotlines?_=lan-2');
+// Khoá cache bỏ tham số lạ → lần 2 không thể là MISS (HIT, hoặc STALE/UPDATING nếu vừa hết 10 giây)
+check('Tham số lạ (?_=) không né được cache nginx', !!hit.headers.get('x-cache-status') && hit.headers.get('x-cache-status') !== 'MISS', hit.headers.get('x-cache-status'));
 const tr = await call('POST', '/public/track', { code: rep.data?.code, phone: PHONE });
 check('Người dân tra cứu tiến độ bằng mã + SĐT', tr.status === 200 && tr.data?.total === 1 && tr.data?.verified === true);
 check('Tra cứu sai SĐT → như không tồn tại',
@@ -266,9 +295,9 @@ const channelsOff = Object.values(ap.data?.metrics || {});
 check('Duyệt: chốt "đã công bố", từng kênh ghi rõ chưa tích hợp (không treo "Đang phát")',
   ap.status === 200 && ap.data?.status === 'sent' && !!ap.data?.sent_at && channelsOff.length === 3 &&
   channelsOff.every((m) => m.integrated === false), `HTTP ${ap.status} ${ap.data?.status} ${JSON.stringify(ap.data?.metrics).slice(0, 120)}`);
-const pubAlerts = (await call('GET', fresh('/public/alerts'))).data;
-check('Cảnh báo đã duyệt hiện ngay trên cổng công khai', JSON.stringify(pubAlerts).includes(TITLE));
-const liteAfter = await (await fetch(fresh(ROOT + '/ban-nhe'))).text();
+const pubAlerts = await until('/public/alerts', (d) => JSON.stringify(d).includes(TITLE));
+check('Cảnh báo đã duyệt hiện trên cổng công khai (≤ 15 giây)', JSON.stringify(pubAlerts).includes(TITLE));
+const liteAfter = await until('/ban-nhe', (t) => t.includes(TITLE), { raw: true });
 check('Cảnh báo hiện trên bản nhẹ', liteAfter.includes(TITLE));
 await sleep(6000);
 const again = (await call('GET', '/alerts/broadcasts', null, checker)).data?.find((b) => b.id === br.data?.id);

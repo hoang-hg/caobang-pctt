@@ -292,6 +292,9 @@ async def logs(limit: int = 40, codes: list[str] = Depends(MON)):
     )
 
 
+MAX_LEVEL_DEVIATION_M = 50  # mực nước báo lệch MNDBT quá chừng này → gần như chắc chắn gõ nhầm
+
+
 class ReservoirOperationIn(BaseModel):
     current_level: float = Field(ge=-50, le=3000, description="Mực nước hồ (m)")
     spill_gates_open: int = Field(ge=0, le=50, description="Số cửa xả tràn đang mở")
@@ -312,12 +315,23 @@ async def update_reservoir_operation(
     """Trực ban nhập số liệu vận hành hồ khi đơn vị quản lý hồ báo về (chưa có kết nối tự động) — cổng công khai và
     trang bản nhẹ hiện ngay; hồ chưa có số liệu hiện "Chưa có số liệu vận hành" thay vì "Chưa xả tràn"."""
     res = await fetch_one(
-        "SELECT id, name, spill_gates FROM iot_telemetry.reservoirs WHERE id = :id", {"id": reservoir_id}
+        "SELECT id, name, spill_gates, normal_level FROM iot_telemetry.reservoirs WHERE id = :id",
+        {"id": reservoir_id},
     )
     if not res:
         raise HTTPException(404, "Không tìm thấy hồ chứa")
     if res["spill_gates"] and body.spill_gates_open > res["spill_gates"]:
         raise HTTPException(422, f"Hồ chỉ có {res['spill_gates']} cửa xả")
+    # Gõ thừa / thiếu chữ số (1900 thay vì 190) → cổng công khai báo "xả lũ lớn" giả hoặc bỏ sót — chặn trước khi ghi
+    if (
+        res["normal_level"] is not None
+        and abs(body.current_level - res["normal_level"]) > MAX_LEVEL_DEVIATION_M
+    ):
+        raise HTTPException(
+            422,
+            f"Mực nước {body.current_level:g} m lệch mực nước dâng bình thường ({res['normal_level']:g} m) quá "
+            f"{MAX_LEVEL_DEVIATION_M} m — kiểm tra lại số liệu (gõ thừa / thiếu chữ số?)",
+        )
     now = datetime.now(UTC)
     reported = body.reported_at or now
     if reported.tzinfo is None:

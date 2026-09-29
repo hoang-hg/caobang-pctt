@@ -25,6 +25,7 @@ from app.services import lite
 from app.services.data_import.engine import xom_sort_key
 from app.services.landslides import get_landslides_overview
 from app.services.lite import NATIONAL_HOTLINES, RISK_ADVICE, province_hotlines
+from app.services.readings import LATEST_COLS, LATEST_JOIN
 from app.services.reports import CATEGORY, ReportError, create_report, public_photo_url, verify_turnstile
 from app.services.reservoirs import get_reservoirs_overview
 from app.services.safe_routing import haversine_km, plan_route
@@ -34,6 +35,17 @@ from app.services.tracking import track_ticket
 router = APIRouter(prefix="/public", tags=["Công khai"])
 
 LEVEL_LABEL = ["Dưới báo động I", "Trên báo động I", "Trên báo động II", "Trên báo động III"]
+
+
+def river_level(value: float | None, stale: bool, thresholds: dict) -> tuple[int | None, str]:
+    """(cấp báo động, nhãn) cho người dân. Chưa có số đo → (None, "Chưa có số liệu"). Mất tín hiệu mà số đo cuối dưới
+    báo động → (None, "Mất tín hiệu"): không khẳng định an toàn bằng số cũ; số cuối đã vượt báo động thì vẫn báo."""
+    if value is None:
+        return None, "Chưa có số liệu"
+    level = alarm_level(value, thresholds)
+    if stale:
+        return (level, f"{LEVEL_LABEL[level]} · mất tín hiệu") if level else (None, "Mất tín hiệu")
+    return level, LEVEL_LABEL[level]
 
 
 @router.get("/overview")
@@ -47,14 +59,12 @@ async def overview():
                SELECT round(avg(mm)::numeric, 1)::float AS avg_24h, round(max(mm)::numeric, 1)::float AS max_24h FROM t"""
         )
         rivers = await fetch_all(
-            """SELECT s.name, s.river, s.alarm_thresholds AS thr,
-                      (SELECT round(value::numeric, 2)::float FROM iot_telemetry.sensor_readings r
-                        WHERE r.station_id = s.id ORDER BY time DESC LIMIT 1) AS value
-                 FROM iot_telemetry.monitoring_stations s WHERE s.type = 'muc_nuoc' ORDER BY s.id"""
+            f"""SELECT s.name, s.river, s.alarm_thresholds AS thr, {LATEST_COLS}
+                  FROM iot_telemetry.monitoring_stations s {LATEST_JOIN}
+                 WHERE s.type = 'muc_nuoc' ORDER BY s.id"""
         )
         for r in rivers:
-            lv = alarm_level(r["value"] or 0, r.pop("thr") or {})
-            r["level"], r["level_label"] = lv, LEVEL_LABEL[lv]
+            r["level"], r["level_label"] = river_level(r["value"], r["stale"], r.pop("thr") or {})
         sos = await fetch_all(
             """SELECT u.code, u.name, count(*) FILTER (WHERE t.status <> 'hoan_thanh') AS dang_xu_ly,
                       count(*) FILTER (WHERE t.status = 'hoan_thanh' AND t.resolved_at > now() - interval '24 hours') AS da_xu_ly_24h
@@ -110,12 +120,11 @@ async def overview():
 @router.get("/map")
 async def public_map():
     async def build():
+        # value / time / stale: trạm chưa có số đo hoặc mất tín hiệu → giao diện hiện xám, không "an toàn"
         stations = await fetch_all(
-            """SELECT s.id, s.name, s.type, s.river, s.unit, s.alarm_thresholds AS thresholds,
-                      ST_Y(s.location) AS lat, ST_X(s.location) AS lon,
-                      (SELECT round(value::numeric, 2)::float FROM iot_telemetry.sensor_readings r
-                        WHERE r.station_id = s.id ORDER BY time DESC LIMIT 1) AS value
-                 FROM iot_telemetry.monitoring_stations s"""
+            f"""SELECT s.id, s.name, s.type, s.river, s.unit, s.alarm_thresholds AS thresholds,
+                       ST_Y(s.location) AS lat, ST_X(s.location) AS lon, {LATEST_COLS}
+                  FROM iot_telemetry.monitoring_stations s {LATEST_JOIN}"""
         )
         zones = await fetch_all(
             """SELECT type, level, name, depth_m, ST_AsGeoJSON(ST_SimplifyPreserveTopology(geom, 0.0003), 5)::json AS geom

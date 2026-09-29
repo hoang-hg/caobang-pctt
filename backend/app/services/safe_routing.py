@@ -1,8 +1,13 @@
 """Định tuyến an toàn: đường ngắn nhất (theo thời gian) trên đồ thị giao thông,
 né đoạn đường giao cắt vùng sạt lở/lũ quét hoặc vùng ngập sâu (cấp đỏ) còn hiệu lực trong PostGIS.
+
+``safe`` chỉ nghĩa là "không đi qua vùng nguy hiểm ĐÃ GHI NHẬN": cả tuyến (kể cả chặng chim bay từ vị trí tới nút giao
+gần nhất / từ nút cuối tới đích — mạng đường còn thưa, chặng này có thể dài) được kiểm tra với MỌI vùng nguy hiểm đang
+hiệu lực. ``offroad_km``: phần tuyến không có dữ liệu đường — giao diện phải nói rõ, không khẳng định an toàn.
 """
 
 import heapq
+import json
 import math
 from dataclasses import dataclass
 
@@ -116,7 +121,19 @@ async def plan_route(
     from_lat: float, from_lon: float, to_lat: float, to_lon: float, speed_factor: float = 1.0
 ) -> dict:
     edges, nodes = await load_graph()
-    return build_route(edges, nodes, from_lat, from_lon, to_lat, to_lon, speed_factor)
+    route = build_route(edges, nodes, from_lat, from_lon, to_lat, to_lon, speed_factor)
+    # Đồ thị chỉ né đoạn đường bị chặn; chặng chim bay và vùng ngập mức vàng / cam không được xét ở đó → kiểm tra lại
+    # toàn tuyến với mọi vùng nguy hiểm đang hiệu lực
+    hits = await fetch_all(
+        """SELECT name FROM iot_telemetry.hazard_zones
+            WHERE valid_until > now() AND ST_Intersects(geom, ST_SetSRID(ST_GeomFromGeoJSON(:g), 4326))
+            ORDER BY (level = 'do') DESC, (level = 'cam') DESC, name LIMIT 5""",
+        {"g": json.dumps(route["geometry"])},
+    )
+    route["hazards"] = [h["name"] for h in hits]
+    if hits:
+        route["safe"] = False
+    return route
 
 
 def build_route(
@@ -139,6 +156,7 @@ def build_route(
             "distance_km": round(km, 1),
             "duration_min": round(km / 15 * 60),
             "safe": False,
+            "offroad_km": round(km, 1),
             "roads": [],
             "blocked_segments": 0,
         }
@@ -154,11 +172,13 @@ def build_route(
     hours = 0.0
     km = haversine_km(from_lat, from_lon, *nodes[a])
     hours += km / 20  # chặng tiếp cận nút giao gần nhất
+    offroad = km  # phần không có dữ liệu đường (chim bay)
     if not path and a != b:
         # Hai nút giao không nối với nhau (mạng đường rời) → đoạn giữa chưa có đường: tính theo đường chim bay,
         # nếu không quãng đường / thời gian bị báo thiếu cả đoạn này
         gap = haversine_km(*nodes[a], *nodes[b])
         km += gap
+        offroad += gap
         hours += gap / 15
     passes_hazard = False
     roads: list[str] = []
@@ -172,6 +192,7 @@ def build_route(
             roads.append(e.road)
     last = haversine_km(*nodes[b], to_lat, to_lon)
     km += last
+    offroad += last
     hours += last / 15  # chặng cuối (đường thôn, lội nước…)
     coords.append([to_lon, to_lat])
 
@@ -188,6 +209,7 @@ def build_route(
         "distance_km": round(km, 1),
         "duration_min": round(hours * 60),
         "safe": safe and not passes_hazard,
+        "offroad_km": round(offroad, 1),
         "roads": roads,
         "blocked_segments": sum(1 for e in edges if e.blocked),
     }
