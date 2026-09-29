@@ -82,7 +82,9 @@ check('Danh sách xóm của xã (công khai, không cần đăng nhập)', haml
 check('Xã không tồn tại → 404', (await call('GET', '/public/hamlets?xa=CB-KHONGCO')).status === 404);
 check('Mã xóm không có trong danh sách → 422',
   (await call('POST', '/public/reports', reportForm({ ...COBA, extra: { hamlet: 'CB-HOAAN-KHONGCO' } }))).status === 422);
-const sub = await call('POST', '/public/reports', reportForm({ ...COBA, extra: { hamlet: hamlet?.code || '' } }));
+// Mô tả có SĐT + tên người (người dân hay ghi) → phần công khai phải che SĐT; tên người do cán bộ bỏ khi duyệt
+const SUB_DESC = 'Nước ngập qua đường liên thôn trước nhà ông Nông Văn Thử, cần gì gọi 0912 345 678';
+const sub = await call('POST', '/public/reports', reportForm({ ...COBA, desc: SUB_DESC, extra: { hamlet: hamlet?.code || '' } }));
 check('Người dân gửi phản ánh kèm ảnh + xóm', sub.status === 201 && sub.data.photos === 1, sub.data?.code);
 const subTp = await call('POST', '/public/reports', reportForm({ ...TP, desc: 'Cây đổ chắn ngang đường trong nội thị' }));
 
@@ -118,12 +120,34 @@ check('Quản trị xã duyệt phản ánh trong xã', appr.status === 200 && a
 pub = (await call('GET', '/public/reports')).data;
 const shown = pub.find((r) => r.code === sub.data.code);
 check('Sau khi duyệt: hiện công khai, không kèm thông tin người gửi', shown && !('reporter_phone' in shown) && shown.public_note === 'Đã cử dân quân kiểm tra');
+// Phần công khai mặc định (cán bộ không sửa gì): nội dung đã che SĐT, vị trí làm tròn (điểm chấm có thể là nhà người báo)
+check('Gợi ý nội dung công khai cho cán bộ đã che SĐT', item.public_description_suggested?.includes('[đã ẩn]') && !item.public_description_suggested.includes('345'),
+  item.public_description_suggested);
+check('Công khai mặc định: che SĐT trong mô tả', shown && !shown.description.includes('345 678') && shown.description.includes('[đã ẩn]'), shown?.description);
+const dLat = Math.abs(shown.lat - COBA.lat), dLon = Math.abs(shown.lon - COBA.lon);
+check('Công khai mặc định: vị trí làm tròn (lệch ≤ ~150 m), ghi rõ gần đúng',
+  (dLat > 1e-6 || dLon > 1e-6) && dLat <= 0.0011 && dLon <= 0.0011 && shown.approx_m === 150, `${shown.lat},${shown.lon} ~${shown.approx_m} m`);
 const pubImg = await call('GET', `/public/reports/${sub.data.id}/photos/0`, null, null, true);
 const jpeg = Buffer.from(await pubImg.arrayBuffer());
 check('Ảnh công khai là JPEG đã mã hoá lại (không còn EXIF)', pubImg.status === 200 && jpeg[0] === 0xff && jpeg[1] === 0xd8 && !jpeg.includes(Buffer.from('Exif')));
+// Cán bộ sửa phần công khai: bỏ tên người, công khai đúng điểm (điểm công cộng), không công khai ảnh
+const PUB_DESC = 'Nước ngập qua đường liên thôn, xe máy không đi được';
+const edit = await call('POST', `/reports/${sub.data.id}/moderate`,
+  { action: 'edit_public', public_description: PUB_DESC, exact_location: true, public_photos: false }, T.coba);
+check('Sửa phần công khai giữ trạng thái đã duyệt', edit.status === 200 && edit.data.status === 'da_duyet' && edit.data.public_description === PUB_DESC);
+const shown2 = (await call('GET', '/public/reports')).data.find((r) => r.code === sub.data.code);
+check('Cổng hiện nội dung cán bộ đã sửa (không còn tên người)', shown2?.description === PUB_DESC && !JSON.stringify(shown2).includes('Nông Văn Thử'));
+check('Vị trí chính xác khi cán bộ chọn', Math.abs(shown2.lat - COBA.lat) < 1e-6 && Math.abs(shown2.lon - COBA.lon) < 1e-6 && shown2.approx_m === null);
+check('Không công khai ảnh → cổng không có ảnh, link ảnh công khai 404',
+  shown2.photos.length === 0 && (await call('GET', `/public/reports/${sub.data.id}/photos/0`, null, null, true)).status === 404);
+check('Cán bộ vẫn xem được ảnh (link có chữ ký)', (await fetch(ROOT + edit.data.photo_urls[0].thumb)).status === 200);
+check('Không sửa phần công khai của phản ánh chưa duyệt → 409',
+  (await call('POST', `/reports/${subTp.data.id}/moderate`, { action: 'edit_public', public_description: PUB_DESC }, T.tinh)).status === 409);
 const toSos = await call('POST', `/reports/${subTp.data.id}/to-sos`, { incident_type: 'ngap_lut', priority: 2 }, T.tinh);
 check('Quản trị tỉnh chuyển phản ánh thành phiếu SOS', toSos.status === 200 && toSos.data.sos_code?.startsWith('SOS-'), toSos.data?.sos_code);
 check('Không chuyển SOS lần 2 → 409', (await call('POST', `/reports/${subTp.data.id}/to-sos`, {}, T.tinh)).status === 409);
+const shownTp = (await call('GET', '/public/reports')).data.find((r) => r.code === subTp.data.code);
+check('Chuyển SOS cũng công khai phản ánh → vị trí làm tròn mặc định', shownTp?.approx_m === 150, `${shownTp?.lat},${shownTp?.lon}`);
 
 // ---------------------------------------------------------------- Phân cấp quản trị
 const stamp = Date.now().toString(36).slice(-5);

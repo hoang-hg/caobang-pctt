@@ -26,7 +26,16 @@ from app.services.data_import.engine import xom_sort_key
 from app.services.landslides import get_landslides_overview
 from app.services.lite import NATIONAL_HOTLINES, RISK_ADVICE, province_hotlines
 from app.services.readings import LATEST_COLS, LATEST_JOIN
-from app.services.reports import CATEGORY, ReportError, create_report, public_photo_url, verify_turnstile
+from app.services.reports import (
+    CATEGORY,
+    PUBLIC_APPROX_M,
+    PUBLIC_POINT_SQL,
+    ReportError,
+    create_report,
+    public_photo_url,
+    redact_public_text,
+    verify_turnstile,
+)
 from app.services.reservoirs import get_reservoirs_overview
 from app.services.safe_routing import haversine_km, plan_route
 from app.services.simulator import alarm_level
@@ -161,17 +170,24 @@ async def public_map():
 
 
 async def _approved_reports(hours: int) -> list[dict]:
+    # Chỉ PHẦN CÔNG KHAI cán bộ đã duyệt: nội dung công khai (chưa có → mô tả gốc), vị trí công khai (chưa có → làm
+    # tròn), ảnh khi được phép. Luôn che SĐT / email / số giấy tờ lần nữa khi trả ra (phòng cán bộ sót).
     rows = await fetch_all(
-        """SELECT r.id, r.code, r.category, r.description, r.public_note, r.status, r.created_at,
-                  jsonb_array_length(r.photos) AS n_photos, u.name AS admin_name,
-                  ST_Y(r.location) AS lat, ST_X(r.location) AS lon
+        f"""SELECT r.id, r.code, r.category, COALESCE(r.public_description, r.description) AS description,
+                  r.public_note, r.status, r.created_at, u.name AS admin_name,
+                  CASE WHEN r.public_photos THEN jsonb_array_length(r.photos) ELSE 0 END AS n_photos,
+                  ST_Y(p.pt) AS lat, ST_X(p.pt) AS lon, ST_Equals(p.pt, r.location) AS exact_location
              FROM community.citizen_reports r LEFT JOIN spatial_admin.administrative_units u ON u.id = r.admin_unit_id
+            CROSS JOIN LATERAL (SELECT {PUBLIC_POINT_SQL} AS pt) p
             WHERE r.status IN ('da_duyet', 'da_xu_ly') AND r.created_at > now() - make_interval(hours => :h)
             ORDER BY r.created_at DESC LIMIT 200""",
         {"h": hours},
     )
     for r in rows:
         rid = str(r["id"])
+        r["description"] = redact_public_text(r["description"])
+        # Vị trí gần đúng → giao diện ghi "vị trí gần đúng (~150 m)"; null = vị trí chính xác cán bộ đã xác nhận
+        r["approx_m"] = None if r.pop("exact_location") else PUBLIC_APPROX_M
         r["category_label"] = CATEGORY.get(r["category"], r["category"])
         r["photos"] = [
             {"thumb": public_photo_url(rid, i, True), "full": public_photo_url(rid, i)}
@@ -474,7 +490,9 @@ async def hamlets(xa: str = Query(..., max_length=40)):
 
 
 class TrackIn(BaseModel):
-    code: str = Field(..., min_length=3, max_length=20, description="Mã phiếu SOS-… hoặc PA-…")
+    code: str = Field(
+        ..., min_length=3, max_length=30, description="Mã phiếu SOS-… / PA-…, hoặc mã tra cứu PA-…-XXXXXX"
+    )
     phone: str | None = Field(None, max_length=20, description="SĐT người gửi — bắt buộc nếu phiếu có SĐT")
 
 

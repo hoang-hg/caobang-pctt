@@ -63,16 +63,24 @@ for (const q of ['SOS', 'PA-', '100', PHONE]) {
 }
 check('GET /track không còn dùng (SĐT không nằm trên URL)', (await call('GET', `/public/track?code=${mine.data.code}`)).status === 405);
 
-// ---- Phản ánh ẩn danh: chỉ tiến độ, không lộ nội dung
-const r2 = await track(anon.data.code);
+// ---- Phản ánh không để lại SĐT: mã PA-… tăng dần (đoán được) → chỉ mã tra cứu đầy đủ (đuôi ngẫu nhiên cấp khi gửi)
+check('Gửi phản ánh nhận mã tra cứu PA-…-XXXXXX', /^PA-\d+-[A-Z]{6}$/.test(anon.data?.track_code || '') &&
+  anon.data.track_code.startsWith(`${anon.data.code}-`), anon.data?.track_code);
+check('Không SĐT, chỉ nhập mã phiếu (dò mã tăng dần) → như không tồn tại', (await track(anon.data.code)).data?.total === 0);
+const wrongKey = `${anon.data.code}-${anon.data.track_code.endsWith('AAAAAA') ? 'BBBBBB' : 'AAAAAA'}`;
+check('Sai đuôi mã tra cứu → như không tồn tại', (await track(wrongKey)).data?.total === 0);
+const r2 = await track(anon.data.track_code);
 const it2 = r2.data?.results?.[0];
-check('Phản ánh ẩn danh tra bằng mã → chỉ có tiến độ', r2.data?.total === 1 && !r2.data.verified && it2.description == null && it2.address == null);
-check('Không lộ nội dung phản ánh ẩn danh', !JSON.stringify(r2.data).includes('không được lộ'));
+check('Đúng mã tra cứu → thấy tiến độ, không cần SĐT', r2.data?.total === 1 && it2?.timeline?.length === 4 && it2.description == null && it2.address == null);
+check('Mã tra cứu chữ thường, không gạch nối vẫn khớp', (await track(anon.data.track_code.toLowerCase().replaceAll('-', ''))).data?.total === 1);
+check('Không lộ nội dung phản ánh', !JSON.stringify(r2.data).includes('không được lộ'));
+check('Phản ánh có SĐT: mã tra cứu cũng dùng được', (await track(mine.data.track_code)).data?.total === 1);
 
 // ---- Lý do từ chối là nội bộ
 const anonRow = (await call('GET', '/reports?status=cho_duyet', null, T.coba)).data?.items?.find((x) => x.code === anon.data.code);
+check('Cán bộ không thấy mã tra cứu của người gửi', anonRow && !JSON.stringify(anonRow).includes(anon.data.track_code.slice(-6)));
 await call('POST', `/reports/${anonRow.id}/moderate`, { action: 'reject', reject_reason: 'LY_DO_NOI_BO_BI_MAT' }, T.coba);
-const r3 = await track(anon.data.code);
+const r3 = await track(anon.data.track_code);
 check('Từ chối → mốc "rejected", không lộ lý do nội bộ', r3.data?.results?.[0]?.timeline?.[1]?.state === 'rejected' && !JSON.stringify(r3.data).includes('LY_DO_NOI_BO'));
 
 // ---- SOS
@@ -80,7 +88,7 @@ const r4 = await track(sos.data.code, PHONE);
 check('Người báo tin tra được phiếu SOS', r4.data?.total === 1 && r4.data.results[0].type === 'sos');
 check('Không lộ ghi chú nội bộ của phiếu SOS', !JSON.stringify(r4.data).includes('GHI_CHU_NOI_BO'));
 check('SOS: sai SĐT → như không tồn tại', (await track(sos.data.code, '0999000000')).data?.total === 0);
-const SENSITIVE = ['reporter_phone"', 'reporter_name', 'raw_message', 'lat"', 'lon"', 'reject_reason', 'notes'];
+const SENSITIVE = ['reporter_phone"', 'reporter_name', 'raw_message', 'lat"', 'lon"', 'reject_reason', 'notes', 'track_key'];
 const leaked = SENSITIVE.filter((k) => JSON.stringify([r1.data, r2.data, r3.data, r4.data]).includes(`"${k}`));
 check('Không trả trường nhạy cảm', leaked.length === 0, leaked.join(', '));
 
@@ -97,6 +105,10 @@ check('Dò mã bằng 1 SĐT: sau 10 lần không ra kết quả → 429', st ==
 st = 0;
 for (let i = 0; i < 12 && st !== 429; i++) st = (await track(sos.data.code, `0977${String(100000 + i)}`)).status;
 check('Dò SĐT của 1 mã: sau 10 lần sai → khoá tra cứu mã đó', st === 429);
+// Biết mã phản ánh → thử đuôi mã tra cứu (đếm theo mã phiếu, không theo đuôi)
+st = 0;
+for (let i = 0; i < 12 && st !== 429; i++) st = (await track(`${anon.data.code}-${'ABCDEFGHJKLM'[i]}ZZZZZ`)).status;
+check('Dò đuôi mã tra cứu: sau 10 lần sai → khoá tra cứu mã đó', st === 429);
 check('Mã khác, SĐT khác vẫn tra cứu bình thường', (await track(mine.data.code, PHONE)).data?.total === 1);
 
 console.log(failed ? `\n${failed} kiểm tra KHÔNG đạt` : '\nTất cả kiểm tra tra cứu tiến độ đạt');

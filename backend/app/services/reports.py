@@ -1,7 +1,9 @@
 """Phản ánh hiện trường của người dân: xử lý ảnh, lưu trữ, link ảnh có chữ ký, tạo phản ánh.
 
 Quyền riêng tư: họ tên / SĐT người gửi chỉ cán bộ có ``report.view`` mới xem; ảnh được mã hoá lại để xoá EXIF
-(toạ độ GPS, model điện thoại…). API công khai chỉ trả phản ánh đã duyệt, không kèm thông tin người gửi.
+(toạ độ GPS, model điện thoại…). API công khai chỉ trả phản ánh đã duyệt, không kèm thông tin người gửi, và chỉ trả
+PHẦN CÔNG KHAI do cán bộ duyệt: nội dung đã che SĐT / email / số giấy tờ, vị trí làm tròn (trừ khi cán bộ chọn vị trí
+chính xác — điểm công cộng), ảnh chỉ khi cán bộ cho công khai.
 """
 
 from __future__ import annotations
@@ -12,6 +14,8 @@ import hmac
 import io
 import json
 import logging
+import re
+import secrets
 import time
 import uuid
 import warnings
@@ -26,6 +30,7 @@ from app.db import fetch_one
 from app.infra import storage
 from app.rbac import domains
 from app.services.events import log_event
+from app.services.sos_nlp import PHONE_RE
 from app.ws.hub import hub
 
 log = logging.getLogger(__name__)
@@ -51,6 +56,30 @@ OPEN_FORMATS = ["JPEG", "PNG", "WEBP"]
 FULL_SIZE = 1600
 THUMB_SIZE = 400
 PHOTO_URL_TTL = 3600
+
+# Vị trí công khai mặc định: làm tròn về lưới 0,002° (~220 m) → lệch tối đa ~150 m so với điểm người dân chấm (có thể
+# là nhà họ). Làm tròn cố định (không cộng nhiễu ngẫu nhiên): nhiễu mới mỗi lần có thể lấy trung bình để tìm lại điểm gốc.
+PUBLIC_GRID_DEG = 0.002
+PUBLIC_APPROX_M = 150
+# Biểu thức SQL (bảng phản ánh đặt tên r): vị trí công khai đã chọn khi duyệt, chưa có → làm tròn vị trí gốc
+PUBLIC_POINT_SQL = f"COALESCE(r.public_location, ST_SnapToGrid(r.location, {PUBLIC_GRID_DEG}))"
+_EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
+REDACTED = "[đã ẩn]"
+
+# Mã tra cứu phản ánh: đuôi ngẫu nhiên 6 chữ cái (24^6 ≈ 191 triệu, chỉ chữ → không lẫn với số phiếu; bỏ I, O dễ nhầm
+# với 1, 0). Mã phiếu PA-… tăng dần nên đoán được — người gửi không để lại SĐT tra cứu bằng PA-1003-KXMPQR.
+TRACK_KEY_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ"
+TRACK_KEY_LEN = 6
+
+
+def redact_public_text(text: str | None) -> str:
+    """Che SĐT / số giấy tờ / email trước khi công khai — người dân hay ghi SĐT, số nhà… vào mô tả. Không thay cán bộ
+    đọc lại (tên người, địa chỉ nhà không che tự động được)."""
+    return _EMAIL_RE.sub(REDACTED, PHONE_RE.sub(REDACTED, text or ""))
+
+
+def new_track_key() -> str:
+    return "".join(secrets.choice(TRACK_KEY_ALPHABET) for _ in range(TRACK_KEY_LEN))
 
 
 class ReportError(ValueError):
@@ -182,6 +211,7 @@ async def create_report(
     processed = await asyncio.to_thread(lambda: [process_image(p) for p in photos])
 
     report_id = str(uuid.uuid4())
+    track_key = new_track_key()
     now = datetime.now(UTC)
     meta = []
     for i, (full, thumb, w, h) in enumerate(processed):
@@ -193,11 +223,11 @@ async def create_report(
 
     row = await fetch_one(
         """INSERT INTO community.citizen_reports (id, category, description, location, address, hamlet_name,
-                 admin_unit_id, reporter_name, reporter_phone, photos, client_ip_hash)
+                 admin_unit_id, reporter_name, reporter_phone, photos, client_ip_hash, track_key)
            VALUES (CAST(:id AS uuid), :c, :d, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326), :addr, :hamlet,
                    (SELECT id FROM spatial_admin.administrative_units WHERE level = 'xa'
                      ORDER BY geom <-> ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) LIMIT 1),
-                   :rn, :rp, CAST(:ph AS jsonb), :ip)
+                   :rn, :rp, CAST(:ph AS jsonb), :ip, :tk)
            RETURNING code, admin_unit_id""",
         {
             "id": report_id,
@@ -211,6 +241,7 @@ async def create_report(
             "rp": reporter_phone,
             "ph": json.dumps(meta),
             "ip": ip_hash(client_ip),
+            "tk": track_key,
         },
     )
     code = domains.code_of_unit_id(row["admin_unit_id"])
@@ -235,4 +266,10 @@ async def create_report(
         "info",
         admin_unit_id=row["admin_unit_id"],
     )
-    return {"id": report_id, "code": row["code"], "photos": len(meta)}
+    # track_code chỉ trả 1 lần cho người gửi (không lưu ở đâu khác ngoài CSDL, không hiện cho cán bộ)
+    return {
+        "id": report_id,
+        "code": row["code"],
+        "track_code": f"{row['code']}-{track_key}",
+        "photos": len(meta),
+    }

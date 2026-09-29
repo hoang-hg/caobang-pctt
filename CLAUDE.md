@@ -237,6 +237,9 @@ Python trong container.
   `TOTP_REQUIRED_ROLES` trống ở dev.
 - Ảnh: luôn qua `services/reports.process_image` (xoá EXIF, chống bomb, JPEG) rồi `infra.storage.put`; ảnh chưa duyệt chỉ
   phát qua `signed_photo_url`.
+- Phản ánh ra cổng công khai: chỉ phần công khai (`public_description` qua `redact_public_text`, vị trí
+  `PUBLIC_POINT_SQL` — làm tròn nếu cán bộ chưa chọn chính xác, ảnh khi `public_photos`). Không trả `description` /
+  `location` gốc ra API công khai.
 - Log không ghi query string, token, SĐT, toạ độ người dân (`main.DropQueryString` áp cho `uvicorn.access` và `uvicorn.error`).
   Gửi dữ liệu ra dịch vụ ngoài phải che thông tin cá nhân trước (mẫu `sos_nlp.redact_for_llm`).
 

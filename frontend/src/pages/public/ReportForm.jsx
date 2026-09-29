@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { MapContainer, Marker, useMap, useMapEvents } from 'react-leaflet';
 import {
   CheckCircle2, LocateFixed, Loader2, Send, Trash2, MapPin, AlertCircle,
-  ShieldCheck, ImagePlus, Search, Waves, AlertTriangle
+  ShieldCheck, ImagePlus, Search, Waves, AlertTriangle, Copy
 } from 'lucide-react';
 import { Modal } from '../../components/common/ui';
 import Turnstile from '../../components/common/Turnstile';
@@ -130,7 +130,7 @@ export default function ReportForm({ onClose, myLocation, onTrack }) {
                 className="btn bg-accent text-white hover:brightness-110 px-4 py-2 text-xs sm:text-sm font-semibold flex items-center gap-1.5 shadow-sm"
                 onClick={() => {
                   onClose();
-                  onTrack(done.code, f.reporter_phone);
+                  onTrack(done.track_code || done.code, f.reporter_phone);
                 }}
               >
                 <Search size={15} />
@@ -149,9 +149,25 @@ export default function ReportForm({ onClose, myLocation, onTrack }) {
           </div>
           <div className="text-xl font-bold text-ink">Đã tiếp nhận phản ánh</div>
           <div className="rounded-xl bg-panel2 p-3 text-sm flex flex-col items-center gap-1 max-w-sm w-full border border-line">
-            <div>Mã phản ánh: <b className="font-mono text-base text-accent">{done.code}</b></div>
+            <div>Mã phản ánh: <b className="font-mono text-base text-ink">{done.code}</b></div>
+            {done.track_code && (
+              <div className="flex items-center gap-1.5">
+                Mã tra cứu: <b className="font-mono text-base text-accent select-all">{done.track_code}</b>
+                <button
+                  type="button"
+                  className="text-muted hover:text-accent"
+                  title="Sao chép mã tra cứu"
+                  aria-label="Sao chép mã tra cứu"
+                  onClick={() => navigator.clipboard?.writeText(done.track_code)}
+                >
+                  <Copy size={14} />
+                </button>
+              </div>
+            )}
             <div className="text-xs text-muted">
-              Lưu lại mã này. Tra cứu tiến độ trên Cổng công khai bằng mã phiếu và số điện thoại bạn đã nhập (nếu có).
+              {f.reporter_phone.trim()
+                ? 'Chụp màn hình hoặc lưu lại mã tra cứu. Tra cứu tiến độ bằng mã tra cứu, hoặc mã phản ánh kèm số điện thoại bạn đã nhập.'
+                : 'Chụp màn hình hoặc lưu lại mã tra cứu — bạn không để lại số điện thoại nên đây là cách duy nhất để xem tiến độ. Mã này không được cấp lại.'}
             </div>
           </div>
           <p className="max-w-md text-sm text-ink-2 leading-relaxed">
@@ -292,7 +308,7 @@ export default function ReportForm({ onClose, myLocation, onTrack }) {
           </div>
 
           <p className="-mt-1 flex items-center gap-1 text-[11px] text-muted">
-            <ShieldCheck size={12} className="shrink-0 text-good" /> Họ tên, số điện thoại chỉ cán bộ xác minh mới xem được, không hiển thị công khai.
+            <ShieldCheck size={12} className="shrink-0 text-good" /> Họ tên, số điện thoại chỉ cán bộ xác minh mới xem được, không hiển thị công khai. Nội dung được cán bộ xem lại trước khi công khai; vị trí trên cổng được làm tròn.
           </p>
 
           {/* Honeypot chống bot tự động */}

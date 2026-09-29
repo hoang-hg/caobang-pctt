@@ -108,7 +108,7 @@ export default function TicketTracker({ initialCode = '', initialPhone = '', onQ
             </h2>
             <p className="text-xs sm:text-sm text-ink-2 mt-1 leading-relaxed">
               Nhập <b>mã phiếu</b> (dạng <code className="font-mono text-accent">SOS-1080</code>, <code className="font-mono text-accent">PA-1017</code>) và <b>số điện thoại đã dùng khi gửi</b>.
-              Phản ánh gửi ẩn danh (không để lại SĐT) chỉ cần mã phiếu và chỉ xem được các mốc tiến độ.
+              Phản ánh không để lại số điện thoại: nhập <b>mã tra cứu</b> được cấp khi gửi (dạng <code className="font-mono text-accent">PA-1017-KXMPQR</code>), không cần số điện thoại.
             </p>
           </div>
 
@@ -124,7 +124,7 @@ export default function TicketTracker({ initialCode = '', initialPhone = '', onQ
               type="text"
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              placeholder="Mã phiếu: PA-… hoặc SOS-…"
+              placeholder="Mã phiếu / mã tra cứu: PA-… hoặc SOS-…"
               aria-label="Mã phiếu"
               autoCapitalize="characters"
               className="input pl-10 py-2.5 text-sm sm:text-base w-full shadow-inner font-medium font-mono"
@@ -139,7 +139,7 @@ export default function TicketTracker({ initialCode = '', initialPhone = '', onQ
               inputMode="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder="SĐT đã dùng khi gửi"
+              placeholder="SĐT đã dùng khi gửi (nếu có)"
               aria-label="Số điện thoại đã dùng khi gửi"
               autoComplete="tel"
               className="input pl-9 pr-9 py-2.5 text-sm sm:text-base w-full shadow-inner font-medium"
@@ -211,7 +211,8 @@ export default function TicketTracker({ initialCode = '', initialPhone = '', onQ
             Không tìm thấy thông tin phù hợp
           </div>
           <p className="text-xs sm:text-sm text-muted mt-1.5 leading-relaxed max-w-md">
-            Không tìm thấy phiếu <b className="text-ink font-mono">{activeQuery.code}</b> khớp với số điện thoại đã nhập. Vui lòng kiểm tra lại mã phiếu và số điện thoại bạn dùng khi gửi.
+            Không tìm thấy phiếu <b className="text-ink font-mono">{activeQuery.code}</b> khớp với số điện thoại đã nhập. Vui lòng kiểm tra lại mã phiếu và số điện thoại bạn dùng khi gửi
+            (phản ánh không để lại số điện thoại: nhập đầy đủ mã tra cứu dạng PA-1017-KXMPQR).
           </p>
           <div className="mt-5 p-3.5 rounded-xl bg-panel2 border border-line text-left text-xs space-y-1.5 w-full">
             <div className="font-semibold text-ink flex items-center gap-1.5">
@@ -258,12 +259,6 @@ export default function TicketTracker({ initialCode = '', initialPhone = '', onQ
                   );
                 })}
               </div>
-            </div>
-          )}
-
-          {!data?.verified && (
-            <div className="rounded-xl border border-line bg-panel2/60 px-3 py-2 text-xs text-muted">
-              Phản ánh gửi ẩn danh: chỉ hiển thị các mốc tiến độ, không hiển thị nội dung và địa chỉ.
             </div>
           )}
 

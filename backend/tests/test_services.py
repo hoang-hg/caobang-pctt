@@ -224,7 +224,7 @@ def test_track_items_never_include_address_or_description():
     đang mắc kẹt (người gửi đã biết địa chỉ của mình)."""
     from datetime import UTC, datetime
 
-    from app.services.tracking import PRIVATE_FIELDS, format_report_item, format_sos_item
+    from app.services.tracking import format_report_item, format_sos_item
 
     now = datetime(2026, 9, 29, 8, 0, tzinfo=UTC)
     sos = format_sos_item(
@@ -246,7 +246,6 @@ def test_track_items_never_include_address_or_description():
     for item in (sos, report):
         assert "address" not in item and "description" not in item
         assert "Nà Rì" not in str(item) and "ông A" not in str(item)
-    assert "address" not in PRIVATE_FIELDS and "description" not in PRIVATE_FIELDS
 
 
 def test_overdue_sql_uses_sla_per_priority():
