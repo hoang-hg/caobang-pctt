@@ -62,26 +62,35 @@ const match = (await call('GET', `/sos/${inCoba.data.id}/match`, null, T.baolac)
 const disp = await call('POST', '/dispatch', { ticket_id: inCoba.data.id, force_id: match.forces[0].id, vehicle_ids: [], personnel: 3 }, T.baolac);
 check('Chỉ huy cụm điều động SOS trong cụm', disp.status === 200, `${disp.data?.route?.distance_km} km`);
 
-// Tranh chấp điều động: 2 điều phối viên cùng lúc / danh sách cũ trên màn hình
-const inCoba2 = await call('POST', '/sos', { raw_message: 'Sạt lở đất vùi nhà ở xã Cô Ba, 2 người mắc kẹt', source: 'CAN_BO' }, T.coba);
-const m2 = (await call('GET', `/sos/${inCoba2.data.id}/match`, null, T.baolac)).data;
+// Tranh chấp điều động: 2 điều phối viên cùng lúc / danh sách cũ trên màn hình. Mỗi bước dùng phiếu riêng — cùng 1 lực
+// lượng điều 2 lần cho CÙNG phiếu đã bị chặn bởi quy tắc chống lệnh trùng (smoke), ở đây thử tranh chấp xe / quân số
+const newCoba = async (msg) => (await call('POST', '/sos', { raw_message: msg, source: 'CAN_BO' }, T.coba)).data;
+const tA = await newCoba('Sạt lở đất vùi nhà ở xã Cô Ba, 2 người mắc kẹt');
+const tB = await newCoba('Ngập sâu ở xã Cô Ba, 3 người mắc kẹt trên mái nhà');
+const tC = await newCoba('Lũ cuốn trôi cầu tạm ở xã Cô Ba, 4 người bị cô lập');
+const m2 = (await call('GET', `/sos/${tA.id}/match`, null, T.baolac)).data;
 const f0 = m2.forces[0];
+let free = tB;  // phiếu chưa có lệnh của f0
 if (m2.vehicles.length && f0) {
   const veh = m2.vehicles[0].id;
-  const twin = await Promise.all([1, 2].map(() => call('POST', '/dispatch',
-    { ticket_id: inCoba2.data.id, force_id: f0.id, vehicle_ids: [veh], personnel: 1 }, T.baolac)));
-  check('2 lệnh đồng thời cùng 1 phương tiện: chỉ 1 lệnh nhận được xe (409)',
-    twin.map((r) => r.status).sort().join() === '200,409', twin.map((r) => r.data?.detail || r.status).join(' | '));
+  const twin = await Promise.all([tA, tB].map((t) => call('POST', '/dispatch',
+    { ticket_id: t.id, force_id: f0.id, vehicle_ids: [veh], personnel: 1 }, T.baolac)));
+  const lost = twin.find((r) => r.status === 409);
+  check('2 lệnh đồng thời (2 phiếu) cùng 1 phương tiện: chỉ 1 lệnh nhận được xe (409)',
+    twin.map((r) => r.status).sort().join() === '200,409' && /phương tiện/.test(lost?.data?.detail || ''),
+    twin.map((r) => r.data?.detail || r.status).join(' | '));
+  free = twin[0].status === 409 ? tA : tB;
 } else {
   console.log('SKIP  Tranh chấp phương tiện (không có phương tiện rảnh gần Cô Ba)');
 }
-const all = await call('POST', '/dispatch', { ticket_id: inCoba2.data.id, force_id: f0.id, vehicle_ids: [], personnel: 10000 }, T.baolac);
-check('Điều động toàn bộ quân số còn sẵn sàng', all.status === 200);
-const none = await call('POST', '/dispatch', { ticket_id: inCoba2.data.id, force_id: f0.id, vehicle_ids: [], personnel: 1 }, T.baolac);
-check('Lực lượng hết người sẵn sàng → 409 (không trừ âm quân số)', none.status === 409, none.data?.detail);
+const all = await call('POST', '/dispatch', { ticket_id: tC.id, force_id: f0.id, vehicle_ids: [], personnel: 10000 }, T.baolac);
+check('Điều động toàn bộ quân số còn sẵn sàng', all.status === 200, all.data?.detail);
+const none = await call('POST', '/dispatch', { ticket_id: free.id, force_id: f0.id, vehicle_ids: [], personnel: 1 }, T.baolac);
+check('Lực lượng hết người sẵn sàng → 409 (không trừ âm quân số)',
+  none.status === 409 && /người sẵn sàng/.test(none.data?.detail || ''), none.data?.detail);
 const forceOf = async () => (await call('GET', '/resources/forces', null, T.chihuy)).data.find((x) => x.id === f0.id);
-check('Quân số sẵn sàng không âm', (await forceOf()).personnel_ready === 0);
-await call('POST', `/sos/${inCoba2.data.id}/resolve`, null, T.chihuy);
+check('Quân số sẵn sàng không âm', (await forceOf()).personnel_ready === 0, `${(await forceOf()).personnel_ready}`);
+for (const t of [tA, tB, tC]) await call('POST', `/sos/${t.id}/resolve`, null, T.chihuy);
 const back = await forceOf();
 check('Hoàn thành phiếu → lực lượng trở lại sẵn sàng', back.personnel_ready > 0 && back.personnel_on_mission >= 0, `${back.personnel_ready} sẵn sàng`);
 
