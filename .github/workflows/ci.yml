@@ -229,6 +229,20 @@ jobs:
           echo "Stack không sẵn sàng sau 15 phút"; $DC ps; exit 1
       - name: Kiểm thử luồng vận hành thật
         run: node tests/e2e/prod-flow.mjs http://127.0.0.1:8080 http://127.0.0.1:8025
+      # prod-flow vừa nhập tệp mẫu (CB-LL-001…) → golive phải NO-GO và chỉ ra bản ghi mẫu; không phần nào lỗi giữa chừng
+      - name: Kiểm tra Go / No-Go (deploy/golive-check.sh)
+        run: |
+          set +e
+          DCP="$DC" sh deploy/golive-check.sh http://frontend:80 > golive.log 2>&1
+          code=$?
+          set -e
+          cat golive.log
+          [ "$code" -eq 1 ] || { echo "Phải NO-GO: còn dữ liệu mẫu của prod-flow"; exit 1; }
+          grep -q "Còn bản ghi mẫu CB-LL-001" golive.log || { echo "Không phát hiện bản ghi mẫu"; exit 1; }
+          ! grep -q "Không kiểm tra được" golive.log || { echo "Có phần kiểm tra bị lỗi giữa chừng"; exit 1; }
+          for t in T1 T2 T3 T5; do
+            grep -q "^ĐẠT *$t " golive.log || { echo "Kịch bản đối kháng $t không đạt"; exit 1; }
+          done
       - name: Log khi lỗi
         if: failure()
         run: $DC logs --tail=300 migrate backend worker frontend backup
