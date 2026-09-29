@@ -323,6 +323,7 @@ DATASETS: dict[str, Dataset] = {
             geometry_columns=("location",),
             admin_unit=True,
             fixed_insert={"source": "external"},
+            public=True,  # trạm hiện trên bản đồ / tổng quan công khai → nhập xong xoá cache cổng
         ),
         Dataset(
             "ho_chua",

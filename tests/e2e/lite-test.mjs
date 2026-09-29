@@ -58,9 +58,16 @@ const br = await call('POST', '/alerts/broadcasts', {
 }, maker);
 const ap = await call('POST', `/alerts/broadcasts/${br.data?.id}/approve`, { pin: '2468' }, checker);
 check('Phát cảnh báo thử', ap.status === 200, br.data?.code);
-// tham số lạ để bỏ qua cache 10 giây của nginx; cache Redis đã bị xoá khi phê duyệt
-const fresh = await page(`?xa=${code}&t=${Date.now()}`);
-check('Cảnh báo vừa phát hiện ngay trên bản nhẹ của xã', fresh.html.includes(title));
+// Cache Redis đã bị xoá khi phê duyệt; còn cache nginx ≤ 10 giây — tham số lạ (?t=) KHÔNG né được (khoá cache chỉ gồm
+// tham số thật, chống dồn tải backend) → chờ tối đa 15 giây: cũng là kiểm tra cam kết "hiện trên bản nhẹ ≤ 10 giây"
+let fresh = await page(`?xa=${code}`);
+for (let i = 0; i < 15 && !fresh.html.includes(title); i++) {
+  await new Promise((r) => setTimeout(r, 1000));
+  fresh = await page(`?xa=${code}`);
+}
+check('Cảnh báo vừa phát hiện trên bản nhẹ của xã (≤ 15 giây)', fresh.html.includes(title));
+const busted = await page(`?xa=${code}&t=${Date.now()}`);
+check('Tham số lạ không né được cache nginx', busted.headers.get('x-cache-status') !== 'MISS', busted.headers.get('x-cache-status'));
 check('Cảnh báo mức đỏ → nguy cơ cao', fresh.html.includes('NGUY CƠ CAO'));
 
 // ---------------------------------------------------------------- Service worker & manifest

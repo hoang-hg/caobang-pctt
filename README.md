@@ -155,7 +155,7 @@ graph LR
 | Vùng nguy hiểm (`vung_nguy_hiem`) 🌐 | `hazard_zones` | GeoJSON vùng | `ma` | ✓ (không xoá vùng do cảm biến tạo) |
 | Điểm nguy hiểm (`diem_nguy_hiem`) 🌐 | `hazard_points` | CSV / Excel / GeoJSON điểm | `ma` | ✓ |
 | Danh bạ & đường dây nóng (`danh_ba`) 🌐 | `contacts` | CSV / Excel | `ma` (+ `ma_cap_tren`) | ✓ |
-| Trạm quan trắc (`tram_quan_trac`) | `monitoring_stations` | CSV / Excel / GeoJSON điểm | `ma` | — |
+| Trạm quan trắc (`tram_quan_trac`) 🌐 | `monitoring_stations` | CSV / Excel / GeoJSON điểm | `ma` | — |
 | Hồ chứa (`ho_chua`) 🌐 | `reservoirs` | CSV / Excel / GeoJSON điểm | `ma` | — |
 | Kho vật tư (`kho`) | `warehouses` | CSV / Excel / GeoJSON điểm | `ma` | — |
 | Tồn kho (`ton_kho`) | `inventory` | CSV / Excel | `ma_kho` + `ma_vat_tu` | — |

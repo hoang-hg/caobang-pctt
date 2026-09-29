@@ -176,7 +176,7 @@ check('Tổng quan công khai đếm hồ chưa có số liệu', ov?.reservoirs
 const river = ov?.rivers?.find((r) => r.name === 'Trạm thuỷ văn Cao Bằng');
 check('Trạm chưa có số liệu: "Chưa có số liệu" (không báo dưới báo động)', river?.level === null && river?.level_label === 'Chưa có số liệu' &&
   river?.value === null, JSON.stringify(river));
-const st0 = ((await call('GET', '/public/map')).data?.stations || []).find((x) => x.id === 'CB-WL-BANGGIANG');
+const st0 = ((await until('/public/map', (d) => d?.stations?.some((x) => x.id === 'CB-WL-BANGGIANG')))?.stations || []).find((x) => x.id === 'CB-WL-BANGGIANG');
 check('Bản đồ công khai: trạm chưa có số đo trả value = null, kèm thời điểm / cờ mất tín hiệu', st0 && st0.value === null &&
   'time' in st0 && st0.stale === false, JSON.stringify(st0));
 check('Số cửa mở vượt số cửa của hồ → 422',
