@@ -168,6 +168,7 @@ SYSTEM_ROLES: Final[tuple[tuple[str, str, str, bool, list[tuple[str, str]]], ...
             "report.view",
             "report.moderate",
             "data.import",
+            "data.submit",  # có đủ quyền của admin_xa → tạo được tài khoản admin xã (chống leo thang)
             "monitoring.update",
         ),
     ),
@@ -209,6 +210,7 @@ SYSTEM_ROLES: Final[tuple[tuple[str, str, str, bool, list[tuple[str, str]]], ...
             "user.manage",
             "report.view",
             "report.moderate",
+            "data.submit",  # gửi dữ liệu các xã trong cụm chờ tỉnh duyệt; cấp được vai trò admin xã
         ),
     ),
     (

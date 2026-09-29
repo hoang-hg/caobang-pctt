@@ -815,7 +815,7 @@ Yêu cầu ở phạm vi toàn tỉnh **không** khớp phân quyền cấp cụ
 | `truong_ban` Lãnh đạo BCH | ✗ | Tất cả trừ `rbac.manage` |
 | `admin_tinh` Quản trị tỉnh | ✗ | Tài khoản, duyệt phản ánh, xử lý SOS và **điều động** toàn tỉnh; xem nguồn lực, cảnh báo, nhật ký, nguồn dữ liệu; **nhập dữ liệu chính thức**; cập nhật vận hành hồ chứa. Không soạn/duyệt cảnh báo, không sửa vai trò |
 | `admin_xa` Quản trị xã/phường | ✓ | Tài khoản & duyệt phản ánh trong xã; tiếp nhận – cập nhật SOS của xã; gửi dữ liệu của xã chờ tỉnh duyệt |
-| `chi_huy_cum` Chỉ huy cụm | ✓ | Điều hành, xuất kho, soạn + duyệt cảnh báo, tài khoản trong cụm |
+| `chi_huy_cum` Chỉ huy cụm | ✓ | Điều hành, xuất kho, soạn + duyệt cảnh báo, tài khoản trong cụm; gửi dữ liệu các xã trong cụm chờ tỉnh duyệt |
 | `truc_ban` Trực ban điều hành | ✓ | Tiếp nhận SOS, điều động, soạn cảnh báo (Maker), tổng đài; cập nhật vận hành hồ chứa (khi được giao toàn tỉnh) |
 | `can_bo_xa` Cán bộ PCTT xã | ✓ | Tiếp nhận & cập nhật SOS, xem nguồn lực trong xã |
 | `thu_kho` Thủ kho | ✓ | Xem & xuất kho |
