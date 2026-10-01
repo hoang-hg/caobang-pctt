@@ -84,8 +84,8 @@ export function citizen() {
 }
 
 // Tài khoản demo có quyền xem dashboard (monitoring.view + resource.view)
-const ACCOUNTS = [['admin', 'admin123'], ['chihuy', 'chihuy123'], ['trucban', 'trucban123'], ['xem', 'xem123'],
-  ['admin.tinh', 'admintinh123'], ['chihuy.baolac', 'baolac123']];
+const ACCOUNTS = [['admin', 'admin123'], ['chihuy', 'chihuy123'], ['trucban', 'trucban123'], ['admin.tinh', 'admintinh123'],
+  ['admin.coba', 'admincoba123'], ['canbo.coba', 'coba123']];
 let token = null;
 export function official() {
   if (!token) {

@@ -49,7 +49,7 @@ Sửa chức năng, cấu hình hay quy trình thì cập nhật đúng mục tr
 | F | Bộ lọc địa phương & Sáng/Tối | toàn cục | 56 xã/phường (sau 01/07/2025), preset lưu vực, vùng núi cao, biên giới, địa bàn huyện cũ; Omni-search (địa danh, toạ độ, mã SOS); giao diện sáng/tối |
 | G | Nguồn dữ liệu & IoT | `/nguon-du-lieu` | Dự báo tổ hợp ECMWF + GFS theo xã; OpenWeather; cổng IoT HTTP / MQTT / LoRaWAN; kiểm tra số đo; cảnh báo mất tín hiệu; giám sát kết nối |
 | H | Phản ánh của người dân | `/phan-anh` | Cán bộ đúng địa bàn duyệt / từ chối / chuyển SOS phản ánh có ảnh của người dân |
-| I | Phân quyền | `/phan-quyen` | Tài khoản, vai trò, phạm vi toàn tỉnh → cụm → xã; chống leo thang quyền; nhật ký phân quyền |
+| I | Phân quyền | `/phan-quyen` | 3 cấp, mỗi cấp 1 vai trò (Quản trị hệ thống · Quản trị tỉnh · Quản trị xã/phường), mỗi tài khoản 1 vai trò; chỉ cấp trên quản lý cấp dưới; nhật ký phân quyền |
 | — | **Cổng công khai** | `/`, `/cong-khai` | Người dân không cần đăng nhập: cảnh báo đã duyệt, bản đồ vùng nguy hiểm – điểm sơ tán, "Tôi đang ở đâu?", dự báo mưa theo xã, mực nước, hồ chứa, điểm đen sạt lở, đường dây nóng, **gửi phản ánh kèm ảnh**, tra cứu tiến độ phiếu |
 
 Tự động hoá: cảm biến nghiêng / độ ẩm đất vượt BĐ II → tự khoanh vùng nguy cơ 1 km, tạo phiếu SOS nguồn `SENSOR` và
@@ -332,17 +332,14 @@ Mật khẩu công khai trong mã nguồn (`backend/app/seed_data.py`) — **b�
 
 | Tài khoản | Mật khẩu | Vai trò | Phạm vi | PIN |
 |---|---|---|---|---|
-| `admin` | `admin123` | Super admin | Toàn tỉnh | `0000` |
-| `admin.tinh` | `admintinh123` | Admin tỉnh | Toàn tỉnh | – |
-| `admin.coba` | `admincoba123` | Admin xã | Xã Cô Ba | – |
-| `admin.cathan` | `admincathan123` | Admin xã | Xã Ca Thành | – |
-| `admin.thucphan` | `adminthucphan123` | Admin phường | Phường Thục Phán | – |
-| `chihuy` | `chihuy123` | Lãnh đạo BCH — phê duyệt (Checker) | Toàn tỉnh | `2468` |
-| `trucban` | `trucban123` | Trực ban — soạn lệnh (Maker) | Toàn tỉnh | – |
-| `chihuy.baolac` | `baolac123` | Chỉ huy cụm | Cụm Bảo Lạc (8 xã) | `1357` |
-| `canbo.coba` | `coba123` | Cán bộ PCTT xã | Xã Cô Ba | – |
-| `thukho` | `thukho123` | Thủ kho | Toàn tỉnh | – |
-| `xem` | `xem123` | Quan sát (chỉ xem) | Toàn tỉnh | – |
+| `admin` | `admin123` | Cấp 1 · Quản trị hệ thống | Toàn tỉnh | `0000` |
+| `admin.tinh` | `admintinh123` | Cấp 2 · Quản trị tỉnh | Toàn tỉnh | – |
+| `chihuy` | `chihuy123` | Cấp 2 · Quản trị tỉnh (chức vụ lãnh đạo — có PIN, duyệt cảnh báo) | Toàn tỉnh | `2468` |
+| `trucban` | `trucban123` | Cấp 2 · Quản trị tỉnh (chức vụ trực ban — soạn lệnh, chưa cấp PIN) | Toàn tỉnh | – |
+| `admin.coba` | `admincoba123` | Cấp 3 · Quản trị xã | Xã Cô Ba | – |
+| `admin.cathan` | `admincathan123` | Cấp 3 · Quản trị xã | Xã Ca Thành | – |
+| `admin.thucphan` | `adminthucphan123` | Cấp 3 · Quản trị phường | Phường Thục Phán | – |
+| `canbo.coba` | `coba123` | Cấp 3 · Quản trị xã (chức vụ cán bộ PCTT) | Xã Cô Ba | – |
 
 Dùng thử: cổng công khai → **Tôi đang ở đâu?**, **Gửi phản ánh** · đăng nhập `trucban` soạn lệnh cảnh báo → đăng nhập
 `chihuy` phê duyệt bằng PIN · `admin.coba` duyệt phản ánh vừa gửi · bản đồ: kéo đội cứu hộ thả vào điểm SOS ·
@@ -410,7 +407,7 @@ Mọi biến của backend khai báo ở `backend/app/config.py`. Tệp mẫu: `
 | `JWT_SECRET` | chuỗi mẫu | **bắt buộc** ≥ 32 ký tự ngẫu nhiên | Ký phiên đăng nhập |
 | `SECRET_KEY` | trống (dẫn xuất từ JWT_SECRET) | **bắt buộc**, khác JWT_SECRET | Mã hoá API key đối tác và khoá xác thực 2 lớp trong CSDL — đổi khoá = nhập lại key, mọi người cài lại 2 lớp |
 | `JWT_EXPIRE_HOURS` | `12` | tuỳ chọn | Thời hạn phiên |
-| `TOTP_REQUIRED_ROLES` | trống | `super_admin,truong_ban,admin_tinh,chi_huy_cum` | Vai trò bắt buộc xác thực 2 lớp ([11.1](#xac-thuc-2-lop)); trống → cảnh báo khi khởi động |
+| `TOTP_REQUIRED_ROLES` | trống | `super_admin,admin_tinh` | Vai trò bắt buộc xác thực 2 lớp ([11.1](#xac-thuc-2-lop)); trống → cảnh báo khi khởi động; còn tên vai trò cũ → cảnh báo |
 | `TOTP_ISSUER` | `BCH PCTT Cao Bằng` | tuỳ chọn | Tên hiện trong ứng dụng xác thực |
 | `POSTGRES_USER` / `_DB` | `pctt` / `caobang_pctt` | tuỳ chọn | |
 | `POSTGRES_PASSWORD` | `pctt_dev_password` | **bắt buộc** (dùng hex, ghép vào URL) | |
@@ -724,7 +721,7 @@ graph LR
 1. **Không tự duyệt**: người soạn không phê duyệt được lệnh của chính mình (nguyên tắc 4 mắt).
 2. **Ký duyệt bằng PIN** cá nhân (lưu dạng băm PBKDF2-SHA256). Sai PIN 5 lần trong 15 phút → tạm khoá phê duyệt 15 phút
    (chống dò PIN khi phiên đăng nhập bị lộ); mỗi lần sai ghi nhật ký `broadcast.approve_failed`.
-3. Người duyệt phải có quyền `alert.approve` trên **tất cả** xã nhận tin (chỉ huy cụm không duyệt được lệnh toàn tỉnh).
+3. Người duyệt: tài khoản Cấp 1–2 **đã được cấp PIN**, không phải người soạn, có quyền `alert.approve` trên **tất cả** xã nhận tin ([8.2](#phan-quyen)).
 4. Phát theo ranh giới xã/phường hoặc đa giác khoanh trên bản đồ. Có vùng vẽ thì người soạn phải có quyền trên mọi xã
    vùng vẽ đi qua (không chỉ các xã tự chọn). Mỗi lệnh chỉ được duyệt 1 lần (bấm đúp / hai lãnh đạo cùng duyệt → 1 lần phát).
 
@@ -795,22 +792,28 @@ graph TD
 ---
 
 <a id="phan-quyen"></a>
-## 8. Phân quyền (RBAC)
+## 8. Phân quyền (RBAC) — 3 cấp
 
-Casbin `rbac_with_domains`: **quyền** (`obj.act`) gom thành **vai trò**, vai trò được gán cho tài khoản tại một **phạm vi**
-(domain) là địa bàn phân cấp. Danh mục quyền là nguồn sự thật duy nhất ở `backend/app/rbac/permissions.py`.
+**Mỗi cấp 1 vai trò, mỗi tài khoản đúng 1 vai trò tại 1 phạm vi** — điều hành đồng bộ, nhật ký luôn rõ ai làm gì với tư
+cách gì. Chức vụ (lãnh đạo, trực ban, cán bộ…) chỉ ghi ở hồ sơ tài khoản; quyền do **cấp** quyết định. Không có vai trò
+tuỳ chỉnh. Casbin `rbac_with_domains`; danh mục quyền và 3 vai trò là nguồn sự thật duy nhất ở
+`backend/app/rbac/permissions.py`.
+
+| Cấp | Vai trò | Phạm vi | Làm được | Quản lý tài khoản |
+|---|---|---|---|---|
+| 1 | `super_admin` Quản trị hệ thống | toàn tỉnh `*` | Tất cả | Mọi cấp |
+| 2 | `admin_tinh` Quản trị tỉnh | toàn tỉnh `*` | Mọi quyền nghiệp vụ toàn tỉnh: SOS, **điều động**, **soạn và duyệt cảnh báo** (cần PIN, không tự duyệt lệnh mình soạn), tổng đài, kho, phương tiện, nhật ký pháp lý, nguồn dữ liệu / IoT, **nhập dữ liệu chính thức**, duyệt hồ sơ xã gửi, vận hành hồ chứa | Cấp 3 |
+| 3 | `admin_xa` Quản trị xã/phường | đúng 1 xã `<CUM>/<MA_XA>` | Trong xã: tiếp nhận – cập nhật – hoàn thành SOS, duyệt / chuyển SOS phản ánh, xuất kho của xã, xem nguồn lực / cảnh báo / danh bạ, **gửi dữ liệu chờ tỉnh duyệt** | Không |
 
 ```
-*                          Toàn tỉnh Cao Bằng
-├── BAOLAC/*               Cụm Bảo Lạc (địa bàn huyện cũ, 8 xã)
-│   ├── BAOLAC/CB-COBA     Xã Cô Ba
-│   └── BAOLAC/CB-HUNGDAO  Xã Hưng Đạo …
-├── TPCAOBANG/*            Cụm TP. Cao Bằng (3 phường)
-└── …                      10 cụm = 10 địa bàn huyện/thành phố trước 01/07/2025
+*                          Toàn tỉnh Cao Bằng — Cấp 1, Cấp 2
+├── BAOLAC/CB-COBA         Xã Cô Ba — Cấp 3
+├── BAOLAC/CB-HUNGDAO      Xã Hưng Đạo — Cấp 3
+└── …                      56 xã/phường (cột administrative_units.rbac_domain)
 ```
 
-Mỗi xã có cột `administrative_units.rbac_domain`. Gán ở `BAOLAC/*` khớp mọi `BAOLAC/CB-...`; gán ở `*` khớp mọi nơi.
-Yêu cầu ở phạm vi toàn tỉnh **không** khớp phân quyền cấp cụm/xã — quyền "toàn tỉnh" chỉ có hiệu lực khi cấp ở `*`.
+Tiền tố `<CUM>` (địa bàn huyện cũ) chỉ còn trong mã phạm vi để khớp dữ liệu; **không còn cấp vai trò theo cụm**. Yêu cầu
+ở phạm vi toàn tỉnh không khớp quyền cấp xã.
 
 ### 8.1. Danh mục quyền
 
@@ -821,55 +824,49 @@ Yêu cầu ở phạm vi toàn tỉnh **không** khớp phân quyền cấp cụ
 | `sos.view` / `.create` / `.update` / `.resolve` | ✓ | Xem / tiếp nhận / chuyển trạng thái / xác nhận đã cứu |
 | `dispatch.create` | ✓ | Điều động (theo xã của điểm SOS; được điều lực lượng ngoài xã) |
 | `resource.view` | ✓ | Lực lượng, kho, phương tiện, điểm sơ tán |
-| `inventory.issue` | ✓ | Ra lệnh xuất kho (theo xã của kho) |
+| `inventory.issue` | ✓ | Ra lệnh xuất kho (theo xã của kho; kho cấp tỉnh cần quyền toàn tỉnh) |
 | `vehicle.update` | ✓ | Đổi trạng thái phương tiện |
 | `alert.view` / `.create` / `.approve` | ✓ | Xem / soạn (Maker) / duyệt (Checker) — phải có quyền trên **tất cả** xã nhận tin |
 | `contact.view` | ✓ | Danh bạ (cấp tỉnh luôn hiện, cấp xã/thôn theo phạm vi) |
 | `hotline.operate` | toàn tỉnh | Tổng đài, phân luồng cuộc gọi |
 | `audit.view` | toàn tỉnh | Nhật ký pháp lý |
-| `user.view` / `user.manage` | ✓ | Xem / tạo tài khoản con, cấp – thu hồi vai trò, đặt lại xác thực 2 lớp trong phạm vi |
+| `user.view` / `user.manage` | ✓ | Xem / tạo tài khoản cấp dưới, đổi cấp – phạm vi, đặt lại mật khẩu / PIN / 2 lớp, khoá |
 | `report.view` / `report.moderate` | ✓ | Xem (kể cả SĐT người gửi) / duyệt – từ chối – chuyển SOS phản ánh |
 | `integration.view` / `integration.manage` | toàn tỉnh | Xem / cấu hình nguồn dữ liệu, thiết bị IoT, cấp khoá |
 | `data.import` | toàn tỉnh | Nhập dữ liệu chính thức từ tệp; phê duyệt / từ chối hồ sơ xã gửi ([2.4](#nhap-du-lieu)) |
 | `data.submit` | ✓ | Gửi dữ liệu của xã mình chờ cấp tỉnh phê duyệt ([2.4](#nhap-du-lieu)) |
-| `rbac.manage` | toàn tỉnh | Tạo / sửa / xoá định nghĩa vai trò |
 
-### 8.2. Vai trò hệ thống (đồng bộ mỗi lần khởi động)
+### 8.2. Cảnh báo: 4 mắt + PIN
 
-| Vai trò | Uỷ quyền được | Quyền chính |
-|---|---|---|
-| `super_admin` Quản trị hệ thống | ✗ | Tất cả |
-| `truong_ban` Lãnh đạo BCH | ✗ | Tất cả trừ `rbac.manage` |
-| `admin_tinh` Quản trị tỉnh | ✗ | Tài khoản, duyệt phản ánh, xử lý SOS và **điều động** toàn tỉnh; xem nguồn lực, cảnh báo, nhật ký, nguồn dữ liệu; **nhập dữ liệu chính thức**; cập nhật vận hành hồ chứa. Không soạn/duyệt cảnh báo, không sửa vai trò |
-| `admin_xa` Quản trị xã/phường | ✓ | Tài khoản & duyệt phản ánh trong xã; tiếp nhận – cập nhật SOS của xã; gửi dữ liệu của xã chờ tỉnh duyệt |
-| `chi_huy_cum` Chỉ huy cụm | ✓ | Điều hành, xuất kho, soạn + duyệt cảnh báo, tài khoản trong cụm; gửi dữ liệu các xã trong cụm chờ tỉnh duyệt |
-| `truc_ban` Trực ban điều hành | ✓ | Tiếp nhận SOS, điều động, soạn cảnh báo (Maker), tổng đài; cập nhật vận hành hồ chứa (khi được giao toàn tỉnh) |
-| `can_bo_xa` Cán bộ PCTT xã | ✓ | Tiếp nhận & cập nhật SOS, xem nguồn lực trong xã |
-| `thu_kho` Thủ kho | ✓ | Xem & xuất kho |
-| `quan_sat` Quan sát | ✓ | Chỉ xem |
+Mọi tài khoản Cấp 1–2 soạn và duyệt được lệnh cảnh báo, nhưng **duyệt cần PIN** (do cấp trên cấp khi tạo / sửa tài khoản;
+tài khoản chưa được cấp PIN nhận thông báo "chưa được cấp mã PIN phê duyệt") và **người soạn không tự duyệt lệnh của
+mình**. PIN sai 5 lần → khoá duyệt 15 phút. Cấp 3 không soạn / duyệt cảnh báo, không có PIN.
 
-Vai trò tuỳ chỉnh do `super_admin` tạo ở **Phân quyền → Vai trò & quyền**.
+### 8.3. Quản lý tài khoản: chỉ cấp trên → cấp dưới
 
-### 8.3. Uỷ quyền & chống leo thang
+1. Cấp 1 quản lý mọi tài khoản (trừ tự đổi vai trò / tự khoá mình).
+2. Người khác chỉ tạo và quản lý tài khoản **cấp dưới** mình (Cấp 2 → Cấp 3); Cấp 3 không quản lý ai. **Cùng cấp không đổi
+   mật khẩu, PIN, xác thực 2 lớp, không khoá / đổi cấp của nhau** → không mạo danh được (đổi mật khẩu người khác rồi đăng
+   nhập thay họ).
+3. Vai trò được cấp: thấp hơn cấp của người cấp, đúng loại phạm vi (Cấp 1–2 toàn tỉnh, Cấp 3 đúng 1 xã), trong phạm vi
+   `user.manage` của người cấp, và người cấp có đủ mọi quyền của vai trò đó (không leo thang).
+4. **Đổi cấp / phạm vi** thay vai trò hiện có (không cộng dồn); xuống Cấp 3 thì xoá PIN.
 
-1. `super_admin` cấp được mọi vai trò ở mọi phạm vi.
-2. Người khác chỉ cấp vai trò **uỷ quyền được** và không phải `super_admin` / `truong_ban` / `admin_tinh` → chuỗi quản trị
-   **super admin → admin tỉnh → admin xã → cán bộ**.
-3. Phạm vi cấp phải nằm trong phạm vi `user.manage` của người cấp.
-4. **Không leo thang**: mọi quyền của vai trò được cấp, người cấp phải đang có ở phạm vi đó.
-5. Không sửa / khoá tài khoản có vai trò ngoài phạm vi mình, không tự khoá mình.
+Đổi cấp / phạm vi, đổi mật khẩu, khoá tài khoản → `users.token_version` tăng → phiên cũ bị từ chối (401). Mọi thao tác ghi
+`communications.rbac_audit_log`. Giao diện chỉ ẩn/hiện; backend mới là nơi chặn thật. WebSocket chỉ đẩy sự kiện thuộc
+phạm vi người dùng.
 
-Cấp / thu hồi quyền, đổi mật khẩu, khoá tài khoản → `users.token_version` tăng → phiên cũ bị từ chối (401). Mọi thao tác
-ghi `communications.rbac_audit_log`. Giao diện chỉ ẩn/hiện; backend mới là nơi chặn thật. WebSocket chỉ đẩy sự kiện SOS /
-nhật ký thuộc xã trong phạm vi người dùng.
+**Chuyển từ mô hình cũ** (tự động khi khởi động, `rbac/seed.migrate_roles`, ghi nhật ký "Chuyển sang phân quyền 3 cấp"):
+Lãnh đạo BCH, Trực ban → Quản trị tỉnh; Cán bộ xã → Quản trị xã cùng xã; tài khoản nhiều vai trò → giữ cấp cao nhất.
+Chỉ huy cụm, Thủ kho, Quan sát, vai trò tuỳ chỉnh, phạm vi cụm → **gỡ vai trò và khoá tài khoản** (không tự nâng quyền);
+Quản trị hệ thống cấp lại đúng cấp rồi mở khoá ở **Phân quyền → Đổi cấp / phạm vi**.
 
 **Tài khoản khi khởi động**: Superadmin tạo từ `SUPERADMIN_*` **một lần** khi chưa có; tài khoản demo chỉ tạo khi
-`DEMO_MODE=true`. Vai trò chỉ được gán **lúc tạo** tài khoản; khởi động lại **không ghi đè** mật khẩu, trạng thái khoá,
-vai trò đã chỉnh (gỡ hết vai trò của Superadmin ban đầu thì không bị gán lại). Vô hiệu hoá tài khoản: **khoá** tài khoản.
+`DEMO_MODE=true`. Khởi động lại **không ghi đè** mật khẩu, trạng thái khoá, vai trò đã chỉnh. Vô hiệu hoá: **khoá** tài khoản.
 
-API quản trị `/api/v1/rbac`: `GET /permissions`, `/roles` (`user.view`) · `GET /scopes` · `POST/PATCH/DELETE /roles…`
-(`rbac.manage`) · `GET/POST /users`, `PATCH /users/{id}`, `POST/DELETE /users/{id}/assignments`, `POST /users/{id}/mfa/reset` (`user.manage` + rào chắn
-uỷ quyền) · `GET /audit` (`user.view`, lọc theo phạm vi).
+API quản trị `/api/v1/rbac`: `GET /permissions`, `/roles` (`user.view`; 3 vai trò, chỉ đọc) · `GET /scopes` (toàn tỉnh +
+56 xã) · `GET/POST /users`, `PATCH /users/{id}`, `PUT /users/{id}/assignment` (đổi cấp / phạm vi), `POST /users/{id}/mfa/reset`
+(`user.manage` + rào chắn cấp) · `GET /audit` (`user.view`, lọc theo phạm vi).
 
 ---
 
@@ -949,7 +946,7 @@ phần lớn do cache nginx 10 giây trả (không tới backend, không bị đ
   `TURNSTILE_SITE_KEY` và `TURNSTILE_SECRET` → form hiện ô xác minh, không cần build lại giao diện). Backend không gọi
   được Cloudflare (mất kết nối quốc tế) → cho qua và ghi cảnh báo, để người dân vẫn gửi được lúc thiên tai; trình duyệt
   không tải được ô xác minh → form báo lỗi và nhắc gọi 112.
-- Phản ánh gán xã theo vị trí → chỉ cán bộ có quyền ở xã / cụm / tỉnh chứa xã đó thấy và duyệt; phản ánh mới đẩy thông
+- Phản ánh gán xã theo vị trí → chỉ cán bộ có quyền ở xã đó hoặc toàn tỉnh thấy và duyệt; phản ánh mới đẩy thông
   báo realtime (`report.new`) cho đúng những người đó.
 - Ảnh: xoay theo EXIF rồi **xoá toàn bộ EXIF/GPS**, chặn ảnh bomb (> 40 megapixel), mã hoá lại JPEG 1600 px + ảnh nhỏ 400 px,
   lưu MinIO bucket riêng tư. Ảnh chưa duyệt chỉ xem qua link **có chữ ký HMAC, hết hạn sau 1 giờ**.
@@ -1225,8 +1222,8 @@ Ngoài mật khẩu, đăng nhập cần mã 6 số từ ứng dụng xác thự
 Authenticator… — chuẩn TOTP RFC 6238, không cần SMS, không cần Internet trên điện thoại). Lộ mật khẩu vẫn không vào được
 tài khoản. Mã nguồn: `backend/app/mfa.py`, `api/v1/mfa.py`, `frontend/src/components/account/Mfa.jsx`.
 
-- **Bắt buộc theo vai trò**: `TOTP_REQUIRED_ROLES` (mặc định production: Quản trị hệ thống, Lãnh đạo BCH, Quản trị tỉnh,
-  Chỉ huy cụm — những người quản lý tài khoản hoặc phê duyệt cảnh báo). Người có vai trò này chưa bật → lần đăng nhập sau
+- **Bắt buộc theo vai trò**: `TOTP_REQUIRED_ROLES` (mặc định production: `super_admin,admin_tinh` — Cấp 1–2, những người
+  quản lý tài khoản và phê duyệt cảnh báo). Người có vai trò này chưa bật → lần đăng nhập sau
   phải cài đặt ngay (quét QR, nhập mã, lưu 10 mã khôi phục) mới vào được; phiên cũ bị từ chối. Superadmin cũng cài ở lần
   đăng nhập đầu tiên sau khi triển khai.
 - **Tự bật** (mọi cán bộ): menu tài khoản → **Xác thực 2 lớp**. Tắt cần mật khẩu + mã; vai trò bắt buộc không tự tắt được.
@@ -1258,11 +1255,11 @@ Kiểm thử API (cần stack dev đang chạy với `DEMO_MODE=true`; tham số
 | Nghiệp vụ | Lệnh |
 |---|---|
 | Luồng nghiệp vụ SOS, cảnh báo, nhật ký | `node tests/e2e/smoke.mjs` |
-| Phân quyền theo phạm vi | `node tests/e2e/rbac-test.mjs` |
+| Phân quyền 3 cấp: đúng 3 vai trò, phạm vi xã, cấp trên quản lý cấp dưới (chống mạo danh cùng cấp), đổi cấp / phạm vi, 4 mắt + PIN | `node tests/e2e/rbac-test.mjs` · `node tests/e2e/login-hierarchy-test.mjs` |
 | IoT HTTP / batch / LoRaWAN / MQTT, dự báo | `node tests/e2e/iot-test.mjs` |
 | Cổng & API công khai, phản ánh, tài khoản, giới hạn tần suất | `node tests/e2e/public-test.mjs [backend] [mailpit]` |
 | Tra cứu tiến độ phiếu | `node tests/e2e/track-test.mjs` |
-| Xác thực 2 lớp: bật / đăng nhập 2 bước / mã khôi phục / tắt / đặt lại / khoá; bắt buộc theo vai trò khi backend có `TOTP_REQUIRED_ROLES=kiem_thu_2fa` (~1,5 phút) | `node tests/e2e/totp-test.mjs` |
+| Xác thực 2 lớp: bật / đăng nhập 2 bước / mã khôi phục / tắt / đặt lại / khoá; bắt buộc theo vai trò khi backend có `TOTP_REQUIRED_ROLES=admin_xa` và chạy với `REQUIRED_ROLE=admin_xa` (~1,5 phút; CI kiểm bắt buộc 2 lớp ở job prod) | `node tests/e2e/totp-test.mjs` |
 | Hồ chứa & xả lũ | `node tests/e2e/reservoir-test.mjs` |
 | Điểm đen sạt lở & đường đèo | `node tests/e2e/landslide-test.mjs` |
 | Nhập dữ liệu (12 loại, kiểm tra lỗi, cập nhật không trùng, thay toàn bộ) | `node tests/e2e/import-test.mjs` |
@@ -1297,7 +1294,8 @@ node ui-test.mjs http://localhost:8080                 # stack dev có dữ li�
 UI_READONLY=1 UI_USER=… UI_PASS=… node ui-test.mjs https://pctt.caobang.gov.vn   # máy thật trước go-live: chỉ xem
 ```
 `UI_READONLY=1` chỉ mở trang / hộp thoại, không gửi, không điều động, không duyệt — dùng được trên hệ thống đang phục vụ
-(tài khoản bắt buộc 2 lớp không dùng được: tạo tài khoản xem riêng, khoá sau khi thử).
+(tài khoản bắt buộc 2 lớp — Cấp 1–2 ở máy thật — không dùng được: tạo 1 tài khoản Cấp 3 riêng để thử, khoá sau khi
+thử; các bước ngoài quyền Cấp 3 ghi "bỏ qua").
 
 <a id="kiem-thu-tai"></a>
 ### 12.2. Kiểm thử tải
@@ -1342,7 +1340,7 @@ tăng CPU nếu kịch bản đồng thời chưa đạt.
 
 **CI** (`.github/workflows/ci.yml`, mỗi push / PR): ruff + pytest; ESLint + build frontend; kiểm tra `docker-compose.prod.yml`
 (thiếu bí mật phải báo lỗi, đủ bí mật phải hợp lệ); dựng stack bằng `docker-compose.yml` với `DEMO_MODE=true`,
-`SIMULATOR=true`, `TOTP_REQUIRED_ROLES=kiem_thu_2fa`, `OPS_DISK_WARN_PCT=1` và chạy 11 bộ kiểm thử API. **Deploy** (`deploy.yml`): tag `vX.Y.Z` → build & đẩy image lên GitHub
+`SIMULATOR=true`, `OPS_DISK_WARN_PCT=1` và chạy 11 bộ kiểm thử API. **Deploy** (`deploy.yml`): tag `vX.Y.Z` → build & đẩy image lên GitHub
 Container Registry.
 
 ---

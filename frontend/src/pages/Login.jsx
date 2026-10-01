@@ -327,7 +327,7 @@ export default function Login() {
             <span className="font-semibold text-ink">Phân quyền đa cấp nghiêm ngặt:</span> Quyền hạn được xác thực tự động theo vai trò{' '}
             <span className="text-ink-2 font-medium">Tổng hệ thống</span>,{' '}
             <span className="text-ink-2 font-medium">Cấp Tỉnh</span> và{' '}
-            <span className="text-ink-2 font-medium">Cấp Xã/Cụm</span>. Cán bộ chưa có tài khoản vui lòng liên hệ Văn phòng BCH để được cấp quyền.
+            <span className="text-ink-2 font-medium">Cấp Xã/Phường</span>. Cán bộ chưa có tài khoản vui lòng liên hệ Văn phòng BCH để được cấp quyền.
           </div>
         </div>
       </div>

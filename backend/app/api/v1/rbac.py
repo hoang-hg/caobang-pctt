@@ -1,13 +1,13 @@
-"""API quản trị phân quyền: /api/v1/rbac/*"""
+"""API quản trị phân quyền: /api/v1/rbac/* — 3 vai trò cố định theo cấp, mỗi tài khoản 1 vai trò (app/rbac/management.py)."""
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
 from app.auth import current_user
 from app.db import fetch_all
 from app.rbac import domains
 from app.rbac import management as svc
-from app.rbac.authz import allowed_patterns, require_any, require_permission
+from app.rbac.authz import allowed_patterns, require_any
 from app.rbac.permissions import ALL_PERMISSIONS
 
 router = APIRouter(prefix="/rbac", tags=["Phân quyền"])
@@ -35,42 +35,6 @@ async def scopes(_: dict = Depends(current_user)):
 @router.get("/roles")
 async def roles(_: dict = Depends(require_any("user", "view"))):
     return await svc.list_roles()
-
-
-class RoleIn(BaseModel):
-    name: str
-    display_name: str = Field(min_length=2)
-    description: str | None = None
-    is_delegatable: bool = False
-    permissions: list[str]
-
-
-@router.post("/roles", status_code=201)
-async def create_role(body: RoleIn, actor: dict = Depends(require_permission("rbac", "manage"))):
-    return await svc.create_role(
-        actor, body.name, body.display_name, body.description, body.is_delegatable, body.permissions
-    )
-
-
-class RolePatch(BaseModel):
-    display_name: str | None = None
-    description: str | None = None
-    is_delegatable: bool | None = None
-    permissions: list[str] | None = None
-
-
-@router.patch("/roles/{name}")
-async def update_role(
-    name: str, body: RolePatch, actor: dict = Depends(require_permission("rbac", "manage"))
-):
-    return await svc.update_role(
-        actor, name, body.display_name, body.description, body.is_delegatable, body.permissions
-    )
-
-
-@router.delete("/roles/{name}", status_code=204, response_class=Response)
-async def delete_role(name: str, actor: dict = Depends(require_permission("rbac", "manage"))):
-    await svc.delete_role(actor, name)
 
 
 @router.get("/users")
@@ -123,15 +87,13 @@ class AssignmentIn(BaseModel):
     domain: str
 
 
-@router.post("/users/{user_id}/assignments", status_code=201)
-async def grant(user_id: str, body: AssignmentIn, actor: dict = Depends(require_any("user", "manage"))):
-    await svc.grant(actor, user_id, body.role, body.domain)
+@router.put("/users/{user_id}/assignment")
+async def set_assignment(
+    user_id: str, body: AssignmentIn, actor: dict = Depends(require_any("user", "manage"))
+):
+    """Đổi cấp / phạm vi của tài khoản cấp dưới: thay vai trò hiện có bằng đúng 1 vai trò."""
+    await svc.set_assignment(actor, user_id, body.role, body.domain)
     return {"ok": True}
-
-
-@router.delete("/users/{user_id}/assignments", status_code=204, response_class=Response)
-async def revoke(user_id: str, role: str, domain: str, actor: dict = Depends(require_any("user", "manage"))):
-    await svc.revoke(actor, user_id, role, domain)
 
 
 @router.post("/users/{user_id}/mfa/reset")

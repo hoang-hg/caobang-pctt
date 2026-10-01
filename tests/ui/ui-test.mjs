@@ -8,7 +8,9 @@
 //   node ui-test.mjs [http://localhost:8080]
 // Biến môi trường:
 //   UI_READONLY=1   chỉ xem (không gửi phản ánh / điều động / duyệt) — chạy được trên máy chủ thật trước go-live
-//   UI_USER, UI_PASS  tài khoản cán bộ (mặc định admin / admin123 của dữ liệu mẫu); tài khoản bắt buộc 2 lớp không dùng được
+//   UI_USER, UI_PASS  tài khoản cán bộ (mặc định admin / admin123 của dữ liệu mẫu). Tài khoản bắt buộc 2 lớp (Cấp 1–2 ở
+//                     máy thật) không dùng được → máy thật: tạo 1 tài khoản Cấp 3 riêng để thử, khoá sau khi thử; bước
+//                     ngoài quyền của Cấp 3 được ghi "bỏ qua"
 //   UI_SHOTS=thư_mục  lưu ảnh chụp màn hình bước lỗi (CI tải lên làm artifact)
 import fs from 'node:fs';
 import { chromium, devices } from 'playwright';
@@ -218,6 +220,35 @@ async function staff(ctx, trackCode) {
     });
   }
 
+  // Phân quyền 3 cấp: chọn Cấp quyết định phạm vi (Cấp 3 → 1 xã; Cấp 1–2 → toàn tỉnh) và ô PIN (chỉ Cấp 1–2). Không lưu.
+  await step(ctx, 'Tạo tài khoản: Cấp 3 chọn 1 xã, không PIN; Cấp 2 toàn tỉnh, có PIN (không lưu)', async () => {
+    await page.goto(`${ROOT}/phan-quyen`);
+    await waitMain(page);
+    const create = visible(page.getByRole('button', { name: 'Tạo tài khoản công vụ' }));
+    await create.waitFor({ timeout: READONLY ? 5_000 : 15_000 }).catch((e) => { if (!READONLY) throw e; });
+    if (READONLY && !(await create.count())) return 'bỏ qua: tài khoản không quản lý tài khoản (Cấp 3)';
+    await create.click();
+    const dialog = page.getByRole('dialog');
+    const level = dialog.getByLabel('Cấp', { exact: true });
+    const levels = (await level.locator('option').allTextContents()).filter((o) => o.startsWith('Cấp'));
+    // Cấp 1 (tài khoản mặc định của kiểm thử) thấy đủ 3 cấp; Cấp 2 chỉ thấy Cấp 3 (chỉ tạo cấp dưới mình)
+    if (!levels.includes('Cấp 3 · Quản trị xã/phường') || (!READONLY && levels.length !== 3)) {
+      throw new Error(`các cấp được tạo: ${levels.join(' | ')}`);
+    }
+    await level.selectOption({ label: 'Cấp 3 · Quản trị xã/phường' });
+    const communes = await dialog.getByLabel('Phạm vi', { exact: true }).locator('option').count();
+    if (communes < 50) throw new Error(`chỉ có ${communes - 1} xã để chọn`);
+    if (await dialog.getByText('PIN phê duyệt cảnh báo').count()) throw new Error('Cấp 3 không được có ô PIN');
+    if (levels.includes('Cấp 2 · Quản trị tỉnh')) {
+      await level.selectOption({ label: 'Cấp 2 · Quản trị tỉnh' });
+      await dialog.getByText('Toàn tỉnh Cao Bằng').waitFor();
+      await dialog.getByText('PIN phê duyệt cảnh báo').waitFor();
+    }
+    await expectNoOverflow(ctx, 'hộp thoại tạo tài khoản', dialog);
+    await dialog.getByRole('button', { name: 'Huỷ' }).click();
+    return `${levels.length} cấp, ${communes - 1} xã`;
+  });
+
   await step(ctx, READONLY ? 'Mở hộp thoại điều động (không phát lệnh)' : 'Điều động: chọn lực lượng → phát lệnh → báo chưa gửi cho đội', async () => {
     await page.goto(`${ROOT}/cuu-ho`);
     await waitMain(page);
@@ -273,7 +304,10 @@ async function staff(ctx, trackCode) {
   await step(ctx, 'Nhập dữ liệu bằng form: điền bản ghi, chọn vị trí trên bản đồ, kiểm tra', async () => {
     await page.goto(`${ROOT}/nhap-du-lieu`);
     await waitMain(page);
-    await visible(page.getByRole('navigation', { name: 'Loại dữ liệu' }).getByRole('button', { name: /Điểm nguy hiểm/ })).click();
+    const ds = visible(page.getByRole('navigation', { name: 'Loại dữ liệu' }).getByRole('button', { name: /Điểm nguy hiểm/ }));
+    await ds.waitFor({ timeout: READONLY ? 5_000 : 15_000 }).catch((e) => { if (!READONLY) throw e; });
+    if (READONLY && !(await ds.count())) return 'bỏ qua: tài khoản không nhập / gửi loại dữ liệu này';
+    await ds.click();
     await page.getByRole('button', { name: 'Điền trực tiếp' }).click();
     const rec = page.locator('fieldset', { hasText: 'Bản ghi 1' });
     await rec.waitFor();

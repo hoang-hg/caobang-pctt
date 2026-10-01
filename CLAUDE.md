@@ -5,7 +5,7 @@ Hướng dẫn cho trợ lý AI và lập trình viên làm việc trong kho mã
 ## 1. Dự án
 
 Hệ thống điều hành **Phòng chống thiên tai & Tìm kiếm cứu nạn tỉnh Cao Bằng** (~0,55 triệu dân, 56 xã/phường sau
-01/07/2025). Người dùng: Ban Chỉ huy tỉnh, chỉ huy cụm (địa bàn huyện cũ), cán bộ xã, và **người dân** qua cổng công khai
+01/07/2025). Người dùng: cán bộ cấp tỉnh (Ban Chỉ huy), cán bộ xã/phường, và **người dân** qua cổng công khai
 không cần đăng nhập. Sai sót ở đây có thể khiến người dân đi tới điểm sơ tán không có thật hoặc không nhận được cảnh báo —
 ưu tiên đúng và an toàn hơn nhanh.
 
@@ -176,7 +176,10 @@ Python trong container.
 `{"codes": codes}` vào tham số SQL.
 
 **Phân quyền (bắt buộc cho mọi endpoint nội bộ)** — chi tiết README §8
-- Casbin `rbac_with_domains`, domain phân cấp `*` → `CUM/*` → `CUM/MA_XA` (cột `administrative_units.rbac_domain`).
+- **3 cấp, mỗi cấp 1 vai trò** (`super_admin` / `admin_tinh` phạm vi `*`, `admin_xa` phạm vi `CUM/MA_XA` — cột
+  `administrative_units.rbac_domain`; không còn phạm vi cụm `CUM/*`), **mỗi tài khoản 1 vai trò**, không vai trò tuỳ
+  chỉnh. Quyền mới → gán vào vai trò của cấp phù hợp, không thêm vai trò. Quản lý tài khoản chỉ cấp trên → cấp dưới
+  (`management.assert_can_manage_user`) — cùng cấp không đổi mật khẩu / PIN / 2 lớp của nhau.
 - `require_permission(obj, act, scope_loader)`: một tài nguyên cụ thể (loader trong `scope_loaders.py` đọc xã của
   tài nguyên: `sos_ticket`, `warehouse`, `vehicle`, `broadcast_domains`, `citizen_report`).
 - `area_scope(obj, act)`: danh sách lọc theo vùng ∩ phạm vi được phép → mã xã cho `area_clause`.
@@ -338,7 +341,7 @@ Python trong container.
   Chạy lại liên tiếp → xoá khoá `rl:*` trong Redis. `iot-test.mjs` gọi `docker exec caobang-pctt-mqtt`, `ops-test.mjs` gọi
   `docker exec caobang-pctt-db` / `-worker` (tên container cố định). Ngoại lệ: `prod-flow.mjs` chạy trên stack production.
 - CI (`ci.yml`): ruff + pytest → ESLint + build frontend → kiểm tra `docker-compose.prod.yml` → stack Docker Compose
-  (`DEMO_MODE=true`, `SIMULATOR=true`, `TOTP_REQUIRED_ROLES=kiem_thu_2fa`, `OPS_DISK_WARN_PCT=1`) + 12 script API (`lite-test.mjs`
+  (`DEMO_MODE=true`, `SIMULATOR=true`, `OPS_DISK_WARN_PCT=1`) + 12 script API (`lite-test.mjs`
   chạy qua nginx: tham số = URL frontend :8080; `totp-test.mjs` tự tính mã TOTP, cần biến trên để thử luồng bắt buộc;
   `ops-test.mjs` chạy cuối: ngưỡng ổ đĩa 1% → chờ email sự cố trong Mailpit + `/health/full` 503).
   Job `prod` song song: dựng `docker-compose.prod.yml` (+ Mailpit qua tệp override chỉ có trong CI) trên CSDL trống,

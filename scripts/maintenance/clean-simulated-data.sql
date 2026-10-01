@@ -32,14 +32,12 @@ TRUNCATE iot_telemetry.sensor_readings CASCADE;
 -- 5. Thanh lọc tài khoản: Giữ lại tài khoản Admin Tổng và các Admin con chính quy
 DELETE FROM communications.users WHERE username NOT IN (
     'admin', 'admin.tinh', 'chihuy', 'trucban',
-    'admin.coba', 'admin.cathan', 'admin.thucphan',
-    'chihuy.baolac', 'canbo.coba', 'thukho', 'xem'
+    'admin.coba', 'admin.cathan', 'admin.thucphan', 'canbo.coba'
 );
 
 DELETE FROM public.casbin_rule WHERE ptype = 'g' AND v0 NOT IN (
     'admin', 'admin.tinh', 'chihuy', 'trucban',
-    'admin.coba', 'admin.cathan', 'admin.thucphan',
-    'chihuy.baolac', 'canbo.coba', 'thukho', 'xem'
+    'admin.coba', 'admin.cathan', 'admin.thucphan', 'canbo.coba'
 );
 
 UPDATE communications.users SET is_active = TRUE;

@@ -1,8 +1,8 @@
 """Phạm vi (domain) RBAC theo địa bàn Cao Bằng.
 
-    "*"                 toàn tỉnh
-    "<CUM>/*"           một cụm — địa bàn huyện cũ (VD "BAOLAC/*")
-    "<CUM>/<MA_XA>"     một xã/phường (VD "BAOLAC/CB-COBA")
+    "*"                 toàn tỉnh — vai trò Cấp 1, Cấp 2
+    "<CUM>/<MA_XA>"     một xã/phường (VD "BAOLAC/CB-COBA") — vai trò Cấp 3
+    "<CUM>/*"           một cụm (địa bàn huyện cũ) — KHÔNG còn cấp vai trò theo cụm; mẫu này chỉ còn trong nhật ký cũ
 
 Danh sách đơn vị (56 xã) được nạp một lần vào bộ nhớ.
 """
@@ -106,12 +106,11 @@ def label(domain: str) -> str:
     return f"{u.name} ({u.district})" if u else domain
 
 
-def scope_tree() -> list[dict]:
-    clusters: dict[str, dict] = {}
-    for u in _units:
-        c = clusters.setdefault(
-            u.cluster,
-            {"domain": f"{u.cluster}/*", "label": f"Cụm {u.district}", "district": u.district, "units": []},
-        )
-        c["units"].append({"domain": u.domain, "code": u.code, "label": u.name})
-    return [{"domain": GLOBAL_SCOPE, "label": "Toàn tỉnh Cao Bằng", "clusters": list(clusters.values())}]
+def scope_tree() -> dict:
+    """Phạm vi cấp được: toàn tỉnh (Cấp 1–2) và từng xã/phường (Cấp 3)."""
+    return {
+        "province": {"domain": GLOBAL_SCOPE, "label": "Toàn tỉnh Cao Bằng"},
+        "communes": [
+            {"domain": u.domain, "code": u.code, "label": u.name, "district": u.district} for u in _units
+        ],
+    }

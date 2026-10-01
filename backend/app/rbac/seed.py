@@ -1,17 +1,63 @@
-"""Đồng bộ vai trò hệ thống (idempotent, mỗi lần khởi động) + tạo tài khoản Superadmin / tài khoản demo lần đầu."""
+"""Đồng bộ vai trò hệ thống (idempotent, mỗi lần khởi động) + tạo tài khoản Superadmin / tài khoản demo lần đầu.
+
+Chuyển sang mô hình 3 cấp (mỗi cấp 1 vai trò, mỗi tài khoản 1 vai trò — app/rbac/permissions.py): vai trò cũ đổi theo
+``RETIRED_ROLES``, vai trò tuỳ chỉnh / cụm bị gỡ; tài khoản mất hết vai trò vì chuyển đổi bị khoá chờ cấp trên cấp lại.
+Mọi thay đổi ghi nhật ký phân quyền (người thực hiện: "Hệ thống").
+"""
 
 from __future__ import annotations
 
+import json
 import logging
+from collections.abc import Callable
+from dataclasses import dataclass, field
 
 from app import seed_data as D
 from app.auth import hash_secret
 from app.config import settings
 from app.db import execute, fetch_one
+from app.rbac import domains
 from app.rbac.enforcer import get_enforcer, notify_policy_changed
-from app.rbac.permissions import GLOBAL_SCOPE, SYSTEM_ROLES
+from app.rbac.permissions import (
+    GLOBAL_SCOPE,
+    RETIRED_ROLES,
+    ROLE_LEVEL,
+    SYSTEM_ROLE_NAMES,
+    SYSTEM_ROLES,
+    scope_fits,
+)
 
 log = logging.getLogger(__name__)
+SYSTEM_ACTOR = "Hệ thống (chuyển sang phân quyền 3 cấp)"
+
+
+@dataclass
+class RolePlan:
+    remove: list[tuple[str, str, str]] = field(default_factory=list)  # (tài khoản, vai trò, phạm vi) gỡ
+    add: list[tuple[str, str, str]] = field(default_factory=list)
+    lock: list[str] = field(default_factory=list)  # mất hết vai trò vì chuyển đổi → khoá chờ cấp lại
+
+
+def plan_role_cleanup(groups: list[tuple[str, str, str]], is_commune: Callable[[str], bool]) -> RolePlan:
+    """Mỗi tài khoản còn TỐI ĐA 1 vai trò hợp lệ: đổi vai trò cũ theo RETIRED_ROLES, bỏ vai trò tuỳ chỉnh, bỏ phạm vi
+    sai cấp (cụm, xã không tồn tại); nhiều vai trò → giữ cấp cao nhất. Không có quyền nào được nới thêm phạm vi."""
+    by_user: dict[str, list[tuple[str, str]]] = {}
+    for user, role, dom in groups:
+        by_user.setdefault(user, []).append((role, dom))
+    plan = RolePlan()
+    for user, items in by_user.items():
+        candidates = []
+        for role, dom in items:
+            new = role if role in ROLE_LEVEL else RETIRED_ROLES.get(role)
+            if new and scope_fits(new, dom) and (dom == GLOBAL_SCOPE or is_commune(dom)):
+                candidates.append((ROLE_LEVEL[new], dom, new))
+        wanted = {(min(candidates)[2], min(candidates)[1])} if candidates else set()
+        current = set(items)
+        plan.remove += [(user, r, d) for r, d in sorted(current - wanted)]
+        plan.add += [(user, r, d) for r, d in sorted(wanted - current)]
+        if current and not wanted:
+            plan.lock.append(user)
+    return plan
 
 
 async def dedupe_policies() -> None:
@@ -85,8 +131,61 @@ async def ensure_system_accounts() -> None:
             await ensure_user(username, full, pos, pw, pin, f"{username}@{D.DEMO_EMAIL_DOMAIN}", role, domain)
 
 
+async def migrate_roles() -> None:
+    """Gỡ định nghĩa vai trò ngoài 3 vai trò hệ thống, chuyển phân quyền của từng tài khoản (plan_role_cleanup)."""
+    e = get_enforcer()
+    for role in {p[0] for p in e.get_policy()} - SYSTEM_ROLE_NAMES:
+        await e.remove_filtered_policy(0, role)
+    await execute(
+        "DELETE FROM communications.rbac_role_metadata WHERE NOT (name = ANY(:keep))",
+        {"keep": sorted(SYSTEM_ROLE_NAMES)},
+    )
+    await domains.load_units()
+    groups = [(g[0], g[1], g[2]) for g in e.get_grouping_policy() if len(g) >= 3]
+    commune_domains = {u.domain for u in domains.units()}
+    plan = plan_role_cleanup(groups, lambda d: d in commune_domains)
+    if not (plan.remove or plan.add or plan.lock):
+        return
+    for user, role, dom in plan.remove:
+        await e.remove_grouping_policy(user, role, dom)
+    for user, role, dom in plan.add:
+        await e.add_grouping_policy(user, role, dom)
+    changed = sorted({u for u, _, _ in plan.remove + plan.add} | set(plan.lock))
+    await execute(
+        """UPDATE communications.users SET token_version = token_version + 1,
+                  is_active = CASE WHEN username = ANY(:lock) THEN false ELSE is_active END
+            WHERE username = ANY(:u)""",
+        {"u": changed, "lock": plan.lock},
+    )
+    for user in changed:
+        details = {
+            "from": [f"{r}@{d}" for u, r, d in plan.remove if u == user],
+            "to": [f"{r}@{d}" for u, r, d in plan.add if u == user],
+            "locked": user in plan.lock,
+        }
+        new = next(((r, d) for u, r, d in plan.add if u == user), (None, None))
+        await execute(
+            """INSERT INTO communications.rbac_audit_log (actor_id, actor_name, action, target_user, role, domain, details)
+               VALUES (NULL, :an, 'role.migrate', :t, :r, :d, CAST(:det AS jsonb))""",
+            {
+                "an": SYSTEM_ACTOR,
+                "t": user,
+                "r": new[0],
+                "d": new[1],
+                "det": json.dumps(details, ensure_ascii=False),
+            },
+        )
+    log.warning(
+        "[rbac] chuyển sang 3 cấp: %d tài khoản đổi vai trò, %d tài khoản bị khoá chờ cấp lại (%s)",
+        len(changed) - len(plan.lock),
+        len(plan.lock),
+        ", ".join(plan.lock) or "không",
+    )
+
+
 async def bootstrap() -> None:
     await dedupe_policies()
     await sync_system_roles()
+    await migrate_roles()
     await ensure_system_accounts()
     await notify_policy_changed()

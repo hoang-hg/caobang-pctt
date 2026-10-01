@@ -1,4 +1,4 @@
-// Kiểm thử xác thực đăng nhập bảo mật và phân cấp 3 bậc quyền hạn (Tổng hệ thống · Tỉnh · Xã)
+// Kiểm thử đăng nhập và phân quyền 3 cấp (Cấp 1 Quản trị hệ thống · Cấp 2 Quản trị tỉnh · Cấp 3 Quản trị xã/phường)
 //   node tests/e2e/login-hierarchy-test.mjs [http://localhost:8000]
 
 const BASE = (process.argv[2] || 'http://localhost:8000') + '/api/v1';
@@ -103,58 +103,19 @@ async function main() {
       tinhUsers.data.length === superUsers.data.length
   );
 
-  check(
-    'Cấp 3 (Admin xã Cô Ba) chỉ thấy tài khoản trong phạm vi xã được giao',
-    cobaUsers.status === 200 && cobaUsers.data.length < superUsers.data.length,
-    `Admin xã thấy: ${cobaUsers.data.length} tài khoản`
-  );
+  check('Cấp 3 (Admin xã Cô Ba) không xem / quản lý tài khoản → 403', cobaUsers.status === 403, `HTTP ${cobaUsers.status}`);
 
-  // 7. Thử Admin xã cấp quyền ra ngoài xã mình → Phải bị chặn 403
+  // 7. Chỉ cấp trên tạo / quản lý tài khoản cấp dưới; Cấp 3 không tạo tài khoản nào
   const stamp = Date.now().toString(36);
-  const createSubInCoba = await call(
-    'POST',
-    '/rbac/users',
-    {
-      username: `cbx.${stamp}`,
-      full_name: 'Cán bộ thử nghiệm',
-      password: 'matkhau123',
-      role: 'can_bo_xa',
-      domain: 'BAOLAC/CB-COBA',
-    },
-    cobaToken
-  );
-  check('Admin xã Cô Ba tạo tài khoản cán bộ trong xã mình', createSubInCoba.status === 201);
-
-  const grantOutside = await call(
-    'POST',
-    `/rbac/users/${createSubInCoba.data.id}/assignments`,
-    {
-      role: 'can_bo_xa',
-      domain: 'NGUYENBINH/CB-CATHANH', // Ngoài xã Cô Ba!
-    },
-    cobaToken
-  );
-  check(
-    'Admin xã Cô Ba gán vai trò ngoài địa bàn (Ca Thành) → 403 Forbidden',
-    grantOutside.status === 403,
-    grantOutside.data?.detail
-  );
-
-  // Thử Admin xã tự cấp vai trò Admin Tỉnh → Phải bị chặn 403
-  const escalateRole = await call(
-    'POST',
-    `/rbac/users/${createSubInCoba.data.id}/assignments`,
-    {
-      role: 'admin_tinh',
-      domain: 'BAOLAC/CB-COBA',
-    },
-    cobaToken
-  );
-  check(
-    'Admin xã cố leo thang cấp vai trò Admin Tỉnh → 403 Forbidden',
-    escalateRole.status === 403,
-    escalateRole.data?.detail
-  );
+  const body = (role, domain) => ({ username: `cbx.${stamp}`, full_name: 'Cán bộ thử nghiệm', password: 'matkhau123', role, domain });
+  const byXa = await call('POST', '/rbac/users', body('admin_xa', 'BAOLAC/CB-COBA'), cobaToken);
+  check('Cấp 3 không tạo được tài khoản, kể cả trong xã mình → 403', byXa.status === 403, byXa.data?.detail);
+  const byTinh = await call('POST', '/rbac/users', body('admin_xa', 'BAOLAC/CB-COBA'), tinhToken);
+  check('Cấp 2 tạo tài khoản Cấp 3 xã Cô Ba', byTinh.status === 201, byTinh.data?.detail);
+  const escalate = await call('PUT', `/rbac/users/${byTinh.data?.id}/assignment`, { role: 'admin_tinh', domain: '*' }, tinhToken);
+  check('Cấp 2 không nâng tài khoản lên Cấp 2 → 403', escalate.status === 403, escalate.data?.detail);
+  const xaEsc = await call('PUT', `/rbac/users/${byTinh.data?.id}/assignment`, { role: 'admin_tinh', domain: '*' }, cobaToken);
+  check('Cấp 3 cố leo thang cấp vai trò → 403', xaEsc.status === 403, xaEsc.data?.detail);
 
   console.log(`\n=== TỔNG KẾT: ${failures === 0 ? 'TẤT CẢ KIỂM THỬ THÀNH CÔNG (100% PASS)' : `${failures} THẤT BẠI`} ===`);
   if (failures > 0) process.exit(1);

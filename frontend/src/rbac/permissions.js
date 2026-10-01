@@ -3,7 +3,7 @@
  *
  * Mỗi quyền: { obj, act, dom }. dom là phạm vi:
  *   "*"              toàn tỉnh
- *   "BAOLAC/*"       cả cụm (địa bàn huyện cũ)
+ *   "BAOLAC/*"       cả cụm (địa bàn huyện cũ) — chỉ còn trong dữ liệu cũ, không cấp vai trò theo cụm
  *   "BAOLAC/CB-COBA" một xã
  * Giao diện chỉ ẩn/hiện; backend mới là nơi chặn thật.
  */
