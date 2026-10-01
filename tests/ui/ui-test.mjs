@@ -230,13 +230,17 @@ async function staff(ctx, trackCode) {
     await create.click();
     const dialog = page.getByRole('dialog');
     const level = dialog.getByLabel('Cấp', { exact: true });
+    // Danh sách cấp tải từ API sau khi hộp thoại mở (điện thoại chậm hơn) → chờ có lựa chọn Cấp 3 rồi mới đọc
+    await level.locator('option', { hasText: 'Cấp 3 · Quản trị xã/phường' }).waitFor({ state: 'attached' });
     const levels = (await level.locator('option').allTextContents()).filter((o) => o.startsWith('Cấp'));
     // Cấp 1 (tài khoản mặc định của kiểm thử) thấy đủ 3 cấp; Cấp 2 chỉ thấy Cấp 3 (chỉ tạo cấp dưới mình)
     if (!levels.includes('Cấp 3 · Quản trị xã/phường') || (!READONLY && levels.length !== 3)) {
       throw new Error(`các cấp được tạo: ${levels.join(' | ')}`);
     }
     await level.selectOption({ label: 'Cấp 3 · Quản trị xã/phường' });
-    const communes = await dialog.getByLabel('Phạm vi', { exact: true }).locator('option').count();
+    const scope = dialog.getByLabel('Phạm vi', { exact: true });
+    await scope.locator('option').nth(50).waitFor({ state: 'attached' }); // danh sách 56 xã cũng tải từ API
+    const communes = await scope.locator('option').count();
     if (communes < 50) throw new Error(`chỉ có ${communes - 1} xã để chọn`);
     if (await dialog.getByText('PIN phê duyệt cảnh báo').count()) throw new Error('Cấp 3 không được có ô PIN');
     if (levels.includes('Cấp 2 · Quản trị tỉnh')) {
