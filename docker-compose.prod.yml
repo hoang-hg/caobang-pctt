@@ -325,7 +325,9 @@ services:
     restart: unless-stopped
     entrypoint: ["/bin/sh", "/backup-offsite.sh"]
     environment:
-      BACKUP_REMOTE: ${BACKUP_REMOTE:?Đặt BACKUP_REMOTE (VD offsite:pctt-sao-luu/caobang)}
+      # Không dùng ${…:?}: compose kiểm biến của MỌI service kể cả profile chưa bật → thiếu kho sao lưu ngoài là không
+      # khởi động được cả hệ thống. deploy/backup-offsite.sh tự dừng kèm hướng dẫn khi bật profile mà chưa đặt biến này.
+      BACKUP_REMOTE: ${BACKUP_REMOTE:-}
       BACKUP_OFFSITE_EVERY_S: ${BACKUP_OFFSITE_EVERY_S:-3600}
       # Remote "offsite" kiểu S3 (AWS / MinIO / kho đối tượng trong nước). Kiểu khác (sftp…): đặt OFFSITE_TYPE và
       # thêm biến RCLONE_CONFIG_OFFSITE_* vào tệp .env.offsite (tuỳ chọn, cùng thư mục)

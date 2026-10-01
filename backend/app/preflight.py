@@ -118,6 +118,11 @@ def check(s: Settings) -> tuple[list[str], list[str]]:
         warnings.append(
             "SMTP_HOST chưa trỏ tới máy chủ thư thật — người dùng không nhận được email quên mật khẩu"
         )
+    elif s.smtp_user and not s.smtp_password:
+        warnings.append(
+            "SMTP_USER đã đặt nhưng SMTP_PASSWORD trống — máy chủ thư sẽ từ chối đăng nhập: email quên mật khẩu, báo "
+            "sự cố không gửi được (Gmail: dùng mật khẩu ứng dụng)"
+        )
     if s.llm_api_url:
         warnings.append(
             "LLM_API_URL đang bật: nội dung tin SOS (đã che SĐT) được gửi tới dịch vụ ngoài — cần đánh giá "

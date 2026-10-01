@@ -215,6 +215,14 @@ jobs:
               networks: [default]
               ports: ["127.0.0.1:8025:8025"]
           EOF
+      - name: Cấu hình compose hợp lệ khi chưa có kho sao lưu ngoài / sau Traefik có sẵn
+        run: |
+          # Chưa đặt BACKUP_REMOTE (chưa bật --profile offsite) vẫn phải khởi động được
+          grep -v '^BACKUP_REMOTE=' ci.prod.env > ci.nooffsite.env
+          docker compose -f docker-compose.prod.yml --env-file ci.nooffsite.env config -q
+          # Máy chủ có Traefik (Coolify…): nginx không mở cổng, có nhãn Traefik đúng tên miền
+          docker compose -f docker-compose.prod.yml -f deploy/docker-compose.traefik.yml --env-file ci.prod.env config --format json > traefik.json
+          node -e "const f=require('./traefik.json').services.frontend; if (f.ports?.length || f.labels['traefik.http.routers.pctt.rule'] !== 'Host(\`pctt.ci.local\`)') { console.error(JSON.stringify(f)); process.exit(1); } console.log('OK', f.labels['traefik.http.routers.pctt.rule'])"
       - name: Build & khởi động stack production (CSDL trống)
         run: |
           $DC up -d --build backend worker frontend backup mailpit
