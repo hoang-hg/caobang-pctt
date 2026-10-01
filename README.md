@@ -1103,6 +1103,10 @@ Phát hành theo **số phiên bản**: máy chủ không build, chỉ kéo imag
    Coolify — 10.3) · `none` (proxy của trung tâm dữ liệu). Có `BACKUP_REMOTE` → thêm profile `offsite`;
    `MQTT_URL` trỏ vào broker kèm theo → profile `mqtt`.
 
+Máy chủ còn chạy **v1.0.0**: lần nâng cấp kế tiếp chạy script của phiên bản đích từ `/tmp` (script v1.0.0 bị chép đè khi
+đang chạy): `curl -fsSL https://raw.githubusercontent.com/hoang-hg/caobang-pctt/vX.Y.Z/deploy/update.sh -o /tmp/update.sh && sh
+/tmp/update.sh X.Y.Z`. Từ v1.0.1 script tự chạy từ bản sao tạm — chạy thẳng trong thư mục cài đặt.
+
 **Quay lại** bản trước: `sh deploy/update.sh <phiên bản trước>` (image cũ vẫn còn trên máy). Script **không tự khôi phục
 CSDL**: nếu bản mới đã chạy migration làm đổi cấu trúc CSDL, khôi phục bản `_truoc-<phiên bản>.dump` theo 10.5.
 Image riêng tư (repo / package private): trên máy chủ `docker login ghcr.io -u <tài khoản>` bằng token chỉ quyền
