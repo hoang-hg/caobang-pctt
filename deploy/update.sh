@@ -20,6 +20,16 @@
 #   PCTT_SOURCE=github|none, PCTT_PULL=1|0, PCTT_HEALTH_URL, PCTT_SKIP_BACKUP=1 (chỉ khi thật cần, ghi rõ lý do)
 set -eu
 
+# Chạy từ bản sao tạm: bước 4 chép mã nguồn mới đè lên chính tệp này — shell đọc dở một tệp vừa bị ghi đè (khi bản mới
+# của script khác bản đang chạy) có thể chạy sai giữa chừng
+if [ -z "${PCTT_UPDATE_SELF:-}" ]; then
+	PCTT_UPDATE_SELF=$(mktemp)
+	cp "$0" "$PCTT_UPDATE_SELF"
+	export PCTT_UPDATE_SELF
+	exec sh "$PCTT_UPDATE_SELF" "$@"
+fi
+trap 'rm -f "$PCTT_UPDATE_SELF"' EXIT
+
 VER="${1:-}"
 VER="${VER#v}"
 if ! echo "$VER" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
@@ -70,7 +80,7 @@ if ! mkdir "$LOCK" 2>/dev/null; then
 	exit 1
 fi
 TMP=$(mktemp -d)
-trap 'rm -rf "$LOCK" "$TMP"' EXIT
+trap 'rm -rf "$LOCK" "$TMP" "$PCTT_UPDATE_SELF"' EXIT
 
 echo "Cập nhật $OLD → v$VER"
 echo "Lệnh compose: $DCP"
