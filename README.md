@@ -1079,15 +1079,35 @@ Sau lần chạy đầu:
 
 ### 10.4. Cập nhật phiên bản
 
-1. Push `main` → CI xanh. 2. Gắn tag `vX.Y.Z` → `deploy.yml` đẩy `ghcr.io/<owner>/caobang-pctt-backend|frontend:X.Y.Z`.
-3. Sao lưu thủ công (10.5) nếu có migration. 4. Trên máy chủ:
+Phát hành theo **số phiên bản**: máy chủ không build, chỉ kéo image GitHub đã build từ đúng commit đã qua CI.
 
-```bash
-# image dựng sẵn: đặt BACKEND_IMAGE / FRONTEND_IMAGE trong .env.production
-dcp pull && dcp up -d          # hoặc build từ mã nguồn: git pull && dcp up -d --build
-```
+1. Sửa code → nhánh → PR → **CI đạt cả 4 job** → gộp `main`.
+2. Cần cập nhật máy chủ khi thay đổi chạm `backend/`, `frontend/`, `docker-compose.prod.yml`, `deploy/` (tài liệu, CI,
+   cấu hình dev thì không). Gắn tag trên commit đó của `main`:
+   ```bash
+   git tag v1.0.1 <commit trên main> && git push origin v1.0.1
+   ```
+   `deploy.yml` build và đẩy `ghcr.io/hoang-hg/caobang-pctt-backend|frontend:1.0.1` (~5–10 phút, tab **Actions**); tag
+   nằm ngoài `main` → dừng, không phát hành.
+3. Trên máy chủ (Termius / SSH):
+   ```bash
+   cd /opt/caobang-pctt && sh deploy/update.sh 1.0.1
+   ```
+   [`deploy/update.sh`](deploy/update.sh): tải mã nguồn v1.0.1 (compose, `deploy/`, cấu hình nginx) → kéo 2 image → **sao
+   lưu CSDL** (`backups/db/pctt_<thời điểm>_truoc-1.0.1.dump`) → chép mã nguồn đè lên (giữ `.env.production`, `backups/`,
+   `data/`), đặt `BACKEND_IMAGE` / `FRONTEND_IMAGE`, khởi động lại (migration chạy trước backend) → kiểm tra
+   `https://DOMAIN/health/full`: không được phát sinh kiểm tra lỗi mới so với trước khi cập nhật. Bước tải / kéo / sao lưu
+   lỗi → dừng, hệ thống chưa bị đụng tới. Kiểm tra lỗi → **tự quay lại** mã nguồn + image cũ. Phiên bản đang chạy:
+   `cat .phien-ban`. Trang ngắt ~10–30 giây lúc thay container.
+4. Cách vào hệ thống — `PCTT_PROXY` trong `.env.production`: `caddy` (mặc định) · `traefik` (máy chủ có sẵn Traefik /
+   Coolify — 10.3) · `none` (proxy của trung tâm dữ liệu). Có `BACKUP_REMOTE` → thêm profile `offsite`;
+   `MQTT_URL` trỏ vào broker kèm theo → profile `mqtt`.
 
-Quay lui: đặt lại tag image cũ; nếu migration đã đổi cấu trúc CSDL thì khôi phục bản sao lưu trước nâng cấp.
+**Quay lại** bản trước: `sh deploy/update.sh <phiên bản trước>` (image cũ vẫn còn trên máy). Script **không tự khôi phục
+CSDL**: nếu bản mới đã chạy migration làm đổi cấu trúc CSDL, khôi phục bản `_truoc-<phiên bản>.dump` theo 10.5.
+Image riêng tư (repo / package private): trên máy chủ `docker login ghcr.io -u <tài khoản>` bằng token chỉ quyền
+`read:packages`. CI (job `prod`) chạy thật `update.sh` trên stack production thử: cập nhật thành công, thiếu image (dừng,
+không đổi gì), image hỏng (migration lỗi → tự quay lại, hệ thống vẫn phục vụ).
 
 **Image dịch vụ** (PostgreSQL, Redis, MinIO, Caddy, Mosquitto) được ghim theo digest (`tag@sha256:…`) trong
 `docker-compose.prod.yml` nên mỗi lần triển khai chạy đúng bản đã kiểm thử. Cập nhật bản vá bảo mật định kỳ (hằng quý

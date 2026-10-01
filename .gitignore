@@ -26,3 +26,5 @@ tests/ui/shots/
 # Image Docker xuất ra để chép lên máy chủ (docker save) — tệp lớn, không đưa vào git
 /*.tar
 /*.tar.gz
+# Phiên bản đang chạy trên máy chủ (deploy/update.sh ghi)
+.phien-ban

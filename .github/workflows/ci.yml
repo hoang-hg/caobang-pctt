@@ -256,6 +256,28 @@ jobs:
           for t in T1 T2 T3 T5; do
             grep -q "^ĐẠT *$t " golive.log || { echo "Kịch bản đối kháng $t không đạt"; exit 1; }
           done
+      - name: Cập nhật phiên bản (deploy/update.sh) — thành công, thiếu image, image hỏng → tự quay lại
+        run: |
+          export PCTT_ENV_FILE=ci.prod.env PCTT_COMPOSE_FILES="-f docker-compose.prod.yml -f ci.prod.override.yml" \
+            PCTT_SOURCE=none PCTT_PULL=0 PCTT_IMAGE_REPO=ci/caobang-pctt PCTT_HEALTH_URL=http://127.0.0.1:8080/health/full
+          running() { docker inspect caobang-pctt-prod-backend-1 --format '{{.Config.Image}}'; }
+          docker tag caobang-pctt-backend:local ci/caobang-pctt-backend:9.9.9
+          docker tag caobang-pctt-frontend:local ci/caobang-pctt-frontend:9.9.9
+          sh deploy/update.sh 9.9.9
+          test "$(cat .phien-ban)" = 9.9.9 && test "$(running)" = ci/caobang-pctt-backend:9.9.9
+          grep -qx 'BACKEND_IMAGE=ci/caobang-pctt-backend:9.9.9' ci.prod.env
+          ls ci-backups/db/*_truoc-9.9.9.dump
+          # Phiên bản chưa có image → dừng ngay, không đổi gì
+          if sh deploy/update.sh 9.9.10; then echo "Phải lỗi: chưa có image 9.9.10"; exit 1; fi
+          grep -qx 'BACKEND_IMAGE=ci/caobang-pctt-backend:9.9.9' ci.prod.env
+          # Image hỏng (migrate không chạy được) → tự quay lại 9.9.9, hệ thống vẫn phục vụ
+          docker pull -q alpine:3 && docker tag alpine:3 ci/caobang-pctt-backend:9.9.11
+          docker tag caobang-pctt-frontend:local ci/caobang-pctt-frontend:9.9.11
+          if sh deploy/update.sh 9.9.11; then echo "Phải lỗi: image hỏng"; exit 1; fi
+          ls ci-backups/db/*_truoc-9.9.11.dump
+          grep -qx 'BACKEND_IMAGE=ci/caobang-pctt-backend:9.9.9' ci.prod.env
+          test "$(cat .phien-ban)" = 9.9.9 && test "$(running)" = ci/caobang-pctt-backend:9.9.9
+          curl -fsS http://127.0.0.1:8080/health/full
       - name: Log khi lỗi
         if: failure()
         run: $DC logs --tail=300 migrate backend worker frontend backup
