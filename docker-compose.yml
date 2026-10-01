@@ -159,6 +159,7 @@ services:
 
   frontend:
     build: ./frontend
+    image: caobang-pctt-frontend  # tên cố định như backend — đóng gói chép lên máy chủ: docker save caobang-pctt-frontend
     container_name: caobang-pctt-frontend
     ports:
       - "8080:80"
