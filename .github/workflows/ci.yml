@@ -120,7 +120,11 @@ jobs:
       - name: Kiểm thử IoT & nguồn dữ liệu
         run: node tests/e2e/iot-test.mjs
       - name: Kiểm thử cổng công khai, phản ánh, tài khoản
-        run: node tests/e2e/public-test.mjs
+        run: |
+          # rbac-test + login-hierarchy-test vừa đăng nhập ~20 lần cùng IP → xoá bộ đếm giới hạn đăng nhập 30/phút/IP,
+          # không thì đăng nhập trong public-test có lúc gặp 429 (tuỳ tốc độ máy CI)
+          docker compose exec -T redis sh -c "redis-cli --scan --pattern 'rl:*' | xargs -r redis-cli del"
+          node tests/e2e/public-test.mjs
       - name: Kiểm thử xác thực 2 lớp (TOTP)
         run: |
           # public-test đăng nhập nhiều lần (cả thử khoá tài khoản) → xoá bộ đếm giới hạn đăng nhập 30/phút/IP
