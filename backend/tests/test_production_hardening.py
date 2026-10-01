@@ -61,6 +61,19 @@ def test_preflight_accepts_hardened_production():
     assert warnings == []
 
 
+def test_preflight_warns_smtp_user_without_password():
+    """Khai máy chủ thư + tài khoản mà thiếu mật khẩu → email không gửi được; không được coi là đã cấu hình SMTP."""
+    _, warnings = preflight.check(make(app_env="production", **{**STRONG, "smtp_user": "pctt@gmail.com"}))
+    assert any("SMTP_PASSWORD" in w for w in warnings)
+    _, warnings = preflight.check(
+        make(
+            app_env="production",
+            **{**STRONG, "smtp_user": "pctt@gmail.com", "smtp_password": "mat-khau-ung-dung"},
+        )
+    )
+    assert warnings == []
+
+
 @pytest.mark.parametrize(
     ("override", "needle"),
     [

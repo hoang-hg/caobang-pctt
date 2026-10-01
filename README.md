@@ -1050,6 +1050,13 @@ dcp logs migrate backend | tail -50     # đọc các dòng "[cấu hình] …" 
   phía trước phải chuyển `X-Forwarded-For`, `X-Forwarded-Proto`, hỗ trợ WebSocket (timeout ≥ 1 giờ) và chặn cổng 8080 từ
   Internet. Biết chính xác IP proxy → bản sao `frontend/nginx/real-ip.conf` chỉ tin IP đó, trỏ `NGINX_REAL_IP_CONF` tới.
 - **Cloudflare phía trước**: `real-ip.conf` riêng dùng dải IP Cloudflare + `real_ip_header CF-Connecting-IP;`.
+- **Máy chủ đã có Traefik** giữ cổng 80/443 (Coolify, Dokploy…): bỏ `--profile caddy`, thêm
+  `-f deploy/docker-compose.traefik.yml` vào mọi lệnh `dcp` — nginx không mở cổng ra máy chủ, Traefik chuyển `DOMAIN`
+  vào qua mạng Docker của nó, tự cấp HTTPS + HSTS. Mặc định theo Coolify 4 (mạng `coolify`, entrypoint `http` / `https`,
+  certresolver `letsencrypt`); Traefik khác: đặt `TRAEFIK_*` (ghi chú đầu tệp).
+- **Chưa có tên miền** (chạy thử): `DOMAIN=<tên>.<IP>.sslip.io` (VD `pctt.203.0.113.10.sslip.io`) — tên tự trỏ về IP,
+  vẫn có chứng chỉ Let's Encrypt thật. Không dùng để công bố cho người dân; có tên miền chính thức thì đổi `DOMAIN` rồi
+  `dcp up -d`, dữ liệu giữ nguyên.
 - **IoT qua MQTT**: [6.5](#mqtt), thêm `--profile mqtt`.
 
 Kiểm tra:

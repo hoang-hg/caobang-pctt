@@ -1,0 +1,33 @@
+# Máy chủ ĐÃ CÓ Traefik giữ cổng 80/443 (Coolify, Dokploy, Traefik tự dựng…) → không dùng Caddy (bỏ --profile caddy).
+# nginx (frontend) không mở cổng ra máy chủ; Traefik chuyển ${DOMAIN} vào qua mạng Docker của nó, tự cấp HTTPS
+# Let's Encrypt, thêm HSTS. README 10.3.
+#
+#   docker compose -f docker-compose.prod.yml -f deploy/docker-compose.traefik.yml --env-file .env.production up -d
+#
+# Tên mạng / entrypoint / certresolver mặc định theo Coolify 4. Traefik khác: xem tham số của nó
+#   docker inspect <container traefik> --format '{{range .Config.Cmd}}{{println .}}{{end}}' | grep -E 'entrypoints|certificatesresolvers'
+# rồi đặt TRAEFIK_NETWORK, TRAEFIK_ENTRYPOINT_HTTP, TRAEFIK_ENTRYPOINT_HTTPS, TRAEFIK_CERTRESOLVER trong .env.production.
+# Traefik nằm trong dải IP nội bộ Docker (10/8, 172.16/12) → nginx đã tin X-Forwarded-For của nó (frontend/nginx/real-ip.conf).
+services:
+  frontend:
+    ports: !reset []
+    networks: [default, traefik]
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${TRAEFIK_NETWORK:-coolify}
+      - traefik.http.routers.pctt-http.rule=Host(`${DOMAIN}`)
+      - traefik.http.routers.pctt-http.entrypoints=${TRAEFIK_ENTRYPOINT_HTTP:-http}
+      - traefik.http.routers.pctt-http.middlewares=pctt-https
+      - traefik.http.middlewares.pctt-https.redirectscheme.scheme=https
+      - traefik.http.routers.pctt.rule=Host(`${DOMAIN}`)
+      - traefik.http.routers.pctt.entrypoints=${TRAEFIK_ENTRYPOINT_HTTPS:-https}
+      - traefik.http.routers.pctt.tls=true
+      - traefik.http.routers.pctt.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}
+      - traefik.http.routers.pctt.middlewares=pctt-hsts
+      - traefik.http.middlewares.pctt-hsts.headers.stsSeconds=31536000
+      - traefik.http.services.pctt.loadbalancer.server.port=80
+
+networks:
+  traefik:
+    name: ${TRAEFIK_NETWORK:-coolify}
+    external: true
