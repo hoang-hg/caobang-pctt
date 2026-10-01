@@ -1,7 +1,8 @@
 # ==========================================
 # Deploy — build & push Docker image lên GitHub Container Registry khi tạo tag phiên bản
 #   git tag v1.0.0 && git push origin v1.0.0
-# Máy chủ (VPS) chỉ cần: docker compose pull && docker compose up -d
+# Máy chủ: cd /opt/caobang-pctt && sh deploy/update.sh X.Y.Z  (sao lưu → kéo image → cập nhật → kiểm tra → tự quay lại; README 10.4)
+# Chỉ gắn tag cho commit đã gộp vào main (đã qua CI) — job dừng nếu tag nằm ngoài main.
 # (mô hình GitOps giống thientai-org: máy chủ không build, chỉ kéo image đã kiểm thử)
 # ==========================================
 name: Deploy
@@ -29,6 +30,12 @@ jobs:
         service: [backend, frontend]
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Chỉ phát hành commit đã gộp vào main (đã qua CI)
+        run: |
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || {
+            echo "Tag $GITHUB_REF_NAME không nằm trên main — chỉ gắn tag cho commit đã gộp (đã qua CI)"; exit 1; }
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:

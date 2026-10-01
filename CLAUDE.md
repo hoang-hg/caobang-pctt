@@ -317,6 +317,8 @@ Python trong container.
 - [ ] Đọc ảnh người dân: `Image.open(…, formats=…)` chỉ các định dạng cho phép — không để Pillow thử mọi bộ đọc.
 - [ ] Chuyển hướng theo tham số URL (`?next=`): phân giải bằng `new URL(…)` và so origin (`safeNext`, `App.jsx`);
       chặn chuỗi bắt đầu `//` là chưa đủ (`/\evil.com`).
+- [ ] Cập nhật máy chủ: chỉ qua tag `vX.Y.Z` trên `main` đã qua CI → `deploy.yml` build image → trên máy chủ
+      `sh deploy/update.sh X.Y.Z` (sao lưu, tự quay lại khi lỗi — README 10.4). Không build / sửa tay trên máy chủ.
 - [ ] Thao tác nhiều người cùng làm trên 1 phiếu / tài nguyên: khoá dòng (`FOR UPDATE`) rồi kiểm tra trạng thái TRONG
       transaction (mẫu `/dispatch` khoá phiếu SOS), ghi có điều kiện (`UPDATE … WHERE status = … RETURNING`). Tạo phiếu
       trong transaction khác: `create_ticket(conn=…)` rồi `announce_ticket` sau commit.
