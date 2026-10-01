@@ -25,7 +25,6 @@ class Resource(StrEnum):
     HOTLINE = "hotline"  # tổng đài / IVR
     AUDIT = "audit"  # nhật ký pháp lý
     USER = "user"  # tài khoản người dùng
-    RBAC = "rbac"  # quản trị vai trò
     INTEGRATION = "integration"  # nguồn dữ liệu ngoài, thiết bị IoT
     REPORT = "report"  # phản ánh hiện trường của người dân
     DATA = "data"  # nhập dữ liệu chính thức từ tệp
@@ -83,7 +82,6 @@ ALL_PERMISSIONS: Final[tuple[Permission, ...]] = (
     Permission(R.AUDIT, A.VIEW, False, "Xem nhật ký pháp lý"),
     Permission(R.USER, A.VIEW, True, "Xem tài khoản trong phạm vi"),
     Permission(R.USER, A.MANAGE, True, "Tạo tài khoản con, cấp / thu hồi vai trò trong phạm vi"),
-    Permission(R.RBAC, A.MANAGE, False, "Quản trị vai trò (tạo / sửa / xoá role)"),
     Permission(R.REPORT, A.VIEW, True, "Xem phản ánh của người dân (kể cả SĐT người gửi)"),
     Permission(R.REPORT, A.MODERATE, True, "Duyệt / từ chối / chuyển SOS phản ánh của người dân"),
     Permission(R.INTEGRATION, A.VIEW, False, "Xem nguồn dữ liệu, thiết bị IoT, giám sát kết nối"),
@@ -124,58 +122,38 @@ def perms(*codes: str) -> list[tuple[str, str]]:
 
 
 # ---------------------------------------------------------------------------
-# Vai trò hệ thống (seed mỗi lần khởi động, không xoá được)
-#   name, tên hiển thị, mô tả, được uỷ quyền?, danh sách quyền
+# 3 vai trò cố định — MỖI CẤP 1 VAI TRÒ, mỗi tài khoản đúng 1 vai trò tại 1 phạm vi (đồng bộ điều hành, rõ dấu vết):
+#   Cấp 1  super_admin  Quản trị hệ thống    phạm vi toàn tỉnh "*"
+#   Cấp 2  admin_tinh   Quản trị tỉnh        phạm vi toàn tỉnh "*"   — mọi tài khoản cấp tỉnh soạn / duyệt cảnh báo (PIN)
+#   Cấp 3  admin_xa     Quản trị xã/phường   phạm vi đúng 1 xã "<CUM>/<MA_XA>"
+# Chỉ CẤP TRÊN tạo / quản lý tài khoản cấp dưới: Cấp 1 → mọi cấp, Cấp 2 → Cấp 3, Cấp 3 → không ai. Cùng cấp không đổi
+# mật khẩu / PIN / xác thực 2 lớp của nhau (chống mạo danh). Không có vai trò tuỳ chỉnh.
+# Vai trò cũ (trước 10/2026) tự chuyển khi khởi động — RETIRED_ROLES, app/rbac/seed.py.
+#   name, tên hiển thị, mô tả, cấp trên (không phải Cấp 1) được cấp?, danh sách quyền
 # ---------------------------------------------------------------------------
-_OPS = (
-    "monitoring.view",
-    "sos.view",
-    "sos.create",
-    "sos.update",
-    "sos.resolve",
-    "dispatch.create",
-    "resource.view",
-)
+PROVINCE_ROLE: Final[str] = "admin_tinh"
+COMMUNE_ROLE: Final[str] = "admin_xa"
 
 SYSTEM_ROLES: Final[tuple[tuple[str, str, str, bool, list[tuple[str, str]]], ...]] = (
-    (SUPER_ADMIN_ROLE, "Quản trị hệ thống", "Toàn quyền, kể cả quản trị vai trò", False, [("*", "*")]),
     (
-        "truong_ban",
-        "Lãnh đạo BCH PCTT & TKCN",
-        "Chỉ huy toàn diện, phê duyệt cảnh báo, quản lý tài khoản — không quản trị định nghĩa vai trò",
+        SUPER_ADMIN_ROLE,
+        "Quản trị hệ thống",
+        "Toàn quyền; tạo và quản lý tài khoản mọi cấp",
         False,
-        perms(*(p.code for p in ALL_PERMISSIONS if p.code != "rbac.manage")),
+        [("*", "*")],
     ),
     (
-        "admin_tinh",
+        PROVINCE_ROLE,
         "Quản trị tỉnh",
-        "Quản trị hệ thống cấp tỉnh: Quản lý tài khoản, phân quyền cấp dưới, điều động, duyệt phản ánh và điều hành tác chiến toàn tỉnh",
+        "Điều hành toàn tỉnh: SOS, điều động, soạn và duyệt cảnh báo (cần PIN, không tự duyệt lệnh mình soạn), tổng đài, "
+        "kho, nhập dữ liệu, duyệt hồ sơ xã gửi; tạo và quản lý tài khoản Cấp 3",
         False,
-        perms(
-            "monitoring.view",
-            "sos.view",
-            "sos.create",
-            "sos.update",
-            "sos.resolve",
-            "dispatch.create",
-            "resource.view",
-            "alert.view",
-            "contact.view",
-            "audit.view",
-            "integration.view",
-            "user.view",
-            "user.manage",
-            "report.view",
-            "report.moderate",
-            "data.import",
-            "data.submit",  # có đủ quyền của admin_xa → tạo được tài khoản admin xã (chống leo thang)
-            "monitoring.update",
-        ),
+        perms(*(p.code for p in ALL_PERMISSIONS)),
     ),
     (
-        "admin_xa",
+        COMMUNE_ROLE,
         "Quản trị xã/phường",
-        "Quản trị cấp xã/phường: Tạo tài khoản cán bộ xã, duyệt phản ánh và xử lý SOS trong địa bàn xã",
+        "Trong địa bàn xã: tiếp nhận và xử lý SOS, duyệt phản ánh, xuất kho của xã, gửi dữ liệu chờ tỉnh duyệt",
         True,
         perms(
             "monitoring.view",
@@ -184,84 +162,42 @@ SYSTEM_ROLES: Final[tuple[tuple[str, str, str, bool, list[tuple[str, str]]], ...
             "sos.update",
             "sos.resolve",
             "resource.view",
-            "alert.view",
-            "contact.view",
-            "user.view",
-            "user.manage",
-            "report.view",
-            "report.moderate",
-            "data.submit",  # dữ liệu của xã → cấp tỉnh duyệt rồi mới hiển thị
-        ),
-    ),
-    (
-        "chi_huy_cum",
-        "Chỉ huy cụm (địa bàn huyện cũ)",
-        "Điều hành, phê duyệt cảnh báo và quản lý tài khoản trong cụm được giao",
-        True,
-        perms(
-            *_OPS,
             "inventory.issue",
-            "vehicle.update",
             "alert.view",
-            "alert.create",
-            "alert.approve",
             "contact.view",
-            "user.view",
-            "user.manage",
             "report.view",
             "report.moderate",
-            "data.submit",  # gửi dữ liệu các xã trong cụm chờ tỉnh duyệt; cấp được vai trò admin xã
+            "data.submit",
         ),
-    ),
-    (
-        "truc_ban",
-        "Trực ban điều hành",
-        "Tiếp nhận SOS, điều động, soạn lệnh cảnh báo (Maker), vận hành tổng đài",
-        True,
-        perms(
-            *_OPS,
-            "vehicle.update",
-            "alert.view",
-            "alert.create",
-            "contact.view",
-            "hotline.operate",
-            "integration.view",
-            "report.view",
-            "report.moderate",
-            "monitoring.update",  # nhận báo cáo vận hành từ các hồ
-        ),
-    ),
-    (
-        "can_bo_xa",
-        "Cán bộ PCTT xã/phường",
-        "Tiếp nhận & cập nhật SOS, theo dõi nguồn lực trong xã",
-        True,
-        perms(
-            "monitoring.view",
-            "sos.view",
-            "sos.create",
-            "sos.update",
-            "sos.resolve",
-            "resource.view",
-            "alert.view",
-            "contact.view",
-            "report.view",
-        ),
-    ),
-    (
-        "thu_kho",
-        "Thủ kho",
-        "Theo dõi và xuất kho vật tư",
-        True,
-        perms("monitoring.view", "resource.view", "inventory.issue"),
-    ),
-    (
-        "quan_sat",
-        "Quan sát (chỉ xem)",
-        "Lãnh đạo sở ngành, cơ quan phối hợp — chỉ xem",
-        True,
-        perms("monitoring.view", "sos.view", "resource.view", "alert.view", "contact.view"),
     ),
 )
 SYSTEM_ROLE_NAMES: Final[frozenset[str]] = frozenset(r[0] for r in SYSTEM_ROLES)
-NON_DELEGATABLE: Final[frozenset[str]] = frozenset({SUPER_ADMIN_ROLE, "truong_ban", "admin_tinh"})
+ROLE_LEVEL: Final[dict[str, int]] = {SUPER_ADMIN_ROLE: 1, PROVINCE_ROLE: 2, COMMUNE_ROLE: 3}
+LEVEL_LABEL: Final[dict[int, str]] = {
+    1: "Cấp 1 · Tổng hệ thống",
+    2: "Cấp 2 · Cấp tỉnh",
+    3: "Cấp 3 · Cấp xã/phường",
+}
+NO_LEVEL: Final[int] = 9  # tài khoản chưa có vai trò
+
+# Vai trò cũ → vai trò mới (None = bỏ: tài khoản bị khoá chờ cấp trên cấp lại đúng cấp)
+RETIRED_ROLES: Final[dict[str, str | None]] = {
+    "truong_ban": PROVINCE_ROLE,  # Lãnh đạo BCH
+    "truc_ban": PROVINCE_ROLE,  # Trực ban điều hành
+    "can_bo_xa": COMMUNE_ROLE,  # Cán bộ PCTT xã
+    "chi_huy_cum": None,  # bỏ cụm (địa bàn huyện cũ)
+    "thu_kho": None,
+    "quan_sat": None,
+}
+
+
+def scope_fits(role: str, domain: str) -> bool:
+    """Cấp 1, Cấp 2 chỉ ở phạm vi toàn tỉnh; Cấp 3 đúng 1 xã (không cụm, không toàn tỉnh)."""
+    if ROLE_LEVEL.get(role, NO_LEVEL) <= 2:
+        return domain == GLOBAL_SCOPE
+    return role == COMMUNE_ROLE and domain != GLOBAL_SCOPE and not domain.endswith("/*")
+
+
+def level_of(roles: list[str] | set[str]) -> int:
+    """Cấp cao nhất (số nhỏ nhất) trong các vai trò; không có vai trò hợp lệ → NO_LEVEL."""
+    return min((ROLE_LEVEL.get(r, NO_LEVEL) for r in roles), default=NO_LEVEL)

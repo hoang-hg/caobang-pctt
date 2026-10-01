@@ -1,5 +1,5 @@
 // Kiểm thử xác thực 2 lớp TOTP: tự bật, đăng nhập 2 bước, chống dùng lại mã, mã khôi phục, tắt, quản trị đặt lại,
-// khoá khi sai nhiều lần, và (khi backend chạy với TOTP_REQUIRED_ROLES=kiem_thu_2fa) bắt buộc cài đặt khi đăng nhập.
+// khoá khi sai nhiều lần, và (backend TOTP_REQUIRED_ROLES=admin_xa + REQUIRED_ROLE=admin_xa) bắt buộc cài đặt khi đăng nhập.
 //   node tests/e2e/totp-test.mjs [http://localhost:8000]
 // Mã TOTP tính ngay trong script (RFC 6238, HMAC-SHA1, 30 giây, 6 số) — không cần điện thoại. Chạy ~1 phút (chờ bước
 // thời gian mới để có mã chưa dùng).
@@ -7,7 +7,7 @@ import crypto from 'node:crypto';
 
 const ROOT = process.argv[2] || 'http://localhost:8000';
 const BASE = ROOT + '/api/v1';
-const REQUIRED_ROLE = 'kiem_thu_2fa';
+const REQUIRED_ROLE = process.env.REQUIRED_ROLE || ''; // vai trò bắt buộc 2 lớp để thử (VD admin_xa)
 let failures = 0;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const check = (name, cond, extra = '') => {
@@ -60,7 +60,7 @@ const stamp = Date.now().toString(36);
 const username = `mfa.${stamp}`;
 const password = 'MatKhau2fa9';
 const created = await call('POST', '/rbac/users', {
-  username, full_name: 'Thử xác thực 2 lớp', password, role: 'can_bo_xa', domain: 'BAOLAC/CB-COBA',
+  username, full_name: 'Thử xác thực 2 lớp', password, role: 'admin_xa', domain: 'BAOLAC/CB-COBA',
 }, admin);
 check('Tạo tài khoản thử', created.status === 201, username);
 const userId = created.data?.id;
@@ -141,18 +141,17 @@ for (let i = 0; i < 12 && status !== 429; i += 1) status = (await call('POST', '
 check('Sai mã nhiều lần → tạm khoá (429)', status === 429);
 check('Đang khoá: mã đúng cũng bị từ chối', (await call('POST', '/auth/mfa/verify', { challenge: c4, code: await freshCode(s3) })).status === 429);
 
-// ---------------------------------------------------------------- vai trò bắt buộc (cần TOTP_REQUIRED_ROLES=kiem_thu_2fa)
-const role = await call('POST', '/rbac/roles', {
-  name: REQUIRED_ROLE, display_name: 'Thử bắt buộc 2 lớp', permissions: ['monitoring.view'],
-}, admin);
-check('Vai trò thử bắt buộc 2 lớp', role.status === 201 || role.status === 409);
+// ---------------------------------------------------------------- vai trò bắt buộc
+// Chỉ chạy khi backend bắt buộc 2 lớp cho Cấp 3 (TOTP_REQUIRED_ROLES=admin_xa, đặt REQUIRED_ROLE=admin_xa khi chạy test).
+// CI không bật (mọi tài khoản demo cấp xã sẽ phải cài 2 lớp) — job prod kiểm bắt buộc 2 lớp cho Cấp 2 với cấu hình thật.
 const forcedName = `mfa.bb.${stamp}`;
-await call('POST', '/rbac/users', {
-  username: forcedName, full_name: 'Thử bắt buộc 2 lớp', password, role: REQUIRED_ROLE, domain: '*',
-}, admin);
-const forced = await login(forcedName, password);
-if (forced.data?.mfa !== 'setup') {
-  console.log(`SKIP  Bắt buộc cài đặt khi đăng nhập — backend chưa đặt TOTP_REQUIRED_ROLES=${REQUIRED_ROLE}`);
+const forced = REQUIRED_ROLE
+  ? (await call('POST', '/rbac/users', {
+    username: forcedName, full_name: 'Thử bắt buộc 2 lớp', password, role: REQUIRED_ROLE, domain: 'BAOLAC/CB-COBA',
+  }, admin), await login(forcedName, password))
+  : null;
+if (forced?.data?.mfa !== 'setup') {
+  console.log('SKIP  Bắt buộc cài đặt khi đăng nhập — chạy với REQUIRED_ROLE=admin_xa + backend TOTP_REQUIRED_ROLES=admin_xa');
 } else {
   const fc = forced.data.challenge;
   check('Vai trò bắt buộc: chưa có token, phải cài đặt', !forced.data.token);

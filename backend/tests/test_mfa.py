@@ -71,7 +71,7 @@ def test_challenge_token_is_not_a_session_token():
 
 class FakeEnforcer:
     def get_filtered_grouping_policy(self, _index, username):
-        return {"lanhdao": [["lanhdao", "truong_ban", "*"]], "canbo": [["canbo", "can_bo_xa", "CB-X"]]}.get(
+        return {"lanhdao": [["lanhdao", "admin_tinh", "*"]], "canbo": [["canbo", "admin_xa", "CB-X"]]}.get(
             username, []
         )
 
@@ -80,7 +80,7 @@ def test_required_roles(monkeypatch):
     monkeypatch.setattr(mfa, "get_enforcer", FakeEnforcer)
     monkeypatch.setattr(settings, "totp_required_roles", "")
     assert not mfa.required("lanhdao")
-    monkeypatch.setattr(settings, "totp_required_roles", " super_admin, truong_ban ")
+    monkeypatch.setattr(settings, "totp_required_roles", " super_admin, admin_tinh ")
     assert mfa.required("lanhdao")
     assert not mfa.required("canbo")
     assert not mfa.required("khong-co")

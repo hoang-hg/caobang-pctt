@@ -143,13 +143,15 @@ class ApproveIn(BaseModel):
 
 @router.post("/broadcasts/{broadcast_id}/approve")
 async def approve(broadcast_id: str, body: ApproveIn, user: dict = Depends(require_any("alert", "approve"))):
-    """CHECKER: Lãnh đạo xác nhận bằng mã PIN → hệ thống bắt đầu phát trên các kênh.
-    Phải có quyền phê duyệt trên TẤT CẢ xã nhận tin (chỉ huy cụm không duyệt được lệnh toàn tỉnh)."""
+    """CHECKER: tài khoản cấp tỉnh (không phải người soạn) xác nhận bằng mã PIN → hệ thống bắt đầu phát trên các kênh.
+    Phải có quyền phê duyệt trên TẤT CẢ xã nhận tin."""
     doms = await broadcast_domains(broadcast_id)
     if doms is None:
         raise HTTPException(404, "Không tìm thấy lệnh")
     if not can_all(user, "alert", "approve", doms):
         raise forbidden()
+    if not user["pin_hash"]:
+        raise HTTPException(403, "Tài khoản chưa được cấp mã PIN phê duyệt — đề nghị Quản trị hệ thống cấp")
     # PIN 6 số: không giới hạn thì phiên bị lộ dò được PIN → khoá thử PIN 15 phút sau 5 lần sai
     pin_key = f"pinfail:{user['username'].lower()}"
     if await ratelimit.peek(pin_key) >= MAX_PIN_FAILS:

@@ -89,7 +89,8 @@ Script chỉ đọc dữ liệu. Ngoại lệ duy nhất là 2 lần tra cứu s
   `docker run --rm <image backend> python -m app.golive_web https://<tên miền>`.
 - **Thủ công, giao diện chỉ xem** trên máy thật (khổ máy tính và điện thoại; không gửi, không điều động, không duyệt):
   `cd tests/ui && npm ci && npx playwright install chromium && UI_READONLY=1 UI_USER=… UI_PASS=… node ui-test.mjs https://<tên miền>`.
-  Dùng tài khoản xem riêng, khoá sau khi thử.
+  Dùng 1 tài khoản Cấp 3 tạo riêng để thử (Cấp 1–2 bắt buộc 2 lớp nên kiểm thử tự động không đăng nhập được), khoá
+  sau khi thử.
 - **Thủ công, kiểm thử tải k6** (README 12.2) trên máy chủ thật, mức 10% dân số trong 1 giờ.
 - **Thủ công, văn bản của BCH**, nêu rõ tới khi tích hợp SMS / Cell Broadcast / Zalo:
   - hệ thống **chưa phải kênh cảnh báo chính thức**;

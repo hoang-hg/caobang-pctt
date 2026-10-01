@@ -73,8 +73,7 @@ jobs:
       # Kiểm thử API dùng tài khoản demo + dữ liệu mẫu + bộ mô phỏng
       DEMO_MODE: "true"
       SIMULATOR: "true"
-      # vai trò thử của totp-test.mjs: kiểm tra luồng bắt buộc cài xác thực 2 lớp khi đăng nhập
-      TOTP_REQUIRED_ROLES: kiem_thu_2fa
+      # Bắt buộc 2 lớp theo vai trò: kiểm ở job prod (Cấp 1–2 với cấu hình thật) — bật ở đây thì mọi tài khoản demo phải cài
       # ops-test.mjs: ngưỡng ổ đĩa 1% → giả lập ổ đĩa đầy, thử trọn luồng cảnh báo sự cố (email tới Mailpit, 503)
       OPS_DISK_WARN_PCT: "1"
       OPS_ALERT_EMAILS: van-hanh@ci.local
@@ -114,8 +113,10 @@ jobs:
         run: sleep 45
       - name: Kiểm thử luồng nghiệp vụ
         run: node tests/e2e/smoke.mjs
-      - name: Kiểm thử phân quyền RBAC
-        run: node tests/e2e/rbac-test.mjs
+      - name: Kiểm thử phân quyền 3 cấp
+        run: |
+          node tests/e2e/rbac-test.mjs
+          node tests/e2e/login-hierarchy-test.mjs
       - name: Kiểm thử IoT & nguồn dữ liệu
         run: node tests/e2e/iot-test.mjs
       - name: Kiểm thử cổng công khai, phản ánh, tài khoản

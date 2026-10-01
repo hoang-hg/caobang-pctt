@@ -22,10 +22,10 @@ const check = (name, cond, extra = '') => {
 const auth = (t) => ({ Authorization: `Bearer ${t}` });
 
 const admin = (await call('POST', '/auth/login', { username: 'admin', password: 'admin123' })).data.token;
-const xem = (await call('POST', '/auth/login', { username: 'xem', password: 'xem123' })).data.token;
+const xa = (await call('POST', '/auth/login', { username: 'admin.coba', password: 'admincoba123' })).data.token; // Cấp 3
 const A = auth(admin);
 
-check('Tài khoản quan sát không xem được nguồn dữ liệu → 403', (await call('GET', '/integrations/sources', null, auth(xem))).status === 403);
+check('Quản trị xã không xem được nguồn dữ liệu → 403', (await call('GET', '/integrations/sources', null, auth(xa))).status === 403);
 const sources = (await call('GET', '/integrations/sources', null, A)).data;
 const om = sources.find((s) => s.code === 'OPEN_METEO_ENS');
 if (om?.status === 'ok') {

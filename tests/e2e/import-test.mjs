@@ -30,11 +30,12 @@ const upload = (name, step, filename, content, token, mode = 'upsert') => {
 };
 
 const admin = await login('admin', 'admin123');
-const xem = await login('xem', 'xem123');
+const xa = await login('admin.coba', 'admincoba123'); // Cấp 3: chỉ gửi hồ sơ chờ tỉnh duyệt
 const stamp = Date.now().toString(36).toUpperCase();
 
 // ---- Quyền & danh mục
-check('Tài khoản quan sát không có quyền nhập dữ liệu → 403', (await call('GET', '/data-import/datasets', null, xem)).status === 403);
+check('Quản trị xã không nhập thẳng dữ liệu (chỉ gửi hồ sơ chờ duyệt) → 403',
+  (await upload('diem_so_tan', 'apply', 'diem.csv', 'ma,ten\nX,Y\n', xa)).status === 403);
 const list = await call('GET', '/data-import/datasets', null, admin);
 check('Danh mục loại dữ liệu', list.status === 200 && list.data.some((d) => d.name === 'diem_so_tan' && d.replaceable),
   `${list.data?.length} loại`);

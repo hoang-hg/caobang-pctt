@@ -966,7 +966,8 @@ PLACE_NAMES = [
 DEMO_EMAIL_DOMAIN = "caobang-pctt.local"
 
 # Tài khoản demo: (username, họ tên, chức vụ, mật khẩu, PIN phê duyệt, vai trò RBAC, phạm vi)
-# Phạm vi: "*" toàn tỉnh · "<CUM>/*" cả cụm (địa bàn huyện cũ) · "<CUM>/<MA_XA>" một xã
+# 3 cấp, mỗi cấp 1 vai trò: super_admin / admin_tinh phạm vi "*" toàn tỉnh · admin_xa phạm vi "<CUM>/<MA_XA>" một xã.
+# Chức vụ (lãnh đạo, trực ban, cán bộ…) chỉ là thông tin, quyền do cấp quyết định; PIN = được duyệt cảnh báo (Cấp 1–2).
 USERS = [
     ("admin", "Quản trị hệ thống", "Kỹ sư vận hành hệ thống", "admin123", "0000", "super_admin", "*"),
     (
@@ -975,7 +976,7 @@ USERS = [
         "Phó Trưởng ban Thường trực BCH PCTT & TKCN tỉnh",
         "chihuy123",
         "2468",
-        "truong_ban",
+        "admin_tinh",
         "*",
     ),
     (
@@ -1006,11 +1007,8 @@ USERS = [
         "admin_xa",
         "TPCAOBANG/CB-THUCPHAN",
     ),
-    ("trucban", "Nông Văn Trực", "Cán bộ trực ban Văn phòng BCH tỉnh", "trucban123", None, "truc_ban", "*"),
-    ("chihuy.baolac", "Ma Văn Thành", "Chỉ huy cụm Bảo Lạc", "baolac123", "1357", "chi_huy_cum", "BAOLAC/*"),
-    ("canbo.coba", "Triệu Thị Mai", "Cán bộ PCTT xã Cô Ba", "coba123", None, "can_bo_xa", "BAOLAC/CB-COBA"),
-    ("thukho", "Lý Văn Kho", "Thủ kho dự trữ PCTT tỉnh", "thukho123", None, "thu_kho", "*"),
-    ("xem", "Tài khoản xem", "Lãnh đạo Sở ngành", "xem123", None, "quan_sat", "*"),
+    ("trucban", "Nông Văn Trực", "Cán bộ trực ban Văn phòng BCH tỉnh", "trucban123", None, "admin_tinh", "*"),
+    ("canbo.coba", "Triệu Thị Mai", "Cán bộ PCTT xã Cô Ba", "coba123", None, "admin_xa", "BAOLAC/CB-COBA"),
 ]
 
 TEMPLATES = [

@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     jwt_secret: str = DEV_JWT_SECRET
     jwt_expire_hours: int = 12
     cors_origins: str = "http://localhost:5173,http://localhost:8080"
-    # Vai trò BẮT BUỘC xác thực 2 lớp (TOTP), cách nhau dấu phẩy — VD super_admin,truong_ban,admin_tinh,chi_huy_cum.
+    # Vai trò BẮT BUỘC xác thực 2 lớp (TOTP), cách nhau dấu phẩy — VD super_admin,admin_tinh.
     # Trống = không bắt buộc (ai cũng tự bật được). Người có vai trò này chưa bật → lần đăng nhập sau phải cài đặt.
     totp_required_roles: str = ""
     totp_issuer: str = (

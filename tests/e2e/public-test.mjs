@@ -97,7 +97,7 @@ const T = {
   admin: await login('admin', 'admin123'),
   tinh: await login('admin.tinh', 'admintinh123'),
   coba: await login('admin.coba', 'admincoba123'),
-  xem: await login('xem', 'xem123'),
+  thucphan: await login('admin.thucphan', 'adminthucphan123'),
 };
 check('Đăng nhập Quản trị tỉnh, Quản trị xã', !!T.tinh && !!T.coba);
 const cobaList = (await call('GET', '/reports?status=cho_duyet', null, T.coba)).data;
@@ -112,8 +112,8 @@ const tampered = item.photo_urls[0].thumb.replace(/sig=(\w)/, (_, c) => `sig=${c
 check('Link ảnh sửa chữ ký → 403', (await fetch(ROOT + tampered)).status === 403);
 check('Quản trị xã không duyệt phản ánh ngoài xã → 403',
   (await call('POST', `/reports/${subTp.data.id}/moderate`, { action: 'approve' }, T.coba)).status === 403);
-check('Tài khoản quan sát không duyệt được → 403',
-  (await call('POST', `/reports/${sub.data.id}/moderate`, { action: 'approve' }, T.xem)).status === 403);
+check('Quản trị xã khác (Thục Phán) không duyệt phản ánh của Cô Ba → 403',
+  (await call('POST', `/reports/${sub.data.id}/moderate`, { action: 'approve' }, T.thucphan)).status === 403);
 check('Từ chối cần lý do → 422', (await call('POST', `/reports/${sub.data.id}/moderate`, { action: 'reject' }, T.coba)).status === 422);
 const appr = await call('POST', `/reports/${sub.data.id}/moderate`, { action: 'approve', public_note: 'Đã cử dân quân kiểm tra' }, T.coba);
 check('Quản trị xã duyệt phản ánh trong xã', appr.status === 200 && appr.data.status === 'da_duyet');
@@ -156,26 +156,22 @@ const adminXa = await call('POST', '/rbac/users', {
 }, T.tinh);
 check('Quản trị tỉnh tạo tài khoản Quản trị xã', adminXa.status === 201);
 check('Mật khẩu yếu bị từ chối → 422', (await call('POST', '/rbac/users', {
-  username: `yeu.${stamp}`, full_name: 'Mật khẩu yếu', password: 'abc', role: 'can_bo_xa', domain: 'BAOLAC/CB-COBA',
-}, T.coba)).status === 422);
-const canbo = await call('POST', '/rbac/users', {
-  username: `cbx.${stamp}`, full_name: 'Cán bộ xã thử', password: 'MatKhau2026', role: 'can_bo_xa', domain: 'BAOLAC/CB-COBA',
-}, T.coba);
-check('Quản trị xã tạo cán bộ trong xã mình', canbo.status === 201);
-check('Quản trị xã không tạo tài khoản ở xã khác → 403', (await call('POST', '/rbac/users', {
-  username: `x.${stamp}`, full_name: 'Xã khác', password: 'MatKhau2026', role: 'can_bo_xa', domain: 'BAOLAC/CB-HUNGDAO',
+  username: `yeu.${stamp}`, full_name: 'Mật khẩu yếu', password: 'abc', role: 'admin_xa', domain: 'BAOLAC/CB-COBA',
+}, T.tinh)).status === 422);
+// 3 cấp: chỉ cấp trên tạo tài khoản — Quản trị xã (Cấp 3) không tạo tài khoản nào, kể cả trong xã mình
+check('Quản trị xã không tạo được tài khoản (chỉ cấp trên tạo) → 403', (await call('POST', '/rbac/users', {
+  username: `cbx.${stamp}`, full_name: 'Cán bộ xã thử', password: 'MatKhau2026', role: 'admin_xa', domain: 'BAOLAC/CB-COBA',
 }, T.coba)).status === 403);
-check('Quản trị xã không cấp vai trò Thủ kho (không có quyền xuất kho) → 403', (await call('POST', `/rbac/users/${canbo.data.id}/assignments`, { role: 'thu_kho', domain: 'BAOLAC/CB-COBA' }, T.coba)).status === 403);
 // Quản trị tỉnh được điều động toàn tỉnh (vai trò admin_tinh có dispatch.create) — lực lượng không tồn tại → lỗi dữ liệu, không phải 403
 check('Quản trị tỉnh có quyền điều động (không bị 403)', (await call('POST', '/dispatch', { ticket_id: toSos.data.sos_id, force_id: toSos.data.sos_id }, T.tinh)).status !== 403);
 
 // ---------------------------------------------------------------- Mật khẩu
-check('Đổi mật khẩu sai mật khẩu hiện tại → 400', (await call('POST', '/auth/change-password', { current_password: 'sai', new_password: 'MoiMoi2026' }, T.xem)).status === 400);
-check('Đổi mật khẩu yếu → 422', (await call('POST', '/auth/change-password', { current_password: 'xem123', new_password: '12345678' }, T.xem)).status === 422);
+check('Đổi mật khẩu sai mật khẩu hiện tại → 400', (await call('POST', '/auth/change-password', { current_password: 'sai', new_password: 'MoiMoi2026' }, T.thucphan)).status === 400);
+check('Đổi mật khẩu yếu → 422', (await call('POST', '/auth/change-password', { current_password: 'adminthucphan123', new_password: '12345678' }, T.thucphan)).status === 422);
 // Tài khoản tạm có email cho luồng quên mật khẩu (không đụng tới tài khoản demo)
 const pwUser = `pw.${stamp}`;
 const pwMail = `${pwUser}@caobang-pctt.local`;
-await call('POST', '/rbac/users', { username: pwUser, full_name: 'Tài khoản thử mật khẩu', password: 'BanDau2026', role: 'quan_sat', domain: '*', email: pwMail }, T.admin);
+await call('POST', '/rbac/users', { username: pwUser, full_name: 'Tài khoản thử mật khẩu', password: 'BanDau2026', role: 'admin_xa', domain: 'BAOLAC/CB-COBA', email: pwMail }, T.admin);
 const pwTok = await login(pwUser, 'BanDau2026');
 const fp = await call('POST', '/auth/forgot-password', { login: pwMail });
 const fpNone = await call('POST', '/auth/forgot-password', { login: 'khong.ton.tai' });

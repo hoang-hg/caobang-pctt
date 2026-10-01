@@ -20,6 +20,7 @@ from app.config import (
     Settings,
     settings,
 )
+from app.rbac.permissions import SYSTEM_ROLE_NAMES
 
 log = logging.getLogger(__name__)
 
@@ -102,8 +103,13 @@ def check(s: Settings) -> tuple[list[str], list[str]]:
     # Xác thực 2 lớp
     if not s.totp_required_role_set:
         warnings.append(
-            "Chưa bắt buộc xác thực 2 lớp (TOTP_REQUIRED_ROLES) — nên bật cho super_admin, truong_ban, admin_tinh, "
-            "chi_huy_cum (quản trị tài khoản, phê duyệt cảnh báo)"
+            "Chưa bắt buộc xác thực 2 lớp (TOTP_REQUIRED_ROLES) — nên bật cho super_admin, admin_tinh (quản trị tài "
+            "khoản, phê duyệt cảnh báo)"
+        )
+    elif unknown := sorted(s.totp_required_role_set - SYSTEM_ROLE_NAMES):
+        warnings.append(
+            f"TOTP_REQUIRED_ROLES có vai trò không còn tồn tại: {', '.join(unknown)} — hệ thống chỉ còn super_admin, "
+            "admin_tinh, admin_xa (VD TOTP_REQUIRED_ROLES=super_admin,admin_tinh)"
         )
 
     # Sao lưu

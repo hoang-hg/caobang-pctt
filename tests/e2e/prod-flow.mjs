@@ -203,14 +203,17 @@ const mk = async (username, role, domain, extra = {}) =>
   call('POST', '/rbac/users', { username, full_name: `Kiểm thử ${role}`, password: PW, role, domain, ...extra }, admin);
 const xaUser = `canbo.${stamp}`;
 const chkUser = `lanhdao.${stamp}`;
-check('Tạo tài khoản cán bộ xã (có email)', (await mk(xaUser, 'can_bo_xa', 'BAOLAC/CB-COBA', { email: `${xaUser}@ci.local` })).status === 201);
-check('Tạo tài khoản lãnh đạo BCH (có PIN)', (await mk(chkUser, 'truong_ban', '*', { pin: CHECKER_PIN })).status === 201);
+check('Tạo tài khoản Cấp 3 xã Cô Ba (có email)', (await mk(xaUser, 'admin_xa', 'BAOLAC/CB-COBA', { email: `${xaUser}@ci.local` })).status === 201);
+check('Tạo tài khoản Cấp 2 (lãnh đạo, có PIN)', (await mk(chkUser, 'admin_tinh', '*', { pin: CHECKER_PIN })).status === 201);
 const xa = (await call('POST', '/auth/login', { username: xaUser, password: PW })).data?.token;
 check('Cán bộ xã đăng nhập 1 bước (vai trò không bắt buộc 2 lớp)', !!xa);
 check('Cán bộ xã không cập nhật được vận hành hồ → 403',
   (await call('PATCH', `/reservoirs/${HO}/operation`, { current_level: 180, spill_gates_open: 0 }, xa)).status === 403);
-const { token: checker, mfa: chkMfa } = await loginWithSetup(chkUser, PW, 'Lãnh đạo');
-check('Lãnh đạo BCH: bắt buộc cài 2 lớp khi đăng nhập lần đầu', !!checker && chkMfa === true);
+const { token: checker, mfa: chkMfa, secret: chkSecret } = await loginWithSetup(chkUser, PW, 'Lãnh đạo');
+check('Cấp 2: bắt buộc cài 2 lớp khi đăng nhập lần đầu', !!checker && chkMfa === true);
+check('Cấp 2: /auth/me ghi rõ bắt buộc 2 lớp', (await call('GET', '/auth/me', null, checker)).data?.mfa?.required === true);
+check('Cấp 2: không tự tắt được 2 lớp (vai trò bắt buộc) → 403',
+  (await call('POST', '/auth/mfa/disable', { password: PW, code: await freshCode(chkSecret) }, checker)).status === 403);
 
 // ---- Xã/phường gửi dữ liệu → cấp tỉnh phê duyệt rồi mới hiển thị
 const qtxa = `qtxa.${stamp}`;

@@ -27,7 +27,7 @@ STRONG = {
     "smtp_host": "smtp.caobang.gov.vn",
     "turnstile_site_key": "0x4AAA-site",
     "turnstile_secret": "0x4AAA-secret",
-    "totp_required_roles": "super_admin,truong_ban,admin_tinh,chi_huy_cum",
+    "totp_required_roles": "super_admin,admin_tinh",
     "backup_remote": "offsite:pctt-sao-luu/caobang",
 }
 
@@ -59,6 +59,13 @@ def test_preflight_accepts_hardened_production():
     errors, warnings = preflight.check(make(app_env="production", **STRONG))
     assert errors == []
     assert warnings == []
+
+
+def test_preflight_warns_retired_roles_in_totp_list():
+    """.env cũ còn tên vai trò đã gộp (truong_ban, chi_huy_cum…) → cảnh báo, gợi ý danh sách mới."""
+    old = {**STRONG, "totp_required_roles": "super_admin,truong_ban,admin_tinh,chi_huy_cum"}
+    _, warnings = preflight.check(make(app_env="production", **old))
+    assert any("chi_huy_cum" in w and "truong_ban" in w and "super_admin,admin_tinh" in w for w in warnings)
 
 
 def test_preflight_warns_smtp_user_without_password():

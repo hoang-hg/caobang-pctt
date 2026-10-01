@@ -36,7 +36,6 @@ const publicSites = async () => (await call('GET', `/public/map?_=${Date.now()}`
 const xa = await login('admin.coba', 'admincoba123'); // quản trị xã Cô Ba (BAOLAC/CB-COBA)
 const xaKhac = await login('admin.cathan', 'admincathan123'); // quản trị xã Ca Thành
 const tinh = await login('admin.tinh', 'admintinh123'); // quản trị tỉnh — duyệt
-const xem = await login('xem', 'xem123');
 check('Đăng nhập xã, tỉnh', !!xa && !!xaKhac && !!tinh);
 const stamp = Date.now().toString(36).toUpperCase();
 const units = (await call('GET', '/admin-units?level=xa', null, tinh)).data || [];
@@ -48,7 +47,6 @@ const [cbLat, cbLon] = at('CB-COBA');
 const [tpLat, tpLon] = at('CB-THUCPHAN');
 
 // ---- Quyền & danh mục của xã
-check('Tài khoản quan sát không vào được nhập / gửi dữ liệu → 403', (await call('GET', '/data-import/datasets', null, xem)).status === 403);
 const list = (await call('GET', '/data-import/datasets', null, xa)).data || [];
 check('Xã chỉ thấy loại dữ liệu được gửi (không có hồ chứa, trạm, ranh giới)',
   list.length === 9 && !list.some((d) => ['ho_chua', 'tram_quan_trac', 'ranh_gioi_xa', 'cay_xang'].includes(d.name)), list.map((d) => d.name).join(','));
