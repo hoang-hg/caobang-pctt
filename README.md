@@ -15,7 +15,7 @@ Sửa chức năng, cấu hình hay quy trình thì cập nhật đúng mục tr
 | Bạn là | Nên đọc |
 |---|---|
 | Lãnh đạo, cán bộ nghiệp vụ | [1. Tổng quan](#tong-quan) · [2. Hiện trạng](#hien-trang) · [7. Quy trình nghiệp vụ](#quy-trinh) · [8. Phân quyền](#phan-quyen) |
-| Người vận hành máy chủ | [2. Hiện trạng](#hien-trang) · [5. Cấu hình](#cau-hinh) · [6. Kết nối dữ liệu thật](#ket-noi-du-lieu) · [10. Triển khai thật](#trien-khai) · [11. Bảo mật](#bao-mat) |
+| Người vận hành máy chủ | [2. Hiện trạng](#hien-trang) · [5. Cấu hình](#cau-hinh) · [6. Kết nối dữ liệu thật](#ket-noi-du-lieu) · [10. Triển khai thật](#trien-khai) ([10.8. Sổ tay từng bước](#so-tay-van-hanh)) · [11. Bảo mật](#bao-mat) |
 | Lập trình viên | [3. Kiến trúc](#kien-truc) · [4. Chạy thử](#chay-thu) · [12. Kiểm thử](#kiem-thu) · [CLAUDE.md](CLAUDE.md) |
 
 **Mục lục**
@@ -1090,7 +1090,8 @@ Sau lần chạy đầu:
 
 ### 10.4. Cập nhật phiên bản
 
-Phát hành theo **số phiên bản**: máy chủ không build, chỉ kéo image GitHub đã build từ đúng commit đã qua CI.
+Phát hành theo **số phiên bản**: máy chủ không build, chỉ kéo image GitHub đã build từ đúng commit đã qua CI. Làm theo
+từng lệnh (kèm kiểm tra trước / sau, xử lý sự cố): [10.8](#so-tay-van-hanh).
 
 1. Sửa code → nhánh → PR → **CI đạt cả 4 job** → gộp `main`.
 2. Cần cập nhật máy chủ khi thay đổi chạm `backend/`, `frontend/`, `docker-compose.prod.yml`, `deploy/` (tài liệu, CI,
@@ -1219,6 +1220,127 @@ lỗi (chỉ tên kiểm tra + đạt / lỗi; chi tiết trong email). `/health
 Cổng công khai: nginx cache giữ tải backend gần như không đổi; nút cổ chai tiếp theo là băng thông file tĩnh → CDN.
 Cán bộ: tăng `API_WORKERS` / số bản backend. Sẵn sàng cao (RTO < vài giờ): PostgreSQL replica + PITR (WAL-G / pgBackRest),
 Redis Sentinel, MinIO phân tán, cân bằng tải nhiều máy.
+
+<a id="so-tay-van-hanh"></a>
+### 10.8. Sổ tay từng bước: phát hành & cập nhật máy chủ
+
+Làm theo thứ tự khi máy chủ **đã cài** theo 10.3. Lệnh dưới viết cho máy chủ có sẵn Traefik (Coolify, `PCTT_PROXY=traefik`);
+máy dùng Caddy thì bỏ `-f …/deploy/docker-compose.traefik.yml` trong các lệnh. Thay `X.Y.Z` bằng số phiên bản mới (sửa lỗi:
+tăng số cuối, VD 1.0.2 → 1.0.3) và `<tên miền>` bằng `DOMAIN`. Không dán mật khẩu, khoá, nội dung `.env.production` vào
+chat / email / kho mã.
+
+**Chuẩn bị (một lần)**
+
+- Máy phát triển (Windows): Git, Node 22, Docker Desktop và **GitHub CLI**: `winget install --id GitHub.cli -e` → mở lại
+  PowerShell **và** VS Code → `gh auth login` → `GitHub.com` → `HTTPS` → `Yes` → `Login with a web browser` → dán mã 8 ký tự
+  ở trang github.com/login/device → **Authorize** → `gh auth status` phải báo đã đăng nhập. Dùng token dán tay
+  (`github_pat_…`) thì token cần quyền kho: **Contents** và **Pull requests**: Read and write, **Actions**: Read-only.
+- Máy chủ: lệnh tắt `dcp` (mở lại phiên SSH sau khi thêm):
+
+  ```bash
+  echo "alias dcp='docker compose -f /opt/caobang-pctt/docker-compose.prod.yml -f /opt/caobang-pctt/deploy/docker-compose.traefik.yml --env-file /opt/caobang-pctt/.env.production'" >> /root/.bashrc
+  ```
+
+**A. Phát hành một phiên bản (máy phát triển)**
+
+1. Nhánh mới từ `main` mới nhất, sửa code, chạy kiểm tra như [12](#kiem-thu) (ruff + pytest, `npm run lint` + `npm run build`):
+
+   ```bash
+   git checkout main && git pull
+   git checkout -b <ten-nhanh>
+   # … sửa code, cập nhật README nếu đổi chức năng / cấu hình …
+   git add -A && git commit -m "<mô tả tiếng Việt>"
+   git push -u origin <ten-nhanh>
+   gh pr create --fill
+   ```
+
+2. Chờ CI: `gh pr checks --watch` — đủ **4 job** xanh (Backend, Frontend, E2E, Production). Job đỏ → sửa, commit, push
+   lại trên cùng nhánh (CI tự chạy lại).
+3. Gộp: `gh pr merge --merge --delete-branch` (hoặc nút **Merge** trên GitHub).
+4. Thay đổi chạm `backend/`, `frontend/`, `docker-compose.prod.yml`, `deploy/` → gắn tag để build image (chỉ sửa tài liệu
+   / CI thì dừng ở bước 3):
+
+   ```bash
+   git checkout main && git pull
+   git tag -a vX.Y.Z -m "vX.Y.Z — <nội dung chính>"
+   git push origin vX.Y.Z
+   # ~10 giây sau: theo dõi workflow Deploy tới khi 2 job "Build & push" xanh (1–10 phút)
+   gh run watch $(gh run list --workflow deploy.yml --limit 1 --json databaseId --jq '.[0].databaseId') --exit-status
+   ```
+
+**B. Cập nhật máy chủ (SSH / Termius)**
+
+1. Kiểm tra trước — có dịch vụ lỗi thì xử lý trước (10.6), không cập nhật chồng lên:
+
+   ```bash
+   cd /opt/caobang-pctt
+   cat .phien-ban                                 # phiên bản đang chạy
+   dcp ps                                         # mọi dịch vụ Up / healthy
+   curl -s https://<tên miền>/health/full; echo   # "status":"ok"
+   ```
+
+2. Cập nhật: `sh deploy/update.sh X.Y.Z` → chờ dòng `XONG: đang chạy vX.Y.Z` (2–5 phút, trang ngắt 10–30 giây). Ghi lại
+   tên bản sao lưu `backups/db/pctt_…_truoc-X.Y.Z.dump` script in ra.
+3. Kiểm tra sau:
+
+   ```bash
+   cat .phien-ban                                 # X.Y.Z
+   dcp ps                                         # healthy; migrate: Exited (0)
+   dcp logs migrate | tail -20                    # chỉ các dòng "[cấu hình] …" đã biết, không có Traceback
+   DCP="docker compose -f docker-compose.prod.yml -f deploy/docker-compose.traefik.yml --env-file .env.production" \
+     sh deploy/golive-check.sh <tên miền>         # phần "Từ bên ngoài": 0 LỖI
+   ```
+
+4. Mở cổng trên trình duyệt, **Ctrl+F5** (bỏ bản đã lưu của service worker), xem trang vừa thay đổi.
+
+**C. Khi gặp sự cố**
+
+| Màn hình báo | Xử lý |
+|---|---|
+| `!! Cập nhật lỗi — quay lại bản …` | Script đã tự quay lại bản cũ, hệ thống vẫn chạy. Lưu toàn bộ màn hình + `dcp logs --tail 100 migrate backend` gửi người phát triển |
+| `LỖI: không kéo được image vX.Y.Z` | Workflow Deploy chưa xong / lỗi (tab **Actions**) — chờ xong rồi chạy lại; hệ thống chưa bị đụng tới |
+| `LỖI: không tải được mã nguồn vX.Y.Z` | Chưa đẩy tag (`git push origin vX.Y.Z`) hoặc gõ sai số phiên bản |
+| `Đang có một lần cập nhật khác chạy` | Chắc chắn không còn `update.sh` nào chạy (`ps aux \| grep update.sh`) → `rm -rf /tmp/pctt-update.lock` |
+| Bản mới chạy nhưng sai nghiệp vụ | Quay lại: `sh deploy/update.sh <bản trước>`. Migration bản mới đã đổi cấu trúc CSDL → khôi phục `…_truoc-X.Y.Z.dump` theo 10.5 |
+
+**D. Đổi cấu hình `.env.production`** (VD email báo sự cố, Turnstile, sao lưu ngoài)
+
+```bash
+cd /opt/caobang-pctt
+cp -p .env.production .env.production.bak-$(date +%F)   # bản cũ để quay lại
+nano .env.production                                    # Ctrl+W tìm · Ctrl+O lưu · Ctrl+X thoát
+dcp up -d                                               # tạo lại dịch vụ có cấu hình thay đổi (~15 giây)
+sleep 20; dcp logs backend --since 2m | grep "cấu hình" # các cảnh báo cấu hình còn lại
+```
+
+Email bằng Gmail (tới khi có máy chủ thư của cơ quan): dùng một hộp thư Gmail **riêng cho hệ thống**, bật **Xác minh 2
+bước**, tạo **mật khẩu ứng dụng** tại myaccount.google.com/apppasswords (16 chữ cái, bỏ dấu cách — mật khẩu đăng nhập thường
+không dùng được), rồi đặt:
+
+```bash
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_STARTTLS=true
+SMTP_USER=<gmail của hệ thống>
+SMTP_PASSWORD=<mật khẩu ứng dụng>
+SMTP_FROM=BCH PCTT Cao Bang <gmail của hệ thống>     # đúng địa chỉ ở SMTP_USER
+OPS_ALERT_EMAILS=<email người trực 1>,<email người trực 2>
+```
+
+Thử gửi tới người nhận báo sự cố, rồi thử trọn luồng báo sự cố (điều kiện 6 của docs/GO-LIVE.md):
+
+```bash
+dcp exec -T worker python -c "from app.infra.mailer import _send; from app.infra.ops_watch import recipients; to = recipients(); [_send(t, '[PCTT Cao Bằng] Thử email báo sự cố', 'Email thử từ máy chủ PCTT: cấu hình SMTP đã hoạt động.') for t in to]; print('ĐÃ GỬI tới', ', '.join(to))"
+OPS_DISK_WARN_PCT=1 dcp up -d worker   # giả lập ổ đĩa đầy → email "SỰ CỐ: …" sau 2–3 phút (/health/full tạm 503)
+dcp up -d worker                       # trả ngưỡng cũ → email "ĐÃ KHÔI PHỤC: …" sau ~2 phút
+```
+
+Lỗi `Username and Password not accepted` = sai mật khẩu ứng dụng hoặc hộp thư chưa bật Xác minh 2 bước. Không thấy
+email → xem mục Spam.
+
+**E. Khởi động lại máy chủ** (đăng nhập thấy `*** System restart required ***` sau khi hệ điều hành tự cập nhật bản vá):
+chọn giờ vắng người, báo trước người dùng các ứng dụng khác chạy chung máy → `reboot` → ~2 phút sau vào lại:
+`dcp ps` (dịch vụ tự chạy lại nhờ `restart: unless-stopped`) và `curl -s https://<tên miền>/health/full`.
 
 ---
 
