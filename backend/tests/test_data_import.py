@@ -118,6 +118,23 @@ def test_convert_rows_reports_errors_per_row():
     assert rows[0].lat == 22.66 and rows[0].values["loai"] == "truong_hoc"
 
 
+def test_water_level_thresholds_must_strictly_increase():
+    """Trạm mực nước: ngưỡng BĐ đảo thứ tự / gõ nhầm → LỖI (cấp báo động cho người dân tính từ đây); thiếu ngưỡng giữa
+    vẫn nhập được (go-live mới bắt buộc đủ 3). Loại trạm khác: chỉ cảnh báo như trước."""
+    _, report = _rows(
+        "tram_quan_trac",
+        "ma,ten,loai,don_vi,bao_dong_1,bao_dong_2,bao_dong_3,vi_do,kinh_do\n"
+        "W1,Trạm A,muc_nuoc,m,180,181,182,22.66,106.25\n"  # đúng
+        "W2,Trạm B,muc_nuoc,m,182,181,180,22.66,106.25\n"  # đảo thứ tự
+        "W3,Trạm C,muc_nuoc,m,180,18.1,182,22.66,106.25\n"  # gõ nhầm
+        "W4,Trạm D,muc_nuoc,m,180,,182,22.66,106.25\n"  # thiếu BĐ II
+        "W5,Trạm E,muc_nuoc,m,180,180,182,22.66,106.25\n"  # hai ngưỡng bằng nhau
+        "R1,Trạm mưa,luong_mua,mm,100,50,150,22.66,106.25\n",
+    )
+    assert {i.row for i in report.errors if i.field == "bao_dong_1"} == {3, 4, 6}
+    assert any(i.row == 7 for i in report.warnings) and not any(i.row == 7 for i in report.errors)
+
+
 def test_defaults_and_derived_values():
     rows, report = _rows(
         "luc_luong",

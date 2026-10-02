@@ -69,7 +69,7 @@ backend/                   Python 3.12, FastAPI, SQLAlchemy async (psycopg3), Ca
 
 frontend/                  React 18, Vite 6, Tailwind 3, TanStack Query 5, Zustand 5, React Router 6, react-leaflet 4,
                            Recharts 2, lucide-react. Không có test runner — kiểm tra bằng `npm run lint` + `npm run build`.
-  nginx.conf + nginx/      cấu hình nginx trong image (gzip_static, cache API công khai, real-ip, proxy-headers, security-headers)
+  nginx.conf + nginx/      cấu hình nginx trong image (gzip_static, cache API công khai + /admin-units, real-ip, proxy-headers, security-headers)
   scripts/compress.mjs     chạy sau `vite build`: nén sẵn dist/**/*.gz cho gzip_static
   vite.config.js           manualChunks dạng hàm: vendor (react, router, query, zustand, clsx) · map (leaflet) · charts;
                            plugin serviceWorker: src/sw.js → dist/sw.js (điền VERSION + PRECACHE)
@@ -134,7 +134,8 @@ Python trong container.
   → router. Thêm middleware phải giữ ProxyHeaders ngoài cùng.
 - **Chạy thật**: service `migrate` chạy `alembic upgrade head && python -m app.seed` một lần; backend/worker khởi động sau.
   Dev: backend tự migrate + seed trước gunicorn. db/redis/minio ở mạng `data` (internal).
-- **nginx (frontend)**: cache 10 s mọi `GET /api/v1/public/*` (trả stale khi backend lỗi), ghi đè `X-Forwarded-For`,
+- **nginx (frontend)**: cache 10 s mọi `GET /api/v1/public/*` và `GET /api/v1/admin-units*` (danh sách / ranh giới xã cổng
+  gọi mỗi lần mở trang — `units-cache.conf`) (trả stale khi backend lỗi), ghi đè `X-Forwarded-For`,
   `gzip_static` cho tệp tĩnh + gzip động cho API, header bảo mật qua snippet (vì `add_header` trong `location` không kế thừa từ `server`).
 
 ## 5. Môi trường & cấu hình
@@ -216,6 +217,9 @@ Python trong container.
   mọi giá trị qua `html.escape`; mỗi danh sách có trần `MAX_*` để luôn < `MAX_BYTES` (50 KB) — thêm mục mới thì thêm
   trần và cập nhật `test_lite.test_worst_case_stays_under_limit`. Tham số `xa` lạ → trang toàn tỉnh (không tạo khoá cache).
   Phê duyệt cảnh báo gọi `invalidate("public:")` để bản nhẹ / cổng hiện ngay.
+- Lớp / chức năng chỉ có dữ liệu mô phỏng hoặc viết sẵn (quỹ đạo bão `/map/storm-track`): `SIMULATOR=false` → API 404,
+  frontend khoá lớp và ghi "Chưa kết nối nguồn dữ liệu chính thức" (`unavailable` trong `MonitoringMap.jsx`) — không bao
+  giờ vẽ kịch bản như dữ liệu thật, không cắt chữ "mô phỏng" khỏi nhãn.
 
 **Giới hạn tần suất & IP**
 - Quy tắc ở `RULES` trong `infra/ratelimit.py` (khớp tiền tố, quy tắc cụ thể đặt trước). Nhà mạng dùng chung IP (CGNAT) →
@@ -227,7 +231,8 @@ Python trong container.
   bật 2 lớp; sai mã 2 lớp theo tài khoản (`lock_key`). Không quay lại khoá chỉ theo tài khoản — ai biết tên đăng nhập
   cũng khoá được người duyệt cảnh báo giữa lúc thiên tai.
 - Cache nginx API công khai: `proxy_cache_key` liệt kê từng `$arg_…` — thêm tham số GET công khai mới phải thêm vào đó
-  (`test_public_cache_key_covers_every_public_query_param`).
+  (`test_public_cache_key_covers_every_public_query_param`); `/admin-units` có khoá riêng trong `units-cache.conf`
+  (`test_units_cache_key_covers_every_admin_units_query_param`, gồm cả tham số của dependency như `admin_codes`).
 
 **Xác thực & dữ liệu cá nhân**
 - Mật khẩu mới phải qua `auth.password_problem`; PIN ký duyệt băm như mật khẩu. Đổi / đặt lại mật khẩu tăng `token_version`.
@@ -238,11 +243,12 @@ Python trong container.
   có vai trò trong `TOTP_REQUIRED_ROLES` mà chưa bật. Kiểm mã luôn qua `mfa.check_code` (cập nhật có điều kiện
   `totp_last_step` / gạch mã khôi phục — chống dùng lại, chống gửi đồng thời). Tài khoản demo / e2e không bị bắt buộc vì
   `TOTP_REQUIRED_ROLES` trống ở dev.
-- Ảnh: luôn qua `services/reports.process_image` (xoá EXIF, chống bomb, JPEG) rồi `infra.storage.put`; ảnh chưa duyệt chỉ
-  phát qua `signed_photo_url`.
+- Ảnh: luôn qua `services/reports.process_image` (xoá EXIF / XMP / comment — Pillow tự ghi lại `img.info` khi save nên
+  phải `info.clear()`; chống bomb, JPEG) rồi `infra.storage.put`; ảnh chưa duyệt chỉ phát qua `signed_photo_url`.
 - Phản ánh ra cổng công khai: chỉ phần công khai (`public_description` qua `redact_public_text`, vị trí
   `PUBLIC_POINT_SQL` — làm tròn nếu cán bộ chưa chọn chính xác, ảnh khi `public_photos`). Không trả `description` /
-  `location` gốc ra API công khai.
+  `location` gốc ra API công khai. Thao tác tự công khai mà KHÔNG phải bước duyệt nội dung (chuyển SOS phản ánh chưa
+  duyệt) chỉ được công khai câu chung (`reports.sos_public_text`), không ảnh (`public_photos` mặc định của cột là true).
 - Log không ghi query string, token, SĐT, toạ độ người dân (`main.DropQueryString` áp cho `uvicorn.access` và `uvicorn.error`).
   Gửi dữ liệu ra dịch vụ ngoài phải che thông tin cá nhân trước (mẫu `sos_nlp.redact_for_llm`).
 
@@ -263,8 +269,10 @@ Python trong container.
   (mẫu `area.IN_PROVINCE_SQL`, `public._locate`).
 - Pool CSDL mặc định 5 + 5 mỗi tiến trình; tổng kết nối phải < `max_connections` (README §10.2).
 
-**Seed & mô phỏng**: dữ liệu hằng ở `seed_data.py`, logic ở `seed.py` (`seed_admin`, `seed_roads` luôn chạy; `seed_telemetry`,
-`seed_resources`, `seed_comms`, `seed_operations` chỉ khi `DEMO_MODE`). Kịch bản khí tượng mô phỏng: `services/scenario.py`
+**Seed & mô phỏng**: dữ liệu hằng ở `seed_data.py`, logic ở `seed.py` (`seed_admin` luôn chạy; `seed_roads` — sơ đồ nối
+tâm các xã, `road_segments.source = 'so_do'` — cùng `seed_telemetry`, `seed_resources`, `seed_comms`, `seed_operations`
+chỉ khi `DEMO_MODE`; `DEMO_MODE=false` xoá đoạn `so_do` còn sót mỗi lần seed: `drop_sample_roads`, không đụng đường
+`chinh_thuc`). Kịch bản khí tượng mô phỏng: `services/scenario.py`
 (chu kỳ 96 giờ). Seed gán lại `admin_unit_id` theo vị trí thực (`reconcile_admin_units`) — phạm vi RBAC dựa trên ranh giới xã.
 
 ## 7. Quy ước frontend
@@ -322,9 +330,11 @@ Python trong container.
 - [ ] Thao tác nhiều người cùng làm trên 1 phiếu / tài nguyên: khoá dòng (`FOR UPDATE`) rồi kiểm tra trạng thái TRONG
       transaction (mẫu `/dispatch` khoá phiếu SOS), ghi có điều kiện (`UPDATE … WHERE status = … RETURNING`). Tạo phiếu
       trong transaction khác: `create_ticket(conn=…)` rồi `announce_ticket` sau commit.
-- [ ] Không khẳng định điều hệ thống không biết: thiếu / cũ số liệu (trạm `stationView`, hồ `chua_co_so_lieu`) → xám,
-      không "an toàn / bình thường"; tuyến chỉ "không qua vùng nguy hiểm đã ghi nhận"; việc chưa tích hợp (SMS, Push,
-      Cell Broadcast) → giao diện nói rõ **chưa gửi**, không mô phỏng như đã gửi khi `SIMULATOR=false`.
+- [ ] Không khẳng định điều hệ thống không biết: thiếu / cũ số liệu (trạm `stationView`, hồ `chua_co_so_lieu`, điểm đen
+      sạt lở `chua_co_du_lieu`, chưa có mạng đường `roads_available`) → xám, không "an toàn / bình thường / không ách
+      tắc"; không hiện "TRỰC TIẾP" khi không nguồn nào báo số đo; tuyến chỉ "không qua vùng nguy hiểm đã ghi nhận", chưa có
+      mạng đường thì chỉ "khoảng cách chim bay"; việc chưa tích hợp (SMS, Push, Cell Broadcast) → giao diện nói rõ **chưa
+      gửi**, không mô phỏng như đã gửi khi `SIMULATOR=false`.
 - [ ] Dữ liệu mẫu / tài khoản demo mới phải để `app/golive.py` nhận ra được (SĐT `DEMO_PHONE_PREFIX`, email
       `DEMO_EMAIL_DOMAIN`, mã ví dụ tệp mẫu `…-001`); trường nhạy cảm mới của phản ánh / bản đồ công khai → thêm vào
       `REPORT_PRIVATE` / `MAP_PRIVATE` (`app/golive_web.py`, kịch bản T1 / T2).

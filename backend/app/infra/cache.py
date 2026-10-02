@@ -49,7 +49,9 @@ WAIT_S = 3.0  # tiến trình khác chờ kết quả tối đa, quá thì tự 
 
 
 def _dumps(value: Any) -> str:
-    return json.dumps(jsonable_encoder(value), ensure_ascii=False)
+    # Gọn như phản hồi thường của FastAPI: chuỗi lưu được trả thẳng cho client (cached_view, cached_response) — dấu cách
+    # sau "," / ":" làm ranh giới xã nặng thêm ~10%
+    return json.dumps(jsonable_encoder(value), ensure_ascii=False, separators=(",", ":"))
 
 
 async def _read(r, key: str) -> str | None:
@@ -127,6 +129,12 @@ async def _compute(r, key: str, ttl: int, producer: Callable[[], Awaitable[Any]]
 
 async def cached(key: str, ttl: int, producer: Callable[[], Awaitable[Any]]) -> Any:
     return json.loads(await _cached_payload(key, ttl, producer))
+
+
+async def cached_response(key: str, ttl: int, producer: Callable[[], Awaitable[Any]]) -> Response:
+    """Như ``cached`` nhưng trả thẳng chuỗi JSON đã lưu (như ``cached_view``) — không giải mã rồi mã hoá lại mỗi lần
+    trúng cache. Cho dữ liệu lớn trả nguyên cho client (ranh giới xã ~170 KB: ~60 ms CPU mỗi lần)."""
+    return Response(await _cached_payload(key, ttl, producer), media_type="application/json")
 
 
 async def _cached_payload(key: str, ttl: int, producer: Callable[[], Awaitable[Any]]) -> str:

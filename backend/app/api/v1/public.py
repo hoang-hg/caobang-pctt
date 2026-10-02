@@ -119,6 +119,7 @@ async def overview():
                 "blocked_count": ls_overview["blocked_count"],
                 "warning_count": ls_overview["warning_count"],
                 "safe_count": ls_overview["safe_count"],
+                "no_data_count": ls_overview["no_data_count"],
             },
             "generated_at": (await fetch_one("SELECT now() AS t"))["t"],
         }

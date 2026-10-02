@@ -336,9 +336,12 @@ export default function MapLayers({ data, layers, timeline, onDispatch, onCamera
   );
 }
 
+/** Quỹ đạo bão: chỉ bộ mô phỏng có (kịch bản trình diễn); chạy thật API trả 404 tới khi nối nguồn chính thức. */
+export const stormQuery = { queryKey: ['storm'], queryFn: () => api('/map/storm-track'), staleTime: 10 * 60_000, retry: false };
+
 /** Quỹ đạo bão/ATNĐ + vùng gió giật; vị trí tâm theo thanh thời gian. */
 export function StormLayer({ offset }) {
-  const { data } = useQuery({ queryKey: ['storm'], queryFn: () => api('/map/storm-track'), staleTime: 10 * 60_000 });
+  const { data } = useQuery(stormQuery);
   if (!data) return null;
   const pts = data.points;
   const past = pts.filter((p) => !p.forecast).map((p) => [p.lat, p.lon]);
@@ -355,7 +358,8 @@ export function StormLayer({ offset }) {
         </CircleMarker>
       ))}
       <Circle center={[cur.lat, cur.lon]} radius={cur.wind_kmh * 900} pathOptions={{ color: '#a855f7', weight: 1, fillOpacity: 0.08 }}>
-        <Tooltip permanent direction="center" className="!bg-transparent !border-0 !shadow-none">🌀 {data.name.split('(')[0]}</Tooltip>
+        {/* Giữ nguyên "(kịch bản mô phỏng)" trong tên — không để quỹ đạo trình diễn trông như bão thật */}
+        <Tooltip permanent direction="center" className="!bg-transparent !border-0 !shadow-none">🌀 {data.name}</Tooltip>
       </Circle>
     </>
   );

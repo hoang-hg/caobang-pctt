@@ -55,6 +55,15 @@ export const SUBMISSION_STATUS = {
   da_rut: { label: 'Đã rút', cls: 'bg-panel2 text-muted' },
 };
 
+/** Điểm đen sạt lở (services/landslides.py): nhãn ngắn + màu chữ theo traffic_status. "chua_co_du_lieu" (không cảm
+ * biến / vùng nguy hiểm nào) → xám, KHÔNG xanh như "chưa ghi nhận nguy cơ". `warn`: lớp màu cảnh báo của nơi gọi. */
+export const landslideStatus = (s, warn = 'text-serious') =>
+  ({
+    cam_duong: { short: 'Cấm đường', cls: 'text-danger' },
+    canh_bao: { short: 'Cảnh báo', cls: warn },
+    chua_co_du_lieu: { short: 'Chưa có dữ liệu', cls: 'text-muted' },
+  })[s] || { short: 'Chưa ghi nhận', cls: 'text-good' };
+
 /** Lệnh đã duyệt mà các kênh chưa nối cổng gửi tin thật (metrics[kênh].integrated === false). */
 export const notIntegrated = (b) => Object.values(b?.metrics || {}).some((v) => v?.integrated === false);
 export const broadcastStatus = (b) => BROADCAST_STATUS[notIntegrated(b) ? 'published' : b.status] || BROADCAST_STATUS.draft;

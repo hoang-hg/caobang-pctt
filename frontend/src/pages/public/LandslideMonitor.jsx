@@ -4,7 +4,7 @@ import clsx from 'clsx';
 import {
   AlertTriangle, ShieldAlert, Compass, RefreshCw, CloudRain,
   MapPin, Search, SlidersHorizontal, CheckCircle2, AlertOctagon,
-  Ban, ShieldCheck, Navigation, Gauge, Mountain, Milestone, Truck
+  Ban, ShieldCheck, Navigation, Gauge, Mountain, Milestone, Truck, CircleHelp
 } from 'lucide-react';
 import { api } from '../../api/client';
 import { BackButton } from '../../components/common/ui';
@@ -54,7 +54,12 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap }) {
   const blockedCount = data?.blocked_count || 0;
   const warningCount = data?.warning_count || 0;
   const safeCount = data?.safe_count || 0;
+  const noDataCount = data?.no_data_count || 0; // không cảm biến / vùng nguy hiểm nào → xám, không phải "an toàn"
   const totalCount = data?.total_points || 0;
+  // Chưa điểm nào có cảm biến báo số đo → không được hiện "TRỰC TIẾP" (khẳng định đang giám sát)
+  const live = (data?.monitored_count || 0) > 0;
+  // Chưa có mạng đường → không xác định được đoạn bị chia cắt: "0 điểm" là không biết, không phải "không ách tắc"
+  const noRoads = data?.roads_available === false;
 
   return (
     <div className="space-y-5 animate-in fade-in duration-200">
@@ -69,10 +74,18 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap }) {
               <h1 className="text-base sm:text-lg font-bold text-ink">
                 Bản Đồ Điểm Đen Sạt Trượt & Trạng Thái Đường Đèo
               </h1>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-good/15 text-good border border-good/30 animate-pulse">
-                <span className="h-1.5 w-1.5 rounded-full bg-good" />
-                TRỰC TIẾP
-              </span>
+              {live ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-good/15 text-good border border-good/30 animate-pulse">
+                  <span className="h-1.5 w-1.5 rounded-full bg-good" />
+                  TRỰC TIẾP
+                </span>
+              ) : (
+                data && (
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-panel2 text-muted border border-line">
+                    CHƯA CÓ CẢM BIẾN BÁO SỐ ĐO
+                  </span>
+                )
+              )}
             </div>
             <p className="text-xs text-muted mt-0.5">
               Giám sát nguy cơ sạt lở đất đá, ngập ngầm tràn, chia cắt giao thông đèo dốc và cảm biến dịch chuyển taluy
@@ -112,7 +125,7 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap }) {
               </div>
               <p className="text-xs sm:text-sm text-white/95 mt-1.5 leading-relaxed">
                 Bị chia cắt: <b>{points.filter((p) => p.traffic_status === 'cam_duong').map((p) => p.name).join(', ')}</b>.
-                Không cố vượt qua; tuân thủ biển báo, chốt chặn của lực lượng chức năng và dùng “Chỉ đường an toàn” để tìm tuyến tránh.
+                Không cố vượt qua; tuân thủ biển báo, chốt chặn và hướng dẫn tuyến tránh của lực lượng chức năng.
               </p>
             </div>
           </div>
@@ -138,28 +151,32 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap }) {
           </div>
         </div>
 
-        {/* Card 2: Cấm lưu thông / Tắc đường */}
+        {/* Card 2: Cấm lưu thông / Tắc đường — chưa có mạng đường thì xám, không khẳng định "không ách tắc" */}
         <div className={clsx(
           'card p-4 flex flex-col justify-between border-l-4',
-          blockedCount > 0 ? 'border-l-red-500 bg-danger/5 ring-1 ring-danger/30' : 'border-l-good'
+          blockedCount > 0 ? 'border-l-red-500 bg-danger/5 ring-1 ring-danger/30' : noRoads ? 'border-l-line' : 'border-l-good'
         )}>
           <div className="flex items-center justify-between text-muted text-xs">
             <span>Tắc đường / Cấm phương tiện</span>
             <div className={clsx(
               'h-8 w-8 rounded-lg flex items-center justify-center font-bold',
-              blockedCount > 0 ? 'bg-danger/15 text-danger animate-pulse' : 'bg-good/10 text-good'
+              blockedCount > 0 ? 'bg-danger/15 text-danger animate-pulse' : noRoads ? 'bg-panel2 text-muted' : 'bg-good/10 text-good'
             )}>
               <Ban size={16} />
             </div>
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className={clsx('text-2xl font-black font-mono', blockedCount > 0 ? 'text-danger' : 'text-good')}>
-              {blockedCount}
+            <span className={clsx('text-2xl font-black font-mono', blockedCount > 0 ? 'text-danger' : noRoads ? 'text-muted' : 'text-good')}>
+              {blockedCount > 0 || !noRoads ? blockedCount : '–'}
             </span>
-            <span className="text-xs text-muted">điểm cấm tuyệt đối</span>
+            <span className="text-xs text-muted">{blockedCount > 0 || !noRoads ? 'điểm cấm tuyệt đối' : 'chưa có dữ liệu mạng đường'}</span>
           </div>
-          <div className={clsx('text-[11px] font-medium mt-2 border-t border-line/60 pt-1.5', blockedCount > 0 ? 'text-danger font-bold' : 'text-good')}>
-            {blockedCount > 0 ? 'Theo vùng nguy hiểm đang hiệu lực' : 'Không có điểm ách tắc'}
+          <div className={clsx('text-[11px] font-medium mt-2 border-t border-line/60 pt-1.5', blockedCount > 0 ? 'text-danger font-bold' : noRoads ? 'text-muted' : 'text-good')}>
+            {blockedCount > 0
+              ? 'Theo vùng nguy hiểm đang hiệu lực'
+              : noRoads
+                ? 'Không xác định được đoạn bị chia cắt — theo dõi thông báo của chính quyền'
+                : 'Không có điểm ách tắc'}
           </div>
         </div>
 
@@ -180,20 +197,23 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap }) {
           </div>
         </div>
 
-        {/* Card 4: Chưa ghi nhận nguy cơ — KHÔNG khẳng định đường an toàn (chỉ là cảm biến / vùng cảnh báo chưa báo gì) */}
-        <div className="card p-4 flex flex-col justify-between border-l-4 border-l-good">
+        {/* Card 4: Chưa ghi nhận nguy cơ — KHÔNG khẳng định đường an toàn (chỉ là cảm biến / vùng cảnh báo chưa báo gì).
+            Có điểm chưa có dữ liệu giám sát → thẻ xám nêu số điểm đó trước: hệ thống không theo dõi được, không phải an toàn */}
+        <div className={clsx('card p-4 flex flex-col justify-between border-l-4', noDataCount ? 'border-l-line' : 'border-l-good')}>
           <div className="flex items-center justify-between text-muted text-xs">
-            <span>Chưa ghi nhận nguy cơ</span>
-            <div className="h-8 w-8 rounded-lg bg-good/10 text-good flex items-center justify-center font-bold">
-              <CheckCircle2 size={16} />
+            <span>{noDataCount ? 'Chưa có dữ liệu giám sát' : 'Chưa ghi nhận nguy cơ'}</span>
+            <div className={clsx('h-8 w-8 rounded-lg flex items-center justify-center font-bold', noDataCount ? 'bg-panel2 text-muted' : 'bg-good/10 text-good')}>
+              {noDataCount ? <CircleHelp size={16} /> : <CheckCircle2 size={16} />}
             </div>
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-black font-mono text-good">{safeCount}</span>
-            <span className="text-xs text-muted">điểm chưa có cảnh báo</span>
+            <span className={clsx('text-2xl font-black font-mono', noDataCount ? 'text-muted' : 'text-good')}>{noDataCount || safeCount}</span>
+            <span className="text-xs text-muted">{noDataCount ? 'điểm chưa có cảm biến / số liệu' : 'điểm chưa có cảnh báo'}</span>
           </div>
           <div className="text-[11px] text-muted mt-2 border-t border-line/60 pt-1.5">
-            Theo cảm biến và vùng cảnh báo đang hiệu lực — vẫn chú ý khi trời mưa
+            {noDataCount
+              ? `Không có nghĩa là an toàn — khi mưa lớn hạn chế đi qua${safeCount ? ` · ${safeCount} điểm có giám sát, chưa ghi nhận nguy cơ` : ''}`
+              : 'Theo cảm biến và vùng cảnh báo đang hiệu lực — vẫn chú ý khi trời mưa'}
           </div>
         </div>
       </div>
@@ -245,6 +265,7 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap }) {
               <option value="cam_duong">⛔ Cấm lưu thông / Tắc đường</option>
               <option value="canh_bao">⚠️ Cảnh báo / Hạn chế xe</option>
               <option value="thong_suot">✅ Chưa ghi nhận nguy cơ</option>
+              <option value="chua_co_du_lieu">❔ Chưa có dữ liệu giám sát</option>
             </select>
 
             <span className="text-xs text-muted ml-1">Loại hình:</span>
@@ -279,6 +300,7 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap }) {
           const isBlocked = p.traffic_status === 'cam_duong';
           const isWarning = p.traffic_status === 'canh_bao';
           const isSafe = p.traffic_status === 'thong_suot';
+          const isNoData = p.traffic_status === 'chua_co_du_lieu';
 
           return (
             <div
@@ -325,12 +347,15 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap }) {
                         ? 'bg-danger text-white shadow-sm shadow-danger/30 animate-pulse'
                         : isWarning
                         ? 'bg-amber-500 text-white shadow-sm shadow-amber-500/30'
+                        : isNoData
+                        ? 'bg-panel2 text-muted border-line'
                         : 'bg-good/15 text-good border-good/30'
                     )}
                   >
                     {isBlocked && <Ban size={12} />}
                     {isWarning && <AlertTriangle size={12} />}
                     {isSafe && <CheckCircle2 size={12} />}
+                    {isNoData && <CircleHelp size={12} />}
                     {p.traffic_label}
                   </span>
                 </div>
@@ -347,10 +372,10 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap }) {
                   <p className="text-[11px] opacity-95">{p.description}</p>
                 </div>
 
-                {/* 2. Lực lượng ứng trực & hành động */}
+                {/* 2. Khuyến cáo theo trạng thái (lời khuyên chung — hệ thống không biết lực lượng nào đang ở hiện trường) */}
                 <div className="text-xs text-ink-2 bg-panel2/30 p-2.5 rounded-xl border border-line/40">
                   <b className="text-ink flex items-center gap-1 mb-1">
-                    <ShieldCheck size={13} className="text-good" /> Lực lượng đang xử lý:
+                    <ShieldCheck size={13} className="text-good" /> Khuyến cáo:
                   </b>
                   <p className="text-[11px] text-muted">{p.response_action}</p>
                 </div>
@@ -389,7 +414,7 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap }) {
                     </div>
                   ) : (
                     <div className="p-2 rounded-lg bg-panel2/30 border border-line/40 text-[10px] text-muted">
-                      Trạm mưa: Đang đo
+                      Trạm mưa: chưa có số liệu
                     </div>
                   )}
 
@@ -420,7 +445,7 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap }) {
                     </div>
                   ) : (
                     <div className="p-2 rounded-lg bg-panel2/30 border border-line/40 text-[10px] text-muted">
-                      Đo đạc: Trực ban địa phương
+                      Cảm biến taluy: chưa có số đo
                     </div>
                   )}
                 </div>

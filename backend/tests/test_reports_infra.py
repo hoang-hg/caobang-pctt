@@ -34,6 +34,27 @@ def test_process_image_resizes_and_strips_exif():
     assert max(t.size) == 400 and t.format == "JPEG"
 
 
+def test_process_image_strips_gps_xmp_and_comment():
+    """Ảnh điện thoại có GPS (EXIF), XMP và comment JPEG (marker COM) — ảnh lưu / ảnh nhỏ không còn chút siêu dữ liệu
+    nào: comment có thể chứa địa chỉ nhà người báo, XMP có thể chứa lại toạ độ."""
+    img = Image.new("RGB", (1200, 900), (90, 140, 60))
+    exif = Image.Exif()
+    exif[0x8825] = {1: "N", 2: (22.0, 40.0, 7.4), 3: "E", 4: (106.0, 15.0, 34.1)}  # GPSInfo
+    xmp = b'<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:Description exif:GPSLatitude="22,40.12N"/></x:xmpmeta>'
+    buf = io.BytesIO()
+    img.save(buf, "JPEG", exif=exif, xmp=xmp, comment=b"nha ong A xom Na Ri")
+    raw = buf.getvalue()
+    assert b"Na Ri" in raw and b"GPSLatitude" in raw  # ảnh thử thật sự có đủ siêu dữ liệu
+    for out in process_image(raw)[:2]:
+        assert not {"exif", "xmp", "comment"} & set(Image.open(io.BytesIO(out)).info)
+        assert b"Exif" not in out and b"GPSLatitude" not in out and b"Na Ri" not in out
+    # Kịch bản T4 của kiểm tra go-live bắt được đủ 3 loại (trước đây chỉ dò chuỗi "Exif")
+    from app.golive_web import image_metadata
+
+    assert {"exif", "xmp", "comment"} <= set(image_metadata(raw))
+    assert image_metadata(process_image(raw)[0]) == []
+
+
 def test_process_image_rejects_non_image_and_oversize():
     with pytest.raises(ReportError):
         process_image(b"<?php system($_GET['c']); ?>")

@@ -110,6 +110,9 @@ def process_image(data: bytes) -> tuple[bytes, bytes, int, int]:
         except (Image.DecompressionBombWarning, Image.DecompressionBombError, OSError) as exc:
             raise ReportError("Tệp không phải ảnh hợp lệ") from exc
     img = ImageOps.exif_transpose(img).convert("RGB")  # xoay đúng chiều rồi bỏ EXIF khi lưu lại
+    # Pillow tự ghi lại comment JPEG (marker COM), XMP… có trong info khi save → xoá hết: người dân / ứng dụng camera có
+    # thể để địa chỉ, toạ độ dạng chữ trong đó (kiểm toán go-live 10/2026)
+    img.info.clear()
     full = img.copy()
     full.thumbnail((FULL_SIZE, FULL_SIZE))
     thumb = img.copy()

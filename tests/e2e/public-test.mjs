@@ -148,6 +148,10 @@ check('Quản trị tỉnh chuyển phản ánh thành phiếu SOS', toSos.statu
 check('Không chuyển SOS lần 2 → 409', (await call('POST', `/reports/${subTp.data.id}/to-sos`, {}, T.tinh)).status === 409);
 const shownTp = (await call('GET', '/public/reports')).data.find((r) => r.code === subTp.data.code);
 check('Chuyển SOS cũng công khai phản ánh → vị trí làm tròn mặc định', shownTp?.approx_m === 150, `${shownTp?.lat},${shownTp?.lon}`);
+// Chuyển SOS là thao tác khẩn cấp, không phải bước duyệt nội dung → không lấy mô tả gốc, không công khai ảnh
+check('Chuyển SOS phản ánh chưa duyệt: cổng chỉ hiện câu chung, không mô tả gốc, không ảnh',
+  !!shownTp && !shownTp.description.includes('Cây đổ chắn ngang') && shownTp.photos.length === 0 &&
+  (await call('GET', `/public/reports/${subTp.data.id}/photos/0`, null, null, true)).status === 404, shownTp?.description);
 
 // ---------------------------------------------------------------- Phân cấp quản trị
 const stamp = Date.now().toString(36).slice(-5);

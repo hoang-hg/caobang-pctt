@@ -113,6 +113,13 @@ const lite = await fetch(ROOT + '/ban-nhe');
 check('Bản nhẹ /ban-nhe (CSDL trống)', lite.status === 200 && (await lite.text()).includes('</html>'));
 const emptyRes = (await call('GET', '/public/reservoirs')).data;
 check('Chưa nhập hồ chứa: 0 hồ, không báo "đang xả"', emptyRes?.total_reservoirs === 0 && emptyRes?.spill_count === 0);
+const emptyLs = (await call('GET', '/public/landslides')).data;
+check('Chưa có cảm biến / vùng nguy hiểm: mọi điểm đen "Chưa có dữ liệu giám sát" (xám), không "Chưa ghi nhận nguy cơ"',
+  emptyLs?.total_points > 0 && emptyLs.no_data_count === emptyLs.total_points && emptyLs.safe_count === 0 && emptyLs.monitored_count === 0,
+  JSON.stringify({ tong: emptyLs?.total_points, xam: emptyLs?.no_data_count, xanh: emptyLs?.safe_count }));
+check('Chạy thật không có mạng đường vẽ tay → báo "chưa có dữ liệu mạng đường" (không khẳng định "không ách tắc")',
+  emptyLs?.roads_available === false);
+check('Quỹ đạo bão mô phỏng: chưa đăng nhập → 401', (await call('GET', '/map/storm-track')).status === 401);
 
 // ================================================================ 3. Quản trị đăng nhập (bắt buộc cài 2 lớp)
 const first = await call('POST', '/auth/login', { username: ADMIN, password: ADMIN_PW });
@@ -133,6 +140,8 @@ const staffGets = ['/auth/me', '/dashboard/kpis', '/dashboard/logs', '/dashboard
   '/integrations/sources', '/integrations/devices', '/integrations/monitor', '/map/layers', '/map/timeline',
   '/forecast/models', '/forecast/areas', '/admin-units', '/admin-units/tree', '/admin-units/presets', '/rbac/users',
   '/rbac/roles', '/rbac/permissions', '/rbac/scopes', '/rbac/audit', '/data-import/datasets', '/search?q=cao'];
+check('Chạy thật không có quỹ đạo bão mẫu (chưa nối nguồn chính thức) → 404',
+  (await call('GET', '/map/storm-track', null, admin)).status === 404);
 const bad = [];
 for (const p of staffGets) {
   const r = await call('GET', p, null, admin);
@@ -273,6 +282,8 @@ if (force) {
 const pr = (await call('GET', '/public/route?from_lat=22.6700&from_lon=106.2400&to_lat=22.6657&to_lon=106.2522')).data;
 check('Chỉ đường công khai tới điểm trong vùng nguy hiểm → không báo "an toàn"', pr?.safe === false &&
   pr?.hazards?.includes('Khu dân cư xóm Nà Rì') && typeof pr?.offroad_km === 'number', JSON.stringify({ safe: pr?.safe, hazards: pr?.hazards }));
+check('Chạy thật không nạp sơ đồ đường vẽ tay → chỉ đường là hướng chim bay (không có tên đường)',
+  Array.isArray(pr?.roads) && pr.roads.length === 0 && pr.offroad_km === pr.distance_km, JSON.stringify(pr?.roads));
 // Điểm nguy hiểm đã nhập (tệp mẫu: "Taluy Km 12 QL34" tại điểm đến) → cảnh báo kèm tuyến
 check('Cảnh báo kèm tuyến: điểm nguy hiểm sát tuyến', pr?.warnings?.some((w) => w.includes('Taluy Km 12 QL34')), JSON.stringify(pr?.warnings));
 await call('GET', '/public/hotlines?_=lan-1');

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import clsx from 'clsx';
 import { HelpCircle, ChevronDown, ChevronUp, X, MapPin, PhoneCall } from 'lucide-react';
 import { stationView } from '../../utils/stations';
+import { landslideStatus } from '../../utils/labels';
 
 /**
  * Thanh Chú thích Ký hiệu & Tra cứu Điểm Giám sát ở Đầu Trang
@@ -114,8 +115,8 @@ export default function TopLegendBar({
         name: p.name,
         sub: `${p.road_name} · ${p.admin_name}`,
         value: p.traffic_label,
-        status: p.traffic_status === 'cam_duong' ? 'Cấm đường' : p.traffic_status === 'canh_bao' ? 'Cảnh báo' : 'Chưa ghi nhận',
-        statusColor: p.traffic_status === 'cam_duong' ? 'text-danger' : p.traffic_status === 'canh_bao' ? 'text-amber-500' : 'text-good',
+        status: landslideStatus(p.traffic_status).short,
+        statusColor: landslideStatus(p.traffic_status, 'text-amber-500').cls,
         lat: p.lat,
         lon: p.lon,
         type: 'landslide',
