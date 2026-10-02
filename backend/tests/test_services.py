@@ -288,3 +288,33 @@ def test_llm_output_is_validated():
         "trapped_count": 5,
         "vulnerable": ["tre_em"],
     }
+
+
+def test_landslide_without_any_evidence_is_no_data_not_safe():
+    """Điểm đen không có vùng nguy hiểm gần, không đường bị cắt, không cảm biến báo số đo → "Chưa có dữ liệu giám sát"
+    (xám), KHÔNG "Chưa ghi nhận nguy cơ" (xanh). Có bằng chứng thì giữ quy tắc cũ."""
+    from app.services.landslides import NO_DATA, TRAFFIC, traffic_status
+
+    assert traffic_status(False, "binh_thuong", near_zone=False, monitored=False) == NO_DATA
+    assert TRAFFIC[NO_DATA][1] == "gray"
+    assert traffic_status(False, "binh_thuong", near_zone=False, monitored=True) == "thong_suot"
+    assert traffic_status(False, "vang", near_zone=True, monitored=False) == "thong_suot"
+    assert traffic_status(False, "do", near_zone=True, monitored=False) == "canh_bao"
+    assert traffic_status(True, "binh_thuong", near_zone=False, monitored=False) == "cam_duong"
+
+
+async def test_storm_track_is_simulation_only(monkeypatch):
+    """Quỹ đạo bão viết cứng là kịch bản của bộ mô phỏng: chạy thật (SIMULATOR=false) → 404, không hiện như bão thật."""
+    import pytest
+    from fastapi import HTTPException
+
+    from app.api.v1 import map_layers
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "simulator", False)
+    with pytest.raises(HTTPException) as e:
+        await map_layers.storm_track({})
+    assert e.value.status_code == 404
+    monkeypatch.setattr(settings, "simulator", True)
+    track = await map_layers.storm_track({})
+    assert track["simulated"] is True and "mô phỏng" in track["name"]

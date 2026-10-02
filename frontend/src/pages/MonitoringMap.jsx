@@ -10,7 +10,7 @@ import {
 import { api } from '../api/client';
 import { useAreaQuery, useUnitsGeo } from '../api/hooks';
 import { useStore } from '../app/store';
-import MapLayers, { StormLayer } from '../components/map/MapLayers';
+import MapLayers, { StormLayer, stormQuery } from '../components/map/MapLayers';
 import { AdminBoundaries, AreaFocus, BASEMAPS, BaseLayer, DrawTool, FocusHandler, ForecastChoropleth, MeasureTool, RadarLayer, RAIN_BINS, RouteTool } from '../components/map/MapTools';
 import DispatchModal from '../components/common/DispatchModal';
 import CameraModal from '../components/common/CameraModal';
@@ -85,6 +85,12 @@ export default function MonitoringMap() {
     queryFn: () => api('/map/timeline', { params: { offset_h: offset } }),
     enabled: offset !== 0,
   });
+  // Lớp chưa có nguồn dữ liệu thật (API 404) → khoá nút và ghi rõ lý do: bật lên mà trống dễ bị hiểu là "không có bão"
+  const storm = useQuery(stormQuery);
+  const unavailable = {
+    storm: storm.isError ? 'Chưa kết nối nguồn dữ liệu chính thức' : null,
+    roads: data && !data.roads?.features?.length ? 'Chưa có dữ liệu mạng đường' : null, // chạy thật chưa nhập mạng đường
+  };
 
   const onDrawn = useCallback(async (polygon) => {
     setTool(null);
@@ -132,7 +138,7 @@ export default function MonitoringMap() {
           filtered={filter.codes.length > 0}
           padding={{ topLeft: [leftOpen ? 320 : 50, 30], bottomRight: [rightOpen ? 370 : 60, 90] }}
         />
-        {layers.storm && <StormLayer offset={offset} />}
+        {layers.storm && !unavailable.storm && <StormLayer offset={offset} />}
         <MapLayers
           data={data}
           layers={layers}
@@ -171,17 +177,25 @@ export default function MonitoringMap() {
                     <label
                       key={key}
                       className={clsx(
-                        'flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1 text-xs transition-colors',
-                        layers[key] ? 'bg-panel2 font-medium text-ink' : 'text-ink-2 hover:bg-panel2/60'
+                        'flex items-center gap-2.5 rounded-lg px-2 py-1 text-xs transition-colors',
+                        unavailable[key]
+                          ? 'cursor-not-allowed text-muted'
+                          : layers[key]
+                            ? 'cursor-pointer bg-panel2 font-medium text-ink'
+                            : 'cursor-pointer text-ink-2 hover:bg-panel2/60'
                       )}
                     >
                       <input
                         type="checkbox"
-                        checked={layers[key]}
+                        checked={layers[key] && !unavailable[key]}
+                        disabled={!!unavailable[key]}
                         onChange={(e) => setLayers((l) => ({ ...l, [key]: e.target.checked }))}
                         className="rounded accent-[rgb(var(--accent))]"
                       />
-                      <span className="truncate">{label}</span>
+                      <span className="min-w-0">
+                        <span className="block truncate">{label}</span>
+                        {unavailable[key] && <span className="block text-[10px]">{unavailable[key]}</span>}
+                      </span>
                     </label>
                   ))}
                 </div>

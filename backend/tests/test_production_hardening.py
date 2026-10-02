@@ -155,6 +155,31 @@ def test_public_cache_key_covers_every_public_query_param():
     assert params <= keyed, f"thêm vào proxy_cache_key (frontend/nginx/public-cache.conf): {params - keyed}"
 
 
+def test_units_cache_key_covers_every_admin_units_query_param():
+    """Danh sách / ranh giới xã qua nginx cache (units-cache.conf, cổng công khai gọi mỗi lần mở trang). Tham số GET nào
+    của /api/v1/admin-units — kể cả tham số trong dependency như admin_codes của parse_codes — thiếu trong khoá → các giá
+    trị khác nhau dùng chung 1 bản cache → trả SAI vùng."""
+    import re
+    from pathlib import Path
+
+    from fastapi.dependencies.utils import get_flat_dependant
+
+    conf = Path(__file__).resolve().parents[2] / "frontend" / "nginx" / "units-cache.conf"
+    if not conf.exists():
+        pytest.skip("không có mã frontend (chạy trong container backend)")
+    keyed = set(re.findall(r"\$arg_(\w+)", conf.read_text(encoding="utf-8")))
+    from app.api.v1.admin_units import router
+
+    params = {
+        p.alias
+        for r in router.routes
+        if "GET" in getattr(r, "methods", set())
+        for p in get_flat_dependant(r.dependant).query_params
+    }
+    assert {"level", "admin_codes"} <= params, "không đọc được tham số của router admin-units"
+    assert params <= keyed, f"thêm vào proxy_cache_key (frontend/nginx/units-cache.conf): {params - keyed}"
+
+
 def test_weak_pin():
     for pin in ("0000", "1234", "123456", "654321", "111111", "12a456"):
         assert preflight.weak_pin(pin), pin

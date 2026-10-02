@@ -115,6 +115,7 @@ async def _kpis(codes: list[str]) -> dict:
             "blocked_count": sum(p["traffic_status"] == "cam_duong" for p in landslides),
             "warning_count": sum(p["traffic_status"] == "canh_bao" for p in landslides),
             "safe_count": sum(p["traffic_status"] == "thong_suot" for p in landslides),
+            "no_data_count": sum(p["traffic_status"] == "chua_co_du_lieu" for p in landslides),
             "points": landslides,
         },
     }

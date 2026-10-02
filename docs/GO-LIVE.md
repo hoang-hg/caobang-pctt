@@ -82,7 +82,7 @@ Script chỉ đọc dữ liệu. Ngoại lệ duy nhất là 2 lần tra cứu s
   | T1 | Phản ánh công khai không lộ người báo |
   | T2 | Bản đồ công khai không có lực lượng, kho, phương tiện |
   | T3 | Tra cứu sai SĐT không xác nhận mã có thật |
-  | T4 | Ảnh: chưa duyệt không xem được, link nội bộ phải có chữ ký, không còn EXIF |
+  | T4 | Ảnh: chưa duyệt không xem được, link nội bộ phải có chữ ký, không còn EXIF / XMP / comment |
   | T5 | API nội bộ đóng với người chưa đăng nhập |
 
   Máy chủ không gọi được chính tên miền của nó (NAT) thì chạy phần này từ máy khác:

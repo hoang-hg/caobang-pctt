@@ -2,11 +2,12 @@
 
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.area import area_clause, parse_codes
 from app.auth import current_user
+from app.config import settings
 from app.db import fetch_all, fetch_one
 from app.infra.cache import cached_view
 from app.rbac.authz import NO_MATCH, allowed_codes, forbidden, require_any, restrict_codes
@@ -192,8 +193,11 @@ async def timeline(offset_h: int = 0, _: dict = Depends(require_any("monitoring"
 
 
 @router.get("/storm-track")
-async def storm_track():
-    """Quỹ đạo hoàn lưu bão/ATNĐ mẫu (vào Bắc Bộ, suy yếu thành vùng áp thấp qua Cao Bằng)."""
+async def storm_track(_: dict = Depends(require_any("monitoring", "view"))):
+    """Quỹ đạo bão / ATNĐ. Chưa nối nguồn chính thức (Trung tâm Dự báo KTTV quốc gia) → chạy thật trả 404: quỹ đạo dưới
+    đây là KỊCH BẢN của bộ mô phỏng (mốc giờ tính theo hiện tại), bật lớp giữa bão thật mà thấy nó là chỉ huy sai."""
+    if not settings.simulator:
+        raise HTTPException(404, "Chưa kết nối nguồn dữ liệu quỹ đạo bão chính thức")
     now = datetime.now(UTC).replace(minute=0, second=0, microsecond=0)
     pts = [
         (-24, 20.9, 107.9, 118, "Bão cấp 11"),
@@ -206,6 +210,7 @@ async def storm_track():
     ]
     return {
         "name": "Hoàn lưu bão số 3 (kịch bản mô phỏng)",
+        "simulated": True,
         "points": [
             {
                 "time": now + timedelta(hours=h),

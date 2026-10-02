@@ -1,14 +1,15 @@
 """Đơn vị hành chính, preset lọc nhanh, vùng lọc (phục vụ Bộ lọc địa phương).
 
 Không cần đăng nhập — cổng công khai gọi danh sách xã, ranh giới xã / tỉnh mỗi lần mở trang → cache Redis 1 giờ với tiền
-tố "public:" (nhập ranh giới xã bằng công cụ nhập dữ liệu gọi invalidate("public:") nên bản mới có hiệu lực ngay).
+tố "public:" (nhập ranh giới xã bằng công cụ nhập dữ liệu gọi invalidate("public:") nên bản mới có hiệu lực ngay), trả
+thẳng chuỗi JSON đã lưu (cached_response), và nginx cache thêm 10 giây (frontend/nginx/units-cache.conf).
 """
 
 from fastapi import APIRouter, Depends
 
 from app.area import parse_codes
 from app.db import fetch_all, fetch_one
-from app.infra.cache import cached
+from app.infra.cache import cached_response
 
 LEVELS = ("tinh", "xa")  # chỉ cache cấp có thật — tham số lạ không tạo thêm khoá cache
 TTL = 3600
@@ -23,7 +24,7 @@ router = APIRouter(prefix="/admin-units", tags=["Hành chính"])
 @router.get("")
 async def list_units(level: str | None = None):
     if level is None or level in LEVELS:
-        return await cached(f"public:admin-units:{level or 'all'}", TTL, lambda: _list_units(level))
+        return await cached_response(f"public:admin-units:{level or 'all'}", TTL, lambda: _list_units(level))
     return await _list_units(level)
 
 
@@ -44,7 +45,7 @@ async def _list_units(level: str | None) -> list[dict]:
 @router.get("/geojson")
 async def units_geojson(level: str = "xa"):
     if level in LEVELS:
-        return await cached(
+        return await cached_response(
             f"public:admin-units-geojson:{GEOM_VERSION}:{level}", TTL, lambda: _units_geojson(level)
         )
     return await _units_geojson(level)
@@ -75,7 +76,7 @@ async def area(codes: list[str] = Depends(parse_codes)):
     """Hình học hợp nhất + bbox của vùng đang lọc (để bản đồ fitBounds và phủ mask ngoài ranh giới).
     Toàn tỉnh (cổng công khai vẽ ranh giới tỉnh) được cache; vùng lọc của cán bộ thì tính mỗi lần."""
     if not codes:
-        return await cached(f"public:admin-units-area:{GEOM_VERSION}:CB", TTL, lambda: _area(codes))
+        return await cached_response(f"public:admin-units-area:{GEOM_VERSION}:CB", TTL, lambda: _area(codes))
     return await _area(codes)
 
 

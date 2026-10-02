@@ -1,9 +1,10 @@
 """Nạp dữ liệu tỉnh Cao Bằng (chạy idempotent: bỏ qua nếu đã có dữ liệu).
 
-DEMO_MODE=false (triển khai thật): chỉ dữ liệu NỀN — địa giới 56 xã, preset, địa danh, mạng đường, mẫu tin cảnh báo,
-    danh mục vật tư. Trạm, hồ, lực lượng, kho, điểm sơ tán, vùng nguy hiểm, danh bạ phải nhập từ dữ liệu chính thức
-    (README.md mục 2) — tuyệt đối không hiển thị điểm sơ tán / số điện thoại giả cho người dân.
-DEMO_MODE=true (trình diễn, CI): thêm toàn bộ dữ liệu MẪU + tài khoản demo.
+DEMO_MODE=false (triển khai thật): chỉ dữ liệu NỀN — địa giới 56 xã, preset, địa danh, mẫu tin cảnh báo, danh mục
+    vật tư. Trạm, hồ, lực lượng, kho, điểm sơ tán, vùng nguy hiểm, danh bạ phải nhập từ dữ liệu chính thức
+    (README.md mục 2) — tuyệt đối không hiển thị điểm sơ tán / số điện thoại giả cho người dân. Không nạp sơ đồ đường
+    vẽ tay (chỉ đường người dân sẽ vẽ tuyến trên đường giả lập) và xoá sơ đồ cũ nếu còn (drop_sample_roads).
+DEMO_MODE=true (trình diễn, CI): thêm toàn bộ dữ liệu MẪU + tài khoản demo + sơ đồ đường nối tâm các xã.
 
 python -m app.seed            # nạp nếu CSDL trống
 python -m app.seed --reset    # xoá dữ liệu nghiệp vụ và nạp lại (bị chặn ở APP_ENV=production)
@@ -228,8 +229,8 @@ async def seed_roads(conn: AsyncConnection, units: dict[str, dict]):
             length = haversine_km(la, lo, lb, lob) * 1.35
             await ex(
                 conn,
-                """INSERT INTO operations.road_segments (road_name, source_node, target_node, length_km, speed_kmh, geom)
-                              VALUES (:r, :a, :b, :l, :s, ST_SetSRID(ST_MakeLine(ARRAY[ST_MakePoint(:lo,:la), ST_MakePoint(:mlo,:mla), ST_MakePoint(:lob,:lb)]),4326))""",
+                """INSERT INTO operations.road_segments (road_name, source_node, target_node, length_km, speed_kmh, geom, source)
+                              VALUES (:r, :a, :b, :l, :s, ST_SetSRID(ST_MakeLine(ARRAY[ST_MakePoint(:lo,:la), ST_MakePoint(:mlo,:mla), ST_MakePoint(:lob,:lb)]),4326), 'so_do')""",
                 {
                     "r": road,
                     "a": node_ids[a],
@@ -1034,13 +1035,33 @@ DELETE FROM public.casbin_rule WHERE ptype = 'g'
 """
 
 
+async def drop_sample_roads() -> int:
+    """Xoá sơ đồ đường vẽ tay (``source = 'so_do'``) mà bản cũ nạp cả khi chạy thật — chỉ đường cho người dân không được
+    vẽ tuyến trên đường giả lập. Đường chính thức (source khác) giữ nguyên. Trả về số đoạn đã xoá."""
+    async with engine.begin() as conn:
+        removed = await fetch_all(
+            "DELETE FROM operations.road_segments WHERE source = 'so_do' RETURNING id", conn=conn
+        )
+        await ex(
+            conn,
+            """DELETE FROM operations.road_nodes n WHERE NOT EXISTS (
+                   SELECT 1 FROM operations.road_segments s WHERE n.id IN (s.source_node, s.target_node))""",
+        )
+    return len(removed)
+
+
 async def main(reset: bool = False):
     preflight.enforce()
     if reset and settings.app_env == "production":
         raise SystemExit("[seed] --reset xoá toàn bộ dữ liệu nghiệp vụ — không cho phép ở APP_ENV=production")
+    # Trước bước "đã có dữ liệu → bỏ qua": CSDL đang chạy thật cũng được dọn ở lần triển khai tới (service migrate)
+    if not settings.demo_mode and (n := await drop_sample_roads()):
+        print(f"[seed] Đã xoá {n} đoạn đường của sơ đồ vẽ tay (chỉ dùng khi DEMO_MODE=true)")
+        await invalidate("public:")  # bản đồ công khai bỏ lớp "đường bị chia cắt" vẽ trên đường giả lập
     existing = await fetch_one("SELECT count(*) AS n FROM spatial_admin.administrative_units")
     if existing["n"] and not reset:
         print(f"[seed] Đã có {existing['n']} đơn vị hành chính — bỏ qua.")
+        await close_redis()
         return
     now = datetime.now(UTC).replace(second=0, microsecond=0)
     async with engine.begin() as conn:
@@ -1053,8 +1074,9 @@ async def main(reset: bool = False):
             {"t": now.isoformat()},
         )
         units = await seed_admin(conn)
-        await seed_roads(conn, units)
         if settings.demo_mode:
+            # Sơ đồ nối tâm các xã — chỉ để trình diễn định tuyến; chạy thật chờ mạng đường chính thức (README 2.2)
+            await seed_roads(conn, units)
             await seed_telemetry(conn, units, now)
             await seed_resources(conn, units, now)
             users = await seed_comms(conn, units, now)

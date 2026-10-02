@@ -4,7 +4,8 @@ Quyền ``report.view`` / ``report.moderate`` theo phạm vi xã — Quản tr�
 
 Duyệt = chọn PHẦN CÔNG KHAI: nội dung (mặc định mô tả gốc đã che SĐT / email / số giấy tờ — cán bộ bỏ tiếp tên người,
 số nhà…), vị trí (mặc định làm tròn ~150 m; chính xác khi là điểm công cộng: đường, cầu, taluy), có công khai ảnh không.
-Mô tả / vị trí gốc chỉ cán bộ xem.
+Mô tả / vị trí gốc chỉ cán bộ xem. Chuyển SOS phản ánh CHƯA duyệt không phải bước duyệt nội dung: cổng chỉ hiện câu chung
+theo loại, không ảnh, vị trí làm tròn (sos_public_text) — công khai thêm bằng "Sửa phần công khai".
 """
 
 from typing import Literal
@@ -117,14 +118,21 @@ PUBLIC_FIELDS_SQL = """
 
 
 def _public_params(
-    public_description: str | None, description: str, exact: bool | None = None, photos: bool | None = None
+    public_description: str | None, auto: str, exact: bool | None = None, photos: bool | None = None
 ) -> dict:
+    """auto: nội dung công khai lần đầu khi cán bộ không nhập (đã che thông tin cá nhân)."""
     return {
         "pd": public_description.strip() if public_description else None,
-        "auto": redact_public_text(description),
+        "auto": auto,
         "exact": exact,
         "pp": photos,
     }
+
+
+def sos_public_text(category: str) -> str:
+    """Phần công khai khi chuyển SOS phản ánh chưa duyệt: thao tác khẩn cấp, cán bộ chưa đọc lại nội dung → không lấy mô
+    tả gốc (tên người, số nhà không che tự động được), chỉ nêu loại sự cố."""
+    return f"{CATEGORY.get(category, 'Phản ánh hiện trường')} — cán bộ đã tiếp nhận; nội dung chi tiết chưa công khai."
 
 
 @router.post("/{report_id}/moderate")
@@ -157,7 +165,10 @@ async def moderate(
             "s": status,
             **(
                 _public_params(
-                    body.public_description, current["description"], body.exact_location, body.public_photos
+                    body.public_description,
+                    redact_public_text(current["description"]),
+                    body.exact_location,
+                    body.public_photos,
                 )
                 if publish
                 else {}
@@ -223,8 +234,10 @@ async def to_sos(
             notes=f"Từ phản ánh người dân {r['code']}: {r['description'][:300]}",
             conn=conn,  # cùng transaction với việc gắn phiếu vào phản ánh → lỗi giữa chừng không để lại phiếu mồ côi
         )
-        # Chuyển SOS cũng công khai phản ánh (người dân thấy đã có lực lượng xử lý) → phần công khai mặc định an toàn:
-        # nội dung đã che, vị trí làm tròn. Cán bộ sửa sau bằng "Sửa phần công khai".
+        # Chuyển SOS cũng công khai phản ánh (người dân thấy đã có lực lượng xử lý). Phản ánh CHƯA duyệt: chỉ câu chung theo
+        # loại, KHÔNG ảnh (mặc định cột là công khai ảnh), vị trí làm tròn — cán bộ đọc lại rồi mới "Sửa phần công khai".
+        # Đã duyệt trước đó: giữ nguyên phần công khai cán bộ đã chọn.
+        reviewed = r["status"] in ("da_duyet", "da_xu_ly")
         await execute(
             f"""UPDATE community.citizen_reports SET sos_ticket_id = CAST(:t AS uuid), moderated_by = :u, moderated_at = now(),
                       status = CASE WHEN status = 'cho_duyet' THEN 'da_duyet' ELSE status END, {PUBLIC_FIELDS_SQL}
@@ -234,7 +247,7 @@ async def to_sos(
                 "t": str(ticket["id"]),
                 "u": user["id"],
                 "id": report_id,
-                **_public_params(None, r["description"]),
+                **_public_params(None, sos_public_text(r["category"]), photos=None if reviewed else False),
             },
             conn,
         )

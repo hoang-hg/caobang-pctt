@@ -221,7 +221,16 @@ def _row_checks(ds: Dataset, row: Prepared, report: Report) -> None:
     if ds.name == "tram_quan_trac":
         levels = [v.get(k) for k in ("bao_dong_1", "bao_dong_2", "bao_dong_3")]
         given = [x for x in levels if x is not None]
-        if given != sorted(given):
+        if v.get("loai") == "muc_nuoc":
+            # Cấp báo động cho người dân tính từ các ngưỡng này (alarm_level lấy cấp CAO NHẤT bị vượt): đảo thứ tự / gõ
+            # nhầm (18.1 thay 181) là báo sai cấp cho cả lưu vực → không nhập
+            if any(a >= b for a, b in zip(given, given[1:], strict=False)):
+                report.error(
+                    row.number,
+                    "bao_dong_1",
+                    "Ngưỡng báo động trạm mực nước phải tăng dần I < II < III — kiểm tra lại với văn bản gốc",
+                )
+        elif given != sorted(given):
             report.warn(
                 row.number, "bao_dong_1", "Ngưỡng báo động không tăng dần I ≤ II ≤ III — kiểm tra lại"
             )

@@ -7,12 +7,15 @@ Mọi trạng thái động đều tính từ dữ liệu thật trong CSDL — 
 - Chia cắt giao thông: đoạn đường giao với vùng nguy hiểm đang hiệu lực, cách điểm ≤ 2 km
   (cùng quy tắc với lớp "đường bị chia cắt" trên bản đồ công khai).
 - Xã/phường: tra theo toạ độ trên ranh giới hành chính 2 cấp hiện hành.
+- Không có bằng chứng nào (không vùng nguy hiểm gần, không đường bị cắt, cảm biến nghiêng / độ ẩm đất gắn kèm không
+  có số đo 6 giờ qua — VD chưa lắp, mã cảm biến mẫu không tồn tại khi chạy thật) → "Chưa có dữ liệu giám sát" (xám),
+  KHÔNG phải "Chưa ghi nhận nguy cơ" (xanh): không để người dân hiểu là có cảm biến đang theo dõi mà chưa báo gì.
 Endpoint công khai → chỉ trả thông tin an toàn công khai, không có vị trí lực lượng.
 """
 
 from __future__ import annotations
 
-from app.db import fetch_all
+from app.db import fetch_all, fetch_one
 
 # Danh mục tham chiếu — chỉ mô tả địa hình / đặc điểm lâu dài, không mô tả sự cố cụ thể
 KNOWN_BLACKSPOTS = [
@@ -174,18 +177,24 @@ RISK_LABEL = {
     "vang": "Trung bình",
     "binh_thuong": "Chưa ghi nhận nguy cơ",
 }
+NO_DATA = "chua_co_du_lieu"
 TRAFFIC = {
     "cam_duong": ("Đường bị chia cắt – không đi qua", "red"),
     "canh_bao": ("Nguy cơ sạt lở – hạn chế đi qua", "orange"),
     "thong_suot": ("Chưa ghi nhận nguy cơ", "green"),
+    NO_DATA: ("Chưa có dữ liệu giám sát", "gray"),
 }
-# Khuyến cáo chung theo trạng thái — không gán hành động cho cơ quan cụ thể
+# Khuyến cáo chung theo trạng thái — không gán hành động cho cơ quan cụ thể. Không hướng người dân tới "Chỉ đường an
+# toàn" để tìm tuyến tránh: chạy thật chưa có mạng đường chính thức, công cụ đó chỉ có hướng chim bay.
 GUIDANCE = {
-    "cam_duong": "Không đi qua khu vực này. Tuân thủ biển báo, chốt chặn và hướng dẫn của lực lượng chức năng; "
-    "dùng công cụ “Chỉ đường an toàn” để tìm tuyến tránh.",
+    "cam_duong": "Không đi qua khu vực này. Tuân thủ biển báo, chốt chặn và hướng dẫn tuyến tránh của lực lượng "
+    "chức năng.",
     "canh_bao": "Hạn chế đi qua, đặc biệt ban đêm và khi đang mưa. Không dừng đỗ dưới chân taluy, "
     "quan sát đá lăn, vết nứt mới và báo ngay cho chính quyền xã hoặc gửi phản ánh.",
     "thong_suot": "Chưa ghi nhận nguy cơ từ cảm biến và vùng cảnh báo. Vẫn chú ý giảm tốc độ ở đoạn đèo dốc khi trời mưa.",
+    NO_DATA: "Điểm này chưa có cảm biến hay số liệu giám sát kết nối với hệ thống — không có nghĩa là an toàn. Khi mưa "
+    "lớn hạn chế đi qua, không dừng đỗ dưới chân taluy, theo dõi thông báo của chính quyền và báo ngay khi thấy vết nứt, "
+    "đá lăn.",
 }
 
 DYNAMIC_SQL = """
@@ -236,10 +245,14 @@ def max_level(*levels: str) -> str:
     return max(levels, key=LEVELS.index)
 
 
-def traffic_status(road_cut: bool, risk: str) -> str:
+def traffic_status(road_cut: bool, risk: str, near_zone: bool = True, monitored: bool = True) -> str:
+    """near_zone: có vùng nguy hiểm sạt lở / lũ quét đang hiệu lực trong 1 km; monitored: có cảm biến nghiêng / độ ẩm đất
+    gắn kèm báo số đo trong 6 giờ qua. Không có bằng chứng nào → NO_DATA (xám), không phải "Chưa ghi nhận nguy cơ"."""
     if road_cut:
         return "cam_duong"
-    return "canh_bao" if risk in ("cam", "do") else "thong_suot"
+    if risk in ("cam", "do"):
+        return "canh_bao"
+    return "thong_suot" if near_zone or monitored else NO_DATA
 
 
 async def get_landslides_overview() -> dict:
@@ -265,7 +278,8 @@ async def get_landslides_overview() -> dict:
 
     points = []
     corridors: dict[str, int] = {}
-    counts = {"cam_duong": 0, "canh_bao": 0, "thong_suot": 0}
+    counts = dict.fromkeys(TRAFFIC, 0)
+    monitored_count = 0
     for item in KNOWN_BLACKSPOTS:
         d = dyn_by_code.get(item["code"], {})
 
@@ -307,7 +321,9 @@ async def get_landslides_overview() -> dict:
 
         zone_lv = LEVELS[d.get("zone_rank") or 0]
         risk = max_level(zone_lv, tilt_lv, soil_lv)
-        status = traffic_status(bool(d.get("road_cut")), risk)
+        monitored = tilt_info is not None or soil_info is not None  # mưa một mình không đo được taluy
+        monitored_count += monitored
+        status = traffic_status(bool(d.get("road_cut")), risk, d.get("zone_rank") is not None, monitored)
         counts[status] += 1
         label, color = TRAFFIC[status]
 
@@ -325,7 +341,8 @@ async def get_landslides_overview() -> dict:
                 "category": item["category"],
                 "category_label": CATEGORY_LABEL[item["category"]],
                 "risk_level": risk,
-                "risk_label": RISK_LABEL[risk],
+                "risk_label": label if status == NO_DATA else RISK_LABEL[risk],
+                "monitored": monitored,
                 "traffic_status": status,
                 "traffic_label": label,
                 "traffic_color": color,
@@ -340,11 +357,17 @@ async def get_landslides_overview() -> dict:
             }
         )
 
+    # Chưa có mạng đường (chạy thật chưa nhập — sơ đồ vẽ tay chỉ có khi DEMO_MODE) → "0 điểm chia cắt" là không biết, không
+    # phải "không có điểm ách tắc"
+    roads = await fetch_one("SELECT EXISTS (SELECT 1 FROM operations.road_segments) AS ok")
     return {
         "total_points": len(points),
+        "roads_available": bool(roads and roads["ok"]),
         "blocked_count": counts["cam_duong"],
         "warning_count": counts["canh_bao"],
         "safe_count": counts["thong_suot"],
+        "no_data_count": counts[NO_DATA],
+        "monitored_count": monitored_count,  # 0 → giao diện không được hiện "TRỰC TIẾP"
         "corridors": [{"name": k, "count": v} for k, v in sorted(corridors.items(), key=lambda x: -x[1])],
         "points": points,
     }

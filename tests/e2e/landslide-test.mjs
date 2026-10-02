@@ -16,8 +16,14 @@ check('Có danh mục điểm đen', pts.length >= 10, `${pts.length} điểm`);
 check('Đếm trạng thái khớp danh sách',
   data.blocked_count === pts.filter((p) => p.traffic_status === 'cam_duong').length &&
   data.warning_count === pts.filter((p) => p.traffic_status === 'canh_bao').length &&
-  data.blocked_count + data.warning_count + data.safe_count === pts.length);
+  data.no_data_count === pts.filter((p) => p.traffic_status === 'chua_co_du_lieu').length &&
+  data.blocked_count + data.warning_count + data.safe_count + data.no_data_count === pts.length);
+// Không cảm biến báo số đo, không vùng nguy hiểm (mức "bình thường") → xám "Chưa có dữ liệu giám sát", không xanh
+check('Điểm không có bằng chứng giám sát không hiện "Chưa ghi nhận nguy cơ"',
+  pts.every((p) => p.monitored || p.risk_level !== 'binh_thuong' || p.traffic_status !== 'thong_suot') &&
+  pts.filter((p) => p.traffic_status === 'chua_co_du_lieu').every((p) => p.traffic_color === 'gray' && !p.monitored));
 check('Mỗi điểm có trạng thái, mức nguy cơ, khuyến cáo', pts.every((p) => p.traffic_label && p.risk_label && p.response_action));
+check('Bản trình diễn có sơ đồ đường → xác định được đoạn bị chia cắt', data.roads_available === true);
 check('Xã/phường tra theo toạ độ (ranh giới 2 cấp, không còn "H." / "Thị trấn")',
   pts.filter((p) => p.admin_name).length >= pts.length - 1 && !pts.some((p) => /^(H\.|Thị trấn|Huyện)/.test(p.admin_name || '')));
 check('Có điểm chịu ảnh hưởng vùng sạt lở đang hiệu lực (dữ liệu mô phỏng)', pts.some((p) => p.risk_level !== 'binh_thuong'));

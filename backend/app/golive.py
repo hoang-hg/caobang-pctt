@@ -84,6 +84,26 @@ async def check_data() -> list[Item]:
                 FAIL, f"{len(rows)} trạm mực nước thiếu ngưỡng BĐ I/II/III: {_few([r['name'] for r in rows])}"
             )
         )
+    # Ngưỡng đảo thứ tự / gõ nhầm (nhập trước khi công cụ nhập chặn lỗi này) → báo sai cấp báo động cho người dân.
+    # CASE: chỉ ép kiểu khi cả 3 là số (Postgres không bảo đảm thứ tự tính các vế AND)
+    rows = await fetch_all(
+        """SELECT name FROM iot_telemetry.monitoring_stations
+            WHERE type = 'muc_nuoc'
+              AND CASE WHEN jsonb_typeof(alarm_thresholds->'bd1') = 'number'
+                        AND jsonb_typeof(alarm_thresholds->'bd2') = 'number'
+                        AND jsonb_typeof(alarm_thresholds->'bd3') = 'number'
+                   THEN NOT ((alarm_thresholds->>'bd1')::float < (alarm_thresholds->>'bd2')::float
+                             AND (alarm_thresholds->>'bd2')::float < (alarm_thresholds->>'bd3')::float)
+                   ELSE false END
+            ORDER BY name"""
+    )
+    if rows:
+        out.append(
+            Item(
+                FAIL,
+                f"{len(rows)} trạm mực nước có ngưỡng không tăng dần I < II < III: {_few([r['name'] for r in rows])}",
+            )
+        )
     fresh = await fetch_one(
         "SELECT count(DISTINCT station_id) AS n FROM iot_telemetry.sensor_readings WHERE time > now() - interval '24 hours'"
     )

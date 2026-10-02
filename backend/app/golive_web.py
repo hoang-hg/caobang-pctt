@@ -13,12 +13,14 @@ Mã thoát 1 khi có LỖI.
 from __future__ import annotations
 
 import asyncio
+import io
 import re
 import secrets
 import sys
 from urllib.parse import urlsplit
 
 import httpx
+from PIL import Image
 
 from app.golive import FAIL, MANUAL, OK, WARN, Item
 
@@ -45,8 +47,21 @@ INTERNAL_APIS = [
     "data-import/submissions",
     "integrations/devices",
     "dashboard/logs",
+    "map/storm-track",
 ]
 HSTS_MIN_S = 180 * 86400
+
+
+def image_metadata(data: bytes) -> list[str]:
+    """Siêu dữ liệu còn sót trong ảnh công khai: EXIF (GPS, máy), XMP (có thể chứa lại toạ độ), comment JPEG (địa chỉ…).
+    services/reports.process_image phải xoá hết. Không đọc được ảnh → báo luôn để người kiểm tra mở xem."""
+    try:
+        info = Image.open(io.BytesIO(data)).info
+    except Exception:  # noqa: BLE001 — trang lỗi / không phải ảnh
+        return ["không đọc được ảnh"]
+    return sorted(k for k in ("exif", "xmp", "comment") if info.get(k)) + (
+        ["Exif"] if b"Exif" in data[:65536] else []
+    )
 
 
 def _keys(obj) -> set[str]:
@@ -220,11 +235,11 @@ async def check_red_team(c: httpx.AsyncClient, base: str) -> list[Item]:
     with_photo = next((r for r in reports if r.get("photos")), None)
     if with_photo:
         img = await c.get(base + with_photo["photos"][0]["full"])
-        exif = b"Exif" in img.content[:65536]
+        meta = image_metadata(img.content)
         out.append(
             Item(
-                OK if img.status_code == 200 and not exif else FAIL,
-                f"T4 ảnh công khai {with_photo['code']}: EXIF {exif}",
+                OK if img.status_code == 200 and not meta else FAIL,
+                f"T4 ảnh công khai {with_photo['code']}: siêu dữ liệu còn sót {meta or 'không'} (EXIF / XMP / comment)",
             )
         )
         fake = await c.get(

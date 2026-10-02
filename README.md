@@ -61,7 +61,7 @@ Tự động hoá: cảm biến nghiêng / độ ẩm đất vượt BĐ II → 
 <a id="hien-trang"></a>
 ## 2. Hiện trạng chức năng & dữ liệu
 
-Cập nhật lần cuối: 27/09/2026. Đổi trạng thái một chức năng (mô phỏng → thật) phải cập nhật mục này.
+Cập nhật lần cuối: 02/10/2026. Đổi trạng thái một chức năng (mô phỏng → thật) phải cập nhật mục này.
 Ký hiệu: ✅ chạy thật · 🟡 chạy thật nhưng dựa trên dữ liệu xấp xỉ · 🔶 mô phỏng · ⛔ chưa có
 
 ### 2.1. Chức năng
@@ -80,10 +80,11 @@ Ký hiệu: ✅ chạy thật · 🟡 chạy thật nhưng dựa trên dữ li�
 | Giám sát | Nhận số đo IoT (HTTP / MQTT / LoRaWAN), kiểm tra số đo, mất tín hiệu | ✅ | Chưa có trạm thật nào kết nối |
 | Giám sát | Số đo trạm, dự báo mực nước (HEC-HMS), nowcast | 🔶 | Sinh bởi bộ mô phỏng khi `SIMULATOR=true` |
 | Giám sát | Camera | 🔶 | Hình vẽ; chưa nối media server RTSP/HLS |
+| Giám sát | Quỹ đạo bão / áp thấp (bản đồ điều hành) | 🔶 / ⛔ | `SIMULATOR=true`: quỹ đạo kịch bản viết sẵn, nhãn ghi rõ "kịch bản mô phỏng"; chạy thật: `GET /map/storm-track` trả 404, nút lớp bị khoá kèm "Chưa kết nối nguồn dữ liệu chính thức" — chưa nối Trung tâm Dự báo KTTV quốc gia |
 | Giám sát | Cảnh báo tự động (vượt báo động, cảm biến sạt lở) | ✅ | Chạy trên số đo thật lẫn mô phỏng |
 | Công khai | Cổng thông tin, "Tôi đang ở đâu?", dự báo, chia sẻ cảnh báo | ✅ / 🟡 | Điểm sơ tán, vùng nguy hiểm, đường chia cắt hiện cho dân → **bắt buộc dữ liệu chính thức** |
-| Công khai | Điểm đen sạt lở & đường đèo | 🟡 | 12 điểm khai báo trong code (`services/landslides.py`); trạng thái suy ra từ vùng nguy hiểm + cảm biến — **chưa có dữ liệu giám sát thì mọi điểm hiện "bình thường"** |
-| Công khai | Chỉ đường an toàn | 🟡 | Mạng đường là các trục chính vẽ xấp xỉ; ngoài mạng đường chỉ hiện hướng chim bay (nét đứt xám). Toàn tuyến (kể cả chặng chim bay) được kiểm tra với **mọi** vùng nguy hiểm đang hiệu lực; chỉ báo "không đi qua vùng nguy hiểm **đã ghi nhận**", nêu tên vùng nếu cắt qua và số km chưa có dữ liệu đường |
+| Công khai | Điểm đen sạt lở & đường đèo | 🟡 | 12 điểm khai báo trong code (`services/landslides.py`, gắn mã cảm biến mẫu); trạng thái suy ra từ vùng nguy hiểm + cảm biến. Không vùng nguy hiểm trong 1 km, không đường bị cắt, cảm biến nghiêng / độ ẩm đất gắn kèm không có số đo 6 giờ qua → **"Chưa có dữ liệu giám sát" (xám)**, không "Chưa ghi nhận nguy cơ"; trang chỉ hiện "TRỰC TIẾP" khi có cảm biến báo số đo; chưa có mạng đường → thẻ "Tắc đường" ghi "chưa có dữ liệu mạng đường" (không khẳng định "không ách tắc") |
+| Công khai | Chỉ đường an toàn | 🟡 / ⛔ | Chạy thật **chưa có mạng đường chính thức** (sơ đồ trục chính vẽ tay chỉ nạp khi `DEMO_MODE=true`): chỉ hiện **khoảng cách và hướng chim bay** (nét đứt xám), ghi rõ không phải đường đi, nêu tên vùng nguy hiểm hướng đó cắt qua. Có mạng đường: toàn tuyến (kể cả chặng chim bay) được kiểm tra với **mọi** vùng nguy hiểm đang hiệu lực; chỉ báo "không đi qua vùng nguy hiểm **đã ghi nhận**", nêu tên vùng nếu cắt qua và số km chưa có dữ liệu đường |
 | Công khai | Phản ánh kèm ảnh, duyệt theo địa bàn, tra cứu tiến độ | ✅ | |
 | Công khai | Bản nhẹ `/ban-nhe` (< 50 KB, không JavaScript), mở lại khi mất mạng (PWA) | ✅ | [9.4](#ban-nhe) |
 | Nền tảng | Bản đồ nền tự lưu trữ (OpenStreetMap) | ✅ | Cần chạy `deploy/fetch-basemap.sh` ([6.9](#ban-do-nen)) |
@@ -101,7 +102,7 @@ vùng nguy hiểm, số điện thoại không có thật.
 | Ranh giới, dân số 56 xã/phường | `administrative_units` (xa) | ✅ dữ liệu công khai sau sắp xếp (`backend/seed/caobang_communes.geojson`, [13](#nguon-dia-gioi)); số hộ = dân số / 4 (ước tính) | Có shapefile chính thức của Sở NN&MT thì nhập đè bằng loại `ranh_gioi_xa`. Phạm vi RBAC và việc gán SOS/phản ánh vào xã dựa trên ranh giới này |
 | Xóm / tổ dân phố | `administrative_units` (thon) | ⛔ 8 xóm **mẫu** | Danh sách sau sắp xếp năm 2026 (nghị quyết HĐND từng xã) — UBND xã / Sở Nội vụ; nhập bằng loại `xom` ([2.4](#nhap-du-lieu)) |
 | Địa danh (đèo, di tích, công trình) | `spatial_admin.place_names` | 🟡 mẫu | UBND xã |
-| Mạng đường | `operations.road_nodes`, `road_segments` | 🟡 trục chính vẽ tay | Sở Xây dựng / OSM đã hiệu chỉnh |
+| Mạng đường | `operations.road_nodes`, `road_segments` | ⛔ trống — sơ đồ trục chính vẽ tay (`source = 'so_do'`) chỉ nạp khi `DEMO_MODE=true`; bản cũ đã nạp khi chạy thật bị xoá ở lần triển khai kế tiếp (seed, migration 0013). Chưa có loại dữ liệu nhập | Sở Xây dựng / OSM đã hiệu chỉnh |
 | Mẫu tin cảnh báo | `communications.message_templates` | ✅ | Rà soát lời văn với Văn phòng BCH |
 | Danh mục vật tư | `resources.items` | ✅ | |
 | Trạm quan trắc, ngưỡng báo động | `iot_telemetry.monitoring_stations` | ⛔ trống | Đài KTTV Cao Bằng, VRain |
@@ -167,6 +168,9 @@ graph LR
 
 - **Mã (`ma`)** là định danh ổn định: nhập lại tệp đã sửa → **cập nhật** đúng bản ghi, không nhân đôi. Ô trống ghi
   đè thành trống (tệp là nguồn chính), trừ cột ghi "trống = giữ nguyên".
+- **Ngưỡng báo động trạm mực nước** phải tăng dần **BĐ I < II < III** — đảo thứ tự / gõ nhầm (`18.1` thay `181`) là lỗi,
+  không nhập (cấp báo động cho người dân tính từ các ngưỡng này); được để trống tạm, nhưng go-live bắt buộc đủ 3 ngưỡng
+  và kiểm tra lại thứ tự. Trạm loại khác: không tăng dần chỉ cảnh báo.
 - **Toạ độ WGS84** (vĩ độ ~22,3–23,1; kinh độ ~105,3–106,9 cho Cao Bằng); điểm ngoài tỉnh bị từ chối. GeoJSON phải là
   WGS84 (EPSG:4326) — tệp VN-2000 phải chuyển hệ trước. Hình học vùng lỗi tự sửa (`ST_MakeValid`) kèm cảnh báo.
 - **Xã/phường** tự xác định theo vị trí nếu để trống `ma_xa`. Nhập ranh giới xã mới → mọi đối tượng (SOS, phản ánh,
@@ -693,7 +697,10 @@ graph TD
     nhà người báo. Cán bộ chọn **vị trí chính xác** khi là điểm công cộng (đường, cầu, taluy, bờ sông). Làm tròn cố định,
     không cộng nhiễu ngẫu nhiên (nhiễu mới mỗi lần lấy trung bình được).
   - **Ảnh**: bỏ chọn "công khai ảnh" khi ảnh có mặt người, biển số, số nhà → cổng không có ảnh, link ảnh công khai 404.
-  - "Chuyển SOS" cũng công khai phản ánh → dùng mặc định an toàn ở trên. Sửa sau bằng **"Sửa phần công khai"**.
+  - "Chuyển SOS" cũng công khai phản ánh (người dân thấy đã có lực lượng xử lý) nhưng **không phải bước duyệt nội
+    dung**: phản ánh chưa duyệt chỉ hiện câu chung theo loại ("Ngập lụt — cán bộ đã tiếp nhận; nội dung chi tiết chưa
+    công khai"), vị trí làm tròn, **không ảnh**. Phản ánh đã duyệt trước đó giữ phần công khai đã chọn. Đọc lại rồi công
+    khai thêm bằng **"Sửa phần công khai"**.
 - **Tra cứu tiến độ** (`/cong-khai`, không cần đăng nhập): nhập mã `SOS-xxxx` / `PA-xxxx` **và** SĐT đã dùng khi gửi.
   Không tìm gần đúng, không tìm chỉ bằng SĐT; sai SĐT trả kết quả như "không tồn tại". Gửi phản ánh xong, người dân nhận
   **mã tra cứu** `PA-xxxx-XXXXXX` (đuôi 6 chữ cái ngẫu nhiên, chỉ hiện 1 lần, cán bộ không thấy) — tra được không cần SĐT;
@@ -888,7 +895,10 @@ Mọi `GET` công khai được nginx cache thêm **10 giây** và trả bản g
 MISS / HIT / STALE) — lúc cao điểm, số yêu cầu vào backend gần như không tăng theo số người xem. Khoá cache chỉ gồm các
 tham số API thật sự dùng (`frontend/nginx/public-cache.conf`): thêm tham số lạ (`?_=ngẫu_nhiên`) không né được cache để
 dồn tải vào backend. **Thêm tham số GET mới cho API công khai → thêm vào `proxy_cache_key`** (pytest kiểm tra), nếu không
-các giá trị khác nhau dùng chung một bản cache.
+các giá trị khác nhau dùng chung một bản cache. Danh sách / ranh giới xã, tỉnh (`GET /api/v1/admin-units*`, cổng gọi mỗi
+lần mở trang, ~170 KB) cũng qua cache nginx 10 giây (`frontend/nginx/units-cache.conf`, khoá `level` + `admin_codes`) và
+Redis trả thẳng chuỗi JSON đã lưu — không tính vào giới hạn 600 yêu cầu / phút / IP (sau CGNAT vài trăm người mở cổng
+cùng lúc trước đây là bị 429).
 
 | Endpoint | Mô tả | Cache Redis |
 |---|---|---|
@@ -948,7 +958,8 @@ phần lớn do cache nginx 10 giây trả (không tới backend, không bị đ
   không tải được ô xác minh → form báo lỗi và nhắc gọi 112.
 - Phản ánh gán xã theo vị trí → chỉ cán bộ có quyền ở xã đó hoặc toàn tỉnh thấy và duyệt; phản ánh mới đẩy thông
   báo realtime (`report.new`) cho đúng những người đó.
-- Ảnh: xoay theo EXIF rồi **xoá toàn bộ EXIF/GPS**, chặn ảnh bomb (> 40 megapixel), mã hoá lại JPEG 1600 px + ảnh nhỏ 400 px,
+- Ảnh: xoay theo EXIF rồi **xoá toàn bộ siêu dữ liệu** — EXIF/GPS, XMP (có thể chứa lại toạ độ), comment JPEG (Pillow tự
+  ghi lại nếu không xoá; có thể chứa địa chỉ) — chặn ảnh bomb (> 40 megapixel), mã hoá lại JPEG 1600 px + ảnh nhỏ 400 px,
   lưu MinIO bucket riêng tư. Ảnh chưa duyệt chỉ xem qua link **có chữ ký HMAC, hết hạn sau 1 giờ**.
 
 <a id="ban-nhe"></a>

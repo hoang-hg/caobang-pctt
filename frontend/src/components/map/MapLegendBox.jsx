@@ -5,6 +5,7 @@ import {
   X
 } from 'lucide-react';
 import { stationView } from '../../utils/stations';
+import { landslideStatus } from '../../utils/labels';
 
 /** Biểu tượng theo loại điểm đang chọn — dùng chung cho thẻ chi tiết (chú giải) và thanh nổi trên bản đồ công khai. */
 export const POINT_EMOJI = { rain: '🌧️', water: '💧', reservoir: '🏛️', landslide: '⚠️', evac: '🏠', report: '📸' };
@@ -115,8 +116,8 @@ export default function MapLegendBox({
         name: p.name,
         sub: `${p.road_name} · ${p.admin_name}`,
         value: p.traffic_label,
-        status: p.traffic_status === 'cam_duong' ? 'Cấm đường' : p.traffic_status === 'canh_bao' ? 'Cảnh báo' : 'Chưa ghi nhận',
-        statusColor: p.traffic_status === 'cam_duong' ? 'text-danger' : p.traffic_status === 'canh_bao' ? 'text-serious' : 'text-good',
+        status: landslideStatus(p.traffic_status).short,
+        statusColor: landslideStatus(p.traffic_status).cls,
         lat: p.lat,
         lon: p.lon,
         type: 'landslide',

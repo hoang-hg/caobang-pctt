@@ -13,7 +13,7 @@ import { useUnitsGeo, useUnits, useProvinceArea } from '../../api/hooks';
 import { useStore } from '../../app/store';
 import { AdminBoundaries, BaseLayer, RAIN_BINS } from '../../components/map/MapTools';
 import { evacIcon, hazardIcon, pinIcon, stationIcon, reservoirIcon } from '../../components/map/icons';
-import { LEVEL } from '../../utils/labels';
+import { LEVEL, landslideStatus } from '../../utils/labels';
 import { ago, dateTime } from '../../utils/format';
 import { stationView } from '../../utils/stations';
 import L from 'leaflet';
@@ -248,18 +248,19 @@ function PublicMap({ data, forecast, geo, me, route, target, layers, basemap = '
           </Marker>
         ))}
         {layers.landslides && data?.landslides?.map((p) => {
-          const isBlocked = p.traffic_status === 'cam_duong';
+          const tone = landslideStatus(p.traffic_status).cls;
           return (
             <Marker
               key={p.code}
               position={[p.lat, p.lon]}
-              icon={hazardIcon(p.category === 'deo_doc' ? 'giao_thong' : 'sat_lo', p.risk_level)}
+              // Chưa có dữ liệu giám sát → icon xám (không tô màu mức nguy cơ khi hệ thống không biết)
+              icon={hazardIcon(p.category === 'deo_doc' ? 'giao_thong' : 'sat_lo', p.traffic_status === 'chua_co_du_lieu' ? 'gray' : p.risk_level)}
               eventHandlers={{
                 click: () => onSelectPoint?.({
                   id: p.code,
                   name: p.name,
                   sub: `${p.road_name} · ${p.admin_name}`,
-                  statusColor: isBlocked ? 'text-danger' : p.traffic_status === 'canh_bao' ? 'text-serious' : 'text-good',
+                  statusColor: tone,
                   type: 'landslide',
                   raw: p,
                 }),
@@ -271,7 +272,7 @@ function PublicMap({ data, forecast, geo, me, route, target, layers, basemap = '
                   <div className="text-xs text-muted">{p.road_name} · {p.admin_name}</div>
                   <div className="text-xs pt-1 border-t border-line/60">
                     Tình trạng:{' '}
-                    <b className={isBlocked ? 'text-danger font-bold' : p.traffic_status === 'canh_bao' ? 'text-serious font-bold' : 'text-good font-bold'}>
+                    <b className={clsx(tone, 'font-bold')}>
                       {p.traffic_label}
                     </b>
                   </div>
@@ -919,12 +920,23 @@ export default function PublicPortal() {
                         <div className="flex items-center gap-2">
                           <Compass size={16} className="text-accent shrink-0" />
                           <div>
-                            Lộ trình sơ tán: <b>{route.distance_km} km</b> (~{route.duration_min} phút di chuyển). Trạng thái:{' '}
                             {!route.roads?.length ? (
-                              <span className="font-bold text-amber-500">
-                                Chưa có dữ liệu đường tại khu vực này — nét đứt chỉ là hướng chim bay, không phải đường đi. Hãy đi theo chỉ dẫn của cán bộ địa phương.
-                              </span>
-                            ) : route.safe ? (
+                              // Chưa có mạng đường chính thức: không có "lộ trình", không ước thời gian di chuyển
+                              <>
+                                Khoảng cách chim bay: <b>{route.distance_km} km</b>.{' '}
+                                <span className="font-bold text-amber-500">
+                                  Chưa có dữ liệu đường tại khu vực này — nét đứt chỉ là hướng chim bay, không phải đường đi. Hãy đi theo chỉ dẫn của cán bộ địa phương.
+                                </span>
+                                {route.hazards?.length > 0 && (
+                                  <span className="block font-bold text-danger">
+                                    Hướng này cắt qua vùng nguy cơ: {route.hazards.join(', ')} — hết sức cẩn thận, hỏi cán bộ địa phương hoặc gọi 112
+                                  </span>
+                                )}
+                              </>
+                            ) : (
+                              <>Lộ trình sơ tán: <b>{route.distance_km} km</b> (~{route.duration_min} phút di chuyển). Trạng thái:{' '}</>
+                            )}
+                            {!route.roads?.length ? null : route.safe ? (
                               // Chỉ khẳng định điều hệ thống biết: không cắt vùng nguy hiểm ĐÃ GHI NHẬN (không phải "an toàn")
                               <span className="font-bold text-good">Không đi qua vùng nguy hiểm đã được ghi nhận</span>
                             ) : (
@@ -1119,7 +1131,13 @@ export default function PublicPortal() {
                         <>
                           <div className="flex items-center gap-1.5 font-semibold text-ink truncate">
                             <Compass size={15} className="text-accent shrink-0" />
-                            <span className="truncate">Tuyến sơ tán: <b className="text-accent">{route.distance_km} km</b> (~{route.duration_min} phút)</span>
+                            <span className="truncate">
+                              {route.roads?.length ? (
+                                <>Tuyến sơ tán: <b className="text-accent">{route.distance_km} km</b> (~{route.duration_min} phút)</>
+                              ) : (
+                                <>Hướng chim bay (chưa có dữ liệu đường): <b className="text-accent">{route.distance_km} km</b></>
+                              )}
+                            </span>
                           </div>
                           <button
                             type="button"
@@ -1525,7 +1543,7 @@ export default function PublicPortal() {
                 sub: `${pt.road_name} · ${pt.admin_name}`,
                 value: pt.traffic_label,
                 status: pt.traffic_label,
-                statusColor: pt.traffic_status === 'cam_duong' ? 'text-danger' : pt.traffic_status === 'canh_bao' ? 'text-amber-500' : 'text-good',
+                statusColor: landslideStatus(pt.traffic_status, 'text-amber-500').cls,
                 lat: pt.lat,
                 lon: pt.lon,
                 type: 'landslide',

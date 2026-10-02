@@ -174,6 +174,13 @@ function ActionModal({ report, action, onClose }) {
             </label>
           </div>
         )}
+
+        {action === 'sos' && report.status === 'cho_duyet' && (
+          <p className="text-xs text-muted">
+            Cổng công khai chỉ hiện loại phản ánh, vị trí làm tròn (~150 m) và &quot;đã chuyển lực lượng cứu hộ xử lý&quot; —
+            không công khai nội dung, ảnh người dân gửi. Đọc lại rồi dùng <b>Sửa phần công khai</b> nếu muốn công khai thêm.
+          </p>
+        )}
       </div>
     </Modal>
   );
