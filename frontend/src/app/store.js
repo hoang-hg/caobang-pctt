@@ -11,6 +11,21 @@ const initialTheme = () => {
 
 const savedAuth = (() => { try { return JSON.parse(safeGet('pctt_auth') || 'null'); } catch { return null; } })();
 
+/** Chưa bấm chọn Sáng / Tối → theo hệ điều hành, kể cả khi máy tự đổi (điện thoại chuyển nền tối lúc chiều tối, máy
+ * tính theo lịch). Đã bấm chọn (pctt_theme) thì giữ lựa chọn đó. */
+function followSystemTheme() {
+  try {
+    window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', (e) => {
+      if (safeGet('pctt_theme')) return;
+      const theme = e.matches ? 'light' : 'dark';
+      document.documentElement.classList.toggle('dark', theme === 'dark');
+      useStore.setState({ theme });
+    });
+  } catch {
+    /* trình duyệt cũ không có matchMedia / addEventListener */
+  }
+}
+
 export const useStore = create((set, get) => ({
   // ---- Chế độ Sáng/Tối ----
   theme: initialTheme(),
@@ -77,3 +92,5 @@ export const useStore = create((set, get) => ({
     setTimeout(() => set((s) => ({ toasts: s.toasts.filter((x) => x.id !== id) })), t.duration || 6000);
   },
 }));
+
+followSystemTheme();

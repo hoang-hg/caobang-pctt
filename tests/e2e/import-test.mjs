@@ -123,8 +123,9 @@ check('Kho vật tư không cho thay toàn bộ (có dữ liệu tham chiếu) �
 // ---- Mọi loại dữ liệu: nhập tệp mẫu 2 lần (lần 1 thêm, lần 2 cập nhật) — theo thứ tự phụ thuộc
 const ORDER = ['kho', 'ton_kho', 'luc_luong', 'phuong_tien', 'diem_so_tan', 'vung_nguy_hiem', 'diem_nguy_hiem', 'danh_ba',
   'tram_quan_trac', 'ngap_kich_ban', 'ho_chua', 'cay_xang', 'xom']; // ngap_kich_ban sau tram_quan_trac: tham chiếu trạm mẫu
-check('Kiểm thử phủ mọi loại dữ liệu (trừ ranh giới xã, kiểm riêng)',
-  list.data.filter((d) => d.name !== 'ranh_gioi_xa').every((d) => ORDER.includes(d.name)));
+// Ranh giới xã, nhóm lọc nhanh (tệp mẫu điền sẵn nhiều nhóm đang dùng) kiểm riêng ở dưới
+check('Kiểm thử phủ mọi loại dữ liệu (trừ ranh giới xã, nhóm lọc nhanh — kiểm riêng)',
+  list.data.filter((d) => !['ranh_gioi_xa', 'nhom_loc_nhanh'].includes(d.name)).every((d) => ORDER.includes(d.name)));
 for (const name of ORDER) {
   const res = await fetch(`${BASE}/data-import/datasets/${name}/template`, { headers: { Authorization: `Bearer ${admin}` } });
   const filename = (res.headers.get('content-disposition') || '').match(/filename="([^"]+)"/)?.[1];
@@ -163,6 +164,35 @@ check('Xóm: tìm kiếm ra xóm mới, kèm xã trực thuộc', hit?.sub === '
 const sos = (await call('POST', '/sos/parse', { text: `Nước lũ dâng nhanh ở xóm Pò Tấu ${stamp}, 4 người mắc kẹt trên mái nhà` }, admin)).data;
 check('Xóm: tin SOS nhắc xóm mới → nhận ra đúng xã (không cần khởi động lại)',
   sos?.place?.unit_code === 'CB-PHUCHOA' && sos.place.kind === 'thon', JSON.stringify(sos?.place));
+
+// ---- Nhóm lọc nhanh theo thiên tai: tệp mẫu = các nhóm đang dùng; xã ghi theo tên hoặc mã; "thay toàn bộ" không đụng
+// nhóm "Địa bàn … (cũ)" do hệ thống tạo
+const presets = async () => (await call('GET', '/admin-units/presets', null, admin)).data || [];
+const groupsBefore = (await presets()).filter((p) => p.kind === 'luu_vuc');
+const oldDistricts = (await presets()).filter((p) => p.kind === 'dia_ban_cu').length;
+const tplRes = await fetch(`${BASE}/data-import/datasets/nhom_loc_nhanh/template`, { headers: { Authorization: `Bearer ${admin}` } });
+const groupsCsv = new Uint8Array(await tplRes.arrayBuffer());
+const groupsText = new TextDecoder().decode(groupsCsv);
+check('Nhóm lọc nhanh: tệp mẫu điền sẵn các nhóm đang dùng', tplRes.status === 200 && groupsBefore.length > 0
+  && groupsBefore.every((g) => groupsText.includes(g.code)), `${groupsBefore.length} nhóm`);
+const same = await upload('nhom_loc_nhanh', 'apply', 'nhom.csv', groupsCsv, admin);
+check('Nhóm lọc nhanh: nhập lại tệp mẫu = cập nhật, không thêm', same.status === 200 && same.data.result.created === 0
+  && same.data.result.updated === groupsBefore.length, JSON.stringify(same.data?.result || same.data?.report?.errors?.slice(0, 2)));
+const newGroup = `ma,ten,mo_ta,loai_thien_tai,danh_sach_xa\nLV_GAM_${stamp},Lưu vực sông Gâm ${stamp},Kiểm thử,ngap_lut,Xã Bảo Lạc; CB-COCPANG\n`;
+const ag = await upload('nhom_loc_nhanh', 'apply', 'nhom.csv', newGroup, admin);
+const added = (await presets()).find((p) => p.code === `LV_GAM_${stamp}`);
+check('Nhóm lọc nhanh: thêm nhóm — xã ghi theo tên được đổi thành mã', ag.status === 200 && ag.data.result.created === 1
+  && added?.unit_codes?.join() === 'CB-BAOLAC,CB-COCPANG' && added?.kind === 'luu_vuc' && added?.hazard === 'ngap_lut',
+  JSON.stringify(added || ag.data?.report?.errors?.slice(0, 2)));
+const badGroup = await upload('nhom_loc_nhanh', 'validate', 'nhom.csv', 'ma,ten,danh_sach_xa\nDB_00,Trùng nhóm cũ,Không Có Xã\n', admin);
+check('Nhóm lọc nhanh: xã không có / mã trùng nhóm địa bàn cũ → lỗi',
+  badGroup.data?.errors?.some((e) => e.field === 'danh_sach_xa') && badGroup.data?.errors?.some((e) => e.field === 'ma'));
+const restore = await upload('nhom_loc_nhanh', 'apply', 'nhom.csv', groupsCsv, admin, 'replace');
+const groupsAfter = await presets();
+check('Nhóm lọc nhanh: thay toàn bộ bằng tệp mẫu cũ → bỏ nhóm vừa thêm, nhóm địa bàn cũ giữ nguyên',
+  restore.status === 200 && restore.data.result.deleted === 1 && !groupsAfter.some((p) => p.code === `LV_GAM_${stamp}`)
+  && groupsAfter.filter((p) => p.kind === 'dia_ban_cu').length === oldDistricts && oldDistricts > 0,
+  JSON.stringify(restore.data?.result || restore.data?.report?.errors?.slice(0, 2)));
 
 // ---- Ranh giới xã: nhập lại chính ranh giới hiện có + dân số mới
 const units = await call('GET', '/admin-units/geojson?level=xa', null, admin);

@@ -1,15 +1,12 @@
 """Omni-search: địa danh, đơn vị hành chính, trạm, hồ chứa, lực lượng, kho, mã SOS hoặc toạ độ GPS."""
 
-import re
-
 from fastapi import APIRouter, Depends
 
 from app.db import fetch_all
 from app.rbac.authz import allowed_codes, require_any
+from app.services.coords import parse_coords
 
 router = APIRouter(prefix="/search", tags=["Tìm kiếm"])
-
-COORD_RE = re.compile(r"^\s*(-?\d{1,2}\.\d+)\s*[,; ]\s*(-?\d{2,3}\.\d+)\s*$")
 
 
 @router.get("")
@@ -19,9 +16,9 @@ async def search(q: str, limit: int = 12, user: dict = Depends(require_any("moni
     q = q.strip()
     if not q:
         return []
-    m = COORD_RE.match(q)
-    if m:
-        lat, lon = float(m.group(1)), float(m.group(2))
+    # Thập phân, độ-phút-giây, N/E hoặc B/Đ, ghi ngược, đường dẫn Google Maps (app/services/coords.py)
+    if coords := parse_coords(q):
+        lat, lon = coords
         unit = await fetch_all(
             """SELECT name, code FROM spatial_admin.administrative_units
                 WHERE level = 'xa' AND ST_Contains(geom, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326))""",

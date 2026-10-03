@@ -18,10 +18,14 @@ _EXAMPLE_POLYGON = {
 
 
 def template(
-    ds: Dataset, examples: dict[str, str] | None = None, center: tuple[float, float] | None = None
+    ds: Dataset,
+    examples: dict[str, str] | None = None,
+    center: tuple[float, float] | None = None,
+    rows: list[dict[str, str]] | None = None,
 ) -> tuple[bytes, str, str]:
     """(nội dung, tên tệp, content-type). ``examples``: thay giá trị mẫu (VD mã xã của người gửi, cấp "xa");
-    ``center`` (vĩ độ, kinh độ): đặt vị trí / vùng mẫu trong xã của người gửi để tệp mẫu hợp lệ ngay."""
+    ``center`` (vĩ độ, kinh độ): đặt vị trí / vùng mẫu trong xã của người gửi để tệp mẫu hợp lệ ngay; ``rows``: dữ
+    liệu hiện có điền sẵn thay dòng ví dụ (chỉ loại không có hình học — VD nhóm lọc nhanh)."""
     values = {f.name: f.example for f in ds.fields}
     values.update({k: v for k, v in (examples or {}).items() if k in values})
     polygon = _EXAMPLE_POLYGON
@@ -52,7 +56,8 @@ def template(
     buf = io.StringIO()
     writer = csv.writer(buf)
     writer.writerow([f.name for f in ds.fields])
-    writer.writerow([values[f.name] for f in ds.fields])
+    for row in rows or [values]:
+        writer.writerow([row.get(f.name, "") for f in ds.fields])
     return buf.getvalue().encode("utf-8-sig"), f"mau_{ds.name}.csv", "text/csv; charset=utf-8"
 
 

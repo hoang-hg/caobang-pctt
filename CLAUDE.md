@@ -54,7 +54,7 @@ backend/                   Python 3.12, FastAPI, SQLAlchemy async (psycopg3), Ca
   app/services/            sos, sos_nlp, dispatch_matching, safe_routing, broadcast, reports, tracking, reservoirs,
                            landslides, events (log_event), simulator, scenario, lite (trang bản nhẹ /ban-nhe, HTML < 50 KB),
                            mission (link nhiệm vụ cho trưởng nhóm hiện trường: mã, hạn, nội dung lệnh)
-  app/services/data_import/  nhập dữ liệu chính thức từ tệp: specs.py (khai báo 12 loại) · parsing.py (CSV/xlsx/GeoJSON,
+  app/services/data_import/  nhập dữ liệu chính thức từ tệp: specs.py (khai báo 15 loại) · parsing.py (CSV/xlsx/GeoJSON,
                            chuẩn hoá — thuần) · engine.py (validate / apply 1 transaction) · templates.py · service.py
                            (nhật ký, sự kiện, xoá cache) · __main__.py (dòng lệnh). API: app/api/v1/data_import.py
                            (+ hồ sơ xã gửi – tỉnh duyệt: /data-import/submissions, bảng operations.data_submissions)
@@ -305,7 +305,11 @@ chỉ khi `DEMO_MODE`; `DEMO_MODE=false` xoá đoạn `so_do` còn sót mỗi l�
 - **Phân quyền UI**: `<Can I="dispatch" a="create" scope={x.admin_code}>`, `usePermission(obj, act, scope)`,
   `useCanAll`, `useAllowedCodes(obj, act)` (null = toàn tỉnh). UI chỉ ẩn/hiện — backend mới chặn thật.
 - **Giao diện**: màu qua biến CSS (`src/index.css`) + token Tailwind (`bg-panel`, `bg-panel2`, `text-ink-2`, `text-muted`,
-  `border-line`, `bg-danger`, `text-good`, `text-accent`…); màu trạng thái cố định; hỗ trợ cả sáng và tối. Component
+  `border-line`, `bg-danger`, `text-good`, `text-accent`…); màu trạng thái cố định; hỗ trợ cả sáng và tối. CHỮ màu
+  trạng thái (`text-warn` / `text-serious` / `text-good`) lấy biến `--*-text` (`tailwind.config.js` `textColor`): nền sáng là
+  sắc đậm hơn — vàng / cam / xanh lá gốc không đạt 4,5 : 1 trên nền trắng; màu trạng thái mới làm chữ thì thêm cặp biến
+  tương tự. Bảng màu tối nằm trong `@media screen` → in luôn nền sáng; vùng cuộn cao cố định (`max-h-…` +
+  `overflow-y-auto`) thêm `print:max-h-none print:overflow-visible` để in không bị cắt (mẫu cột Kanban ở RescueCenter). Component
   dùng chung trong `components/common/ui.jsx` (KpiCard, Modal, Tabs, Section, Empty, Progress, StatusDot). Icon `lucide-react`.
 - **Biểu đồ** Recharts lấy màu từ `useChartTheme()` (+ `axisProps`, `ChartTooltip`); không dùng 2 trục Y (tách biểu đồ).
 - **Bản đồ**: `leaflet-draw` và `protomaps-leaflet` cần `L` toàn cục → `components/map/leafletGlobal.js` import trước.

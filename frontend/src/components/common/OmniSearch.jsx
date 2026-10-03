@@ -57,7 +57,7 @@ export default function OmniSearch() {
       <Search size={15} className="pointer-events-none absolute left-3 top-2.5 text-muted" />
       <input
         className="input pl-9"
-        placeholder="Tìm địa danh, toạ độ (22.66, 106.25), mã SOS…"
+        placeholder="Tìm địa danh, mã SOS, toạ độ GPS, link Google Maps…"
         value={q}
         onChange={(e) => setQ(e.target.value)}
         onFocus={() => items.length && setOpen(true)}

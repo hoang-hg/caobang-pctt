@@ -21,6 +21,12 @@ export default {
         good: v('good'),
         info: v('info'),
       },
+      // Chữ màu trạng thái: sắc riêng cho nền sáng (src/index.css --*-text); bg-/border-/ring-warn… giữ màu gốc
+      textColor: {
+        serious: v('serious-text'),
+        warn: v('warn-text'),
+        good: v('good-text'),
+      },
       fontFamily: {
         sans: ['"Be Vietnam Pro"', 'Inter', 'system-ui', 'sans-serif'],
         mono: ['"JetBrains Mono"', 'Consolas', 'monospace'],

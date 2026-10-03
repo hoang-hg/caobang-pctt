@@ -56,11 +56,11 @@ function Shell() {
   }, [auth?.token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col print:block print:h-auto">
       <Header />
-      <div className="flex min-h-0 flex-1">
+      <div className="flex min-h-0 flex-1 print:block">
         <Sidebar />
-        <main className="min-w-0 flex-1 overflow-auto scroll-thin">
+        <main className="min-w-0 flex-1 overflow-auto scroll-thin print:overflow-visible">
           <Suspense fallback={<PageLoading />}>
             <Routes>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />

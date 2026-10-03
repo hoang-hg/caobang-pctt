@@ -240,6 +240,8 @@ def _row_checks(ds: Dataset, row: Prepared, report: Report) -> None:
             "cap_bao_dong",
             "Ghi đúng một ngưỡng kích hoạt: cấp báo động (1–3) HOẶC mực nước (m) — không để trống cả hai, không ghi cả hai",
         )
+    if ds.name == "nhom_loc_nhanh" and v.get("danh_sach_xa") == []:  # ô chỉ có dấu phân cách
+        report.error(row.number, "danh_sach_xa", "Nhóm phải có ít nhất 1 xã/phường")
     if ds.name == "cay_xang" and None not in (v.get("xang_l"), v.get("dau_l"), v.get("suc_chua_l")):
         if v["xang_l"] + v["dau_l"] > v["suc_chua_l"]:
             report.warn(row.number, "suc_chua_l", "Tổng xăng + dầu lớn hơn sức chứa")
@@ -283,6 +285,8 @@ async def check_database(
     await _check_refs(ds, rows, report, replace, scope)
     if ds.name == "ngap_kich_ban":
         await _check_flood_triggers(rows, report)
+    if ds.name == "nhom_loc_nhanh":
+        await _check_preset_units(rows, report)
     if scope is not None:
         await _check_scope(ds, rows, report, scope)
     await _count_changes(ds, rows, report, replace, scope)
@@ -306,6 +310,86 @@ async def _check_flood_triggers(rows: list[Prepared], report: Report) -> None:
                 "cap_bao_dong",
                 f"Trạm {code} chưa có ngưỡng báo động cấp {level} — nhập ngưỡng cho trạm trước, hoặc ghi mực nước (m)",
             )
+
+
+def plain_unit_name(name: str) -> str:
+    """'Xã Cô Ba' / 'co  ba' → 'co ba': so khớp tên xã/phường không dấu, bỏ chữ "xã" / "phường" / "thị trấn" ở đầu."""
+    s = re.sub(r"\s+", " ", strip_accents(name).lower()).strip()
+    return re.sub(r"^(xa|phuong|thi tran) ", "", s)
+
+
+async def _xa_units() -> tuple[list[dict], dict[str, list[str]]]:
+    """(56 xã/phường: mã, tên; tên không dấu → các mã — tên trùng nhau thì có nhiều mã)."""
+    units = await fetch_all("SELECT code, name FROM spatial_admin.administrative_units WHERE level = 'xa'")
+    by_name: dict[str, list[str]] = {}
+    for u in units:
+        by_name.setdefault(plain_unit_name(u["name"]), []).append(u["code"])
+    return units, by_name
+
+
+async def _check_preset_units(rows: list[Prepared], report: Report) -> None:
+    """Nhóm lọc nhanh: mỗi mục là mã hoặc tên xã/phường đang có → ghi mã. Tên trùng nhiều xã → yêu cầu ghi mã. Mã
+    nhóm không được trùng nhóm "Địa bàn … (cũ)" hệ thống tạo (bị ``conflict_where`` bỏ qua → tưởng đã nhập)."""
+    units, by_name = await _xa_units()
+    by_code = {u["code"].upper(): u["code"] for u in units}
+    reserved = {
+        r["code"] for r in await fetch_all("SELECT code FROM spatial_admin.presets WHERE kind <> 'luu_vuc'")
+    }
+    for row in rows:
+        if row.values.get("ma") in reserved:
+            report.error(
+                row.number,
+                "ma",
+                f"Mã {row.values['ma']} là nhóm địa bàn huyện cũ của hệ thống — chọn mã khác",
+            )
+        codes: list[str] = []
+        unknown: list[str] = []
+        ambiguous: list[str] = []
+        for item in row.values.get("danh_sach_xa") or []:
+            code = by_code.get(item.upper())
+            if code is None:
+                found = by_name.get(plain_unit_name(item), [])
+                if len(found) == 1:
+                    code = found[0]
+                else:
+                    (ambiguous if found else unknown).append(item)
+            if code and code not in codes:
+                codes.append(code)
+        if unknown:
+            report.error(row.number, "danh_sach_xa", f"Không có xã/phường: {', '.join(unknown)}")
+        if ambiguous:
+            report.error(
+                row.number,
+                "danh_sach_xa",
+                f"Tên trùng nhiều xã/phường — ghi mã thay tên: {', '.join(ambiguous)}",
+            )
+        if row.values.get("danh_sach_xa") is not None:
+            row.values["danh_sach_xa"] = codes
+
+
+async def template_rows(ds: Dataset) -> list[dict[str, str]] | None:
+    """Dòng điền sẵn cho tệp mẫu (``None`` = một dòng ví dụ). Nhóm lọc nhanh: các nhóm đang dùng — BCH sửa trên danh
+    sách hiện có thay vì gõ lại; xã ghi theo tên (dễ đọc), tên trùng nhiều xã thì ghi mã."""
+    if ds.name != "nhom_loc_nhanh":
+        return None
+    units, by_name = await _xa_units()
+    label = {
+        u["code"]: u["name"] if len(by_name[plain_unit_name(u["name"])]) == 1 else u["code"] for u in units
+    }
+    presets = await fetch_all(
+        """SELECT code, name, description, hazard, unit_codes FROM spatial_admin.presets
+            WHERE kind = 'luu_vuc' ORDER BY code"""
+    )
+    return [
+        {
+            "ma": p["code"],
+            "ten": p["name"],
+            "mo_ta": p["description"] or "",
+            "loai_thien_tai": p["hazard"] or "tong_hop",
+            "danh_sach_xa": "; ".join(label.get(c, c) for c in p["unit_codes"]),
+        }
+        for p in presets
+    ] or None
 
 
 async def _check_communes(ds: Dataset, rows: list[Prepared], report: Report) -> None:
@@ -625,7 +709,7 @@ def _columns(ds: Dataset, row: Prepared) -> tuple[list[str], list[str], dict[str
         value = row.values.get(fld.name)
         name = f"c_{fld.column}"
         cols.append(fld.column)
-        if fld.kind == "list":
+        if fld.kind in ("list", "code_list"):
             exprs.append(f"CAST(:{name} AS text[])")
             value = value or []
         elif fld.kind == "date":

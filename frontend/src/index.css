@@ -8,7 +8,10 @@
    Theme tokens (RGB channels, để Tailwind dùng được alpha).
    Sáng: nền #F9FAFB, chữ #1F2937 — cho hiện trường & in báo cáo.
    Tối (mặc định Trung tâm điều hành): nền #111827.
-   Màu trạng thái (đỏ/cam/vàng/xanh) cố định, không đổi theo theme.
+   Màu trạng thái (đỏ/cam/vàng/xanh) của nền, huy hiệu, bản đồ cố định, không đổi theo theme. CHỮ màu trạng thái
+   (text-warn / text-serious / text-good — tailwind.config.js) dùng --*-text: ở nền sáng là sắc đậm hơn, vì vàng / cam /
+   xanh lá của nền chỉ đạt tương phản 1,8 / 2,6 / 3,4 : 1 trên nền trắng (cần ≥ 4,5 : 1 — dưới nắng không đọc được).
+   Bảng màu tối chỉ áp cho màn hình (@media screen): in ra giấy luôn dùng bảng màu sáng.
    ------------------------------------------------------------------ */
 :root {
   color-scheme: light;
@@ -25,6 +28,9 @@
   --serious: 236 131 90;
   --warn: 250 178 25;
   --good: 12 163 12;
+  --serious-text: 194 65 12; /* #C2410C — 5,2 : 1 trên nền trắng */
+  --warn-text: 161 98 7; /* #A16207 — 4,9 : 1 */
+  --good-text: 21 128 61; /* #15803D — 5,0 : 1 */
 
   /* Màu biểu đồ (theo bộ palette đã kiểm định CVD) */
   --series-1: #2a78d6;
@@ -35,24 +41,29 @@
   --chart-shortage: #d1d5db;
 }
 
-.dark {
-  color-scheme: dark;
-  --bg: 17 24 39;
-  --panel: 24 32 48;
-  --panel-2: 31 41 59;
-  --line: 51 65 85;
-  --ink: 241 245 249;
-  --ink-2: 203 213 225;
-  --muted: 148 163 184;
-  --accent: 57 135 229;
-  --info: 57 135 229;
+@media screen {
+  .dark {
+    color-scheme: dark;
+    --bg: 17 24 39;
+    --panel: 24 32 48;
+    --panel-2: 31 41 59;
+    --line: 51 65 85;
+    --ink: 241 245 249;
+    --ink-2: 203 213 225;
+    --muted: 148 163 184;
+    --accent: 57 135 229;
+    --info: 57 135 229;
+    --serious-text: 236 131 90; /* nền tối: chính màu trạng thái đã đủ tương phản */
+    --warn-text: 250 178 25;
+    --good-text: 12 163 12;
 
-  --series-1: #3987e5;
-  --series-2: #d95926;
-  --series-3: #199e70;
-  --chart-grid: #273449;
-  --chart-axis: #94a3b8;
-  --chart-shortage: #334155;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --chart-grid: #273449;
+    --chart-axis: #94a3b8;
+    --chart-shortage: #334155;
+  }
 }
 
 html, body, #root { height: 100%; }
@@ -162,4 +173,7 @@ body {
 
 @media print {
   .no-print { display: none !important; }
+  /* Khung ứng dụng cao đúng một màn hình, nội dung cuộn trong <main> (App.jsx, lớp print:*) → in ra chỉ được phần
+     đang thấy. Khi in: mở hết chiều cao để nội dung sang các trang sau. */
+  html, body, #root { height: auto; }
 }

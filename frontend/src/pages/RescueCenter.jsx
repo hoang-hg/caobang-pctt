@@ -582,7 +582,7 @@ export default function RescueCenter() {
               onDragLeave={() => setOver(null)}
               onDrop={(e) => { e.preventDefault(); setOver(null); move(e.dataTransfer.getData('text/plain'), col.key); }}
               className={clsx(
-                'card flex max-h-[calc(100vh-11rem)] min-h-[360px] flex-col border-t-4 transition-all',
+                'card flex max-h-[calc(100vh-11rem)] min-h-[360px] flex-col border-t-4 transition-all print:max-h-none print:min-h-0',
                 col.tone,
                 over === col.key ? 'ring-2 ring-accent border-dashed bg-accent/5' : 'bg-panel'
               )}
@@ -595,7 +595,7 @@ export default function RescueCenter() {
                 <div className="text-[11px] text-muted mt-0.5">{col.hint}</div>
               </div>
 
-              <div className="flex flex-1 flex-col gap-2.5 overflow-y-auto p-2.5 scroll-thin">
+              <div className="flex flex-1 flex-col gap-2.5 overflow-y-auto p-2.5 scroll-thin print:overflow-visible">
                 {filteredTickets
                   .filter((t) => t.status === col.key)
                   .map((t) => (
