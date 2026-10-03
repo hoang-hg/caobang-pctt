@@ -19,7 +19,7 @@ class Field:
     name: str  # tên cột trong tệp / thuộc tính GeoJSON
     label: str  # mô tả tiếng Việt
     column: str | None = None  # cột CSDL; None = chỉ dùng để xử lý (VD ngưỡng báo động ghép thành jsonb)
-    kind: str = "text"  # text | code | int | float | date | bool | enum | phone | list
+    kind: str = "text"  # text | code | int | float | date | bool | enum | phone | list | code_list
     required: bool = False
     choices: tuple[str, ...] = ()
     min: float | None = None
@@ -141,6 +141,46 @@ DATASETS: dict[str, Dataset] = {
                 "parent_id IN (SELECT id FROM spatial_admin.administrative_units WHERE code = ANY(:within))",
             ),
             public=True,
+        ),
+        Dataset(
+            "nhom_loc_nhanh",
+            "Nhóm lọc nhanh theo thiên tai",
+            "Nhóm xã/phường cho mục “Lọc nhanh theo đặc thù thiên tai” của bộ lọc địa phương và chọn vùng nhận cảnh "
+            "báo (VD vùng trũng hạ lưu sông Bằng Giang, lưu vực sông Gâm, vùng đèo dốc sạt lở). Tệp mẫu chứa sẵn các "
+            "nhóm đang dùng — sửa, thêm dòng rồi nhập lại. Danh sách xã ghi mã hoặc tên, cách nhau dấu ;. “Thay toàn "
+            "bộ” xoá nhóm không có trong tệp; nhóm “Địa bàn … (cũ)” do hệ thống tạo, không bị ảnh hưởng.",
+            "spatial_admin.presets",
+            ("code",),
+            (
+                Field(
+                    "ma", "Mã nhóm (duy nhất, VD LV_SONG_GAM)", "code", "code", True, example="LV_SONG_GAM"
+                ),
+                Field("ten", "Tên nhóm hiện trên bộ lọc", "name", required=True, example="Lưu vực sông Gâm"),
+                Field(
+                    "mo_ta", "Mô tả ngắn", "description", example="Xã ven sông Gâm — lũ quét, sạt lở bờ sông"
+                ),
+                Field(
+                    "loai_thien_tai",
+                    "Loại thiên tai",
+                    "hazard",
+                    "enum",
+                    choices=("ngap_lut", "sat_lo", "tong_hop"),
+                    default="tong_hop",
+                    example="ngap_lut",
+                ),
+                Field(
+                    "danh_sach_xa",
+                    "Xã/phường trong nhóm: mã hoặc tên, cách nhau dấu ;",
+                    "unit_codes",
+                    "code_list",
+                    True,
+                    example="CB-BAOLAC;Cốc Pàng",
+                ),
+            ),
+            fixed={"kind": "luu_vuc"},
+            conflict_where="spatial_admin.presets.kind = 'luu_vuc'",
+            replaceable=True,
+            replace_scope="kind = 'luu_vuc'",
         ),
         Dataset(
             "diem_so_tan",

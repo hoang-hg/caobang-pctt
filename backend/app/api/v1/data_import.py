@@ -108,7 +108,7 @@ async def dataset_template(name: str, user: dict = Depends(import_or_submit)):
             {"c": scope[0]},
         )
         center = (c["lat"], c["lon"]) if c and c["lat"] is not None else None
-    body, filename, media_type = template(ds, examples, center)
+    body, filename, media_type = template(ds, examples, center, await importer.template_rows(ds))
     return Response(
         body, media_type=media_type, headers={"Content-Disposition": f'attachment; filename="{filename}"'}
     )

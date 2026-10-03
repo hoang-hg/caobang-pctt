@@ -46,7 +46,7 @@ Sửa chức năng, cấu hình hay quy trình thì cập nhật đúng mục tr
 | C | Vật tư & Lực lượng | `/nguon-luc` | Lực lượng / Kho vật tư / Phương tiện; cảnh báo kho < 20% định mức, sắp hết hạn; **báo tình trạng (bảo dưỡng / hỏng) và nhiên liệu từng phương tiện**; nhiên liệu dự trữ (cập nhật được); điều động nhanh; **xuất / nhập kho**; xuất Excel/PDF |
 | D | Điều hành cứu hộ | `/cuu-ho` | Kanban 4 cột, SLA cấp 1/2/3 (3′/15′/60′), tiếp nhận đa kênh + bóc tách tin nhắn, khớp lực lượng gần nhất theo kỹ năng, ETA, tiến độ sơ tán theo xã (xã / trực ban cập nhật) & sức chứa |
 | E | Cảnh báo & Hotline | `/canh-bao` | Mẫu tin có tham số, phát theo xã / vùng vẽ, 5 kênh, **Maker–Checker + PIN**, bảng theo dõi giao nhận, danh bạ Tỉnh → Xã → Thôn, IVR, nhật ký pháp lý |
-| F | Bộ lọc địa phương & Sáng/Tối | toàn cục | 56 xã/phường (sau 01/07/2025), preset lưu vực, vùng núi cao, biên giới, địa bàn huyện cũ; Omni-search (địa danh, toạ độ, mã SOS); giao diện sáng/tối |
+| F | Bộ lọc địa phương & Sáng/Tối | toàn cục | 56 xã/phường (sau 01/07/2025), nhóm lọc nhanh theo thiên tai (BCH tự sửa qua Nhập dữ liệu), địa bàn huyện cũ; Omni-search (địa danh, xóm, mã SOS, toạ độ thập phân / độ-phút-giây / link Google Maps); giao diện sáng/tối theo hệ điều hành, in luôn nền sáng |
 | G | Nguồn dữ liệu & IoT | `/nguon-du-lieu` | Dự báo tổ hợp ECMWF + GFS theo xã; OpenWeather; cổng IoT HTTP / MQTT / LoRaWAN; kiểm tra số đo; cảnh báo mất tín hiệu; giám sát kết nối |
 | H | Phản ánh của người dân | `/phan-anh` | Cán bộ đúng địa bàn duyệt / từ chối / chuyển SOS phản ánh có ảnh của người dân |
 | I | Phân quyền | `/phan-quyen` | 3 cấp, mỗi cấp 1 vai trò (Quản trị hệ thống · Quản trị tỉnh · Quản trị xã/phường), mỗi tài khoản 1 vai trò; chỉ cấp trên quản lý cấp dưới; nhật ký phân quyền |
@@ -161,6 +161,7 @@ graph LR
 |---|---|---|---|---|
 | Ranh giới xã/phường (`ranh_gioi_xa`) | `administrative_units` | GeoJSON vùng | mã xã có sẵn — chỉ cập nhật | — |
 | Xóm / tổ dân phố (`xom`) | `administrative_units` (cấp thôn) | CSV / Excel | `ma` — trống = tự sinh `<mã xã>-<tên>` | ✓ chỉ xóm của các xã có trong tệp |
+| Nhóm lọc nhanh theo thiên tai (`nhom_loc_nhanh`) | `presets` | CSV / Excel | `ma` | ✓ chỉ nhóm thiên tai (nhóm "Địa bàn … (cũ)" giữ nguyên) |
 | Điểm sơ tán (`diem_so_tan`) 🌐 | `evacuation_sites` | CSV / Excel / GeoJSON điểm | `ma` | ✓ |
 | Vùng nguy hiểm (`vung_nguy_hiem`) 🌐 | `hazard_zones` | GeoJSON vùng | `ma` | ✓ (không xoá vùng do cảm biến tạo) |
 | Điểm nguy hiểm (`diem_nguy_hiem`) 🌐 | `hazard_points` | CSV / Excel / GeoJSON điểm | `ma` | ✓ |
@@ -194,6 +195,12 @@ graph LR
   đã sáp nhập: chỉ xoá xóm của các xã **có trong tệp**. Dùng cho: người dân **chọn xóm khi gửi phản ánh** (danh sách
   theo xã, [9](#cong-cong-khai)), tìm kiếm địa danh, nhận biết xóm trong tin SOS (tên xóm trùng ở nhiều xã: tin phải
   nhắc cả xã mới gán đúng xóm). Hiện có 8 xóm **mẫu** — thay bằng danh sách chính thức lấy từ UBND các xã / Sở Nội vụ.
+- **Nhóm lọc nhanh theo thiên tai** (mục "Lọc nhanh theo đặc thù thiên tai" của bộ lọc địa phương, chọn vùng nhận cảnh
+  báo): tệp mẫu tải về **chứa sẵn các nhóm đang dùng** — danh sách xã của từng nhóm hiện do người lập trình đặt, BCH xác
+  nhận / sửa rồi nhập lại; thêm nhóm mới bằng dòng mới (VD lưu vực sông Gâm, sông Quây Sơn, đèo Mã Phục). Cột
+  `danh_sach_xa` ghi **mã hoặc tên** xã/phường, cách nhau `;` ("Xã Bảo Lạc; CB-COCPANG"); tên trùng nhiều xã → ghi mã.
+  `loai_thien_tai`: `ngap_lut` / `sat_lo` / `tong_hop` (biểu tượng trên bộ lọc). Nhóm "Địa bàn … (cũ)" do hệ thống
+  tạo từ địa bàn huyện cũ, không sửa qua tệp.
 - Thứ tự khi nhập lần đầu: ranh giới xã → xóm → kho → tồn kho → lực lượng → phương tiện → phần còn lại.
 
 Dòng lệnh (tệp lớn, người vận hành máy chủ):
@@ -255,6 +262,11 @@ mailpit  SMTP thử nghiệm (chỉ dev)               backup  pg_dump + ảnh h
 - **Kiểm tra cấu hình**: `APP_ENV=staging|production` → backend, worker, seed **dừng khởi động** nếu còn khoá / mật khẩu
   mặc định (`backend/app/preflight.py`).
 - **Bộ lọc địa phương**: frontend chỉ gửi `admin_codes`; backend hợp nhất ranh giới xã và lọc bằng `ST_Intersects`.
+  Nhóm lọc nhanh theo thiên tai là dữ liệu (`spatial_admin.presets`), BCH sửa qua Nhập dữ liệu (`nhom_loc_nhanh`, [2.4](#nhap-du-lieu)).
+- **Sáng / Tối**: biến CSS (`frontend/src/index.css`). Chưa bấm chọn thì theo hệ điều hành (kể cả khi máy tự đổi lúc
+  chiều tối). Chữ màu trạng thái (vàng / cam / xanh lá) có sắc đậm riêng cho nền sáng — đọc được dưới nắng (≥ 4,5 : 1).
+  Bảng màu tối chỉ áp cho màn hình: in (Ctrl+P) luôn ra nền sáng, chữ đậm; thanh trên, menu, thông báo không in; nội
+  dung dài in sang các trang sau (không bị cắt ở mép màn hình).
 - **Chịu tải** (đo ở [12.2](#kiem-thu-tai)):
   - Người dân: tệp tĩnh nén sẵn; cổng công khai chỉ tải ~220 KB (gzip) lần đầu; API công khai cache 2 tầng (nginx 10 s +
     Redis); "Tôi đang ở đâu?" làm tròn toạ độ ~11 m và cache.
@@ -1501,7 +1513,7 @@ Kiểm thử API (cần stack dev đang chạy với `DEMO_MODE=true`; tham số
 | Xác thực 2 lớp: bật / đăng nhập 2 bước / mã khôi phục / tắt / đặt lại / khoá; bắt buộc theo vai trò khi backend có `TOTP_REQUIRED_ROLES=admin_xa` và chạy với `REQUIRED_ROLE=admin_xa` (~1,5 phút; CI kiểm bắt buộc 2 lớp ở job prod) | `node tests/e2e/totp-test.mjs` |
 | Hồ chứa & xả lũ | `node tests/e2e/reservoir-test.mjs` |
 | Điểm đen sạt lở & đường đèo | `node tests/e2e/landslide-test.mjs` |
-| Nhập dữ liệu (12 loại, kiểm tra lỗi, cập nhật không trùng, thay toàn bộ) | `node tests/e2e/import-test.mjs` |
+| Nhập dữ liệu (15 loại, kiểm tra lỗi, cập nhật không trùng, thay toàn bộ) | `node tests/e2e/import-test.mjs` |
 | Xã gửi – tỉnh duyệt: phạm vi xã, chờ duyệt không hiện, cũ → mới, duyệt / từ chối / rút, email | `node tests/e2e/submission-test.mjs [backend] [mailpit]` |
 | Bản nhẹ `/ban-nhe`, service worker, manifest — qua nginx (tham số = địa chỉ frontend, mặc định `http://localhost:8080`) | `node tests/e2e/lite-test.mjs` |
 | Tự giám sát: `/health/full`; email cảnh báo sự cố khi backend có `OPS_DISK_WARN_PCT=1` (giả lập ổ đĩa đầy, ~2 phút); dọn nhật ký cũ | `node tests/e2e/ops-test.mjs [backend] [mailpit]` |

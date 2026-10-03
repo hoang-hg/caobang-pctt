@@ -226,6 +226,12 @@ def to_list(value: Any) -> list[str]:
     return [norm_key(p) for p in re.split(r"[;,|]", str(value)) if p.strip()]
 
 
+def to_code_list(value: Any) -> list[str]:
+    """Danh sách mã hoặc tên (xã trong nhóm lọc nhanh): tách theo ; , | hoặc xuống dòng, giữ nguyên chữ (mã viết hoa,
+    tên có dấu — không chuẩn hoá như ``to_list``), bỏ mục trùng, giữ thứ tự."""
+    return list(dict.fromkeys(p.strip() for p in re.split(r"[;,|\n]", str(value)) if p.strip()))
+
+
 CONVERTERS = {
     "int": to_int,
     "float": to_float,
@@ -234,4 +240,5 @@ CONVERTERS = {
     "phone": to_phone,
     "code": to_code,
     "list": to_list,
+    "code_list": to_code_list,
 }
