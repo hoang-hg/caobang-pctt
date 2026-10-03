@@ -77,7 +77,8 @@ async def match(ticket: dict) -> dict:
                    ST_Y(v.current_location) AS lat, ST_X(v.current_location) AS lon,
                    ST_Distance(v.current_location::geography, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography) AS distance_m
               FROM resources.vehicles v LEFT JOIN resources.forces f ON f.id = v.force_id
-             WHERE v.status = 'san_sang' AND v.vehicle_type = ANY(:types) AND v.fuel_level >= 20
+             -- Nhiên liệu chưa ai báo (NULL) vẫn gợi ý, giao diện ghi "chưa rõ nhiên liệu"; đã báo dưới 20% thì bỏ
+             WHERE v.status = 'san_sang' AND v.vehicle_type = ANY(:types) AND (v.fuel_level IS NULL OR v.fuel_level >= 20)
                AND ST_DWithin(v.current_location::geography, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography, :r)
              ORDER BY distance_m
             """,

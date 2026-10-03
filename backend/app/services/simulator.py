@@ -481,7 +481,10 @@ class Simulator:
                 )
                 await execute(
                     """UPDATE resources.vehicles SET current_location = ST_SetSRID(ST_MakePoint(:lon, :lat), 4326), updated_at = now(),
-                              fuel_level = GREATEST(5, fuel_level - CASE WHEN random() < 0.15 THEN 1 ELSE 0 END)
+                              -- GREATEST(5, NULL) = 5 trong Postgres: nhiên liệu chưa báo (NULL) phải giữ NULL
+                              fuel_level = CASE WHEN fuel_level IS NULL THEN NULL
+                                                ELSE GREATEST(5, fuel_level - CASE WHEN random() < 0.15 THEN 1 ELSE 0 END) END,
+                              fuel_updated_at = CASE WHEN fuel_level IS NULL THEN fuel_updated_at ELSE now() END
                         WHERE id = ANY(:v)""",
                     {**pos, "v": o["vehicle_ids"]},
                     conn,

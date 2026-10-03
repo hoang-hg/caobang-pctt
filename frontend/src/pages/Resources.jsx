@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import { MapContainer, Marker, Popup } from 'react-leaflet';
 import {
   Users, Ship, Package, AlertTriangle, FileSpreadsheet, FileDown, MapPin, Phone, Send, Truck, Wrench, Fuel, Search, PackageMinus,
+  PackagePlus, Pencil,
 } from 'lucide-react';
 import { useAreaQuery } from '../api/hooks';
 import { useStore } from '../app/store';
@@ -11,10 +12,11 @@ import { Empty, KpiCard, Modal, Progress, Section, StatusDot, Tabs } from '../co
 import SuppliesChart from '../components/charts/SuppliesChart';
 import DispatchModal from '../components/common/DispatchModal';
 import IssueModal from '../components/common/IssueModal';
+import { FuelDepotModal, ReceiveModal, VehicleModal } from '../components/common/LogisticsModals';
 import { BaseLayer } from '../components/map/MapTools';
 import { vehicleIcon } from '../components/map/icons';
 import { CATEGORY, FORCE_TYPE, INCIDENT, PRIORITY, RES_STATUS, SKILL, VEHICLE, VEHICLE_CAT } from '../utils/labels';
-import { dateTime, int } from '../utils/format';
+import { dateTime, int, time } from '../utils/format';
 import { exportExcel } from '../utils/exportExcel';
 import { exportSnapshotPdf } from '../utils/exportPdf';
 import { Can } from '../rbac/usePermission';
@@ -53,6 +55,9 @@ export default function Resources() {
   const [q, setQ] = useState('');
   const [quick, setQuick] = useState(null);
   const [issue, setIssue] = useState(null);
+  const [vehicleEdit, setVehicleEdit] = useState(null);
+  const [receive, setReceive] = useState(null);
+  const [depotEdit, setDepotEdit] = useState(null);
   const tableRef = useRef(null);
 
   const { data: summary } = useAreaQuery('resources-summary', '/resources/summary', {}, { refetchInterval: 30_000 });
@@ -88,7 +93,7 @@ export default function Resources() {
     } else {
       exportExcel(fVehicles.map((v) => ({
         'Số hiệu': v.code, 'Tên': v.name, 'Loại': VEHICLE[v.vehicle_type], 'Nhóm': VEHICLE_CAT[v.category], 'Đơn vị': v.force_name,
-        'Trạng thái': RES_STATUS[v.status].label, 'Nhiên liệu %': v.fuel_level, 'Nhiệm vụ': v.mission_code || '',
+        'Trạng thái': RES_STATUS[v.status].label, 'Nhiên liệu %': v.fuel_level ?? '', 'Nhiệm vụ': v.mission_code || '',
       })), { sheet: 'Phuong tien', filename: `phuong-tien-${stamp}.xlsx` });
     }
   };
@@ -204,6 +209,9 @@ export default function Resources() {
                     </div>
                     <div className="no-print flex gap-1">
                       <button className="btn-ghost px-2 py-1" title="Xem trên bản đồ" onClick={() => showOnMap(w.lat, w.lon, w.name)}><MapPin size={14} /></button>
+                      <Can I="inventory" a="receive" scope={w.admin_code}>
+                        <button className="btn-ghost px-2 py-1 text-xs" onClick={() => setReceive(w)}><PackagePlus size={12} /> Nhập hàng</button>
+                      </Can>
                       <Can I="inventory" a="issue" scope={w.admin_code}>
                         <button className="btn-primary px-2 py-1 text-xs" onClick={() => setIssue(w)}><PackageMinus size={12} /> Xuất kho</button>
                       </Can>
@@ -259,14 +267,29 @@ export default function Resources() {
                               {RES_STATUS[v.status].label}
                             </div>
                             {v.status === 'nhiem_vu' && v.mission_code && (
-                              <div className="mt-0.5 text-xs text-muted">{v.mission_code} · <Progress value={(v.mission_progress || 0) * 100} tone="warn" className="inline-block w-20 align-middle" /></div>
+                              // Chưa có GPS: không vẽ thanh tiến độ giả — ghi đang đến (ETA) / đã đến (trực ban ghi khi đội báo)
+                              <div className="mt-0.5 text-xs text-muted">
+                                {v.mission_code} · {v.mission_status === 'da_den' ? `đã đến lúc ${time(v.mission_arrived_at)}` : `đang đến, ETA ${time(v.mission_eta)}`}
+                              </div>
                             )}
+                            {v.status === 'bao_duong' && v.status_note && <div className="mt-0.5 text-xs text-muted">{v.status_note}</div>}
                           </td>
                           <td className="w-32">
-                            <div className="flex items-center gap-1 text-xs"><Fuel size={12} /> {v.fuel_level}%</div>
-                            <Progress value={v.fuel_level} tone={v.fuel_level < 30 ? 'danger' : v.fuel_level < 60 ? 'warn' : 'good'} />
+                            {v.fuel_level == null ? (
+                              <div className="flex items-center gap-1 text-xs text-muted" title="Chưa ai báo mức nhiên liệu"><Fuel size={12} /> Chưa cập nhật</div>
+                            ) : (
+                              <>
+                                <div className="flex items-center gap-1 text-xs" title={v.fuel_updated_at ? `Báo lúc ${dateTime(v.fuel_updated_at)}` : undefined}><Fuel size={12} /> {v.fuel_level}%</div>
+                                <Progress value={v.fuel_level} tone={v.fuel_level < 30 ? 'danger' : v.fuel_level < 60 ? 'warn' : 'good'} />
+                              </>
+                            )}
                           </td>
-                          <td className="no-print"><button className="btn-ghost px-2 py-1" title="Xem trên bản đồ" onClick={() => showOnMap(v.lat, v.lon, v.code)}><MapPin size={14} /></button></td>
+                          <td className="no-print whitespace-nowrap">
+                            <Can I="vehicle" a="update" scope={v.admin_code}>
+                              <button className="btn-ghost px-2 py-1 text-xs" title="Báo tình trạng, nhiên liệu" onClick={() => setVehicleEdit(v)}><Pencil size={13} /> Cập nhật</button>
+                            </Can>
+                            <button className="btn-ghost px-2 py-1" title="Xem trên bản đồ" onClick={() => showOnMap(v.lat, v.lon, v.code)}><MapPin size={14} /></button>
+                          </td>
                         </tr>
                       )),
                     ];
@@ -293,7 +316,13 @@ export default function Resources() {
                   {depots.map((d) => (
                     <div key={d.id} className="text-sm">
                       <div className="flex justify-between"><span>{d.name}</span><span className="font-mono text-xs">{int(d.gasoline_l + d.diesel_l)} / {int(d.capacity_l)} L</span></div>
-                      <div className="flex gap-2 text-[11px] text-muted"><span>Xăng {int(d.gasoline_l)} L</span><span>Dầu {int(d.diesel_l)} L</span></div>
+                      <div className="flex gap-2 text-[11px] text-muted">
+                        <span>Xăng {int(d.gasoline_l)} L</span><span>Dầu {int(d.diesel_l)} L</span>
+                        <span>{d.updated_at ? `· cập nhật ${dateTime(d.updated_at)}` : '· theo tệp nhập'}</span>
+                        <Can I="inventory" a="receive" scope={d.admin_code}>
+                          <button className="no-print ml-auto text-accent hover:underline" onClick={() => setDepotEdit(d)}>Cập nhật</button>
+                        </Can>
+                      </div>
                       <Progress value={(100 * (d.gasoline_l + d.diesel_l)) / d.capacity_l} tone={(d.gasoline_l + d.diesel_l) / d.capacity_l < 0.3 ? 'danger' : 'accent'} />
                     </div>
                   ))}
@@ -306,6 +335,9 @@ export default function Resources() {
 
       {quick && <QuickDispatch force={quick} onClose={() => setQuick(null)} />}
       <IssueModal warehouse={issue} onClose={() => setIssue(null)} />
+      {vehicleEdit && <VehicleModal vehicle={vehicleEdit} onClose={() => setVehicleEdit(null)} />}
+      {receive && <ReceiveModal warehouse={receive} onClose={() => setReceive(null)} />}
+      {depotEdit && <FuelDepotModal depot={depotEdit} onClose={() => setDepotEdit(null)} />}
     </div>
   );
 }

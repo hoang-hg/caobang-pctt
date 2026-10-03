@@ -11,9 +11,9 @@ from app.area import area_clause, unit_clause
 from app.auth import audit
 from app.config import settings
 from app.db import execute, fetch_all, fetch_one, transaction
-from app.rbac import scope_loaders
+from app.rbac import domains, scope_loaders
 from app.rbac.authz import area_scope, can, forbidden, require_any, require_permission
-from app.services import dispatch_matching
+from app.services import dispatch_matching, logistics
 from app.services.events import log_event
 from app.services.safe_routing import VEHICLE_SPEED, plan_route
 from app.services.sos import SLA_MINUTES, TICKET_SELECT, create_ticket, get_ticket
@@ -202,6 +202,9 @@ class DispatchIn(BaseModel):
     vehicle_ids: list[str] = []
     personnel: int = Field(3, ge=1)
     supplies: dict[str, int] = {}
+    # Kho xuất vật tư mang theo (tuỳ chọn): trừ tồn kho trong cùng giao dịch với lệnh — kho không đủ thì không phát lệnh.
+    # Không chọn: lệnh chỉ ghi nhu cầu vật tư (trực ban tự xuất kho riêng).
+    warehouse_id: str | None = None
 
 
 @router.post("/dispatch")
@@ -222,6 +225,25 @@ async def dispatch(body: DispatchIn, user: dict = Depends(require_any("dispatch"
         raise HTTPException(404, "Không tìm thấy phiếu SOS hoặc lực lượng")
     if ticket["status"] == "hoan_thanh":
         raise HTTPException(400, "Phiếu đã hoàn thành")
+    supplies = {code: n for code, n in body.supplies.items() if n > 0}
+    warehouse = None
+    if body.warehouse_id and supplies:
+        wh_domain = await scope_loaders.warehouse(body.warehouse_id)
+        if wh_domain is None:
+            raise HTTPException(404, "Không tìm thấy kho xuất vật tư")
+        if not can(user, "inventory", "issue", wh_domain):
+            raise forbidden()
+        warehouse = await fetch_one(
+            "SELECT id, name, admin_unit_id FROM resources.warehouses WHERE id = CAST(:w AS uuid)",
+            {"w": body.warehouse_id},
+        )
+    # Tên mặt hàng cho thông báo thiếu hàng / nhật ký (kho chưa từng có mặt hàng thì không có dòng tồn kho để lấy tên)
+    item_names = {
+        r["code"]: r["name"]
+        for r in await fetch_all(
+            "SELECT code, name FROM resources.items WHERE code = ANY(:c)", {"c": list(supplies)}
+        )
+    }
     if force["personnel_ready"] < 1:
         raise HTTPException(409, f"{force['name']} không còn người sẵn sàng")
     vehicle_ids = list(dict.fromkeys(body.vehicle_ids))
@@ -283,18 +305,41 @@ async def dispatch(body: DispatchIn, user: dict = Depends(require_any("dispatch"
             raise HTTPException(
                 409, "Có phương tiện không còn sẵn sàng (đang làm nhiệm vụ / bảo dưỡng) — chọn lại"
             )
+        if warehouse:
+            # Trừ có điều kiện từng mặt hàng: kho thiếu bất kỳ mặt hàng nào → huỷ cả lệnh (rollback), báo mặt hàng thiếu
+            stock = await fetch_all(
+                """SELECT item_code, quantity FROM resources.inventory
+                    WHERE warehouse_id = CAST(:w AS uuid) AND item_code = ANY(:c) FOR UPDATE""",
+                {"w": body.warehouse_id, "c": list(supplies)},
+                conn,
+            )
+            short = logistics.supplies_shortage(supplies, {r["item_code"]: r["quantity"] for r in stock})
+            if short:
+                raise HTTPException(
+                    409,
+                    f"{warehouse['name']} không đủ: {', '.join(item_names.get(c, c) for c in short)} — chọn kho khác "
+                    "hoặc điều động không kèm xuất kho",
+                )
+            await execute(
+                """UPDATE resources.inventory i SET quantity = i.quantity - s.n, last_updated = now()
+                     FROM unnest(CAST(:c AS text[]), CAST(:n AS int[])) AS s(code, n)
+                    WHERE i.warehouse_id = CAST(:w AS uuid) AND i.item_code = s.code""",
+                {"w": body.warehouse_id, "c": list(supplies), "n": list(supplies.values())},
+                conn,
+            )
         order = await fetch_one(
             """INSERT INTO operations.dispatch_orders (ticket_id, force_id, vehicle_ids, personnel, supplies, dispatched_by, eta,
-                                                       route_geom, distance_km, route_safe)
+                                                       route_geom, distance_km, route_safe, supplies_warehouse_id)
                VALUES (CAST(:t AS uuid), CAST(:f AS uuid), CAST(:v AS uuid[]), :p, CAST(:s AS jsonb), :by, :eta,
-                       ST_SetSRID(ST_GeomFromGeoJSON(:g), 4326), :km, :safe)
+                       ST_SetSRID(ST_GeomFromGeoJSON(:g), 4326), :km, :safe, CAST(:wh AS uuid))
                RETURNING id, eta, distance_km, route_safe""",
             {
                 "t": body.ticket_id,
                 "f": body.force_id,
                 "v": vehicle_ids,
                 "p": personnel,
-                "s": json.dumps(body.supplies),
+                "s": json.dumps(supplies),
+                "wh": body.warehouse_id if warehouse else None,
                 "by": user["full_name"],
                 "eta": eta,
                 "g": json.dumps(route["geometry"]),
@@ -319,6 +364,8 @@ async def dispatch(body: DispatchIn, user: dict = Depends(require_any("dispatch"
                 "vehicles": len(vehicle_ids),
                 "personnel": personnel,
                 "route_km": route["distance_km"],
+                "supplies": supplies,
+                "warehouse": warehouse["name"] if warehouse else None,
             },
             conn,
         )
@@ -328,6 +375,20 @@ async def dispatch(body: DispatchIn, user: dict = Depends(require_any("dispatch"
     await hub.publish(
         "dispatch.updated", {"dispatch_id": order["id"], "ticket_id": body.ticket_id, "status": "dang_di"}
     )
+    if warehouse:
+        await hub.publish(
+            "inventory.changed",
+            {"warehouse_id": body.warehouse_id},
+            "resource",
+            domains.code_of_unit_id(warehouse["admin_unit_id"]),
+        )
+        await log_event(
+            f"{warehouse['name']} xuất vật tư theo lệnh điều động {ticket['code']}: "
+            + ", ".join(f"{n} {item_names.get(code, code)}" for code, n in supplies.items()),
+            "van_hanh",
+            "info",
+            warehouse["admin_unit_id"],
+        )
     await log_event(
         f"LỆNH ĐIỀU ĐỘNG: {force['name']} ({personnel} người, {len(vehicle_ids)} phương tiện) → {ticket['code']}, "
         f"{route['distance_km']} km, ETA {route['duration_min']} phút"
@@ -350,6 +411,41 @@ async def dispatch(body: DispatchIn, user: dict = Depends(require_any("dispatch"
             f"toạ độ {ticket['lat']:.5f},{ticket['lon']:.5f}. ETA {route['duration_min']} phút.",
         },
     }
+
+
+@router.post("/dispatch/{order_id}/arrived")
+async def dispatch_arrived(
+    order_id: str, user: dict = Depends(require_permission("sos", "update", scope_loaders.dispatch_order))
+):
+    """Đội báo đã đến hiện trường (điện thoại / bộ đàm — chưa có GPS) → lệnh "đã đến", tiến độ 100%, ghi giờ đến. Trước
+    đây khi chạy thật tiến độ đứng 0% tới lúc xác nhận "Đã cứu"."""
+    row = await fetch_one(
+        """UPDATE operations.dispatch_orders SET status = 'da_den', progress = 1, arrived_at = now()
+            WHERE id = CAST(:id AS uuid) AND status = 'dang_di'
+        RETURNING ticket_id, force_id, dispatched_at, arrived_at""",
+        {"id": order_id},
+    )
+    if not row:
+        raise HTTPException(409, "Lệnh không còn ở trạng thái đang di chuyển (đã đến / đã xong / huỷ)")
+    ticket = await get_ticket(row["ticket_id"])
+    force = await fetch_one("SELECT name FROM resources.forces WHERE id = :f", {"f": row["force_id"]})
+    minutes = round((row["arrived_at"] - row["dispatched_at"]).total_seconds() / 60)
+    await audit(
+        user, "dispatch.arrived", "sos_ticket", ticket["code"], {"order": order_id, "minutes": minutes}
+    )
+    await hub.publish("sos.updated", ticket, "sos", ticket["admin_code"])
+    await hub.publish(
+        "dispatch.updated", {"dispatch_id": order_id, "ticket_id": str(row["ticket_id"]), "status": "da_den"}
+    )
+    await log_event(
+        f"{force['name'] if force else 'Lực lượng'} đã đến hiện trường {ticket['code']} sau {minutes} phút"
+        f" ({user['full_name']})",
+        "cuu_ho",
+        "info",
+        lat=ticket["lat"],
+        lon=ticket["lon"],
+    )
+    return ticket
 
 
 @router.get("/evacuation")

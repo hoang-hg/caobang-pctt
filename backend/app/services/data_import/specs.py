@@ -491,7 +491,9 @@ DATASETS: dict[str, Dataset] = {
         Dataset(
             "phuong_tien",
             "Phương tiện",
-            "Phương tiện, thiết bị cứu hộ (lực lượng quản lý phải có trước).",
+            "Phương tiện, thiết bị cứu hộ (lực lượng quản lý phải có trước). Trạng thái và nhiên liệu chỉ áp dụng khi THÊM "
+            "MỚI — sau đó cập nhật bằng nút “Cập nhật” ở trang Vật tư & Lực lượng (nhập lại tệp giữa đợt ứng phó không trả "
+            "phương tiện đang làm nhiệm vụ về “sẵn sàng”, không xoá mức nhiên liệu vừa báo).",
             "resources.vehicles",
             ("code",),
             (
@@ -531,6 +533,24 @@ DATASETS: dict[str, Dataset] = {
                 ),
                 Field("ma_luc_luong", "Mã lực lượng quản lý", None, "code", example="CB-LL-001"),
                 Field("suc_cho", "Sức chở (người)", "capacity", "int", min=0, example="8"),
+                Field(
+                    "trang_thai",
+                    "Trạng thái khi thêm mới (san_sang / bao_duong)",
+                    "status",
+                    "enum",
+                    choices=("san_sang", "bao_duong"),
+                    default="san_sang",
+                    example="san_sang",
+                ),
+                Field(
+                    "nhien_lieu",
+                    "Mức nhiên liệu khi thêm mới (%, trống = chưa rõ)",
+                    "fuel_level",
+                    "int",
+                    min=0,
+                    max=100,
+                    example="80",
+                ),
                 LAT,
                 LON,
             ),
@@ -538,7 +558,7 @@ DATASETS: dict[str, Dataset] = {
             geometry_columns=("current_location",),
             geometry_required=False,
             refs=(Ref("ma_luc_luong", "force_id", "resources.forces"),),
-            insert_only=("current_location",),
+            insert_only=("current_location", "status", "fuel_level", "fuel_updated_at"),
             touch=("updated_at",),
         ),
         Dataset(

@@ -49,6 +49,29 @@ async def vehicle(vehicle_id: str) -> str | None:
     return domains.domain_of_unit_id(row["admin_unit_id"]) if row else None
 
 
+async def dispatch_order(order_id: str) -> str | None:
+    """Lệnh điều động thuộc phạm vi xã của phiếu SOS nó phục vụ."""
+    oid = _uuid_or_none(order_id)
+    if not oid:
+        return None
+    row = await fetch_one(
+        """SELECT t.admin_unit_id FROM operations.dispatch_orders o
+             JOIN operations.sos_tickets t ON t.id = o.ticket_id WHERE o.id = CAST(:id AS uuid)""",
+        {"id": oid},
+    )
+    return domains.domain_of_unit_id(row["admin_unit_id"]) if row else None
+
+
+async def fuel_depot(depot_id: str) -> str | None:
+    did = _uuid_or_none(depot_id)
+    if not did:
+        return None
+    row = await fetch_one(
+        "SELECT admin_unit_id FROM resources.fuel_depots WHERE id = CAST(:id AS uuid)", {"id": did}
+    )
+    return domains.domain_of_unit_id(row["admin_unit_id"]) if row else None
+
+
 async def evacuation_site(site_id: str) -> str | None:
     sid = _uuid_or_none(site_id)
     if not sid:

@@ -385,7 +385,7 @@ export default function MapLayers({ data, layers, timeline, onDispatch, onCamera
               <Popup>
                 <b>{p.code}</b> – {VEHICLE[p.vehicle_type]}
                 <div className="text-xs text-muted">{p.force_name}</div>
-                <div className="text-xs">{RES_STATUS[p.status].label} · Nhiên liệu {p.fuel_level}%</div>
+                <div className="text-xs">{RES_STATUS[p.status].label} · Nhiên liệu {p.fuel_level == null ? 'chưa cập nhật' : `${p.fuel_level}%`}</div>
               </Popup>
             </Marker>
           );

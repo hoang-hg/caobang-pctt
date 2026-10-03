@@ -642,6 +642,10 @@ def _columns(ds: Dataset, row: Prepared) -> tuple[list[str], list[str], dict[str
         cols.append("alarm_thresholds")
         exprs.append("CAST(:c_thresholds AS jsonb)")
         params["c_thresholds"] = json.dumps(thresholds)
+    if ds.name == "phuong_tien":
+        # Mức nhiên liệu có trong tệp → ghi thời điểm báo (chỉ khi thêm mới, như fuel_level — xem insert_only)
+        cols.append("fuel_updated_at")
+        exprs.append("CASE WHEN CAST(:c_fuel_level AS int) IS NULL THEN NULL ELSE now() END")
     for ref in ds.refs:
         name = f"r_{ref.column}"
         cols.append(ref.column)

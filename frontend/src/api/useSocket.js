@@ -53,7 +53,7 @@ export function useSocket() {
           qc.setQueriesData({ queryKey: ['logs'] }, (old) => (Array.isArray(old) ? [data, ...old].slice(0, 60) : old));
           break;
         case 'inventory.changed':
-          throttle('inv', 5_000, () => inv('warehouses', 'supplies', 'resources-summary', 'evacuation', 'kpis'));
+          throttle('inv', 5_000, () => inv('warehouses', 'supplies', 'resources-summary', 'evacuation', 'kpis', 'fuel', 'map-layers'));
           break;
         case 'broadcast.updated':
           inv('broadcasts', 'audit');

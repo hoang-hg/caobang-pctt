@@ -23,3 +23,10 @@ export function communeAt(geo, lat, lon) {
   const f = geo?.features?.find((x) => pointInGeometry(lon, lat, x.geometry));
   return f?.properties?.code || null;
 }
+
+/** Khoảng cách đường chim bay (km) giữa hai điểm WGS84 — xếp kho gần điểm sự cố. */
+export function distanceKm(lat1, lon1, lat2, lon2) {
+  const r = (d) => (d * Math.PI) / 180;
+  const a = Math.sin(r(lat2 - lat1) / 2) ** 2 + Math.cos(r(lat1)) * Math.cos(r(lat2)) * Math.sin(r(lon2 - lon1) / 2) ** 2;
+  return 6371 * 2 * Math.asin(Math.sqrt(a));
+}
