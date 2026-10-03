@@ -755,12 +755,12 @@ graph LR
   mở, lưu lượng theo báo cáo của đơn vị quản lý hồ (`PATCH /api/v1/reservoirs/{mã}/operation`, ghi nhật ký thao tác) →
   cổng công khai và bản nhẹ cập nhật ngay, kèm thời điểm số liệu; số liệu cũ hơn 6 giờ gắn nhãn **"Số liệu cũ"**.
 - **Dự báo mực nước**: hệ thống không tự chạy mô hình thuỷ văn. Người có quyền `monitoring.update` bấm **Nhập bản tin
-  dự báo** ở khối Hydrograph của Dashboard, chọn trạm, dán bảng 2 cột "thời điểm – mực nước" từ bản tin của Đài KTTV
+  dự báo** (dưới biểu đồ Hydrograph của Dashboard), chọn trạm, dán bảng 2 cột "thời điểm – mực nước" từ bản tin của Đài KTTV
   (dán thẳng từ Excel; giờ viết `07:00 04/10`, `7h 04/10/2026` hoặc `2026-10-04 07:00`, mực nước `180,45` hoặc
   `180.45`), xem trước đỉnh dự báo so với BĐ I–III rồi lưu (`PUT /api/v1/stations/{mã}/forecast`, model `KTTV`). Bản tin
   mới **thay toàn bộ** bản tin cũ của trạm; mốc lệch ngưỡng BĐ I quá 50 m (gõ thừa / thiếu chữ số) bị từ chối. Hydrograph
-  vẽ nét đứt kèm giờ phát hành; chưa có bản tin → ghi "Chưa có bản tin dự báo". Bản tin hết hiệu lực: **Gỡ bản tin hiện
-  có** (`DELETE` cùng đường dẫn). Mọi thao tác ghi nhật ký thao tác và nhật ký sự kiện (đỉnh vượt báo động → mức cảnh báo).
+  vẽ nét đứt kèm giờ phát hành; chưa có bản tin → ghi "Chưa có bản tin dự báo". Bản tin hết hiệu lực: mở lại form, bấm
+  **Gỡ bản tin** (`DELETE` cùng đường dẫn). Mọi thao tác ghi nhật ký thao tác và nhật ký sự kiện (đỉnh vượt báo động → mức cảnh báo).
 - **Tiến độ sơ tán**: KPI "Sơ tán an toàn (hộ)" của Dashboard cộng từ bảng tiến độ của từng xã. Người có quyền
   `evacuation.update` (quản trị xã cho xã mình, cấp tỉnh cho mọi xã) vào Điều hành cứu hộ → **Giám sát sơ tán nhân dân** →
   **Sửa** / **+ Cập nhật xã**, nhập số hộ, nhân khẩu phải sơ tán và đã sơ tán (`PUT /api/v1/evacuation/{mã xã}`). Chặn

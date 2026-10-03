@@ -65,12 +65,12 @@ export default function ForecastBulletinModal({ stations, stationId, onClose }) 
         <>
           {current.length > 0 && (
             <button className="btn-ghost mr-auto text-danger" disabled={busy} onClick={remove}>
-              Gỡ bản tin hiện có
+              Gỡ bản tin
             </button>
           )}
           <button className="btn-ghost" onClick={onClose}>Huỷ</button>
           <button className="btn-primary" disabled={busy || !points.length || errors.length > 0 || !issued} onClick={save}>
-            Lưu bản tin ({points.length} mốc)
+            Lưu bản tin
           </button>
         </>
       }

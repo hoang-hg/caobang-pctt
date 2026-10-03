@@ -325,26 +325,27 @@ export default function Dashboard() {
             <Section
               title="Biểu đồ thủy văn (Hydrograph)"
               right={
-                <div className="flex items-center gap-2">
-                  <select
-                    className="input w-auto py-1 px-2.5 text-xs border border-line"
-                    value={activeStation}
-                    onChange={(e) => setStationId(e.target.value)}
-                    aria-label="Chọn trạm thủy văn"
-                  >
-                    {stations.map((s) => (
-                      <option key={s.id} value={s.id}>{s.name.replace('Trạm thủy văn ', '')}</option>
-                    ))}
-                  </select>
-                  {canForecast && stations.length > 0 && (
-                    <button className="btn-ghost whitespace-nowrap px-2.5 py-1 text-xs" onClick={() => setBulletinOpen(true)}>
-                      Nhập bản tin dự báo
-                    </button>
-                  )}
-                </div>
+                <select
+                  className="input w-auto py-1 px-2.5 text-xs border border-line"
+                  value={activeStation}
+                  onChange={(e) => setStationId(e.target.value)}
+                  aria-label="Chọn trạm thủy văn"
+                >
+                  {stations.map((s) => (
+                    <option key={s.id} value={s.id}>{s.name.replace('Trạm thủy văn ', '')}</option>
+                  ))}
+                </select>
               }
             >
               <Hydrograph stationId={activeStation} height={250} />
+              {/* Dưới biểu đồ, không ở hàng tiêu đề: tiêu đề + chọn trạm đã kín bề ngang điện thoại */}
+              {canForecast && stations.length > 0 && (
+                <div className="no-print mt-2 flex justify-end">
+                  <button className="btn-ghost px-2.5 py-1 text-xs" onClick={() => setBulletinOpen(true)}>
+                    Nhập bản tin dự báo
+                  </button>
+                </div>
+              )}
               {bulletinOpen && (
                 <ForecastBulletinModal stations={stations} stationId={activeStation} onClose={() => setBulletinOpen(false)} />
               )}
