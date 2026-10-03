@@ -39,13 +39,18 @@ const mmss = (sec) => {
   return h ? `${h}h${String(m).padStart(2, '0')}` : `${m}:${String(s % 60).padStart(2, '0')}`;
 };
 
-function TicketCard({ t, now, onDispatch, onResolve, onFocus }) {
+function TicketCard({ t, now, onDispatch, onResolve, onFocus, onArrived }) {
   const canUpdate = usePermission('sos', 'update', t.admin_code);
   const pr = PRIORITY[t.priority] || PRIORITY[2];
   const waitingSec = (now - new Date(t.received_at).getTime()) / 1000;
   const slaSec = t.sla_minutes * 60;
   const breached = t.status === 'moi' && waitingSec > slaSec;
   const etaSec = t.eta ? (new Date(t.eta).getTime() - now) / 1000 : null;
+  // Tiến độ: đã đến = 100%; bộ mô phỏng có tiến độ thật; chạy thật chưa có GPS → ước tính theo giờ xuất phát và ETA
+  const arrived = t.dispatch_status === 'da_den';
+  const span = t.dispatched_at && t.eta ? new Date(t.eta) - new Date(t.dispatched_at) : 0;
+  const estimated = !arrived && !(t.progress > 0);
+  const progress = arrived ? 100 : t.progress > 0 ? t.progress * 100 : span > 0 ? Math.min(95, (100 * (now - new Date(t.dispatched_at))) / span) : 0;
 
   return (
     <div
@@ -108,12 +113,17 @@ function TicketCard({ t, now, onDispatch, onResolve, onFocus }) {
               <Navigation size={12} className="text-accent" />
               <span className="truncate">{t.force_name}</span>
             </div>
-            <div className="flex items-center gap-2">
-              <Progress value={(t.progress || 0) * 100} tone="warn" className="flex-1" />
+            <div className="flex items-center gap-2" title={estimated ? 'Ước tính theo giờ xuất phát và ETA (chưa có GPS)' : undefined}>
+              <Progress value={progress} tone={arrived ? 'good' : 'warn'} className="flex-1" />
               <span className="font-mono text-[11px] text-ink font-semibold">
-                {t.dispatch_status === 'da_den' ? 'Đã đến nơi' : etaSec > 0 ? `ETA ${mmss(etaSec)}` : 'Sắp đến'}
+                {arrived ? `Đã đến ${time(t.arrived_at)}` : etaSec > 0 ? `ETA ${mmss(etaSec)}` : 'Quá ETA'}
               </span>
             </div>
+            {!arrived && canUpdate && t.dispatch_id && (
+              <button className="btn-ghost w-full justify-center px-2 py-1 text-xs" onClick={() => onArrived(t)}>
+                <CheckCircle2 size={12} /> Đội báo đã đến hiện trường
+              </button>
+            )}
             {!t.route_safe && <div className="text-[11px] font-medium text-danger">⚠ Lộ trình buộc qua vùng nguy hiểm</div>}
           </div>
         )}
@@ -462,6 +472,16 @@ export default function RescueCenter() {
     }
   };
 
+  const onArrived = async (t) => {
+    try {
+      await api(`/dispatch/${t.dispatch_id}/arrived`, { method: 'POST' });
+      qc.invalidateQueries({ queryKey: ['sos'] });
+      toast({ tone: 'good', title: `${t.force_name || 'Lực lượng'} đã đến hiện trường ${t.code}` });
+    } catch (e) {
+      toast({ tone: 'danger', title: 'Không cập nhật được', body: e.message });
+    }
+  };
+
   const onFocus = (t) => {
     setFocus({ lat: t.lat, lon: t.lon, zoom: 15, label: t.code });
     navigate('/ban-do');
@@ -550,6 +570,7 @@ export default function RescueCenter() {
                       onDispatch={setDispatch}
                       onResolve={(x) => move(x.id, 'hoan_thanh')}
                       onFocus={onFocus}
+                      onArrived={onArrived}
                     />
                   ))}
                 {!counts[col.key] && (

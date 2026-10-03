@@ -442,8 +442,9 @@ async def seed_resources(conn: AsyncConnection, units: dict[str, dict], now: dat
         status = "bao_duong" if code in ("CB-X04", "CB-MX03", "CB-FC03") else "san_sang"
         await ex(
             conn,
-            """INSERT INTO resources.vehicles (code, name, vehicle_type, category, force_id, status, fuel_level, capacity, current_location)
-                          VALUES (:c,:n,:t,:cat,:f,:s,:fuel,:cap, ST_SetSRID(ST_MakePoint(:lon,:lat),4326))""",
+            """INSERT INTO resources.vehicles (code, name, vehicle_type, category, force_id, status, fuel_level, fuel_updated_at,
+                                              capacity, current_location)
+                          VALUES (:c,:n,:t,:cat,:f,:s,:fuel, now(),:cap, ST_SetSRID(ST_MakePoint(:lon,:lat),4326))""",
             {
                 "c": code,
                 "n": name,
@@ -1035,6 +1036,18 @@ DELETE FROM public.casbin_rule WHERE ptype = 'g'
 """
 
 
+async def clear_unverified_fuel() -> int:
+    """Chạy thật: nhiên liệu phương tiện trước migration 0015 là mặc định 100% (không có cách cập nhật) → xoá về "chưa cập
+    nhật". Số đã báo qua giao diện / tệp nhập có fuel_updated_at, giữ nguyên. Trả về số phương tiện đã xoá."""
+    async with engine.begin() as conn:
+        rows = await fetch_all(
+            """UPDATE resources.vehicles SET fuel_level = NULL
+                WHERE fuel_updated_at IS NULL AND fuel_level IS NOT NULL RETURNING id""",
+            conn=conn,
+        )
+    return len(rows)
+
+
 async def drop_sample_roads() -> int:
     """Xoá sơ đồ đường vẽ tay (``source = 'so_do'``) mà bản cũ nạp cả khi chạy thật — chỉ đường cho người dân không được
     vẽ tuyến trên đường giả lập. Đường chính thức (source khác) giữ nguyên. Trả về số đoạn đã xoá."""
@@ -1058,6 +1071,8 @@ async def main(reset: bool = False):
     if not settings.demo_mode and (n := await drop_sample_roads()):
         print(f"[seed] Đã xoá {n} đoạn đường của sơ đồ vẽ tay (chỉ dùng khi DEMO_MODE=true)")
         await invalidate("public:")  # bản đồ công khai bỏ lớp "đường bị chia cắt" vẽ trên đường giả lập
+    if not settings.demo_mode and (n := await clear_unverified_fuel()):
+        print(f'[seed] {n} phương tiện: nhiên liệu mặc định 100% không có nguồn → "chưa cập nhật"')
     existing = await fetch_one("SELECT count(*) AS n FROM spatial_admin.administrative_units")
     if existing["n"] and not reset:
         print(f"[seed] Đã có {existing['n']} đơn vị hành chính — bỏ qua.")

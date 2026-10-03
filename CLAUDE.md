@@ -222,6 +222,9 @@ Python trong container.
   liệu thật, không cắt chữ "mô phỏng" khỏi nhãn. Dữ liệu cán bộ nhập tay (bản tin mực nước / bão, điểm sự cố, số người ở
   điểm sơ tán): kiểm tra gõ nhầm ở hàm thuần (`services/map_ops.py`, `forecast_problem`…), ghi `audit` + `log_event`.
 - Điểm nguy hiểm đang hiệu lực: luôn dùng `map_ops.active_point_sql()` (còn `active` và chưa quá `expires_at`).
+- Số liệu chưa có ai báo (nhiên liệu phương tiện…) để NULL và hiện "chưa cập nhật" — không điền mặc định trông như số thật;
+  lọc theo số đó thì giữ bản ghi NULL (`fuel_level IS NULL OR fuel_level >= 20`). Cột trạng thái động nhập từ tệp →
+  `insert_only` (nhập lại tệp giữa đợt ứng phó không ghi đè trạng thái đang có).
 
 **Giới hạn tần suất & IP**
 - Quy tắc ở `RULES` trong `infra/ratelimit.py` (khớp tiền tố, quy tắc cụ thể đặt trước). Nhà mạng dùng chung IP (CGNAT) →

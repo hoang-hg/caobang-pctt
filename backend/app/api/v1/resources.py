@@ -1,5 +1,7 @@
 """Quản lý Vật tư & Lực lượng cứu hộ (Phân hệ C)."""
 
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
@@ -9,8 +11,9 @@ from app.db import fetch_all, fetch_one, transaction
 from app.infra.cache import cached_view, invalidate
 from app.rbac import domains, scope_loaders
 from app.rbac.authz import area_scope, require_permission
-from app.services import map_ops
+from app.services import logistics, map_ops
 from app.services.events import log_event
+from app.services.readings import VN_TZ, vn_time
 from app.ws.hub import hub
 
 router = APIRouter(prefix="/resources", tags=["Nguồn lực"])
@@ -107,13 +110,16 @@ async def warehouses(codes: list[str] = Depends(RES), level: str | None = None):
 @router.get("/vehicles")
 async def vehicles(codes: list[str] = Depends(RES), category: str | None = None, status: str | None = None):
     return await fetch_all(
-        f"""SELECT v.id, v.code, v.name, v.vehicle_type, v.category, v.status, v.fuel_level, v.capacity, v.updated_at,
-                   f.name AS force_name, f.contact_phone, ST_Y(v.current_location) AS lat, ST_X(v.current_location) AS lon,
-                   t.code AS mission_code, d.progress AS mission_progress
+        f"""SELECT v.id, v.code, v.name, v.vehicle_type, v.category, v.status, v.fuel_level, v.fuel_updated_at, v.status_note,
+                   v.capacity, v.updated_at, f.name AS force_name, f.contact_phone, u.code AS admin_code,
+                   ST_Y(v.current_location) AS lat, ST_X(v.current_location) AS lon,
+                   t.code AS mission_code, d.progress AS mission_progress, d.status AS mission_status, d.eta AS mission_eta,
+                   d.arrived_at AS mission_arrived_at
               FROM resources.vehicles v
               LEFT JOIN resources.forces f ON f.id = v.force_id
+              LEFT JOIN spatial_admin.administrative_units u ON u.id = f.admin_unit_id
               LEFT JOIN operations.sos_tickets t ON t.id = v.mission_ticket_id
-              LEFT JOIN LATERAL (SELECT progress FROM operations.dispatch_orders o
+              LEFT JOIN LATERAL (SELECT progress, status, eta, arrived_at FROM operations.dispatch_orders o
                                   WHERE o.ticket_id = v.mission_ticket_id AND v.id = ANY(o.vehicle_ids)
                                   ORDER BY dispatched_at DESC LIMIT 1) d ON TRUE
              WHERE {area_clause('v.current_location', codes)}
@@ -124,11 +130,19 @@ async def vehicles(codes: list[str] = Depends(RES), category: str | None = None,
     )
 
 
+@router.get("/items")
+async def items(_: list[str] = Depends(RES)):
+    """Danh mục vật tư (mã, tên, nhóm, đơn vị) — form nhập thêm hàng, mặt hàng mới ở kho."""
+    return await fetch_all("SELECT code, name, category, unit FROM resources.items ORDER BY category, name")
+
+
 @router.get("/fuel-depots")
 async def fuel_depots(codes: list[str] = Depends(RES)):
     return await fetch_all(
-        f"""SELECT id, name, gasoline_l, diesel_l, capacity_l, ST_Y(location) AS lat, ST_X(location) AS lon
-              FROM resources.fuel_depots WHERE {area_clause('location', codes)} ORDER BY name""",
+        f"""SELECT d.id, d.code, d.name, d.gasoline_l, d.diesel_l, d.capacity_l, d.updated_at, u.code AS admin_code,
+                   ST_Y(d.location) AS lat, ST_X(d.location) AS lon
+              FROM resources.fuel_depots d LEFT JOIN spatial_admin.administrative_units u ON u.id = d.admin_unit_id
+             WHERE {area_clause('d.location', codes)} ORDER BY d.name""",
         {"codes": codes},
     )
 
@@ -180,6 +194,95 @@ async def update_site_occupancy(
     return {"id": site_id, "current_occupancy": body.current_occupancy, "capacity": site["capacity"]}
 
 
+@router.post("/warehouses/{warehouse_id}/receive")
+async def receive(
+    warehouse_id: str,
+    body: logistics.ReceiveIn,
+    user: dict = Depends(require_permission("inventory", "receive", scope_loaders.warehouse)),
+):
+    """Nhập thêm hàng (hàng cứu trợ về, mua bổ sung): cộng vào tồn kho, hạn dùng giữ hạn sớm nhất. Mặt hàng mới ở kho cần
+    định mức an toàn. Trước đây chỉ có xuất kho — muốn tăng tồn phải nhập lại cả tệp tồn kho."""
+    item = await fetch_one(
+        "SELECT code, name, unit FROM resources.items WHERE code = :c", {"c": body.item_code}
+    )
+    if not item:
+        raise HTTPException(422, f"Không có mặt hàng mã {body.item_code} trong danh mục vật tư")
+    async with transaction() as conn:
+        old = await fetch_one(
+            """SELECT quantity, safety_quota, expiry_date FROM resources.inventory
+                WHERE warehouse_id = CAST(:w AS uuid) AND item_code = :i FOR UPDATE""",
+            {"w": warehouse_id, "i": body.item_code},
+            conn,
+        )
+        if problem := logistics.receive_problem(body, old is not None, datetime.now(VN_TZ).date()):
+            raise HTTPException(422, problem)
+        row = await fetch_one(
+            """INSERT INTO resources.inventory (warehouse_id, item_code, quantity, safety_quota, expiry_date)
+               VALUES (CAST(:w AS uuid), :i, :q, :quota, :exp)
+               ON CONFLICT (warehouse_id, item_code) DO UPDATE
+                  SET quantity = resources.inventory.quantity + EXCLUDED.quantity,
+                      safety_quota = COALESCE(CAST(:quota_set AS int), resources.inventory.safety_quota),
+                      expiry_date = :exp, last_updated = now()
+               RETURNING warehouse_id, item_code, quantity, safety_quota, expiry_date""",
+            {
+                "w": warehouse_id,
+                "i": body.item_code,
+                "q": body.quantity,
+                "quota": body.safety_quota if body.safety_quota is not None else 0,
+                "quota_set": body.safety_quota,
+                "exp": logistics.merged_expiry(old["expiry_date"] if old else None, body.expiry_date),
+            },
+            conn,
+        )
+        wh = await fetch_one(
+            "SELECT name, admin_unit_id FROM resources.warehouses WHERE id = CAST(:w AS uuid)",
+            {"w": warehouse_id},
+            conn,
+        )
+        await audit(user, "inventory.receive", "warehouse", warehouse_id, body.model_dump(mode="json"), conn)
+    await hub.publish("inventory.changed", row, "resource", domains.code_of_unit_id(wh["admin_unit_id"]))
+    await log_event(
+        f"{wh['name']} nhập {body.quantity} {item['unit']} {item['name']}"
+        + (f" — {body.source}" if body.source else "")
+        + f" ({user['full_name']})",
+        "van_hanh",
+        "info",
+        wh["admin_unit_id"],
+    )
+    return row
+
+
+@router.patch("/fuel-depots/{depot_id}")
+async def update_fuel_depot(
+    depot_id: str,
+    body: logistics.FuelDepotIn,
+    user: dict = Depends(require_permission("inventory", "receive", scope_loaders.fuel_depot)),
+):
+    """Cập nhật lượng xăng / dầu dự trữ tại điểm cấp nhiên liệu (trước đây chỉ qua nhập tệp)."""
+    depot = await fetch_one(
+        "SELECT name, capacity_l, admin_unit_id FROM resources.fuel_depots WHERE id = CAST(:id AS uuid)",
+        {"id": depot_id},
+    )
+    if problem := logistics.depot_problem(body.gasoline_l, body.diesel_l, depot["capacity_l"]):
+        raise HTTPException(422, problem)
+    row = await fetch_one(
+        """UPDATE resources.fuel_depots SET gasoline_l = :g, diesel_l = :d, updated_at = now()
+            WHERE id = CAST(:id AS uuid) RETURNING id, gasoline_l, diesel_l, capacity_l, updated_at""",
+        {"g": body.gasoline_l, "d": body.diesel_l, "id": depot_id},
+    )
+    await audit(user, "fuel_depot.update", "fuel_depot", depot_id, body.model_dump())
+    await hub.publish("inventory.changed", {"fuel_depot_id": depot_id})
+    await log_event(
+        f"{depot['name']}: xăng {body.gasoline_l} L, dầu {body.diesel_l} L / sức chứa {depot['capacity_l']} L"
+        + (f" — {body.source}" if body.source else "")
+        + f" (cập nhật lúc {vn_time(row['updated_at'])}, {user['full_name']})",
+        "van_hanh",
+        "info",
+        depot["admin_unit_id"],
+    )
+    return row
+
+
 class IssueIn(BaseModel):
     item_code: str
     quantity: int = Field(gt=0)
@@ -220,24 +323,48 @@ async def issue(
     return row
 
 
-class VehicleStatusIn(BaseModel):
-    status: str = Field(pattern="^(san_sang|nhiem_vu|bao_duong)$")
-
-
 @router.patch("/vehicles/{vehicle_id}")
 async def update_vehicle(
     vehicle_id: str,
-    body: VehicleStatusIn,
+    body: logistics.VehicleUpdateIn,
     user: dict = Depends(require_permission("vehicle", "update", scope_loaders.vehicle)),
 ):
-    row = await fetch_one(
-        """UPDATE resources.vehicles SET status = :s, updated_at = now(),
-                  mission_ticket_id = CASE WHEN :s = 'nhiem_vu' THEN mission_ticket_id ELSE NULL END
-            WHERE id = CAST(:id AS uuid) RETURNING id, code, status""",
-        {"s": body.status, "id": vehicle_id},
+    """Đơn vị quản lý / trực ban báo tình trạng phương tiện: Sẵn sàng ↔ Bảo dưỡng / hỏng (phương tiện hỏng không được gợi
+    ý điều động) và mức nhiên liệu (%). "Đang làm nhiệm vụ" chỉ do lệnh điều động gán; báo hỏng giữa nhiệm vụ → phương
+    tiện rời nhiệm vụ (hoàn thành phiếu không trả nó về "sẵn sàng")."""
+    before = await fetch_one(
+        "SELECT code, name, status FROM resources.vehicles WHERE id = CAST(:id AS uuid)", {"id": vehicle_id}
     )
-    if not row:
-        raise HTTPException(404, "Không tìm thấy phương tiện")
-    await audit(user, "vehicle.status", "vehicle", row["code"], body.model_dump())
-    await hub.publish("gps.update", [])
+    row = await fetch_one(
+        """UPDATE resources.vehicles
+              SET status = COALESCE(CAST(:s AS text), status),
+                  mission_ticket_id = CASE WHEN CAST(:s AS text) IS NULL THEN mission_ticket_id END,
+                  status_note = CASE WHEN CAST(:s AS text) IS NULL THEN status_note ELSE CAST(:note AS text) END,
+                  fuel_level = COALESCE(CAST(:fuel AS int), fuel_level),
+                  fuel_updated_at = CASE WHEN CAST(:fuel AS int) IS NULL THEN fuel_updated_at ELSE now() END,
+                  updated_at = now()
+            WHERE id = CAST(:id AS uuid)
+        RETURNING id, code, status, fuel_level, fuel_updated_at, status_note""",
+        {"s": body.status, "note": body.note, "fuel": body.fuel_level, "id": vehicle_id},
+    )
+    await audit(user, "vehicle.update", "vehicle", row["code"], body.model_dump())
+    await hub.publish("dispatch.updated", {"vehicle_id": vehicle_id})
+    parts = []
+    if body.status and body.status != before["status"]:
+        parts.append(
+            f"{logistics.VEHICLE_STATUS_LABEL[before['status']]} → {logistics.VEHICLE_STATUS_LABEL[body.status]}"
+        )
+    if body.fuel_level is not None:
+        parts.append(f"nhiên liệu {body.fuel_level}%")
+    if parts:
+        await log_event(
+            f"{row['code']} {before['name']}: {', '.join(parts)}"
+            + (f" — {body.note}" if body.note else "")
+            + f" ({user['full_name']})",
+            "van_hanh",
+            "warning"
+            if body.status == "bao_duong"
+            or (body.fuel_level is not None and body.fuel_level < logistics.FUEL_LOW)
+            else "info",
+        )
     return row

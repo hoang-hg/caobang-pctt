@@ -38,6 +38,7 @@ class Action(StrEnum):
     UPDATE = "update"
     RESOLVE = "resolve"
     ISSUE = "issue"
+    RECEIVE = "receive"
     APPROVE = "approve"
     OPERATE = "operate"
     MANAGE = "manage"
@@ -82,6 +83,12 @@ ALL_PERMISSIONS: Final[tuple[Permission, ...]] = (
     Permission(R.DISPATCH, A.CREATE, True, "Phát lệnh điều động lực lượng"),
     Permission(R.RESOURCE, A.VIEW, True, "Xem lực lượng, kho, phương tiện, điểm sơ tán"),
     Permission(R.INVENTORY, A.ISSUE, True, "Ra lệnh xuất kho"),
+    Permission(
+        R.INVENTORY,
+        A.RECEIVE,
+        True,
+        "Nhập thêm hàng vào kho (hàng cứu trợ, mua bổ sung); cập nhật nhiên liệu dự trữ tại điểm cấp nhiên liệu",
+    ),
     Permission(R.VEHICLE, A.UPDATE, True, "Cập nhật trạng thái phương tiện"),
     Permission(R.ALERT, A.VIEW, True, "Xem lệnh cảnh báo & tỷ lệ chuyển giao"),
     Permission(R.ALERT, A.CREATE, True, "Soạn lệnh cảnh báo (Maker)"),
@@ -163,7 +170,7 @@ SYSTEM_ROLES: Final[tuple[tuple[str, str, str, bool, list[tuple[str, str]]], ...
         COMMUNE_ROLE,
         "Quản trị xã/phường",
         "Trong địa bàn xã: tiếp nhận và xử lý SOS, cập nhật tiến độ sơ tán, đánh dấu sự cố trên bản đồ, duyệt phản ánh, "
-        "xuất kho của xã, gửi dữ liệu chờ tỉnh duyệt",
+        "xuất / nhập kho của xã, gửi dữ liệu chờ tỉnh duyệt",
         True,
         perms(
             "monitoring.view",
@@ -175,6 +182,8 @@ SYSTEM_ROLES: Final[tuple[tuple[str, str, str, bool, list[tuple[str, str]]], ...
             "incident.update",
             "resource.view",
             "inventory.issue",
+            "inventory.receive",
+            "vehicle.update",
             "alert.view",
             "contact.view",
             "report.view",

@@ -313,6 +313,11 @@ if (force) {
     disp.data?.route?.safe === false && disp.data?.route?.hazards?.includes('Khu dân cư xóm Nà Rì'), JSON.stringify(disp.data?.route?.hazards));
   check('Không có SMS / Push: lệnh điều động báo rõ CHƯA gửi cho đội (trực ban phải gọi)',
     disp.data?.notification?.sent === false && !!disp.data?.notification?.message);
+  // Chưa có GPS: trực ban ghi "đội đã đến hiện trường" khi đội báo qua điện thoại / bộ đàm
+  const arrived = await call('POST', `/dispatch/${disp.data?.order?.id}/arrived`, null, admin);
+  check('Đội báo đã đến hiện trường → lệnh "đã đến", ghi giờ đến', arrived.status === 200 && arrived.data?.dispatch_status === 'da_den'
+    && !!arrived.data?.arrived_at, `HTTP ${arrived.status}`);
+  check('Báo "đã đến" lần hai → 409', (await call('POST', `/dispatch/${disp.data?.order?.id}/arrived`, null, admin)).status === 409);
 }
 const pr = (await call('GET', '/public/route?from_lat=22.6700&from_lon=106.2400&to_lat=22.6657&to_lon=106.2522')).data;
 check('Chỉ đường công khai tới điểm trong vùng nguy hiểm → không báo "an toàn"', pr?.safe === false &&
@@ -333,6 +338,30 @@ check('Mã tra cứu cấp khi gửi (PA-…-XXXXXX) tra được không cần S
   (await call('POST', '/public/track', { code: rep.data.track_code })).data?.total === 1, rep.data?.track_code);
 const resolved = await call('POST', `/sos/${ticket?.id}/resolve`, null, admin);
 check('Xác nhận đã cứu an toàn', resolved.data?.status === 'hoan_thanh', `HTTP ${resolved.status}`);
+
+// ---------------------------------------------------------------- Vật tư & lực lượng: số liệu cập nhật tay
+const vehiclesNow = (await call('GET', '/resources/vehicles', null, admin)).data || [];
+const pt = vehiclesNow.find((v) => v.code === 'CB-PT-001');
+check('Phương tiện nhập từ tệp mẫu: nhiên liệu 80% kèm giờ báo (không còn mặc định 100%)',
+  pt?.fuel_level === 80 && !!pt?.fuel_updated_at && pt?.status === 'san_sang', JSON.stringify(pt || {}).slice(0, 160));
+const broken = await call('PATCH', `/resources/vehicles/${pt?.id}`, { status: 'bao_duong', note: 'Hỏng máy (kiểm thử)' }, admin);
+check('Báo phương tiện hỏng → "bảo dưỡng" kèm lý do', broken.status === 200 && broken.data?.status === 'bao_duong'
+  && broken.data?.status_note === 'Hỏng máy (kiểm thử)', `HTTP ${broken.status}`);
+const fixed = await call('PATCH', `/resources/vehicles/${pt?.id}`, { status: 'san_sang', fuel_level: 45 }, admin);
+check('Sửa xong + báo nhiên liệu 45%', fixed.status === 200 && fixed.data?.status === 'san_sang' && fixed.data?.fuel_level === 45);
+check('Không tự đặt "đang làm nhiệm vụ" (chỉ lệnh điều động gán) → 422',
+  (await call('PATCH', `/resources/vehicles/${pt?.id}`, { status: 'nhiem_vu' }, admin)).status === 422);
+const kho = ((await call('GET', '/resources/warehouses', null, admin)).data || []).find((w) => w.code === 'CB-KHO-001');
+const before = kho?.items?.find((i) => i.item_code === 'MI_TOM')?.quantity ?? 0;
+const rcv = await call('POST', `/resources/warehouses/${kho?.id}/receive`, { item_code: 'MI_TOM', quantity: 50, source: 'kiểm thử' }, admin);
+check('Nhập thêm hàng → cộng vào tồn kho', rcv.status === 200 && rcv.data?.quantity === before + 50, `${before} → ${rcv.data?.quantity}`);
+check('Mặt hàng mới ở kho chưa có định mức → 422',
+  (await call('POST', `/resources/warehouses/${kho?.id}/receive`, { item_code: 'AO_PHAO', quantity: 10 }, admin)).status === 422);
+const depot = ((await call('GET', '/resources/fuel-depots', null, admin)).data || [])[0];
+const dep = depot && (await call('PATCH', `/resources/fuel-depots/${depot.id}`, { gasoline_l: 1000, diesel_l: 2000 }, admin));
+check('Cập nhật nhiên liệu dự trữ', dep?.status === 200 && dep.data?.gasoline_l === 1000 && !!dep.data?.updated_at, `HTTP ${dep?.status}`);
+check('Xăng + dầu vượt sức chứa → 422', !depot || (await call('PATCH', `/resources/fuel-depots/${depot.id}`,
+  { gasoline_l: depot.capacity_l, diesel_l: 1 }, admin)).status === 422);
 
 // ================================================================ 8. Cảnh báo Maker – Checker (kênh gửi tin chưa tích hợp)
 const TITLE = `Kiểm thử cảnh báo ngập ${stamp}`;

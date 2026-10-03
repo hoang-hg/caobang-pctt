@@ -32,6 +32,7 @@ SELECT t.id, t.code, t.reporter_name, t.reporter_phone, t.source, t.raw_message,
        t.resolved_at, t.notes, ST_Y(t.location) AS lat, ST_X(t.location) AS lon,
        u.code AS admin_code, u.name AS admin_name,
        d.id AS dispatch_id, d.status AS dispatch_status, d.eta, d.progress, d.distance_km, d.route_safe,
+       d.dispatched_at, d.arrived_at,
        f.name AS force_name, f.contact_phone AS force_phone, f.id AS force_id
   FROM operations.sos_tickets t
   LEFT JOIN spatial_admin.administrative_units u ON u.id = t.admin_unit_id

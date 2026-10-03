@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { Send, Phone, Route, ShieldCheck, TriangleAlert, Loader2, CheckCircle2 } from 'lucide-react';
 import { api } from '../../api/client';
 import { useStore } from '../../app/store';
 import { Modal } from './ui';
-import { usePermission } from '../../rbac/usePermission';
+import { useAllowedCodes, usePermission } from '../../rbac/usePermission';
+import { distanceKm } from '../../utils/geo';
 import { FORCE_TYPE, INCIDENT, PRIORITY, SKILL, VEHICLE, VULNERABLE } from '../../utils/labels';
 
 const ITEM_NAME = {
@@ -23,6 +24,13 @@ export default function DispatchModal({ ticket, presetForceId, onClose }) {
   const [personnel, setPersonnel] = useState(3);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
+  const [warehouseId, setWarehouseId] = useState(''); // '' = chỉ ghi nhu cầu vật tư, không trừ kho
+  const issueCodes = useAllowedCodes('inventory', 'issue'); // null = toàn tỉnh
+  const { data: allWarehouses = [] } = useQuery({
+    queryKey: ['warehouses', 'dispatch'],
+    queryFn: () => api('/resources/warehouses'),
+    enabled: !!ticket,
+  });
 
   const { data: match, isLoading } = useQuery({
     queryKey: ['match', ticket?.id],
@@ -43,6 +51,20 @@ export default function DispatchModal({ ticket, presetForceId, onClose }) {
     setVehicleIds(picks);
   }, [match, presetForceId]);
 
+  const supplies = useMemo(() => match?.needs.supplies || {}, [match]);
+  const stores = useMemo(() => {
+    if (!ticket) return [];
+    return allWarehouses
+      .filter((w) => !issueCodes || issueCodes.includes(w.admin_code))
+      .map((w) => {
+        const stock = Object.fromEntries(w.items.map((i) => [i.item_code, i.quantity]));
+        const short = Object.entries(supplies).filter(([code, n]) => n > 0 && (stock[code] || 0) < n).map(([code]) => code);
+        return { ...w, km: distanceKm(ticket.lat, ticket.lon, w.lat, w.lon), short };
+      })
+      .sort((a, b) => a.short.length - b.short.length || a.km - b.km);
+  }, [allWarehouses, issueCodes, supplies, ticket]);
+  const chosen = stores.find((w) => w.id === warehouseId);
+
   if (!ticket) return null;
   const pr = PRIORITY[ticket.priority] || PRIORITY[2];
   const presetMissing = presetForceId && match && !match.forces.some((f) => f.id === presetForceId);
@@ -52,11 +74,12 @@ export default function DispatchModal({ ticket, presetForceId, onClose }) {
     try {
       const res = await api('/dispatch', {
         method: 'POST',
-        body: { ticket_id: ticket.id, force_id: forceId, vehicle_ids: vehicleIds, personnel, supplies: match?.needs.supplies || {} },
+        body: { ticket_id: ticket.id, force_id: forceId, vehicle_ids: vehicleIds, personnel, supplies, warehouse_id: warehouseId || null },
       });
       setResult(res);
       qc.invalidateQueries({ queryKey: ['sos'] });
       qc.invalidateQueries({ queryKey: ['map-layers'] });
+      if (warehouseId) qc.invalidateQueries({ queryKey: ['warehouses'] });
       toast({ tone: 'good', title: `Đã phát lệnh điều động ${ticket.code}`, body: `ETA ${res.route.duration_min} phút · ${res.route.distance_km} km` });
     } catch (e) {
       toast({ tone: 'danger', title: 'Không phát được lệnh', body: e.message });
@@ -78,7 +101,7 @@ export default function DispatchModal({ ticket, presetForceId, onClose }) {
           <>
             {!allowed && <span className="mr-auto self-center text-xs text-danger">Bạn không có quyền điều động tại địa bàn này</span>}
             <button className="btn-ghost" onClick={onClose}>Huỷ</button>
-            <button className="btn-danger" disabled={!allowed || !forceId || busy} onClick={submit}>
+            <button className="btn-danger" disabled={!allowed || !forceId || busy || chosen?.short.length > 0} onClick={submit}>
               {busy ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} Phát lệnh khẩn cấp
             </button>
           </>
@@ -109,6 +132,11 @@ export default function DispatchModal({ ticket, presetForceId, onClose }) {
               </b>
             </div>
           </div>
+          {chosen && (
+            <div className="text-xs text-ink-2">
+              Đã xuất từ <b>{chosen.name}</b>: {Object.entries(supplies).map(([code, n]) => `${n} ${ITEM_NAME[code] || code}`).join(', ')}
+            </div>
+          )}
           <div className="text-xs text-muted">
             Tuyến: {result.route.roads.join(' → ') || 'đường địa phương'}
             {result.route.offroad_km >= 0.5 && ` · ${result.route.offroad_km} km chưa có dữ liệu đường`}
@@ -161,6 +189,26 @@ export default function DispatchModal({ ticket, presetForceId, onClose }) {
               {Object.entries(match.needs.vehicles).map(([t, n]) => <li key={t}>• {n} {VEHICLE[t]}</li>)}
               {Object.entries(match.needs.supplies).map(([code, n]) => <li key={code}>• {n} {ITEM_NAME[code] || code}</li>)}
             </ul>
+            {Object.keys(supplies).length > 0 && (
+              <label className="mb-3 flex flex-col gap-1 text-sm">
+                Vật tư mang theo
+                <select className="input" value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)}>
+                  <option value="">Chỉ ghi nhu cầu — không trừ kho</option>
+                  {stores.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      Xuất từ {w.name} · {w.km.toFixed(1)} km{w.short.length ? ` · thiếu ${w.short.map((c) => ITEM_NAME[c] || c).join(', ')}` : ' · đủ hàng'}
+                    </option>
+                  ))}
+                </select>
+                {chosen?.short.length > 0 ? (
+                  <span className="text-[11px] text-danger">Kho này không đủ hàng — chọn kho khác hoặc chỉ ghi nhu cầu.</span>
+                ) : (
+                  <span className="text-[11px] text-muted">
+                    {chosen ? 'Tồn kho bị trừ cùng lúc phát lệnh.' : 'Không chọn kho: nhớ xuất kho riêng khi đội nhận hàng.'}
+                  </span>
+                )}
+              </label>
+            )}
             <h4 className="mb-1 text-sm font-semibold">Lực lượng gần nhất <span className="font-normal text-muted">(bán kính {match.radius_km} km)</span></h4>
             {presetMissing && <p className="mb-1 text-xs text-warn">Đơn vị được kéo thả không còn quân số sẵn sàng trong bán kính — chọn đơn vị khác.</p>}
             <div className="flex flex-col gap-1.5">
@@ -195,7 +243,7 @@ export default function DispatchModal({ ticket, presetForceId, onClose }) {
                     onChange={(e) => setVehicleIds((ids) => (e.target.checked ? [...ids, v.id] : ids.filter((x) => x !== v.id)))}
                   />
                   <span className="text-sm"><b>{v.code}</b> {VEHICLE[v.vehicle_type]}</span>
-                  <span className="ml-auto text-xs text-muted">{v.distance_km} km · ⛽ {v.fuel_level}%</span>
+                  <span className="ml-auto text-xs text-muted">{v.distance_km} km · ⛽ {v.fuel_level == null ? 'chưa rõ' : `${v.fuel_level}%`}</span>
                 </label>
               ))}
               {!match.vehicles.length && <p className="text-sm text-muted">Không có phương tiện chuyên dụng rảnh trong bán kính.</p>}

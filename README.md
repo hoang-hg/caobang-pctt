@@ -43,7 +43,7 @@ Sửa chức năng, cấu hình hay quy trình thì cập nhật đúng mục tr
 |---|---|---|---|
 | A | Dashboard tổng quan | `/dashboard` | KPI thời gian thực (mưa lưu vực, mực nước so với BĐ I/II/III, sơ tán, SOS chờ > 15′ nhấp nháy, lực lượng, phương tiện); hydrograph thực đo + dự báo (bản tin KTTV do trực ban nhập); mưa giờ + tích luỹ + dự báo mô hình 3 giờ tới; ngưỡng sạt lở; vật tư theo kho; dự báo mưa 72 giờ theo xã; nhật ký sự kiện; **xuất PDF báo cáo nhanh** |
 | B | Bản đồ giám sát | `/ban-do` | 4 nhóm lớp (thuỷ văn, vùng nguy hiểm, lực lượng – vật tư, SOS), radar mưa, thanh thời gian −12h…+24h (số đo quá khứ, bản tin dự báo), popup có biểu đồ mini, trạm mất tín hiệu ghi rõ, **vùng ngập theo kịch bản BĐ I–III**, **bản tin bão** do trực ban nhập, **đánh dấu điểm sự cố** (có hạn hiệu lực), phản ánh của người dân, cập nhật số người ở điểm sơ tán, **kéo–thả đội cứu hộ vào điểm SOS**, khoanh vùng → đếm hộ dân → soạn cảnh báo, đo khoảng cách, **tìm đường an toàn A→B** |
-| C | Vật tư & Lực lượng | `/nguon-luc` | Lực lượng / Kho vật tư / Phương tiện; cảnh báo kho < 20% định mức, sắp hết hạn; nhiên liệu; điều động nhanh; ra lệnh xuất kho; xuất Excel/PDF |
+| C | Vật tư & Lực lượng | `/nguon-luc` | Lực lượng / Kho vật tư / Phương tiện; cảnh báo kho < 20% định mức, sắp hết hạn; **báo tình trạng (bảo dưỡng / hỏng) và nhiên liệu từng phương tiện**; nhiên liệu dự trữ (cập nhật được); điều động nhanh; **xuất / nhập kho**; xuất Excel/PDF |
 | D | Điều hành cứu hộ | `/cuu-ho` | Kanban 4 cột, SLA cấp 1/2/3 (3′/15′/60′), tiếp nhận đa kênh + bóc tách tin nhắn, khớp lực lượng gần nhất theo kỹ năng, ETA, tiến độ sơ tán theo xã (xã / trực ban cập nhật) & sức chứa |
 | E | Cảnh báo & Hotline | `/canh-bao` | Mẫu tin có tham số, phát theo xã / vùng vẽ, 5 kênh, **Maker–Checker + PIN**, bảng theo dõi giao nhận, danh bạ Tỉnh → Xã → Thôn, IVR, nhật ký pháp lý |
 | F | Bộ lọc địa phương & Sáng/Tối | toàn cục | 56 xã/phường (sau 01/07/2025), preset lưu vực, vùng núi cao, biên giới, địa bàn huyện cũ; Omni-search (địa danh, toạ độ, mã SOS); giao diện sáng/tối |
@@ -73,7 +73,8 @@ Ký hiệu: ✅ chạy thật · 🟡 chạy thật nhưng dựa trên dữ li�
 | Cảnh báo | Tổng đài IVR, nút gọi `tel:` | 🔶 / ⛔ | Nhật ký cuộc gọi là mô phỏng; chưa nối tổng đài SIP |
 | Cứu hộ | Phiếu SOS, Kanban, SLA, điều động, khớp lực lượng gần nhất | ✅ | Phụ thuộc dữ liệu lực lượng (2.2) |
 | Cứu hộ | **Báo lệnh điều động tới trưởng nhóm** (SMS / Push) | ⛔ | Chưa gửi: hộp thoại điều động ghi rõ "hệ thống chưa gửi tin cho đội", có nút gọi và sao chép nội dung lệnh để trực ban báo qua điện thoại / Zalo |
-| Cứu hộ | Vị trí lực lượng, phương tiện theo thời gian thực | ⛔ | Chưa có thiết bị định vị; khi chạy thật vị trí đứng yên tại nơi đóng quân (chỉ bộ mô phỏng làm di chuyển) |
+| Cứu hộ | Vị trí lực lượng, phương tiện theo thời gian thực | ⛔ | Chưa có thiết bị định vị; khi chạy thật vị trí đứng yên tại nơi đóng quân (chỉ bộ mô phỏng làm di chuyển). Thay thế: trực ban bấm **Đội báo đã đến hiện trường** khi đội báo qua điện thoại / bộ đàm; trước đó thanh tiến độ là **ước tính theo ETA** (ghi rõ) |
+| Nguồn lực | Trạng thái, nhiên liệu phương tiện; nhập thêm hàng; nhiên liệu dự trữ; vật tư mang theo khi điều động | ✅ | Cập nhật tay ([7.1](#sop-cuu-ho)). Nhiên liệu **chưa ai báo** hiện "Chưa cập nhật" (trước đây mặc định 100%) |
 | Cứu hộ | Tiến độ sơ tán theo xã (KPI "Sơ tán an toàn" của Dashboard) | ✅ | Xã / trực ban cập nhật ở Điều hành cứu hộ → **Giám sát sơ tán nhân dân** ([7.4](#giam-sat-kttv)); chưa ai cập nhật thì KPI là 0/0 |
 | Cứu hộ | Bóc tách tin nhắn SOS | ✅ | Bộ luật offline; LLM tuỳ chọn (SĐT được che trước khi gửi) |
 | Cứu hộ | Tiếp nhận SOS tự động từ Zalo OA / app (`POST /api/v1/sos/intake`) | ⛔ | Cổng có sẵn, **tắt** tới khi đặt `INTAKE_API_KEY` và có bên gửi |
@@ -169,7 +170,7 @@ graph LR
 | Kho vật tư (`kho`) | `warehouses` | CSV / Excel / GeoJSON điểm | `ma` | — |
 | Tồn kho (`ton_kho`) | `inventory` | CSV / Excel | `ma_kho` + `ma_vat_tu` | — |
 | Lực lượng (`luc_luong`) | `forces` | CSV / Excel / GeoJSON điểm | `ma` | — |
-| Phương tiện (`phuong_tien`) | `vehicles` | CSV / Excel | `ma` (+ `ma_luc_luong`) | — |
+| Phương tiện (`phuong_tien`) | `vehicles` | CSV / Excel | `ma` (+ `ma_luc_luong`; `trang_thai`, `nhien_lieu` **chỉ khi thêm mới** — nhập lại không đổi trạng thái / nhiên liệu đang có) | — |
 | Điểm cấp nhiên liệu (`cay_xang`) | `fuel_depots` | CSV / Excel / GeoJSON điểm | `ma` | ✓ |
 
 🌐 = hiện trên cổng công khai. Quy tắc:
@@ -654,6 +655,7 @@ cơ quan nhà nước) — sửa `url` trong `BASEMAPS`, bảo đảm thể hi�
 
 Quy trình phối hợp **Người dân — Cán bộ tác chiến — Lãnh đạo chỉ huy**, phục vụ huấn luyện, diễn tập và vận hành.
 
+<a id="sop-cuu-ho"></a>
 ### 7.1. Tiếp nhận, phân loại & điều phối cứu hộ (SOS)
 
 ```mermaid
@@ -683,7 +685,21 @@ sequenceDiagram
    **Phiếu có thể trùng** (cùng SĐT hoặc cách < 200 m trong 30 phút, chưa hoàn thành) được báo ngay khi tạo.
    **Nhiều trực ban cùng xử lý 1 phiếu**: lệnh điều động khoá phiếu tới khi ghi xong — phiếu vừa được xác nhận "Đã cứu"
    không bị mở lại; cùng một lực lượng không điều 2 lần cho cùng phiếu (409); quân số / phương tiện trừ có điều kiện.
-4. **Thực thi & hoàn tất**: theo dõi vị trí lực lượng trên bản đồ; đưa người về điểm sơ tán rồi đánh dấu **Đã cứu an toàn**.
+   **Vật tư mang theo**: hộp thoại điều động gợi ý vật tư theo loại sự cố; chọn **Xuất từ kho …** (xếp theo khoảng cách,
+   ghi đủ / thiếu từng mặt hàng) thì tồn kho bị trừ **cùng giao dịch** với lệnh — kho thiếu bất kỳ mặt hàng nào → không
+   phát lệnh (409), quân số / phương tiện giữ nguyên; không chọn kho → lệnh chỉ ghi nhu cầu, trực ban xuất kho riêng.
+   Phương tiện **bảo dưỡng / hỏng** hoặc đã báo nhiên liệu **dưới 20%** không được gợi ý; nhiên liệu chưa báo vẫn gợi ý,
+   ghi "chưa rõ".
+4. **Thực thi & hoàn tất**: chưa có GPS — khi đội báo qua điện thoại / bộ đàm, trực ban (hoặc xã của phiếu, quyền
+   `sos.update`) bấm **Đội báo đã đến hiện trường** trên thẻ phiếu (`POST /api/v1/dispatch/{lệnh}/arrived`, ghi giờ đến);
+   trước đó thanh tiến độ là ước tính theo giờ xuất phát và ETA. Đưa người về điểm sơ tán rồi đánh dấu **Đã cứu an toàn**
+   (lực lượng, phương tiện tự về "sẵn sàng").
+5. **Nguồn lực** (trang Vật tư & Lực lượng): **Cập nhật** từng phương tiện — Sẵn sàng ↔ Bảo dưỡng / hỏng kèm lý do, mức
+   nhiên liệu % (`PATCH /api/v1/resources/vehicles/{id}`, quyền `vehicle.update`; "đang làm nhiệm vụ" chỉ do lệnh điều
+   động gán, báo hỏng giữa nhiệm vụ thì phương tiện rời nhiệm vụ). **Nhập hàng** vào kho (`POST
+   …/warehouses/{id}/receive`, quyền `inventory.receive`): cộng vào tồn kho, hạn dùng giữ **hạn sớm nhất**, mặt hàng mới cần
+   định mức, chặn hàng đã hết hạn. **Cập nhật** nhiên liệu dự trữ tại điểm cấp nhiên liệu (`PATCH …/fuel-depots/{id}`,
+   không vượt sức chứa). Mọi thao tác ghi nhật ký thao tác + nhật ký sự kiện.
 
 ### 7.2. Phản ánh hiện trường & tra cứu tiến độ
 
@@ -852,7 +868,7 @@ tuỳ chỉnh. Casbin `rbac_with_domains`; danh mục quyền và 3 vai trò là
 |---|---|---|---|---|
 | 1 | `super_admin` Quản trị hệ thống | toàn tỉnh `*` | Tất cả | Mọi cấp |
 | 2 | `admin_tinh` Quản trị tỉnh | toàn tỉnh `*` | Mọi quyền nghiệp vụ toàn tỉnh: SOS, **điều động**, **soạn và duyệt cảnh báo** (cần PIN, không tự duyệt lệnh mình soạn), tổng đài, kho, phương tiện, nhật ký pháp lý, nguồn dữ liệu / IoT, **nhập dữ liệu chính thức**, duyệt hồ sơ xã gửi, vận hành hồ chứa | Cấp 3 |
-| 3 | `admin_xa` Quản trị xã/phường | đúng 1 xã `<CUM>/<MA_XA>` | Trong xã: tiếp nhận – cập nhật – hoàn thành SOS, cập nhật tiến độ sơ tán, đánh dấu điểm sự cố, duyệt / chuyển SOS phản ánh, xuất kho của xã, xem nguồn lực / cảnh báo / danh bạ, **gửi dữ liệu chờ tỉnh duyệt** | Không |
+| 3 | `admin_xa` Quản trị xã/phường | đúng 1 xã `<CUM>/<MA_XA>` | Trong xã: tiếp nhận – cập nhật – hoàn thành SOS, cập nhật tiến độ sơ tán, đánh dấu điểm sự cố, duyệt / chuyển SOS phản ánh, xuất / nhập kho của xã, báo tình trạng phương tiện của lực lượng xã, xem nguồn lực / cảnh báo / danh bạ, **gửi dữ liệu chờ tỉnh duyệt** | Không |
 
 ```
 *                          Toàn tỉnh Cao Bằng — Cấp 1, Cấp 2
@@ -875,8 +891,9 @@ Tiền tố `<CUM>` (địa bàn huyện cũ) chỉ còn trong mã phạm vi đ�
 | `sos.view` / `.create` / `.update` / `.resolve` | ✓ | Xem / tiếp nhận / chuyển trạng thái / xác nhận đã cứu |
 | `dispatch.create` | ✓ | Điều động (theo xã của điểm SOS; được điều lực lượng ngoài xã) |
 | `resource.view` | ✓ | Lực lượng, kho, phương tiện, điểm sơ tán |
-| `inventory.issue` | ✓ | Ra lệnh xuất kho (theo xã của kho; kho cấp tỉnh cần quyền toàn tỉnh) |
-| `vehicle.update` | ✓ | Đổi trạng thái phương tiện |
+| `inventory.issue` | ✓ | Ra lệnh xuất kho (theo xã của kho; kho cấp tỉnh cần quyền toàn tỉnh); chọn kho xuất vật tư khi điều động |
+| `inventory.receive` | ✓ | Nhập thêm hàng vào kho; cập nhật nhiên liệu dự trữ tại điểm cấp nhiên liệu (quản trị xã có sẵn cho xã mình) |
+| `vehicle.update` | ✓ | Báo tình trạng (sẵn sàng / bảo dưỡng – hỏng) và mức nhiên liệu phương tiện (theo xã của lực lượng quản lý; quản trị xã có sẵn) |
 | `alert.view` / `.create` / `.approve` | ✓ | Xem / soạn (Maker) / duyệt (Checker) — phải có quyền trên **tất cả** xã nhận tin |
 | `contact.view` | ✓ | Danh bạ (cấp tỉnh luôn hiện, cấp xã/thôn theo phạm vi) |
 | `hotline.operate` | toàn tỉnh | Tổng đài, phân luồng cuộc gọi |
