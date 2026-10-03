@@ -64,6 +64,12 @@ export function useSocket() {
         case 'reservoir.updated': // trực ban nhập số liệu vận hành hồ
           inv('pub-reservoirs', 'kpis', 'map-layers');
           break;
+        case 'evacuation.updated': // xã / trực ban cập nhật tiến độ sơ tán
+          inv('evacuation', 'kpis');
+          break;
+        case 'forecast.updated': // trực ban nhập / gỡ bản tin dự báo mực nước KTTV
+          inv('series');
+          break;
         case 'hazard.new':
           inv('map-layers');
           toast({ tone: 'danger', title: 'Cảm biến vượt ngưỡng', body: data.name });

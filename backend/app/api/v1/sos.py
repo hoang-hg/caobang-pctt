@@ -5,7 +5,7 @@ import json
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Header, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.area import area_clause, unit_clause
 from app.auth import audit
@@ -370,3 +370,82 @@ async def evacuation(codes: list[str] = Depends(area_scope("monitoring", "view")
         {"codes": codes},
     )
     return {"progress": progress, "sites": sites}
+
+
+class EvacuationIn(BaseModel):
+    planned_households: int = Field(ge=0, le=200_000, description="Số hộ phải sơ tán theo kế hoạch")
+    evacuated_households: int = Field(ge=0, le=200_000, description="Số hộ đã sơ tán an toàn")
+    planned_persons: int = Field(ge=0, le=1_000_000)
+    evacuated_persons: int = Field(ge=0, le=1_000_000)
+    source: str | None = Field(None, max_length=200, description="VD: Báo cáo UBND xã lúc 14h")
+
+    @model_validator(mode="after")
+    def _persons_cover_households(self) -> "EvacuationIn":
+        # Mỗi hộ ít nhất 1 người — số nhân khẩu ít hơn số hộ là gõ nhầm cột
+        if (
+            self.planned_persons < self.planned_households
+            or self.evacuated_persons < self.evacuated_households
+        ):
+            raise ValueError("Số nhân khẩu không thể ít hơn số hộ — kiểm tra lại hai cột")
+        return self
+
+
+def evacuation_problem(body: EvacuationIn, households: int | None, population: int | None) -> str | None:
+    """Gõ thừa chữ số (1200 thay vì 120) → KPI toàn tỉnh sai lệch. Chặn khi vượt số hộ / dân số của xã (nếu đã có)."""
+    if households:
+        for value, what in ((body.planned_households, "Kế hoạch"), (body.evacuated_households, "Đã sơ tán")):
+            if value > households:
+                return f"{what} {value} hộ vượt tổng số hộ của xã ({households}) — kiểm tra lại số liệu"
+    if population:
+        for value, what in ((body.planned_persons, "Kế hoạch"), (body.evacuated_persons, "Đã sơ tán")):
+            if value > population:
+                return f"{what} {value} nhân khẩu vượt dân số của xã ({population}) — kiểm tra lại số liệu"
+    return None
+
+
+@router.put("/evacuation/{code}")
+async def update_evacuation(
+    code: str,
+    body: EvacuationIn,
+    user: dict = Depends(require_permission("evacuation", "update", scope_loaders.commune)),
+):
+    """Xã (hoặc trực ban tỉnh) cập nhật kế hoạch và số hộ / nhân khẩu đã sơ tán → KPI "Sơ tán an toàn" của Dashboard và
+    bảng tiến độ ở Trung tâm điều hành cập nhật ngay. Kết thúc đợt: nhập lại số đã sơ tán = 0."""
+    unit = await fetch_one(
+        """SELECT id, name, households, population FROM spatial_admin.administrative_units
+            WHERE code = :c AND level = 'xa'""",
+        {"c": code},
+    )
+    if not unit:
+        raise HTTPException(404, "Không tìm thấy xã/phường")
+    if problem := evacuation_problem(body, unit["households"], unit["population"]):
+        raise HTTPException(422, problem)
+    row = await fetch_one(
+        """INSERT INTO operations.evacuation_progress
+                  (admin_unit_id, planned_households, evacuated_households, planned_persons, evacuated_persons)
+           VALUES (:u, :ph, :eh, :pp, :ep)
+           ON CONFLICT (admin_unit_id) DO UPDATE SET
+                  planned_households = EXCLUDED.planned_households, evacuated_households = EXCLUDED.evacuated_households,
+                  planned_persons = EXCLUDED.planned_persons, evacuated_persons = EXCLUDED.evacuated_persons,
+                  updated_at = now()
+           RETURNING planned_households, evacuated_households, planned_persons, evacuated_persons, updated_at""",
+        {
+            "u": unit["id"],
+            "ph": body.planned_households,
+            "eh": body.evacuated_households,
+            "pp": body.planned_persons,
+            "ep": body.evacuated_persons,
+        },
+    )
+    await audit(user, "evacuation.update", "admin_unit", code, body.model_dump())
+    await hub.publish("evacuation.updated", {"code": code})
+    await log_event(
+        f"{unit['name']}: đã sơ tán {body.evacuated_households}/{body.planned_households} hộ "
+        f"({body.evacuated_persons}/{body.planned_persons} nhân khẩu)"
+        + (f" — nguồn: {body.source}" if body.source else "")
+        + f" ({user['full_name']})",
+        "cuu_ho",
+        "info",
+        admin_unit_id=unit["id"],
+    )
+    return {"code": code, "name": unit["name"], **row}

@@ -7,12 +7,14 @@ from pydantic import BaseModel, Field
 
 from app.area import area_clause, unit_clause
 from app.auth import audit
-from app.db import fetch_all, fetch_one
+from app.db import execute, fetch_all, fetch_one, transaction
 from app.infra.cache import cached_view, invalidate
 from app.rbac.authz import area_scope, require_any, require_permission
 from app.services.events import log_event
 from app.services.landslides import get_landslides_overview
+from app.services.lite import VN_TZ
 from app.services.reservoirs import get_reservoirs_overview
+from app.services.simulator import alarm_level
 from app.services.sos import OVERDUE_SQL
 from app.ws.hub import hub
 
@@ -161,7 +163,7 @@ async def station_series(
         {"id": station_id, "h": hours, "bm": bucket_minutes},
     )
     forecast = await fetch_all(
-        "SELECT time, value, model FROM iot_telemetry.forecasts WHERE station_id = :id AND time > now() - interval '1 hour' ORDER BY time",
+        "SELECT time, value, model, issued_at FROM iot_telemetry.forecasts WHERE station_id = :id AND time > now() - interval '1 hour' ORDER BY time",
         {"id": station_id},
     )
     return {"station": station, "observed": observed, "forecast": forecast}
@@ -367,3 +369,127 @@ async def update_reservoir_operation(
         "warning" if body.spill_gates_open else "info",
     )
     return next(r for r in (await get_reservoirs_overview())["reservoirs"] if r["id"] == reservoir_id)
+
+
+# ------------------------------------------------------------------ bản tin dự báo mực nước (KTTV)
+
+FORECAST_MODEL = "KTTV"  # trực ban nhập theo bản tin của Đài KTTV; "HEC-HMS" chỉ do bộ mô phỏng sinh
+MAX_FORECAST_POINTS = 240  # 10 ngày × 24 giờ
+FORECAST_PAST = timedelta(hours=12)
+FORECAST_AHEAD = timedelta(days=10)
+
+
+class ForecastPoint(BaseModel):
+    time: datetime
+    value: float = Field(ge=-50, le=3000, description="Mực nước dự báo (m)")
+
+
+class ForecastBulletinIn(BaseModel):
+    points: list[ForecastPoint] = Field(min_length=1, max_length=MAX_FORECAST_POINTS)
+    issued_at: datetime | None = Field(None, description="Thời điểm phát hành bản tin — trống = bây giờ")
+    source: str | None = Field(None, max_length=200, description="VD: Đài KTTV tỉnh Cao Bằng, bản tin 15h")
+
+
+def forecast_problem(body: ForecastBulletinIn, now: datetime, ref_level: float | None) -> str | None:
+    """Lỗi của bản tin (None = hợp lệ). ref_level = ngưỡng BĐ I (hoặc số đo gần nhất) để bắt lỗi gõ thừa / thiếu chữ số."""
+    times = [p.time for p in body.points]
+    if any(t.tzinfo is None for t in times) or (body.issued_at and body.issued_at.tzinfo is None):
+        return "Thời điểm phải kèm múi giờ"
+    if len(set(times)) != len(times):
+        return "Có hai dòng trùng thời điểm"
+    if min(times) < now - FORECAST_PAST or max(times) > now + FORECAST_AHEAD:
+        return "Thời điểm dự báo phải trong khoảng từ 12 giờ trước đến 10 ngày tới"
+    if body.issued_at and (
+        body.issued_at > now + timedelta(minutes=5) or body.issued_at < now - timedelta(days=2)
+    ):
+        return "Thời điểm phát hành không hợp lệ (tương lai hoặc quá 2 ngày)"
+    if ref_level is not None:
+        far = next((p for p in body.points if abs(p.value - ref_level) > MAX_LEVEL_DEVIATION_M), None)
+        if far:
+            return (
+                f"Mực nước {far.value:g} m lệch mức tham chiếu của trạm ({ref_level:g} m) quá {MAX_LEVEL_DEVIATION_M} m"
+                " — kiểm tra lại số liệu (gõ thừa / thiếu chữ số?)"
+            )
+    return None
+
+
+async def _water_station(station_id: str) -> dict:
+    station = await fetch_one(
+        """SELECT id, name, type, alarm_thresholds AS thr FROM iot_telemetry.monitoring_stations WHERE id = :id""",
+        {"id": station_id},
+    )
+    if not station:
+        raise HTTPException(404, "Không tìm thấy trạm")
+    if station["type"] != "muc_nuoc":
+        raise HTTPException(422, "Chỉ nhập dự báo cho trạm mực nước")
+    return station
+
+
+@router.put("/stations/{station_id}/forecast")
+async def put_forecast_bulletin(
+    station_id: str,
+    body: ForecastBulletinIn,
+    user: dict = Depends(require_permission("monitoring", "update")),
+):
+    """Trực ban nhập bản tin dự báo mực nước của Đài KTTV (dán từ bảng tính) → Hydrograph vẽ nét đứt sau số đo thực.
+    Bản tin mới thay toàn bộ bản tin cũ của trạm (không trộn hai bản tin)."""
+    station = await _water_station(station_id)
+    thr = station["thr"] or {}
+    ref = thr.get("bd1")
+    if ref is None:
+        last = await fetch_one(
+            "SELECT value FROM iot_telemetry.sensor_readings WHERE station_id = :id ORDER BY time DESC LIMIT 1",
+            {"id": station_id},
+        )
+        ref = last["value"] if last else None
+    now = datetime.now(UTC)
+    if problem := forecast_problem(body, now, ref):
+        raise HTTPException(422, problem)
+    points = sorted(body.points, key=lambda p: p.time)
+    async with transaction() as conn:
+        await execute(
+            "DELETE FROM iot_telemetry.forecasts WHERE station_id = :id AND model = :m",
+            {"id": station_id, "m": FORECAST_MODEL},
+            conn,
+        )
+        await execute(
+            """INSERT INTO iot_telemetry.forecasts (station_id, time, value, model, issued_at)
+               SELECT :id, unnest(CAST(:t AS timestamptz[])), unnest(CAST(:v AS float8[])), :m, :i""",
+            {
+                "id": station_id,
+                "t": [p.time for p in points],
+                "v": [p.value for p in points],
+                "m": FORECAST_MODEL,
+                "i": body.issued_at or now,
+            },
+            conn,
+        )
+    peak = max(points, key=lambda p: p.value)
+    level = alarm_level(peak.value, thr)
+    await audit(user, "forecast.bulletin", "station", station_id, body.model_dump(mode="json"))
+    await hub.publish("forecast.updated", {"station_id": station_id})
+    await log_event(
+        f"Bản tin dự báo mực nước {station['name']}: đỉnh {peak.value:.2f} m lúc "
+        f"{peak.time.astimezone(VN_TZ):%H:%M %d/%m}"
+        + (f", trên báo động {'I' * level}" if level else "")
+        + (f" — nguồn: {body.source}" if body.source else "")
+        + f" ({user['full_name']})",
+        "canh_bao" if level else "van_hanh",
+        "warning" if level else "info",
+    )
+    return {"station_id": station_id, "points": len(points), "peak": peak.value, "peak_level": level}
+
+
+@router.delete("/stations/{station_id}/forecast", status_code=204)
+async def delete_forecast_bulletin(
+    station_id: str, user: dict = Depends(require_permission("monitoring", "update"))
+):
+    """Bản tin hết hiệu lực hoặc nhập nhầm trạm → gỡ dự báo KTTV của trạm."""
+    station = await _water_station(station_id)
+    await execute(
+        "DELETE FROM iot_telemetry.forecasts WHERE station_id = :id AND model = :m",
+        {"id": station_id, "m": FORECAST_MODEL},
+    )
+    await audit(user, "forecast.bulletin_delete", "station", station_id, {})
+    await hub.publish("forecast.updated", {"station_id": station_id})
+    await log_event(f"Gỡ bản tin dự báo mực nước {station['name']} ({user['full_name']})", "van_hanh", "info")

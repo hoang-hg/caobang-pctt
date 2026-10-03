@@ -28,6 +28,7 @@ class Resource(StrEnum):
     INTEGRATION = "integration"  # nguồn dữ liệu ngoài, thiết bị IoT
     REPORT = "report"  # phản ánh hiện trường của người dân
     DATA = "data"  # nhập dữ liệu chính thức từ tệp
+    EVACUATION = "evacuation"  # kế hoạch và tiến độ sơ tán nhân dân theo xã
 
 
 class Action(StrEnum):
@@ -64,12 +65,13 @@ ALL_PERMISSIONS: Final[tuple[Permission, ...]] = (
         R.MONITORING,
         A.UPDATE,
         False,
-        "Cập nhật số liệu vận hành hồ chứa (mực nước, cửa xả, lưu lượng) theo báo cáo",
+        "Cập nhật số liệu vận hành hồ chứa theo báo cáo; nhập bản tin dự báo mực nước của KTTV",
     ),
     Permission(R.SOS, A.VIEW, True, "Xem phiếu SOS"),
     Permission(R.SOS, A.CREATE, True, "Tiếp nhận / tạo phiếu SOS"),
     Permission(R.SOS, A.UPDATE, True, "Chuyển trạng thái, đổi mức ưu tiên phiếu SOS"),
     Permission(R.SOS, A.RESOLVE, True, "Xác nhận đã cứu an toàn"),
+    Permission(R.EVACUATION, A.UPDATE, True, "Cập nhật kế hoạch và tiến độ sơ tán nhân dân của xã"),
     Permission(R.DISPATCH, A.CREATE, True, "Phát lệnh điều động lực lượng"),
     Permission(R.RESOURCE, A.VIEW, True, "Xem lực lượng, kho, phương tiện, điểm sơ tán"),
     Permission(R.INVENTORY, A.ISSUE, True, "Ra lệnh xuất kho"),
@@ -153,7 +155,8 @@ SYSTEM_ROLES: Final[tuple[tuple[str, str, str, bool, list[tuple[str, str]]], ...
     (
         COMMUNE_ROLE,
         "Quản trị xã/phường",
-        "Trong địa bàn xã: tiếp nhận và xử lý SOS, duyệt phản ánh, xuất kho của xã, gửi dữ liệu chờ tỉnh duyệt",
+        "Trong địa bàn xã: tiếp nhận và xử lý SOS, cập nhật tiến độ sơ tán, duyệt phản ánh, xuất kho của xã, gửi dữ liệu "
+        "chờ tỉnh duyệt",
         True,
         perms(
             "monitoring.view",
@@ -161,6 +164,7 @@ SYSTEM_ROLES: Final[tuple[tuple[str, str, str, bool, list[tuple[str, str]]], ...
             "sos.create",
             "sos.update",
             "sos.resolve",
+            "evacuation.update",
             "resource.view",
             "inventory.issue",
             "alert.view",

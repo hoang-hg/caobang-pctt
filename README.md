@@ -41,10 +41,10 @@ Sửa chức năng, cấu hình hay quy trình thì cập nhật đúng mục tr
 
 | # | Phân hệ | Trang | Nội dung chính |
 |---|---|---|---|
-| A | Dashboard tổng quan | `/dashboard` | KPI thời gian thực (mưa lưu vực, mực nước so với BĐ I/II/III, sơ tán, SOS chờ > 15′ nhấp nháy, lực lượng, phương tiện); hydrograph thực đo + dự báo; mưa giờ + tích luỹ + nowcast 3 giờ; ngưỡng sạt lở; vật tư theo kho; dự báo mưa 72 giờ theo xã; nhật ký sự kiện; **xuất PDF báo cáo nhanh** |
+| A | Dashboard tổng quan | `/dashboard` | KPI thời gian thực (mưa lưu vực, mực nước so với BĐ I/II/III, sơ tán, SOS chờ > 15′ nhấp nháy, lực lượng, phương tiện); hydrograph thực đo + dự báo (bản tin KTTV do trực ban nhập); mưa giờ + tích luỹ + dự báo mô hình 3 giờ tới; ngưỡng sạt lở; vật tư theo kho; dự báo mưa 72 giờ theo xã; nhật ký sự kiện; **xuất PDF báo cáo nhanh** |
 | B | Bản đồ giám sát | `/ban-do` | 4 nhóm lớp (thuỷ văn, vùng nguy hiểm, lực lượng – vật tư, SOS), radar mưa, thanh thời gian −12h…+24h, popup có biểu đồ mini, **kéo–thả đội cứu hộ vào điểm SOS**, khoanh vùng → đếm hộ dân → soạn cảnh báo, đo khoảng cách, **tìm đường an toàn A→B** |
 | C | Vật tư & Lực lượng | `/nguon-luc` | Lực lượng / Kho vật tư / Phương tiện; cảnh báo kho < 20% định mức, sắp hết hạn; nhiên liệu; điều động nhanh; ra lệnh xuất kho; xuất Excel/PDF |
-| D | Điều hành cứu hộ | `/cuu-ho` | Kanban 4 cột, SLA cấp 1/2/3 (3′/15′/60′), tiếp nhận đa kênh + bóc tách tin nhắn, khớp lực lượng gần nhất theo kỹ năng, ETA, theo dõi sơ tán & sức chứa |
+| D | Điều hành cứu hộ | `/cuu-ho` | Kanban 4 cột, SLA cấp 1/2/3 (3′/15′/60′), tiếp nhận đa kênh + bóc tách tin nhắn, khớp lực lượng gần nhất theo kỹ năng, ETA, tiến độ sơ tán theo xã (xã / trực ban cập nhật) & sức chứa |
 | E | Cảnh báo & Hotline | `/canh-bao` | Mẫu tin có tham số, phát theo xã / vùng vẽ, 5 kênh, **Maker–Checker + PIN**, bảng theo dõi giao nhận, danh bạ Tỉnh → Xã → Thôn, IVR, nhật ký pháp lý |
 | F | Bộ lọc địa phương & Sáng/Tối | toàn cục | 56 xã/phường (sau 01/07/2025), preset lưu vực, vùng núi cao, biên giới, địa bàn huyện cũ; Omni-search (địa danh, toạ độ, mã SOS); giao diện sáng/tối |
 | G | Nguồn dữ liệu & IoT | `/nguon-du-lieu` | Dự báo tổ hợp ECMWF + GFS theo xã; OpenWeather; cổng IoT HTTP / MQTT / LoRaWAN; kiểm tra số đo; cảnh báo mất tín hiệu; giám sát kết nối |
@@ -74,11 +74,14 @@ Ký hiệu: ✅ chạy thật · 🟡 chạy thật nhưng dựa trên dữ li�
 | Cứu hộ | Phiếu SOS, Kanban, SLA, điều động, khớp lực lượng gần nhất | ✅ | Phụ thuộc dữ liệu lực lượng (2.2) |
 | Cứu hộ | **Báo lệnh điều động tới trưởng nhóm** (SMS / Push) | ⛔ | Chưa gửi: hộp thoại điều động ghi rõ "hệ thống chưa gửi tin cho đội", có nút gọi và sao chép nội dung lệnh để trực ban báo qua điện thoại / Zalo |
 | Cứu hộ | Vị trí lực lượng, phương tiện theo thời gian thực | ⛔ | Chưa có thiết bị định vị; khi chạy thật vị trí đứng yên tại nơi đóng quân (chỉ bộ mô phỏng làm di chuyển) |
+| Cứu hộ | Tiến độ sơ tán theo xã (KPI "Sơ tán an toàn" của Dashboard) | ✅ | Xã / trực ban cập nhật ở Điều hành cứu hộ → **Giám sát sơ tán nhân dân** ([7.4](#giam-sat-kttv)); chưa ai cập nhật thì KPI là 0/0 |
 | Cứu hộ | Bóc tách tin nhắn SOS | ✅ | Bộ luật offline; LLM tuỳ chọn (SĐT được che trước khi gửi) |
 | Cứu hộ | Tiếp nhận SOS tự động từ Zalo OA / app (`POST /api/v1/sos/intake`) | ⛔ | Cổng có sẵn, **tắt** tới khi đặt `INTAKE_API_KEY` và có bên gửi |
 | Giám sát | Dự báo mưa tổ hợp ECMWF + GFS theo 56 xã (Open-Meteo) | ✅ | Gói miễn phí chỉ cho mục đích phi thương mại ([6.2](#open-meteo)) |
 | Giám sát | Nhận số đo IoT (HTTP / MQTT / LoRaWAN), kiểm tra số đo, mất tín hiệu | ✅ | Chưa có trạm thật nào kết nối |
-| Giám sát | Số đo trạm, dự báo mực nước (HEC-HMS), nowcast | 🔶 | Sinh bởi bộ mô phỏng khi `SIMULATOR=true` |
+| Giám sát | Số đo trạm | 🔶 | Sinh bởi bộ mô phỏng khi `SIMULATOR=true`; chạy thật cần trạm thật kết nối |
+| Giám sát | Dự báo mực nước (Hydrograph) | ✅ | Trực ban nhập **bản tin dự báo của Đài KTTV** ([7.4](#giam-sat-kttv)); đường "HEC-HMS" chỉ có ở bộ mô phỏng — hệ thống không tự chạy mô hình thuỷ văn |
+| Giám sát | Mưa 3 giờ tới của trạm mưa | ✅ | Dự báo mô hình số (Open-Meteo, [6.2](#open-meteo)), **không phải** nowcast radar — chưa có số liệu radar gốc |
 | Giám sát | Camera | 🔶 | Hình vẽ; chưa nối media server RTSP/HLS |
 | Giám sát | Quỹ đạo bão / áp thấp (bản đồ điều hành) | 🔶 / ⛔ | `SIMULATOR=true`: quỹ đạo kịch bản viết sẵn, nhãn ghi rõ "kịch bản mô phỏng"; chạy thật: `GET /map/storm-track` trả 404, nút lớp bị khoá kèm "Chưa kết nối nguồn dữ liệu chính thức" — chưa nối Trung tâm Dự báo KTTV quốc gia |
 | Giám sát | Cảnh báo tự động (vượt báo động, cảm biến sạt lở) | ✅ | Chạy trên số đo thật lẫn mô phỏng |
@@ -111,6 +114,7 @@ vùng nguy hiểm, số điện thoại không có thật.
 | Lực lượng, phương tiện | `resources.forces`, `vehicles` | ⛔ trống | BCH Quân sự, Công an, đội xung kích |
 | Kho, tồn kho, nhiên liệu | `resources.warehouses`, `inventory`, `fuel_depots` | ⛔ trống | Văn phòng BCH |
 | Điểm sơ tán | `resources.evacuation_sites` | ⛔ trống | Phương án ứng phó của từng xã |
+| Kế hoạch và tiến độ sơ tán (số hộ, nhân khẩu) | `operations.evacuation_progress` | ⛔ trống | Phương án ứng phó của từng xã; xã tự cập nhật khi có đợt sơ tán ([7.4](#giam-sat-kttv)) |
 | Danh bạ, đường dây nóng tỉnh | `communications.contacts` | ⛔ trống (cổng chỉ hiện 112/113/114/115) | Văn phòng BCH |
 
 Nhập bằng công cụ ở [2.4](#nhap-du-lieu), có người thứ hai đối chiếu với văn bản gốc.
@@ -520,7 +524,8 @@ ChirpStack/TTN ─┤ POST /api/v1/ingest/lorawan   (Bearer token LORAWAN)      
 - Một lần gọi cho cả 56 xã (toạ độ tâm xã): `models=ecmwf_ifs025,gfs025`, `hourly=precipitation`, 72 giờ, cộng 1 lần gọi
   dự báo tất định ECMWF (nhiệt độ, gió giật). Chu kỳ 3 giờ.
 - Mỗi giờ, mỗi xã: P10 / P50 / P90 / trung bình / xác suất mưa ≥ 5 mm/h cho `ECMWF_ENS`, `GFS_ENS`, `BLEND` (gộp 82
-  thành phần) → `iot_telemetry.area_forecasts`. Nowcast 3 giờ của trạm mưa lấy P50 kết hợp của xã chứa trạm.
+  thành phần) → `iot_telemetry.area_forecasts`. Dự báo 3 giờ tới của trạm mưa (biểu đồ mưa ở Dashboard) lấy P50 kết hợp của xã chứa trạm — dự báo mô hình số,
+  không phải nowcast radar.
 - **Kích hoạt từ dự báo**: xã có mưa 24 giờ tới (P50) ≥ `alert_24h_mm` (100 mm) → nháp "Chuẩn bị sơ tán" chờ duyệt
   (tối đa 1 lần / 12 giờ).
 - Cấu hình JSON (trang Nguồn dữ liệu): `{"models": ["ecmwf_ifs025","gfs025"], "forecast_days": 3, "include_deterministic": true, "heavy_mm_h": 5.0, "alert_24h_mm": 100.0}`.
@@ -749,6 +754,17 @@ graph LR
   `monitoring.update` (trực ban, quản trị tỉnh) bấm **Cập nhật vận hành** ở Dashboard → chuyên đề **Hồ chứa & Xả lũ**, nhập mực nước, số cửa xả đang
   mở, lưu lượng theo báo cáo của đơn vị quản lý hồ (`PATCH /api/v1/reservoirs/{mã}/operation`, ghi nhật ký thao tác) →
   cổng công khai và bản nhẹ cập nhật ngay, kèm thời điểm số liệu; số liệu cũ hơn 6 giờ gắn nhãn **"Số liệu cũ"**.
+- **Dự báo mực nước**: hệ thống không tự chạy mô hình thuỷ văn. Người có quyền `monitoring.update` bấm **Nhập bản tin
+  dự báo** ở khối Hydrograph của Dashboard, chọn trạm, dán bảng 2 cột "thời điểm – mực nước" từ bản tin của Đài KTTV
+  (dán thẳng từ Excel; giờ viết `07:00 04/10`, `7h 04/10/2026` hoặc `2026-10-04 07:00`, mực nước `180,45` hoặc
+  `180.45`), xem trước đỉnh dự báo so với BĐ I–III rồi lưu (`PUT /api/v1/stations/{mã}/forecast`, model `KTTV`). Bản tin
+  mới **thay toàn bộ** bản tin cũ của trạm; mốc lệch ngưỡng BĐ I quá 50 m (gõ thừa / thiếu chữ số) bị từ chối. Hydrograph
+  vẽ nét đứt kèm giờ phát hành; chưa có bản tin → ghi "Chưa có bản tin dự báo". Bản tin hết hiệu lực: **Gỡ bản tin hiện
+  có** (`DELETE` cùng đường dẫn). Mọi thao tác ghi nhật ký thao tác và nhật ký sự kiện (đỉnh vượt báo động → mức cảnh báo).
+- **Tiến độ sơ tán**: KPI "Sơ tán an toàn (hộ)" của Dashboard cộng từ bảng tiến độ của từng xã. Người có quyền
+  `evacuation.update` (quản trị xã cho xã mình, cấp tỉnh cho mọi xã) vào Điều hành cứu hộ → **Giám sát sơ tán nhân dân** →
+  **Sửa** / **+ Cập nhật xã**, nhập số hộ, nhân khẩu phải sơ tán và đã sơ tán (`PUT /api/v1/evacuation/{mã xã}`). Chặn
+  nhân khẩu ít hơn số hộ, số vượt tổng số hộ / dân số của xã. Kết thúc đợt: nhập số đã sơ tán = 0.
 
 ### 7.5. Kịch bản lũ & ngập lụt
 
@@ -810,7 +826,7 @@ tuỳ chỉnh. Casbin `rbac_with_domains`; danh mục quyền và 3 vai trò là
 |---|---|---|---|---|
 | 1 | `super_admin` Quản trị hệ thống | toàn tỉnh `*` | Tất cả | Mọi cấp |
 | 2 | `admin_tinh` Quản trị tỉnh | toàn tỉnh `*` | Mọi quyền nghiệp vụ toàn tỉnh: SOS, **điều động**, **soạn và duyệt cảnh báo** (cần PIN, không tự duyệt lệnh mình soạn), tổng đài, kho, phương tiện, nhật ký pháp lý, nguồn dữ liệu / IoT, **nhập dữ liệu chính thức**, duyệt hồ sơ xã gửi, vận hành hồ chứa | Cấp 3 |
-| 3 | `admin_xa` Quản trị xã/phường | đúng 1 xã `<CUM>/<MA_XA>` | Trong xã: tiếp nhận – cập nhật – hoàn thành SOS, duyệt / chuyển SOS phản ánh, xuất kho của xã, xem nguồn lực / cảnh báo / danh bạ, **gửi dữ liệu chờ tỉnh duyệt** | Không |
+| 3 | `admin_xa` Quản trị xã/phường | đúng 1 xã `<CUM>/<MA_XA>` | Trong xã: tiếp nhận – cập nhật – hoàn thành SOS, cập nhật tiến độ sơ tán, duyệt / chuyển SOS phản ánh, xuất kho của xã, xem nguồn lực / cảnh báo / danh bạ, **gửi dữ liệu chờ tỉnh duyệt** | Không |
 
 ```
 *                          Toàn tỉnh Cao Bằng — Cấp 1, Cấp 2
@@ -827,7 +843,8 @@ Tiền tố `<CUM>` (địa bàn huyện cũ) chỉ còn trong mã phạm vi đ�
 | Quyền | Theo phạm vi | Mô tả |
 |---|---|---|
 | `monitoring.view` | ✓ | Dashboard, bản đồ, số liệu quan trắc |
-| `monitoring.update` | toàn tỉnh | Cập nhật số liệu vận hành hồ chứa (mực nước, cửa xả, lưu lượng) theo báo cáo của đơn vị quản lý hồ |
+| `monitoring.update` | toàn tỉnh | Cập nhật số liệu vận hành hồ chứa (mực nước, cửa xả, lưu lượng) theo báo cáo của đơn vị quản lý hồ; nhập / gỡ bản tin dự báo mực nước của KTTV |
+| `evacuation.update` | ✓ | Cập nhật kế hoạch và tiến độ sơ tán của xã (quản trị xã có sẵn cho xã mình) |
 | `sos.view` / `.create` / `.update` / `.resolve` | ✓ | Xem / tiếp nhận / chuyển trạng thái / xác nhận đã cứu |
 | `dispatch.create` | ✓ | Điều động (theo xã của điểm SOS; được điều lực lượng ngoài xã) |
 | `resource.view` | ✓ | Lực lượng, kho, phương tiện, điểm sơ tán |

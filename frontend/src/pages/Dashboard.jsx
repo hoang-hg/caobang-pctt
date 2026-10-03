@@ -14,6 +14,8 @@ import RainfallChart from '../components/charts/RainfallChart';
 import LandslideScatter from '../components/charts/LandslideScatter';
 import SuppliesChart from '../components/charts/SuppliesChart';
 import AreaForecastChart from '../components/charts/AreaForecastChart';
+import ForecastBulletinModal from '../components/charts/ForecastBulletinModal';
+import { usePermission } from '../rbac/usePermission';
 import { ALARM, alarmLevel } from '../utils/labels';
 import { int, num, pct } from '../utils/format';
 import { exportSnapshotPdf } from '../utils/exportPdf';
@@ -56,6 +58,8 @@ export default function Dashboard() {
   const [stationId, setStationId] = useState('CB-WL-01');
   const [activeMode, setActiveMode] = useState('tong_hop'); // tong_hop | hochua | satlo
   const [exporting, setExporting] = useState(false);
+  const [bulletinOpen, setBulletinOpen] = useState(false);
+  const canForecast = usePermission('monitoring', 'update', '*');
   const ref = useRef(null);
 
   const waitOverdue = k?.sos?.overdue > 0;
@@ -321,22 +325,32 @@ export default function Dashboard() {
             <Section
               title="Biểu đồ thủy văn (Hydrograph)"
               right={
-                <select
-                  className="input w-auto py-1 px-2.5 text-xs border border-line"
-                  value={activeStation}
-                  onChange={(e) => setStationId(e.target.value)}
-                  aria-label="Chọn trạm thủy văn"
-                >
-                  {stations.map((s) => (
-                    <option key={s.id} value={s.id}>{s.name.replace('Trạm thủy văn ', '')}</option>
-                  ))}
-                </select>
+                <div className="flex items-center gap-2">
+                  <select
+                    className="input w-auto py-1 px-2.5 text-xs border border-line"
+                    value={activeStation}
+                    onChange={(e) => setStationId(e.target.value)}
+                    aria-label="Chọn trạm thủy văn"
+                  >
+                    {stations.map((s) => (
+                      <option key={s.id} value={s.id}>{s.name.replace('Trạm thủy văn ', '')}</option>
+                    ))}
+                  </select>
+                  {canForecast && stations.length > 0 && (
+                    <button className="btn-ghost whitespace-nowrap px-2.5 py-1 text-xs" onClick={() => setBulletinOpen(true)}>
+                      Nhập bản tin dự báo
+                    </button>
+                  )}
+                </div>
               }
             >
               <Hydrograph stationId={activeStation} height={250} />
+              {bulletinOpen && (
+                <ForecastBulletinModal stations={stations} stationId={activeStation} onClose={() => setBulletinOpen(false)} />
+              )}
             </Section>
 
-            <Section title="Cường độ mưa & Nowcasting 3 giờ">
+            <Section title="Cường độ mưa & dự báo 3 giờ tới">
               <RainfallChart height={270} />
             </Section>
 
