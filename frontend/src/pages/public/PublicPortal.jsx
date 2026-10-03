@@ -20,7 +20,6 @@ import L from 'leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import MapLegendBox, { POINT_EMOJI } from '../../components/map/MapLegendBox';
 import { BackButton, useEscapeToClose } from '../../components/common/ui';
-import TopLegendBar from '../../components/map/TopLegendBar';
 import ReportForm from './ReportForm';
 import TicketTracker from './TicketTracker';
 import ReservoirMonitor from './ReservoirMonitor';
@@ -557,7 +556,7 @@ export default function PublicPortal() {
             </a>
 
             <button
-              className="btn-danger hidden sm:inline-flex text-xs px-3 py-1.5"
+              className="btn-danger inline-flex text-xs px-2.5 sm:px-3 py-1.5 shadow-xs font-semibold"
               onClick={() => setReporting(true)}
             >
               <Camera size={14} />
@@ -690,16 +689,19 @@ export default function PublicPortal() {
 
         {/* 4 Thẻ hành động nhanh cho người dân */}
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {/* Nút 1: Kiểm tra vị trí an toàn */}
+          {/* Thẻ 1: Kiểm tra vị trí an toàn */}
           <div
             onClick={locate}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); locate(); } }}
             className="card p-4 flex flex-col justify-between cursor-pointer hover:border-accent hover:shadow-md transition-all group border-l-4 border-l-accent"
           >
             <div className="flex items-center justify-between">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/15 text-accent group-hover:scale-105 transition-transform">
                 <LocateFixed size={20} />
               </div>
-              <span className="text-[11px] font-semibold text-accent group-hover:underline">Bấm để kiểm tra →</span>
+              <span className="text-[11px] font-semibold text-accent group-hover:underline">Kiểm tra ngay →</span>
             </div>
             <div className="mt-3">
               <div className="font-bold text-sm text-ink">Tôi đang ở đâu? Có an toàn không?</div>
@@ -707,57 +709,72 @@ export default function PublicPortal() {
             </div>
           </div>
 
-          {/* Nút 2: Tra cứu tiến độ cứu hộ / phản ánh */}
+          {/* Thẻ 2: Điểm sơ tán an toàn gần nhất */}
+          <div
+            onClick={() => {
+              setActiveTab('sotan');
+              scrollToContent();
+            }}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveTab('sotan'); scrollToContent(); } }}
+            className="card p-4 flex flex-col justify-between cursor-pointer hover:border-emerald-500 hover:shadow-md transition-all group border-l-4 border-l-emerald-500"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 group-hover:scale-105 transition-transform">
+                <Home size={20} />
+              </div>
+              <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 group-hover:underline">Xem điểm sơ tán →</span>
+            </div>
+            <div className="mt-3">
+              <div className="font-bold text-sm text-ink">Điểm sơ tán an toàn gần nhất</div>
+              <div className="text-xs text-muted mt-0.5">Nhà văn hóa, trường học, điểm tạm trú khẩn cấp có người phụ trách</div>
+            </div>
+          </div>
+
+          {/* Thẻ 3: Cảnh báo sạt trượt taluy & Đèo dốc */}
+          <div
+            onClick={() => {
+              setActiveTab('satlo');
+              scrollToContent();
+            }}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveTab('satlo'); scrollToContent(); } }}
+            className="card p-4 flex flex-col justify-between cursor-pointer hover:border-amber-500 hover:shadow-md transition-all group border-l-4 border-l-amber-500"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 group-hover:scale-105 transition-transform">
+                <Mountain size={20} />
+              </div>
+              <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 group-hover:underline">Xem đèo dốc →</span>
+            </div>
+            <div className="mt-3">
+              <div className="font-bold text-sm text-ink">Sạt trượt & Tuyến đèo dốc</div>
+              <div className="text-xs text-muted mt-0.5">Theo dõi vị trí sạt lở, các đoạn đèo cấm đường và lộ trình tránh an toàn</div>
+            </div>
+          </div>
+
+          {/* Thẻ 4: Tra cứu tiến độ cứu hộ & phản ánh */}
           <div
             onClick={() => {
               setActiveTab('tracuu');
               scrollToContent();
             }}
-            className="card p-4 flex flex-col justify-between cursor-pointer hover:border-amber-500 hover:shadow-md transition-all group border-l-4 border-l-amber-500"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveTab('tracuu'); scrollToContent(); } }}
+            className="card p-4 flex flex-col justify-between cursor-pointer hover:border-sky-500 hover:shadow-md transition-all group border-l-4 border-l-sky-500"
           >
             <div className="flex items-center justify-between">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/15 text-amber-600 group-hover:scale-105 transition-transform">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-500/15 text-sky-600 dark:text-sky-400 group-hover:scale-105 transition-transform">
                 <Search size={20} />
               </div>
-              <span className="text-[11px] font-semibold text-amber-600 group-hover:underline">Tra cứu ngay →</span>
+              <span className="text-[11px] font-semibold text-sky-600 dark:text-sky-400 group-hover:underline">Tra cứu tiến độ →</span>
             </div>
             <div className="mt-3">
-              <div className="font-bold text-sm text-ink">Tra cứu tiến độ cứu hộ & phản ánh</div>
-              <div className="text-xs text-muted mt-0.5">Nhập mã phiếu (SOS-…, PA-…) và SĐT đã dùng khi gửi</div>
-            </div>
-          </div>
-
-          {/* Nút 3: Gửi phản ánh hiện trường */}
-          <div
-            onClick={() => setReporting(true)}
-            className="card p-4 flex flex-col justify-between cursor-pointer hover:border-danger hover:shadow-md transition-all group border-l-4 border-l-danger"
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-danger/15 text-danger group-hover:scale-105 transition-transform">
-                <Camera size={20} />
-              </div>
-              <span className="text-[11px] font-semibold text-danger group-hover:underline">Chụp & Gửi →</span>
-            </div>
-            <div className="mt-3">
-              <div className="font-bold text-sm text-ink">Gửi phản ánh ngập lụt / sạt lở</div>
-              <div className="text-xs text-muted mt-0.5">Chụp ảnh điểm ngập, tắc đèo, đất đá sạt trượt để báo BCH tỉnh</div>
-            </div>
-          </div>
-
-          {/* Nút 4: Đường dây nóng cứu nạn */}
-          <div
-            onClick={() => setShowSosModal(true)}
-            className="card p-4 flex flex-col justify-between cursor-pointer hover:border-red-500 hover:shadow-md transition-all group border-l-4 border-l-red-500"
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/15 text-red-600 group-hover:scale-105 transition-transform">
-                <Phone size={20} />
-              </div>
-              <span className="text-[11px] font-semibold text-red-600 group-hover:underline">Xem danh bạ →</span>
-            </div>
-            <div className="mt-3">
-              <div className="font-bold text-sm text-ink">Tổng đài cứu trợ & Đường dây nóng</div>
-              <div className="text-xs text-muted mt-0.5">Số khẩn cấp 112, 114, 115 và trực ban PCTT tỉnh</div>
+              <div className="font-bold text-sm text-ink">Tra cứu tiến độ (SOS / Phản ánh)</div>
+              <div className="text-xs text-muted mt-0.5">Nhập mã phiếu (SOS-…, PA-…) và SĐT để theo dõi tiến độ xử lý</div>
             </div>
           </div>
         </div>
@@ -997,20 +1014,6 @@ export default function PublicPortal() {
             </div>
           </section>
         )}
-
-        {/* Khối Chú thích Ký hiệu & Tra cứu Điểm Giám sát ở Đầu Trang */}
-        <TopLegendBar
-          data={map}
-          onSelectPoint={handleSelectPoint}
-          onNavigateTab={(tabId) => {
-            setActiveTab(tabId);
-            scrollToContent();
-          }}
-          onFocusMap={() => {
-            setActiveTab('bando');
-            scrollToContent();
-          }}
-        />
 
         {/* Thanh Điều hướng Tabs (Bản đồ / Hồ chứa / Sạt trượt / Tra cứu tiến độ / Mực nước / Điểm sơ tán / Hotline / Cẩm nang) */}
         <div ref={tabsRef} className="flex scroll-mt-20 border-b border-line gap-1.5 sm:gap-2 overflow-x-auto scroll-thin pb-2 pt-1 scroll-smooth">
