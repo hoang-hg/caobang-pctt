@@ -136,17 +136,23 @@ async def plan_route(
     route = build_route(edges, nodes, from_lat, from_lon, to_lat, to_lon, speed_factor)
     # Đồ thị chỉ né đoạn đường bị chặn; chặng chim bay và vùng ngập mức vàng / cam không được xét ở đó → kiểm tra lại
     # toàn tuyến với mọi vùng nguy hiểm đang hiệu lực
+    route["hazards"] = await route_hazards(route["geometry"])
+    if route["hazards"]:
+        route["safe"] = False
+    route["warnings"] = await route_warnings(route["geometry"])
+    return route
+
+
+async def route_hazards(geometry: dict) -> list[str]:
+    """Tên các vùng nguy hiểm đang hiệu lực mà tuyến cắt qua (mức đỏ, cam trước). Link nhiệm vụ gọi lại theo tuyến đã
+    lưu của lệnh → đội thấy vùng nguy hiểm mới phát sinh sau lúc phát lệnh."""
     hits = await fetch_all(
         """SELECT name FROM iot_telemetry.hazard_zones
             WHERE valid_until > now() AND ST_Intersects(geom, ST_SetSRID(ST_GeomFromGeoJSON(:g), 4326))
             ORDER BY (level = 'do') DESC, (level = 'cam') DESC, name LIMIT 5""",
-        {"g": json.dumps(route["geometry"])},
+        {"g": json.dumps(geometry)},
     )
-    route["hazards"] = [h["name"] for h in hits]
-    if hits:
-        route["safe"] = False
-    route["warnings"] = await route_warnings(route["geometry"])
-    return route
+    return [h["name"] for h in hits]
 
 
 async def route_warnings(geometry: dict) -> list[str]:

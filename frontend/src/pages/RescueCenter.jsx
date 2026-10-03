@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import {
   Bot, CheckCircle2, Clock, MapPin, Phone, Send, Sparkles, Timer, Inbox, Loader2, Navigation, Home,
-  Search
+  Search, LifeBuoy, Link2
 } from 'lucide-react';
 import { api } from '../api/client';
 import { useAreaQuery, useUnits } from '../api/hooks';
@@ -12,6 +12,7 @@ import { useStore } from '../app/store';
 import { Empty, Modal, Progress, Section } from '../components/common/ui';
 import DispatchModal from '../components/common/DispatchModal';
 import OccupancyModal from '../components/common/OccupancyModal';
+import { MissionLinkModal } from '../components/common/MissionLink';
 import { Can, useAllowedCodes, usePermission } from '../rbac/usePermission';
 import { INCIDENT, PRIORITY, SOURCE, VULNERABLE } from '../utils/labels';
 import { int, pct, time } from '../utils/format';
@@ -39,7 +40,7 @@ const mmss = (sec) => {
   return h ? `${h}h${String(m).padStart(2, '0')}` : `${m}:${String(s % 60).padStart(2, '0')}`;
 };
 
-function TicketCard({ t, now, onDispatch, onResolve, onFocus, onArrived }) {
+function TicketCard({ t, now, onDispatch, onResolve, onFocus, onArrived, onLink }) {
   const canUpdate = usePermission('sos', 'update', t.admin_code);
   const pr = PRIORITY[t.priority] || PRIORITY[2];
   const waitingSec = (now - new Date(t.received_at).getTime()) / 1000;
@@ -51,6 +52,11 @@ function TicketCard({ t, now, onDispatch, onResolve, onFocus, onArrived }) {
   const span = t.dispatched_at && t.eta ? new Date(t.eta) - new Date(t.dispatched_at) : 0;
   const estimated = !arrived && !(t.progress > 0);
   const progress = arrived ? 100 : t.progress > 0 ? t.progress * 100 : span > 0 ? Math.min(95, (100 * (now - new Date(t.dispatched_at))) / span) : 0;
+  // Báo cáo gần nhất của trưởng nhóm qua link nhiệm vụ ("đã đến" đã hiện ở thanh tiến độ)
+  const active = t.status === 'thuc_thi';
+  const needSupport = active && t.field_kind === 'need_support';
+  const rescued = active && t.field_kind === 'rescued';
+  const missionOpen = active && t.dispatch_id && (t.dispatch_status === 'dang_di' || t.dispatch_status === 'da_den');
 
   return (
     <div
@@ -125,6 +131,19 @@ function TicketCard({ t, now, onDispatch, onResolve, onFocus, onArrived }) {
               </button>
             )}
             {!t.route_safe && <div className="text-[11px] font-medium text-danger">⚠ Lộ trình buộc qua vùng nguy hiểm</div>}
+            {needSupport && (
+              <div className="rounded-md border border-danger/50 bg-danger/10 px-2 py-1 text-[11px] text-danger [overflow-wrap:anywhere]">
+                <b>Đội cần chi viện</b> ({time(t.field_at)}){t.field_note ? `: ${t.field_note}` : ''}
+              </div>
+            )}
+            {rescued && (
+              <div className="rounded-md border border-good/50 bg-good/10 px-2 py-1 text-[11px] text-good [overflow-wrap:anywhere]">
+                <b>
+                  Đội báo đã cứu {t.trapped_count ? `${t.field_people_safe}/${t.trapped_count}` : t.field_people_safe} người
+                </b>{' '}
+                ({time(t.field_at)}) — chờ xác nhận{t.field_note ? `: ${t.field_note}` : ''}
+              </div>
+            )}
           </div>
         )}
 
@@ -165,13 +184,29 @@ function TicketCard({ t, now, onDispatch, onResolve, onFocus, onArrived }) {
           </Can>
         )}
 
+        {missionOpen && (
+          <Can I="dispatch" a="create" scope={t.admin_code}>
+            <button className="btn-ghost px-2 py-1 text-xs" onClick={() => onLink(t)} title="Cấp lại link nhiệm vụ cho trưởng nhóm">
+              <Link2 size={12} /> Link
+            </button>
+          </Can>
+        )}
+
+        {needSupport && (
+          <Can I="dispatch" a="create" scope={t.admin_code}>
+            <button className="btn-danger px-2 py-1 text-xs font-semibold" onClick={() => onDispatch(t)} title="Điều thêm lực lượng chi viện">
+              <LifeBuoy size={12} /> Chi viện
+            </button>
+          </Can>
+        )}
+
         {t.status === 'thuc_thi' && (
           <Can I="sos" a="resolve" scope={t.admin_code}>
             <button
-              className="btn-good ml-auto px-2.5 py-1 text-xs shadow-sm font-semibold"
+              className={clsx('btn-good ml-auto px-2.5 py-1 text-xs shadow-sm font-semibold', rescued && 'ring-2 ring-good/40')}
               onClick={() => onResolve(t)}
             >
-              <CheckCircle2 size={12} /> Đã an toàn
+              <CheckCircle2 size={12} /> {rescued ? 'Xác nhận hoàn thành' : 'Đã an toàn'}
             </button>
           </Can>
         )}
@@ -456,6 +491,7 @@ export default function RescueCenter() {
   const now = useNow();
   const { data: tickets = [] } = useAreaQuery('sos', '/sos', {}, { refetchInterval: 20_000 });
   const [dispatch, setDispatch] = useState(null);
+  const [linkFor, setLinkFor] = useState(null);
   const [over, setOver] = useState(null);
   const [filterText, setFilterText] = useState('');
 
@@ -571,6 +607,7 @@ export default function RescueCenter() {
                       onResolve={(x) => move(x.id, 'hoan_thanh')}
                       onFocus={onFocus}
                       onArrived={onArrived}
+                      onLink={setLinkFor}
                     />
                   ))}
                 {!counts[col.key] && (
@@ -592,6 +629,7 @@ export default function RescueCenter() {
       </div>
 
       {dispatch && <DispatchModal ticket={dispatch} onClose={() => setDispatch(null)} />}
+      {linkFor && <MissionLinkModal ticket={linkFor} onClose={() => setLinkFor(null)} />}
     </div>
   );
 }

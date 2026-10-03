@@ -8,6 +8,8 @@ export const PRIORITY = {
 };
 export const SOS_STATUS = { moi: 'Chờ xử lý', dieu_phoi: 'Đang điều phối', thuc_thi: 'Đang thực thi', hoan_thanh: 'Hoàn thành' };
 export const SOURCE = { ZALO: 'Zalo OA', APP: 'Ứng dụng', HOTLINE: 'Tổng đài', SENSOR: 'Cảm biến IoT', CAN_BO: 'Cán bộ' };
+// Báo cáo của trưởng nhóm từ link nhiệm vụ (trang /nhiem-vu)
+export const FIELD_REPORT = { arrived: 'Đã đến hiện trường', rescued: 'Đã cứu an toàn', need_support: 'Cần chi viện' };
 export const VULNERABLE = { nguoi_gia: 'Người già', tre_em: 'Trẻ em', thuong_nang: 'Thương nặng', thai_phu: 'Thai phụ' };
 export const FORCE_TYPE = {
   quan_su: 'Quân sự', cong_an: 'Công an', bien_phong: 'Biên phòng', dan_quan: 'Dân quân', tinh_nguyen: 'Tình nguyện', y_te: 'Y tế',

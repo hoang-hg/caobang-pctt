@@ -18,6 +18,7 @@ from app.api.v1 import (
     integrations,
     map_layers,
     mfa,
+    mission,
     public,
     rbac,
     reports,
@@ -112,6 +113,7 @@ for r in (
     public,
     reports,
     data_import,
+    mission,
 ):
     app.include_router(r.router, prefix="/api/v1")
 

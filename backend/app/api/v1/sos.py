@@ -13,7 +13,7 @@ from app.config import settings
 from app.db import execute, fetch_all, fetch_one, transaction
 from app.rbac import domains, scope_loaders
 from app.rbac.authz import area_scope, can, forbidden, require_any, require_permission
-from app.services import dispatch_matching, logistics
+from app.services import dispatch_matching, logistics, mission
 from app.services.events import log_event
 from app.services.safe_routing import VEHICLE_SPEED, plan_route
 from app.services.sos import SLA_MINUTES, TICKET_SELECT, create_ticket, get_ticket
@@ -258,6 +258,7 @@ async def dispatch(body: DispatchIn, user: dict = Depends(require_any("dispatch"
     route = await plan_route(force["lat"], force["lon"], ticket["lat"], ticket["lon"], speed_factor)
     personnel = min(body.personnel, force["personnel_ready"])
     eta = datetime.now(UTC) + timedelta(minutes=route["duration_min"])
+    token, token_hash = mission.new_token()  # link nhiệm vụ cho trưởng nhóm (app/services/mission.py)
 
     async with transaction() as conn:
         # Khoá phiếu tới hết transaction, kiểm tra lại trạng thái TRONG khoá (bước tính lộ trình ở trên mất vài trăm
@@ -329,10 +330,12 @@ async def dispatch(body: DispatchIn, user: dict = Depends(require_any("dispatch"
             )
         order = await fetch_one(
             """INSERT INTO operations.dispatch_orders (ticket_id, force_id, vehicle_ids, personnel, supplies, dispatched_by, eta,
-                                                       route_geom, distance_km, route_safe, supplies_warehouse_id)
+                                                       route_geom, distance_km, route_safe, supplies_warehouse_id,
+                                                       mission_token_hash, mission_expires_at)
                VALUES (CAST(:t AS uuid), CAST(:f AS uuid), CAST(:v AS uuid[]), :p, CAST(:s AS jsonb), :by, :eta,
-                       ST_SetSRID(ST_GeomFromGeoJSON(:g), 4326), :km, :safe, CAST(:wh AS uuid))
-               RETURNING id, eta, distance_km, route_safe""",
+                       ST_SetSRID(ST_GeomFromGeoJSON(:g), 4326), :km, :safe, CAST(:wh AS uuid),
+                       :mh, now() + make_interval(hours => :ttl))
+               RETURNING id, eta, distance_km, route_safe, mission_expires_at""",
             {
                 "t": body.ticket_id,
                 "f": body.force_id,
@@ -345,6 +348,8 @@ async def dispatch(body: DispatchIn, user: dict = Depends(require_any("dispatch"
                 "g": json.dumps(route["geometry"]),
                 "km": route["distance_km"],
                 "safe": route["safe"],
+                "mh": token_hash,
+                "ttl": mission.MISSION_TTL_HOURS,
             },
             conn,
         )
@@ -403,12 +408,15 @@ async def dispatch(body: DispatchIn, user: dict = Depends(require_any("dispatch"
         "route": route,
         "ticket": updated,
         # Nội dung lệnh cho trưởng nhóm. CHƯA tích hợp SMS / Push → hệ thống KHÔNG gửi (sent = False): giao diện yêu cầu
-        # trực ban gọi / nhắn trực tiếp — không được để trực ban tưởng đội đã nhận lệnh
+        # trực ban gọi / nhắn trực tiếp — không được để trực ban tưởng đội đã nhận lệnh. Kèm link nhiệm vụ: trưởng nhóm
+        # mở trên điện thoại (không đăng nhập) để báo đã đến / đã cứu / cần chi viện. Mã chỉ trả MỘT lần ở đây (CSDL
+        # lưu SHA-256) — mất thì trực ban cấp link mới.
         "notification": {
             "to": force["contact_phone"],
             "sent": False,
-            "message": f"[LỆNH KHẨN] {ticket['code']}: {ticket['address'] or ticket['admin_name']} – "
-            f"toạ độ {ticket['lat']:.5f},{ticket['lon']:.5f}. ETA {route['duration_min']} phút.",
+            "message": mission.order_message(ticket, mission.mission_url(token), route["duration_min"]),
+            "mission_url": mission.mission_url(token),
+            "mission_expires_at": order["mission_expires_at"],
         },
     }
 
@@ -419,14 +427,22 @@ async def dispatch_arrived(
 ):
     """Đội báo đã đến hiện trường (điện thoại / bộ đàm — chưa có GPS) → lệnh "đã đến", tiến độ 100%, ghi giờ đến. Trước
     đây khi chạy thật tiến độ đứng 0% tới lúc xác nhận "Đã cứu"."""
-    row = await fetch_one(
-        """UPDATE operations.dispatch_orders SET status = 'da_den', progress = 1, arrived_at = now()
-            WHERE id = CAST(:id AS uuid) AND status = 'dang_di'
-        RETURNING ticket_id, force_id, dispatched_at, arrived_at""",
-        {"id": order_id},
-    )
-    if not row:
-        raise HTTPException(409, "Lệnh không còn ở trạng thái đang di chuyển (đã đến / đã xong / huỷ)")
+    async with transaction() as conn:
+        row = await fetch_one(
+            """UPDATE operations.dispatch_orders SET status = 'da_den', progress = 1, arrived_at = now()
+                WHERE id = CAST(:id AS uuid) AND status = 'dang_di'
+            RETURNING id, ticket_id, force_id, dispatched_at, arrived_at""",
+            {"id": order_id},
+            conn,
+        )
+        if not row:
+            raise HTTPException(409, "Lệnh không còn ở trạng thái đang di chuyển (đã đến / đã xong / huỷ)")
+        # Lịch sử trên link nhiệm vụ: đội thấy trực ban đã ghi nhận (báo qua bộ đàm / điện thoại)
+        await execute(
+            """INSERT INTO operations.dispatch_field_reports (order_id, kind, via) VALUES (:o, 'arrived', 'staff')""",
+            {"o": row["id"]},
+            conn,
+        )
     ticket = await get_ticket(row["ticket_id"])
     force = await fetch_one("SELECT name FROM resources.forces WHERE id = :f", {"f": row["force_id"]})
     minutes = round((row["arrived_at"] - row["dispatched_at"]).total_seconds() / 60)
