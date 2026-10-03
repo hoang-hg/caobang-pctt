@@ -21,7 +21,7 @@ from app.config import settings
 from app.db import fetch_all, fetch_one
 from app.infra import ratelimit
 from app.infra.cache import cached, cached_view
-from app.services import lite
+from app.services import lite, map_ops
 from app.services.data_import.engine import xom_sort_key
 from app.services.landslides import get_landslides_overview
 from app.services.lite import NATIONAL_HOTLINES, RISK_ADVICE, province_hotlines
@@ -141,8 +141,8 @@ async def public_map():
                  FROM iot_telemetry.hazard_zones WHERE valid_until > now()"""
         )
         points = await fetch_all(
-            """SELECT type, level, name, description, reported_at, ST_Y(location) AS lat, ST_X(location) AS lon
-                 FROM iot_telemetry.hazard_points WHERE active"""
+            f"""SELECT type, level, name, description, reported_at, ST_Y(location) AS lat, ST_X(location) AS lon
+                  FROM iot_telemetry.hazard_points WHERE {map_ops.active_point_sql()}"""
         )
         evac = await fetch_all(
             """SELECT e.id, e.name, e.site_type, e.capacity, e.current_occupancy, e.contact_phone AS hotline, u.name AS admin_name,

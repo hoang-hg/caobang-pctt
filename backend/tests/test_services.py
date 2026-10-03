@@ -304,17 +304,22 @@ def test_landslide_without_any_evidence_is_no_data_not_safe():
 
 
 async def test_storm_track_is_simulation_only(monkeypatch):
-    """Quỹ đạo bão viết cứng là kịch bản của bộ mô phỏng: chạy thật (SIMULATOR=false) → 404, không hiện như bão thật."""
+    """Chưa có bản tin bão trực ban nhập: chạy thật (SIMULATOR=false) → 404, không hiện kịch bản như bão thật; bộ mô phỏng
+    trả kịch bản, tên ghi rõ "mô phỏng"."""
     import pytest
     from fastapi import HTTPException
 
     from app.api.v1 import map_layers
     from app.config import settings
 
+    async def no_bulletins(*a, **kw):
+        return []
+
+    monkeypatch.setattr(map_layers, "fetch_all", no_bulletins)
     monkeypatch.setattr(settings, "simulator", False)
     with pytest.raises(HTTPException) as e:
         await map_layers.storm_track({})
     assert e.value.status_code == 404
     monkeypatch.setattr(settings, "simulator", True)
-    track = await map_layers.storm_track({})
+    (track,) = (await map_layers.storm_track({}))["storms"]
     assert track["simulated"] is True and "mô phỏng" in track["name"]

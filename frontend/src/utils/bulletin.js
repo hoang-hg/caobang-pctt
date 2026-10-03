@@ -59,3 +59,9 @@ export function parseBulletin(text, now = new Date()) {
   points.sort((a, b) => a.time.localeCompare(b.time));
   return { points, errors };
 }
+
+/** "14:00 04/10" theo giờ máy người xem (cán bộ trong tỉnh) */
+export const fmtVn = (iso) => new Date(iso).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
+
+/** Giờ Việt Nam hiện tại dạng "YYYY-MM-DDTHH:mm" cho ô datetime-local (máy trực ban có thể đặt sai múi giờ) */
+export const nowVn = () => new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 16);

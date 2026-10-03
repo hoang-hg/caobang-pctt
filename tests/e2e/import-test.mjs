@@ -122,7 +122,7 @@ check('Kho vật tư không cho thay toàn bộ (có dữ liệu tham chiếu) �
 
 // ---- Mọi loại dữ liệu: nhập tệp mẫu 2 lần (lần 1 thêm, lần 2 cập nhật) — theo thứ tự phụ thuộc
 const ORDER = ['kho', 'ton_kho', 'luc_luong', 'phuong_tien', 'diem_so_tan', 'vung_nguy_hiem', 'diem_nguy_hiem', 'danh_ba',
-  'tram_quan_trac', 'ho_chua', 'cay_xang', 'xom'];
+  'tram_quan_trac', 'ngap_kich_ban', 'ho_chua', 'cay_xang', 'xom']; // ngap_kich_ban sau tram_quan_trac: tham chiếu trạm mẫu
 check('Kiểm thử phủ mọi loại dữ liệu (trừ ranh giới xã, kiểm riêng)',
   list.data.filter((d) => d.name !== 'ranh_gioi_xa').every((d) => ORDER.includes(d.name)));
 for (const name of ORDER) {

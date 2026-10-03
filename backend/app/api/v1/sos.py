@@ -363,7 +363,7 @@ async def evacuation(codes: list[str] = Depends(area_scope("monitoring", "view")
         {"codes": codes},
     )
     sites = await fetch_all(
-        f"""SELECT e.id, e.name, e.site_type, e.capacity, e.current_occupancy, u.name AS admin_name
+        f"""SELECT e.id, e.name, e.site_type, e.capacity, e.current_occupancy, u.name AS admin_name, u.code AS admin_code
               FROM resources.evacuation_sites e JOIN spatial_admin.administrative_units u ON u.id = e.admin_unit_id
              WHERE {area_clause('e.location', codes)}
              ORDER BY (e.current_occupancy::float / NULLIF(e.capacity, 0)) DESC NULLS LAST""",

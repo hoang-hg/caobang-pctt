@@ -1,16 +1,19 @@
-import { useCallback, useMemo, useState } from 'react';
+import { Fragment, useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { MapContainer, ScaleControl, ZoomControl } from 'react-leaflet';
+import { MapContainer, ScaleControl, ZoomControl, useMapEvents } from 'react-leaflet';
 import clsx from 'clsx';
 import {
   Layers, Ruler, Route, PenTool, Circle as CircleIcon, Map as MapIcon, X, Siren, Megaphone, ChevronLeft, ChevronRight, Clock,
-  Search, Compass
+  Search, Compass, MapPin
 } from 'lucide-react';
 import { api } from '../api/client';
 import { useAreaQuery, useUnitsGeo } from '../api/hooks';
 import { useStore } from '../app/store';
-import MapLayers, { StormLayer, stormQuery } from '../components/map/MapLayers';
+import MapLayers, { floodScenarioStates, StormLayer, stormQuery } from '../components/map/MapLayers';
+import IncidentModal from '../components/map/IncidentModal';
+import StormBulletinModal from '../components/map/StormBulletinModal';
+import OccupancyModal from '../components/common/OccupancyModal';
 import { AdminBoundaries, AreaFocus, BASEMAPS, BaseLayer, DrawTool, FocusHandler, ForecastChoropleth, MeasureTool, RadarLayer, RAIN_BINS, RouteTool } from '../components/map/MapTools';
 import DispatchModal from '../components/common/DispatchModal';
 import CameraModal from '../components/common/CameraModal';
@@ -18,6 +21,7 @@ import IssueModal from '../components/common/IssueModal';
 import { Can, usePermission } from '../rbac/usePermission';
 import { ALARM, alarmLevel, INCIDENT, PRIORITY, STATION_TYPE } from '../utils/labels';
 import { ago, int } from '../utils/format';
+import { fmtVn } from '../utils/bulletin';
 
 const LAYER_GROUPS = [
   {
@@ -34,8 +38,10 @@ const LAYER_GROUPS = [
     title: 'Cảnh báo & Vùng nguy hiểm',
     items: [
       ['flood', 'Vùng ngập lụt'],
+      ['floodScenario', 'Vùng ngập theo kịch bản (BĐ I–III)'],
       ['landslide', 'Vùng sạt lở / lũ quét'],
       ['hazardPoints', 'Điểm nóng sạt lở, sự cố giao thông – hạ tầng'],
+      ['reports', 'Phản ánh của người dân (72 giờ)'],
       ['roads', 'Mạng đường & đoạn bị chặn'],
     ],
   },
@@ -55,9 +61,16 @@ const LAYER_GROUPS = [
 ];
 
 const DEFAULT_LAYERS = {
-  stations: true, reservoirs: true, forecast: false, radar: false, storm: false, flood: true, landslide: true, hazardPoints: true, roads: false,
+  stations: true, reservoirs: true, forecast: false, radar: false, storm: false, flood: true, floodScenario: true, landslide: true, hazardPoints: true,
+  reports: true, roads: false,
   forces: true, vehicles: false, routes: true, warehouses: true, evac: false, cameras: true, sos: true, admin: true,
 };
+
+/** Chạm một điểm trên bản đồ khi công cụ "Đánh dấu sự cố" đang bật. */
+function PickPoint({ active, onPick }) {
+  useMapEvents({ click: (e) => active && onPick({ lat: e.latlng.lat, lon: e.latlng.lng }) });
+  return null;
+}
 
 export default function MonitoringMap() {
   const navigate = useNavigate();
@@ -74,6 +87,9 @@ export default function MonitoringMap() {
   const [drawn, setDrawn] = useState(null);
   const [routeInfo, setRouteInfo] = useState(null);
   const [sosSearch, setSosSearch] = useState('');
+  const [incident, setIncident] = useState(null); // { lat, lon, report? } → form đánh dấu sự cố
+  const [stormForm, setStormForm] = useState(false);
+  const [occupancy, setOccupancy] = useState(null); // điểm sơ tán đang cập nhật số người
   const [rightTab, setRightTab] = useState('sos'); // sos | sensors
 
   const { data } = useAreaQuery('map-layers', '/map/layers', {}, { refetchInterval: 30_000 });
@@ -87,10 +103,21 @@ export default function MonitoringMap() {
   });
   // Lớp chưa có nguồn dữ liệu thật (API 404) → khoá nút và ghi rõ lý do: bật lên mà trống dễ bị hiểu là "không có bão"
   const storm = useQuery(stormQuery);
+  const scenarioStates = useMemo(() => floodScenarioStates(data, offset !== 0 ? timeline : null), [data, offset, timeline]);
   const unavailable = {
-    storm: storm.isError ? 'Chưa kết nối nguồn dữ liệu chính thức' : null,
+    storm: storm.isError ? storm.error?.message || 'Chưa có bản tin bão đang theo dõi' : null,
     roads: data && !data.roads?.features?.length ? 'Chưa có dữ liệu mạng đường' : null, // chạy thật chưa nhập mạng đường
+    floodScenario: data && !scenarioStates.length ? 'Chưa nhập bản đồ ngập theo kịch bản' : null,
   };
+  // Ghi chú dưới tên lớp (không khoá lớp): vùng kịch bản nào đang hiện theo mực nước tại thời điểm đang xem
+  const unknownLevels = scenarioStates.filter((x) => x.level == null).length;
+  const notes = {
+    floodScenario: scenarioStates.length
+      ? `${scenarioStates.filter((x) => x.active).length}/${scenarioStates.length} vùng đang ngập theo mực nước ${offset ? `lúc ${fmtVn(Date.now() + offset * 3600_000)}` : 'hiện tại'}${unknownLevels ? ` · ${unknownLevels} vùng chưa có số đo trạm` : ''}`
+      : null,
+  };
+  const canStorm = usePermission('monitoring', 'update', '*');
+  const canIncident = usePermission('incident', 'update');
 
   const onDrawn = useCallback(async (polygon) => {
     setTool(null);
@@ -108,7 +135,10 @@ export default function MonitoringMap() {
     () => data?.sos.features.map((f) => f.properties).sort((a, b) => a.priority - b.priority || new Date(a.received_at) - new Date(b.received_at)) || [],
     [data],
   );
-  const sensorAlerts = data?.stations.features.map((f) => f.properties).filter((p) => alarmLevel(p.value, p.thresholds) > 0) || [];
+  const stationList = data?.stations.features.map((f) => f.properties) || [];
+  const sensorAlerts = stationList.filter((p) => !p.stale && p.value != null && alarmLevel(p.value, p.thresholds) > 0);
+  const silentStations = stationList.filter((p) => p.stale); // mất tín hiệu — thiết bị hay hỏng đúng lúc lũ về
+  const noDataCount = stationList.filter((p) => p.value == null).length;
   const setFocus = useStore((s) => s.setFocus);
   const canDispatch = usePermission('dispatch', 'create');
 
@@ -146,7 +176,10 @@ export default function MonitoringMap() {
           onDispatch={(ticket, forceId) => setDispatch({ ticket, forceId })}
           onCamera={setCamera}
           onIssue={setIssue}
+          onIncident={setIncident}
+          onOccupancy={setOccupancy}
         />
+        <PickPoint active={tool === 'incident'} onPick={(pt) => { setTool(null); setIncident(pt); }} />
         <FocusHandler />
         <DrawTool mode={tool === 'polygon' || tool === 'circle' ? tool : null} onDrawn={onDrawn} />
         <MeasureTool active={tool === 'measure'} />
@@ -174,8 +207,8 @@ export default function MonitoringMap() {
                 <div className="text-[11px] font-bold uppercase tracking-wider text-muted px-1">{g.title}</div>
                 <div className="space-y-0.5">
                   {g.items.map(([key, label]) => (
+                    <Fragment key={key}>
                     <label
-                      key={key}
                       className={clsx(
                         'flex items-center gap-2.5 rounded-lg px-2 py-1 text-xs transition-colors',
                         unavailable[key]
@@ -195,8 +228,15 @@ export default function MonitoringMap() {
                       <span className="min-w-0">
                         <span className="block truncate">{label}</span>
                         {unavailable[key] && <span className="block text-[10px]">{unavailable[key]}</span>}
+                        {!unavailable[key] && notes[key] && <span className="block text-[10px] text-muted">{notes[key]}</span>}
                       </span>
                     </label>
+                    {key === 'storm' && canStorm && (
+                      <button className="ml-8 text-[11px] font-medium text-accent hover:underline" onClick={() => setStormForm(true)}>
+                        Nhập / cập nhật bản tin bão
+                      </button>
+                    )}
+                    </Fragment>
                   ))}
                 </div>
               </div>
@@ -235,6 +275,7 @@ export default function MonitoringMap() {
             ['route', Route, 'Tìm đường an toàn A → B (tránh vùng nguy hiểm)'],
             ['polygon', PenTool, 'Khoanh vùng nguy cơ (đa giác)'],
             ['circle', CircleIcon, 'Khoanh vùng tròn'],
+            ...(canIncident ? [['incident', MapPin, 'Đánh dấu điểm sự cố (cây đổ, đứt điện, sập cầu…)']] : []),
           ].map(([t, Icon, label]) => (
             <button
               key={t}
@@ -255,7 +296,7 @@ export default function MonitoringMap() {
         {tool && (
           <div className="card px-3.5 py-2 text-xs shadow-xl bg-panel/95 backdrop-blur-md max-w-xs border border-accent/40 animate-in fade-in">
             <div className="flex items-center justify-between mb-1 font-semibold text-accent">
-              <span>Đang dùng: {tool === 'measure' ? 'Thước đo' : tool === 'route' ? 'Dò đường an toàn' : 'Khoanh vùng'}</span>
+              <span>Đang dùng: {{ measure: 'Thước đo', route: 'Dò đường an toàn', incident: 'Đánh dấu sự cố' }[tool] || 'Khoanh vùng'}</span>
               <button onClick={() => setTool(null)} className="text-muted hover:text-ink"><X size={13} /></button>
             </div>
             {tool === 'measure' && 'Chạm lên bản đồ để thêm các điểm đo khoảng cách. Bấm lại nút thước để xoá.'}
@@ -271,6 +312,7 @@ export default function MonitoringMap() {
               'Chạm chọn điểm A (vị trí lực lượng) rồi điểm B (nơi cần cứu hộ).'
             ))}
             {(tool === 'polygon' || tool === 'circle') && 'Vẽ vùng nguy cơ: hệ thống tự động đếm số hộ dân và chuẩn bị cảnh báo sơ tán.'}
+            {tool === 'incident' && 'Chạm vào vị trí sự cố trên bản đồ để đánh dấu (hiện ngay trên cổng công khai).'}
           </div>
         )}
 
@@ -342,7 +384,7 @@ export default function MonitoringMap() {
                 className={clsx('flex-1 py-1 text-xs rounded-lg font-medium transition-colors', rightTab === 'sensors' ? 'bg-accent text-white' : 'text-muted hover:bg-panel2')}
                 onClick={() => setRightTab('sensors')}
               >
-                Cảm biến ({sensorAlerts.length})
+                Cảm biến ({sensorAlerts.length + silentStations.length})
               </button>
             </div>
 
@@ -417,9 +459,33 @@ export default function MonitoringMap() {
                     </button>
                   );
                 })}
-                {!sensorAlerts.length && (
+                {silentStations.length > 0 && (
+                  <div className="pt-1 text-[11px] font-bold uppercase tracking-wide text-muted">Mất tín hiệu ({silentStations.length})</div>
+                )}
+                {silentStations.map((p) => {
+                  const lv = alarmLevel(p.value, p.thresholds);
+                  return (
+                    <button
+                      key={p.id}
+                      className="w-full rounded-xl border border-dashed border-line p-2.5 text-left hover:border-accent hover:bg-panel2/80 transition-all"
+                      onClick={() => setFocus({ lat: p.lat, lon: p.lon, zoom: 14, label: p.name })}
+                    >
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="chip bg-panel2 text-muted text-[10px] font-bold">Mất tín hiệu từ {fmtVn(p.time)}</span>
+                        <span className="text-muted">{STATION_TYPE[p.type]}</span>
+                      </div>
+                      <div className="text-xs font-medium text-ink truncate">{p.name}</div>
+                      <div className="text-[11px] text-muted mt-0.5">
+                        Số đo cuối {p.value?.toFixed(2)} {p.unit}
+                        {lv > 0 && <span className={clsx('chip ml-1 text-[10px]', ALARM[lv].cls)}>{ALARM[lv].label}</span>}
+                      </div>
+                    </button>
+                  );
+                })}
+                {!sensorAlerts.length && !silentStations.length && (
                   <div className="py-8 text-center text-xs text-muted">
-                    Tất cả các trạm quan trắc đều trong ngưỡng an toàn
+                    Không có trạm vượt báo động hoặc mất tín hiệu
+                    {noDataCount > 0 && <span className="block mt-1">{noDataCount} trạm chưa có số đo — không coi là an toàn</span>}
                   </div>
                 )}
               </>
@@ -501,6 +567,9 @@ export default function MonitoringMap() {
       {dispatch && <DispatchModal ticket={dispatch.ticket} presetForceId={dispatch.forceId} onClose={() => setDispatch(null)} />}
       <CameraModal camera={camera} onClose={() => setCamera(null)} />
       <IssueModal warehouse={issue} onClose={() => setIssue(null)} />
+      {incident && <IncidentModal at={incident} onClose={() => setIncident(null)} />}
+      {stormForm && <StormBulletinModal onClose={() => setStormForm(false)} />}
+      {occupancy && <OccupancyModal site={occupancy} onClose={() => setOccupancy(null)} />}
     </div>
   );
 }

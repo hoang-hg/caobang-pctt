@@ -22,11 +22,13 @@ const P = {
   warn: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4M12 17h.01"/>',
   plug: '<path d="M12 22v-5M9 8V2M15 8V2M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/>',
   road: '<path d="M4 19 8 5M16 5l4 14M12 6v2M12 11v2M12 16v2"/>',
+  msg: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/>',
+  storm: '<path d="M21 4H3M18 8H6M19 12H9M16 16h-6M11 20H9"/>',
 };
 
-function badge(path, { bg = '#fff', stroke = COLORS.blue, size = 28, ring = stroke, shape = 'circle', extraClass = '', label } = {}) {
+function badge(path, { bg = '#fff', stroke = COLORS.blue, size = 28, ring = stroke, shape = 'circle', extraClass = '', label, dashed = false, opacity = 1 } = {}) {
   const radius = shape === 'square' ? '7px' : '9999px';
-  const html = `<div class="${extraClass}" style="width:${size}px;height:${size}px;border-radius:${radius};background:${bg};border:2px solid ${ring};display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.35);position:relative">${svg(path, stroke, size * 0.58)}${
+  const html = `<div class="${extraClass}" style="width:${size}px;height:${size}px;border-radius:${radius};background:${bg};border:2px ${dashed ? 'dashed' : 'solid'} ${ring};opacity:${opacity};display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.35);position:relative">${svg(path, stroke, size * 0.58)}${
     label ? `<span style="position:absolute;top:-8px;right:-10px;background:${ring};color:#fff;font:600 10px/14px sans-serif;padding:0 4px;border-radius:7px">${label}</span>` : ''
   }</div>`;
   return L.divIcon({ html, className: 'map-icon', iconSize: [size, size], iconAnchor: [size / 2, size / 2], popupAnchor: [0, -size / 2] });
@@ -51,11 +53,20 @@ export const vehicleIcon = (v) =>
 
 const ALARM_COLOR = [COLORS.good, COLORS.vang, COLORS.cam, COLORS.do];
 /** level null = chưa có số liệu / mất tín hiệu → xám (không dùng màu xanh "an toàn"). */
-export const stationIcon = (type, level, value) => {
+/** stale: mất tín hiệu — viền nét đứt, mờ; vẫn giữ màu báo động nếu số đo cuối đã vượt (level > 0), không ghi số. */
+export const stationIcon = (type, level, value, stale = false) => {
   const path = { luong_mua: P.rain, muc_nuoc: P.drop, do_nghieng: P.tilt, do_am_dat: P.drop }[type];
   const ring = level == null ? COLORS.gray : ALARM_COLOR[level];
-  return badge(path, { bg: '#fff', stroke: ring === COLORS.good ? COLORS.blue : ring, ring, size: 26, label: value });
+  return badge(path, { bg: '#fff', stroke: ring === COLORS.good ? COLORS.blue : ring, ring, size: 26, label: value, dashed: stale, opacity: stale ? 0.7 : 1 });
 };
+
+/** Phản ánh của người dân: chờ duyệt = nền trắng viền nét đứt; đã duyệt / đã xử lý = nền tím. */
+export const reportIcon = (status) =>
+  status === 'cho_duyet'
+    ? badge(P.msg, { bg: '#fff', stroke: '#7c3aed', ring: '#7c3aed', size: 24, dashed: true })
+    : badge(P.msg, { bg: '#7c3aed', stroke: '#fff', ring: '#fff', size: 24 });
+
+export const stormIcon = () => badge(P.storm, { bg: '#a855f7', stroke: '#fff', ring: '#fff', size: 26 });
 
 export const reservoirIcon = (gatesOpen) =>
   badge(P.dam, { bg: '#e0f2fe', stroke: '#075985', ring: gatesOpen ? COLORS.cam : '#075985', size: 28, shape: 'square', label: gatesOpen ? `${gatesOpen} cửa` : undefined });

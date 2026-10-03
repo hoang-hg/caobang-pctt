@@ -4,12 +4,8 @@ import clsx from 'clsx';
 import { api } from '../../api/client';
 import { useStore } from '../../app/store';
 import { Modal } from '../common/ui';
-import { parseBulletin } from '../../utils/bulletin';
+import { fmtVn as fmt, nowVn, parseBulletin } from '../../utils/bulletin';
 import { ALARM, alarmLevel } from '../../utils/labels';
-
-const fmt = (iso) => new Date(iso).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
-// Giờ Việt Nam hiện tại dạng "YYYY-MM-DDTHH:mm" cho ô datetime-local (máy trực ban có thể đặt sai múi giờ)
-const nowVn = () => new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 16);
 
 const SAMPLE = '07:00 04/10\t180,45\n13:00 04/10\t181,10\n19:00 04/10\t181,60\n01:00 05/10\t181,20';
 
