@@ -39,6 +39,8 @@ async def load_order(token: str | None, conn=None, lock: bool = False) -> dict:
     )
     if not order:
         raise HTTPException(404, mission.INVALID)
+    if order["status"] == "huy":
+        raise HTTPException(410, mission.CANCELLED)
     if order["status"] not in mission.ACTIVE:
         raise HTTPException(410, mission.FINISHED)
     if not order["live"]:

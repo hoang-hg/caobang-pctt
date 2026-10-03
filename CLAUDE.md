@@ -198,6 +198,9 @@ Python trong container.
   `broadcast.updated`, `inventory.changed`, `call.new`, `log.new`, `report.new`, `report.updated`, `ingest.log`,
   `source.updated`, `evacuation.updated`, `hazard.updated`, `storm.updated`, `forecast.updated`, `reservoir.updated`,
   `submission.updated`, `data.imported`, `field.report` (trưởng nhóm báo qua link nhiệm vụ). Sự kiện mới phải thêm nhánh xử lý trong `frontend/src/api/useSocket.js`.
+- Cảnh báo "đang hiệu lực" (cổng công khai, "Tôi đang ở đâu?", bản nhẹ, màn hình cảnh báo): luôn dùng
+  `services/broadcast.active_alert_sql(alias)` (đã duyệt, chưa kết thúc, chưa quá `valid_until`) — không tự viết điều kiện
+  theo giờ phát (trước đây cố định 48 giờ ở 4 nơi).
 - Nhật ký sự kiện điều hành: `services/events.log_event(message, category, severity, admin_unit_id|lat/lon)`.
   Nhật ký pháp lý thao tác người dùng: `auth.audit(user, action, entity, entity_id, details)` — mọi thao tác ghi đều gọi.
 
@@ -433,6 +436,9 @@ chỉ khi `DEMO_MODE`; `DEMO_MODE=false` xoá đoạn `so_do` còn sót mỗi l�
 - WebSocket: sự kiện không gắn mã xã phải có nhóm quyền — thêm loại sự kiện mới thì khai báo ở `EVENT_SCOPE`
   (`ws/hub.py`), thêm nhóm quyền mới ở `SCOPE_ACTIONS`. Không gắn gì = gửi mọi tài khoản đăng nhập.
 - `api()` (frontend) trả `null` cho 204 — route xoá trả 204, không trả JSON rỗng.
+- Phiếu SOS còn lệnh điều động đang thực hiện không chuyển về `moi` / `dieu_phoi` được (409); bỏ đội phải qua
+  `POST /dispatch/{id}/cancel` (trả quân số / phương tiện). Xác nhận cứu xong (`update_sos` → `hoan_thanh`) tự chuyển phản
+  ánh đã chuyển SOS sang `da_xu_ly` (`close_linked_reports`) — thêm đường đóng phiếu mới phải gọi cả hai bước.
 - Endpoint không đăng nhập trả dữ liệu theo **mã bí mật / header** (VD link nhiệm vụ `/mission`, `X-Mission-Token`) không được
   đặt dưới `/api/v1/public/`: nginx cache tiền tố đó theo URI + vài tham số, **không theo header** → trả dữ liệu của người
   này cho người khác. Mã bí mật gửi qua đường dẫn để sau `#` (không vào log), CSDL chỉ lưu SHA-256 (mẫu `services/mission.py`).

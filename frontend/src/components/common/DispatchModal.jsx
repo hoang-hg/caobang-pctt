@@ -8,12 +8,7 @@ import { Modal } from './ui';
 import { MissionLinkBox } from './MissionLink';
 import { useAllowedCodes, usePermission } from '../../rbac/usePermission';
 import { distanceKm } from '../../utils/geo';
-import { FORCE_TYPE, INCIDENT, PRIORITY, SKILL, VEHICLE, VULNERABLE } from '../../utils/labels';
-
-const ITEM_NAME = {
-  AO_PHAO: 'Áo phao', TUI_SO_CUU: 'Túi sơ cứu', DEN_PIN: 'Đèn pin', BAT_TRAI: 'Bạt che', THUOC_CO_BAN: 'Cơ số thuốc',
-  MI_TOM: 'Mì tôm (thùng)', NUOC_CHAI: 'Nước (thùng)', CLORAMIN_B: 'Cloramin B (kg)',
-};
+import { FORCE_TYPE, INCIDENT, ITEM_NAME, PRIORITY, SKILL, VEHICLE, VULNERABLE } from '../../utils/labels';
 
 /** Lệnh điều động: gợi ý nhu cầu + khớp nối lực lượng/phương tiện gần nhất → phát lệnh khẩn cấp. */
 export default function DispatchModal({ ticket, presetForceId, onClose }) {
@@ -33,10 +28,13 @@ export default function DispatchModal({ ticket, presetForceId, onClose }) {
     enabled: !!ticket,
   });
 
-  const { data: match, isLoading } = useQuery({
+  // Không có quyền điều động (VD cán bộ xã kéo phiếu sang "Đang điều phối"): không gọi /match (403) — trước đây hộp
+  // thoại quay "Đang quét lực lượng…" mãi
+  const { data: match, isLoading, error: matchError, refetch } = useQuery({
     queryKey: ['match', ticket?.id],
     queryFn: () => api(`/sos/${ticket.id}/match`),
-    enabled: !!ticket,
+    enabled: !!ticket && allowed,
+    retry: 1,
   });
 
   useEffect(() => {
@@ -181,6 +179,16 @@ export default function DispatchModal({ ticket, presetForceId, onClose }) {
           {result.notification.mission_url && (
             <MissionLinkBox url={result.notification.mission_url} expiresAt={result.notification.mission_expires_at} />
           )}
+        </div>
+      ) : !allowed ? (
+        <div className="rounded-lg border border-warn/60 bg-warn/10 p-3 text-sm text-ink">
+          Phiếu đã chuyển sang <b>Đang điều phối</b>. Tài khoản của bạn không có quyền phát lệnh điều động tại địa bàn này —
+          báo trực ban tỉnh để điều lực lượng.
+        </div>
+      ) : matchError ? (
+        <div className="flex flex-col items-start gap-2 rounded-lg border border-danger/50 bg-danger/5 p-3 text-sm">
+          <span>Không tải được danh sách lực lượng: {matchError.message}</span>
+          <button type="button" className="btn-ghost px-3 py-1 text-xs" onClick={() => refetch()}>Thử lại</button>
         </div>
       ) : isLoading || !match ? (
         <div className="flex items-center gap-2 py-8 text-muted"><Loader2 className="animate-spin" size={16} /> Đang quét lực lượng trong bán kính…</div>

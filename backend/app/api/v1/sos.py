@@ -11,10 +11,12 @@ from app.area import area_clause, unit_clause
 from app.auth import audit
 from app.config import settings
 from app.db import execute, fetch_all, fetch_one, transaction
+from app.infra.cache import invalidate
 from app.rbac import domains, scope_loaders
 from app.rbac.authz import area_scope, can, forbidden, require_any, require_permission
 from app.services import dispatch_matching, logistics, mission
 from app.services.events import log_event
+from app.services.reports import REPORT_SOS_DONE, REPORT_SOS_NOTES
 from app.services.safe_routing import VEHICLE_SPEED, plan_route
 from app.services.sos import SLA_MINUTES, TICKET_SELECT, create_ticket, get_ticket
 from app.services.sos_nlp import extract
@@ -118,6 +120,18 @@ async def update_sos(
     before = await get_ticket(ticket_id)
     if not before:
         raise HTTPException(404, "Không tìm thấy phiếu")
+    # Kéo phiếu đang có đội thực hiện về "Chờ xử lý" / "Đang điều phối": phiếu hiện như chưa ai xử lý (quá hạn SLA) trong
+    # khi đội vẫn đang đi, lực lượng bị giữ, không điều lại được → phải huỷ lệnh điều động trước
+    if body.status in ("moi", "dieu_phoi") and await fetch_one(
+        """SELECT 1 FROM operations.dispatch_orders
+            WHERE ticket_id = CAST(:t AS uuid) AND status IN ('dang_di', 'da_den') LIMIT 1""",
+        {"t": ticket_id},
+    ):
+        raise HTTPException(
+            409,
+            "Phiếu đang có lực lượng thực hiện — huỷ lệnh điều động trước (nút “Huỷ lệnh” trên thẻ phiếu) rồi mới "
+            "chuyển về chờ xử lý / điều phối",
+        )
     if body.status == "hoan_thanh" and not can(
         user, "sos", "resolve", await scope_loaders.sos_ticket(ticket_id)
     ):
@@ -135,6 +149,7 @@ async def update_sos(
     )
     if body.status == "hoan_thanh":
         await release_dispatch(ticket_id)
+        await close_linked_reports(ticket_id)
     ticket = await get_ticket(ticket_id)
     await audit(user, "sos.update", "sos_ticket", ticket["code"], body.model_dump(exclude_none=True))
     await hub.publish("sos.updated", ticket, "sos", ticket["admin_code"])
@@ -149,6 +164,24 @@ async def update_sos(
     return ticket
 
 
+async def _release_order(conn, ticket_id, order: dict) -> None:
+    """Trả quân số & phương tiện của một lệnh về trạng thái sẵn sàng (hoàn thành / huỷ lệnh)."""
+    await execute(
+        """UPDATE resources.forces SET personnel_on_mission = GREATEST(0, personnel_on_mission - :p),
+                  personnel_ready = personnel_ready + LEAST(:p, personnel_on_mission),
+                  status = CASE WHEN personnel_on_mission - :p <= 0 THEN 'san_sang' ELSE status END, updated_at = now()
+            WHERE id = :f""",
+        {"p": order["personnel"], "f": order["force_id"]},
+        conn,
+    )
+    await execute(
+        """UPDATE resources.vehicles SET status = 'san_sang', mission_ticket_id = NULL, updated_at = now()
+            WHERE id = ANY(:v) AND mission_ticket_id = CAST(:t AS uuid)""",  # xe đã nhận nhiệm vụ khác → giữ
+        {"v": order["vehicle_ids"], "t": str(ticket_id)},
+        conn,
+    )
+
+
 async def release_dispatch(ticket_id: str) -> None:
     """Hoàn thành nhiệm vụ: trả lực lượng & phương tiện về trạng thái sẵn sàng."""
     async with transaction() as conn:
@@ -160,20 +193,29 @@ async def release_dispatch(ticket_id: str) -> None:
             conn,
         )
         for o in orders:
-            await execute(
-                """UPDATE resources.forces SET personnel_on_mission = GREATEST(0, personnel_on_mission - :p),
-                          personnel_ready = personnel_ready + LEAST(:p, personnel_on_mission),
-                          status = CASE WHEN personnel_on_mission - :p <= 0 THEN 'san_sang' ELSE status END, updated_at = now()
-                    WHERE id = :f""",
-                {"p": o["personnel"], "f": o["force_id"]},
-                conn,
-            )
-            await execute(
-                """UPDATE resources.vehicles SET status = 'san_sang', mission_ticket_id = NULL, updated_at = now()
-                    WHERE id = ANY(:v) AND mission_ticket_id = CAST(:t AS uuid)""",  # xe đã nhận nhiệm vụ khác → giữ
-                {"v": o["vehicle_ids"], "t": ticket_id},
-                conn,
-            )
+            await _release_order(conn, ticket_id, o)
+
+
+async def close_linked_reports(ticket_id: str) -> None:
+    """Phản ánh của người dân đã chuyển thành phiếu này → "đã xử lý": người dân tra cứu mã PA- thấy hoàn tất (trước đây
+    "đang xử lý" mãi tới khi cán bộ tự đóng phản ánh). Ghi chú công khai do cán bộ viết riêng thì giữ nguyên."""
+    rows = await fetch_all(
+        """UPDATE community.citizen_reports
+              SET status = 'da_xu_ly', moderated_at = now(),
+                  public_note = CASE WHEN public_note IS NULL OR public_note = ANY(:auto) THEN :done ELSE public_note END
+            WHERE sos_ticket_id = CAST(:t AS uuid) AND status = 'da_duyet'
+        RETURNING id, code, admin_unit_id""",
+        {"t": ticket_id, "auto": list(REPORT_SOS_NOTES), "done": REPORT_SOS_DONE},
+    )
+    for r in rows:
+        await hub.publish(
+            "report.updated",
+            {"id": str(r["id"]), "code": r["code"], "status": "da_xu_ly"},
+            "report",
+            domains.code_of_unit_id(r["admin_unit_id"]),
+        )
+    if rows:
+        await invalidate("public:")
 
 
 @router.post("/sos/{ticket_id}/resolve")
@@ -458,6 +500,88 @@ async def dispatch_arrived(
         f" ({user['full_name']})",
         "cuu_ho",
         "info",
+        lat=ticket["lat"],
+        lon=ticket["lon"],
+    )
+    return ticket
+
+
+class CancelIn(BaseModel):
+    reason: str = Field(min_length=3, max_length=300, description="VD: Đường bị sạt, đội không tiếp cận được")
+    # Vật tư mang theo (đã trừ kho khi phát lệnh) chưa dùng, đã nhập lại kho xuất → cộng lại tồn kho
+    return_supplies: bool = False
+
+
+@router.post("/dispatch/{order_id}/cancel")
+async def cancel_dispatch(
+    order_id: str,
+    body: CancelIn,
+    user: dict = Depends(require_permission("dispatch", "create", scope_loaders.dispatch_order)),
+):
+    """Huỷ lệnh điều động (nhầm lực lượng, đội không tiếp cận được…): trả quân số / phương tiện về sẵn sàng, link nhiệm
+    vụ đóng ngay. Phiếu không còn lệnh nào đang thực hiện → về "Đang điều phối" để điều lực lượng khác."""
+    reason = body.reason.strip()
+    async with transaction() as conn:
+        order = await fetch_one(
+            """UPDATE operations.dispatch_orders
+                  SET status = 'huy', cancelled_at = now(), cancelled_by = :by, cancel_reason = :r
+                WHERE id = CAST(:id AS uuid) AND status IN ('dang_di', 'da_den')
+            RETURNING id, ticket_id, force_id, vehicle_ids, personnel, supplies, supplies_warehouse_id""",
+            {"id": order_id, "by": user["full_name"], "r": reason},
+            conn,
+        )
+        if not order:
+            raise HTTPException(409, "Lệnh không còn đang thực hiện (đã xong hoặc đã huỷ)")
+        await _release_order(conn, order["ticket_id"], order)
+        supplies = order["supplies"] or {}
+        returned = bool(body.return_supplies and order["supplies_warehouse_id"] and supplies)
+        if returned:
+            await execute(
+                """UPDATE resources.inventory i SET quantity = i.quantity + s.n, last_updated = now()
+                     FROM unnest(CAST(:c AS text[]), CAST(:n AS int[])) AS s(code, n)
+                    WHERE i.warehouse_id = :w AND i.item_code = s.code""",
+                {"w": order["supplies_warehouse_id"], "c": list(supplies), "n": list(supplies.values())},
+                conn,
+            )
+        await execute(
+            """UPDATE operations.sos_tickets SET status = 'dieu_phoi'
+                WHERE id = :t AND status = 'thuc_thi'
+                  AND NOT EXISTS (SELECT 1 FROM operations.dispatch_orders o
+                                   WHERE o.ticket_id = :t AND o.status IN ('dang_di', 'da_den'))""",
+            {"t": order["ticket_id"]},
+            conn,
+        )
+        ticket = await get_ticket(order["ticket_id"], conn)
+        await audit(
+            user,
+            "dispatch.cancel",
+            "sos_ticket",
+            ticket["code"],
+            {"order": order_id, "reason": reason, "supplies_returned": returned},
+            conn,
+        )
+    force = await fetch_one("SELECT name FROM resources.forces WHERE id = :f", {"f": order["force_id"]})
+    await hub.publish("sos.updated", ticket, "sos", ticket["admin_code"])
+    await hub.publish(
+        "dispatch.updated", {"dispatch_id": order_id, "ticket_id": str(order["ticket_id"]), "status": "huy"}
+    )
+    if returned:
+        wh = await fetch_one(
+            "SELECT admin_unit_id FROM resources.warehouses WHERE id = :w",
+            {"w": order["supplies_warehouse_id"]},
+        )
+        await hub.publish(
+            "inventory.changed",
+            {"warehouse_id": str(order["supplies_warehouse_id"])},
+            "resource",
+            domains.code_of_unit_id(wh["admin_unit_id"]) if wh else None,
+        )
+    await log_event(
+        f"HUỶ LỆNH ĐIỀU ĐỘNG: {force['name'] if force else 'Lực lượng'} → {ticket['code']} — {reason}"
+        + (" — vật tư nhập lại kho" if returned else "")
+        + f" ({user['full_name']})",
+        "cuu_ho",
+        "warning",
         lat=ticket["lat"],
         lon=ticket["lon"],
     )

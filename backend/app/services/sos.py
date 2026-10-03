@@ -17,6 +17,14 @@ OVERDUE_SQL = (
     + " ELSE 15 END)"
 )
 
+SOURCE_LABEL = {
+    "ZALO": "Zalo OA",
+    "APP": "ứng dụng",
+    "HOTLINE": "tổng đài",
+    "SENSOR": "cảm biến",
+    "CAN_BO": "cán bộ",
+}
+
 INCIDENT_LABEL = {
     "ngap_lut": "Ngập lụt",
     "sat_lo": "Sạt lở",
@@ -34,6 +42,7 @@ SELECT t.id, t.code, t.reporter_name, t.reporter_phone, t.source, t.raw_message,
        d.id AS dispatch_id, d.status AS dispatch_status, d.eta, d.progress, d.distance_km, d.route_safe,
        d.dispatched_at, d.arrived_at,
        f.name AS force_name, f.contact_phone AS force_phone, f.id AS force_id,
+       d.supplies AS dispatch_supplies, wh.name AS supplies_warehouse,
        fr.kind AS field_kind, fr.people_safe AS field_people_safe, fr.note AS field_note, fr.via AS field_via,
        fr.created_at AS field_at
   FROM operations.sos_tickets t
@@ -41,9 +50,11 @@ SELECT t.id, t.code, t.reporter_name, t.reporter_phone, t.source, t.raw_message,
   LEFT JOIN LATERAL (SELECT * FROM operations.dispatch_orders o WHERE o.ticket_id = t.id AND o.status <> 'huy'
                       ORDER BY o.dispatched_at DESC LIMIT 1) d ON TRUE
   LEFT JOIN resources.forces f ON f.id = d.force_id
+  LEFT JOIN resources.warehouses wh ON wh.id = d.supplies_warehouse_id
   LEFT JOIN LATERAL (SELECT r.kind, r.people_safe, r.note, r.via, r.created_at
                        FROM operations.dispatch_field_reports r JOIN operations.dispatch_orders o2 ON o2.id = r.order_id
-                      WHERE o2.ticket_id = t.id ORDER BY r.created_at DESC LIMIT 1) fr ON TRUE
+                      WHERE o2.ticket_id = t.id AND o2.status <> 'huy'
+                      ORDER BY r.created_at DESC LIMIT 1) fr ON TRUE
 """
 
 
@@ -79,9 +90,11 @@ async def announce_ticket(ticket: dict, source: str) -> None:
     nơi gọi gọi hàm này SAU khi commit (không báo một phiếu có thể còn bị rollback)."""
     await hub.publish("sos.new", ticket, "sos", ticket["admin_code"])
     dups = ticket.get("possible_duplicates") or []
+    trapped = ticket["trapped_count"]
     await log_event(
         f"{ticket['code']} – {INCIDENT_LABEL[ticket['incident_type']]} tại {ticket['address'] or ticket['admin_name']}"
-        f" ({ticket['trapped_count']} người) qua {source}"
+        + (f" ({trapped} người)" if trapped else "")
+        + f" qua {SOURCE_LABEL.get(source, source)}"
         + (f" — có thể trùng {', '.join(dups)}" if dups else ""),
         "nguoi_dan",
         "danger" if ticket["priority"] == 1 else "warning",

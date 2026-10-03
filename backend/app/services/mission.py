@@ -37,6 +37,7 @@ REPORT_LABEL = {
 INVALID = "Link nhiệm vụ không hợp lệ hoặc đã được thay bằng link mới — liên hệ trực ban"
 FINISHED = "Nhiệm vụ đã kết thúc — cảm ơn các đồng chí. Cần hỗ trợ thêm, gọi trực ban."
 EXPIRED = "Link nhiệm vụ đã hết hạn — đề nghị trực ban cấp link mới"
+CANCELLED = "Lệnh điều động này đã được trực ban huỷ — dừng di chuyển, liên hệ trực ban để nhận lệnh mới"
 
 
 def new_token() -> tuple[str, str]:

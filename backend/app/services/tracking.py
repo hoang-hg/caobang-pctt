@@ -53,6 +53,19 @@ def mask_phone(phone: str | None) -> str | None:
     return "***"
 
 
+def eta_text(eta: datetime | None, now: datetime) -> str:
+    """Thời gian còn lại tới hiện trường cho người dân. Quá giờ dự kiến mà đội chưa báo đến: nói đúng là chậm hơn dự
+    kiến — trước đây ghi "trong ít phút tới" mãi."""
+    if not eta:
+        return "Đang di chuyển trên lộ trình an toàn"
+    minutes = round((eta - now).total_seconds() / 60)
+    if minutes > 1:
+        return f"Dự kiến khoảng {minutes} phút nữa tiếp cận"
+    if minutes >= -5:
+        return "Dự kiến tiếp cận trong ít phút tới"
+    return "Chậm hơn dự kiến (đường khó đi) — đội vẫn đang tiếp cận, BCH đang giữ liên lạc với đội"
+
+
 def format_sos_item(t: dict, now: datetime) -> dict:
     code = t["code"]
     status = t["status"]
@@ -62,7 +75,10 @@ def format_sos_item(t: dict, now: datetime) -> dict:
     acknowledged_at = t.get("acknowledged_at")
     received_at = t["received_at"]
     resolved_at = t.get("resolved_at")
+    arrived_at = t.get("arrived_at")
     eta = t.get("eta")
+    # Đội đã báo đến hiện trường (link nhiệm vụ / trực ban ghi) — phiếu vẫn "thực thi" tới khi trực ban xác nhận cứu xong
+    arrived = status == "thuc_thi" and dispatch_status == "da_den"
 
     # Mốc 1: Tiếp nhận (🟡)
     s1 = {
@@ -104,31 +120,25 @@ def format_sos_item(t: dict, now: datetime) -> dict:
         }
 
     # Mốc 3: Đội cứu hộ trên đường đến / tiếp cận (🟢)
-    if status == "hoan_thanh":
+    if status == "hoan_thanh" or arrived:
+        unit = force_name or "Lực lượng cứu hộ"
         s3 = {
             "step": 3,
             "name": "dang_den",
-            "title": "Đã tiếp cận hiện trường",
-            "time": format_vn_time(resolved_at or acknowledged_at),
+            "title": "Đội cứu hộ đã đến hiện trường" if arrived else "Đã tiếp cận hiện trường",
+            "time": format_vn_time(arrived_at or resolved_at or acknowledged_at),
             "state": "done",
             "color": "green",
             "icon": "navigation",
-            "detail": "Lực lượng cứu hộ đã tiếp cận hiện trường.",
+            "detail": f"{unit} đã đến hiện trường" + (", đang tổ chức cứu hộ." if arrived else "."),
         }
     elif status == "thuc_thi" or (dispatch_status and dispatch_status == "dang_di"):
-        eta_text = "Đang di chuyển trên lộ trình an toàn"
-        if eta:
-            diff_min = max(1, round((eta - now).total_seconds() / 60))
-            if diff_min <= 1:
-                eta_text = "Dự kiến tiếp cận trong ít phút tới"
-            else:
-                eta_text = f"Dự kiến khoảng {diff_min} phút nữa tiếp cận"
         target_force = force_name or "cứu hộ"
         s3 = {
             "step": 3,
             "name": "dang_den",
             "title": "Đội cứu hộ đang trên đường đến",
-            "time": eta_text,
+            "time": eta_text(eta, now),
             "state": "current",
             "color": "green",
             "icon": "navigation",
@@ -162,9 +172,9 @@ def format_sos_item(t: dict, now: datetime) -> dict:
         s4 = {
             "step": 4,
             "name": "hoan_thanh",
-            "title": "Hoàn thành cứu nạn an toàn",
-            "time": None,
-            "state": "waiting",
+            "title": "Đang cứu hộ, đưa người tới nơi an toàn" if arrived else "Hoàn thành cứu nạn an toàn",
+            "time": "Đang thực hiện" if arrived else None,
+            "state": "current" if arrived else "waiting",
             "color": "blue",
             "icon": "shield",
             "detail": "Cán bộ điều hành xác nhận khi đã đưa người gặp nạn tới nơi an toàn.",
@@ -177,7 +187,7 @@ def format_sos_item(t: dict, now: datetime) -> dict:
         "incident_type": t["incident_type"],
         "incident_label": INCIDENT_LABEL.get(t["incident_type"], t["incident_type"]),
         "status": status,
-        "status_label": SOS_STATUS_LABELS.get(status, status),
+        "status_label": "Đội cứu hộ đã đến hiện trường" if arrived else SOS_STATUS_LABELS.get(status, status),
         "created_at": t["received_at"].isoformat() if t.get("received_at") else None,
         # KHÔNG trả địa chỉ / nội dung: người gửi đã biết; lỡ bị dò trúng mã + SĐT cũng không lộ nơi người đang mắc kẹt
         "admin_name": t.get("admin_name"),
@@ -188,13 +198,36 @@ def format_sos_item(t: dict, now: datetime) -> dict:
     }
 
 
-def format_report_item(r: dict) -> dict:
+def _sos_progress(r: dict, now: datetime) -> tuple[str, str | None, str]:
+    """(tiêu đề, thời gian, chi tiết) bước "xử lý" của phản ánh đã chuyển thành phiếu cứu hộ — theo tiến độ phiếu."""
+    sos, force = r["sos_code"], r.get("force_name") or "Lực lượng cứu hộ"
+    if r.get("dispatch_status") == "da_den":
+        return (
+            "Đội cứu hộ đã đến hiện trường",
+            format_vn_time(r.get("arrived_at")),
+            f"{force} đã đến, đang cứu hộ ({sos}).",
+        )
+    if r.get("dispatch_status") == "dang_di":
+        return (
+            "Đội cứu hộ đang trên đường đến",
+            eta_text(r.get("eta"), now),
+            f"{force} đang di chuyển tới hiện trường ({sos}).",
+        )
+    return (
+        f"Đã chuyển thành yêu cầu cứu hộ {sos}",
+        "Đang bố trí lực lượng",
+        "BCH đang bố trí lực lượng cứu hộ gần nhất.",
+    )
+
+
+def format_report_item(r: dict, now: datetime | None = None) -> dict:
     code = r["code"]
     status = r["status"]
     force_name = r.get("force_name")
     public_note = r.get("public_note")
     moderated_at = r.get("moderated_at")
     created_at = r["created_at"]
+    now = now or datetime.now(UTC)
 
     # Mốc 1: Tiếp nhận phản ánh
     s1 = {
@@ -256,6 +289,18 @@ def format_report_item(r: dict) -> dict:
             "color": "green",
             "icon": "truck",
             "detail": public_note or "Cán bộ địa phương đã xử lý phản ánh.",
+        }
+    elif status == "da_duyet" and r.get("sos_code"):
+        title, when, detail = _sos_progress(r, now)
+        s3 = {
+            "step": 3,
+            "name": "xu_ly",
+            "title": title,
+            "time": when,
+            "state": "current",
+            "color": "green",
+            "icon": "truck",
+            "detail": detail,
         }
     elif status == "da_duyet":
         s3 = {
@@ -340,6 +385,7 @@ def format_report_item(r: dict) -> dict:
         "reporter_phone_masked": mask_phone(r.get("reporter_phone")),
         "force_name": force_name,
         "public_note": public_note,
+        "sos_code": r.get("sos_code"),  # phản ánh đã chuyển thành phiếu cứu hộ (người gửi tra được bằng SĐT)
         "timeline": [s1, s2, s3, s4],
     }
 
@@ -350,11 +396,11 @@ CODE_RE = re.compile(r"^(SOS|PA)-?(\d{3,7})(?:-?([A-Z]{6}))?$")
 SOS_SQL = """
     SELECT t.code, t.status, t.incident_type, t.received_at, t.acknowledged_at, t.resolved_at,
            t.address, t.reporter_phone, u.name AS admin_name,
-           d.status AS dispatch_status, d.dispatched_at, d.eta, f.name AS force_name
+           d.status AS dispatch_status, d.dispatched_at, d.eta, d.arrived_at, f.name AS force_name
       FROM operations.sos_tickets t
       LEFT JOIN spatial_admin.administrative_units u ON u.id = t.admin_unit_id
       LEFT JOIN LATERAL (
-          SELECT o.status, o.dispatched_at, o.eta, o.force_id FROM operations.dispatch_orders o
+          SELECT o.status, o.dispatched_at, o.eta, o.arrived_at, o.force_id FROM operations.dispatch_orders o
            WHERE o.ticket_id = t.id AND o.status <> 'huy'
            ORDER BY o.dispatched_at DESC LIMIT 1
       ) d ON TRUE
@@ -364,11 +410,13 @@ SOS_SQL = """
 
 REPORT_SQL = """
     SELECT r.code, r.category, r.description, r.status, r.public_note, r.created_at, r.moderated_at,
-           r.address, r.reporter_phone, r.track_key, u.name AS admin_name, f.name AS force_name
+           r.address, r.reporter_phone, r.track_key, u.name AS admin_name, f.name AS force_name,
+           st.code AS sos_code, d.status AS dispatch_status, d.eta, d.arrived_at
       FROM community.citizen_reports r
       LEFT JOIN spatial_admin.administrative_units u ON u.id = r.admin_unit_id
+      LEFT JOIN operations.sos_tickets st ON st.id = r.sos_ticket_id
       LEFT JOIN LATERAL (
-          SELECT o.force_id FROM operations.dispatch_orders o
+          SELECT o.force_id, o.status, o.eta, o.arrived_at FROM operations.dispatch_orders o
            WHERE o.ticket_id = r.sos_ticket_id AND o.status <> 'huy'
            ORDER BY o.dispatched_at DESC LIMIT 1
       ) d ON TRUE
