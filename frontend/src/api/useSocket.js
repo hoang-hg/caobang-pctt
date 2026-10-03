@@ -64,8 +64,14 @@ export function useSocket() {
         case 'reservoir.updated': // trực ban nhập số liệu vận hành hồ
           inv('pub-reservoirs', 'kpis', 'map-layers');
           break;
-        case 'evacuation.updated': // xã / trực ban cập nhật tiến độ sơ tán
-          inv('evacuation', 'kpis');
+        case 'evacuation.updated': // xã / trực ban cập nhật tiến độ sơ tán, số người ở điểm sơ tán
+          inv('evacuation', 'kpis', 'map-layers');
+          break;
+        case 'hazard.updated': // cán bộ đánh dấu / kết thúc điểm sự cố trên bản đồ
+          inv('map-layers');
+          break;
+        case 'storm.updated': // trực ban nhập / kết thúc bản tin bão
+          inv('storm');
           break;
         case 'forecast.updated': // trực ban nhập / gỡ bản tin dự báo mực nước KTTV
           inv('series');

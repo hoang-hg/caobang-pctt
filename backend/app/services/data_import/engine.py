@@ -234,6 +234,12 @@ def _row_checks(ds: Dataset, row: Prepared, report: Report) -> None:
             report.warn(
                 row.number, "bao_dong_1", "Ngưỡng báo động không tăng dần I ≤ II ≤ III — kiểm tra lại"
             )
+    if ds.name == "ngap_kich_ban" and (v.get("cap_bao_dong") is None) == (v.get("muc_nuoc_m") is None):
+        report.error(
+            row.number,
+            "cap_bao_dong",
+            "Ghi đúng một ngưỡng kích hoạt: cấp báo động (1–3) HOẶC mực nước (m) — không để trống cả hai, không ghi cả hai",
+        )
     if ds.name == "cay_xang" and None not in (v.get("xang_l"), v.get("dau_l"), v.get("suc_chua_l")):
         if v["xang_l"] + v["dau_l"] > v["suc_chua_l"]:
             report.warn(row.number, "suc_chua_l", "Tổng xăng + dầu lớn hơn sức chứa")
@@ -275,9 +281,31 @@ async def check_database(
         for row in rows:
             row.ma_xa = row.values.get("ma_xa")
     await _check_refs(ds, rows, report, replace, scope)
+    if ds.name == "ngap_kich_ban":
+        await _check_flood_triggers(rows, report)
     if scope is not None:
         await _check_scope(ds, rows, report, scope)
     await _count_changes(ds, rows, report, replace, scope)
+
+
+async def _check_flood_triggers(rows: list[Prepared], report: Report) -> None:
+    """Vùng ngập theo cấp báo động: trạm phải có ngưỡng cấp đó (không có → vùng không bao giờ bật được)."""
+    codes = {r.values["ma_tram"] for r in rows if r.values.get("ma_tram") and r.values.get("cap_bao_dong")}
+    if not codes:
+        return
+    found = await fetch_all(
+        "SELECT id, alarm_thresholds AS thr FROM iot_telemetry.monitoring_stations WHERE id = ANY(:c)",
+        {"c": list(codes)},
+    )
+    thresholds = {r["id"]: r["thr"] or {} for r in found}
+    for row in rows:
+        code, level = row.values.get("ma_tram"), row.values.get("cap_bao_dong")
+        if code in thresholds and level and thresholds[code].get(f"bd{level}") is None:
+            report.error(
+                row.number,
+                "cap_bao_dong",
+                f"Trạm {code} chưa có ngưỡng báo động cấp {level} — nhập ngưỡng cho trạm trước, hoặc ghi mực nước (m)",
+            )
 
 
 async def _check_communes(ds: Dataset, rows: list[Prepared], report: Report) -> None:

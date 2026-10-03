@@ -1,17 +1,19 @@
 import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Circle, CircleMarker, GeoJSON, Marker, Polyline, Popup, Tooltip, useMap } from 'react-leaflet';
 import { Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, YAxis } from 'recharts';
-import { Phone, Send, Video, PackageMinus } from 'lucide-react';
+import { Phone, Send, Video, PackageMinus, Users } from 'lucide-react';
 import clsx from 'clsx';
 import { api } from '../../api/client';
 import { useStore } from '../../app/store';
 import Hydrograph from '../charts/Hydrograph';
 import { useChartTheme } from '../charts/chartTheme';
 import { Can, usePermission } from '../../rbac/usePermission';
-import { cameraIcon, evacIcon, forceIcon, hazardIcon, reservoirIcon, sosIcon, stationIcon, vehicleIcon, warehouseIcon } from './icons';
-import { ALARM, alarmLevel, CATEGORY, FORCE_TYPE, INCIDENT, LEVEL, PRIORITY, RES_STATUS, SKILL, SOS_STATUS, SOURCE, STATION_TYPE, VEHICLE } from '../../utils/labels';
+import { cameraIcon, evacIcon, forceIcon, hazardIcon, reportIcon, reservoirIcon, sosIcon, stationIcon, stormIcon, vehicleIcon, warehouseIcon } from './icons';
+import { ALARM, alarmLevel, CATEGORY, FORCE_TYPE, INCIDENT, LEVEL, PRIORITY, REPORT_STATUS, RES_STATUS, SKILL, SOS_STATUS, SOURCE, STATION_TYPE, VEHICLE } from '../../utils/labels';
 import { ago, num } from '../../utils/format';
+import { fmtVn } from '../../utils/bulletin';
 
 const ll = (f) => [f.geometry.coordinates[1], f.geometry.coordinates[0]];
 const Tel = ({ phone, label = 'Gọi' }) =>
@@ -37,22 +39,35 @@ function MiniSeries({ stationId, unit }) {
 }
 
 function StationPopup({ p }) {
-  const lv = alarmLevel(p.value, p.thresholds);
+  const lv = p.value == null ? 0 : alarmLevel(p.value, p.thresholds);
+  const value = p.value == null ? null : `${num(p.value, p.type === 'muc_nuoc' ? 2 : 1)} ${p.unit}`;
+  const chip = p.thresholds?.bd1 != null && <span className={clsx('chip', ALARM[lv].cls)}>{ALARM[lv].label}</span>;
   return (
     <div className="w-72">
       <div className="font-semibold">{p.name}</div>
       <div className="mb-1 text-xs text-muted">{STATION_TYPE[p.type]} · {p.id}</div>
-      <div className="mb-1 flex items-center gap-2">
-        {p.value == null ? (
-          // API điều hành chỉ lấy số đo trong 2 giờ qua: không có = chưa có thiết bị / mất tín hiệu, KHÔNG phải "dưới BĐ I"
-          <span className="chip bg-panel2 text-muted">Không có số đo trong 2 giờ qua</span>
-        ) : (
-          <>
-            <span className="font-mono text-lg">{num(p.value, p.type === 'muc_nuoc' ? 2 : 1)} {p.unit}</span>
-            {p.thresholds?.bd1 != null && <span className={clsx('chip', ALARM[lv].cls)}>{ALARM[lv].label}</span>}
-          </>
-        )}
-      </div>
+      {p.at ? (
+        // Đang xem thời điểm khác trên thanh thời gian: quá khứ = số đo, tương lai = bản tin dự báo
+        <div className="mb-1 flex flex-wrap items-center gap-2">
+          <span className="text-xs text-muted">Lúc {fmtVn(p.at)}:</span>
+          {value ? <><span className="font-mono text-lg">{value}</span>{chip}</> : <span className="chip bg-panel2 text-muted">Không có số đo / dự báo</span>}
+        </div>
+      ) : value == null ? (
+        // Chưa có thiết bị / chưa từng nhận số đo — KHÔNG phải "dưới BĐ I"
+        <div className="mb-1"><span className="chip bg-panel2 text-muted">Chưa có số đo</span></div>
+      ) : p.stale ? (
+        // Mất tín hiệu: không hiện số cũ như đang đo; số cuối vượt báo động thì vẫn nêu cấp để chỉ huy biết
+        <div className="mb-1 space-y-1 text-xs">
+          <span className="chip bg-panel2 text-muted">Mất tín hiệu từ {fmtVn(p.time)}</span>
+          <div>Số đo cuối <b className="font-mono">{value}</b> {lv > 0 && chip} — không xác nhận được hiện trạng</div>
+        </div>
+      ) : (
+        <div className="mb-1 flex items-center gap-2">
+          <span className="font-mono text-lg">{value}</span>
+          {chip}
+          <span className="text-[11px] text-muted">{fmtVn(p.time)}</span>
+        </div>
+      )}
       {p.type === 'muc_nuoc' ? <Hydrograph stationId={p.id} height={130} hours={24} compact /> : <MiniSeries stationId={p.id} unit={p.unit} />}
     </div>
   );
@@ -123,7 +138,91 @@ function SosPopup({ p, onDispatch }) {
   );
 }
 
-export default function MapLayers({ data, layers, timeline, onDispatch, onCamera, onIssue }) {
+const INCIDENT_TYPE = { sat_lo: 'Sạt lở', giao_thong: 'Sự cố giao thông', ha_tang: 'Sự cố hạ tầng' };
+const POINT_SOURCE = { import: 'bản đồ điểm nguy hiểm', officer: 'cán bộ đánh dấu', report: 'từ phản ánh của người dân' };
+
+function HazardPopup({ p }) {
+  const qc = useQueryClient();
+  const toast = useStore((s) => s.toast);
+  const canClose = usePermission('incident', 'update', p.admin_code) && p.source !== 'import';
+  const close = async () => {
+    if (!window.confirm(`Kết thúc sự cố "${p.name}"? Điểm sẽ ẩn khỏi bản đồ và cổng công khai.`)) return;
+    try {
+      await api(`/map/incidents/${p.id}/close`, { method: 'POST' });
+      toast({ tone: 'good', title: 'Đã kết thúc sự cố', body: p.name });
+      qc.invalidateQueries({ queryKey: ['map-layers'] });
+    } catch (e) {
+      toast({ tone: 'danger', title: 'Không kết thúc được', body: e.message });
+    }
+  };
+  return (
+    <div className="w-64">
+      <b>{p.name}</b>
+      <div className="text-xs text-muted">{INCIDENT_TYPE[p.type] || p.type} · {ago(p.reported_at)} · {POINT_SOURCE[p.source] || p.source}</div>
+      {p.description && <p className="text-xs">{p.description}</p>}
+      {p.expires_at && <div className="text-[11px] text-muted">Tự ẩn lúc {fmtVn(p.expires_at)}</div>}
+      {canClose && <button className="btn-ghost mt-1 px-2 py-1 text-xs" onClick={close}>Kết thúc sự cố</button>}
+    </div>
+  );
+}
+
+function ReportPopup({ p, onIncident }) {
+  const navigate = useNavigate();
+  const canIncident = usePermission('incident', 'update', p.admin_code);
+  const st = REPORT_STATUS[p.status];
+  return (
+    <div className="w-64">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <b>{p.category_label}</b>
+        {st && <span className={clsx('chip text-[10px]', st.cls)}>{st.label}</span>}
+      </div>
+      <div className="text-xs text-muted">{p.code} · {ago(p.created_at)} · {p.address || p.hamlet_name || p.admin_name}</div>
+      <p className="mt-1 text-xs">{p.description}</p>
+      {p.n_photos > 0 && <div className="text-[11px] text-muted">{p.n_photos} ảnh — xem ở trang Phản ánh</div>}
+      {p.to_sos && <div className="text-[11px] font-semibold text-danger">Đã chuyển thành phiếu SOS</div>}
+      <div className="mt-2 flex flex-wrap gap-1">
+        {p.has_incident ? (
+          <span className="chip bg-panel2">Đã có điểm sự cố</span>
+        ) : (
+          canIncident && p.incident_type && (
+            <button className="btn-primary px-2 py-1 text-xs" onClick={() => onIncident({ lat: p.lat, lon: p.lon, report: p })}>Tạo điểm sự cố</button>
+          )
+        )}
+        <button className="btn-ghost px-2 py-1 text-xs" onClick={() => navigate('/phan-anh')}>Mở trang Phản ánh</button>
+      </div>
+    </div>
+  );
+}
+
+function EvacPopup({ p, onOccupancy }) {
+  const canUpdate = usePermission('evacuation', 'update', p.admin_code);
+  return (
+    <div className="w-56">
+      <b>{p.name}</b>
+      <div className="text-sm">Đang chứa: <b className={clsx('font-mono', p.current_occupancy > p.capacity && 'text-danger')}>{p.current_occupancy}/{p.capacity}</b> người</div>
+      <div className="mt-1 flex flex-wrap gap-1">
+        {canUpdate && <button className="btn-primary px-2 py-1 text-xs" onClick={() => onOccupancy(p)}><Users size={12} /> Cập nhật số người</button>}
+        <Tel phone={p.contact_phone} />
+      </div>
+    </div>
+  );
+}
+
+/** Vùng ngập theo kịch bản: mực nước trạm tại thời điểm đang xem (hiện tại = số đo còn tín hiệu; thanh thời gian = số đo
+ * quá khứ / bản tin dự báo) so với ngưỡng của vùng. → [{ p, level, active }]; level null = chưa có số liệu → không tô. */
+export function floodScenarioStates(data, timeline) {
+  const stations = Object.fromEntries((data?.stations.features || []).map((f) => [f.properties.id, f.properties]));
+  return (data?.flood_scenarios?.features || []).map((f) => {
+    const p = f.properties;
+    const st = stations[p.station_id];
+    const level = timeline ? (timeline.values?.[p.station_id] ?? null) : st && !st.stale ? st.value : null;
+    return { f, p, level, active: level != null && p.trigger != null && level >= p.trigger };
+  });
+}
+
+const ROMAN = { 1: 'I', 2: 'II', 3: 'III' };
+
+export default function MapLayers({ data, layers, timeline, onDispatch, onCamera, onIssue, onIncident, onOccupancy }) {
   const map = useMap();
   const gps = useStore((s) => s.gps);
   const theme = useStore((s) => s.theme);
@@ -131,7 +230,7 @@ export default function MapLayers({ data, layers, timeline, onDispatch, onCamera
   const canDispatch = usePermission('dispatch', 'create');
 
   const openSos = useMemo(() => data?.sos.features || [], [data]);
-  const floodFactor = timeline?.flood_factor ?? 1;
+  const scenarios = useMemo(() => floodScenarioStates(data, timeline), [data, timeline]);
 
   // Kéo–thả đội cứu hộ vào điểm SOS → mở lệnh điều động
   const onForceDrop = (force, marker) => {
@@ -167,10 +266,10 @@ export default function MapLayers({ data, layers, timeline, onDispatch, onCamera
         .map((f) => {
           const p = f.properties;
           const flood = p.type === 'ngap';
-          const depthOpacity = flood ? Math.min(0.7, 0.2 + (p.depth_m || 0.5) * 0.2) * Math.min(1.4, floodFactor) : 0.25;
+          const depthOpacity = flood ? Math.min(0.7, 0.2 + (p.depth_m || 0.5) * 0.2) : 0.25;
           return (
             <GeoJSON
-              key={`${p.id}-${floodFactor}-${theme}`}
+              key={`${p.id}-${theme}`}
               data={f}
               style={{
                 color: flood ? '#1d4ed8' : (LEVEL[p.level]?.color || '#ef4444'),
@@ -189,14 +288,33 @@ export default function MapLayers({ data, layers, timeline, onDispatch, onCamera
           );
         })}
 
+      {layers.floodScenario &&
+        scenarios
+          .filter((s) => s.active)
+          .map(({ f, p, level }) => (
+            <GeoJSON key={`fs-${p.id}-${theme}`} data={f} style={{ color: '#1e40af', weight: 1, fillColor: '#2563eb', fillOpacity: 0.28 }}>
+              <Popup>
+                <b>{p.name}</b>
+                <div className="text-xs">
+                  Kịch bản ngập khi {p.station_name} {p.alarm_level ? `đạt BĐ ${ROMAN[p.alarm_level]}` : 'đạt'} ({p.trigger} m) — mực nước
+                  {timeline ? ` lúc ${fmtVn(timeline.time)}` : ' hiện tại'} <b className="font-mono">{level} m</b>
+                </div>
+                {p.depth_m != null && <div className="text-xs text-muted">Độ sâu ngập điển hình ~{p.depth_m} m</div>}
+              </Popup>
+            </GeoJSON>
+          ))}
+
       {layers.hazardPoints &&
         data.hazard_points.features.map((f) => (
           <Marker key={f.properties.id} position={ll(f)} icon={hazardIcon(f.properties.type, f.properties.level)}>
-            <Popup>
-              <b>{f.properties.name}</b>
-              <div className="text-xs text-muted">{ago(f.properties.reported_at)}</div>
-              <p className="text-xs">{f.properties.description}</p>
-            </Popup>
+            <Popup><HazardPopup p={f.properties} /></Popup>
+          </Marker>
+        ))}
+
+      {layers.reports &&
+        (data.reports?.features || []).map((f) => (
+          <Marker key={f.properties.id} position={ll(f)} icon={reportIcon(f.properties.status)}>
+            <Popup minWidth={260}><ReportPopup p={f.properties} onIncident={onIncident} /></Popup>
           </Marker>
         ))}
 
@@ -204,12 +322,15 @@ export default function MapLayers({ data, layers, timeline, onDispatch, onCamera
       {layers.stations &&
         data.stations.features.map((f) => {
           const p = f.properties;
-          const value = timeline?.values?.[p.id] ?? p.value;
-          const lv = value == null ? null : alarmLevel(value, p.thresholds); // null → biểu tượng xám (không có số đo)
-          const label = value == null ? undefined : p.type === 'muc_nuoc' ? value.toFixed(1) : p.type === 'luong_mua' ? Math.round(value) : value.toFixed(1);
+          // Thanh thời gian: chỉ giá trị tại thời điểm đó (không có → xám, không lấy số hiện tại thay); hiện tại: số đo
+          // mới nhất, cũ quá 60 phút = mất tín hiệu (viền nét đứt, không ghi số; số cuối vượt BĐ thì giữ màu báo động)
+          const value = timeline ? (timeline.values?.[p.id] ?? null) : p.value;
+          const stale = !timeline && p.stale;
+          const lv = value == null ? null : alarmLevel(value, p.thresholds);
+          const label = value == null || stale ? undefined : p.type === 'muc_nuoc' ? value.toFixed(1) : p.type === 'luong_mua' ? Math.round(value) : value.toFixed(1);
           return (
-            <Marker key={p.id} position={ll(f)} icon={stationIcon(p.type, lv, label)}>
-              <Popup minWidth={290}><StationPopup p={{ ...p, value }} /></Popup>
+            <Marker key={p.id} position={ll(f)} icon={stationIcon(p.type, stale && !lv ? null : lv, label, stale)}>
+              <Popup minWidth={290}><StationPopup p={{ ...p, value, stale, at: timeline?.time }} /></Popup>
             </Marker>
           );
         })}
@@ -251,11 +372,7 @@ export default function MapLayers({ data, layers, timeline, onDispatch, onCamera
           const p = f.properties;
           return (
             <Marker key={p.id} position={ll(f)} icon={evacIcon(p.current_occupancy / p.capacity)}>
-              <Popup>
-                <b>{p.name}</b>
-                <div className="text-sm">Đang chứa: <b className="font-mono">{p.current_occupancy}/{p.capacity}</b> người</div>
-                <Tel phone={p.contact_phone} />
-              </Popup>
+              <Popup><EvacPopup p={p} onOccupancy={onOccupancy} /></Popup>
             </Marker>
           );
         })}
@@ -336,31 +453,56 @@ export default function MapLayers({ data, layers, timeline, onDispatch, onCamera
   );
 }
 
-/** Quỹ đạo bão: chỉ bộ mô phỏng có (kịch bản trình diễn); chạy thật API trả 404 tới khi nối nguồn chính thức. */
-export const stormQuery = { queryKey: ['storm'], queryFn: () => api('/map/storm-track'), staleTime: 10 * 60_000, retry: false };
+/** Bão / ATNĐ: bản tin trực ban nhập (hoặc kịch bản của bộ mô phỏng); chạy thật chưa có bản tin → API 404, lớp bị khoá. */
+export const stormQuery = { queryKey: ['storm'], queryFn: () => api('/map/storm-track'), staleTime: 5 * 60_000, retry: false };
 
-/** Quỹ đạo bão/ATNĐ + vùng gió giật; vị trí tâm theo thanh thời gian. */
+/** Vị trí tâm bão tại thời điểm t: nội suy tuyến tính giữa hai mốc kề; ngoài khoảng các mốc → null (không vẽ tâm). */
+function stormPosition(pts, t) {
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [a, b] = [pts[i], pts[i + 1]];
+    const [ta, tb] = [Date.parse(a.time), Date.parse(b.time)];
+    if (t >= ta && t <= tb) {
+      const k = tb === ta ? 0 : (t - ta) / (tb - ta);
+      return { lat: a.lat + (b.lat - a.lat) * k, lon: a.lon + (b.lon - a.lon) * k, near: k < 0.5 ? a : b };
+    }
+  }
+  return null;
+}
+
+function StormTrack({ storm, t }) {
+  const pts = storm.points;
+  const done = pts.filter((p) => !p.forecast);
+  const ahead = [done.at(-1), ...pts.filter((p) => p.forecast)].filter(Boolean);
+  const pos = stormPosition(pts, t);
+  const level = (p) => `${p.label}${p.wind_level != null ? ` cấp ${p.wind_level}` : ''}${p.gust_level != null ? `, giật ${p.gust_level}` : ''}`;
+  return (
+    <>
+      {done.length > 1 && <Polyline positions={done.map((p) => [p.lat, p.lon])} pathOptions={{ color: '#a855f7', weight: 3 }} />}
+      {ahead.length > 1 && <Polyline positions={ahead.map((p) => [p.lat, p.lon])} pathOptions={{ color: '#a855f7', weight: 3, dashArray: '8 6' }} />}
+      {pts.map((p) => (
+        <CircleMarker key={p.time} center={[p.lat, p.lon]} radius={4} pathOptions={{ color: '#a855f7', fillOpacity: 1 }}>
+          <Tooltip>{fmtVn(p.time)} · {level(p)}{p.forecast ? ' · dự báo' : ''}</Tooltip>
+        </CircleMarker>
+      ))}
+      {pos && (
+        <>
+          {pos.near.radius_km && (
+            <Circle center={[pos.lat, pos.lon]} radius={pos.near.radius_km * 1000} pathOptions={{ color: '#a855f7', weight: 1, fillOpacity: 0.08 }} />
+          )}
+          <Marker position={[pos.lat, pos.lon]} icon={stormIcon()}>
+            {/* Giữ nguyên "(kịch bản mô phỏng)" trong tên — không để quỹ đạo trình diễn trông như bão thật */}
+            <Tooltip permanent direction="right" offset={[14, 0]}>{storm.name} · {level(pos.near)}</Tooltip>
+          </Marker>
+        </>
+      )}
+    </>
+  );
+}
+
+/** Quỹ đạo các cơn bão đang theo dõi + vùng gió mạnh quanh tâm theo thanh thời gian. */
 export function StormLayer({ offset }) {
   const { data } = useQuery(stormQuery);
   if (!data) return null;
-  const pts = data.points;
-  const past = pts.filter((p) => !p.forecast).map((p) => [p.lat, p.lon]);
-  const future = pts.filter((p, i) => p.forecast || i === pts.filter((x) => !x.forecast).length - 1).map((p) => [p.lat, p.lon]);
   const t = Date.now() + offset * 3600_000;
-  const cur = pts.reduce((best, p) => (Math.abs(new Date(p.time) - t) < Math.abs(new Date(best.time) - t) ? p : best), pts[0]);
-  return (
-    <>
-      <Polyline positions={past} pathOptions={{ color: '#a855f7', weight: 3 }} />
-      <Polyline positions={future} pathOptions={{ color: '#a855f7', weight: 3, dashArray: '8 6' }} />
-      {pts.map((p) => (
-        <CircleMarker key={p.time} center={[p.lat, p.lon]} radius={4} pathOptions={{ color: '#a855f7', fillOpacity: 1 }}>
-          <Tooltip>{new Date(p.time).toLocaleString('vi-VN', { hour: '2-digit', day: '2-digit', month: '2-digit' })} · {p.label} · gió {p.wind_kmh} km/h</Tooltip>
-        </CircleMarker>
-      ))}
-      <Circle center={[cur.lat, cur.lon]} radius={cur.wind_kmh * 900} pathOptions={{ color: '#a855f7', weight: 1, fillOpacity: 0.08 }}>
-        {/* Giữ nguyên "(kịch bản mô phỏng)" trong tên — không để quỹ đạo trình diễn trông như bão thật */}
-        <Tooltip permanent direction="center" className="!bg-transparent !border-0 !shadow-none">🌀 {data.name}</Tooltip>
-      </Circle>
-    </>
-  );
+  return data.storms.map((storm) => <StormTrack key={storm.id || storm.name} storm={storm} t={t} />);
 }

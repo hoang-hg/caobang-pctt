@@ -6,9 +6,10 @@ from pydantic import BaseModel, Field
 from app.area import area_clause
 from app.auth import audit
 from app.db import fetch_all, fetch_one, transaction
-from app.infra.cache import cached_view
+from app.infra.cache import cached_view, invalidate
 from app.rbac import domains, scope_loaders
 from app.rbac.authz import area_scope, require_permission
+from app.services import map_ops
 from app.services.events import log_event
 from app.ws.hub import hub
 
@@ -142,6 +143,41 @@ async def evacuation_sites(codes: list[str] = Depends(RES)):
              ORDER BY (e.current_occupancy::float / NULLIF(e.capacity, 0)) DESC NULLS LAST""",
         {"codes": codes},
     )
+
+
+@router.patch("/evacuation-sites/{site_id}/occupancy")
+async def update_site_occupancy(
+    site_id: str,
+    body: map_ops.OccupancyIn,
+    user: dict = Depends(require_permission("evacuation", "update", scope_loaders.evacuation_site)),
+):
+    """Trưởng điểm / xã báo số người đang ở điểm sơ tán → bản đồ điều hành, Điều hành cứu hộ và cổng công khai (chỗ
+    còn trống) cập nhật ngay. Vượt sức chứa vẫn nhận (ghi cảnh báo), quá 2 lần sức chứa coi là gõ nhầm."""
+    site = await fetch_one(
+        "SELECT name, capacity, admin_unit_id FROM resources.evacuation_sites WHERE id = CAST(:id AS uuid)",
+        {"id": site_id},
+    )
+    if problem := map_ops.occupancy_problem(body.current_occupancy, site["capacity"]):
+        raise HTTPException(422, problem)
+    await fetch_one(
+        """UPDATE resources.evacuation_sites SET current_occupancy = :n WHERE id = CAST(:id AS uuid)
+            RETURNING id""",
+        {"n": body.current_occupancy, "id": site_id},
+    )
+    await audit(user, "evacuation.site_occupancy", "evacuation_site", site_id, body.model_dump())
+    await invalidate("public:")  # cổng công khai hiện chỗ còn trống của điểm sơ tán
+    await hub.publish("evacuation.updated", {"site_id": site_id})
+    over = body.current_occupancy > site["capacity"]
+    await log_event(
+        f"{site['name']}: đang chứa {body.current_occupancy}/{site['capacity']} người"
+        + (" — VƯỢT SỨC CHỨA" if over else "")
+        + (f" — nguồn: {body.source}" if body.source else "")
+        + f" ({user['full_name']})",
+        "cuu_ho",
+        "warning" if over else "info",
+        site["admin_unit_id"],
+    )
+    return {"id": site_id, "current_occupancy": body.current_occupancy, "capacity": site["capacity"]}
 
 
 class IssueIn(BaseModel):

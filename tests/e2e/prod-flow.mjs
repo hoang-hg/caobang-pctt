@@ -173,6 +173,41 @@ for (const ds of datasets) {
 }
 check('Danh bạ cấp tỉnh vừa nhập → đường dây nóng trên cổng công khai', hasPhone(await until('/public/hotlines', hasPhone)));
 
+// ---------------------------------------------------------------- Bản đồ điều hành: dữ liệu thật thay mô phỏng
+const layersNow = (await call('GET', '/map/layers', null, admin)).data;
+const scenario = layersNow?.flood_scenarios?.features?.[0]?.properties;
+check('Vùng ngập theo kịch bản (tệp mẫu, BĐ II) → ngưỡng đọc từ trạm', scenario?.trigger === 181, JSON.stringify(scenario || {}).slice(0, 120));
+check('Lớp phản ánh trên bản đồ điều hành', Array.isArray(layersNow?.reports?.features));
+const tl = await call('GET', '/map/timeline?offset_h=6', null, admin);
+check('Thanh thời gian không còn "hệ số ngập" gắn cứng trạm mẫu', tl.status === 200 && !('flood_factor' in (tl.data || {})));
+const nowMs = Date.now();
+const iso = (h) => new Date(nowMs + h * 3600_000).toISOString();
+const storm = await call('POST', '/map/storm-bulletins', {
+  name: 'Bão thử nghiệm E2E', issued_at: iso(0), source: 'kiểm thử',
+  points: [
+    { time: iso(-6), lat: 20.5, lon: 108.5, wind_level: 11, gust_level: 13, radius_km: 200 },
+    { time: iso(0), lat: 21.2, lon: 107.3, wind_level: 9, gust_level: 11, radius_km: 150 },
+    { time: iso(12), lat: 22.0, lon: 105.9, wind_level: 6 },
+  ],
+}, admin);
+const track = await call('GET', '/map/storm-track', null, admin);
+check('Nhập bản tin bão → lớp quỹ đạo có dữ liệu thật', storm.status === 201 && track.status === 200
+  && track.data?.storms?.[0]?.name === 'Bão thử nghiệm E2E' && track.data.storms[0].simulated === false, `HTTP ${storm.status} / ${track.status}`);
+await call('DELETE', `/map/storm-bulletins/${storm.data?.id}`, null, admin);
+check('Kết thúc theo dõi bão → lớp quỹ đạo lại 404', (await call('GET', '/map/storm-track', null, admin)).status === 404);
+const incidentName = `Cây đổ chắn đường E2E ${nowMs}`;
+const inc = await call('POST', '/map/incidents', { lat: 22.665, lon: 106.255, type: 'giao_thong', level: 'cam', name: incidentName, hours: 6 }, admin);
+const hasIncident = (d) => (d?.hazard_points || []).some((x) => x.name === incidentName);
+check('Đánh dấu điểm sự cố → hiện trên cổng công khai ≤ 15 giây', inc.status === 201 && hasIncident(await until('/public/map', hasIncident)),
+  `HTTP ${inc.status}`);
+const closed = await call('POST', `/map/incidents/${inc.data?.id}/close`, null, admin);
+check('Kết thúc sự cố → ẩn khỏi cổng công khai', closed.status === 200 && !hasIncident(await until('/public/map', (d) => !hasIncident(d))));
+const site = (await call('GET', '/resources/evacuation-sites', null, admin)).data?.[0];
+const occ = site && (await call('PATCH', `/resources/evacuation-sites/${site.id}/occupancy`, { current_occupancy: 7 }, admin));
+const hasOcc = (d) => (d?.evacuation_sites || []).some((x) => x.id === site?.id && x.current_occupancy === 7);
+check('Cập nhật số người ở điểm sơ tán → cổng công khai', occ?.status === 200 && hasOcc(await until('/public/map', hasOcc)),
+  `HTTP ${occ?.status}`);
+
 // ================================================================ 5. Hồ chứa: chưa có số liệu → trực ban cập nhật vận hành
 const HO = 'HO-BANGGIANG';
 let res = await until('/public/reservoirs', (d) => d?.reservoirs?.some((r) => r.id === HO));

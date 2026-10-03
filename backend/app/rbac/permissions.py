@@ -29,6 +29,7 @@ class Resource(StrEnum):
     REPORT = "report"  # phản ánh hiện trường của người dân
     DATA = "data"  # nhập dữ liệu chính thức từ tệp
     EVACUATION = "evacuation"  # kế hoạch và tiến độ sơ tán nhân dân theo xã
+    INCIDENT = "incident"  # điểm sự cố (sạt lở, giao thông, hạ tầng) cán bộ đánh dấu trên bản đồ
 
 
 class Action(StrEnum):
@@ -72,6 +73,12 @@ ALL_PERMISSIONS: Final[tuple[Permission, ...]] = (
     Permission(R.SOS, A.UPDATE, True, "Chuyển trạng thái, đổi mức ưu tiên phiếu SOS"),
     Permission(R.SOS, A.RESOLVE, True, "Xác nhận đã cứu an toàn"),
     Permission(R.EVACUATION, A.UPDATE, True, "Cập nhật kế hoạch và tiến độ sơ tán nhân dân của xã"),
+    Permission(
+        R.INCIDENT,
+        A.UPDATE,
+        True,
+        "Đánh dấu / kết thúc điểm sự cố (sạt lở, giao thông, hạ tầng) trên bản đồ — hiện ngay trên cổng công khai",
+    ),
     Permission(R.DISPATCH, A.CREATE, True, "Phát lệnh điều động lực lượng"),
     Permission(R.RESOURCE, A.VIEW, True, "Xem lực lượng, kho, phương tiện, điểm sơ tán"),
     Permission(R.INVENTORY, A.ISSUE, True, "Ra lệnh xuất kho"),
@@ -155,8 +162,8 @@ SYSTEM_ROLES: Final[tuple[tuple[str, str, str, bool, list[tuple[str, str]]], ...
     (
         COMMUNE_ROLE,
         "Quản trị xã/phường",
-        "Trong địa bàn xã: tiếp nhận và xử lý SOS, cập nhật tiến độ sơ tán, duyệt phản ánh, xuất kho của xã, gửi dữ liệu "
-        "chờ tỉnh duyệt",
+        "Trong địa bàn xã: tiếp nhận và xử lý SOS, cập nhật tiến độ sơ tán, đánh dấu sự cố trên bản đồ, duyệt phản ánh, "
+        "xuất kho của xã, gửi dữ liệu chờ tỉnh duyệt",
         True,
         perms(
             "monitoring.view",
@@ -165,6 +172,7 @@ SYSTEM_ROLES: Final[tuple[tuple[str, str, str, bool, list[tuple[str, str]]], ...
             "sos.update",
             "sos.resolve",
             "evacuation.update",
+            "incident.update",
             "resource.view",
             "inventory.issue",
             "alert.view",

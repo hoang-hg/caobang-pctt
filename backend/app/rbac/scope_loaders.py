@@ -49,6 +49,26 @@ async def vehicle(vehicle_id: str) -> str | None:
     return domains.domain_of_unit_id(row["admin_unit_id"]) if row else None
 
 
+async def evacuation_site(site_id: str) -> str | None:
+    sid = _uuid_or_none(site_id)
+    if not sid:
+        return None
+    row = await fetch_one(
+        "SELECT admin_unit_id FROM resources.evacuation_sites WHERE id = CAST(:id AS uuid)", {"id": sid}
+    )
+    return domains.domain_of_unit_id(row["admin_unit_id"]) if row else None
+
+
+async def hazard_point(point_id: str) -> str | None:
+    pid = _uuid_or_none(point_id)
+    if not pid:
+        return None
+    row = await fetch_one(
+        "SELECT admin_unit_id FROM iot_telemetry.hazard_points WHERE id = CAST(:id AS uuid)", {"id": pid}
+    )
+    return domains.domain_of_unit_id(row["admin_unit_id"]) if row else None
+
+
 async def commune(code: str) -> str | None:
     """Xã theo mã trong đường dẫn (VD /evacuation/{code}); không phải mã xã → None (404)."""
     return next((u.domain for u in domains.units() if u.code == code), None)

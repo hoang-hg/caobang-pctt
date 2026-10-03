@@ -11,6 +11,7 @@ import { useAreaQuery, useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
 import { Empty, Modal, Progress, Section } from '../components/common/ui';
 import DispatchModal from '../components/common/DispatchModal';
+import OccupancyModal from '../components/common/OccupancyModal';
 import { Can, useAllowedCodes, usePermission } from '../rbac/usePermission';
 import { INCIDENT, PRIORITY, SOURCE, VULNERABLE } from '../utils/labels';
 import { int, pct, time } from '../utils/format';
@@ -381,10 +382,28 @@ function EvacuationRow({ r, onEdit }) {
   );
 }
 
+function SiteRow({ s, onEdit }) {
+  const canEdit = usePermission('evacuation', 'update', s.admin_code);
+  const p = pct(s.current_occupancy, s.capacity);
+  return (
+    <div className="text-xs">
+      <div className="flex justify-between gap-2 mb-0.5">
+        <span className="flex items-center gap-1 truncate text-ink"><Home size={11} className="text-good shrink-0" />{s.name}</span>
+        <span className="flex shrink-0 items-center gap-2">
+          <span className={clsx('font-mono font-semibold', p >= 100 && 'text-danger')}>{s.current_occupancy}/{s.capacity}</span>
+          {canEdit && <button className="text-accent hover:underline" onClick={() => onEdit(s)}>Sửa</button>}
+        </span>
+      </div>
+      <Progress value={p} tone={p >= 100 ? 'danger' : p > 85 ? 'warn' : 'accent'} />
+    </div>
+  );
+}
+
 function Evacuation() {
   const { data } = useAreaQuery('evacuation', '/evacuation', {}, { refetchInterval: 30_000 });
   const canUpdate = usePermission('evacuation', 'update');
   const [editing, setEditing] = useState(null); // null | 'new' | dòng tiến độ
+  const [site, setSite] = useState(null); // điểm sơ tán đang cập nhật số người
   if (!data) return null;
   const totPlanned = data.progress.reduce((s, r) => s + r.planned_households, 0);
   const totDone = data.progress.reduce((s, r) => s + r.evacuated_households, 0);
@@ -406,22 +425,13 @@ function Evacuation() {
         </div>
 
         {editing && <EvacuationModal row={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
+        {site && <OccupancyModal site={site} onClose={() => setSite(null)} />}
 
         <div>
           <div className="mb-1.5 text-[11px] font-semibold uppercase text-muted">Sức chứa các điểm sơ tán</div>
           <div className="flex max-h-48 flex-col gap-2 overflow-y-auto pr-1 scroll-thin">
-            {data.sites.map((s) => {
-              const p = pct(s.current_occupancy, s.capacity);
-              return (
-                <div key={s.id} className="text-xs">
-                  <div className="flex justify-between gap-2 mb-0.5">
-                    <span className="flex items-center gap-1 truncate text-ink"><Home size={11} className="text-good shrink-0" />{s.name}</span>
-                    <span className={clsx('font-mono font-semibold', p >= 100 && 'text-danger')}>{s.current_occupancy}/{s.capacity}</span>
-                  </div>
-                  <Progress value={p} tone={p >= 100 ? 'danger' : p > 85 ? 'warn' : 'accent'} />
-                </div>
-              );
-            })}
+            {data.sites.map((s) => <SiteRow key={s.id} s={s} onEdit={setSite} />)}
+            {!data.sites.length && <Empty>Chưa có điểm sơ tán trong phạm vi</Empty>}
           </div>
         </div>
       </div>

@@ -217,9 +217,11 @@ Python trong container.
   mọi giá trị qua `html.escape`; mỗi danh sách có trần `MAX_*` để luôn < `MAX_BYTES` (50 KB) — thêm mục mới thì thêm
   trần và cập nhật `test_lite.test_worst_case_stays_under_limit`. Tham số `xa` lạ → trang toàn tỉnh (không tạo khoá cache).
   Phê duyệt cảnh báo gọi `invalidate("public:")` để bản nhẹ / cổng hiện ngay.
-- Lớp / chức năng chỉ có dữ liệu mô phỏng hoặc viết sẵn (quỹ đạo bão `/map/storm-track`): `SIMULATOR=false` → API 404,
-  frontend khoá lớp và ghi "Chưa kết nối nguồn dữ liệu chính thức" (`unavailable` trong `MonitoringMap.jsx`) — không bao
-  giờ vẽ kịch bản như dữ liệu thật, không cắt chữ "mô phỏng" khỏi nhãn.
+- Lớp / chức năng chưa có dữ liệu thật (quỹ đạo bão `/map/storm-track` khi chưa có bản tin trực ban nhập): `SIMULATOR=false`
+  → API 404, frontend khoá lớp và ghi lý do (`unavailable` trong `MonitoringMap.jsx`) — không bao giờ vẽ kịch bản như dữ
+  liệu thật, không cắt chữ "mô phỏng" khỏi nhãn. Dữ liệu cán bộ nhập tay (bản tin mực nước / bão, điểm sự cố, số người ở
+  điểm sơ tán): kiểm tra gõ nhầm ở hàm thuần (`services/map_ops.py`, `forecast_problem`…), ghi `audit` + `log_event`.
+- Điểm nguy hiểm đang hiệu lực: luôn dùng `map_ops.active_point_sql()` (còn `active` và chưa quá `expires_at`).
 
 **Giới hạn tần suất & IP**
 - Quy tắc ở `RULES` trong `infra/ratelimit.py` (khớp tiền tố, quy tắc cụ thể đặt trước). Nhà mạng dùng chung IP (CGNAT) →

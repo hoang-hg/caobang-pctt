@@ -12,6 +12,7 @@ import math
 from dataclasses import dataclass
 
 from app.db import fetch_all
+from app.services.map_ops import active_point_sql
 from app.services.readings import LATEST_COLS, LATEST_JOIN, vn_time
 from app.services.simulator import alarm_level
 
@@ -179,9 +180,9 @@ async def route_warnings(geometry: dict) -> list[str]:
                 "không xác nhận được mực nước, hỏi địa phương trước khi qua sông suối"
             )
     points = await fetch_all(
-        """WITH r AS (SELECT ST_SetSRID(ST_GeomFromGeoJSON(:g), 4326)::geography AS g)
+        f"""WITH r AS (SELECT ST_SetSRID(ST_GeomFromGeoJSON(:g), 4326)::geography AS g)
            SELECT p.name, p.level FROM r, iot_telemetry.hazard_points p
-            WHERE p.active AND ST_DWithin(p.location::geography, r.g, :d)
+            WHERE {active_point_sql("p")} AND ST_DWithin(p.location::geography, r.g, :d)
             ORDER BY (p.level = 'do') DESC, p.name LIMIT 5""",
         {"g": g, "d": NEAR_POINT_M},
     )

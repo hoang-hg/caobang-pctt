@@ -326,6 +326,54 @@ DATASETS: dict[str, Dataset] = {
             public=True,  # trạm hiện trên bản đồ / tổng quan công khai → nhập xong xoá cache cổng
         ),
         Dataset(
+            "ngap_kich_ban",
+            "Vùng ngập theo kịch bản",
+            "Bản đồ ngập ứng với mực nước tại một trạm (thường theo cấp BĐ I / II / III). Bản đồ điều hành chỉ tô vùng khi "
+            "mực nước trạm — hiện tại hoặc thời điểm trên thanh thời gian (bản tin dự báo KTTV) — đạt ngưỡng. Ghi CẤP BÁO "
+            "ĐỘNG (1–3, dùng ngưỡng hiện hành của trạm) HOẶC MỰC NƯỚC (m), không ghi cả hai. Trạm phải nhập trước. Chỉ nhận "
+            "GeoJSON (Polygon / MultiPolygon, WGS84).",
+            "iot_telemetry.flood_scenarios",
+            ("code",),
+            (
+                code_field("CB-NKB-BG-BD2"),
+                Field(
+                    "ten", "Tên vùng", "name", required=True, example="Ngập ven sông Bằng Giang khi đạt BĐ II"
+                ),
+                Field(
+                    "ma_tram", "Mã trạm mực nước quyết định", None, "code", True, example="CB-WL-BANGGIANG"
+                ),
+                Field(
+                    "cap_bao_dong",
+                    "Ngập khi mực nước đạt cấp BĐ (1, 2, 3)",
+                    "alarm_level",
+                    "int",
+                    min=1,
+                    max=3,
+                    example="2",
+                ),
+                Field(
+                    "muc_nuoc_m", "HOẶC ngập khi mực nước trạm ≥ (m)", "trigger_level", "float", example=""
+                ),
+                Field("do_sau_m", "Độ sâu ngập điển hình (m)", "depth_m", "float", min=0, example="0.8"),
+                MA_XA,
+            ),
+            geometry="polygon",
+            geometry_columns=("geom",),
+            admin_unit=True,
+            refs=(
+                Ref(
+                    "ma_tram",
+                    "station_id",
+                    "iot_telemetry.monitoring_stations",
+                    key="id",
+                    value="id",
+                    where="type = 'muc_nuoc'",
+                ),
+            ),
+            touch=("updated_at",),
+            replaceable=True,
+        ),
+        Dataset(
             "ho_chua",
             "Hồ chứa",
             "Hồ thuỷ điện / thuỷ lợi (thông số tĩnh). Mực nước, cửa xả, lưu lượng vận hành: trực ban cập nhật ở Dashboard → "
