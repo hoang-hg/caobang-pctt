@@ -72,8 +72,9 @@ Ký hiệu: ✅ chạy thật · 🟡 chạy thật nhưng dựa trên dữ li�
 | Cảnh báo | **Gửi tin tới người dân** (SMS Brandname, Cell Broadcast, Zalo OA/ZNS, Push, loa) | ⛔ | Chưa có code gửi. `SIMULATOR=true`: số "đã gửi / đã nhận" là **số ngẫu nhiên**; `SIMULATOR=false`: lệnh đã duyệt chốt "Đã công bố trên cổng", ghi rõ **chưa** tới điện thoại người dân |
 | Cảnh báo | Tổng đài IVR, nút gọi `tel:` | 🔶 / ⛔ | Nhật ký cuộc gọi là mô phỏng; chưa nối tổng đài SIP |
 | Cứu hộ | Phiếu SOS, Kanban, SLA, điều động, khớp lực lượng gần nhất | ✅ | Phụ thuộc dữ liệu lực lượng (2.2) |
-| Cứu hộ | **Báo lệnh điều động tới trưởng nhóm** (SMS / Push) | ⛔ | Chưa gửi: hộp thoại điều động ghi rõ "hệ thống chưa gửi tin cho đội", có nút gọi và sao chép nội dung lệnh để trực ban báo qua điện thoại / Zalo |
-| Cứu hộ | Vị trí lực lượng, phương tiện theo thời gian thực | ⛔ | Chưa có thiết bị định vị; khi chạy thật vị trí đứng yên tại nơi đóng quân (chỉ bộ mô phỏng làm di chuyển). Thay thế: trực ban bấm **Đội báo đã đến hiện trường** khi đội báo qua điện thoại / bộ đàm; trước đó thanh tiến độ là **ước tính theo ETA** (ghi rõ) |
+| Cứu hộ | **Báo lệnh điều động tới trưởng nhóm** (SMS / Push) | ⛔ | Chưa tự gửi: hộp thoại điều động ghi rõ "hệ thống chưa gửi tin cho đội", có nút gọi và sao chép nội dung lệnh (kèm **link nhiệm vụ**) để trực ban báo qua điện thoại / Zalo |
+| Cứu hộ | **Link nhiệm vụ cho trưởng nhóm hiện trường** (`/nhiem-vu`, không cần tài khoản): xem điểm SOS, chỉ đường Google Maps, gọi người báo tin, báo **đã đến / đã cứu an toàn / cần chi viện** | ✅ | Không lấy vị trí điện thoại; "đã cứu" chờ trực ban xác nhận mới đóng phiếu; link đóng khi xong nhiệm vụ / sau 72 giờ ([7.1](#sop-cuu-ho)) |
+| Cứu hộ | Vị trí lực lượng, phương tiện theo thời gian thực | ⛔ | Chưa có thiết bị định vị; khi chạy thật vị trí đứng yên tại nơi đóng quân (chỉ bộ mô phỏng làm di chuyển). Thay thế: trưởng nhóm bấm **Đã đến hiện trường** trên link nhiệm vụ, hoặc trực ban bấm **Đội báo đã đến hiện trường** khi đội báo qua điện thoại / bộ đàm; trước đó thanh tiến độ là **ước tính theo ETA** (ghi rõ) |
 | Nguồn lực | Trạng thái, nhiên liệu phương tiện; nhập thêm hàng; nhiên liệu dự trữ; vật tư mang theo khi điều động | ✅ | Cập nhật tay ([7.1](#sop-cuu-ho)). Nhiên liệu **chưa ai báo** hiện "Chưa cập nhật" (trước đây mặc định 100%) |
 | Cứu hộ | Tiến độ sơ tán theo xã (KPI "Sơ tán an toàn" của Dashboard) | ✅ | Xã / trực ban cập nhật ở Điều hành cứu hộ → **Giám sát sơ tán nhân dân** ([7.4](#giam-sat-kttv)); chưa ai cập nhật thì KPI là 0/0 |
 | Cứu hộ | Bóc tách tin nhắn SOS | ✅ | Bộ luật offline; LLM tuỳ chọn (SĐT được che trước khi gửi) |
@@ -670,9 +671,9 @@ sequenceDiagram
     Intake->>Dispatcher: Phiếu SOS-xxxx (moi)
     Note over Dispatcher: SLA: Cấp 1 < 3′, Cấp 2 < 15′, Cấp 3 < 60′
     Dispatcher->>Dispatcher: Khớp lực lượng gần nhất theo kỹ năng + lộ trình tránh vùng nguy hiểm
-    Dispatcher->>Forces: Lệnh điều động (dieu_phoi → thuc_thi)
-    Forces->>Dispatcher: Báo cáo đưa người về nơi an toàn
-    Dispatcher->>Dispatcher: hoan_thanh (lưu nhật ký pháp lý)
+    Dispatcher->>Forces: Lệnh điều động + link nhiệm vụ qua Zalo / SMS (dieu_phoi → thuc_thi)
+    Forces->>Dispatcher: Qua link: đã đến / cần chi viện / đã cứu an toàn (N người)
+    Dispatcher->>Dispatcher: Gọi xác nhận → hoan_thanh (lưu nhật ký pháp lý)
 ```
 
 1. **Tiếp nhận**: cổng công khai (phản ánh chuyển SOS), hotline, cán bộ nhập, cảm biến (`SENSOR`), webhook (khi bật).
@@ -690,11 +691,29 @@ sequenceDiagram
    phát lệnh (409), quân số / phương tiện giữ nguyên; không chọn kho → lệnh chỉ ghi nhu cầu, trực ban xuất kho riêng.
    Phương tiện **bảo dưỡng / hỏng** hoặc đã báo nhiên liệu **dưới 20%** không được gợi ý; nhiên liệu chưa báo vẫn gợi ý,
    ghi "chưa rõ".
-4. **Thực thi & hoàn tất**: chưa có GPS — khi đội báo qua điện thoại / bộ đàm, trực ban (hoặc xã của phiếu, quyền
-   `sos.update`) bấm **Đội báo đã đến hiện trường** trên thẻ phiếu (`POST /api/v1/dispatch/{lệnh}/arrived`, ghi giờ đến);
-   trước đó thanh tiến độ là ước tính theo giờ xuất phát và ETA. Đưa người về điểm sơ tán rồi đánh dấu **Đã cứu an toàn**
-   (lực lượng, phương tiện tự về "sẵn sàng").
-5. **Nguồn lực** (trang Vật tư & Lực lượng): **Cập nhật** từng phương tiện — Sẵn sàng ↔ Bảo dưỡng / hỏng kèm lý do, mức
+4. **Link nhiệm vụ cho trưởng nhóm** (dân quân, tổ cứu hộ thường không có tài khoản): mỗi lệnh điều động sinh một link
+   `https://<tên miền>/nhiem-vu#<mã>`, đã kèm cuối **nội dung lệnh** để trực ban sao chép gửi qua Zalo / SMS. Trưởng nhóm
+   mở trên điện thoại, **không đăng nhập**: xem loại sự cố, số người, nhóm yếu thế, địa chỉ, tin nhắn gốc, toạ độ; nút
+   **Chỉ đường** (Google Maps); vùng nguy hiểm / cảnh báo **trên lộ trình đề xuất tính lại lúc mở** (Google Maps không biết
+   vùng sạt lở, ngập); gọi người báo tin và trực ban tỉnh; ba nút **Đã đến hiện trường**, **Đã cứu an toàn** (ghi số người),
+   **Cần chi viện** (ghi cần gì). Báo cáo hiện ngay trên thẻ phiếu (kèm thông báo, chuông khi cần chi viện) và nhật ký.
+   - Trang **không lấy vị trí** điện thoại. **"Đã cứu an toàn" không tự đóng phiếu**: thẻ phiếu hiện "Đội báo đã cứu N/M
+     người — chờ xác nhận"; trực ban gọi xác nhận rồi bấm **Xác nhận hoàn thành** (link lộ ra ngoài cũng không đóng được
+     phiếu). Báo cứu ít hơn số người mắc kẹt → nhật ký ghi "CÒN … NGƯỜI CHƯA RÕ". Cần chi viện → nút **Chi viện** trên thẻ
+     mở hộp thoại điều động thêm lực lượng.
+   - Link chỉ dùng cho **đúng lệnh đó**, đóng khi trực ban xác nhận hoàn thành, lệnh bị huỷ, hoặc sau **72 giờ**. Link chỉ
+     hiện **một lần** (CSDL lưu SHA-256 của mã): mất link, đội đổi trưởng nhóm, hoặc link lộ ra ngoài → nút **Link** trên thẻ
+     phiếu cấp link mới (quyền `dispatch.create`; `POST /api/v1/dispatch/{lệnh}/mission-link`), link cũ hết hiệu lực ngay.
+   - Mã nằm sau dấu `#` → trình duyệt không gửi lên máy chủ (không vào log nginx / backend, không lọt qua Referer); trang
+     gửi lại trong header `X-Mission-Token` tới `/api/v1/mission` — **không** nằm dưới `/api/v1/public/` vì nginx cache
+     tiền tố đó theo đường dẫn. Mất sóng rồi tải lại trang vẫn xem được thông tin đã tải (lưu tạm trên điện thoại, xoá khi
+     link đóng); báo cáo gửi lúc mất sóng báo "chưa gửi được" để bấm lại.
+5. **Thực thi & hoàn tất**: chưa có GPS — đội báo đến qua link nhiệm vụ, hoặc khi đội báo qua điện thoại / bộ đàm, trực ban
+   (hoặc xã của phiếu, quyền `sos.update`) bấm **Đội báo đã đến hiện trường** trên thẻ phiếu (`POST
+   /api/v1/dispatch/{lệnh}/arrived`, ghi giờ đến — link nhiệm vụ hiện "trực ban ghi"); trước đó thanh tiến độ là ước tính
+   theo giờ xuất phát và ETA. Đưa người về điểm sơ tán rồi đánh dấu **Đã cứu an toàn** / **Xác nhận hoàn thành** (lực lượng,
+   phương tiện tự về "sẵn sàng", link nhiệm vụ đóng).
+6. **Nguồn lực** (trang Vật tư & Lực lượng): **Cập nhật** từng phương tiện — Sẵn sàng ↔ Bảo dưỡng / hỏng kèm lý do, mức
    nhiên liệu % (`PATCH /api/v1/resources/vehicles/{id}`, quyền `vehicle.update`; "đang làm nhiệm vụ" chỉ do lệnh điều
    động gán, báo hỏng giữa nhiệm vụ thì phương tiện rời nhiệm vụ). **Nhập hàng** vào kho (`POST
    …/warehouses/{id}/receive`, quyền `inventory.receive`): cộng vào tồn kho, hạn dùng giữ **hạn sớm nhất**, mặt hàng mới cần
@@ -1000,6 +1019,7 @@ phần lớn do cache nginx 10 giây trả (không tới backend, không bị đ
 | Đăng nhập | 30 / phút. Sai mật khẩu 10 lần → khoá 15′ **theo tài khoản + IP** (kẻ xấu biết tên đăng nhập của lãnh đạo chỉ tự khoá IP của mình); 100 lần từ mọi IP → khoá tài khoản **chưa bật 2 lớp**; sai mã 2 lớp 10 lần → khoá cả tài khoản |
 | Quên mật khẩu · Đặt lại | 5 · 10 / giờ |
 | Tiếp nhận SOS tự động | 300 / phút (bắt buộc `X-Intake-Key`) |
+| Link nhiệm vụ `/mission` (không đăng nhập) | 240 / phút / IP + 30 báo cáo / giờ / link (mã 32 ký tự ngẫu nhiên, không dò được) |
 | Nhận số đo IoT `/ingest/*` | 1.200 / phút |
 | API nội bộ (đã đăng nhập) | 600 / phút **theo phiên** + trần 3.000 / phút / IP |
 
@@ -1413,7 +1433,8 @@ xác thực 2 lớp TOTP, bắt buộc theo vai trò ([11.1](#xac-thuc-2-lop)); 
 ảnh xoá EXIF/GPS, link ảnh có chữ ký; IP người phản ánh chỉ lưu băm; CSDL / Redis / MinIO không mở cổng, không ra
 Internet; container backend không chạy root; Swagger tắt ở production; log không chứa token, toạ độ; API key đối tác mã
 hoá Fernet (`SECRET_KEY`), khoá thiết bị băm SHA-256, log `httpx` hạ xuống WARNING để không lộ key trong URL; cổng webhook
-SOS bắt buộc khoá; SĐT được che trước khi gửi tin SOS cho LLM; font chữ và bản đồ nền tự lưu trữ (không gửi IP người dân
+SOS bắt buộc khoá; link nhiệm vụ cho đội hiện trường: mã sau `#` (không vào log), chỉ lưu SHA-256, gắn đúng 1 lệnh, đóng
+khi xong / 72 giờ, không đóng được phiếu; SĐT được che trước khi gửi tin SOS cho LLM; font chữ và bản đồ nền tự lưu trữ (không gửi IP người dân
 cho Google khi mở trang, vẫn hiển thị khi đứt kết nối quốc tế); câu lệnh SQL ở API giới hạn 30 giây; image ghim mã băm; Content-Security-Policy.
 
 **Content-Security-Policy** (`frontend/nginx/security-headers.conf`): trình duyệt chỉ chạy script của trang (và Cloudflare

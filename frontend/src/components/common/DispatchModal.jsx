@@ -5,6 +5,7 @@ import { Send, Phone, Route, ShieldCheck, TriangleAlert, Loader2, CheckCircle2 }
 import { api } from '../../api/client';
 import { useStore } from '../../app/store';
 import { Modal } from './ui';
+import { MissionLinkBox } from './MissionLink';
 import { useAllowedCodes, usePermission } from '../../rbac/usePermission';
 import { distanceKm } from '../../utils/geo';
 import { FORCE_TYPE, INCIDENT, PRIORITY, SKILL, VEHICLE, VULNERABLE } from '../../utils/labels';
@@ -149,7 +150,7 @@ export default function DispatchModal({ ticket, presetForceId, onClose }) {
           {result.notification.sent ? (
             <div className="rounded-lg border border-accent/40 bg-accent/10 p-3 text-sm">
               <div className="text-xs font-semibold text-accent">Đã gửi lệnh tới trưởng nhóm {result.notification.to}</div>
-              <div className="mt-1 font-mono text-[13px]">{result.notification.message}</div>
+              <div className="mt-1 font-mono text-[13px] [overflow-wrap:anywhere]">{result.notification.message}</div>
             </div>
           ) : (
             // Chưa tích hợp SMS / Push: hệ thống KHÔNG tự báo cho đội — trực ban phải gọi / nhắn ngay
@@ -157,7 +158,7 @@ export default function DispatchModal({ ticket, presetForceId, onClose }) {
               <div className="flex items-center gap-1.5 font-semibold text-ink">
                 <TriangleAlert size={15} className="text-warn" /> Hệ thống chưa gửi tin cho đội — gọi hoặc nhắn trưởng nhóm ngay
               </div>
-              <div className="mt-1 font-mono text-[13px]">{result.notification.message}</div>
+              <div className="mt-1 font-mono text-[13px] [overflow-wrap:anywhere]">{result.notification.message}</div>
               <div className="mt-2 flex flex-wrap gap-2">
                 {result.notification.to && (
                   <a className="btn-primary px-3 py-1 text-xs" href={`tel:${result.notification.to.replace(/\s/g, '')}`}>
@@ -176,6 +177,9 @@ export default function DispatchModal({ ticket, presetForceId, onClose }) {
                 </button>
               </div>
             </div>
+          )}
+          {result.notification.mission_url && (
+            <MissionLinkBox url={result.notification.mission_url} expiresAt={result.notification.mission_expires_at} />
           )}
         </div>
       ) : isLoading || !match ? (

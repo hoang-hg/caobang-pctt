@@ -33,12 +33,17 @@ SELECT t.id, t.code, t.reporter_name, t.reporter_phone, t.source, t.raw_message,
        u.code AS admin_code, u.name AS admin_name,
        d.id AS dispatch_id, d.status AS dispatch_status, d.eta, d.progress, d.distance_km, d.route_safe,
        d.dispatched_at, d.arrived_at,
-       f.name AS force_name, f.contact_phone AS force_phone, f.id AS force_id
+       f.name AS force_name, f.contact_phone AS force_phone, f.id AS force_id,
+       fr.kind AS field_kind, fr.people_safe AS field_people_safe, fr.note AS field_note, fr.via AS field_via,
+       fr.created_at AS field_at
   FROM operations.sos_tickets t
   LEFT JOIN spatial_admin.administrative_units u ON u.id = t.admin_unit_id
   LEFT JOIN LATERAL (SELECT * FROM operations.dispatch_orders o WHERE o.ticket_id = t.id AND o.status <> 'huy'
                       ORDER BY o.dispatched_at DESC LIMIT 1) d ON TRUE
   LEFT JOIN resources.forces f ON f.id = d.force_id
+  LEFT JOIN LATERAL (SELECT r.kind, r.people_safe, r.note, r.via, r.created_at
+                       FROM operations.dispatch_field_reports r JOIN operations.dispatch_orders o2 ON o2.id = r.order_id
+                      WHERE o2.ticket_id = t.id ORDER BY r.created_at DESC LIMIT 1) fr ON TRUE
 """
 
 

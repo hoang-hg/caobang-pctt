@@ -40,6 +40,21 @@ export function useSocket() {
             body: `${INCIDENT[data.incident_type]} – ${data.address || data.admin_name || ''} (${data.trapped_count} người)`,
           });
           break;
+        case 'field.report': // trưởng nhóm báo từ link nhiệm vụ (/nhiem-vu)
+          inv('sos', 'kpis', 'map-layers');
+          if (data.kind === 'need_support') {
+            if (useStore.getState().soundOn) playAlarm(1);
+            toast({ tone: 'danger', title: `${data.code}: ${data.force_name} cần chi viện`, body: data.note || '' });
+          } else if (data.kind === 'rescued') {
+            toast({
+              tone: 'good',
+              title: `${data.code}: đội báo đã cứu ${data.people_safe}${data.trapped_count ? `/${data.trapped_count}` : ''} người`,
+              body: 'Gọi xác nhận rồi bấm “Xác nhận hoàn thành” trên thẻ phiếu',
+            });
+          } else {
+            toast({ tone: 'good', title: `${data.force_name} đã đến hiện trường ${data.code}` });
+          }
+          break;
         case 'sos.updated':
         case 'dispatch.updated':
           inv('sos', 'kpis', 'map-layers', 'forces', 'vehicles', 'resources-summary');

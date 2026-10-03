@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Kiểm thử giao diện bằng trình duyệt thật (Playwright / Chromium) trên khổ MÁY TÍNH và ĐIỆN THOẠI: bấm thử các màn hình
 // chính như người dùng thật — cổng công khai (gửi phản ánh, tra cứu), màn hình cán bộ (mọi trang, điều động, duyệt phản
-// ánh, nhập dữ liệu bằng form + chọn vị trí trên bản đồ). Mỗi bước bắt: lỗi JavaScript trên trang (màn hình trắng), API
+// ánh, nhập dữ liệu bằng form + chọn vị trí trên bản đồ), link nhiệm vụ của trưởng nhóm hiện trường (/nhiem-vu). Mỗi bước
+// bắt: lỗi JavaScript trên trang (màn hình trắng), API
 // trả 5xx, trang tràn ngang trên điện thoại.
 //
 //   cd tests/ui && npm ci && npx playwright install chromium
@@ -189,6 +190,7 @@ async function publicPortal(ctx) {
 // ================================================================ Màn hình cán bộ
 async function staff(ctx, trackCode) {
   const { page, vp } = ctx;
+  let missionUrl = null; // link nhiệm vụ của lệnh vừa phát (bước điều động)
 
   await step(ctx, 'Đăng nhập cán bộ', async () => {
     await page.goto(`${ROOT}/dang-nhap`);
@@ -274,10 +276,29 @@ async function staff(ctx, trackCode) {
     // Chưa tích hợp SMS / Push → phải nói rõ hệ thống CHƯA gửi tin cho đội
     const text = await dialog.innerText();
     if (!/chưa gửi tin cho đội|Đã gửi lệnh tới/.test(text)) throw new Error('không nêu trạng thái gửi lệnh cho đội');
+    // Link nhiệm vụ cho trưởng nhóm: mã sau dấu # (không vào log máy chủ) — mở thử ở bước sau
+    missionUrl = await dialog.getByLabel('Link nhiệm vụ').inputValue();
+    if (!/\/nhiem-vu#[\w-]{20,}$/.test(missionUrl)) throw new Error(`link nhiệm vụ sai dạng: ${missionUrl}`);
+    await expectNoOverflow(ctx, 'kết quả điều động', dialog);
     const km = text.match(/([\d.]+) km/)?.[1];
     await dialog.getByRole('button', { name: 'Đóng', exact: true }).last().click();
     return `${km} km`;
   });
+
+  if (!READONLY) {
+    await step(ctx, 'Link nhiệm vụ của trưởng nhóm: xem điểm SOS, chỉ đường → báo đã đến hiện trường', async () => {
+      if (!missionUrl) throw new Error('bước điều động không cho link nhiệm vụ');
+      // Theo địa chỉ đang thử (PUBLIC_BASE_URL của máy chủ có thể khác); trang không dùng phiên đăng nhập của cán bộ
+      await page.goto(`${ROOT}/nhiem-vu#${missionUrl.split('#')[1]}`);
+      await page.getByText('Lệnh cứu hộ khẩn').waitFor({ timeout: 20_000 });
+      const maps = await page.getByRole('link', { name: 'Chỉ đường tới điểm SOS' }).getAttribute('href');
+      if (!/^https:\/\/www\.google\.com\/maps\/dir\/\?api=1&destination=[\d.]+,[\d.]+/.test(maps)) throw new Error(`link chỉ đường sai: ${maps}`);
+      await expectNoOverflow(ctx, '/nhiem-vu');
+      await page.getByRole('button', { name: 'Đã đến hiện trường' }).click();
+      await page.getByText(/Đã báo đến hiện trường lúc/).waitFor({ timeout: 15_000 });
+      return (await page.locator('header').first().innerText()).match(/SOS-\d+/)?.[0];
+    });
+  }
 
   await step(ctx, READONLY ? 'Mở hộp thoại duyệt phản ánh (không duyệt)' : 'Duyệt phản ánh: nội dung công khai đã che, vị trí làm tròn', async () => {
     await page.goto(`${ROOT}/phan-anh`);

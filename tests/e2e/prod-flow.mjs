@@ -304,6 +304,10 @@ const match = await call('GET', `/sos/${ticket?.id}/match`, null, admin);
 const force = match.data?.forces?.find((x) => x.code === 'CB-LL-001') || match.data?.forces?.[0];
 check('Gợi ý lực lượng vừa nhập (Đại đội công binh)', match.status === 200 && force?.code === 'CB-LL-001',
   `${match.data?.forces?.length ?? 0} lực lượng, bán kính ${match.data?.radius_km} km`);
+// Link nhiệm vụ cho trưởng nhóm (không đăng nhập): mã sau dấu # của đường dẫn, gửi lại trong header X-Mission-Token
+const asTeam = (token) => ({ 'X-Mission-Token': token });
+const digits = (p) => (p || '').replace(/\D/g, '');
+let teamToken = '';
 if (force) {
   const disp = await call('POST', '/dispatch', { ticket_id: ticket.id, force_id: force.id, personnel: 6 }, admin);
   check('Phát lệnh điều động + lộ trình', disp.status === 200 && disp.data?.ticket?.status === 'thuc_thi' && !!disp.data?.route,
@@ -313,11 +317,30 @@ if (force) {
     disp.data?.route?.safe === false && disp.data?.route?.hazards?.includes('Khu dân cư xóm Nà Rì'), JSON.stringify(disp.data?.route?.hazards));
   check('Không có SMS / Push: lệnh điều động báo rõ CHƯA gửi cho đội (trực ban phải gọi)',
     disp.data?.notification?.sent === false && !!disp.data?.notification?.message);
+  const missionUrl = disp.data?.notification?.mission_url || '';
+  teamToken = missionUrl.split('#')[1] || '';
+  check('Lệnh kèm link nhiệm vụ (mã sau dấu #, có trong nội dung gửi đội)', /\/nhiem-vu#[\w-]{30,}$/.test(missionUrl)
+    && disp.data.notification.message.endsWith(missionUrl), missionUrl.replace(/#.*/, '#…'));
+  const mission = await call('GET', '/mission', null, null, asTeam(teamToken));
+  check('Trưởng nhóm mở link: thấy phiếu, SĐT người báo; nginx không cache (khoá cache không gồm header)',
+    mission.status === 200 && mission.data?.code === ticket.code && digits(mission.data?.reporter_phone) === digits(PHONE)
+    && !mission.headers.get('x-cache-status'), `HTTP ${mission.status} cache=${mission.headers.get('x-cache-status')}`);
+  check('Mã nhiệm vụ sai → 404 (không trả nhiệm vụ của đội khác)',
+    (await call('GET', '/mission', null, null, asTeam('x'.repeat(32)))).status === 404);
+  const support = await call('POST', '/mission/report', { kind: 'need_support', note: `Cần thêm 1 xuồng (kiểm thử ${stamp})` }, null, asTeam(teamToken));
+  const boardSupport = (await call('GET', '/sos', null, admin)).data?.find?.((t) => t.id === ticket.id);
+  check('Đội báo "cần chi viện" qua link → thẻ phiếu của trực ban hiện ngay', support.status === 200
+    && boardSupport?.field_kind === 'need_support', `HTTP ${support.status}`);
   // Chưa có GPS: trực ban ghi "đội đã đến hiện trường" khi đội báo qua điện thoại / bộ đàm
   const arrived = await call('POST', `/dispatch/${disp.data?.order?.id}/arrived`, null, admin);
   check('Đội báo đã đến hiện trường → lệnh "đã đến", ghi giờ đến', arrived.status === 200 && arrived.data?.dispatch_status === 'da_den'
     && !!arrived.data?.arrived_at, `HTTP ${arrived.status}`);
   check('Báo "đã đến" lần hai → 409', (await call('POST', `/dispatch/${disp.data?.order?.id}/arrived`, null, admin)).status === 409);
+  const rescued = await call('POST', '/mission/report', { kind: 'rescued', people_safe: 3 }, null, asTeam(teamToken));
+  const boardRescued = (await call('GET', '/sos', null, admin)).data?.find?.((t) => t.id === ticket.id);
+  check('Đội báo "đã cứu an toàn" qua link → phiếu CHƯA đóng, chờ trực ban xác nhận', rescued.status === 200
+    && boardRescued?.status === 'thuc_thi' && boardRescued?.field_kind === 'rescued' && boardRescued?.field_people_safe === 3,
+    `HTTP ${rescued.status} ${boardRescued?.status}`);
 }
 const pr = (await call('GET', '/public/route?from_lat=22.6700&from_lon=106.2400&to_lat=22.6657&to_lon=106.2522')).data;
 check('Chỉ đường công khai tới điểm trong vùng nguy hiểm → không báo "an toàn"', pr?.safe === false &&
@@ -338,6 +361,9 @@ check('Mã tra cứu cấp khi gửi (PA-…-XXXXXX) tra được không cần S
   (await call('POST', '/public/track', { code: rep.data.track_code })).data?.total === 1, rep.data?.track_code);
 const resolved = await call('POST', `/sos/${ticket?.id}/resolve`, null, admin);
 check('Xác nhận đã cứu an toàn', resolved.data?.status === 'hoan_thanh', `HTTP ${resolved.status}`);
+const missionClosed = await call('GET', '/mission', null, null, asTeam(teamToken));
+check('Xong nhiệm vụ → link nhiệm vụ đóng (410), không còn SĐT người báo', missionClosed.status === 410
+  && !digits(JSON.stringify(missionClosed.data)).includes(digits(PHONE)), `HTTP ${missionClosed.status}`);
 
 // ---------------------------------------------------------------- Vật tư & lực lượng: số liệu cập nhật tay
 const vehiclesNow = (await call('GET', '/resources/vehicles', null, admin)).data || [];

@@ -57,6 +57,9 @@ RULES: tuple[Rule, ...] = (
         "intake", "POST", "/api/v1/sos/intake", 300, 60
     ),  # webhook từ vài IP cổng Zalo/app, đã xác thực khoá
     Rule("ingest", "POST", "/api/v1/ingest", 1200, 60),
+    # Link nhiệm vụ (không đăng nhập): trang tự làm mới 30 giây; mã 32 ký tự ngẫu nhiên không dò được. + 30 báo cáo /
+    # giờ / link (app/api/v1/mission.py)
+    Rule("mission", "*", "/api/v1/mission", 240, 60),
     Rule("api", "*", "/api/v1", 600, 60, per_session=True),
 )
 

@@ -46,13 +46,14 @@ backend/                   Python 3.12, FastAPI, SQLAlchemy async (psycopg3), Ca
   app/auth.py              JWT, băm mật khẩu/PIN (PBKDF2), current_user, audit(), password_problem, bump_token_version
   app/mfa.py               xác thực 2 lớp TOTP: mã, mã khôi phục, phiếu đăng nhập, required() theo TOTP_REQUIRED_ROLES
   app/area.py              parse_codes, area_clause, unit_clause (bộ lọc địa phương)
-  app/api/v1/*.py          router: admin_units alerts auth mfa dashboard forecast ingest integrations map_layers public
-                           rbac reports resources search sos
+  app/api/v1/*.py          router: admin_units alerts auth mfa dashboard forecast ingest integrations map_layers mission
+                           public rbac reports resources search sos
   app/rbac/                permissions.py (SSOT quyền + vai trò hệ thống) · authz.py (dependency cho route) ·
                            scope_loaders.py (tài nguyên → domain) · domains.py · enforcer.py · management.py (uỷ quyền,
                            chống leo thang) · seed.py (đồng bộ vai trò, tạo Superadmin / tài khoản demo)
   app/services/            sos, sos_nlp, dispatch_matching, safe_routing, broadcast, reports, tracking, reservoirs,
-                           landslides, events (log_event), simulator, scenario, lite (trang bản nhẹ /ban-nhe, HTML < 50 KB)
+                           landslides, events (log_event), simulator, scenario, lite (trang bản nhẹ /ban-nhe, HTML < 50 KB),
+                           mission (link nhiệm vụ cho trưởng nhóm hiện trường: mã, hạn, nội dung lệnh)
   app/services/data_import/  nhập dữ liệu chính thức từ tệp: specs.py (khai báo 12 loại) · parsing.py (CSV/xlsx/GeoJSON,
                            chuẩn hoá — thuần) · engine.py (validate / apply 1 transaction) · templates.py · service.py
                            (nhật ký, sự kiện, xoá cache) · __main__.py (dòng lệnh). API: app/api/v1/data_import.py
@@ -80,7 +81,8 @@ frontend/                  React 18, Vite 6, Tailwind 3, TanStack Query 5, Zusta
   src/app/store.js         Zustand: theme, filter, focus, alertDraft, gps, auth, wsStatus, soundOn, sidebar, savedAt, toasts
   src/rbac/                permissions.js (khớp domain) · usePermission.js (usePermission, useCanAll, useAllowedCodes, Can)
   src/pages/               trang điều hành (DataImport = nhập dữ liệu chính thức); pages/public/ = cổng công khai (PublicPortal, ReportForm, TicketTracker,
-                           ReservoirMonitor, LandslideMonitor, NetworkBanner = báo mất mạng / gợi ý bản nhẹ)
+                           ReservoirMonitor, LandslideMonitor, NetworkBanner = báo mất mạng / gợi ý bản nhẹ,
+                           MissionPage = /nhiem-vu link nhiệm vụ của trưởng nhóm, không đăng nhập)
   src/components/          common/ (ui.jsx: KpiCard Modal Tabs Section Empty…, Turnstile, DispatchModal…) · layout/ ·
                            map/ (MapLayers, MapTools = nền bản đồ + công cụ, icons, leafletGlobal) · charts/ (chartTheme) ·
                            account/Mfa.jsx (cài đặt / quản lý xác thực 2 lớp — Login import tĩnh, UserMenu lazy)
@@ -194,7 +196,8 @@ Python trong container.
   và `code` = mã xã để chỉ người có quyền ở xã đó nhận (VD `hub.publish("sos.updated", ticket, "sos", ticket["admin_code"])`).
 - Sự kiện hiện có: `reading.new`, `sos.new`, `sos.updated`, `dispatch.updated`, `gps.update`, `hazard.new`,
   `broadcast.updated`, `inventory.changed`, `call.new`, `log.new`, `report.new`, `report.updated`, `ingest.log`,
-  `source.updated`. Sự kiện mới phải thêm nhánh xử lý trong `frontend/src/api/useSocket.js`.
+  `source.updated`, `evacuation.updated`, `hazard.updated`, `storm.updated`, `forecast.updated`, `reservoir.updated`,
+  `submission.updated`, `data.imported`, `field.report` (trưởng nhóm báo qua link nhiệm vụ). Sự kiện mới phải thêm nhánh xử lý trong `frontend/src/api/useSocket.js`.
 - Nhật ký sự kiện điều hành: `services/events.log_event(message, category, severity, admin_unit_id|lat/lon)`.
   Nhật ký pháp lý thao tác người dùng: `auth.audit(user, action, entity, entity_id, details)` — mọi thao tác ghi đều gọi.
 
@@ -287,7 +290,8 @@ chỉ khi `DEMO_MODE`; `DEMO_MODE=false` xoá đoạn `so_do` còn sót mỗi l�
 - **Truy vấn theo vùng lọc**: `useAreaQuery(key, path, extra)`; `key` phải trùng khoá mà `useSocket.js` invalidate khi có sự
   kiện (VD `sos`, `kpis`, `map-layers`, `stations`, `rainfall`, `warehouses`, `reports`, `int-sources`…) để tự làm mới.
 - **Route**: trang điều hành trong `Shell` bọc `<Guard obj act>`; trang công khai ngoài `Shell`. Trang công khai
-  (`pages/public/`) chỉ gọi `/public/*`. Trang mới khai báo `lazy(() => import(...))` trong `App.jsx` (đã có `Suspense`) —
+  (`pages/public/`) chỉ gọi `/public/*` — ngoại lệ `MissionPage` gọi `/mission` bằng `fetch` + header `X-Mission-Token` (không
+  phiên đăng nhập; không đặt dưới `/public/`, xem §11). Trang mới khai báo `lazy(() => import(...))` trong `App.jsx` (đã có `Suspense`) —
   không import tĩnh trang vào `App.jsx` (kéo cả trang vào gói tải lần đầu của người dân).
 - **Service worker** (`src/sw.js`): chỉ lưu `GET` cùng origin, không `Authorization`, không `Range`; API công khai được
   lưu phải nằm trong `PUBLIC_API` — không thêm endpoint có dữ liệu cá nhân / vị trí (`locate`, `track`, `route`, ảnh).
@@ -425,6 +429,9 @@ chỉ khi `DEMO_MODE`; `DEMO_MODE=false` xoá đoạn `so_do` còn sót mỗi l�
 - WebSocket: sự kiện không gắn mã xã phải có nhóm quyền — thêm loại sự kiện mới thì khai báo ở `EVENT_SCOPE`
   (`ws/hub.py`), thêm nhóm quyền mới ở `SCOPE_ACTIONS`. Không gắn gì = gửi mọi tài khoản đăng nhập.
 - `api()` (frontend) trả `null` cho 204 — route xoá trả 204, không trả JSON rỗng.
+- Endpoint không đăng nhập trả dữ liệu theo **mã bí mật / header** (VD link nhiệm vụ `/mission`, `X-Mission-Token`) không được
+  đặt dưới `/api/v1/public/`: nginx cache tiền tố đó theo URI + vài tham số, **không theo header** → trả dữ liệu của người
+  này cho người khác. Mã bí mật gửi qua đường dẫn để sau `#` (không vào log), CSDL chỉ lưu SHA-256 (mẫu `services/mission.py`).
 - `/health/full` (503 khi có sự cố) chỉ cho giám sát bên ngoài — **không** dùng làm healthcheck container (ổ đĩa đầy,
   thiếu sao lưu mà khởi động lại backend thì hỏng thêm). Worker đọc `/backups` và `/ops/offsite` chỉ đọc (compose prod).
 - Content-Security-Policy ở `frontend/nginx/security-headers.conf`: thêm nguồn ngoài (tile, API gọi từ trình duyệt, script,

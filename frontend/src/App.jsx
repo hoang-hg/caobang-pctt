@@ -21,6 +21,7 @@ const DataSources = lazy(() => import('./pages/DataSources'));
 const CitizenReports = lazy(() => import('./pages/CitizenReports'));
 const DataImport = lazy(() => import('./pages/DataImport'));
 const PublicPortal = lazy(() => import('./pages/public/PublicPortal'));
+const MissionPage = lazy(() => import('./pages/public/MissionPage'));
 
 function PageLoading() {
   return <div className="flex h-full min-h-[40vh] items-center justify-center text-sm text-muted">Đang tải…</div>;
@@ -116,6 +117,8 @@ export default function App() {
           <Route path="/dang-nhap" element={loggedIn ? <AfterLogin /> : <Login />} />
           <Route path="/quen-mat-khau" element={<ForgotPassword />} />
           <Route path="/dat-lai-mat-khau" element={<ResetPassword />} />
+          {/* Link nhiệm vụ cho trưởng nhóm hiện trường: mã sau dấu #, không cần tài khoản */}
+          <Route path="/nhiem-vu" element={<MissionPage />} />
           <Route path="/" element={loggedIn ? <Navigate to="/dashboard" replace /> : <PublicPortal />} />
           {/* Điều hành — cần đăng nhập */}
           <Route path="/*" element={loggedIn ? <Shell key={auth.user?.id} /> : <RequireLogin />} />
