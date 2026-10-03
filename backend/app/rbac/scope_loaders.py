@@ -49,6 +49,11 @@ async def vehicle(vehicle_id: str) -> str | None:
     return domains.domain_of_unit_id(row["admin_unit_id"]) if row else None
 
 
+async def commune(code: str) -> str | None:
+    """Xã theo mã trong đường dẫn (VD /evacuation/{code}); không phải mã xã → None (404)."""
+    return next((u.domain for u in domains.units() if u.code == code), None)
+
+
 async def broadcast_domains(broadcast_id: str) -> list[str] | None:
     """Lệnh cảnh báo có thể nhắm nhiều xã → trả danh sách domain (phải có quyền trên TẤT CẢ)."""
     bid = _uuid_or_none(broadcast_id)

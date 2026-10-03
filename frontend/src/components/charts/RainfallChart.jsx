@@ -5,7 +5,7 @@ import { hourLabel } from '../../utils/format';
 import { axisProps, ChartTooltip, Legend, useChartTheme } from './chartTheme';
 
 /** Mưa theo giờ (cột) + mưa tích lũy (đường) — 2 biểu đồ chung trục thời gian, KHÔNG dùng 2 trục Y.
- *  Phần 3 giờ tới (QPF nowcast) vẽ nhạt/nét đứt. */
+ *  Phần 3 giờ tới vẽ nhạt / nét đứt: dự báo mô hình số (Open-Meteo) cho trạm mưa, KHÔNG phải nowcast radar. */
 export default function RainfallChart({ height = 250 }) {
   const c = useChartTheme();
   const { data } = useAreaQuery('rainfall', '/dashboard/rainfall', {}, { refetchInterval: 60_000 });
@@ -37,7 +37,7 @@ export default function RainfallChart({ height = 250 }) {
         <Legend
           items={[
             { label: 'Mưa giờ – thực đo', color: c.s1 },
-            { label: 'Nowcast QPF 3h', color: c.s2 },
+            { label: 'Dự báo mô hình 3 giờ tới', color: c.s2 },
             { label: 'Tích lũy', color: c.s1, line: true },
             { label: 'Tích lũy dự báo', color: c.s2, dashed: true },
           ]}

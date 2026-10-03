@@ -7,11 +7,11 @@ import {
   Search
 } from 'lucide-react';
 import { api } from '../api/client';
-import { useAreaQuery } from '../api/hooks';
+import { useAreaQuery, useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
-import { Empty, Progress, Section } from '../components/common/ui';
+import { Empty, Modal, Progress, Section } from '../components/common/ui';
 import DispatchModal from '../components/common/DispatchModal';
-import { Can, usePermission } from '../rbac/usePermission';
+import { Can, useAllowedCodes, usePermission } from '../rbac/usePermission';
 import { INCIDENT, PRIORITY, SOURCE, VULNERABLE } from '../utils/labels';
 import { int, pct, time } from '../utils/format';
 
@@ -276,8 +276,115 @@ function Intake() {
   );
 }
 
+const EVAC_FIELDS = [
+  ['planned_households', 'Hộ phải sơ tán (kế hoạch)'],
+  ['evacuated_households', 'Hộ đã sơ tán an toàn'],
+  ['planned_persons', 'Nhân khẩu phải sơ tán'],
+  ['evacuated_persons', 'Nhân khẩu đã sơ tán'],
+];
+
+/** Xã / trực ban cập nhật kế hoạch và tiến độ sơ tán (quyền evacuation.update tại xã đó) → KPI "Sơ tán an toàn" của
+ * Dashboard cập nhật ngay. Kết thúc đợt: nhập số đã sơ tán = 0. */
+function EvacuationModal({ row, onClose }) {
+  const qc = useQueryClient();
+  const toast = useStore((st) => st.toast);
+  const { data: units = [] } = useUnits();
+  const allowed = useAllowedCodes('evacuation', 'update');
+  const choices = units.filter((u) => !allowed || allowed.includes(u.code));
+  const [code, setCode] = useState(row?.code || '');
+  const [f, setF] = useState(() => Object.fromEntries(EVAC_FIELDS.map(([k]) => [k, row?.[k] ?? ''])));
+  const [source, setSource] = useState('');
+  const [busy, setBusy] = useState(false);
+  const unit = units.find((u) => u.code === code);
+  const n = (k) => Number(f[k]);
+  const filled = EVAC_FIELDS.every(([k]) => f[k] !== '' && Number.isInteger(n(k)) && n(k) >= 0);
+  const problem = !filled
+    ? null
+    : n('planned_persons') < n('planned_households') || n('evacuated_persons') < n('evacuated_households')
+      ? 'Số nhân khẩu không thể ít hơn số hộ'
+      : unit?.households && Math.max(n('planned_households'), n('evacuated_households')) > unit.households
+        ? `Vượt tổng số hộ của xã (${int(unit.households)})`
+        : null;
+  const submit = async () => {
+    setBusy(true);
+    try {
+      await api(`/evacuation/${encodeURIComponent(code)}`, {
+        method: 'PUT',
+        body: { ...Object.fromEntries(EVAC_FIELDS.map(([k]) => [k, n(k)])), source: source || null },
+      });
+      toast({ tone: 'good', title: `Đã cập nhật sơ tán ${unit?.name || code}` });
+      qc.invalidateQueries({ queryKey: ['evacuation'] });
+      qc.invalidateQueries({ queryKey: ['kpis'] });
+      onClose();
+    } catch (e) {
+      toast({ tone: 'danger', title: 'Không cập nhật được', body: e.message });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={row ? `Cập nhật sơ tán – ${row.name}` : 'Cập nhật sơ tán'}
+      footer={
+        <>
+          <button className="btn-ghost" onClick={onClose}>Huỷ</button>
+          <button className="btn-primary" disabled={!code || !filled || !!problem || busy} onClick={submit}>Lưu số liệu</button>
+        </>
+      }
+    >
+      <div className="grid gap-3 text-sm sm:grid-cols-2">
+        {!row && (
+          <label className="flex flex-col gap-1 sm:col-span-2">
+            Xã / phường *
+            <select className="input" value={code} onChange={(e) => setCode(e.target.value)}>
+              <option value="">— Chọn xã —</option>
+              {choices.map((u) => <option key={u.code} value={u.code}>{u.name}</option>)}
+            </select>
+          </label>
+        )}
+        {EVAC_FIELDS.map(([k, label]) => (
+          <label key={k} className="flex flex-col gap-1">
+            {label} *
+            <input className="input" type="number" min="0" step="1" value={f[k]} onChange={(e) => setF((x) => ({ ...x, [k]: e.target.value }))} />
+          </label>
+        ))}
+        <label className="flex flex-col gap-1 sm:col-span-2">
+          Nguồn báo cáo
+          <input className="input" maxLength={200} placeholder="VD: Báo cáo UBND xã lúc 14h" value={source} onChange={(e) => setSource(e.target.value)} />
+        </label>
+        {problem && <p className="text-xs text-danger sm:col-span-2">{problem}</p>}
+        <p className="text-[11px] text-muted sm:col-span-2">
+          {unit?.households ? `Xã có ${int(unit.households)} hộ, ${int(unit.population)} nhân khẩu. ` : ''}
+          Kết thúc đợt sơ tán: nhập số đã sơ tán = 0. Thao tác được ghi nhật ký.
+        </p>
+      </div>
+    </Modal>
+  );
+}
+
+function EvacuationRow({ r, onEdit }) {
+  const canEdit = usePermission('evacuation', 'update', r.code);
+  const p = pct(r.evacuated_households, r.planned_households);
+  return (
+    <div className="text-xs">
+      <div className="flex justify-between gap-2 mb-0.5">
+        <span className="font-medium text-ink truncate">{r.name}</span>
+        <span className="flex shrink-0 items-center gap-2">
+          <span className="font-mono text-muted" title={`Cập nhật ${time(r.updated_at)}`}>{r.evacuated_households}/{r.planned_households} hộ ({p}%)</span>
+          {canEdit && <button className="text-accent hover:underline" onClick={() => onEdit(r)}>Sửa</button>}
+        </span>
+      </div>
+      <Progress value={p} tone={p < 50 ? 'danger' : p < 80 ? 'warn' : 'good'} />
+    </div>
+  );
+}
+
 function Evacuation() {
   const { data } = useAreaQuery('evacuation', '/evacuation', {}, { refetchInterval: 30_000 });
+  const canUpdate = usePermission('evacuation', 'update');
+  const [editing, setEditing] = useState(null); // null | 'new' | dòng tiến độ
   if (!data) return null;
   const totPlanned = data.progress.reduce((s, r) => s + r.planned_households, 0);
   const totDone = data.progress.reduce((s, r) => s + r.evacuated_households, 0);
@@ -286,23 +393,19 @@ function Evacuation() {
     <Section title="Giám sát sơ tán nhân dân" right={<span className="text-xs font-mono font-semibold text-ink">{int(totDone)}/{int(totPlanned)} hộ</span>}>
       <div className="flex flex-col gap-3">
         <div>
-          <div className="mb-1.5 text-[11px] font-semibold uppercase text-muted">Tiến độ di dời theo xã (thấp nhất trước)</div>
+          <div className="mb-1.5 flex items-center justify-between text-[11px] font-semibold uppercase text-muted">
+            Tiến độ di dời theo xã (thấp nhất trước)
+            {canUpdate && (
+              <button className="normal-case text-accent hover:underline" onClick={() => setEditing('new')}>+ Cập nhật xã</button>
+            )}
+          </div>
           <div className="flex max-h-48 flex-col gap-2 overflow-y-auto pr-1 scroll-thin">
-            {data.progress.map((r) => {
-              const p = pct(r.evacuated_households, r.planned_households);
-              return (
-                <div key={r.code} className="text-xs">
-                  <div className="flex justify-between mb-0.5">
-                    <span className="font-medium text-ink truncate">{r.name}</span>
-                    <span className="font-mono text-muted">{r.evacuated_households}/{r.planned_households} hộ ({p}%)</span>
-                  </div>
-                  <Progress value={p} tone={p < 50 ? 'danger' : p < 80 ? 'warn' : 'good'} />
-                </div>
-              );
-            })}
-            {!data.progress.length && <Empty />}
+            {data.progress.map((r) => <EvacuationRow key={r.code} r={r} onEdit={setEditing} />)}
+            {!data.progress.length && <Empty>Chưa có xã nào báo tiến độ sơ tán</Empty>}
           </div>
         </div>
+
+        {editing && <EvacuationModal row={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
 
         <div>
           <div className="mb-1.5 text-[11px] font-semibold uppercase text-muted">Sức chứa các điểm sơ tán</div>
