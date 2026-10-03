@@ -100,6 +100,10 @@ body {
 
 .map-icon { background: none; border: none; }
 .custom-cluster-icon { background: none !important; border: none !important; }
+/* Nền bản đồ tối Google Maps khi máy chủ chưa có tệp pmtiles offline (không cần CARTO API key) */
+.map-tiles-dark {
+  filter: brightness(0.65) invert(1) contrast(2.5) hue-rotate(200deg) saturate(0.35) brightness(0.7);
+}
 .radar-cluster-wrapper {
   position: relative;
   display: flex;

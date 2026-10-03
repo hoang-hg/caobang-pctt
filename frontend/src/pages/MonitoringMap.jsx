@@ -372,11 +372,11 @@ export default function MonitoringMap() {
                     <div className="flex items-center gap-2">
                       <span className={clsx('h-2.5 w-2.5 rounded-full shrink-0', s.status === 'moi' && 'animate-blink', { 1: 'bg-danger', 2: 'bg-serious', 3: 'bg-warn' }[s.priority])} />
                       <b className="text-sm font-bold text-ink">{s.code}</b>
-                      <span className="text-xs text-muted">{PRIORITY[s.priority].short}</span>
+                      <span className="text-xs text-muted">{PRIORITY[s.priority]?.short || `Cấp ${s.priority}`}</span>
                       <span className="ml-auto text-[11px] text-muted">{ago(s.received_at)}</span>
                     </div>
                     <div className="text-xs text-ink-2 mt-1">
-                      {INCIDENT[s.incident_type]} · <b>{s.trapped_count} người</b> · <span className="text-muted">{s.address}</span>
+                      {INCIDENT[s.incident_type] || s.incident_type} · <b>{s.trapped_count} người</b> · <span className="text-muted">{s.address}</span>
                     </div>
                     {s.status === 'moi' && canDispatch && (
                       <span

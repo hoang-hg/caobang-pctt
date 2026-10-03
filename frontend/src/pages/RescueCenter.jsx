@@ -40,7 +40,7 @@ const mmss = (sec) => {
 
 function TicketCard({ t, now, onDispatch, onResolve, onFocus }) {
   const canUpdate = usePermission('sos', 'update', t.admin_code);
-  const pr = PRIORITY[t.priority];
+  const pr = PRIORITY[t.priority] || PRIORITY[2];
   const waitingSec = (now - new Date(t.received_at).getTime()) / 1000;
   const slaSec = t.sla_minutes * 60;
   const breached = t.status === 'moi' && waitingSec > slaSec;
@@ -263,10 +263,10 @@ function Intake() {
               <span className="chip bg-panel text-ink-2 text-[10px]">{parsed.priority ? `Ưu tiên cấp ${parsed.priority}` : ''}</span>
             </div>
             <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-              <span className="text-muted">Loại sự cố:</span><b>{INCIDENT[parsed.incident_type]}</b>
-              <span className="text-muted">Mức ưu tiên:</span><b>{PRIORITY[parsed.priority].label}</b>
+              <span className="text-muted">Loại sự cố:</span><b>{INCIDENT[parsed.incident_type] || parsed.incident_type}</b>
+              <span className="text-muted">Mức ưu tiên:</span><b>{PRIORITY[parsed.priority]?.label || `Cấp ${parsed.priority}`}</b>
               <span className="text-muted">Số người:</span><b>{parsed.trapped_count} người</b>
-              <span className="text-muted">Nhóm yếu thế:</span><b>{parsed.vulnerable.map((v) => VULNERABLE[v]).join(', ') || 'Không'}</b>
+              <span className="text-muted">Nhóm yếu thế:</span><b>{parsed.vulnerable.map((v) => VULNERABLE[v] || v).join(', ') || 'Không'}</b>
               <span className="text-muted">Địa bàn:</span><b className={clsx(!parsed.place && 'text-danger')}>{parsed.place ? `${parsed.place.name}` : 'Cần cán bộ xác minh toạ độ'}</b>
             </div>
           </div>

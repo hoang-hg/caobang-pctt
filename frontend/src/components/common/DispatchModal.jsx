@@ -44,7 +44,7 @@ export default function DispatchModal({ ticket, presetForceId, onClose }) {
   }, [match, presetForceId]);
 
   if (!ticket) return null;
-  const pr = PRIORITY[ticket.priority];
+  const pr = PRIORITY[ticket.priority] || PRIORITY[2];
   const presetMissing = presetForceId && match && !match.forces.some((f) => f.id === presetForceId);
 
   const submit = async () => {
@@ -87,11 +87,11 @@ export default function DispatchModal({ ticket, presetForceId, onClose }) {
     >
       <div className="mb-3 rounded-lg bg-panel2 p-3">
         <div className="flex flex-wrap items-center gap-2">
-          <span className={clsx('chip', pr.cls)}>{pr.label}</span>
-          <span className="font-semibold">{INCIDENT[ticket.incident_type]}</span>
+          <span className={clsx('chip', pr?.cls)}>{pr?.label}</span>
+          <span className="font-semibold">{INCIDENT[ticket.incident_type] || ticket.incident_type}</span>
           <span className="text-sm text-ink-2">· {ticket.address || ticket.admin_name}</span>
           <span className="text-sm text-ink-2">· {ticket.trapped_count} người</span>
-          {(ticket.vulnerable || []).map((v) => <span key={v} className="chip bg-danger/15 text-danger">{VULNERABLE[v]}</span>)}
+          {(ticket.vulnerable || []).map((v) => <span key={v} className="chip bg-danger/15 text-danger">{VULNERABLE[v] || v}</span>)}
         </div>
         {ticket.raw_message && <p className="mt-1 text-sm italic text-ink-2">“{ticket.raw_message}”</p>}
       </div>

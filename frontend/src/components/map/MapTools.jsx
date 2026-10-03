@@ -41,10 +41,11 @@ export const BASEMAPS = {
   dark: {
     label: 'Chế độ ban đêm',
     local: 'dark',
-    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    subdomains: ['a', 'b', 'c', 'd'],
-    attr: '© CARTO © OpenStreetMap',
-    maxZoom: 19,
+    url: 'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}&hl=vi&gl=vn',
+    subdomains: ['0', '1', '2', '3'],
+    attr: '© Google Maps',
+    maxZoom: 20,
+    className: 'map-tiles-dark',
   },
 };
 
@@ -128,6 +129,7 @@ export function BaseLayer({ basemap }) {
         subdomains={b.subdomains || ['0', '1', '2', '3']}
         attribution={b.attr}
         maxZoom={b.maxZoom || 20}
+        className={b.className}
       />
       {b.labels && <TileLayer key={`${key}-labels`} url={b.labels} maxZoom={b.maxZoom || 19} zIndex={350} />}
     </>
@@ -147,8 +149,18 @@ export function RadarLayer() {
     retry: 0,
   });
   const frame = data?.radar?.past?.at(-1);
-  if (!frame) return null;
-  return <TileLayer url={`${data.host}${frame.path}/256/{z}/{x}/{y}/2/1_1.png`} opacity={0.6} zIndex={400} attribution="Radar © RainViewer" />;
+  if (!frame || !data?.host) return null;
+  return (
+    <TileLayer
+      url={`${data.host}${frame.path}/256/{z}/{x}/{y}/2/1_1.png`}
+      opacity={0.55}
+      zIndex={400}
+      tileSize={256}
+      maxNativeZoom={7}
+      maxZoom={18}
+      attribution="Radar © RainViewer"
+    />
+  );
 }
 
 /** Zoom vừa khít vùng đang lọc + phủ lớp mờ ngoài ranh giới. */

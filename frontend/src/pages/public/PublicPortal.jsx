@@ -120,7 +120,7 @@ function PublicMap({ data, forecast, geo, me, route, target, layers, basemap = '
       )}
       {layers.hazard && data?.hazard_zones.map((z, i) => (
         <GeoJSON key={`z${i}-${z.name}`} data={z.geom}
-          style={{ color: z.type === 'ngap' ? '#1d4ed8' : LEVEL[z.level].color, weight: 1.5, fillColor: z.type === 'ngap' ? '#2563eb' : LEVEL[z.level].color, fillOpacity: 0.3 }}>
+          style={{ color: z.type === 'ngap' ? '#1d4ed8' : (LEVEL[z.level]?.color || '#ef4444'), weight: 1.5, fillColor: z.type === 'ngap' ? '#2563eb' : (LEVEL[z.level]?.color || '#ef4444'), fillOpacity: 0.3 }}>
           <Tooltip sticky>{z.name}</Tooltip>
         </GeoJSON>
       ))}

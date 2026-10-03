@@ -16,7 +16,7 @@ function Tip({ active, payload }) {
       <div className="mt-1">Mưa tích lũy 72h: <b className="font-mono">{p.rain_72h} mm</b></div>
       <div>Cường độ hiện tại: <b className="font-mono">{p.intensity} mm/h</b></div>
       {p.tilt_nearby != null && <div>Độ nghiêng cảm biến gần nhất: <b className="font-mono">{p.tilt_nearby}°</b></div>}
-      <div className="mt-1"><span className={`chip ${LEVEL[p.risk].cls}`}>Nguy cơ {LEVEL[p.risk].label}</span></div>
+      <div className="mt-1"><span className={`chip ${LEVEL[p.risk]?.cls || 'bg-panel2'}`}>Nguy cơ {LEVEL[p.risk]?.label || p.risk || 'Theo dõi'}</span></div>
     </div>
   );
 }

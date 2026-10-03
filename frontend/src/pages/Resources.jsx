@@ -33,8 +33,8 @@ function QuickDispatch({ force, onClose }) {
       <div className="flex flex-col gap-1.5">
         {open.map((t) => (
           <button key={t.id} className="card flex items-center gap-2 p-2 text-left hover:border-accent" onClick={() => setTicket(t)}>
-            <span className={clsx('chip', PRIORITY[t.priority].cls)}>{PRIORITY[t.priority].short}</span>
-            <span className="text-sm"><b>{t.code}</b> · {INCIDENT[t.incident_type]} · {t.address || t.admin_name}</span>
+            <span className={clsx('chip', PRIORITY[t.priority]?.cls || 'bg-panel2')}>{PRIORITY[t.priority]?.short || `Cấp ${t.priority}`}</span>
+            <span className="text-sm"><b>{t.code}</b> · {INCIDENT[t.incident_type] || t.incident_type} · {t.address || t.admin_name}</span>
           </button>
         ))}
         {!open.length && <Empty>Không có điểm nóng đang chờ điều phối</Empty>}

@@ -102,15 +102,15 @@ function WarehousePopup({ p, onIssue }) {
 }
 
 function SosPopup({ p, onDispatch }) {
-  const pr = PRIORITY[p.priority];
+  const pr = PRIORITY[p.priority] || PRIORITY[2];
   return (
     <div className="w-72">
       <div className="flex items-center gap-2">
         <b>{p.code}</b>
-        <span className={clsx('chip', pr.cls)}>{pr.short}</span>
-        <span className="chip bg-panel2">{SOS_STATUS[p.status]}</span>
+        <span className={clsx('chip', pr?.cls)}>{pr?.short}</span>
+        <span className="chip bg-panel2">{SOS_STATUS[p.status] || p.status}</span>
       </div>
-      <div className="mt-1 text-sm font-medium">{INCIDENT[p.incident_type]} · {p.trapped_count} người</div>
+      <div className="mt-1 text-sm font-medium">{INCIDENT[p.incident_type] || p.incident_type} · {p.trapped_count} người</div>
       <div className="text-xs text-muted">{p.address} · {SOURCE[p.source]} · {ago(p.received_at)}</div>
       {p.raw_message && <p className="mt-1 text-xs italic">“{p.raw_message}”</p>}
       {p.status !== 'thuc_thi' && (
@@ -173,16 +173,16 @@ export default function MapLayers({ data, layers, timeline, onDispatch, onCamera
               key={`${p.id}-${floodFactor}-${theme}`}
               data={f}
               style={{
-                color: flood ? '#1d4ed8' : LEVEL[p.level].color,
+                color: flood ? '#1d4ed8' : (LEVEL[p.level]?.color || '#ef4444'),
                 weight: flood ? 1 : 2,
-                fillColor: flood ? '#2563eb' : LEVEL[p.level].color,
+                fillColor: flood ? '#2563eb' : (LEVEL[p.level]?.color || '#ef4444'),
                 fillOpacity: depthOpacity,
                 dashArray: p.source === 'sensor' ? '5 4' : undefined,
               }}
             >
               <Popup>
                 <b>{p.name}</b>
-                <div className="text-xs text-muted">{flood ? `Độ sâu ngập ~${p.depth_m} m` : `Nguy cơ ${LEVEL[p.level].label}`} · nguồn: {p.source === 'sensor' ? 'cảm biến IoT (tự động)' : p.source === 'model' ? 'mô hình nội suy DEM' : 'thủ công'}</div>
+                <div className="text-xs text-muted">{flood ? `Độ sâu ngập ~${p.depth_m} m` : `Nguy cơ ${LEVEL[p.level]?.label || p.level || 'Cảnh báo'}`} · nguồn: {p.source === 'sensor' ? 'cảm biến IoT (tự động)' : p.source === 'model' ? 'mô hình nội suy DEM' : 'thủ công'}</div>
                 <div className="text-xs">Hiệu lực đến {new Date(p.valid_until).toLocaleString('vi-VN')}</div>
               </Popup>
             </GeoJSON>
