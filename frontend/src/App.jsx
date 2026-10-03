@@ -8,6 +8,7 @@ import { useSocket } from './api/useSocket';
 import { api } from './api/client';
 import { useStore } from './app/store';
 import { usePermission } from './rbac/usePermission';
+import { watchAudioUnlock } from './utils/audio';
 import { ForgotPassword, ResetPassword } from './pages/AccountPages'; // nhỏ, UserMenu cũng dùng → import tĩnh
 // Mỗi trang một chunk tải khi cần: người dân mở cổng công khai không phải tải giao diện điều hành
 const Login = lazy(() => import('./pages/Login'));
@@ -45,6 +46,8 @@ function NoAccess() {
 function Shell() {
   useSocket();
   const { setAuth, auth } = useStore();
+  // Chuông SOS: mở khoá âm thanh ở lần bấm / gõ phím đầu tiên (trình duyệt chặn tới lúc đó)
+  useEffect(() => (useStore.getState().audioReady ? undefined : watchAudioUnlock(useStore.getState().setAudioReady)), []);
   const qc = useQueryClient();
 
   // Làm mới quyền khi tải lại trang (quyền có thể đã đổi từ phiên trước)

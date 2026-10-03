@@ -837,7 +837,9 @@ export default function PublicPortal() {
               const R = RISK[here.risk] || RISK.thap;
               const RIcon = R.icon;
               return (
-                <div className="grid gap-4 md:grid-cols-[1.1fr_1.3fr] items-start">
+                // [&>*]:min-w-0: cột co được — tên điểm sơ tán dài + số điện thoại + "Chỉ đường" từng đẩy khung rộng 456 px trên
+                // màn 412 px → trang bị thu nhỏ, khối cảnh báo đè lên nút "Chỉ đường" (không bấm được trên điện thoại)
+                <div className="grid gap-4 md:grid-cols-[1.1fr_1.3fr] items-start [&>*]:min-w-0">
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className={clsx('chip px-3 py-1 text-xs font-bold', R.cls)}>
@@ -907,16 +909,16 @@ export default function PublicPortal() {
 
                     <div className="space-y-2">
                       {here.evacuation_sites.map((s) => (
-                        <div key={s.id} className="flex items-center justify-between gap-3 rounded-xl border border-line bg-panel p-3 shadow-sm hover:border-good transition-colors">
-                          <div className="min-w-0 flex-1">
+                        <div key={s.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-xl border border-line bg-panel p-3 shadow-sm hover:border-good transition-colors">
+                          <div className="min-w-0 grow basis-48">
                             <div className="font-semibold text-sm text-ink truncate">{s.name}</div>
-                            <div className="text-xs text-muted flex items-center gap-2 mt-0.5">
+                            <div className="text-xs text-muted flex flex-wrap items-center gap-x-2 mt-0.5">
                               <span>Khoảng cách: <b className="font-mono text-ink">{s.distance_km} km</b></span>
                               <span>·</span>
                               <span>Còn <b className="text-good font-mono">{s.capacity - s.current_occupancy}</b>/{s.capacity} chỗ</span>
                             </div>
                           </div>
-                          <div className="flex items-center gap-1.5 shrink-0">
+                          <div className="flex items-center gap-1.5 shrink-0 ml-auto">
                             {s.hotline && (
                               <a
                                 href={`tel:${s.hotline.replace(/\s+/g, '')}`}

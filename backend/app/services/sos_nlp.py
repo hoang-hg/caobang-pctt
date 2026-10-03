@@ -62,7 +62,20 @@ NUM_WORDS_VI = {
 NUM_WORDS_ASCII = {"mot": 1, "hai": 2, "ba": 3, "bon": 4, "nam": 5, "bay": 7, "tam": 8, "chin": 9, "muoi": 10}
 
 COORD_RE = re.compile(r"(2[23]\.\d{3,})\s*[,; ]\s*(10[56]\.\d{3,})")
-PEOPLE_RE = re.compile(r"(\d{1,3})\s*(nguoi|nhan khau|ho|chau|em|cu)\b")
+# Số người: "N người" / "N nhân khẩu" đứng một mình là TỔNG; "N cụ già", "N trẻ em", "N người bị thương"… là NHÓM — cộng
+# các nhóm ("2 cụ già và 1 trẻ em" = 3; trước đây lấy số lớn nhất = 2), lấy tổng nếu tin có ghi tổng lớn hơn ("4 người,
+# trong đó 2 trẻ em" = 4). "N hộ" quy ra ~4 người / hộ.
+TOTAL_RE = re.compile(r"(\d{1,3})\s*(?:nguoi|nhan khau)\b(?!\s*(?:gia|cao tuoi|lon|bi thuong|thuong))")
+GROUP_RE = re.compile(
+    r"(\d{1,3})\s*(?:nguoi gia|nguoi cao tuoi|nguoi lon|nguoi bi thuong|nguoi thuong|cu gia|cu ong|cu ba|cu"
+    r"|chau nho|chau|em be|em nho|em|tre em|tre nho|tre|ba bau|thai phu|phu nu)\b"
+)
+HOUSEHOLD_RE = re.compile(r"(\d{1,3})\s*ho\b")
+# Mắc kẹt trên mái / nước tới mái: nguy hiểm tính mạng tức thì → Cấp 1 (SOP, README 7.1) — trước đây chỉ khi ≥ 4 người,
+# và "ngập đến mái" (không có chữ "nhà") không nhận ra. So trên chữ CÒN DẤU: bỏ dấu thì "mưa đến mai" (ngày mai) = "đến
+# mái"; tin gõ không dấu chỉ nhận cụm không mơ hồ.
+ROOF_VI_RE = re.compile(r"(?<!thoải )\bmái\b|nóc nhà")
+ROOF_ASCII = ("mai nha", "tren mai", "len mai", "noc nha")
 WORD_PEOPLE_VI_RE = re.compile(r"(?<!\w)(" + "|".join(NUM_WORDS_VI) + r")\s+(người|hộ)(?!\w)")
 WORD_PEOPLE_ASCII_RE = re.compile(r"\b(" + "|".join(NUM_WORDS_ASCII) + r")\s+nguoi\b")
 
@@ -78,17 +91,14 @@ def parse_rules(text: str, gazetteer: list[dict]) -> dict:
 
     vulnerable = [code for code, kws in VULNERABLE_KEYWORDS.items() if any(k in t for k in kws)]
 
-    trapped = 0
-    households = False
-    for m in PEOPLE_RE.finditer(t):
-        n = int(m.group(1))
-        if m.group(2) == "ho":
-            households = True
-            n *= 4  # quy đổi hộ → nhân khẩu (bình quân ~4 người/hộ)
-        trapped = max(trapped, n)
+    # Một số bàn phím gửi chữ tổ hợp (NFD) → đưa về dạng dựng sẵn (NFC) trước khi so chữ còn dấu
+    low = unicodedata.normalize("NFC", text).lower()
+    total = max((int(m.group(1)) for m in TOTAL_RE.finditer(t)), default=0)
+    groups = sum(int(m.group(1)) for m in GROUP_RE.finditer(t))
+    by_household = max((int(m.group(1)) * 4 for m in HOUSEHOLD_RE.finditer(t)), default=0)  # ~4 người / hộ
+    trapped = max(total, groups, by_household)
+    households = by_household > 0 and by_household >= max(total, groups)
     if trapped == 0:
-        # Một số bàn phím gửi chữ tổ hợp (NFD) → đưa về dạng dựng sẵn (NFC) trước khi so
-        low = unicodedata.normalize("NFC", text).lower()
         if m := WORD_PEOPLE_VI_RE.search(low):
             households = m.group(2) == "hộ"
             trapped = NUM_WORDS_VI[m.group(1)] * (4 if households else 1)
@@ -112,10 +122,10 @@ def parse_rules(text: str, gazetteer: list[dict]) -> dict:
         priority = 1
     elif incident == "sat_lo" and ("vui" in t or "mac ket" in t or "thuong" in t):
         priority = 1
+    elif (ROOF_VI_RE.search(low) or any(k in t for k in ROOF_ASCII)) and (trapped > 0 or "mac ket" in t):
+        priority = 1
     elif incident == "tiep_te":
         priority = 3
-    elif "mai nha" in t or "mac ket" in t or "cuu voi" in t or vulnerable:
-        priority = 1 if trapped >= 4 and "mai nha" in t else 2
     else:
         priority = 2
 

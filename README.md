@@ -689,7 +689,13 @@ sequenceDiagram
 ```
 
 1. **Tiếp nhận**: cổng công khai (phản ánh chuyển SOS), hotline, cán bộ nhập, cảm biến (`SENSOR`), webhook (khi bật).
-   Bộ luật bóc tách địa danh xã/thôn, số người mắc kẹt, nhóm yếu thế (trẻ em, người cao tuổi, phụ nữ mang thai).
+   Bộ luật bóc tách địa danh xã/thôn, số người mắc kẹt, nhóm yếu thế (trẻ em, người cao tuổi, phụ nữ mang thai). Số người
+   **cộng theo nhóm** ("2 cụ già và 1 trẻ em" = 3; tin ghi tổng thì lấy tổng: "4 người, trong đó 2 trẻ em" = 4); "mắc kẹt
+   trên mái / nước tới mái" → **Cấp 1**. Kết quả bóc tách ở khung **Tiếp nhận đa kênh** **sửa được** (loại, mức ưu tiên,
+   số người, nhóm yếu thế) trước khi tạo phiếu; phiếu đã tạo sửa bằng nút bút chì trên thẻ (gọi lại / đội báo thêm thông
+   tin — ghi nhật ký). Cán bộ xã nhận tin ở xã khác: hệ thống nêu vị trí thuộc xã nào, báo trực ban tỉnh tạo phiếu.
+   **Chuông SOS**: trình duyệt chặn âm thanh tới lần bấm đầu tiên trên trang — màn hình trực ban mở lại (F5, tự khởi động)
+   mà chưa ai bấm thì thanh trên hiện **"Bấm để bật chuông SOS"**; bấm vào trang một lần là chuông kêu được.
 2. **Phân cấp & SLA**: **Cấp 1** nguy hiểm tính mạng tức thì (vùi lấp, lũ cuốn, mắc kẹt trên mái) — phản hồi < 3 phút;
    **Cấp 2** nước dâng, cô lập, có người già / trẻ nhỏ — < 15 phút; **Cấp 3** ngập cục bộ, thiếu lương thực — < 60 phút.
 3. **Khớp lực lượng & lộ trình**: lọc đơn vị ứng trực gần nhất (dân quân, quân đội, công an PCCC & CNCH), cảnh báo nếu

@@ -83,12 +83,15 @@ async function step(ctx, name, fn) {
   }
 }
 
-/** Độ tràn ngang (px) của trang và của vùng nội dung <main> — khác 0 trên điện thoại = phải kéo ngang mới đọc hết. */
+/** Độ tràn ngang (px) của trang và của vùng nội dung <main> — khác 0 trên điện thoại = phải kéo ngang mới đọc hết.
+ * Chrome điện thoại gặp nội dung rộng hơn màn hình thì THU NHỎ trang (innerWidth > screen.width) — khi đó
+ * scrollWidth − innerWidth vẫn là 0, phải so thêm innerWidth với bề rộng màn hình (lỗi "Tôi đang ở đâu?" 10/2026). */
 const overflowX = (page) => page.evaluate(() => {
   const main = document.querySelector('main');
   return Math.max(
     document.documentElement.scrollWidth - window.innerWidth,
     main ? main.scrollWidth - main.clientWidth : 0,
+    window.innerWidth - screen.width,
   );
 });
 
@@ -142,6 +145,17 @@ async function publicPortal(ctx) {
     }
     await visible(page.getByRole('button', { name: 'Bản đồ & Cảnh báo' })).click();
     return `${PUBLIC_TABS.length} tab`;
+  });
+
+  await step(ctx, '"Tôi đang ở đâu?": kết quả theo vị trí, chỉ đường tới điểm sơ tán (điện thoại không tràn ngang)', async () => {
+    await page.goto(`${ROOT}/cong-khai`);
+    await page.getByRole('button', { name: /Tôi đang ở đâu/ }).first().click();
+    const go = page.getByRole('button', { name: 'Chỉ đường', exact: true }).first();
+    await go.waitFor({ timeout: 20_000 });
+    await expectNoOverflow(ctx, '"Tôi đang ở đâu?"');
+    await go.click(); // trước đây trên điện thoại khối cảnh báo đè lên nút → không bấm được
+    await page.getByText(/Lộ trình sơ tán|Tuyến sơ tán|chim bay/).first().waitFor({ timeout: 20_000 });
+    return 'chỉ đường được';
   });
 
   if (!READONLY) {
