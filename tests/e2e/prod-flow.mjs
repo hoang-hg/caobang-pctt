@@ -336,6 +336,8 @@ if (force) {
   check('Đội báo đã đến hiện trường → lệnh "đã đến", ghi giờ đến', arrived.status === 200 && arrived.data?.dispatch_status === 'da_den'
     && !!arrived.data?.arrived_at, `HTTP ${arrived.status}`);
   check('Báo "đã đến" lần hai → 409', (await call('POST', `/dispatch/${disp.data?.order?.id}/arrived`, null, admin)).status === 409);
+  check('Phiếu đang có đội thực hiện không kéo về "Chờ xử lý" (409 — phải huỷ lệnh trước)',
+    (await call('PATCH', `/sos/${ticket.id}`, { status: 'moi' }, admin)).status === 409);
   const rescued = await call('POST', '/mission/report', { kind: 'rescued', people_safe: 3 }, null, asTeam(teamToken));
   const boardRescued = (await call('GET', '/sos', null, admin)).data?.find?.((t) => t.id === ticket.id);
   check('Đội báo "đã cứu an toàn" qua link → phiếu CHƯA đóng, chờ trực ban xác nhận', rescued.status === 200
@@ -361,6 +363,21 @@ check('Mã tra cứu cấp khi gửi (PA-…-XXXXXX) tra được không cần S
   (await call('POST', '/public/track', { code: rep.data.track_code })).data?.total === 1, rep.data?.track_code);
 const resolved = await call('POST', `/sos/${ticket?.id}/resolve`, null, admin);
 check('Xác nhận đã cứu an toàn', resolved.data?.status === 'hoan_thanh', `HTTP ${resolved.status}`);
+// Huỷ lệnh điều động (nhầm lực lượng / đội không tiếp cận được): lực lượng về sẵn sàng, link của đội báo đã huỷ
+const sos2 = await call('POST', '/sos', { lat: 22.67, lon: 106.24, incident_type: 'ngap_lut', priority: 2, trapped_count: 1 }, admin);
+const force2 = (await call('GET', `/sos/${sos2.data?.id}/match`, null, admin)).data?.forces?.[0];
+if (force2) {
+  const d2 = await call('POST', '/dispatch', { ticket_id: sos2.data.id, force_id: force2.id, personnel: 1 }, admin);
+  const token2 = d2.data?.notification?.mission_url?.split('#')[1] || '';
+  const c2 = await call('POST', `/dispatch/${d2.data?.order?.id}/cancel`, { reason: `Kiểm thử huỷ lệnh ${stamp}` }, admin);
+  check('Huỷ lệnh điều động → phiếu về "Đang điều phối", không còn đội', c2.status === 200 && c2.data?.status === 'dieu_phoi'
+    && !c2.data?.dispatch_id, `HTTP ${c2.status} ${c2.data?.status}`);
+  const gone = await call('GET', '/mission', null, null, asTeam(token2));
+  check('Link nhiệm vụ của lệnh đã huỷ → 410 "đã huỷ"', gone.status === 410 && /huỷ/.test(gone.data?.detail || ''), `HTTP ${gone.status}`);
+  await call('PATCH', `/sos/${sos2.data.id}`, { status: 'hoan_thanh' }, admin);
+} else {
+  check('Có lực lượng để thử huỷ lệnh', false);
+}
 const missionClosed = await call('GET', '/mission', null, null, asTeam(teamToken));
 check('Xong nhiệm vụ → link nhiệm vụ đóng (410), không còn SĐT người báo', missionClosed.status === 410
   && !digits(JSON.stringify(missionClosed.data)).includes(digits(PHONE)), `HTTP ${missionClosed.status}`);
@@ -411,6 +428,18 @@ await sleep(6000);
 const again = (await call('GET', '/alerts/broadcasts', null, checker)).data?.find((b) => b.id === br.data?.id);
 check('Không có bộ mô phỏng nào đổi số liệu giao nhận', again?.status === 'sent' && Object.values(again?.metrics || {}).every((m) => m.sent === 0));
 check('Nhật ký pháp lý ghi phê duyệt', ((await call('GET', '/alerts/audit', null, checker)).data || []).some((a) => a.action === 'broadcast.approve'));
+// Thời hạn hiệu lực; gia hạn / kết thúc do lãnh đạo ký PIN — hết nguy hiểm thì thôi hiện cho người dân ngay
+check('Lệnh có hạn hiệu lực (mặc định 48 giờ từ lúc duyệt), lãnh đạo được gia hạn / kết thúc',
+  again?.active === true && !!again?.valid_until && again?.can_manage === true, JSON.stringify({ a: again?.active, v: again?.valid_until }));
+const ext = await call('POST', `/alerts/broadcasts/${br.data?.id}/extend`, { pin: CHECKER_PIN, hours: 12 }, checker);
+check('Gia hạn cảnh báo thêm 12 giờ (ký PIN)', ext.status === 200 && new Date(ext.data?.valid_until) > new Date(again?.valid_until), `HTTP ${ext.status}`);
+const endAlert = await call('POST', `/alerts/broadcasts/${br.data?.id}/end`, { pin: CHECKER_PIN, note: 'Kiểm thử: nước đã rút' }, checker);
+check('Kết thúc cảnh báo (ký PIN)', endAlert.status === 200 && !!endAlert.data?.ended_at && endAlert.data?.active === false, `HTTP ${endAlert.status}`);
+const liteEnded = await until('/ban-nhe', (t) => !t.includes(TITLE), { raw: true });
+check('Cảnh báo đã kết thúc thôi hiện trên bản nhẹ (≤ 15 giây)', !liteEnded.includes(TITLE));
+const pubEnded = await until('/public/alerts', (d) => d.find?.((x) => x.title === TITLE)?.active === false);
+check('Danh sách cảnh báo công khai ghi "đã kết thúc"', pubEnded.find?.((x) => x.title === TITLE)?.active === false
+  && !!pubEnded.find((x) => x.title === TITLE)?.ended_at);
 
 // ================================================================ 9. Thiết bị IoT gửi số đo
 const DEV = `PROD-WL-${stamp}`.toUpperCase();

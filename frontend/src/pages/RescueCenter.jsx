@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import {
   Bot, CheckCircle2, Clock, MapPin, Phone, Send, Sparkles, Timer, Inbox, Loader2, Navigation, Home,
-  Search, LifeBuoy, Link2
+  Search, LifeBuoy, Link2, Ban
 } from 'lucide-react';
 import { api } from '../api/client';
 import { useAreaQuery, useUnits } from '../api/hooks';
@@ -13,6 +13,7 @@ import { Empty, Modal, Progress, Section } from '../components/common/ui';
 import DispatchModal from '../components/common/DispatchModal';
 import OccupancyModal from '../components/common/OccupancyModal';
 import { MissionLinkModal } from '../components/common/MissionLink';
+import CancelDispatchModal from '../components/common/CancelDispatchModal';
 import { Can, useAllowedCodes, usePermission } from '../rbac/usePermission';
 import { INCIDENT, PRIORITY, SOURCE, VULNERABLE } from '../utils/labels';
 import { int, pct, time } from '../utils/format';
@@ -40,7 +41,7 @@ const mmss = (sec) => {
   return h ? `${h}h${String(m).padStart(2, '0')}` : `${m}:${String(s % 60).padStart(2, '0')}`;
 };
 
-function TicketCard({ t, now, onDispatch, onResolve, onFocus, onArrived, onLink }) {
+function TicketCard({ t, now, onDispatch, onResolve, onFocus, onArrived, onLink, onCancel }) {
   const canUpdate = usePermission('sos', 'update', t.admin_code);
   const pr = PRIORITY[t.priority] || PRIORITY[2];
   const waitingSec = (now - new Date(t.received_at).getTime()) / 1000;
@@ -188,6 +189,9 @@ function TicketCard({ t, now, onDispatch, onResolve, onFocus, onArrived, onLink 
           <Can I="dispatch" a="create" scope={t.admin_code}>
             <button className="btn-ghost px-2 py-1 text-xs" onClick={() => onLink(t)} title="Cấp lại link nhiệm vụ cho trưởng nhóm">
               <Link2 size={12} /> Link
+            </button>
+            <button className="btn-ghost px-2 py-1 text-xs text-danger" onClick={() => onCancel(t)} title="Huỷ lệnh điều động (nhầm lực lượng, đội không tiếp cận được…)">
+              <Ban size={12} /> Huỷ lệnh
             </button>
           </Can>
         )}
@@ -492,6 +496,7 @@ export default function RescueCenter() {
   const { data: tickets = [] } = useAreaQuery('sos', '/sos', {}, { refetchInterval: 20_000 });
   const [dispatch, setDispatch] = useState(null);
   const [linkFor, setLinkFor] = useState(null);
+  const [cancelFor, setCancelFor] = useState(null);
   const [over, setOver] = useState(null);
   const [filterText, setFilterText] = useState('');
 
@@ -608,6 +613,7 @@ export default function RescueCenter() {
                       onFocus={onFocus}
                       onArrived={onArrived}
                       onLink={setLinkFor}
+                      onCancel={setCancelFor}
                     />
                   ))}
                 {!counts[col.key] && (
@@ -630,6 +636,7 @@ export default function RescueCenter() {
 
       {dispatch && <DispatchModal ticket={dispatch} onClose={() => setDispatch(null)} />}
       {linkFor && <MissionLinkModal ticket={linkFor} onClose={() => setLinkFor(null)} />}
+      {cancelFor && <CancelDispatchModal ticket={cancelFor} onClose={() => setCancelFor(null)} />}
     </div>
   );
 }

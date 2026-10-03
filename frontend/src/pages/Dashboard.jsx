@@ -5,7 +5,7 @@ import {
   CloudRain, Waves, Home, Siren, Users, Ship, FileDown, Loader2, MapPin, X, ArrowUpRight,
   Droplets, Mountain, LayoutDashboard
 } from 'lucide-react';
-import { useAreaQuery } from '../api/hooks';
+import { useAreaQuery, useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
 import { KpiCard, Progress, Section } from '../components/common/ui';
 import EventLog from '../components/common/EventLog';
@@ -15,7 +15,7 @@ import LandslideScatter from '../components/charts/LandslideScatter';
 import SuppliesChart from '../components/charts/SuppliesChart';
 import AreaForecastChart from '../components/charts/AreaForecastChart';
 import ForecastBulletinModal from '../components/charts/ForecastBulletinModal';
-import { usePermission } from '../rbac/usePermission';
+import { useAllowedCodes, usePermission } from '../rbac/usePermission';
 import { ALARM, alarmLevel } from '../utils/labels';
 import { int, num, pct } from '../utils/format';
 import { exportSnapshotPdf } from '../utils/exportPdf';
@@ -53,8 +53,13 @@ export default function Dashboard() {
   const { data: k } = useAreaQuery('kpis', '/dashboard/kpis', {}, { refetchInterval: 30_000 });
   const { data: stations = [] } = useAreaQuery('stations', '/stations', { type: 'muc_nuoc' });
   const { filter, clearFilter } = useStore();
-  const filterLabel = filter.label;
   const isFiltered = filter.codes.length > 0;
+  // Tài khoản xã chưa chọn lọc: số liệu là của phạm vi được giao — tiêu đề không ghi "Toàn tỉnh"
+  const scope = useAllowedCodes('monitoring', 'view');
+  const { data: units = [] } = useUnits();
+  const scopeUnit = scope?.length === 1 ? units.find((u) => u.code === scope[0]) : null;
+  const scopeLabel = scopeUnit ? `${scopeUnit.unit_type === 'phuong' ? 'Phường' : 'Xã'} ${scopeUnit.name}` : `${scope?.length || 0} xã/phường được giao`;
+  const filterLabel = isFiltered || scope === null ? filter.label : scopeLabel;
   const [stationId, setStationId] = useState('CB-WL-01');
   const [activeMode, setActiveMode] = useState('tong_hop'); // tong_hop | hochua | satlo
   const [exporting, setExporting] = useState(false);
@@ -279,7 +284,7 @@ export default function Dashboard() {
               unit="mm"
               icon={CloudRain}
               tone={k?.rain?.max_24h > 150 ? 'serious' : undefined}
-              sub={<>Cực đại: <b className="font-mono text-ink">{num(k?.rain?.max_24h, 1)} mm</b> ({k?.rain?.max_station?.replace('Trạm đo mưa ', '')})</>}
+              sub={<>Cực đại: <b className="font-mono text-ink">{num(k?.rain?.max_24h, 1)} mm</b>{k?.rain?.max_station && ` (${k.rain.max_station.replace('Trạm đo mưa ', '')})`}</>}
             />
 
             <div className="col-span-2 md:col-span-1 2xl:col-span-2">

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
@@ -9,7 +9,7 @@ import { useStore } from '../app/store';
 import { Empty, Modal, Tabs } from '../components/common/ui';
 import { usePermission } from '../rbac/usePermission';
 import { ago, dateTime } from '../utils/format';
-import { INCIDENT } from '../utils/labels';
+import { INCIDENT, VULNERABLE } from '../utils/labels';
 
 const STATUS = {
   cho_duyet: { label: 'Chờ duyệt', cls: 'bg-warn text-black' },
@@ -25,7 +25,24 @@ function ActionModal({ report, action, onClose }) {
   const [reason, setReason] = useState('');
   const [incident, setIncident] = useState(report.category === 'sat_lo' ? 'sat_lo' : report.category === 'lu_quet' ? 'lu_quet' : 'ngap_lut');
   const [priority, setPriority] = useState(report.category === 'mac_ket' ? 1 : 2);
-  const [trapped, setTrapped] = useState(0);
+  const [trapped, setTrapped] = useState(''); // trống = máy chủ bóc tách từ nội dung người dân gửi
+  const [parsed, setParsed] = useState(null);
+  // Chuyển SOS: điền sẵn số người / mức ưu tiên / loại sự cố từ nội dung người dân viết ("3 người già mắc kẹt") —
+  // trước đây mặc định 0 người → phiếu "0 người", gợi ý lực lượng theo 0 người
+  useEffect(() => {
+    if (action !== 'sos' || !report.description) return undefined;
+    let alive = true;
+    api('/sos/parse', { method: 'POST', body: { text: report.description } })
+      .then((p) => {
+        if (!alive) return;
+        setParsed(p);
+        if (p.trapped_count != null) setTrapped(String(p.trapped_count));
+        if (report.category !== 'mac_ket' && p.priority) setPriority(p.priority);
+        if (!['sat_lo', 'lu_quet', 'ngap'].includes(report.category) && p.incident_type) setIncident(p.incident_type);
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [action, report.description, report.category]);
   const [busy, setBusy] = useState(false); // bấm đúp “Chuyển thành SOS” → 2 phiếu
   // Phần công khai: nội dung gợi ý đã che SĐT / email / số giấy tờ; vị trí mặc định làm tròn; ảnh mặc định công khai
   const publishing = action === 'approve' || action === 'resolve' || action === 'edit_public';
@@ -44,7 +61,10 @@ function ActionModal({ report, action, onClose }) {
     setBusy(true);
     try {
       if (action === 'sos') {
-        const r = await api(`/reports/${report.id}/to-sos`, { method: 'POST', body: { incident_type: incident, priority, trapped_count: Number(trapped) } });
+        const r = await api(`/reports/${report.id}/to-sos`, {
+          method: 'POST',
+          body: { incident_type: incident, priority, trapped_count: trapped === '' ? null : Number(trapped) },
+        });
         toast({ tone: 'good', title: `Đã tạo phiếu ${r.sos_code}`, body: 'Theo dõi tại Điều hành cứu hộ' });
         if (r.possible_duplicates?.length) {
           toast({ tone: 'warn', title: `${r.sos_code} có thể trùng với ${r.possible_duplicates.join(', ')}`, body: 'Kiểm tra trước khi điều động — tránh điều 2 đội tới cùng một nơi.', duration: 12000 });
@@ -170,14 +190,21 @@ function ActionModal({ report, action, onClose }) {
             </label>
             <label>
               <span className="text-xs text-muted">Số người mắc kẹt</span>
-              <input className="input mt-1" type="number" min={0} value={trapped} onChange={(e) => setTrapped(e.target.value)} />
+              <input className="input mt-1" type="number" min={0} value={trapped} placeholder="theo nội dung" onChange={(e) => setTrapped(e.target.value)} />
             </label>
           </div>
+        )}
+        {action === 'sos' && parsed && (parsed.trapped_count != null || parsed.vulnerable?.length > 0) && (
+          <p className="text-xs text-muted">
+            Bóc tách từ nội dung người dân gửi:{parsed.trapped_count != null && <> <b>{parsed.trapped_count} người</b></>}
+            {parsed.vulnerable?.length > 0 && <> · {parsed.vulnerable.map((v) => VULNERABLE[v] || v).join(', ')}</>} — kiểm tra lại
+            trước khi tạo phiếu. Nội dung người dân gửi trở thành tin gốc của phiếu (đội hiện trường xem được).
+          </p>
         )}
 
         {action === 'sos' && report.status === 'cho_duyet' && (
           <p className="text-xs text-muted">
-            Cổng công khai chỉ hiện loại phản ánh, vị trí làm tròn (~150 m) và &quot;đã chuyển lực lượng cứu hộ xử lý&quot; —
+            Cổng công khai chỉ hiện loại phản ánh, vị trí làm tròn (~150 m) và &quot;đã chuyển thành yêu cầu cứu hộ&quot; —
             không công khai nội dung, ảnh người dân gửi. Đọc lại rồi dùng <b>Sửa phần công khai</b> nếu muốn công khai thêm.
           </p>
         )}
@@ -187,15 +214,17 @@ function ActionModal({ report, action, onClose }) {
 }
 
 function ReportCard({ r, onAction, onPhoto }) {
+  const urgent = r.category === 'mac_ket' && r.status === 'cho_duyet'; // có người mắc kẹt, chưa xử lý
   const navigate = useNavigate();
   const setFocus = useStore((s) => s.setFocus);
   const canModerate = usePermission('report', 'moderate', r.admin_code);
   const st = STATUS[r.status];
 
   return (
-    <div className={clsx('card flex flex-col gap-2.5 p-3.5 shadow-sm hover:shadow-md transition-all', r.status === 'cho_duyet' && 'border-warn/70')}>
+    <div className={clsx('card flex flex-col gap-2.5 p-3.5 shadow-sm hover:shadow-md transition-all', r.status === 'cho_duyet' && (urgent ? 'border-danger ring-1 ring-danger/40' : 'border-warn/70'))}>
       <div className="flex items-center gap-2">
         <b className="font-bold text-sm text-ink">{r.code}</b>
+        {urgent && <span className="chip bg-danger text-white text-[10px] font-bold">KHẨN</span>}
         <span className={clsx('chip text-[10px] font-bold', st.cls)}>{st.label}</span>
         <span className="chip bg-panel2 text-[10px]">{r.category_label}</span>
         <span className="ml-auto text-xs text-muted" title={dateTime(r.created_at)}>{ago(r.created_at)}</span>

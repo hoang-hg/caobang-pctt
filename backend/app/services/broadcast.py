@@ -10,6 +10,22 @@ import random
 
 from app.db import fetch_one
 
+ALERT_VALID_HOURS = (6, 12, 24, 48, 72)  # lựa chọn thời hạn hiệu lực khi soạn (API nhận 1–168 giờ)
+
+
+def valid_until_sql(alias: str = "") -> str:
+    """Hết hiệu lực lúc: valid_until (đặt khi duyệt, gia hạn được); lệnh cũ / dữ liệu mẫu chưa có thì lúc phát + hạn."""
+    a = f"{alias}." if alias else ""
+    return f"COALESCE({a}valid_until, COALESCE({a}sent_at, {a}approved_at) + make_interval(hours => {a}valid_hours))"
+
+
+def active_alert_sql(alias: str = "") -> str:
+    """Điều kiện SQL "cảnh báo đang hiệu lực" — dùng chung cổng công khai, "Tôi đang ở đâu?", bản nhẹ, màn hình cảnh
+    báo: đã duyệt phát, chưa bị kết thúc, chưa quá hạn hiệu lực."""
+    a = f"{alias}." if alias else ""
+    return f"{a}status IN ('sending', 'sent') AND {a}ended_at IS NULL AND {valid_until_sql(alias)} > now()"
+
+
 CHANNELS = {
     "SMS": "SMS Brandname",
     "CELL_BROADCAST": "Cell Broadcast (theo trạm BTS)",

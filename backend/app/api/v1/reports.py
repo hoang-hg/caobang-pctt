@@ -22,6 +22,7 @@ from app.rbac import scope_loaders
 from app.rbac.authz import area_scope, require_permission
 from app.services.reports import (
     CATEGORY,
+    REPORT_SOS_NOTE,
     redact_public_text,
     signed_photo_url,
     verify_photo_signature,
@@ -197,7 +198,9 @@ async def moderate(
 class ToSosIn(BaseModel):
     incident_type: Literal["ngap_lut", "sat_lo", "lu_quet", "sap_nha", "cap_cuu", "tiep_te"] = "ngap_lut"
     priority: int = Field(2, ge=1, le=3)
-    trapped_count: int = Field(0, ge=0, le=10000)
+    # Trống = bóc tách từ nội dung người dân gửi ("3 người già mắc kẹt" → 3); trước đây mặc định 0 → phiếu "0 người",
+    # gợi ý lực lượng theo 0 người
+    trapped_count: int | None = Field(None, ge=0, le=10000)
 
 
 CATEGORY_TO_INCIDENT = {"ngap": "ngap_lut", "sat_lo": "sat_lo", "lu_quet": "lu_quet", "mac_ket": "ngap_lut"}
@@ -220,8 +223,10 @@ async def to_sos(
         r = await fetch_one(REPORT_SELECT + " WHERE r.id = CAST(:id AS uuid)", {"id": report_id}, conn)
         if r["sos_ticket_id"]:
             raise HTTPException(409, f"Đã chuyển thành phiếu {r['sos_code']}")
+        # Nội dung người dân gửi là tin gốc của phiếu: thẻ phiếu, link nhiệm vụ của đội hiện trường đều thấy (trước đây chỉ
+        # nằm trong ghi chú nội bộ — đội không biết tình hình); bóc tách thêm số người, nhóm yếu thế
         ticket = await create_ticket(
-            raw_message=None,
+            raw_message=r["description"],
             source="APP",
             reporter_name=r["reporter_name"],
             reporter_phone=r["reporter_phone"],
@@ -231,7 +236,7 @@ async def to_sos(
             priority=body.priority,
             trapped_count=body.trapped_count,
             address=r["address"] or r["admin_name"],
-            notes=f"Từ phản ánh người dân {r['code']}: {r['description'][:300]}",
+            notes=f"Từ phản ánh người dân {r['code']}",
             conn=conn,  # cùng transaction với việc gắn phiếu vào phản ánh → lỗi giữa chừng không để lại phiếu mồ côi
         )
         # Chuyển SOS cũng công khai phản ánh (người dân thấy đã có lực lượng xử lý). Phản ánh CHƯA duyệt: chỉ câu chung theo
@@ -241,17 +246,18 @@ async def to_sos(
         await execute(
             f"""UPDATE community.citizen_reports SET sos_ticket_id = CAST(:t AS uuid), moderated_by = :u, moderated_at = now(),
                       status = CASE WHEN status = 'cho_duyet' THEN 'da_duyet' ELSE status END, {PUBLIC_FIELDS_SQL}
-                      public_note = COALESCE(public_note, 'Đã chuyển lực lượng cứu hộ xử lý')
+                      public_note = COALESCE(public_note, :sos_note)
                 WHERE id = CAST(:id AS uuid)""",
             {
                 "t": str(ticket["id"]),
                 "u": user["id"],
                 "id": report_id,
+                "sos_note": REPORT_SOS_NOTE,
                 **_public_params(None, sos_public_text(r["category"]), photos=None if reviewed else False),
             },
             conn,
         )
-    await announce_ticket(ticket, "APP")  # sau khi commit
+    await announce_ticket(ticket, f"phản ánh người dân {r['code']}")  # sau khi commit
     await audit(user, "report.to_sos", "citizen_report", r["code"], {"sos": ticket["code"]})
     await invalidate("public:")
     return {

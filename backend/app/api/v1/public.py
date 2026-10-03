@@ -22,6 +22,7 @@ from app.db import fetch_all, fetch_one
 from app.infra import ratelimit
 from app.infra.cache import cached, cached_view
 from app.services import lite, map_ops
+from app.services.broadcast import active_alert_sql, valid_until_sql
 from app.services.data_import.engine import xom_sort_key
 from app.services.landslides import get_landslides_overview
 from app.services.lite import NATIONAL_HOTLINES, RISK_ADVICE, province_hotlines
@@ -88,8 +89,8 @@ async def overview():
                  FROM resources.evacuation_sites"""
         )
         alerts = await fetch_one(
-            """SELECT count(*) AS active, max(severity) FILTER (WHERE severity = 'do') AS has_red
-                 FROM communications.alert_broadcasts WHERE status IN ('sending', 'sent') AND COALESCE(sent_at, approved_at) > now() - interval '48 hours'"""
+            f"""SELECT count(*) AS active, max(severity) FILTER (WHERE severity = 'do') AS has_red
+                 FROM communications.alert_broadcasts WHERE {active_alert_sql()}"""
         )
         forecast = await fetch_one(
             """SELECT round(max(t.mm)::numeric)::int AS max_24h, (array_agg(t.name ORDER BY t.mm DESC))[1] AS max_name
@@ -200,12 +201,16 @@ async def _approved_reports(hours: int) -> list[dict]:
 @router.get("/alerts")
 async def alerts(days: int = Query(7, ge=1, le=30)):
     async def build():
+        # Lệnh trong ``days`` ngày qua + lệnh còn hiệu lực (gia hạn nhiều lần): đang hiệu lực trước, kèm hạn / lúc kết thúc
+        # để cổng công khai ghi rõ "đang hiệu lực đến …" / "đã kết thúc"
         rows = await fetch_all(
-            """SELECT b.code, b.title, b.message_body, b.severity, b.channels, COALESCE(b.sent_at, b.approved_at) AS issued_at,
-                      b.target_admin_codes, ST_AsGeoJSON(ST_SimplifyPreserveTopology(b.target_polygon, 0.001), 4)::json AS geom
-                 FROM communications.alert_broadcasts b
-                WHERE b.status IN ('sending', 'sent') AND COALESCE(b.sent_at, b.approved_at) > now() - make_interval(days => :d)
-                ORDER BY COALESCE(b.sent_at, b.approved_at) DESC""",
+            f"""SELECT b.code, b.title, b.message_body, b.severity, b.channels, COALESCE(b.sent_at, b.approved_at) AS issued_at,
+                       {valid_until_sql("b")} AS valid_until, b.ended_at, ({active_alert_sql("b")}) AS active,
+                       b.target_admin_codes, ST_AsGeoJSON(ST_SimplifyPreserveTopology(b.target_polygon, 0.001), 4)::json AS geom
+                  FROM communications.alert_broadcasts b
+                 WHERE b.status IN ('sending', 'sent')
+                   AND (COALESCE(b.sent_at, b.approved_at) > now() - make_interval(days => :d) OR ({active_alert_sql("b")}))
+                 ORDER BY ({active_alert_sql("b")}) DESC, COALESCE(b.sent_at, b.approved_at) DESC""",
             {"d": days},
         )
         names = {
@@ -225,15 +230,18 @@ async def alerts(days: int = Query(7, ge=1, le=30)):
 async def share_alert(code: str):
     """Trang chia sẻ (thẻ Open Graph cho Zalo / Facebook) — người dùng được chuyển tới cổng công khai."""
     row = await fetch_one(
-        """SELECT code, title, message_body FROM communications.alert_broadcasts
-            WHERE code = :c AND status IN ('sending', 'sent')""",
+        f"""SELECT code, title, message_body, ({active_alert_sql()}) AS active FROM communications.alert_broadcasts
+             WHERE code = :c AND status IN ('sending', 'sent')""",
         {"c": code},
     )
     if not row:
         raise HTTPException(404, "Không tìm thấy cảnh báo")
     base = settings.public_base_url.rstrip("/")
     target = f"{base}/?canh-bao={html.escape(row['code'])}"
-    title = html.escape(f"⚠ {row['title']} – BCH PCTT & TKCN tỉnh Cao Bằng")
+    # Link chia sẻ qua Zalo còn lưu lại sau khi hết nguy hiểm → ghi rõ đã hết hiệu lực
+    title = html.escape(
+        ("⚠ " if row["active"] else "[Đã hết hiệu lực] ") + f"{row['title']} – BCH PCTT & TKCN tỉnh Cao Bằng"
+    )
     desc = html.escape(row["message_body"][:280])
     return HTMLResponse(
         f"""<!doctype html><html lang="vi"><head><meta charset="utf-8">
@@ -339,8 +347,8 @@ async def _locate(lat: float, lon: float) -> dict:
     for s in sites:
         s["distance_km"] = round(haversine_km(lat, lon, s["lat"], s["lon"]), 1)
     active_alerts = await fetch_all(
-        """SELECT code, title, severity, COALESCE(sent_at, approved_at) AS issued_at FROM communications.alert_broadcasts
-            WHERE status IN ('sending', 'sent') AND COALESCE(sent_at, approved_at) > now() - interval '48 hours'
+        f"""SELECT code, title, severity, COALESCE(sent_at, approved_at) AS issued_at FROM communications.alert_broadcasts
+            WHERE {active_alert_sql()}
               AND (:code = ANY(target_admin_codes)
                    OR ST_Intersects(target_polygon, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)))
             ORDER BY issued_at DESC""",

@@ -75,7 +75,19 @@ export const landslideStatus = (s, warn = 'text-serious') =>
 
 /** Lệnh đã duyệt mà các kênh chưa nối cổng gửi tin thật (metrics[kênh].integrated === false). */
 export const notIntegrated = (b) => Object.values(b?.metrics || {}).some((v) => v?.integrated === false);
-export const broadcastStatus = (b) => BROADCAST_STATUS[notIntegrated(b) ? 'published' : b.status] || BROADCAST_STATUS.draft;
+export const broadcastStatus = (b) => {
+  // Lệnh đã phát nhưng đã kết thúc / quá thời hạn hiệu lực → không còn hiện cho người dân
+  if (b?.ended_at) return { label: 'Đã kết thúc', cls: 'bg-panel2 text-muted' };
+  if ((b?.status === 'sent' || b?.status === 'sending') && b?.active === false) return { label: 'Hết hiệu lực', cls: 'bg-panel2 text-muted' };
+  return BROADCAST_STATUS[notIntegrated(b) ? 'published' : b.status] || BROADCAST_STATUS.draft;
+};
+// Thời hạn hiệu lực chọn khi soạn cảnh báo (giờ)
+export const ALERT_VALID_HOURS = [[6, '6 giờ'], [12, '12 giờ'], [24, '24 giờ'], [48, '48 giờ'], [72, '3 ngày']];
+// Vật tư mang theo khi điều động (mã danh mục resources.items)
+export const ITEM_NAME = {
+  AO_PHAO: 'Áo phao', TUI_SO_CUU: 'Túi sơ cứu', DEN_PIN: 'Đèn pin', BAT_TRAI: 'Bạt che', THUOC_CO_BAN: 'Cơ số thuốc',
+  MI_TOM: 'Mì tôm (thùng)', NUOC_CHAI: 'Nước (thùng)', CLORAMIN_B: 'Cloramin B (kg)',
+};
 
 export const ROLE = { admin: 'Quản trị', maker: 'Trực ban (soạn lệnh)', checker: 'Lãnh đạo (phê duyệt)', viewer: 'Chỉ xem' };
 

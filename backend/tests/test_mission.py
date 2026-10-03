@@ -116,7 +116,7 @@ async def test_load_order_states(monkeypatch):
 
     for row, detail in (
         (_order(status="hoan_thanh"), mission.FINISHED),
-        (_order(status="huy"), mission.FINISHED),
+        (_order(status="huy"), mission.CANCELLED),
         (_order(live=False), mission.EXPIRED),
     ):
         monkeypatch.setattr(mission_api, "fetch_one", returning(row))

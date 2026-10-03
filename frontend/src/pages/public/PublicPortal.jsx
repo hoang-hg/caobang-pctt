@@ -352,7 +352,7 @@ function AlertCard({ a, highlight }) {
     } catch { /* người dùng huỷ */ }
   };
   return (
-    <div id={`canh-bao-${a.code}`} className={clsx('card p-3.5 border-l-4 transition-all hover:shadow-md', SEV[a.severity] || SEV.vang, highlight && 'ring-2 ring-accent')}>
+    <div id={`canh-bao-${a.code}`} className={clsx('card p-3.5 border-l-4 transition-all hover:shadow-md', a.active === false ? 'border-l-line opacity-75' : SEV[a.severity] || SEV.vang, highlight && 'ring-2 ring-accent')}>
       <div className="flex items-start gap-2.5">
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-panel2 text-danger">
           <Megaphone size={16} />
@@ -360,6 +360,16 @@ function AlertCard({ a, highlight }) {
         <div className="min-w-0 flex-1">
           <div className="font-bold leading-snug text-ink">{a.title}</div>
           <div className="text-xs text-muted mt-0.5">{dateTime(a.issued_at)} · {a.areas.slice(0, 4).join(', ')}{a.areas.length > 4 ? ` và ${a.areas.length - 4} xã khác` : ''}</div>
+          {/* Đang hiệu lực / đã kết thúc: lệnh sơ tán đã dỡ bỏ không còn trông như đang phải sơ tán */}
+          {a.active === false ? (
+            <span className="chip mt-1 bg-panel2 text-muted text-[10px] font-semibold">
+              {a.ended_at ? `Đã kết thúc lúc ${dateTime(a.ended_at)}` : 'Đã hết hiệu lực'}
+            </span>
+          ) : (
+            <span className="chip mt-1 bg-danger/10 text-danger text-[10px] font-semibold">
+              Đang hiệu lực{a.valid_until ? ` đến ${dateTime(a.valid_until)}` : ''}
+            </span>
+          )}
         </div>
         <button className="btn-ghost p-1.5 text-muted hover:text-accent rounded-lg" onClick={share} title="Chia sẻ cảnh báo" aria-label="Chia sẻ cảnh báo">
           <Share2 size={15} />
@@ -404,6 +414,7 @@ export default function PublicPortal() {
   const { data: overview } = useQuery({ queryKey: ['pub-overview'], queryFn: () => pub('/overview'), refetchInterval: REFRESH });
   const { data: map } = useQuery({ queryKey: ['pub-map'], queryFn: () => pub('/map'), refetchInterval: REFRESH });
   const { data: alerts = [] } = useQuery({ queryKey: ['pub-alerts'], queryFn: () => pub('/alerts'), refetchInterval: REFRESH });
+  const activeAlerts = alerts.filter((a) => a.active !== false); // còn hiệu lực — đếm, nhấp nháy; lệnh đã kết thúc vẫn liệt kê bên dưới
   const { data: forecast } = useQuery({ queryKey: ['pub-forecast'], queryFn: () => pub('/forecast/areas', { hours: 24 }), refetchInterval: 10 * REFRESH });
   const { data: hotlines } = useQuery({ queryKey: ['pub-hotlines'], queryFn: () => pub('/hotlines'), staleTime: Infinity });
   const { data: geo } = useUnitsGeo();
@@ -1259,11 +1270,11 @@ export default function PublicPortal() {
                         : 'text-muted hover:text-ink hover:bg-panel/50'
                     )}
                   >
-                    <Megaphone size={14} className={alerts.length > 0 ? 'text-danger animate-pulse' : ''} />
+                    <Megaphone size={14} className={activeAlerts.length > 0 ? 'text-danger animate-pulse' : ''} />
                     <span className="truncate">Cảnh báo</span>
-                    {alerts.length > 0 ? (
+                    {activeAlerts.length > 0 ? (
                       <span className="chip text-[10px] py-0 px-1.5 bg-danger text-white font-mono font-bold animate-pulse">
-                        {alerts.length}
+                        {activeAlerts.length}
                       </span>
                     ) : (
                       <span className="chip text-[10px] py-0 px-1.5 bg-panel text-muted font-mono">0</span>
@@ -1307,7 +1318,7 @@ export default function PublicPortal() {
                           <span>Bản tin chỉ đạo điều hành</span>
                         </div>
                         <span className="chip bg-danger/10 text-danger text-[11px] font-bold">
-                          {alerts.length} bản tin
+                          {activeAlerts.length} đang hiệu lực{alerts.length > activeAlerts.length ? ` · ${alerts.length - activeAlerts.length} đã kết thúc` : ''}
                         </span>
                       </div>
 

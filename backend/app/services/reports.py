@@ -46,6 +46,11 @@ CATEGORY = {
     "mac_ket": "Người mắc kẹt",
     "khac": "Khác",
 }
+# Ghi chú công khai tự đặt cho phản ánh đã chuyển SOS: lúc chuyển (chưa điều đội — câu cũ ghi "đã chuyển lực lượng"
+# khi chưa có ai được điều) và khi SOS đã cứu xong. Cán bộ viết ghi chú riêng thì không bị ghi đè.
+REPORT_SOS_NOTE = "Đã chuyển thành yêu cầu cứu hộ — BCH đang bố trí lực lượng"
+REPORT_SOS_NOTES = (REPORT_SOS_NOTE, "Đã chuyển lực lượng cứu hộ xử lý")
+REPORT_SOS_DONE = "Lực lượng cứu hộ đã hoàn thành, đưa người tới nơi an toàn"
 MAX_PHOTOS = 3
 MAX_BYTES = 8 * 1024 * 1024
 MAX_PIXELS = 40_000_000  # chống "ảnh bom" giải nén
@@ -264,12 +269,14 @@ async def create_report(
         "report",
         code,
     )
+    urgent = category == "mac_ket"  # có người mắc kẹt: báo như SOS (giao diện: chuông, thông báo đỏ)
     await log_event(
-        f"Phản ánh mới {row['code']} – {CATEGORY[category]}"
+        ("PHẢN ÁNH KHẨN " if urgent else "Phản ánh mới ")
+        + f"{row['code']} – {CATEGORY[category]}"
         + (f" tại {unit.name}" if unit else "")
         + " (chờ duyệt)",
         "nguoi_dan",
-        "info",
+        "danger" if urgent else "info",
         admin_unit_id=row["admin_unit_id"],
     )
     # track_code chỉ trả 1 lần cho người gửi (không lưu ở đâu khác ngoài CSDL, không hiện cho cán bộ)

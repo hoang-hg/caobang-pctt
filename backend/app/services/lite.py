@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 from html import escape
 
 from app.db import fetch_all, fetch_one
+from app.services.broadcast import active_alert_sql
 from app.services.data_import.parsing import strip_accents
 from app.services.readings import LATEST_COLS, LATEST_JOIN
 from app.services.simulator import alarm_level
@@ -45,19 +46,28 @@ SITE_TYPE = {
 }
 RIVER_LEVEL = ["Dưới báo động I", "Trên báo động I", "Trên báo động II", "Trên báo động III"]
 
-ACTIVE_ALERTS_SQL = """
+ACTIVE_ALERTS_SQL = (
+    """
 SELECT b.code, b.title, b.message_body, b.severity, COALESCE(b.sent_at, b.approved_at) AS issued_at,
        b.target_admin_codes {extra}
   FROM communications.alert_broadcasts b
- WHERE b.status IN ('sending', 'sent') AND COALESCE(b.sent_at, b.approved_at) > now() - interval '48 hours'
+ WHERE """
+    + active_alert_sql("b")
+    + """
  ORDER BY (b.severity = 'do') DESC, COALESCE(b.sent_at, b.approved_at) DESC"""
+)
 
 
 async def province_hotlines() -> list[dict]:
+    """Số trực ban cấp tỉnh (cổng công khai, bản nhẹ, link nhiệm vụ). So khớp tên cơ quan không dấu, không phân biệt hoa
+    thường — trước đây phải trùng đúng chữ ("Văn phòng Thường trực BCH PCTT&TKCN tỉnh Cao Bằng" trong tệp danh bạ là mất
+    số trực ban ở mọi nơi). Văn phòng thường trực trước, rồi Ban chỉ huy PCTT tỉnh."""
     return await fetch_all(
         """SELECT org, position, phone FROM communications.contacts
-            WHERE level = 'tinh' AND org IN ('Văn phòng thường trực BCH', 'BCH PCTT & TKCN tỉnh')
-            ORDER BY sort LIMIT 2"""
+            WHERE level = 'tinh'
+              AND (spatial_admin.norm(org) LIKE '%thuong truc%' OR spatial_admin.norm(org) LIKE '%pctt%'
+                   OR spatial_admin.norm(org) LIKE '%ban chi huy%')
+            ORDER BY (spatial_admin.norm(org) LIKE '%thuong truc%') DESC, sort LIMIT 2"""
     )
 
 

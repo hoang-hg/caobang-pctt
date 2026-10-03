@@ -68,7 +68,7 @@ Ký hiệu: ✅ chạy thật · 🟡 chạy thật nhưng dựa trên dữ li�
 
 | Phân hệ | Chức năng | Trạng thái | Ghi chú |
 |---|---|---|---|
-| Cảnh báo | Soạn lệnh từ mẫu, khoanh vùng, Maker–Checker + PIN, nhật ký pháp lý | ✅ | |
+| Cảnh báo | Soạn lệnh từ mẫu, khoanh vùng, Maker–Checker + PIN, thời hạn hiệu lực, gia hạn / kết thúc (PIN), nhật ký pháp lý | ✅ | [7.3](#sop-canh-bao) |
 | Cảnh báo | **Gửi tin tới người dân** (SMS Brandname, Cell Broadcast, Zalo OA/ZNS, Push, loa) | ⛔ | Chưa có code gửi. `SIMULATOR=true`: số "đã gửi / đã nhận" là **số ngẫu nhiên**; `SIMULATOR=false`: lệnh đã duyệt chốt "Đã công bố trên cổng", ghi rõ **chưa** tới điện thoại người dân |
 | Cảnh báo | Tổng đài IVR, nút gọi `tel:` | 🔶 / ⛔ | Nhật ký cuộc gọi là mô phỏng; chưa nối tổng đài SIP |
 | Cứu hộ | Phiếu SOS, Kanban, SLA, điều động, khớp lực lượng gần nhất | ✅ | Phụ thuộc dữ liệu lực lượng (2.2) |
@@ -720,12 +720,19 @@ sequenceDiagram
      gửi lại trong header `X-Mission-Token` tới `/api/v1/mission` — **không** nằm dưới `/api/v1/public/` vì nginx cache
      tiền tố đó theo đường dẫn. Mất sóng rồi tải lại trang vẫn xem được thông tin đã tải (lưu tạm trên điện thoại, xoá khi
      link đóng); báo cáo gửi lúc mất sóng báo "chưa gửi được" để bấm lại.
-5. **Thực thi & hoàn tất**: chưa có GPS — đội báo đến qua link nhiệm vụ, hoặc khi đội báo qua điện thoại / bộ đàm, trực ban
+5. **Huỷ lệnh điều động** (nhầm lực lượng, đội không tiếp cận được): nút **Huỷ lệnh** trên thẻ phiếu (quyền
+   `dispatch.create`; `POST /api/v1/dispatch/{lệnh}/cancel`, bắt buộc lý do) → lực lượng, phương tiện về **sẵn sàng**; tích
+   "vật tư chưa dùng đã nhập lại kho" thì cộng lại tồn kho; link nhiệm vụ của đội báo "lệnh đã huỷ"; phiếu không còn đội
+   nào → về **Đang điều phối** để điều lực lượng khác. Phiếu đang có đội thực hiện **không kéo về** "Chờ xử lý" / "Đang
+   điều phối" được (409) — trước đây kéo được: phiếu hiện như chưa ai xử lý (quá hạn SLA) trong khi đội vẫn đi, lực lượng
+   bị giữ tới khi đóng phiếu. Cán bộ xã (không có quyền điều động) kéo phiếu sang "Đang điều phối": hộp thoại báo cần trực
+   ban tỉnh điều lực lượng.
+6. **Thực thi & hoàn tất**: chưa có GPS — đội báo đến qua link nhiệm vụ, hoặc khi đội báo qua điện thoại / bộ đàm, trực ban
    (hoặc xã của phiếu, quyền `sos.update`) bấm **Đội báo đã đến hiện trường** trên thẻ phiếu (`POST
    /api/v1/dispatch/{lệnh}/arrived`, ghi giờ đến — link nhiệm vụ hiện "trực ban ghi"); trước đó thanh tiến độ là ước tính
    theo giờ xuất phát và ETA. Đưa người về điểm sơ tán rồi đánh dấu **Đã cứu an toàn** / **Xác nhận hoàn thành** (lực lượng,
    phương tiện tự về "sẵn sàng", link nhiệm vụ đóng).
-6. **Nguồn lực** (trang Vật tư & Lực lượng): **Cập nhật** từng phương tiện — Sẵn sàng ↔ Bảo dưỡng / hỏng kèm lý do, mức
+7. **Nguồn lực** (trang Vật tư & Lực lượng): **Cập nhật** từng phương tiện — Sẵn sàng ↔ Bảo dưỡng / hỏng kèm lý do, mức
    nhiên liệu % (`PATCH /api/v1/resources/vehicles/{id}`, quyền `vehicle.update`; "đang làm nhiệm vụ" chỉ do lệnh điều
    động gán, báo hỏng giữa nhiệm vụ thì phương tiện rời nhiệm vụ). **Nhập hàng** vào kho (`POST
    …/warehouses/{id}/receive`, quyền `inventory.receive`): cộng vào tồn kho, hạn dùng giữ **hạn sớm nhất**, mặt hàng mới cần
@@ -745,6 +752,14 @@ graph TD
 ```
 
 - Ảnh bị xoá EXIF/GPS, họ tên và SĐT người gửi chỉ cán bộ có `report.view` tại địa bàn đó xem được, IP chỉ lưu dạng băm.
+- Phản ánh loại **"Người mắc kẹt"** báo khẩn như SOS: thông báo đỏ kèm chuông cho cán bộ, nhật ký mức nguy hiểm, thẻ phản
+  ánh ghi **KHẨN** — duyệt và chuyển SOS ngay.
+- **Chuyển SOS**: số người mắc kẹt, mức ưu tiên, loại sự cố **điền sẵn từ nội dung người dân viết** ("3 người già mắc kẹt" →
+  3; cán bộ kiểm tra lại); để trống số người thì máy chủ tự bóc tách. Nội dung người dân gửi trở thành **tin gốc** của
+  phiếu — thẻ phiếu và link nhiệm vụ của đội hiện trường đều thấy (trước đây chỉ nằm trong ghi chú nội bộ, phiếu "0 người").
+  Người dân tra mã `PA-` thấy tiến độ của phiếu cứu hộ: đã chuyển yêu cầu cứu hộ (BCH đang bố trí) → đội đang trên đường →
+  đội đã đến; trực ban xác nhận cứu xong → phản ánh **tự chuyển "đã xử lý"** (trước đây "đang xử lý" mãi tới khi cán bộ tự
+  đóng phản ánh).
 - Khi duyệt, cán bộ ghi chú kết quả (VD "Đã cử dân quân cắm biển cảnh báo") để người dân yên tâm.
 - **Duyệt = chọn phần công khai** — cổng công khai không bao giờ trả mô tả / toạ độ gốc người dân gửi:
   - **Nội dung**: gợi ý sẵn mô tả gốc đã **tự che SĐT, email, số giấy tờ**; cán bộ bỏ tiếp tên người, số nhà. API công khai
@@ -766,8 +781,11 @@ graph TD
   lượng; SĐT hiện dạng che `099***666`. **Chống dò** (mã phiếu tăng dần): ngoài giới hạn theo IP, quá 10 lần tra cứu
   không ra kết quả / giờ với cùng **SĐT** hoặc cùng **mã** → tạm chặn (429) — dò mã bằng SĐT của một người, hay dò SĐT
   (hoặc đuôi mã tra cứu) của một mã từ nhiều IP đều bị chặn; trang tra cứu chỉ tự làm mới khi đã tìm thấy phiếu. 4 mốc: **Đã tiếp nhận → Đã điều động → Đang trên đường đến
-  (ETA, tự làm mới 15 giây) → Đã cứu an toàn / Khắc phục xong** — giảm cuộc gọi dồn dập vào 112/114.
+  (ETA, tự làm mới 15 giây) / Đã đến hiện trường → Đã cứu an toàn / Khắc phục xong** — giảm cuộc gọi dồn dập vào 112/114.
+  Đội đã báo đến (link nhiệm vụ / trực ban ghi) → "Đội cứu hộ đã đến hiện trường, đang cứu hộ"; quá giờ dự kiến mà chưa
+  đến → "chậm hơn dự kiến, BCH đang giữ liên lạc" (trước đây ghi "đang trên đường — trong ít phút tới" mãi).
 
+<a id="sop-canh-bao"></a>
 ### 7.3. Soạn, duyệt & phát cảnh báo (Maker – Checker)
 
 ```mermaid
@@ -787,6 +805,13 @@ graph LR
 3. Người duyệt: tài khoản Cấp 1–2 **đã được cấp PIN**, không phải người soạn, có quyền `alert.approve` trên **tất cả** xã nhận tin ([8.2](#phan-quyen)).
 4. Phát theo ranh giới xã/phường hoặc đa giác khoanh trên bản đồ. Có vùng vẽ thì người soạn phải có quyền trên mọi xã
    vùng vẽ đi qua (không chỉ các xã tự chọn). Mỗi lệnh chỉ được duyệt 1 lần (bấm đúp / hai lãnh đạo cùng duyệt → 1 lần phát).
+5. **Thời hạn hiệu lực**: chọn khi soạn (6 / 12 / 24 / 48 giờ / 3 ngày, mặc định 48 giờ), tính từ lúc duyệt. Hết hạn → thôi
+   hiện trên cổng công khai, "Tôi đang ở đâu?", bản nhẹ; danh sách cảnh báo của người dân vẫn liệt kê, ghi **đã kết thúc /
+   hết hiệu lực** (trước đây mọi lệnh hiện cố định 48 giờ: lệnh sơ tán đã dỡ bỏ vẫn hiện, bão kéo dài thì cảnh báo tự biến
+   mất). Màn hình Cảnh báo: **Gia hạn** (thiên tai kéo dài, cộng thêm từ hạn hiện tại) và **Kết thúc** (hết nguy hiểm sớm,
+   bắt buộc lý do) — chỉ lãnh đạo có `alert.approve` **và đã được cấp PIN**, ký PIN; ghi nhật ký `broadcast.extend` /
+   `broadcast.end`. Lệnh đã kết thúc / hết hạn không gia hạn được — soạn lệnh mới. Link chia sẻ của lệnh đã hết hiệu lực
+   ghi "[Đã hết hiệu lực]".
 
 <a id="giam-sat-kttv"></a>
 ### 7.4. Giám sát khí tượng thuỷ văn, IoT & bản đồ tác chiến

@@ -12,7 +12,13 @@ from app.infra import ratelimit
 from app.infra.cache import invalidate
 from app.rbac.authz import allowed_codes, can_all, forbidden, require_any, require_permission
 from app.rbac.scope_loaders import broadcast_domains, targets_to_domains
-from app.services.broadcast import CHANNELS, estimate_audience, init_metrics
+from app.services.broadcast import (
+    CHANNELS,
+    active_alert_sql,
+    estimate_audience,
+    init_metrics,
+    valid_until_sql,
+)
 from app.services.events import log_event
 from app.services.sos import create_ticket
 from app.ws.hub import hub
@@ -22,15 +28,17 @@ router = APIRouter(prefix="/alerts", tags=["Cảnh báo & Hotline"])
 MAX_PIN_FAILS = 5  # sai PIN phê duyệt quá số lần này trong PIN_LOCK_S → tạm khoá phê duyệt
 PIN_LOCK_S = 900
 
-BROADCAST_SELECT = """
+BROADCAST_SELECT = f"""
 SELECT b.id, b.code, b.title, b.message_body, b.template_code, b.severity, b.target_admin_codes, b.channels, b.status,
        b.auto_generated, b.trigger_source, b.audience, b.metrics, b.created_at, b.approved_at, b.sent_at, b.rejected_reason,
-       b.created_by,
-       mk.full_name AS created_by_name, ck.full_name AS approved_by_name,
+       b.created_by, b.valid_hours, {valid_until_sql("b")} AS valid_until, b.ended_at, b.end_note,
+       ({active_alert_sql("b")}) AS active,
+       mk.full_name AS created_by_name, ck.full_name AS approved_by_name, en.full_name AS ended_by_name,
        ST_AsGeoJSON(ST_SimplifyPreserveTopology(b.target_polygon, 0.0005), 5)::json AS target_geom
   FROM communications.alert_broadcasts b
   LEFT JOIN communications.users mk ON mk.id = b.created_by
   LEFT JOIN communications.users ck ON ck.id = b.approved_by
+  LEFT JOIN communications.users en ON en.id = b.ended_by
 """
 
 
@@ -55,12 +63,12 @@ async def broadcasts(limit: int = 50, user: dict = Depends(require_any("alert", 
               ORDER BY b.created_at DESC LIMIT :l""",
         {"l": limit, "all": allowed is None, "codes": allowed or []},
     )
-    for b in rows:  # frontend dùng để hiện/ẩn nút phê duyệt
-        b["can_approve"] = (
-            b["status"] == "pending_approval"
-            and b["created_by"] != user["id"]
-            and can_all(user, "alert", "approve", targets_to_domains(b["target_admin_codes"]))
-        )
+    for b in rows:  # frontend dùng để hiện/ẩn nút phê duyệt / gia hạn / kết thúc
+        approver = can_all(user, "alert", "approve", targets_to_domains(b["target_admin_codes"]))
+        b["can_approve"] = b["status"] == "pending_approval" and b["created_by"] != user["id"] and approver
+        # Gia hạn / kết thúc lệnh đã công bố: người có quyền phê duyệt VÀ đã được cấp PIN ký (lãnh đạo) — tài khoản cấp
+        # tỉnh chức vụ trực ban có quyền theo vai trò nhưng chưa cấp PIN thì không
+        b["can_manage"] = bool(b["active"]) and approver and bool(user["pin_hash"])
     return rows
 
 
@@ -84,6 +92,9 @@ class BroadcastIn(BaseModel):
     admin_codes: list[str] = []
     polygon: dict | None = None
     channels: list[str] = Field(min_length=1)
+    # Thời hạn hiệu lực tính từ lúc phê duyệt (giờ): hết hạn → thôi hiện trên cổng công khai, "Tôi đang ở đâu?", bản nhẹ.
+    # Còn nguy hiểm thì gia hạn; hết nguy hiểm sớm thì kết thúc (người có quyền phê duyệt)
+    valid_hours: int = Field(48, ge=1, le=168)
 
 
 @router.post("/broadcasts")
@@ -100,14 +111,15 @@ async def create_broadcast(body: BroadcastIn, user: dict = Depends(require_any("
         raise HTTPException(403, "Vùng cảnh báo có xã/phường nằm ngoài phạm vi bạn được giao")
     row = await fetch_one(
         """INSERT INTO communications.alert_broadcasts (title, message_body, template_code, severity, target_admin_codes, target_polygon,
-                 channels, status, audience, created_by)
+                 channels, status, audience, created_by, valid_hours)
            VALUES (:t, :b, :tpl, :s, :codes,
                    CASE WHEN CAST(:poly AS text) IS NULL THEN
                         (SELECT ST_Multi(ST_Union(geom)) FROM spatial_admin.administrative_units WHERE code = ANY(:codes))
                    ELSE ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON(CAST(:poly AS text)), 4326)) END,
-                   :ch, 'pending_approval', CAST(:aud AS jsonb), :u)
+                   :ch, 'pending_approval', CAST(:aud AS jsonb), :u, :vh)
            RETURNING id, code""",
         {
+            "vh": body.valid_hours,
             "t": body.title,
             "b": body.message_body,
             "tpl": body.template_code,
@@ -141,6 +153,21 @@ class ApproveIn(BaseModel):
     pin: str
 
 
+async def verify_pin(user: dict, pin: str, broadcast_id: str, failed_action: str) -> None:
+    """Mã PIN ký của lãnh đạo (phê duyệt / kết thúc cảnh báo). PIN 6 số: không giới hạn thì phiên bị lộ dò được PIN →
+    khoá thử PIN 15 phút sau 5 lần sai."""
+    if not user["pin_hash"]:
+        raise HTTPException(403, "Tài khoản chưa được cấp mã PIN phê duyệt — đề nghị Quản trị hệ thống cấp")
+    pin_key = f"pinfail:{user['username'].lower()}"
+    if await ratelimit.peek(pin_key) >= MAX_PIN_FAILS:
+        raise HTTPException(429, "Nhập sai mã PIN quá nhiều lần — tạm khoá phê duyệt 15 phút")
+    if not verify_secret(pin, user["pin_hash"]):
+        await ratelimit.hit(pin_key, PIN_LOCK_S)
+        await audit(user, failed_action, "alert_broadcast", broadcast_id, {"reason": "sai PIN"})
+        raise HTTPException(403, "Mã PIN không đúng")
+    await ratelimit.clear(pin_key)
+
+
 @router.post("/broadcasts/{broadcast_id}/approve")
 async def approve(broadcast_id: str, body: ApproveIn, user: dict = Depends(require_any("alert", "approve"))):
     """CHECKER: tài khoản cấp tỉnh (không phải người soạn) xác nhận bằng mã PIN → hệ thống bắt đầu phát trên các kênh.
@@ -150,17 +177,7 @@ async def approve(broadcast_id: str, body: ApproveIn, user: dict = Depends(requi
         raise HTTPException(404, "Không tìm thấy lệnh")
     if not can_all(user, "alert", "approve", doms):
         raise forbidden()
-    if not user["pin_hash"]:
-        raise HTTPException(403, "Tài khoản chưa được cấp mã PIN phê duyệt — đề nghị Quản trị hệ thống cấp")
-    # PIN 6 số: không giới hạn thì phiên bị lộ dò được PIN → khoá thử PIN 15 phút sau 5 lần sai
-    pin_key = f"pinfail:{user['username'].lower()}"
-    if await ratelimit.peek(pin_key) >= MAX_PIN_FAILS:
-        raise HTTPException(429, "Nhập sai mã PIN quá nhiều lần — tạm khoá phê duyệt 15 phút")
-    if not verify_secret(body.pin, user["pin_hash"]):
-        await ratelimit.hit(pin_key, PIN_LOCK_S)
-        await audit(user, "broadcast.approve_failed", "alert_broadcast", broadcast_id, {"reason": "sai PIN"})
-        raise HTTPException(403, "Mã PIN không đúng")
-    await ratelimit.clear(pin_key)
+    await verify_pin(user, body.pin, broadcast_id, "broadcast.approve_failed")
     b = await fetch_one(
         "SELECT id, code, title, status, channels, audience, created_by FROM communications.alert_broadcasts WHERE id = CAST(:id AS uuid)",
         {"id": broadcast_id},
@@ -180,7 +197,8 @@ async def approve(broadcast_id: str, body: ApproveIn, user: dict = Depends(requi
     # Điều kiện trạng thái trong cùng câu lệnh → hai lãnh đạo bấm duyệt cùng lúc (hoặc bấm đúp) chỉ phát 1 lần
     if not await fetch_one(
         """UPDATE communications.alert_broadcasts SET status = :st, approved_by = :u, approved_at = now(),
-                  sent_at = CASE WHEN :done THEN now() END, metrics = CAST(:m AS jsonb)
+                  sent_at = CASE WHEN :done THEN now() END, metrics = CAST(:m AS jsonb),
+                  valid_until = now() + make_interval(hours => valid_hours)
             WHERE id = CAST(:id AS uuid) AND status = 'pending_approval' RETURNING id""",
         {"st": status, "done": not simulated, "u": user["id"], "m": json.dumps(metrics), "id": broadcast_id},
     ):
@@ -209,6 +227,79 @@ async def approve(broadcast_id: str, body: ApproveIn, user: dict = Depends(requi
 
 class RejectIn(BaseModel):
     reason: str = Field(min_length=3)
+
+
+async def _manage_check(broadcast_id: str, user: dict) -> None:
+    doms = await broadcast_domains(broadcast_id)
+    if doms is None:
+        raise HTTPException(404, "Không tìm thấy lệnh")
+    if not can_all(user, "alert", "approve", doms):
+        raise forbidden()
+
+
+class EndIn(BaseModel):
+    pin: str
+    note: str = Field(min_length=3, max_length=300, description="VD: Nước đã rút, dỡ bỏ lệnh sơ tán")
+
+
+@router.post("/broadcasts/{broadcast_id}/end")
+async def end_broadcast(
+    broadcast_id: str, body: EndIn, user: dict = Depends(require_any("alert", "approve"))
+):
+    """Kết thúc cảnh báo khi đã hết nguy hiểm (người có quyền phê duyệt, ký PIN): thôi hiện ngay trên cổng công khai,
+    "Tôi đang ở đâu?", bản nhẹ; danh sách cảnh báo của người dân ghi "đã kết thúc"."""
+    await _manage_check(broadcast_id, user)
+    await verify_pin(user, body.pin, broadcast_id, "broadcast.end_failed")
+    row = await fetch_one(
+        f"""UPDATE communications.alert_broadcasts SET ended_at = now(), ended_by = :u, end_note = :n
+             WHERE id = CAST(:id AS uuid) AND {active_alert_sql()} RETURNING id, code, title""",
+        {"u": user["id"], "n": body.note.strip(), "id": broadcast_id},
+    )
+    if not row:
+        raise HTTPException(409, "Lệnh không còn hiệu lực (đã kết thúc hoặc hết hạn)")
+    await audit(
+        user, "broadcast.end", "alert_broadcast", row["code"], {"title": row["title"], "note": body.note}
+    )
+    await hub.publish("broadcast.updated", {"id": row["id"], "code": row["code"], "status": "ended"})
+    await invalidate("public:")
+    await log_event(
+        f"{user['full_name']} KẾT THÚC cảnh báo {row['code']} “{row['title']}” — {body.note.strip()}",
+        "canh_bao",
+        "info",
+    )
+    return await fetch_one(BROADCAST_SELECT + " WHERE b.id = CAST(:id AS uuid)", {"id": broadcast_id})
+
+
+class ExtendIn(BaseModel):
+    pin: str
+    hours: int = Field(ge=1, le=72)
+
+
+@router.post("/broadcasts/{broadcast_id}/extend")
+async def extend_broadcast(
+    broadcast_id: str, body: ExtendIn, user: dict = Depends(require_any("alert", "approve"))
+):
+    """Gia hạn cảnh báo đang hiệu lực (thiên tai kéo dài), ký PIN như phê duyệt: cộng thêm từ hạn hiện tại. Lệnh đã hết
+    hạn / kết thúc không gia hạn được — soạn lệnh mới để duyệt lại."""
+    await _manage_check(broadcast_id, user)
+    await verify_pin(user, body.pin, broadcast_id, "broadcast.extend_failed")
+    row = await fetch_one(
+        f"""UPDATE communications.alert_broadcasts
+               SET valid_until = GREATEST({valid_until_sql()}, now()) + make_interval(hours => :h)
+             WHERE id = CAST(:id AS uuid) AND {active_alert_sql()} RETURNING id, code, title, valid_until""",
+        {"h": body.hours, "id": broadcast_id},
+    )
+    if not row:
+        raise HTTPException(409, "Lệnh không còn hiệu lực — soạn lệnh mới để phê duyệt lại")
+    await audit(user, "broadcast.extend", "alert_broadcast", row["code"], {"hours": body.hours})
+    await hub.publish("broadcast.updated", {"id": row["id"], "code": row["code"], "status": "sent"})
+    await invalidate("public:")
+    await log_event(
+        f"{user['full_name']} gia hạn cảnh báo {row['code']} “{row['title']}” thêm {body.hours} giờ",
+        "canh_bao",
+        "info",
+    )
+    return await fetch_one(BROADCAST_SELECT + " WHERE b.id = CAST(:id AS uuid)", {"id": broadcast_id})
 
 
 @router.post("/broadcasts/{broadcast_id}/reject")

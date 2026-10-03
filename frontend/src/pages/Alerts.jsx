@@ -3,12 +3,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import {
   Megaphone, ShieldCheck, Send, Users, Phone, PhoneCall, ChevronRight, ChevronDown, Radio, KeyRound, XCircle, History, BookUser, Bot, MapPinned,
+  TimerReset, BellOff,
 } from 'lucide-react';
 import { api } from '../api/client';
 import { usePresets, useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
 import { Empty, Modal, Section, Tabs } from '../components/common/ui';
-import { CHANNEL, LEVEL, broadcastStatus, notIntegrated } from '../utils/labels';
+import { ALERT_VALID_HOURS, CHANNEL, LEVEL, broadcastStatus, notIntegrated } from '../utils/labels';
 import { Can, useAllowedCodes, usePermission } from '../rbac/usePermission';
 import { dateTime, int, pct } from '../utils/format';
 
@@ -36,6 +37,7 @@ function Composer() {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [severity, setSeverity] = useState('cam');
+  const [validHours, setValidHours] = useState(48); // hết hạn → thôi hiện cho người dân; gia hạn / kết thúc sớm được
   const [codes, setCodes] = useState([]);
   const [channels, setChannels] = useState(['SMS', 'CELL_BROADCAST', 'ZALO_OA', 'LOA']);
   const [audience, setAudience] = useState(null);
@@ -66,7 +68,7 @@ function Composer() {
     try {
       const res = await api('/alerts/broadcasts', {
         method: 'POST',
-        body: { title, message_body: body, template_code: tpl || null, severity, admin_codes: codes, polygon, channels },
+        body: { title, message_body: body, template_code: tpl || null, severity, admin_codes: codes, polygon, channels, valid_hours: validHours },
       });
       toast({ tone: 'good', title: `Đã gửi lệnh ${res.code} chờ Lãnh đạo phê duyệt` });
       qc.invalidateQueries({ queryKey: ['broadcasts'] });
@@ -138,6 +140,14 @@ function Composer() {
             </>
           )}
         </div>
+
+        <label className="flex flex-wrap items-center gap-2">
+          <span className="font-medium">Hiệu lực</span>
+          <select className="input w-auto py-1" value={validHours} onChange={(e) => setValidHours(Number(e.target.value))} aria-label="Thời hạn hiệu lực">
+            {ALERT_VALID_HOURS.map(([h, label]) => <option key={h} value={h}>{label} kể từ khi duyệt</option>)}
+          </select>
+          <span className="text-[11px] text-muted">Hết hạn thì thôi hiện cho người dân; còn nguy hiểm thì gia hạn, hết sớm thì kết thúc.</span>
+        </label>
 
         <div>
           <div className="mb-1 font-medium">Kênh phát</div>
@@ -273,6 +283,7 @@ function Delivery({ b }) {
 function Broadcasts() {
   const { data = [] } = useQuery({ queryKey: ['broadcasts'], queryFn: () => api('/alerts/broadcasts'), refetchInterval: 15_000 });
   const [approve, setApprove] = useState(null);
+  const [manage, setManage] = useState(null); // { b, mode: 'extend' | 'end' }
   const pending = data.filter((b) => b.status === 'pending_approval');
   const active = data.filter((b) => b.status === 'sending' || b.status === 'sent').slice(0, 6);
 
@@ -315,6 +326,23 @@ function Broadcasts() {
                 <span className="ml-auto whitespace-nowrap text-[11px] text-muted">{dateTime(b.sent_at || b.approved_at)}</span>
               </div>
               <div className="mb-1 text-[11px] text-muted">Duyệt: {b.approved_by_name} · Soạn: {b.created_by_name || 'Hệ thống'}</div>
+              <div className="mb-1.5 flex flex-wrap items-center gap-2 text-[11px]">
+                {b.ended_at ? (
+                  <span className="text-muted">
+                    Kết thúc {dateTime(b.ended_at)}{b.ended_by_name ? ` — ${b.ended_by_name}` : ''}{b.end_note ? `: ${b.end_note}` : ''}
+                  </span>
+                ) : b.active ? (
+                  <span className="font-medium text-ink-2">Hiệu lực đến {dateTime(b.valid_until)} · đang hiện cho người dân</span>
+                ) : (
+                  <span className="text-muted">Hết hiệu lực từ {dateTime(b.valid_until)}</span>
+                )}
+                {b.can_manage && (
+                  <span className="ml-auto flex gap-1.5">
+                    <button className="btn-ghost px-2 py-0.5 text-[11px]" onClick={() => setManage({ b, mode: 'extend' })}><TimerReset size={12} /> Gia hạn</button>
+                    <button className="btn-ghost px-2 py-0.5 text-[11px] text-danger" onClick={() => setManage({ b, mode: 'end' })}><BellOff size={12} /> Kết thúc</button>
+                  </span>
+                )}
+              </div>
               <Delivery b={b} />
             </div>
           ))}
@@ -322,7 +350,74 @@ function Broadcasts() {
         </div>
       </Section>
       {approve && <ApproveModal b={approve} onClose={() => setApprove(null)} />}
+      {manage && <ManageModal b={manage.b} mode={manage.mode} onClose={() => setManage(null)} />}
     </div>
+  );
+}
+
+/** Gia hạn (thiên tai kéo dài) / kết thúc (hết nguy hiểm — ký PIN) một cảnh báo đang hiệu lực. */
+function ManageModal({ b, mode, onClose }) {
+  const qc = useQueryClient();
+  const toast = useStore((s) => s.toast);
+  const [hours, setHours] = useState(24);
+  const [note, setNote] = useState('');
+  const [pin, setPin] = useState('');
+  const [busy, setBusy] = useState(false);
+  const end = mode === 'end';
+  const run = async () => {
+    setBusy(true);
+    try {
+      await api(`/alerts/broadcasts/${b.id}/${end ? 'end' : 'extend'}`, { method: 'POST', body: end ? { pin, note: note.trim() } : { pin, hours } });
+      toast({ tone: 'good', title: end ? `Đã kết thúc cảnh báo ${b.code}` : `Đã gia hạn cảnh báo ${b.code} thêm ${hours} giờ` });
+      qc.invalidateQueries({ queryKey: ['broadcasts'] });
+      onClose();
+    } catch (e) {
+      toast({ tone: 'danger', title: 'Không thực hiện được', body: e.message });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={`${end ? 'Kết thúc' : 'Gia hạn'} cảnh báo – ${b.code}`}
+      footer={
+        <>
+          <button className="btn-ghost" onClick={onClose}>Huỷ</button>
+          <button className={end ? 'btn-danger' : 'btn-primary'} disabled={busy || pin.length < 4 || (end && note.trim().length < 3)} onClick={run}>
+            {end ? <><BellOff size={15} /> Kết thúc cảnh báo</> : <><TimerReset size={15} /> Gia hạn</>}
+          </button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-3 text-sm">
+        <div className="rounded-lg bg-panel2 p-2.5">
+          <b>{b.title}</b>
+          <div className="text-xs text-muted">Đang hiệu lực đến {dateTime(b.valid_until)}</div>
+        </div>
+        {end ? (
+          <>
+            <p className="text-ink-2">Cảnh báo thôi hiện ngay trên cổng công khai, “Tôi đang ở đâu?”, bản nhẹ; danh sách cảnh báo của người dân ghi “đã kết thúc”.</p>
+            <label className="flex flex-col gap-1">
+              Lý do / thông báo kết thúc
+              <input className="input" maxLength={300} value={note} onChange={(e) => setNote(e.target.value)} placeholder="VD: Nước đã rút, dỡ bỏ lệnh sơ tán" />
+            </label>
+          </>
+        ) : (
+          <label className="flex flex-col gap-1">
+            Gia hạn thêm (tính từ hạn hiện tại)
+            <select className="input w-40" value={hours} onChange={(e) => setHours(Number(e.target.value))}>
+              {ALERT_VALID_HOURS.map(([h, label]) => <option key={h} value={h}>{label}</option>)}
+            </select>
+          </label>
+        )}
+        <label className="flex flex-col gap-1">
+          <span className="flex items-center gap-1"><KeyRound size={14} /> Mã PIN ký duyệt của bạn</span>
+          <input type="password" inputMode="numeric" className="input w-40 font-mono tracking-widest" value={pin} onChange={(e) => setPin(e.target.value)} />
+        </label>
+      </div>
+    </Modal>
   );
 }
 
@@ -428,7 +523,10 @@ function Hotline() {
 
 const ACTION = {
   'broadcast.create': 'Soạn lệnh cảnh báo', 'broadcast.approve': 'Phê duyệt phát lệnh', 'broadcast.reject': 'Từ chối lệnh',
-  'broadcast.approve_failed': 'Duyệt thất bại (sai PIN)', 'broadcast.auto_draft': 'Tự sinh bản nháp cảnh báo', 'dispatch.create': 'Phát lệnh điều động',
+  'broadcast.approve_failed': 'Duyệt thất bại (sai PIN)',
+  'broadcast.end': 'Kết thúc cảnh báo', 'broadcast.end_failed': 'Kết thúc cảnh báo thất bại (sai PIN)', 'broadcast.extend': 'Gia hạn cảnh báo',
+  'broadcast.extend_failed': 'Gia hạn cảnh báo thất bại (sai PIN)',
+  'dispatch.cancel': 'Huỷ lệnh điều động', 'broadcast.auto_draft': 'Tự sinh bản nháp cảnh báo', 'dispatch.create': 'Phát lệnh điều động',
   'sos.update': 'Cập nhật phiếu SOS', 'inventory.issue': 'Xuất kho', 'vehicle.status': 'Đổi trạng thái phương tiện',
 };
 
