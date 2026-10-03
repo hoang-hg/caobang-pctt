@@ -3,6 +3,7 @@
 import hmac
 import json
 from datetime import UTC, datetime, timedelta
+from typing import Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field, model_validator
@@ -71,7 +72,12 @@ async def create_sos(body: SosIn, user: dict = Depends(require_any("sos", "creat
 
     def authorize(domain: str) -> None:
         if not can(user, "sos", "create", domain):
-            raise forbidden()
+            # Cán bộ xã nhận tin ở xã khác: nói rõ vị trí thuộc đâu và phải làm gì (trước đây chỉ "không có quyền")
+            raise HTTPException(
+                403,
+                f"Vị trí trong tin thuộc {domains.label(domain)} — ngoài phạm vi bạn được giao. Báo trực ban tỉnh "
+                "(hoặc xã/phường đó) để tạo phiếu; nếu vị trí sai, sửa nội dung tin (tên thôn / xã) rồi tạo lại.",
+            )
 
     try:
         return await create_ticket(**body.model_dump(), authorize=authorize)
@@ -109,6 +115,9 @@ class SosPatch(BaseModel):
     status: str | None = Field(None, pattern="^(moi|dieu_phoi|thuc_thi|hoan_thanh)$")
     priority: int | None = Field(None, ge=1, le=3)
     notes: str | None = None
+    # Gọi lại / đội báo thêm thông tin: sửa số người, nhóm yếu thế (gợi ý lực lượng, link nhiệm vụ cập nhật theo)
+    trapped_count: int | None = Field(None, ge=0, le=10000)
+    vulnerable: list[Literal["nguoi_gia", "tre_em", "thuong_nang", "thai_phu"]] | None = None
 
 
 @router.patch("/sos/{ticket_id}")
@@ -140,12 +149,21 @@ async def update_sos(
         """UPDATE operations.sos_tickets SET
                   status = COALESCE(CAST(:s AS text), status), priority = COALESCE(CAST(:p AS smallint), priority),
                   notes = COALESCE(CAST(:n AS text), notes),
+                  trapped_count = COALESCE(CAST(:tc AS int), trapped_count),
+                  vulnerable = COALESCE(CAST(:vu AS text[]), vulnerable),
                   acknowledged_at = CASE WHEN COALESCE(CAST(:s AS text), 'moi') <> 'moi' THEN COALESCE(acknowledged_at, now())
                                          ELSE acknowledged_at END,
                   resolved_at = CASE WHEN CAST(:s AS text) = 'hoan_thanh' THEN now()
                                      WHEN CAST(:s AS text) IS NOT NULL THEN NULL ELSE resolved_at END
             WHERE id = CAST(:id AS uuid)""",
-        {"s": body.status, "p": body.priority, "n": body.notes, "id": ticket_id},
+        {
+            "s": body.status,
+            "p": body.priority,
+            "n": body.notes,
+            "tc": body.trapped_count,
+            "vu": body.vulnerable,
+            "id": ticket_id,
+        },
     )
     if body.status == "hoan_thanh":
         await release_dispatch(ticket_id)
@@ -153,6 +171,19 @@ async def update_sos(
     ticket = await get_ticket(ticket_id)
     await audit(user, "sos.update", "sos_ticket", ticket["code"], body.model_dump(exclude_none=True))
     await hub.publish("sos.updated", ticket, "sos", ticket["admin_code"])
+    changes = []
+    if body.priority is not None and body.priority != before["priority"]:
+        changes.append(f"ưu tiên Cấp {before['priority']} → Cấp {body.priority}")
+    if body.trapped_count is not None and body.trapped_count != before["trapped_count"]:
+        changes.append(f"số người {before['trapped_count']} → {body.trapped_count}")
+    if changes:
+        await log_event(
+            f"{ticket['code']}: {', '.join(changes)} ({user['full_name']})",
+            "cuu_ho",
+            "warning" if body.priority == 1 else "info",
+            lat=ticket["lat"],
+            lon=ticket["lon"],
+        )
     if body.status and body.status != before["status"]:
         await log_event(
             f"{ticket['code']} chuyển sang “{STATUS_LABEL[body.status]}” ({user['full_name']})",

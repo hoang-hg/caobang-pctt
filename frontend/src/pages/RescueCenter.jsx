@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import {
   Bot, CheckCircle2, Clock, MapPin, Phone, Send, Sparkles, Timer, Inbox, Loader2, Navigation, Home,
-  Search, LifeBuoy, Link2, Ban
+  Search, LifeBuoy, Link2, Ban, Pencil
 } from 'lucide-react';
 import { api } from '../api/client';
 import { useAreaQuery, useUnits } from '../api/hooks';
@@ -14,6 +14,7 @@ import DispatchModal from '../components/common/DispatchModal';
 import OccupancyModal from '../components/common/OccupancyModal';
 import { MissionLinkModal } from '../components/common/MissionLink';
 import CancelDispatchModal from '../components/common/CancelDispatchModal';
+import EditTicketModal from '../components/common/EditTicketModal';
 import { Can, useAllowedCodes, usePermission } from '../rbac/usePermission';
 import { INCIDENT, PRIORITY, SOURCE, VULNERABLE } from '../utils/labels';
 import { int, pct, time } from '../utils/format';
@@ -41,7 +42,7 @@ const mmss = (sec) => {
   return h ? `${h}h${String(m).padStart(2, '0')}` : `${m}:${String(s % 60).padStart(2, '0')}`;
 };
 
-function TicketCard({ t, now, onDispatch, onResolve, onFocus, onArrived, onLink, onCancel }) {
+function TicketCard({ t, now, onDispatch, onResolve, onFocus, onArrived, onLink, onCancel, onEdit }) {
   const canUpdate = usePermission('sos', 'update', t.admin_code);
   const pr = PRIORITY[t.priority] || PRIORITY[2];
   const waitingSec = (now - new Date(t.received_at).getTime()) / 1000;
@@ -73,6 +74,11 @@ function TicketCard({ t, now, onDispatch, onResolve, onFocus, onArrived, onLink,
       <div className="flex items-center gap-1.5 mb-1">
         <b className="text-sm font-bold text-ink">{t.code}</b>
         <span className={clsx('chip text-[10px] font-bold py-0.5', pr.cls)}>{pr.short}</span>
+        {canUpdate && t.status !== 'hoan_thanh' && (
+          <button className="text-muted hover:text-accent" onClick={() => onEdit(t)} title="Sửa mức ưu tiên, số người, nhóm yếu thế" aria-label={`Sửa phiếu ${t.code}`}>
+            <Pencil size={12} />
+          </button>
+        )}
         <span className="ml-auto text-[11px] text-muted font-medium">{SOURCE[t.source]}</span>
       </div>
 
@@ -226,13 +232,16 @@ function Intake() {
   const [source, setSource] = useState('ZALO');
   const [phone, setPhone] = useState('');
   const [parsed, setParsed] = useState(null);
+  const [edit, setEdit] = useState(null); // kết quả bóc tách trực ban đã sửa (mức ưu tiên, số người, loại, nhóm yếu thế)
   const [busy, setBusy] = useState(false);
   const [creating, setCreating] = useState(false); // chống bấm đúp → 2 phiếu SOS trùng
 
   const analyze = async () => {
     setBusy(true);
     try {
-      setParsed(await api('/sos/parse', { method: 'POST', body: { text } }));
+      const p = await api('/sos/parse', { method: 'POST', body: { text } });
+      setParsed(p);
+      setEdit({ incident_type: p.incident_type, priority: p.priority, trapped_count: String(p.trapped_count ?? 0), vulnerable: p.vulnerable || [] });
     } finally {
       setBusy(false);
     }
@@ -241,7 +250,11 @@ function Intake() {
   const create = async () => {
     setCreating(true);
     try {
-      const t = await api('/sos', { method: 'POST', body: { raw_message: text, source, reporter_phone: phone || null } });
+      // Đã bóc tách: gửi kết quả trực ban đã kiểm tra / sửa; chưa bóc tách: máy chủ tự bóc tách từ nội dung
+      const fields = edit
+        ? { incident_type: edit.incident_type, priority: edit.priority, vulnerable: edit.vulnerable, trapped_count: edit.trapped_count === '' ? null : Number(edit.trapped_count) }
+        : {};
+      const t = await api('/sos', { method: 'POST', body: { raw_message: text, source, reporter_phone: phone || null, ...fields } });
       toast({ tone: 'good', title: `Đã tạo phiếu ${t.code}`, body: `${INCIDENT[t.incident_type]} – ${t.address}` });
       if (t.possible_duplicates?.length) {
         // Cùng SĐT hoặc cách < 200 m trong 30 phút, chưa hoàn thành → kiểm tra trước khi điều thêm đội
@@ -249,6 +262,7 @@ function Intake() {
       }
       setText('');
       setParsed(null);
+      setEdit(null);
       setPhone('');
       qc.invalidateQueries({ queryKey: ['sos'] });
     } catch (e) {
@@ -284,7 +298,7 @@ function Intake() {
           className="input min-h-[85px] text-xs leading-relaxed"
           placeholder="Dán tin nhắn cầu cứu từ người dân (Zalo, SMS, gọi điện). Ví dụ: Nước ngập đến mái nhà ở xóm Pác Bó xã Trường Hà, 5 người có 1 cụ già và 2 trẻ em đang leo lên xà nhà..."
           value={text}
-          onChange={(e) => { setText(e.target.value); setParsed(null); }}
+          onChange={(e) => { setText(e.target.value); setParsed(null); setEdit(null); }}
         />
 
         <div className="flex items-center gap-2">
@@ -306,18 +320,47 @@ function Intake() {
           </button>
         </div>
 
-        {parsed && (
-          <div className="rounded-xl bg-panel2 p-3 text-xs space-y-1.5 border border-line">
-            <div className="font-semibold text-accent flex items-center justify-between">
-              <span>Phân loại tự động ({parsed.engine === 'rules' ? 'Quy tắc' : 'Mô hình AI'}):</span>
-              <span className="chip bg-panel text-ink-2 text-[10px]">{parsed.priority ? `Ưu tiên cấp ${parsed.priority}` : ''}</span>
+        {parsed && edit && (
+          // Kết quả bóc tách SỬA ĐƯỢC trước khi tạo phiếu: quy tắc / mô hình có thể đánh giá thấp (VD mắc kẹt trên mái là Cấp 1)
+          <div className="rounded-xl bg-panel2 p-3 text-xs space-y-2 border border-line">
+            <div className="font-semibold text-accent">
+              Phân loại tự động ({parsed.engine === 'rules' ? 'Quy tắc' : 'Mô hình AI'}) — kiểm tra, sửa nếu cần rồi tạo phiếu
             </div>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-              <span className="text-muted">Loại sự cố:</span><b>{INCIDENT[parsed.incident_type] || parsed.incident_type}</b>
-              <span className="text-muted">Mức ưu tiên:</span><b>{PRIORITY[parsed.priority]?.label || `Cấp ${parsed.priority}`}</b>
-              <span className="text-muted">Số người:</span><b>{parsed.trapped_count} người</b>
-              <span className="text-muted">Nhóm yếu thế:</span><b>{parsed.vulnerable.map((v) => VULNERABLE[v] || v).join(', ') || 'Không'}</b>
-              <span className="text-muted">Địa bàn:</span><b className={clsx(!parsed.place && 'text-danger')}>{parsed.place ? `${parsed.place.name}` : 'Cần cán bộ xác minh toạ độ'}</b>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="flex flex-col gap-0.5">
+                <span className="text-muted">Loại sự cố</span>
+                <select className="input py-1 text-xs" value={edit.incident_type} onChange={(e) => setEdit({ ...edit, incident_type: e.target.value })}>
+                  {Object.entries(INCIDENT).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                </select>
+              </label>
+              <label className="flex flex-col gap-0.5">
+                <span className="text-muted">Mức ưu tiên</span>
+                <select className="input py-1 text-xs" value={edit.priority} onChange={(e) => setEdit({ ...edit, priority: Number(e.target.value) })}>
+                  {[1, 2, 3].map((p) => <option key={p} value={p}>{PRIORITY[p].label}</option>)}
+                </select>
+              </label>
+              <label className="flex flex-col gap-0.5">
+                <span className="text-muted">Số người</span>
+                <input className="input py-1 text-xs" type="number" min={0} value={edit.trapped_count} onChange={(e) => setEdit({ ...edit, trapped_count: e.target.value })} />
+              </label>
+              <div className="flex flex-col gap-0.5">
+                <span className="text-muted">Địa bàn</span>
+                <b className={clsx('py-1', !parsed.place && 'text-danger')}>{parsed.place ? parsed.place.name : 'Cần cán bộ xác minh toạ độ'}</b>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-muted">Nhóm yếu thế:</span>
+              {Object.entries(VULNERABLE).map(([k, label]) => (
+                <button
+                  key={k}
+                  type="button"
+                  aria-pressed={edit.vulnerable.includes(k)}
+                  className={clsx('chip px-2 py-0.5', edit.vulnerable.includes(k) ? 'bg-danger text-white' : 'bg-panel text-ink-2')}
+                  onClick={() => setEdit({ ...edit, vulnerable: edit.vulnerable.includes(k) ? edit.vulnerable.filter((x) => x !== k) : [...edit.vulnerable, k] })}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
           </div>
         )}
@@ -497,6 +540,7 @@ export default function RescueCenter() {
   const [dispatch, setDispatch] = useState(null);
   const [linkFor, setLinkFor] = useState(null);
   const [cancelFor, setCancelFor] = useState(null);
+  const [editFor, setEditFor] = useState(null);
   const [over, setOver] = useState(null);
   const [filterText, setFilterText] = useState('');
 
@@ -614,6 +658,7 @@ export default function RescueCenter() {
                       onArrived={onArrived}
                       onLink={setLinkFor}
                       onCancel={setCancelFor}
+                      onEdit={setEditFor}
                     />
                   ))}
                 {!counts[col.key] && (
@@ -637,6 +682,7 @@ export default function RescueCenter() {
       {dispatch && <DispatchModal ticket={dispatch} onClose={() => setDispatch(null)} />}
       {linkFor && <MissionLinkModal ticket={linkFor} onClose={() => setLinkFor(null)} />}
       {cancelFor && <CancelDispatchModal ticket={cancelFor} onClose={() => setCancelFor(null)} />}
+      {editFor && <EditTicketModal ticket={editFor} onClose={() => setEditFor(null)} />}
     </div>
   );
 }

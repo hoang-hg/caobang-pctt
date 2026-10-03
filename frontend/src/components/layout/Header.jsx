@@ -22,7 +22,7 @@ function Clock() {
 }
 
 export default function Header() {
-  const { theme, toggleTheme, wsStatus, soundOn, toggleSound, mobileMenuOpen, setMobileMenuOpen } = useStore();
+  const { theme, toggleTheme, wsStatus, soundOn, toggleSound, mobileMenuOpen, setMobileMenuOpen, audioReady } = useStore();
 
   return (
     <header className="no-print sticky top-0 z-[1100] flex h-14 shrink-0 items-center gap-2 border-b border-line bg-panel/95 px-3 backdrop-blur-md">
@@ -85,6 +85,17 @@ export default function Header() {
           <span className={clsx('h-2 w-2 rounded-full shrink-0', wsStatus === 'online' ? 'bg-good animate-pulse' : wsStatus === 'connecting' ? 'bg-warn animate-ping' : 'bg-danger')} />
           <span className="hidden md:inline font-mono">{wsStatus === 'online' ? 'Trực tuyến' : wsStatus === 'connecting' ? 'Đang nối…' : 'Mất kết nối'}</span>
         </span>
+
+        {/* Trình duyệt đang chặn âm thanh (trang mở lại, chưa ai bấm) → chuông SOS sẽ im: nhắc bấm để mở khoá */}
+        {soundOn && !audioReady && (
+          <button
+            type="button"
+            className="chip animate-pulse border border-warn bg-warn/15 px-2.5 py-1 text-[11px] font-semibold text-ink"
+            title="Trình duyệt chặn âm thanh tới khi bấm vào trang — bấm để chuông SOS kêu được"
+          >
+            <VolumeX size={13} className="text-warn" /> <span className="hidden sm:inline">Bấm để bật chuông SOS</span>
+          </button>
+        )}
 
         {/* Nút bật/tắt âm báo SOS */}
         <button

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { audioAllowed } from '../utils/audio';
 
 const safeGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
 const safeSet = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch { /* bỏ qua */ } };
@@ -68,6 +69,9 @@ export const useStore = create((set, get) => ({
   wsStatus: 'connecting',
   setWsStatus: (wsStatus) => set({ wsStatus }),
   soundOn: safeGet('pctt_sound') !== 'off',
+  // Trình duyệt chặn âm thanh tới lần bấm đầu tiên trên trang (utils/audio.js) — thanh trên nhắc khi còn bị chặn
+  audioReady: audioAllowed(),
+  setAudioReady: () => set({ audioReady: true }),
   toggleSound: () => { const soundOn = !get().soundOn; safeSet('pctt_sound', soundOn ? 'on' : 'off'); set({ soundOn }); },
 
   // ---- Điều khiển Sidebar (Thu gọn trên Desktop & Mở Drawer trên Mobile) ----

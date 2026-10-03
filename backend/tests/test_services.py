@@ -323,3 +323,22 @@ async def test_storm_track_is_simulation_only(monkeypatch):
     monkeypatch.setattr(settings, "simulator", True)
     (track,) = (await map_layers.storm_track({}))["storms"]
     assert track["simulated"] is True and "mô phỏng" in track["name"]
+
+
+def test_people_count_sums_groups_and_roof_is_priority_one():
+    # SOP (README 7.1): mắc kẹt trên mái / nước tới mái = Cấp 1; số người = cộng các nhóm, tin có tổng thì lấy tổng
+    r = parse_rules("Cứu với! Nhà tôi ở tổ 5 nước ngập đến mái, có 2 cụ già và 1 trẻ em mắc kẹt", [])
+    assert r["trapped_count"] == 3 and r["priority"] == 1
+    assert parse_rules("3 người già và 1 trẻ em mắc kẹt trên gác", [])["trapped_count"] == 4
+    assert parse_rules("Nhà ngập sâu, 4 người, trong đó 2 trẻ em", [])["trapped_count"] == 4
+    assert parse_rules("Sạt lở, 2 người bị thương nặng và 1 cụ già", [])["trapped_count"] == 3
+    assert parse_rules("3 người lớn và 2 trẻ em bị cô lập", [])["trapped_count"] == 5
+    assert (
+        parse_rules("Gia đình 5 người, có 2 cụ già và 1 cháu nhỏ, nước ngập trong nhà", [])["trapped_count"]
+        == 5
+    )
+    assert parse_rules("co 3 nguoi mac ket tren mai nha", [])["priority"] == 1  # tin gõ không dấu
+    rain = parse_rules(
+        "Mưa to đến mai, nước ngập trong nhà, 2 người mắc kẹt", []
+    )  # "mai" = ngày mai, không phải mái
+    assert rain["priority"] == 2 and rain["trapped_count"] == 2

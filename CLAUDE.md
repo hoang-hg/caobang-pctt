@@ -314,6 +314,8 @@ chỉ khi `DEMO_MODE`; `DEMO_MODE=false` xoá đoạn `so_do` còn sót mỗi l�
   tương tự. Bảng màu tối nằm trong `@media screen` → in luôn nền sáng; vùng cuộn cao cố định (`max-h-…` +
   `overflow-y-auto`) thêm `print:max-h-none print:overflow-visible` để in không bị cắt (mẫu cột Kanban ở RescueCenter). Component
   dùng chung trong `components/common/ui.jsx` (KpiCard, Modal, Tabs, Section, Empty, Progress, StatusDot). Icon `lucide-react`.
+- **Âm báo**: chỉ qua `utils/audio.playAlarm`; trình duyệt chặn âm thanh tới lần bấm / gõ phím đầu tiên — `watchAudioUnlock`
+  (Shell) mở khoá, `store.audioReady` = thanh trên nhắc "Bấm để bật chuông SOS".
 - **Biểu đồ** Recharts lấy màu từ `useChartTheme()` (+ `axisProps`, `ChartTooltip`); không dùng 2 trục Y (tách biểu đồ).
 - **Bản đồ**: `leaflet-draw` và `protomaps-leaflet` cần `L` toàn cục → `components/map/leafletGlobal.js` import trước.
   Nền bản đồ chỉ qua `<BaseLayer>` trong `components/map/MapTools.jsx`: nền có `local` (Địa lý, Ban đêm) vẽ từ
@@ -377,6 +379,10 @@ chỉ khi `DEMO_MODE`; `DEMO_MODE=false` xoá đoạn `so_do` còn sót mỗi l�
   nhập mọi tệp mẫu, hồ chứa chưa có số liệu → cập nhật vận hành, phản ánh → SOS → điều động, Maker–Checker, IoT, email,
   `/health/full` = 200). Luồng chỉ bộ mô phỏng làm (giao nhận tin, xe di chuyển) phải có đường đi riêng khi `SIMULATOR=false`.
   Thay đổi hành vi nghiệp vụ / quyền → cập nhật script tương ứng.
+- Tràn ngang trên điện thoại (`tests/ui/ui-test.mjs` `overflowX`): Chrome điện thoại gặp nội dung rộng hơn màn hình thì
+  thu nhỏ cả trang (`innerWidth` > `screen.width`) → `scrollWidth − innerWidth` vẫn 0; phải so thêm `innerWidth` với
+  `screen.width`. Lưới / flex có tên dài + nút cố định (`shrink-0`) → cột lưới thêm `min-w-0` (`[&>*]:min-w-0`), hàng
+  cho xuống dòng (`flex-wrap`).
 - `tests/load/load.js` (k6, README §12.2): thay đổi đường đi của cổng công khai hoặc dashboard (thêm API, bỏ cache…) →
   chạy lại, so với bảng kết quả trong README; cập nhật bảng khi số liệu đổi đáng kể.
 
