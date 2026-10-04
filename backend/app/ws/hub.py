@@ -1,7 +1,8 @@
 """Hub WebSocket: đẩy sự kiện thời gian thực tới mọi màn hình điều hành.
 
 Các loại sự kiện: sos.new, sos.updated, gps.update, reading.new, inventory.changed, log.new,
-broadcast.updated, hazard.new, dispatch.updated, call.new, report.new, report.updated, source.updated, ingest.log
+broadcast.updated, broadcast.expiring, hazard.new, dispatch.updated, call.new, report.new, report.updated, source.updated,
+ingest.log
 
 Nhiều tiến trình (gunicorn nhiều worker + tiến trình nền): khi có REDIS_URL, ``publish`` gửi lên kênh Redis
 ``pctt:events``; mỗi tiến trình API lắng nghe kênh đó và phát lại cho các kết nối của chính nó.
@@ -44,6 +45,7 @@ EVENT_SCOPE = {
     "inventory.changed": "resource",
     "gps.update": "resource",
     "broadcast.updated": "alert",
+    "broadcast.expiring": "alert",  # cảnh báo sắp hết hiệu lực (app/services/alert_watch.py)
     "reading.new": "monitoring",
     "hazard.new": "monitoring",
     "reservoir.updated": "monitoring",

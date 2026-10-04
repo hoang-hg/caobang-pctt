@@ -17,16 +17,17 @@ const NAV = [
   { to: '/cuu-ho', label: 'Điều hành cứu hộ', icon: Siren, badge: true, perm: ['sos', 'view'] },
   { to: '/phan-anh', label: 'Phản ánh người dân', icon: Camera, perm: ['report', 'view'], badgeKey: 'reports' },
   { to: '/nguon-luc', label: 'Vật tư & Lực lượng', icon: Boxes, perm: ['resource', 'view'] },
-  { to: '/canh-bao', label: 'Cảnh báo & Hotline', icon: Megaphone, perm: ['alert', 'view'] },
+  { to: '/canh-bao', label: 'Cảnh báo & Hotline', icon: Megaphone, perm: ['alert', 'view'], badgeKey: 'alerts' },
   { to: '/nguon-du-lieu', label: 'Nguồn dữ liệu & IoT', icon: DatabaseZap, perm: ['integration', 'view'] },
   // Cấp tỉnh nhập thẳng + duyệt hồ sơ; xã/phường gửi dữ liệu chờ duyệt
   { to: '/nhap-du-lieu', label: 'Nhập dữ liệu', icon: FileUp, perm: ['data', 'import'], alt: ['data', 'submit'], badgeKey: 'submissions' },
   { to: '/phan-quyen', label: 'Phân quyền', icon: KeyRound, perm: ['user', 'view'] },
 ];
 
-export default function Sidebar() {
+/** Số đếm trên menu (dùng chung Sidebar và nút menu trên điện thoại ở Header — cùng khoá truy vấn, không gọi API 2 lần). */
+export function useNavBadges() {
   const perms = useStore((s) => s.auth?.user?.permissions);
-  const { sidebarCollapsed, toggleSidebarCollapse, mobileMenuOpen, setMobileMenuOpen } = useStore();
+  const hasPin = useStore((s) => !!s.auth?.user?.has_pin);
   const { data } = useAreaQuery('kpis', '/dashboard/kpis', {}, { refetchInterval: 30_000 });
   const waiting = data?.sos?.waiting || 0;
   const canReports = hasPermission(perms, 'report', 'view');
@@ -39,7 +40,26 @@ export default function Sidebar() {
     enabled: canReview,
     refetchInterval: 60_000,
   });
-  const badges = { sos: waiting, reports: rep?.counts?.cho_duyet || 0, submissions: canReview ? subs?.counts?.cho_duyet || 0 : 0 };
+  // Lệnh cảnh báo chờ BẠN phê duyệt (có quyền duyệt + đã cấp PIN, không phải người soạn) — trước đây chỉ có thông báo 6 giây
+  const canApprove = hasPermission(perms, 'alert', 'approve') && hasPin;
+  const { data: pendingAlerts } = useQuery({
+    queryKey: ['broadcasts', 'pending'],
+    queryFn: () => api('/alerts/broadcasts', { params: { status: 'pending_approval', limit: 20 } }),
+    enabled: canApprove,
+    refetchInterval: 60_000,
+  });
+  return {
+    sos: waiting,
+    reports: rep?.counts?.cho_duyet || 0,
+    submissions: canReview ? subs?.counts?.cho_duyet || 0 : 0,
+    alerts: canApprove ? (pendingAlerts || []).filter((b) => b.can_approve).length : 0,
+  };
+}
+
+export default function Sidebar() {
+  const perms = useStore((s) => s.auth?.user?.permissions);
+  const { sidebarCollapsed, toggleSidebarCollapse, mobileMenuOpen, setMobileMenuOpen } = useStore();
+  const badges = useNavBadges();
 
   const navItems = NAV.filter((n) => hasPermission(perms, ...n.perm) || (n.alt && hasPermission(perms, ...n.alt)));
 

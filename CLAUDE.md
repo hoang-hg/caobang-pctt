@@ -53,7 +53,8 @@ backend/                   Python 3.12, FastAPI, SQLAlchemy async (psycopg3), Ca
                            chống leo thang) · seed.py (đồng bộ vai trò, tạo Superadmin / tài khoản demo)
   app/services/            sos, sos_nlp, dispatch_matching, safe_routing, broadcast, reports, tracking, reservoirs,
                            landslides, events (log_event), simulator, scenario, lite (trang bản nhẹ /ban-nhe, HTML < 50 KB),
-                           mission (link nhiệm vụ cho trưởng nhóm hiện trường: mã, hạn, nội dung lệnh)
+                           mission (link nhiệm vụ cho trưởng nhóm hiện trường: mã, hạn, nội dung lệnh),
+                           alert_watch (email người duyệt khi có lệnh cảnh báo chờ duyệt; worker nhắc lệnh sắp hết hiệu lực)
   app/services/data_import/  nhập dữ liệu chính thức từ tệp: specs.py (khai báo 15 loại) · parsing.py (CSV/xlsx/GeoJSON,
                            chuẩn hoá — thuần) · engine.py (validate / apply 1 transaction) · templates.py · service.py
                            (nhật ký, sự kiện, xoá cache) · __main__.py (dòng lệnh). API: app/api/v1/data_import.py
@@ -199,7 +200,7 @@ Python trong container.
 - `hub.publish(event, data, scope=None, code=None)`: sự kiện gắn xã truyền `scope` (`"sos"`, `"monitoring"`, `"report"`)
   và `code` = mã xã để chỉ người có quyền ở xã đó nhận (VD `hub.publish("sos.updated", ticket, "sos", ticket["admin_code"])`).
 - Sự kiện hiện có: `reading.new`, `sos.new`, `sos.updated`, `dispatch.updated`, `gps.update`, `hazard.new`,
-  `broadcast.updated`, `inventory.changed`, `call.new`, `log.new`, `report.new`, `report.updated`, `ingest.log`,
+  `broadcast.updated`, `broadcast.expiring`, `inventory.changed`, `call.new`, `log.new`, `report.new`, `report.updated`, `ingest.log`,
   `source.updated`, `evacuation.updated`, `hazard.updated`, `storm.updated`, `forecast.updated`, `reservoir.updated`,
   `submission.updated`, `data.imported`, `field.report` (trưởng nhóm báo qua link nhiệm vụ). Sự kiện mới phải thêm nhánh xử lý trong `frontend/src/api/useSocket.js`.
   Sự kiện phải báo người trực (thông báo + chuông) thì thêm cả vào `catchUp` của `useSocket.js` — tìm lại bằng REST khi nối
@@ -208,6 +209,9 @@ Python trong container.
 - Cảnh báo "đang hiệu lực" (cổng công khai, "Tôi đang ở đâu?", bản nhẹ, màn hình cảnh báo): luôn dùng
   `services/broadcast.active_alert_sql(alias)` (đã duyệt, chưa kết thúc, chưa quá `valid_until`) — không tự viết điều kiện
   theo giờ phát (trước đây cố định 48 giờ ở 4 nơi).
+- Chỗ mới tạo lệnh cảnh báo chờ duyệt (ngoài `create_broadcast`, `simulator.auto_draft`) → gọi
+  `alert_watch.in_background(mail_new_draft(...))` để email người duyệt; `broadcast.updated` lúc chờ duyệt / từ chối gửi kèm
+  `created_by` (giao diện chỉ báo người duyệt được / người soạn).
 - Nhật ký sự kiện điều hành: `services/events.log_event(message, category, severity, admin_unit_id|lat/lon)`.
   Nhật ký pháp lý thao tác người dùng: `auth.audit(user, action, entity, entity_id, details)` — mọi thao tác ghi đều gọi.
 
