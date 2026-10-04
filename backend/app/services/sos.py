@@ -11,10 +11,19 @@ from app.ws.hub import hub
 
 # Thời hạn phản hồi điều phối (phút) theo cấp ưu tiên — trung tâm cứu hộ và KPI "quá hạn" của dashboard dùng chung
 SLA_MINUTES = {1: 3, 2: 15, 3: 60}
-OVERDUE_SQL = (
-    "t.status = 'moi' AND t.received_at < now() - make_interval(mins => CASE t.priority "
+_SLA_INTERVAL = (
+    "make_interval(mins => CASE t.priority "
     + " ".join(f"WHEN {p} THEN {m}" for p, m in SLA_MINUTES.items())
     + " ELSE 15 END)"
+)
+# Quá hạn: "Chờ xử lý" quá SLA kể từ lúc nhận tin; hoặc "Đang điều phối" mà chưa có đội nào đang đi / ở hiện trường
+# ("Chờ điều động") quá SLA kể từ lúc chuyển sang cột này / lúc huỷ lệnh trước — kéo phiếu sang "Đang điều phối" không
+# dừng được đồng hồ khi chưa ai đi cứu
+OVERDUE_SQL = (
+    f"((t.status = 'moi' AND t.received_at < now() - {_SLA_INTERVAL})"
+    f" OR (t.status = 'dieu_phoi' AND t.status_changed_at < now() - {_SLA_INTERVAL}"
+    " AND NOT EXISTS (SELECT 1 FROM operations.dispatch_orders o"
+    " WHERE o.ticket_id = t.id AND o.status IN ('dang_di', 'da_den'))))"
 )
 
 SOURCE_LABEL = {
@@ -37,7 +46,7 @@ INCIDENT_LABEL = {
 TICKET_SELECT = """
 SELECT t.id, t.code, t.reporter_name, t.reporter_phone, t.source, t.raw_message, t.address,
        t.incident_type, t.priority, t.status, t.trapped_count, t.vulnerable, t.received_at, t.acknowledged_at,
-       t.resolved_at, t.notes, ST_Y(t.location) AS lat, ST_X(t.location) AS lon,
+       t.resolved_at, t.status_changed_at, t.notes, ST_Y(t.location) AS lat, ST_X(t.location) AS lon,
        u.code AS admin_code, u.name AS admin_name,
        d.id AS dispatch_id, d.status AS dispatch_status, d.eta, d.progress, d.distance_km, d.route_safe,
        d.dispatched_at, d.arrived_at,

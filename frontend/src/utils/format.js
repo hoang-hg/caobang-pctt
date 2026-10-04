@@ -6,6 +6,12 @@ export const time = (t) => (t ? new Date(t).toLocaleTimeString('vi-VN', { hour: 
 export const dateTime = (t) => (t ? new Date(t).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : '–');
 export const hourLabel = (t) => new Date(t).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 export const minutesSince = (t) => (t ? Math.floor((Date.now() - new Date(t).getTime()) / 60000) : 0);
+/** Ngày (giờ) Việt Nam cho tên tệp xuất: "2026-10-03" / "2026-10-03-0830". toISOString() là giờ UTC — xuất trước 7 giờ
+ * sáng thì tên tệp mang ngày hôm trước. Việt Nam không đổi giờ mùa hè → cộng 7 giờ là đủ. */
+export const vnFileStamp = (d = new Date(), withTime = false) => {
+  const s = new Date(d.getTime() + 7 * 3600e3).toISOString();
+  return withTime ? `${s.slice(0, 10)}-${s.slice(11, 13)}${s.slice(14, 16)}` : s.slice(0, 10);
+};
 export const ago = (t) => {
   const m = minutesSince(t);
   if (m < 1) return 'vừa xong';

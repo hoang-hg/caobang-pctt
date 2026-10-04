@@ -190,6 +190,10 @@ Python trong container.
 - **Không** kiểm tra tên vai trò trong route. Quyền mới → `ALL_PERMISSIONS` + vai trò trong `SYSTEM_ROLES`
   (`rbac/permissions.py`) + bảng README §8. API trả `admin_code` cho đối tượng frontend cần gate theo xã.
 - Đổi quyền / mật khẩu / khoá tài khoản → `bump_token_version()` (JWT cũ bị từ chối).
+- Route mới dùng `current_user` (qua `require_*`): chặn 403 tài khoản `must_change_password` (mật khẩu do cấp trên đặt).
+  Chỉ `/auth/me`, `/auth/change-password`, `/auth/refresh` dùng thẳng `session_user` (`test_ops_flows3` kiểm danh sách này).
+- Token mang `auth_time` (lúc đăng nhập); cấp token mới luôn qua `create_token(user, auth_time)` — gia hạn giữ mốc cũ,
+  hạn không quá `SESSION_MAX_HOURS` kể từ lúc đăng nhập (`auth.token_expiry`).
 
 **Realtime & nhật ký**
 - `hub.publish(event, data, scope=None, code=None)`: sự kiện gắn xã truyền `scope` (`"sos"`, `"monitoring"`, `"report"`)
@@ -198,6 +202,9 @@ Python trong container.
   `broadcast.updated`, `inventory.changed`, `call.new`, `log.new`, `report.new`, `report.updated`, `ingest.log`,
   `source.updated`, `evacuation.updated`, `hazard.updated`, `storm.updated`, `forecast.updated`, `reservoir.updated`,
   `submission.updated`, `data.imported`, `field.report` (trưởng nhóm báo qua link nhiệm vụ). Sự kiện mới phải thêm nhánh xử lý trong `frontend/src/api/useSocket.js`.
+  Sự kiện phải báo người trực (thông báo + chuông) thì thêm cả vào `catchUp` của `useSocket.js` — tìm lại bằng REST khi nối
+  lại sau mất kết nối (tin phát lúc mất kết nối không tới). `/ws` trả `{"event": "pong", "ts"}` cho "ping" (nhịp tim).
+- Đổi trạng thái phiếu SOS ở câu UPDATE mới → cập nhật cả `status_changed_at` (đồng hồ "Chờ điều động", `OVERDUE_SQL`).
 - Cảnh báo "đang hiệu lực" (cổng công khai, "Tôi đang ở đâu?", bản nhẹ, màn hình cảnh báo): luôn dùng
   `services/broadcast.active_alert_sql(alias)` (đã duyệt, chưa kết thúc, chưa quá `valid_until`) — không tự viết điều kiện
   theo giờ phát (trước đây cố định 48 giờ ở 4 nơi).
@@ -289,7 +296,10 @@ chỉ khi `DEMO_MODE`; `DEMO_MODE=false` xoá đoạn `so_do` còn sót mỗi l�
 ## 7. Quy ước frontend
 
 - **Gọi API**: `api(path, { method, body, params })` trong `src/api/client.js` — tự thêm tiền tố `/api/v1`, Bearer token từ
-  store, lỗi → `ApiError(status, detail)`, 401 → đăng xuất. Upload multipart (phản ánh) dùng `fetch` trực tiếp.
+  store, lỗi → `ApiError(status, detail)`, 401 → đăng xuất (kèm thông báo lý do), 403 có header `X-Must-Change-Password`
+  → màn hình đổi mật khẩu. Upload multipart (phản ánh) dùng `fetch` trực tiếp.
+- **Tên tệp xuất** (Excel / PDF): ngày theo giờ Việt Nam `vnFileStamp()` (`utils/format.js`), không dùng `toISOString()`
+  (giờ UTC — trước 7 giờ sáng ra ngày hôm trước).
 - **Truy vấn theo vùng lọc**: `useAreaQuery(key, path, extra)`; `key` phải trùng khoá mà `useSocket.js` invalidate khi có sự
   kiện (VD `sos`, `kpis`, `map-layers`, `stations`, `rainfall`, `warehouses`, `reports`, `int-sources`…) để tự làm mới.
 - **Route**: trang điều hành trong `Shell` bọc `<Guard obj act>`; trang công khai ngoài `Shell`. Trang công khai

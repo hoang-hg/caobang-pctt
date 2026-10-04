@@ -19,6 +19,14 @@ const check = (name, cond, extra = '') => {
 const login = async (u, p) => (await call('POST', '/auth/login', { username: u, password: p })).data?.token;
 const stamp = Date.now().toString(36);
 const PW = 'MatKhau2026';
+const OWN_PW = 'MatKhauRieng2026'; // mật khẩu người dùng tự đặt ở lần đăng nhập đầu
+// Tài khoản cấp trên vừa tạo: đăng nhập rồi đổi sang mật khẩu riêng (bắt buộc) → token dùng được hệ thống
+const firstLogin = async (u, p) => {
+  const r = (await call('POST', '/auth/login', { username: u, password: p })).data;
+  if (!r?.user?.must_change_password) return r?.token;
+  return (await call('POST', '/auth/change-password', { current_password: p, new_password: OWN_PW }, r.token)).data?.token;
+};
+const jwtBody = (tok) => JSON.parse(Buffer.from(String(tok).split('.')[1] || '', 'base64url').toString() || '{}');
 
 // ---- Chưa đăng nhập
 check('Chưa đăng nhập → 401 khi xem dashboard', (await call('GET', '/dashboard/kpis')).status === 401);
@@ -32,6 +40,16 @@ const T = {
   coba: await login('canbo.coba', 'coba123'), // Cấp 3 xã Cô Ba
 };
 check('Đăng nhập 5 tài khoản demo (3 cấp)', Object.values(T).every(Boolean));
+
+// ---- Phiên tự gia hạn khi trang còn mở: token mới giữ mốc đăng nhập, không quá 72 giờ (SESSION_MAX_HOURS) từ lúc đó
+const renewed = await call('POST', '/auth/refresh', null, T.trucban);
+const t0 = jwtBody(T.trucban);
+const t1 = jwtBody(renewed.data?.token);
+check('Gia hạn phiên: token mới giữ mốc đăng nhập, hạn ≤ 72 giờ kể từ lúc đăng nhập',
+  renewed.status === 200 && !!t0.auth_time && t1.auth_time === t0.auth_time && t1.exp >= t0.exp && t1.exp <= t0.auth_time + 72 * 3600,
+  JSON.stringify({ status: renewed.status, auth_time: [t0.auth_time, t1.auth_time], exp: [t0.exp, t1.exp] }));
+check('Token cũ vẫn dùng được tới hạn của nó', (await call('GET', '/auth/me', null, T.trucban)).status === 200);
+check('Gia hạn cần đăng nhập → 401', (await call('POST', '/auth/refresh')).status === 401);
 
 // ---- Đúng 3 vai trò, không tạo được vai trò khác
 const roles = (await call('GET', '/rbac/roles', null, T.admin)).data || [];
@@ -115,7 +133,7 @@ check('2 lần duyệt đồng thời (bấm đúp) chỉ phát 1 lần', twinAp
 // Khoá PIN: tài khoản duyệt riêng cho kiểm thử (không khoá tài khoản demo các bộ khác dùng)
 const approver = `duyet.${stamp}`;
 await call('POST', '/rbac/users', { username: approver, full_name: 'Người duyệt thử', password: PW, pin: '2580', role: 'admin_tinh', domain: '*' }, T.admin);
-const apTok = await login(approver, PW);
+const apTok = await firstLogin(approver, PW);
 const br3 = (await draft(T.trucban, 'Thử khoá PIN')).data;
 const wrong = [];
 for (let i = 0; i < 5; i++) wrong.push((await call('POST', `/alerts/broadcasts/${br3.id}/approve`, { pin: '0000' }, apTok)).status);
@@ -135,8 +153,27 @@ check('Không còn phạm vi cụm: Cấp 3 theo cụm → 422', (await mkUser(T
 check('Không còn vai trò cũ (truc_ban) → 404', (await mkUser(T.admin, `x3.${stamp}`, 'truc_ban', '*')).status === 404);
 check('Cấp 3 kèm PIN → 422 (Cấp 3 không duyệt cảnh báo)', (await mkUser(T.tinh, `x4.${stamp}`, 'admin_xa', 'BAOLAC/CB-COBA', { pin: '1357' })).status === 422);
 check('Cấp 3 không tạo được tài khoản → 403', (await mkUser(T.coba, `x5.${stamp}`, 'admin_xa', 'BAOLAC/CB-COBA')).status === 403);
-const subTok = await login(`xa.${stamp}`, PW);
-check('Tài khoản Cấp 3 mới đăng nhập được', !!subTok);
+// Mật khẩu do cấp trên đặt: đăng nhập được nhưng phải tự đổi rồi mới dùng hệ thống
+const fresh = (await call('POST', '/auth/login', { username: `xa.${stamp}`, password: PW })).data;
+check('Tài khoản Cấp 3 mới đăng nhập được, bị yêu cầu đổi mật khẩu cấp trên đặt', !!fresh?.token && fresh.user?.must_change_password === true);
+const blocked = await fetch(BASE + '/sos', { headers: { Authorization: `Bearer ${fresh?.token}` } });
+check('Chưa đổi mật khẩu → mọi chức năng bị chặn 403 (kèm header cho giao diện)',
+  blocked.status === 403 && blocked.headers.get('x-must-change-password') === '1', `HTTP ${blocked.status}`);
+check('Chưa đổi mật khẩu vẫn xem được hồ sơ của mình', (await call('GET', '/auth/me', null, fresh?.token)).data?.must_change_password === true);
+const wsBlocked = await new Promise((resolve) => {
+  const ws = new WebSocket(`${BASE.replace('http', 'ws').replace('/api/v1', '/ws')}?token=${encodeURIComponent(fresh?.token)}`);
+  ws.onopen = () => { resolve('open'); ws.close(); };
+  ws.onerror = () => resolve('rejected');
+  ws.onclose = () => resolve('rejected');
+  setTimeout(() => resolve('timeout'), 5000);
+});
+check('Chưa đổi mật khẩu → không nhận tin realtime (WebSocket bị từ chối)', wsBlocked === 'rejected', wsBlocked);
+check('Mật khẩu mới phải khác mật khẩu cấp trên đặt → 422',
+  (await call('POST', '/auth/change-password', { current_password: PW, new_password: PW }, fresh?.token)).status === 422);
+const own = await call('POST', '/auth/change-password', { current_password: PW, new_password: OWN_PW }, fresh?.token);
+const subTok = own.data?.token;
+check('Tự đổi mật khẩu → dùng được hệ thống', own.status === 200 && own.data?.user?.must_change_password === false &&
+  (await call('GET', '/sos', null, subTok)).status === 200);
 
 // Chống mạo danh cùng cấp: Quản trị tỉnh không đổi mật khẩu / PIN / 2 lớp / khoá tài khoản Cấp 2 khác
 const chihuyId = (await call('GET', '/auth/me', null, T.chihuy)).data.id;
@@ -148,7 +185,11 @@ check('Cấp 2 không khoá Cấp 2 khác → 403', (await call('PATCH', `/rbac/
 check('Cấp 2 không sửa Cấp 1 → 403', (await call('PATCH', `/rbac/users/${adminId}`, { is_active: false }, T.tinh)).status === 403);
 check('Cấp 2 không đặt PIN cho Cấp 3 → 422', (await call('PATCH', `/rbac/users/${sub.data.id}`, { pin: '1357' }, T.tinh)).status === 422);
 check('Cấp 2 đặt lại mật khẩu cho Cấp 3', (await call('PATCH', `/rbac/users/${sub.data.id}`, { password: 'MatKhauMoi2026' }, T.tinh)).status === 200);
-check('Mật khẩu mới dùng được, mật khẩu cũ hết hiệu lực', !!(await login(`xa.${stamp}`, 'MatKhauMoi2026')) && !(await login(`xa.${stamp}`, PW)));
+check('Mật khẩu mới dùng được, mật khẩu cũ hết hiệu lực', !!(await login(`xa.${stamp}`, 'MatKhauMoi2026')) && !(await login(`xa.${stamp}`, OWN_PW)));
+check('Cấp trên đặt lại mật khẩu → lần đăng nhập tới phải đổi lại',
+  (await call('POST', '/auth/login', { username: `xa.${stamp}`, password: 'MatKhauMoi2026' })).data?.user?.must_change_password === true);
+check('Danh sách tài khoản báo "chờ tự đổi mật khẩu"',
+  ((await call('GET', '/rbac/users', null, T.tinh)).data || []).some((u) => u.username === `xa.${stamp}` && u.must_change_password === true));
 const subTok2 = await login(`xa.${stamp}`, 'MatKhauMoi2026');
 
 // Đổi cấp / phạm vi = thay vai trò (không cộng dồn)

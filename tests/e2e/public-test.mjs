@@ -198,8 +198,9 @@ check('Đặt lại mật khẩu bằng link email — 2 yêu cầu đồng th�
 check('Token đã dùng không dùng lại được → 400', (await call('POST', '/auth/reset-password', { token, new_password: 'KhacNua2026' })).status === 400);
 check('Phiên cũ bị đăng xuất sau khi đặt lại → 401', (await call('GET', '/auth/me', null, pwTok)).status === 401);
 check('Mật khẩu cũ không đăng nhập được', !(await login(pwUser, 'BanDau2026')));
-const newTok = await login(pwUser, 'MoiMoi2026');
-check('Đăng nhập bằng mật khẩu mới', !!newTok);
+const newLogin = (await call('POST', '/auth/login', { username: pwUser, password: 'MoiMoi2026' })).data;
+const newTok = newLogin?.token;
+check('Đăng nhập bằng mật khẩu mới (tự đặt qua email → không phải đổi lại)', !!newTok && newLogin.user?.must_change_password === false);
 const changed = await call('POST', '/auth/change-password', { current_password: 'MoiMoi2026', new_password: 'LanHai2026' }, newTok);
 check('Đổi mật khẩu → nhận token mới, token cũ hết hiệu lực', changed.status === 200 && !!changed.data.token
   && (await call('GET', '/auth/me', null, newTok)).status === 401 && (await call('GET', '/auth/me', null, changed.data.token)).status === 200);

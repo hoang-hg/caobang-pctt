@@ -77,17 +77,26 @@ async function freshCode(secret) {
     await sleep(30_000 - (Date.now() % 30_000) + 300);
   }
 }
-/** Đăng nhập; vai trò bắt buộc 2 lớp lần đầu → cài đặt TOTP bằng phiếu đăng nhập. Trả về token. */
+/** Phiên mới của tài khoản cấp trên vừa tạo: phải đổi mật khẩu ban đầu sang mật khẩu riêng rồi mới dùng hệ thống. */
+async function ownPassword(session, password, label) {
+  if (!session?.user?.must_change_password) return { token: session?.token, password };
+  const own = `${password}-rieng`;
+  const r = await call('POST', '/auth/change-password', { current_password: password, new_password: own }, session.token);
+  check(`${label}: lần đầu đổi mật khẩu cấp trên đặt`, r.status === 200 && r.data?.user?.must_change_password === false, `HTTP ${r.status}`);
+  return { token: r.data?.token, password: own };
+}
+/** Đăng nhập; vai trò bắt buộc 2 lớp lần đầu → cài đặt TOTP bằng phiếu đăng nhập; mật khẩu cấp trên đặt → đổi. Trả về
+ * token và mật khẩu đang dùng. */
 async function loginWithSetup(username, password, label) {
   const r = await call('POST', '/auth/login', { username, password });
-  if (r.data?.token) return { token: r.data.token, mfa: false };
+  if (r.data?.token) return { ...(await ownPassword(r.data, password, label)), mfa: false };
   if (r.data?.mfa !== 'setup') {
     check(`${label}: đăng nhập`, false, `HTTP ${r.status} ${JSON.stringify(r.data).slice(0, 120)}`);
     return {};
   }
   const setup = await call('POST', '/auth/mfa/setup', { challenge: r.data.challenge });
   const en = await call('POST', '/auth/mfa/enable', { challenge: r.data.challenge, code: await freshCode(setup.data?.secret) });
-  return { token: en.data?.token, mfa: true, secret: setup.data?.secret };
+  return { ...(await ownPassword(en.data, password, label)), mfa: true, secret: setup.data?.secret };
 }
 
 // ================================================================ 1. Hạ tầng & cấu hình an toàn
@@ -249,20 +258,20 @@ const xaUser = `canbo.${stamp}`;
 const chkUser = `lanhdao.${stamp}`;
 check('Tạo tài khoản Cấp 3 xã Cô Ba (có email)', (await mk(xaUser, 'admin_xa', 'BAOLAC/CB-COBA', { email: `${xaUser}@ci.local` })).status === 201);
 check('Tạo tài khoản Cấp 2 (lãnh đạo, có PIN)', (await mk(chkUser, 'admin_tinh', '*', { pin: CHECKER_PIN })).status === 201);
-const xa = (await call('POST', '/auth/login', { username: xaUser, password: PW })).data?.token;
-check('Cán bộ xã đăng nhập 1 bước (vai trò không bắt buộc 2 lớp)', !!xa);
+const { token: xa, mfa: xaMfa } = await loginWithSetup(xaUser, PW, 'Cán bộ xã');
+check('Cán bộ xã đăng nhập 1 bước (vai trò không bắt buộc 2 lớp)', !!xa && xaMfa === false);
 check('Cán bộ xã không cập nhật được vận hành hồ → 403',
   (await call('PATCH', `/reservoirs/${HO}/operation`, { current_level: 180, spill_gates_open: 0 }, xa)).status === 403);
-const { token: checker, mfa: chkMfa, secret: chkSecret } = await loginWithSetup(chkUser, PW, 'Lãnh đạo');
+const { token: checker, mfa: chkMfa, secret: chkSecret, password: chkPw } = await loginWithSetup(chkUser, PW, 'Lãnh đạo');
 check('Cấp 2: bắt buộc cài 2 lớp khi đăng nhập lần đầu', !!checker && chkMfa === true);
 check('Cấp 2: /auth/me ghi rõ bắt buộc 2 lớp', (await call('GET', '/auth/me', null, checker)).data?.mfa?.required === true);
 check('Cấp 2: không tự tắt được 2 lớp (vai trò bắt buộc) → 403',
-  (await call('POST', '/auth/mfa/disable', { password: PW, code: await freshCode(chkSecret) }, checker)).status === 403);
+  (await call('POST', '/auth/mfa/disable', { password: chkPw, code: await freshCode(chkSecret) }, checker)).status === 403);
 
 // ---- Xã/phường gửi dữ liệu → cấp tỉnh phê duyệt rồi mới hiển thị
 const qtxa = `qtxa.${stamp}`;
 check('Tạo tài khoản quản trị xã (Cô Ba)', (await mk(qtxa, 'admin_xa', 'BAOLAC/CB-COBA', { email: `${qtxa}@ci.local` })).status === 201);
-const xaTok = (await call('POST', '/auth/login', { username: qtxa, password: PW })).data?.token;
+const { token: xaTok } = await loginWithSetup(qtxa, PW, 'Quản trị xã');
 const coba = ((await call('GET', '/admin-units?level=xa')).data || []).find((u) => u.code === 'CB-COBA');
 const SITE = `Nhà văn hoá xã gửi ${stamp}`;
 const subForm = new FormData();

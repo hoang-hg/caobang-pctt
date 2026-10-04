@@ -147,6 +147,7 @@ async def update_sos(
         raise forbidden()
     await execute(
         """UPDATE operations.sos_tickets SET
+                  status_changed_at = CASE WHEN CAST(:s AS text) <> status THEN now() ELSE status_changed_at END,
                   status = COALESCE(CAST(:s AS text), status), priority = COALESCE(CAST(:p AS smallint), priority),
                   notes = COALESCE(CAST(:n AS text), notes),
                   trapped_count = COALESCE(CAST(:tc AS int), trapped_count),
@@ -427,7 +428,8 @@ async def dispatch(body: DispatchIn, user: dict = Depends(require_any("dispatch"
             conn,
         )
         await execute(
-            """UPDATE operations.sos_tickets SET status = 'thuc_thi', acknowledged_at = COALESCE(acknowledged_at, now())
+            """UPDATE operations.sos_tickets SET status = 'thuc_thi', acknowledged_at = COALESCE(acknowledged_at, now()),
+                      status_changed_at = CASE WHEN status <> 'thuc_thi' THEN now() ELSE status_changed_at END
                 WHERE id = CAST(:t AS uuid)""",
             {"t": body.ticket_id},
             conn,
@@ -575,7 +577,7 @@ async def cancel_dispatch(
                 conn,
             )
         await execute(
-            """UPDATE operations.sos_tickets SET status = 'dieu_phoi'
+            """UPDATE operations.sos_tickets SET status = 'dieu_phoi', status_changed_at = now()
                 WHERE id = :t AND status = 'thuc_thi'
                   AND NOT EXISTS (SELECT 1 FROM operations.dispatch_orders o
                                    WHERE o.ticket_id = :t AND o.status IN ('dang_di', 'da_den'))""",

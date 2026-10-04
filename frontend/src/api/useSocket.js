@@ -1,19 +1,39 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useStore } from '../app/store';
+import { hasPermission } from '../rbac/permissions';
 import { playAlarm } from '../utils/audio';
 import { INCIDENT } from '../utils/labels';
+import { api } from './client';
+
+const HEARTBEAT_MS = 25_000; // gửi "ping"; máy chủ trả "pong" kèm giờ máy chủ (app/main.py)
+const DEAD_MS = 60_000; // không nhận được gì ngần này → kết nối đã chết (mạng rớt im lặng) → nối lại
+const CATCH_UP_MARGIN_MS = 60_000; // tìm lại lùi thêm 1 phút trước tin cuối cùng nhận được (tin đã báo thì bỏ qua)
+
+const sosToast = (t) => ({
+  tone: t.priority === 1 ? 'danger' : 'warn',
+  title: `SOS mới ${t.code}`,
+  body: `${INCIDENT[t.incident_type]} – ${t.address || t.admin_name || ''} (${t.trapped_count} người)`,
+});
 
 /** Kết nối WebSocket /ws: nhận sự kiện realtime và làm mới dữ liệu tương ứng (không cần F5). */
 export function useSocket() {
   const qc = useQueryClient();
-  const token = useStore((s) => s.auth?.token);
+  // Chỉ nối lại khi đăng nhập / đăng xuất — token gia hạn định kỳ (App.jsx) không làm đứt kết nối
+  const loggedIn = useStore((s) => !!s.auth?.token);
 
   useEffect(() => {
-    if (!token) return undefined;
+    if (!loggedIn) return undefined;
     let ws;
     let retry;
+    let beat;
     let closed = false;
+    let online = false;
+    let outage = false; // đã mất kết nối (hoặc chưa nối được) — lần nối được tới thì tìm lại tin bị lỡ
+    let lastMsgAt = Date.now();
+    let lastServerTs = null; // giờ máy chủ của tin cuối cùng nhận được — mốc tìm lại, không lệ thuộc đồng hồ máy này
+    const mountedAt = Date.now();
+    const notified = new Set(); // SOS / phản ánh / yêu cầu chi viện đã báo — tìm lại không báo trùng
     const last = {};
     const throttle = (key, ms, fn) => {
       const now = Date.now();
@@ -33,16 +53,14 @@ export function useSocket() {
           break;
         case 'sos.new':
           inv('sos', 'kpis', 'map-layers');
+          notified.add(data.code);
           if (useStore.getState().soundOn && data.priority <= 2) playAlarm(data.priority);
-          toast({
-            tone: data.priority === 1 ? 'danger' : 'warn',
-            title: `SOS mới ${data.code}`,
-            body: `${INCIDENT[data.incident_type]} – ${data.address || data.admin_name || ''} (${data.trapped_count} người)`,
-          });
+          toast(sosToast(data));
           break;
         case 'field.report': // trưởng nhóm báo từ link nhiệm vụ (/nhiem-vu)
           inv('sos', 'kpis', 'map-layers');
           if (data.kind === 'need_support') {
+            notified.add(`chi-vien:${data.code}`);
             if (useStore.getState().soundOn) playAlarm(1);
             toast({ tone: 'danger', title: `${data.code}: ${data.force_name} cần chi viện`, body: data.note || '' });
           } else if (data.kind === 'rescued') {
@@ -110,6 +128,7 @@ export function useSocket() {
           break;
         case 'report.new':
           inv('reports');
+          notified.add(data.code);
           if (data.category === 'mac_ket') {
             // Có người mắc kẹt: báo như SOS — trước đây chỉ thông báo vàng, không chuông như phản ánh "cây đổ"
             if (useStore.getState().soundOn) playAlarm(1);
@@ -128,20 +147,108 @@ export function useSocket() {
       }
     };
 
+    // Trong lúc mất kết nối (mạng chập chờn, máy ngủ, đổi wifi / 4G…) sự kiện không tới: SOS mới không có thông báo /
+    // chuông. Nối lại được → mọi màn hình tải lại; SOS còn chờ xử lý, phản ánh chờ duyệt, yêu cầu chi viện đến trong lúc
+    // đó được báo như lúc nhận trực tiếp.
+    const catchUp = async (since) => {
+      qc.invalidateQueries();
+      const perms = useStore.getState().auth?.user?.permissions;
+      const after = (iso) => !!iso && Date.parse(iso) > since;
+      const ring = (priority) => { if (useStore.getState().soundOn) playAlarm(priority); };
+      if (hasPermission(perms, 'sos', 'view')) {
+        const tickets = await api('/sos').catch(() => []);
+        const missed = tickets.filter((t) => t.status === 'moi' && after(t.received_at) && !notified.has(t.code));
+        missed.forEach((t) => notified.add(t.code));
+        if (missed.length === 1) {
+          if (missed[0].priority <= 2) ring(missed[0].priority);
+          toast({ ...sosToast(missed[0]), title: `SOS mới ${missed[0].code} (đến lúc mất kết nối)`, duration: 15000 });
+        } else if (missed.length > 1) {
+          const top = Math.min(...missed.map((t) => t.priority));
+          if (top <= 2) ring(top);
+          toast({
+            tone: top === 1 ? 'danger' : 'warn',
+            title: `${missed.length} SOS mới đến lúc mất kết nối`,
+            body: missed.map((t) => `${t.code} (Cấp ${t.priority})`).join(', '),
+            duration: 15000,
+          });
+        }
+        const support = tickets.filter(
+          (t) => t.status === 'thuc_thi' && t.field_kind === 'need_support' && after(t.field_at) && !notified.has(`chi-vien:${t.code}`)
+        );
+        support.forEach((t) => notified.add(`chi-vien:${t.code}`));
+        if (support.length) {
+          ring(1);
+          toast({ tone: 'danger', title: `Đội cần chi viện: ${support.map((t) => t.code).join(', ')}`, body: 'Báo trong lúc mất kết nối', duration: 15000 });
+        }
+      }
+      if (hasPermission(perms, 'report', 'view')) {
+        const { items = [] } = await api('/reports', { params: { status: 'cho_duyet', limit: 100 } }).catch(() => ({}));
+        const missed = items.filter((r) => after(r.created_at) && !notified.has(r.code));
+        missed.forEach((r) => notified.add(r.code));
+        const urgent = missed.filter((r) => r.category === 'mac_ket');
+        if (urgent.length) {
+          ring(1);
+          toast({
+            tone: 'danger',
+            title: `Phản ánh KHẨN có người mắc kẹt: ${urgent.map((r) => r.code).join(', ')}`,
+            body: 'Đến lúc mất kết nối — duyệt và chuyển SOS ngay',
+            duration: 15000,
+          });
+        }
+        if (missed.length > urgent.length) {
+          toast({ tone: 'warn', title: `${missed.length - urgent.length} phản ánh mới chờ duyệt`, body: 'Đến lúc mất kết nối' });
+        }
+      }
+    };
+
+    const lost = () => {
+      if (online) outage = true;
+      online = false;
+      clearInterval(beat);
+      setWsStatus('offline');
+    };
+
     const connect = () => {
       const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-      ws = new WebSocket(`${proto}://${window.location.host}/ws?token=${encodeURIComponent(token)}`);
+      const token = useStore.getState().auth?.token; // token mới nhất (đã gia hạn)
+      ws = new WebSocket(`${proto}://${window.location.host}/ws?token=${encodeURIComponent(token || '')}`);
       setWsStatus('connecting');
-      ws.onopen = () => setWsStatus('online');
+      ws.onopen = () => {
+        online = true;
+        lastMsgAt = Date.now();
+        setWsStatus('online');
+        // Lần đầu nối mất hơn vài giây (mạng yếu lúc mở trang) cũng tìm lại
+        if (outage || Date.now() - mountedAt > 5000) {
+          const base = lastServerTs ? Date.parse(lastServerTs) : mountedAt;
+          catchUp(base - CATCH_UP_MARGIN_MS);
+        }
+        outage = false;
+        beat = setInterval(() => {
+          if (Date.now() - lastMsgAt > DEAD_MS) {
+            // Kết nối chết mà trình duyệt chưa biết: bỏ kết nối cũ, nối lại ngay
+            const dead = ws;
+            dead.onclose = null;
+            dead.onmessage = null;
+            dead.close();
+            lost();
+            if (!closed) connect();
+          } else if (ws.readyState === WebSocket.OPEN) {
+            ws.send('ping');
+          }
+        }, HEARTBEAT_MS);
+      };
       ws.onmessage = (e) => {
+        lastMsgAt = Date.now();
         try {
-          handle(JSON.parse(e.data));
+          const msg = JSON.parse(e.data);
+          if (msg.ts) lastServerTs = msg.ts;
+          if (msg.event !== 'pong') handle(msg);
         } catch {
           /* bỏ qua gói lỗi */
         }
       };
       ws.onclose = (e) => {
-        setWsStatus('offline');
+        lost();
         if (e.code === 4401) return; // token hết hạn / quyền đã đổi — chờ đăng nhập lại
         if (!closed) retry = setTimeout(connect, 3000);
       };
@@ -150,7 +257,11 @@ export function useSocket() {
     return () => {
       closed = true;
       clearTimeout(retry);
-      ws?.close();
+      clearInterval(beat);
+      if (ws) {
+        ws.onclose = null;
+        ws.close();
+      }
     };
-  }, [qc, token]);
+  }, [qc, loggedIn]);
 }

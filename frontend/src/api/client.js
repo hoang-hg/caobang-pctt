@@ -4,6 +4,22 @@ export class ApiError extends Error {
   constructor(status, message) { super(message); this.status = status; }
 }
 
+/** Máy chủ báo tài khoản còn dùng mật khẩu do cấp trên đặt (VD phiên mở từ trước khi bị đặt lại) → App.jsx chỉ hiện
+ * màn hình đổi mật khẩu. */
+function mustChangePassword() {
+  const { auth, setAuth } = useStore.getState();
+  if (auth?.user && !auth.user.must_change_password) setAuth({ ...auth, user: { ...auth.user, must_change_password: true } });
+}
+
+/** 401 khi đang đăng nhập: phiên hết hạn / bị thu hồi (đổi mật khẩu, đổi quyền, khoá) → về trang đăng nhập, báo lý do
+ * (trước đây chuyển trang không một lời giải thích). Sai mật khẩu lúc đăng nhập cũng là 401 nhưng khi đó chưa có phiên. */
+function sessionEnded(detail) {
+  const { auth, setAuth, toast } = useStore.getState();
+  if (!auth) return;
+  setAuth(null);
+  toast({ tone: 'warn', title: 'Phiên đăng nhập đã kết thúc', body: detail, duration: 10000 });
+}
+
 export async function api(path, { method = 'GET', body, params } = {}) {
   const url = new URL(`/api/v1${path}`, window.location.origin);
   Object.entries(params || {}).forEach(([k, v]) => {
@@ -21,7 +37,8 @@ export async function api(path, { method = 'GET', body, params } = {}) {
       const j = await res.json();
       detail = typeof j.detail === 'string' ? j.detail : JSON.stringify(j.detail);
     } catch { /* không phải JSON */ }
-    if (res.status === 401) useStore.getState().setAuth(null);
+    if (res.status === 401) sessionEnded(detail);
+    if (res.status === 403 && res.headers.get('x-must-change-password')) mustChangePassword();
     throw new ApiError(res.status, detail);
   }
   // Service worker trả bản đã lưu kèm X-PCTT-Saved-At (src/sw.js) → cổng công khai báo "dữ liệu lưu lúc…"
@@ -47,7 +64,8 @@ export async function apiUpload(path, formData) {
   });
   const data = await res.json().catch(() => null);
   if (!res.ok) {
-    if (res.status === 401) useStore.getState().setAuth(null);
+    if (res.status === 401) sessionEnded(typeof data?.detail === 'string' ? data.detail : res.statusText);
+    if (res.status === 403 && res.headers.get('x-must-change-password')) mustChangePassword();
     const err = new ApiError(res.status, typeof data?.detail === 'string' ? data.detail : res.statusText);
     err.data = data;
     throw err;

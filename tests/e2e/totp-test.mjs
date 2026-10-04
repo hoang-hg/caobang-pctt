@@ -58,20 +58,24 @@ const admin = (await login('admin', 'admin123')).data?.token;
 check('Quản trị đăng nhập', !!admin);
 const stamp = Date.now().toString(36);
 const username = `mfa.${stamp}`;
-const password = 'MatKhau2fa9';
+const initialPassword = 'MatKhau2fa9'; // quản trị đặt khi tạo
+const password = 'MatKhauRieng2fa9'; // người dùng tự đổi ở lần đăng nhập đầu (bắt buộc)
 const created = await call('POST', '/rbac/users', {
-  username, full_name: 'Thử xác thực 2 lớp', password, role: 'admin_xa', domain: 'BAOLAC/CB-COBA',
+  username, full_name: 'Thử xác thực 2 lớp', password: initialPassword, role: 'admin_xa', domain: 'BAOLAC/CB-COBA',
 }, admin);
 check('Tạo tài khoản thử', created.status === 201, username);
 const userId = created.data?.id;
 
-let first = await login(username, password);
+let first = await login(username, initialPassword);
 check('Chưa bật: đăng nhập 1 bước', !!first.data?.token && !first.data?.mfa, first.data?.token ? '' : `HTTP ${first.status}`);
 if (first.status === 429) {
   console.log('Giới hạn đăng nhập theo IP (30/phút) — xoá khoá rl:* trong Redis rồi chạy lại (README 12.1)');
   process.exit(1);
 }
-let token = first.data?.token;
+const own = await call('POST', '/auth/change-password', { current_password: initialPassword, new_password: password }, first.data?.token);
+check('Lần đầu phải đổi mật khẩu quản trị đặt', first.data?.user?.must_change_password === true && own.status === 200 &&
+  own.data?.user?.must_change_password === false, `HTTP ${own.status}`);
+let token = own.data?.token;
 let me = (await call('GET', '/auth/me', null, token)).data;
 check('/auth/me báo trạng thái xác thực 2 lớp', me?.mfa?.enabled === false && me?.mfa?.required === false);
 
@@ -147,8 +151,8 @@ check('Đang khoá: mã đúng cũng bị từ chối', (await call('POST', '/au
 const forcedName = `mfa.bb.${stamp}`;
 const forced = REQUIRED_ROLE
   ? (await call('POST', '/rbac/users', {
-    username: forcedName, full_name: 'Thử bắt buộc 2 lớp', password, role: REQUIRED_ROLE, domain: 'BAOLAC/CB-COBA',
-  }, admin), await login(forcedName, password))
+    username: forcedName, full_name: 'Thử bắt buộc 2 lớp', password: initialPassword, role: REQUIRED_ROLE, domain: 'BAOLAC/CB-COBA',
+  }, admin), await login(forcedName, initialPassword))
   : null;
 if (forced?.data?.mfa !== 'setup') {
   console.log('SKIP  Bắt buộc cài đặt khi đăng nhập — chạy với REQUIRED_ROLE=admin_xa + backend TOTP_REQUIRED_ROLES=admin_xa');
@@ -159,7 +163,8 @@ if (forced?.data?.mfa !== 'setup') {
   check('Cài đặt bằng phiếu đăng nhập', fs.status === 200 && !!fs.data?.secret);
   const fe = await call('POST', '/auth/mfa/enable', { challenge: fc, code: await freshCode(fs.data.secret) });
   check('Bật xong → đăng nhập luôn + mã khôi phục', fe.status === 200 && !!fe.data?.token && fe.data?.recovery_codes?.length === 10);
-  const ft = fe.data?.token;
+  // Mật khẩu quản trị đặt → đổi trước khi dùng các chức năng khác
+  const ft = (await call('POST', '/auth/change-password', { current_password: initialPassword, new_password: password }, fe.data?.token)).data?.token;
   check('Vai trò bắt buộc: không tự tắt được',
     (await call('POST', '/auth/mfa/disable', { password, code: await freshCode(fs.data.secret) }, ft)).status === 403);
   check('/auth/me: required = true', (await call('GET', '/auth/me', null, ft)).data?.mfa?.required === true);

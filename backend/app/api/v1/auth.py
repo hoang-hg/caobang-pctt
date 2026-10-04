@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from app import mfa
-from app.auth import audit, create_token, current_user, hash_secret, password_problem, verify_secret
+from app.auth import audit, create_token, hash_secret, password_problem, session_user, verify_secret
 from app.config import settings
 from app.db import execute, fetch_all, fetch_one
 from app.infra import ratelimit
@@ -44,7 +44,7 @@ async def role_names() -> dict[str, str]:
 async def profile(user: dict) -> dict:
     meta = await role_names()
     extra = await fetch_one(
-        """SELECT email, totp_enabled_at, cardinality(totp_recovery_hashes) AS recovery_left
+        """SELECT email, totp_enabled_at, cardinality(totp_recovery_hashes) AS recovery_left, must_change_password
              FROM communications.users WHERE id = CAST(:id AS uuid)""",
         {"id": str(user["id"])},
     )
@@ -55,6 +55,8 @@ async def profile(user: dict) -> dict:
         "position": user["position"],
         "email": extra["email"],
         "has_pin": bool(user["pin_hash"]),
+        # Mật khẩu do cấp trên đặt → giao diện chỉ hiện màn hình đổi mật khẩu (app/auth.py current_user)
+        "must_change_password": extra["must_change_password"],
         "mfa": {
             "enabled": extra["totp_enabled_at"] is not None,
             "required": mfa.required(user["username"]),
@@ -93,8 +95,9 @@ async def check_lock(key: str) -> None:
         raise HTTPException(429, "Đăng nhập sai quá nhiều lần — tài khoản tạm khoá 15 phút")
 
 
-async def session(user: dict) -> dict:
-    return {"token": create_token(user), "user": await profile(user)}
+async def session(user: dict, auth_time: int | None = None) -> dict:
+    """auth_time: giữ mốc đăng nhập khi gia hạn (/auth/refresh); bỏ trống = phiên mới."""
+    return {"token": create_token(user, auth_time), "user": await profile(user)}
 
 
 async def complete_login(user: dict, method: str = "password") -> dict:
@@ -135,8 +138,16 @@ async def login(body: LoginIn, request: Request):
 
 
 @router.get("/me")
-async def me(user: dict = Depends(current_user)):
+async def me(user: dict = Depends(session_user)):
     return await profile(user)
+
+
+@router.post("/refresh")
+async def refresh(user: dict = Depends(session_user)):
+    """Trang điều hành còn mở thì gọi định kỳ: token mới hạn thêm jwt_expire_hours, giữ mốc đăng nhập → phiên không quá
+    session_max_hours kể từ lúc đăng nhập (trực ban xuyên đêm không bị đăng xuất giữa ca). Token cũ vẫn dùng được tới
+    hạn của nó; đổi mật khẩu / khoá tài khoản / đổi quyền thì token_version tăng → không gia hạn được."""
+    return await session(user, user["auth_time"])
 
 
 class ChangePasswordIn(BaseModel):
@@ -145,7 +156,7 @@ class ChangePasswordIn(BaseModel):
 
 
 @router.post("/change-password")
-async def change_password(body: ChangePasswordIn, user: dict = Depends(current_user)):
+async def change_password(body: ChangePasswordIn, user: dict = Depends(session_user)):
     row = await fetch_one(
         "SELECT password_hash FROM communications.users WHERE id = CAST(:id AS uuid)", {"id": str(user["id"])}
     )
@@ -156,7 +167,8 @@ async def change_password(body: ChangePasswordIn, user: dict = Depends(current_u
     if body.new_password == body.current_password:
         raise HTTPException(422, "Mật khẩu mới phải khác mật khẩu hiện tại")
     await execute(
-        """UPDATE communications.users SET password_hash = :pw, password_changed_at = now(), token_version = token_version + 1
+        """UPDATE communications.users SET password_hash = :pw, password_changed_at = now(), must_change_password = false,
+                  token_version = token_version + 1
             WHERE id = CAST(:id AS uuid)""",
         {"pw": hash_secret(body.new_password), "id": str(user["id"])},
     )
@@ -240,7 +252,8 @@ async def reset_password(body: ResetIn):
     if not row or not row["is_active"]:
         raise invalid
     await execute(
-        """UPDATE communications.users SET password_hash = :pw, password_changed_at = now(), token_version = token_version + 1
+        """UPDATE communications.users SET password_hash = :pw, password_changed_at = now(), must_change_password = false,
+                  token_version = token_version + 1
             WHERE id = :u""",
         {"pw": hash_secret(body.new_password), "u": row["user_id"]},
     )

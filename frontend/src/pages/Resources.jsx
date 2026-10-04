@@ -16,7 +16,7 @@ import { FuelDepotModal, ReceiveModal, VehicleModal } from '../components/common
 import { BaseLayer } from '../components/map/MapTools';
 import { vehicleIcon } from '../components/map/icons';
 import { CATEGORY, FORCE_TYPE, INCIDENT, PRIORITY, RES_STATUS, SKILL, VEHICLE, VEHICLE_CAT } from '../utils/labels';
-import { dateTime, int, time } from '../utils/format';
+import { dateTime, int, time, vnFileStamp } from '../utils/format';
 import { exportExcel } from '../utils/exportExcel';
 import { exportSnapshotPdf } from '../utils/exportPdf';
 import { Can } from '../rbac/usePermission';
@@ -78,7 +78,7 @@ export default function Resources() {
   };
 
   const doExcel = () => {
-    const stamp = new Date().toISOString().slice(0, 10);
+    const stamp = vnFileStamp();
     if (tab === 'forces') {
       exportExcel(fForces.map((f) => ({
         'Mã': f.code, 'Đơn vị': f.name, 'Loại': FORCE_TYPE[f.org_type], 'Cấp': f.level === 'tinh' ? 'Tỉnh' : 'Xã', 'Vị trí': f.base_name,
@@ -102,7 +102,7 @@ export default function Resources() {
     exportSnapshotPdf(tableRef.current, {
       title: 'BÁO CÁO NGUỒN LỰC ỨNG PHÓ THIÊN TAI – TỈNH CAO BẰNG',
       subtitle: `${{ forces: 'Lực lượng cứu hộ', supplies: 'Kho vật tư & nhu yếu phẩm', vehicles: 'Phương tiện & thiết bị' }[tab]} · ${filterLabel} · ${new Date().toLocaleString('vi-VN')}`,
-      filename: `nguon-luc-${tab}-${new Date().toISOString().slice(0, 10)}.pdf`,
+      filename: `nguon-luc-${tab}-${vnFileStamp()}.pdf`,
     });
 
   const s = summary || {};
