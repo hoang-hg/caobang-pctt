@@ -24,6 +24,7 @@ from app.config import settings
 from app.db import execute, fetch_all, fetch_one, transaction
 from app.infra.redis import get_redis
 from app.services import scenario
+from app.services.alert_watch import in_background, mail_new_draft
 from app.services.broadcast import advance_delivery, estimate_audience, fill_template
 from app.services.events import log_event
 from app.services.sos import create_ticket
@@ -329,6 +330,15 @@ class Simulator:
         await log_event(
             f"Bản nháp cảnh báo {row['code']} chờ Lãnh đạo phê duyệt: {title}", "canh_bao", "warning"
         )
+        draft = {
+            **row,
+            "message_body": body,
+            "severity": severity,
+            "target_admin_codes": codes,
+            "audience": audience,
+            "valid_hours": 48,
+        }
+        in_background(mail_new_draft(draft, None))  # email người duyệt (không mở hệ thống vẫn biết)
 
     async def forecast_trigger(self, now: datetime) -> None:
         rows = await fetch_all(

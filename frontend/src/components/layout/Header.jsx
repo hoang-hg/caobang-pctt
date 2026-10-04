@@ -6,6 +6,7 @@ import { useStore } from '../../app/store';
 import AdminFilter from '../common/AdminFilter';
 import OmniSearch from '../common/OmniSearch';
 import UserMenu from '../common/UserMenu';
+import { useNavBadges } from './Sidebar';
 
 function Clock() {
   const [now, setNow] = useState(new Date());
@@ -23,17 +24,25 @@ function Clock() {
 
 export default function Header() {
   const { theme, toggleTheme, wsStatus, soundOn, toggleSound, mobileMenuOpen, setMobileMenuOpen, audioReady } = useStore();
+  // Điện thoại: menu thu vào nút ☰ — SOS chờ xử lý / lệnh cảnh báo chờ bạn duyệt hiện số đỏ ngay trên nút
+  const badges = useNavBadges();
+  const urgent = badges.sos + badges.alerts;
 
   return (
     <header className="no-print sticky top-0 z-[1100] flex h-14 shrink-0 items-center gap-2 border-b border-line bg-panel/95 px-3 backdrop-blur-md">
       {/* Nút mở menu trên Mobile */}
       <button
-        className="btn-ghost p-1.5 lg:hidden text-ink-2"
+        className="btn-ghost relative p-1.5 lg:hidden text-ink-2"
         onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-        aria-label="Mở danh mục điều hướng"
+        aria-label={urgent ? `Mở danh mục điều hướng (${urgent} việc khẩn chờ xử lý)` : 'Mở danh mục điều hướng'}
         title="Danh mục menu"
       >
         {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+        {!mobileMenuOpen && urgent > 0 && (
+          <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-danger px-1 text-center text-[10px] font-bold leading-4 text-white">
+            {urgent}
+          </span>
+        )}
       </button>
 
       {/* Logo & Tiêu đề cơ quan */}

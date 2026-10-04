@@ -24,6 +24,7 @@ from app.integrations.runner import ensure_default_sources, runner
 from app.rbac import domains
 from app.rbac.enforcer import init_enforcer, reload_policy, start_policy_watcher, stop_policy_watcher
 from app.rbac.seed import bootstrap as rbac_bootstrap
+from app.services.alert_watch import alert_watch
 from app.services.simulator import simulator
 from app.ws.hub import hub
 
@@ -81,6 +82,7 @@ async def startup() -> None:
         ops_watch.start_worker()
         runner.start()
         bridge.start()
+        alert_watch.start()  # nhắc gia hạn cảnh báo sắp hết hiệu lực
         if settings.simulator:
             simulator.start()
     log.info("Khởi động xong (RUN_MODE=%s, Redis=%s)", settings.run_mode, bool(settings.redis_url))
@@ -92,6 +94,7 @@ async def shutdown() -> None:
     await simulator.stop()
     await runner.stop()
     await bridge.stop()
+    await alert_watch.stop()
     await hub.stop_relay()
     await stop_policy_watcher()
     await close_redis()

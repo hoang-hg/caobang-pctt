@@ -10,8 +10,8 @@ import { usePresets, useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
 import { Empty, Modal, Section, Tabs } from '../components/common/ui';
 import { ALERT_VALID_HOURS, CHANNEL, LEVEL, broadcastStatus, notIntegrated } from '../utils/labels';
-import { Can, useAllowedCodes, usePermission } from '../rbac/usePermission';
-import { dateTime, int, pct } from '../utils/format';
+import { useAllowedCodes, usePermission } from '../rbac/usePermission';
+import { dateTime, int, pct, time } from '../utils/format';
 
 const PARAM_LABEL = {
   ten_ho: 'Tên hồ chứa', luu_luong: 'Lưu lượng xả (m³/s)', thoi_gian: 'Thời gian', song: 'Sông', dia_diem: 'Địa điểm',
@@ -60,6 +60,21 @@ function Composer() {
     }
     api('/alerts/audience', { method: 'POST', body: { admin_codes: codes, polygon } }).then(setAudience).catch(() => setAudience(null));
   }, [codes, polygon]);
+
+  // "Soạn lại từ lệnh này" (lệnh bị từ chối): điền lại nội dung, sửa theo lý do rồi gửi lại
+  useEffect(() => {
+    const p = alertDraft?.prefill;
+    if (!p) return;
+    setTpl('');
+    setParams({});
+    setTitle(p.title);
+    setBody(p.body);
+    setSeverity(p.severity);
+    setChannels(p.channels);
+    setValidHours(p.validHours);
+    setCodes(p.codes);
+    setAlertDraft(null);
+  }, [alertDraft, setAlertDraft]);
 
   const unfilled = template?.params.filter((p) => !params[p]) || [];
   const [sending, setSending] = useState(false); // bấm đúp → 2 lệnh cảnh báo trùng chờ duyệt
@@ -280,75 +295,158 @@ function Delivery({ b }) {
   );
 }
 
-function Broadcasts() {
+const SOON_MS = 2 * 3600e3; // lệnh còn dưới 2 giờ hiệu lực → nhắc gia hạn
+
+function useNow(ms) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), ms);
+    return () => clearInterval(id);
+  }, [ms]);
+  return now;
+}
+
+const leftText = (ms) => {
+  const m = Math.max(0, Math.round(ms / 60000));
+  return m >= 60 ? `${Math.floor(m / 60)} giờ ${String(m % 60).padStart(2, '0')} phút` : `${m} phút`;
+};
+
+function BroadcastCard({ b, now, onManage }) {
+  const left = Date.parse(b.valid_until) - now;
+  const soon = b.active && left < SOON_MS;
+  return (
+    <div className={clsx('rounded-lg border p-2.5', soon ? 'border-warn bg-warn/5' : 'border-line')}>
+      <div className="mb-1 flex items-center gap-2">
+        <b className="text-sm">{b.code}</b>
+        <span className={clsx('chip', broadcastStatus(b).cls)}>{broadcastStatus(b).label}</span>
+        <span className="truncate text-xs">{b.title}</span>
+        <span className="ml-auto whitespace-nowrap text-[11px] text-muted">{dateTime(b.sent_at || b.approved_at)}</span>
+      </div>
+      <div className="mb-1 text-[11px] text-muted">Duyệt: {b.approved_by_name} · Soạn: {b.created_by_name || 'Hệ thống'}</div>
+      <div className="mb-1.5 flex flex-wrap items-center gap-2 text-[11px]">
+        {b.ended_at ? (
+          <span className="text-muted">
+            Kết thúc {dateTime(b.ended_at)}{b.ended_by_name ? ` — ${b.ended_by_name}` : ''}{b.end_note ? `: ${b.end_note}` : ''}
+          </span>
+        ) : soon ? (
+          <span className="font-semibold text-warn">
+            <TimerReset size={12} className="mr-0.5 inline" />
+            Hết hiệu lực lúc {time(b.valid_until)} (còn {leftText(left)}) — gia hạn nếu còn nguy hiểm
+          </span>
+        ) : b.active ? (
+          <span className="font-medium text-ink-2">Hiệu lực đến {dateTime(b.valid_until)} · đang hiện cho người dân</span>
+        ) : (
+          <span className="text-muted">Hết hiệu lực từ {dateTime(b.valid_until)}</span>
+        )}
+        {b.can_manage && (
+          <span className="ml-auto flex gap-1.5">
+            <button className={clsx('px-2 py-0.5 text-[11px]', soon ? 'btn-primary' : 'btn-ghost')} onClick={() => onManage({ b, mode: 'extend' })}><TimerReset size={12} /> Gia hạn</button>
+            <button className="btn-ghost px-2 py-0.5 text-[11px] text-danger" onClick={() => onManage({ b, mode: 'end' })}><BellOff size={12} /> Kết thúc</button>
+          </span>
+        )}
+      </div>
+      <Delivery b={b} />
+    </div>
+  );
+}
+
+/** Lệnh chờ duyệt — đứng đầu trang trên điện thoại (lãnh đạo duyệt bằng điện thoại không phải cuộn qua khung soạn); MỌI
+ * lệnh đang hiệu lực (trước đây chỉ 6 lệnh mới nhất: lệnh sơ tán cũ hơn mất nút gia hạn / kết thúc); lệnh hết hiệu lực
+ * gần đây; lệnh bị từ chối kèm lý do + "Soạn lại". `composer`: khung soạn (người có quyền soạn) — cột trái trên máy tính,
+ * sau mục chờ duyệt trên điện thoại. */
+function Broadcasts({ composer }) {
   const { data = [] } = useQuery({ queryKey: ['broadcasts'], queryFn: () => api('/alerts/broadcasts'), refetchInterval: 15_000 });
+  const now = useNow(30_000);
+  const toast = useStore((s) => s.toast);
+  const setAlertDraft = useStore((s) => s.setAlertDraft);
+  const me = useStore((s) => s.auth?.user?.id);
   const [approve, setApprove] = useState(null);
   const [manage, setManage] = useState(null); // { b, mode: 'extend' | 'end' }
   const pending = data.filter((b) => b.status === 'pending_approval');
-  const active = data.filter((b) => b.status === 'sending' || b.status === 'sent').slice(0, 6);
+  // Sắp hết hiệu lực lên đầu — lệnh cần gia hạn không bị lẫn giữa nhiều lệnh khác
+  const live = data.filter((b) => b.active).sort((a, b) => Date.parse(a.valid_until) - Date.parse(b.valid_until));
+  const past = data.filter((b) => (b.status === 'sending' || b.status === 'sent') && !b.active).slice(0, 4);
+  const rejected = data.filter((b) => b.status === 'rejected' && now - Date.parse(b.approved_at) < 3 * 86400e3).slice(0, 5);
+  const redraft = (b) => {
+    setAlertDraft({
+      prefill: { title: b.title, body: b.message_body, severity: b.severity, codes: b.target_admin_codes, channels: b.channels, validHours: b.valid_hours },
+    });
+    toast({ tone: 'info', title: `Đã điền lại nội dung lệnh ${b.code}`, body: 'Sửa theo lý do từ chối, kiểm tra vùng nhận rồi gửi lại' });
+    document.getElementById('soan-canh-bao')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   return (
-    <div className="flex flex-col gap-3">
-      <Section title={`Chờ phê duyệt (Checker) · ${pending.length}`} right={<ShieldCheck size={16} className="text-warn" />}>
-        <div className="flex flex-col gap-2">
-          {pending.map((b) => (
-            <div key={b.id} className="rounded-lg border border-warn/50 bg-warn/5 p-2.5">
-              <div className="flex items-center gap-2">
-                <b className="text-sm">{b.code}</b>
-                <span className={clsx('chip', SEV_CLS[b.severity])}>{LEVEL[b.severity]?.label}</span>
-                {b.auto_generated && <span className="chip bg-accent/15 text-accent"><Bot size={11} /> Tự động · {b.trigger_source}</span>}
-                <span className="ml-auto text-[11px] text-muted">{dateTime(b.created_at)}</span>
+    <div className={clsx('flex flex-col gap-3', composer && 'xl:grid xl:grid-cols-[420px_1fr] xl:items-start')}>
+      {composer && <div id="soan-canh-bao" className="order-2 scroll-mt-16 xl:order-1">{composer}</div>}
+      <div className={clsx('contents', composer && 'xl:order-2 xl:flex xl:flex-col xl:gap-3')}>
+        <Section className="order-1" title={`Chờ phê duyệt (Checker) · ${pending.length}`} right={<ShieldCheck size={16} className="text-warn" />}>
+          <div className="flex flex-col gap-2">
+            {pending.map((b) => (
+              <div key={b.id} className="rounded-lg border border-warn/50 bg-warn/5 p-2.5">
+                <div className="flex items-center gap-2">
+                  <b className="text-sm">{b.code}</b>
+                  <span className={clsx('chip', SEV_CLS[b.severity])}>{LEVEL[b.severity]?.label}</span>
+                  {b.auto_generated && <span className="chip bg-accent/15 text-accent"><Bot size={11} /> Tự động · {b.trigger_source}</span>}
+                  <span className="ml-auto text-[11px] text-muted">{dateTime(b.created_at)}</span>
+                </div>
+                <div className="mt-1 text-sm font-medium">{b.title}</div>
+                <p className="line-clamp-2 text-xs text-ink-2">{b.message_body}</p>
+                <div className="mt-1 flex items-center gap-2 text-xs text-muted">
+                  <Users size={12} /> {int(b.audience?.households)} hộ · {b.channels.map((c) => CHANNEL[c]).join(', ')}
+                  {b.can_approve ? (
+                    <button className="btn-danger ml-auto px-2 py-1 text-xs" onClick={() => setApprove(b)}><ShieldCheck size={12} /> Phê duyệt</button>
+                  ) : (
+                    <span className="ml-auto italic">Chờ Lãnh đạo BCH xác nhận</span>
+                  )}
+                </div>
               </div>
-              <div className="mt-1 text-sm font-medium">{b.title}</div>
-              <p className="line-clamp-2 text-xs text-ink-2">{b.message_body}</p>
-              <div className="mt-1 flex items-center gap-2 text-xs text-muted">
-                <Users size={12} /> {int(b.audience?.households)} hộ · {b.channels.map((c) => CHANNEL[c]).join(', ')}
-                {b.can_approve ? (
-                  <button className="btn-danger ml-auto px-2 py-1 text-xs" onClick={() => setApprove(b)}><ShieldCheck size={12} /> Phê duyệt</button>
-                ) : (
-                  <span className="ml-auto italic">Chờ Lãnh đạo BCH xác nhận</span>
-                )}
-              </div>
-            </div>
-          ))}
-          {!pending.length && <Empty>Không có lệnh chờ duyệt</Empty>}
-        </div>
-      </Section>
+            ))}
+            {!pending.length && <Empty>Không có lệnh chờ duyệt</Empty>}
+          </div>
+        </Section>
 
-      <Section title="Bảng giám sát tỷ lệ chuyển giao (Delivery Dashboard)" right={<Radio size={16} className="text-accent" />}>
-        <div className="flex flex-col gap-3">
-          {active.map((b) => (
-            <div key={b.id} className="rounded-lg border border-line p-2.5">
-              <div className="mb-1 flex items-center gap-2">
-                <b className="text-sm">{b.code}</b>
-                <span className={clsx('chip', broadcastStatus(b).cls)}>{broadcastStatus(b).label}</span>
-                <span className="truncate text-xs">{b.title}</span>
-                <span className="ml-auto whitespace-nowrap text-[11px] text-muted">{dateTime(b.sent_at || b.approved_at)}</span>
-              </div>
-              <div className="mb-1 text-[11px] text-muted">Duyệt: {b.approved_by_name} · Soạn: {b.created_by_name || 'Hệ thống'}</div>
-              <div className="mb-1.5 flex flex-wrap items-center gap-2 text-[11px]">
-                {b.ended_at ? (
-                  <span className="text-muted">
-                    Kết thúc {dateTime(b.ended_at)}{b.ended_by_name ? ` — ${b.ended_by_name}` : ''}{b.end_note ? `: ${b.end_note}` : ''}
-                  </span>
-                ) : b.active ? (
-                  <span className="font-medium text-ink-2">Hiệu lực đến {dateTime(b.valid_until)} · đang hiện cho người dân</span>
-                ) : (
-                  <span className="text-muted">Hết hiệu lực từ {dateTime(b.valid_until)}</span>
-                )}
-                {b.can_manage && (
-                  <span className="ml-auto flex gap-1.5">
-                    <button className="btn-ghost px-2 py-0.5 text-[11px]" onClick={() => setManage({ b, mode: 'extend' })}><TimerReset size={12} /> Gia hạn</button>
-                    <button className="btn-ghost px-2 py-0.5 text-[11px] text-danger" onClick={() => setManage({ b, mode: 'end' })}><BellOff size={12} /> Kết thúc</button>
-                  </span>
-                )}
-              </div>
-              <Delivery b={b} />
+        <Section
+          className="order-3"
+          title={`Đang hiệu lực · ${live.length} — giám sát chuyển giao`}
+          right={<Radio size={16} className="text-accent" />}
+        >
+          <div className="flex flex-col gap-3">
+            {live.map((b) => <BroadcastCard key={b.id} b={b} now={now} onManage={setManage} />)}
+            {!live.length && <Empty>Không có cảnh báo đang hiệu lực</Empty>}
+            {past.length > 0 && (
+              <>
+                <div className="mt-1 text-[11px] font-semibold uppercase text-muted">Đã kết thúc / hết hiệu lực gần đây</div>
+                {past.map((b) => <BroadcastCard key={b.id} b={b} now={now} onManage={setManage} />)}
+              </>
+            )}
+          </div>
+        </Section>
+
+        {rejected.length > 0 && (
+          <Section className="order-4" title={`Bị từ chối gần đây · ${rejected.length}`} right={<XCircle size={16} className="text-danger" />}>
+            <div className="flex flex-col gap-2">
+              {rejected.map((b) => (
+                <div key={b.id} className={clsx('rounded-lg border p-2.5', b.created_by === me ? 'border-danger/50 bg-danger/5' : 'border-line')}>
+                  <div className="flex items-center gap-2">
+                    <b className="text-sm">{b.code}</b>
+                    <span className="truncate text-xs">{b.title}</span>
+                    {b.created_by === me && <span className="chip bg-danger/15 text-danger">Lệnh bạn soạn</span>}
+                    <span className="ml-auto whitespace-nowrap text-[11px] text-muted">{dateTime(b.approved_at)}</span>
+                  </div>
+                  <div className="mt-1 text-xs text-ink-2 [overflow-wrap:anywhere]">
+                    <b>{b.approved_by_name || 'Lãnh đạo'}</b> từ chối: {b.rejected_reason}
+                  </div>
+                  {composer && (
+                    <button className="btn-ghost mt-1.5 px-2 py-1 text-xs" onClick={() => redraft(b)}>
+                      <Send size={12} /> Soạn lại từ lệnh này
+                    </button>
+                  )}
+                </div>
+              ))}
             </div>
-          ))}
-          {!active.length && <Empty>Chưa phát lệnh nào</Empty>}
-        </div>
-      </Section>
+          </Section>
+        )}
+      </div>
       {approve && <ApproveModal b={approve} onClose={() => setApprove(null)} />}
       {manage && <ManageModal b={manage.b} mode={manage.mode} onClose={() => setManage(null)} />}
     </div>
@@ -501,7 +599,11 @@ function Hotline() {
               <li key={c.id} className="flex gap-2 border-b border-line/60 py-1.5">
                 <span className="font-mono text-muted">{dateTime(c.time)}</span>
                 <span>{c.caller}</span>
-                <span className="ml-auto text-right">Phím {c.ivr_key} · {c.category}<span className="block text-muted">{c.routed_to}</span></span>
+                <span className="ml-auto text-right">
+                  Phím {c.ivr_key} · {c.category}
+                  <span className="block text-muted">{c.routed_to}</span>
+                  {c.ticket_code && <span className="block font-semibold text-danger">→ phiếu {c.ticket_code}</span>}
+                </span>
               </li>
             ))}
           </ul>
@@ -584,12 +686,7 @@ export default function Alerts() {
           ...(canAudit ? [{ value: 'audit', label: 'Nhật ký pháp lý', icon: History }] : []),
         ]}
       />
-      {tab === 'broadcast' && (
-        <div className={clsx('grid grid-cols-1 gap-3', canCreate && 'xl:grid-cols-[420px_1fr]')}>
-          <Can I="alert" a="create"><Composer /></Can>
-          <Broadcasts />
-        </div>
-      )}
+      {tab === 'broadcast' && <Broadcasts composer={canCreate ? <Composer /> : null} />}
       {tab === 'hotline' && <Hotline />}
       {tab === 'audit' && canAudit && <Audit />}
     </div>

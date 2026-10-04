@@ -829,6 +829,19 @@ graph LR
    bắt buộc lý do) — chỉ lãnh đạo có `alert.approve` **và đã được cấp PIN**, ký PIN; ghi nhật ký `broadcast.extend` /
    `broadcast.end`. Lệnh đã kết thúc / hết hạn không gia hạn được — soạn lệnh mới. Link chia sẻ của lệnh đã hết hiệu lực
    ghi "[Đã hết hiệu lực]".
+6. **Báo người duyệt** (người có PIN không phải lúc nào cũng mở hệ thống — `services/alert_watch.py`):
+   - Lệnh mới chờ duyệt (trực ban soạn, hệ thống tự sinh từ dự báo / cảm biến) → **email** mọi người duyệt toàn tỉnh đã
+     cấp PIN (trừ người soạn); trên màn hình: thông báo 15 giây, **số đếm trên menu "Cảnh báo & Hotline"** giữ tới khi
+     duyệt / từ chối; điện thoại: số đỏ trên nút ☰ (SOS chờ + lệnh chờ bạn duyệt). Cán bộ xã không nhận thông báo này.
+   - Lệnh còn hiệu lực **sắp hết hạn** (≤ 60 phút; lệnh ngắn: ≤ nửa thời hạn) → worker nhắc **một lần** mỗi mốc hạn:
+     thông báo trên màn hình (`broadcast.expiring`), email, nhật ký sự kiện. Gia hạn → mốc mới → nhắc lại trước mốc mới.
+     Thẻ lệnh còn dưới 2 giờ đổi màu, ghi "còn … phút — gia hạn nếu còn nguy hiểm".
+   - Nối lại sau mất kết nối: báo các lệnh chờ duyệt đến trong lúc đó.
+7. **Màn hình Cảnh báo**: trên điện thoại mục **Chờ phê duyệt** ở đầu trang (trước khung soạn). Danh sách hiện **mọi lệnh
+   đang hiệu lực** (sắp hết hạn lên đầu) — trước đây chỉ 6 lệnh mới nhất, lệnh sơ tán cũ hơn mất nút gia hạn / kết thúc;
+   API `GET /alerts/broadcasts` xếp lệnh chờ duyệt, lệnh đang hiệu lực lên đầu (lọc được `?status=`).
+8. **Lệnh bị từ chối**: người soạn nhận thông báo kèm lý do; mục **Bị từ chối gần đây** (3 ngày) ghi người từ chối, lý do;
+   nút **Soạn lại từ lệnh này** điền lại tiêu đề, nội dung, mức, vùng xã, kênh, thời hạn để sửa rồi gửi lại.
 
 <a id="giam-sat-kttv"></a>
 ### 7.4. Giám sát khí tượng thuỷ văn, IoT & bản đồ tác chiến

@@ -12,6 +12,7 @@ from app.infra import ratelimit
 from app.infra.cache import invalidate
 from app.rbac.authz import allowed_codes, can_all, forbidden, require_any, require_permission
 from app.rbac.scope_loaders import broadcast_domains, targets_to_domains
+from app.services.alert_watch import in_background, mail_new_draft
 from app.services.broadcast import (
     CHANNELS,
     active_alert_sql,
@@ -55,13 +56,19 @@ async def templates(_: dict = Depends(require_any("alert", "view"))):
 
 
 @router.get("/broadcasts")
-async def broadcasts(limit: int = 50, user: dict = Depends(require_any("alert", "view"))):
+async def broadcasts(
+    limit: int = 50, status: str | None = None, user: dict = Depends(require_any("alert", "view"))
+):
     allowed = allowed_codes(user, "alert", "view")
+    # Lệnh chờ duyệt và lệnh đang hiệu lực luôn lên đầu: trước đây xếp theo giờ soạn, lệnh sơ tán 48 giờ bị các lệnh mới
+    # hơn đẩy khỏi danh sách → không còn nút gia hạn / kết thúc
     rows = await fetch_all(
         BROADCAST_SELECT
-        + """ WHERE CAST(:all AS boolean) OR b.target_admin_codes && CAST(:codes AS text[])
-              ORDER BY b.created_at DESC LIMIT :l""",
-        {"l": limit, "all": allowed is None, "codes": allowed or []},
+        + f""" WHERE (CAST(:all AS boolean) OR b.target_admin_codes && CAST(:codes AS text[]))
+                 AND (CAST(:st AS text) IS NULL OR b.status = :st)
+               ORDER BY (b.status = 'pending_approval') DESC, ({active_alert_sql("b")}) DESC, b.created_at DESC
+               LIMIT :l""",
+        {"l": min(limit, 200), "all": allowed is None, "codes": allowed or [], "st": status},
     )
     for b in rows:  # frontend dùng để hiện/ẩn nút phê duyệt / gia hạn / kết thúc
         approver = can_all(user, "alert", "approve", targets_to_domains(b["target_admin_codes"]))
@@ -139,14 +146,23 @@ async def create_broadcast(body: BroadcastIn, user: dict = Depends(require_any("
         {"title": body.title, "channels": body.channels, "households": aud["households"]},
     )
     await hub.publish(
-        "broadcast.updated", {"id": row["id"], "code": row["code"], "status": "pending_approval"}
+        "broadcast.updated",
+        {
+            "id": row["id"],
+            "code": row["code"],
+            "status": "pending_approval",
+            "title": body.title,
+            "created_by": user["id"],
+        },
     )
     await log_event(
         f"{user['full_name']} soạn lệnh cảnh báo {row['code']} “{body.title}” – chờ phê duyệt",
         "canh_bao",
         "warning",
     )
-    return await fetch_one(BROADCAST_SELECT + " WHERE b.id = :id", {"id": row["id"]})
+    full = await fetch_one(BROADCAST_SELECT + " WHERE b.id = :id", {"id": row["id"]})
+    in_background(mail_new_draft(full, user))  # người duyệt không mở hệ thống vẫn biết có lệnh chờ
+    return full
 
 
 class ApproveIn(BaseModel):
@@ -311,13 +327,30 @@ async def reject(broadcast_id: str, body: RejectIn, user: dict = Depends(require
         raise forbidden()
     row = await fetch_one(
         """UPDATE communications.alert_broadcasts SET status = 'rejected', rejected_reason = :r, approved_by = :u, approved_at = now()
-            WHERE id = CAST(:id AS uuid) AND status = 'pending_approval' RETURNING id, code, title""",
+            WHERE id = CAST(:id AS uuid) AND status = 'pending_approval' RETURNING id, code, title, created_by""",
         {"r": body.reason, "u": user["id"], "id": broadcast_id},
     )
     if not row:
         raise HTTPException(400, "Lệnh không ở trạng thái chờ duyệt")
     await audit(user, "broadcast.reject", "alert_broadcast", row["code"], {"reason": body.reason})
-    await hub.publish("broadcast.updated", {"id": row["id"], "code": row["code"], "status": "rejected"})
+    # Người soạn nhận thông báo kèm lý do (trước đây lệnh lặng lẽ biến khỏi danh sách) → sửa rồi gửi lại
+    await hub.publish(
+        "broadcast.updated",
+        {
+            "id": row["id"],
+            "code": row["code"],
+            "status": "rejected",
+            "title": row["title"],
+            "created_by": row["created_by"],
+            "reason": body.reason,
+            "rejected_by": user["full_name"],
+        },
+    )
+    await log_event(
+        f"{user['full_name']} TỪ CHỐI lệnh cảnh báo {row['code']} “{row['title']}”: {body.reason}",
+        "canh_bao",
+        "info",
+    )
     return row
 
 
@@ -365,7 +398,10 @@ IVR_ROUTES = {
 @router.get("/hotline")
 async def hotline(_: dict = Depends(require_permission("hotline", "operate"))):
     calls = await fetch_all(
-        "SELECT id, time, caller, ivr_key, category, routed_to, duration_s, ticket_id FROM communications.call_logs ORDER BY time DESC LIMIT 30"
+        """SELECT c.id, c.time, c.caller, c.ivr_key, c.category, c.routed_to, c.duration_s, c.ticket_id,
+                  t.code AS ticket_code
+             FROM communications.call_logs c LEFT JOIN operations.sos_tickets t ON t.id = c.ticket_id
+            ORDER BY c.time DESC LIMIT 30"""
     )
     return {
         "hotlines": HOTLINES,

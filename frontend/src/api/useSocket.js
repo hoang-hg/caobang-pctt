@@ -3,12 +3,16 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useStore } from '../app/store';
 import { hasPermission } from '../rbac/permissions';
 import { playAlarm } from '../utils/audio';
+import { time } from '../utils/format';
 import { INCIDENT } from '../utils/labels';
 import { api } from './client';
 
 const HEARTBEAT_MS = 25_000; // gửi "ping"; máy chủ trả "pong" kèm giờ máy chủ (app/main.py)
 const DEAD_MS = 60_000; // không nhận được gì ngần này → kết nối đã chết (mạng rớt im lặng) → nối lại
 const CATCH_UP_MARGIN_MS = 60_000; // tìm lại lùi thêm 1 phút trước tin cuối cùng nhận được (tin đã báo thì bỏ qua)
+
+/** Người duyệt được lệnh cảnh báo: quyền phê duyệt + đã cấp PIN ký (trực ban cấp tỉnh chưa cấp PIN không duyệt được). */
+const approver = (u) => hasPermission(u?.permissions, 'alert', 'approve') && !!u?.has_pin;
 
 const sosToast = (t) => ({
   tone: t.priority === 1 ? 'danger' : 'warn',
@@ -88,10 +92,32 @@ export function useSocket() {
         case 'inventory.changed':
           throttle('inv', 5_000, () => inv('warehouses', 'supplies', 'resources-summary', 'evacuation', 'kpis', 'fuel', 'map-layers'));
           break;
-        case 'broadcast.updated':
+        case 'broadcast.updated': {
           inv('broadcasts', 'audit');
-          if (data.status === 'pending_approval') {
-            toast({ tone: 'warn', title: `Lệnh cảnh báo ${data.code} chờ phê duyệt`, body: data.title || '' });
+          const me = useStore.getState().auth?.user;
+          if (data.status === 'pending_approval' && approver(me) && data.created_by !== me?.id) {
+            // Chỉ người duyệt được (trước đây cả cán bộ xã cũng nhận); số đếm trên menu giữ tới khi duyệt xong
+            notified.add(`duyet:${data.code}`);
+            toast({ tone: 'warn', title: `Lệnh cảnh báo ${data.code} chờ bạn phê duyệt`, body: data.title || '', duration: 15000 });
+          } else if (data.status === 'rejected' && data.created_by && data.created_by === me?.id) {
+            toast({
+              tone: 'danger',
+              title: `Lệnh cảnh báo ${data.code} bị từ chối`,
+              body: `${data.rejected_by ? `${data.rejected_by}: ` : ''}${data.reason || ''} — sửa bằng “Soạn lại” ở trang Cảnh báo`,
+              duration: 20000,
+            });
+          }
+          break;
+        }
+        case 'broadcast.expiring': // tiến trình nền nhắc trước khi cảnh báo thôi hiện cho người dân
+          inv('broadcasts');
+          if (approver(useStore.getState().auth?.user)) {
+            toast({
+              tone: 'warn',
+              title: `Cảnh báo ${data.code} hết hiệu lực lúc ${time(data.valid_until)}`,
+              body: `${data.title || ''} — còn nguy hiểm thì gia hạn ở trang Cảnh báo`,
+              duration: 20000,
+            });
           }
           break;
         case 'reservoir.updated': // trực ban nhập số liệu vận hành hồ
@@ -179,6 +205,19 @@ export function useSocket() {
         if (support.length) {
           ring(1);
           toast({ tone: 'danger', title: `Đội cần chi viện: ${support.map((t) => t.code).join(', ')}`, body: 'Báo trong lúc mất kết nối', duration: 15000 });
+        }
+      }
+      if (approver(useStore.getState().auth?.user)) {
+        const pend = await api('/alerts/broadcasts', { params: { status: 'pending_approval', limit: 20 } }).catch(() => []);
+        const missed = pend.filter((b) => b.can_approve && after(b.created_at) && !notified.has(`duyet:${b.code}`));
+        missed.forEach((b) => notified.add(`duyet:${b.code}`));
+        if (missed.length) {
+          toast({
+            tone: 'warn',
+            title: `${missed.length} lệnh cảnh báo chờ bạn phê duyệt`,
+            body: `${missed.map((b) => b.code).join(', ')} — đến lúc mất kết nối`,
+            duration: 15000,
+          });
         }
       }
       if (hasPermission(perms, 'report', 'view')) {
