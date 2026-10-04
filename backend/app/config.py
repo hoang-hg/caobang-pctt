@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     backup_remote: str = ""
     jwt_secret: str = DEV_JWT_SECRET
     jwt_expire_hours: int = 12
+    # Trang điều hành còn mở thì phiên tự gia hạn (POST /auth/refresh, mỗi lần thêm jwt_expire_hours) tới tối đa ngần
+    # này giờ kể từ lúc đăng nhập — trực ban xuyên đêm không bị đăng xuất giữa ca; quá hạn thì đăng nhập lại
+    session_max_hours: int = 72
     cors_origins: str = "http://localhost:5173,http://localhost:8080"
     # Vai trò BẮT BUỘC xác thực 2 lớp (TOTP), cách nhau dấu phẩy — VD super_admin,admin_tinh.
     # Trống = không bắt buộc (ai cũng tự bật được). Người có vai trò này chưa bật → lần đăng nhập sau phải cài đặt.

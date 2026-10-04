@@ -42,12 +42,35 @@ const mmss = (sec) => {
   return h ? `${h}h${String(m).padStart(2, '0')}` : `${m}:${String(s % 60).padStart(2, '0')}`;
 };
 
-function TicketCard({ t, now, onDispatch, onResolve, onFocus, onArrived, onLink, onCancel, onEdit }) {
+const hasActiveTeam = (t) => t.dispatch_status === 'dang_di' || t.dispatch_status === 'da_den';
+
+/** Đồng hồ SLA của phiếu: "Chờ xử lý" tính từ lúc nhận tin; "Đang điều phối" mà chưa có đội nào đang đi ("Chờ điều động")
+ * tính từ lúc chuyển sang cột này / lúc huỷ lệnh trước — kéo sang "Đang điều phối" không dừng được đồng hồ khi chưa ai đi
+ * cứu. Cùng quy tắc với KPI quá hạn của dashboard (backend app/services/sos.py OVERDUE_SQL). */
+function slaClock(t) {
+  if (t.status === 'moi') return { label: 'Chờ', since: t.received_at };
+  if (t.status === 'dieu_phoi' && !hasActiveTeam(t)) return { label: 'Chờ điều động', since: t.status_changed_at || t.acknowledged_at || t.received_at };
+  return null;
+}
+
+function slaState(t, now) {
+  const clock = slaClock(t);
+  if (!clock) return null;
+  const waitedSec = (now - new Date(clock.since).getTime()) / 1000;
+  return { ...clock, waitedSec, breached: waitedSec > t.sla_minutes * 60 };
+}
+
+function TicketCard({ t, now, onDispatch, onResolve, onFocus, onArrived, onLink, onCancel, onEdit, onMove }) {
   const canUpdate = usePermission('sos', 'update', t.admin_code);
+  const canResolve = usePermission('sos', 'resolve', t.admin_code);
   const pr = PRIORITY[t.priority] || PRIORITY[2];
-  const waitingSec = (now - new Date(t.received_at).getTime()) / 1000;
-  const slaSec = t.sla_minutes * 60;
-  const breached = t.status === 'moi' && waitingSec > slaSec;
+  const sla = slaState(t, now);
+  const breached = !!sla?.breached;
+  // Chuyển trạng thái không cần kéo thả (điện thoại, bàn phím). Đang có đội thực hiện → không về "Chờ xử lý" / "Đang
+  // điều phối" (máy chủ chặn, phải huỷ lệnh trước); "Đã cứu an toàn" cần quyền xác nhận hoàn thành
+  const targets = COLUMNS.filter(
+    (c) => c.key !== t.status && !(hasActiveTeam(t) && (c.key === 'moi' || c.key === 'dieu_phoi')) && (c.key !== 'hoan_thanh' || canResolve)
+  );
   const etaSec = t.eta ? (new Date(t.eta).getTime() - now) / 1000 : null;
   // Tiến độ: đã đến = 100%; bộ mô phỏng có tiến độ thật; chạy thật chưa có GPS → ước tính theo giờ xuất phát và ETA
   const arrived = t.dispatch_status === 'da_den';
@@ -110,13 +133,17 @@ function TicketCard({ t, now, onDispatch, onResolve, onFocus, onArrived, onLink,
       )}
 
       <div className="mt-2.5 flex flex-wrap items-center gap-2 text-xs pt-2 border-t border-line/50">
-        {t.status === 'moi' && (
+        {sla && (
           <span
             className={clsx('inline-flex items-center gap-1 font-mono text-[11px]', breached ? 'font-bold text-danger' : 'text-ink-2')}
-            title={`SLA tiếp nhận cấp ${t.priority}: ${t.sla_minutes} phút`}
+            title={
+              t.status === 'moi'
+                ? `SLA tiếp nhận cấp ${t.priority}: ${t.sla_minutes} phút`
+                : `Chưa có đội nào được điều động — SLA cấp ${t.priority}: ${t.sla_minutes} phút kể từ lúc chuyển sang “Đang điều phối”`
+            }
           >
             <Timer size={13} className={breached ? 'animate-bounce text-danger' : 'text-muted'} />
-            <span>Chờ: {mmss(waitingSec)} / SLA {t.sla_minutes}′{breached && ' · QUÁ HẠN'}</span>
+            <span>{sla.label}: {mmss(sla.waitedSec)} / SLA {t.sla_minutes}′{breached && ' · QUÁ HẠN'}</span>
           </span>
         )}
 
@@ -178,6 +205,19 @@ function TicketCard({ t, now, onDispatch, onResolve, onFocus, onArrived, onLink,
           >
             <Phone size={12} /> Gọi
           </a>
+        )}
+
+        {canUpdate && t.status !== 'hoan_thanh' && targets.length > 0 && (
+          <select
+            className="input w-auto py-1 pl-2 text-xs"
+            value=""
+            onChange={(e) => e.target.value && onMove(t, e.target.value)}
+            aria-label={`Chuyển trạng thái phiếu ${t.code}`}
+            title="Chuyển phiếu sang cột khác (thay cho kéo thả — dùng được trên điện thoại)"
+          >
+            <option value="">Chuyển trạng thái…</option>
+            {targets.map((c) => <option key={c.key} value={c.key}>{c.title}</option>)}
+          </select>
         )}
 
         {(t.status === 'moi' || t.status === 'dieu_phoi') && (
@@ -586,7 +626,7 @@ export default function RescueCenter() {
   }, [tickets, filterText]);
 
   const counts = Object.fromEntries(COLUMNS.map((c) => [c.key, filteredTickets.filter((t) => t.status === c.key).length]));
-  const overdue = tickets.filter((t) => t.status === 'moi' && (now - new Date(t.received_at)) / 60000 > t.sla_minutes).length;
+  const overdue = tickets.filter((t) => slaState(t, now)?.breached).length;
 
   return (
     <div className="flex flex-col gap-3.5 p-3.5 sm:p-5">
@@ -597,7 +637,8 @@ export default function RescueCenter() {
             <span>Trung tâm Điều hành Cứu hộ Khẩn cấp</span>
           </h1>
           <p className="text-xs text-muted mt-0.5">
-            Kéo thả phiếu giữa các cột để phân luồng · Chuẩn SLA: Cấp 1 &lt; 3′, Cấp 2 &lt; 15′, Cấp 3 &lt; 60′
+            Kéo thả phiếu giữa các cột hoặc chọn “Chuyển trạng thái” trên thẻ · Chuẩn SLA chờ xử lý / chờ điều động: Cấp 1 &lt; 3′,
+            Cấp 2 &lt; 15′, Cấp 3 &lt; 60′
           </p>
         </div>
 
@@ -659,6 +700,7 @@ export default function RescueCenter() {
                       onLink={setLinkFor}
                       onCancel={setCancelFor}
                       onEdit={setEditFor}
+                      onMove={(x, status) => move(x.id, status)}
                     />
                   ))}
                 {!counts[col.key] && (

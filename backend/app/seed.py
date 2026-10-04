@@ -772,9 +772,11 @@ async def seed_operations(conn: AsyncConnection, units: dict[str, dict], users: 
         await ex(
             conn,
             """INSERT INTO operations.sos_tickets (reporter_name, reporter_phone, source, raw_message, address, admin_unit_id, location,
-                              incident_type, priority, status, trapped_count, vulnerable, received_at, acknowledged_at, resolved_at)
+                              incident_type, priority, status, trapped_count, vulnerable, received_at, acknowledged_at, resolved_at,
+                              status_changed_at)
                           VALUES (:rn,:rp,:src,:msg,:addr,(SELECT id FROM spatial_admin.administrative_units WHERE code = :uc),
-                                  ST_SetSRID(ST_MakePoint(:lon,:lat),4326),:it,:pr,:st,:tc,:vu,:rec,:ack,:res)""",
+                                  ST_SetSRID(ST_MakePoint(:lon,:lat),4326),:it,:pr,:st,:tc,:vu,:rec,:ack,:res,
+                                  COALESCE(CAST(:res AS timestamptz), CAST(:ack AS timestamptz), CAST(:rec AS timestamptz)))""",
             {
                 "rn": f"Người dân {i + 1}",
                 "rp": phone(800 + i),

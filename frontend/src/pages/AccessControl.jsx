@@ -270,7 +270,7 @@ function CreateUserModal({ onClose }) {
       </div>
       <p className="mt-3 text-xs text-muted leading-relaxed">
         Mỗi tài khoản có đúng 1 vai trò. Bạn chỉ tạo được tài khoản cấp dưới mình, trong phạm vi bạn quản lý. Chức vụ chỉ để
-        hiển thị — quyền do cấp quyết định.
+        hiển thị — quyền do cấp quyết định. Lần đăng nhập đầu, người dùng phải đổi mật khẩu ban đầu sang mật khẩu của riêng mình.
       </p>
     </Modal>
   );
@@ -395,6 +395,7 @@ function CredentialsModal({ user, onClose }) {
       </div>
       <p className="mt-3 text-xs text-muted">
         Sau khi đặt lại mật khẩu, các phiên đăng nhập khác của tài khoản này trên các thiết bị khác sẽ bị hủy phiên để đảm bảo an toàn.
+        Người dùng phải đổi sang mật khẩu của riêng mình ở lần đăng nhập tới.
       </p>
     </Modal>
   );
@@ -578,6 +579,11 @@ function UsersTab() {
                     <div className="text-[11px] text-muted">
                       Xác thực 2 lớp: {u.mfa_enabled ? <span className="text-good font-semibold">Đã bật</span> : 'Chưa bật'}
                     </div>
+                    {u.must_change_password && (
+                      <div className="text-[11px] font-semibold text-warn" title="Mật khẩu do cấp trên đặt — người dùng phải đổi ở lần đăng nhập tới">
+                        Chờ tự đổi mật khẩu
+                      </div>
+                    )}
                   </td>
                   <td className="whitespace-nowrap text-right">
                     {editable && (

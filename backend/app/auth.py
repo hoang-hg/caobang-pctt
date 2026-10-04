@@ -2,6 +2,8 @@
 
 JWT mang ``tv`` (token_version): mỗi lần cấp/thu hồi quyền hoặc khoá tài khoản,
 token_version tăng → token cũ bị từ chối, người dùng phải đăng nhập lại để nhận quyền mới.
+``auth_time``: lúc đăng nhập — POST /auth/refresh cấp token mới giữ nguyên mốc này, phiên không kéo dài quá
+``session_max_hours`` kể từ lúc đăng nhập.
 """
 
 import hashlib
@@ -20,8 +22,10 @@ from app.db import execute, fetch_one
 
 _bearer = HTTPBearer(auto_error=False)
 
-USER_SELECT = """SELECT id, username, full_name, position, pin_hash, token_version, is_active, totp_enabled_at
+USER_SELECT = """SELECT id, username, full_name, position, pin_hash, token_version, is_active, totp_enabled_at,
+                          must_change_password
                    FROM communications.users"""
+MUST_CHANGE_PASSWORD = "Tài khoản đang dùng mật khẩu do cấp trên đặt — đổi sang mật khẩu của riêng bạn trước khi sử dụng hệ thống"
 
 
 def hash_secret(secret: str) -> str:
@@ -38,12 +42,22 @@ def verify_secret(secret: str, stored: str | None) -> bool:
     return hmac.compare_digest(digest.hex(), digest_hex)
 
 
-def create_token(user: dict) -> str:
+def token_expiry(auth_time: int, now: datetime) -> datetime:
+    """Mỗi token sống jwt_expire_hours, nhưng không quá session_max_hours kể từ lúc đăng nhập."""
+    cap = datetime.fromtimestamp(auth_time, UTC) + timedelta(hours=settings.session_max_hours)
+    return min(now + timedelta(hours=settings.jwt_expire_hours), cap)
+
+
+def create_token(user: dict, auth_time: int | None = None) -> str:
+    """auth_time (giây UNIX) = lúc đăng nhập; bỏ trống = vừa đăng nhập."""
+    now = datetime.now(UTC)
+    auth_time = auth_time or int(now.timestamp())
     payload = {
         "sub": str(user["id"]),
         "name": user["full_name"],
         "tv": user["token_version"],
-        "exp": datetime.now(UTC) + timedelta(hours=settings.jwt_expire_hours),
+        "auth_time": auth_time,
+        "exp": token_expiry(auth_time, now),
     }
     return jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
 
@@ -60,15 +74,27 @@ async def user_from_token(token: str) -> dict | None:
     # → đăng nhập lại để cài đặt
     if user["totp_enabled_at"] is None and mfa.required(user["username"]):
         return None
+    # Token cấp trước khi có auth_time (bản cũ): lúc đăng nhập = lúc hết hạn − jwt_expire_hours
+    user["auth_time"] = payload.get("auth_time") or int(payload["exp"]) - settings.jwt_expire_hours * 3600
     return user
 
 
-async def current_user(creds: HTTPAuthorizationCredentials | None = Depends(_bearer)) -> dict:
+async def session_user(creds: HTTPAuthorizationCredentials | None = Depends(_bearer)) -> dict:
+    """Người đang đăng nhập, kể cả tài khoản còn phải đổi mật khẩu — chỉ dùng cho /auth/me, /auth/change-password,
+    /auth/refresh. Mọi API khác dùng ``current_user``."""
     if creds is None:
         raise HTTPException(401, "Chưa đăng nhập")
     user = await user_from_token(creds.credentials)
     if user is None:
         raise HTTPException(401, "Phiên đăng nhập hết hạn hoặc quyền đã thay đổi — vui lòng đăng nhập lại")
+    return user
+
+
+async def current_user(user: dict = Depends(session_user)) -> dict:
+    # Mật khẩu do cấp trên đặt (tạo tài khoản / đặt lại): chặn mọi chức năng tới khi tự đổi. Header này báo giao diện
+    # chuyển sang màn hình đổi mật khẩu (VD phiên đã mở từ trước khi nâng cấp)
+    if user["must_change_password"]:
+        raise HTTPException(403, MUST_CHANGE_PASSWORD, headers={"X-Must-Change-Password": "1"})
     return user
 
 

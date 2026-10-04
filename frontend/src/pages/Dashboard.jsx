@@ -17,7 +17,7 @@ import AreaForecastChart from '../components/charts/AreaForecastChart';
 import ForecastBulletinModal from '../components/charts/ForecastBulletinModal';
 import { useAllowedCodes, usePermission } from '../rbac/usePermission';
 import { ALARM, alarmLevel } from '../utils/labels';
-import { int, num, pct } from '../utils/format';
+import { int, num, pct, vnFileStamp } from '../utils/format';
 import { exportSnapshotPdf } from '../utils/exportPdf';
 import ReservoirMonitor from './public/ReservoirMonitor';
 import LandslideMonitor, { maxTiltText } from './public/LandslideMonitor';
@@ -77,7 +77,7 @@ export default function Dashboard() {
       await exportSnapshotPdf(ref.current, {
         title: 'BÁO CÁO NHANH TÌNH HÌNH THIÊN TAI – TỈNH CAO BẰNG',
         subtitle: `Phạm vi: ${filterLabel} · Thời điểm: ${now.toLocaleString('vi-VN')} · Nguồn: Trung tâm Điều hành PCTT & TKCN tỉnh`,
-        filename: `bao-cao-nhanh-pctt-cao-bang-${now.toISOString().slice(0, 16).replace(/[:T]/g, '')}.pdf`,
+        filename: `bao-cao-nhanh-pctt-cao-bang-${vnFileStamp(now, true)}.pdf`,
       });
     } finally {
       setExporting(false);

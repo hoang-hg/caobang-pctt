@@ -3,13 +3,14 @@ import { Navigate, Route, Routes, useLocation, useSearchParams } from 'react-rou
 import { useQueryClient } from '@tanstack/react-query';
 import Header from './components/layout/Header';
 import Sidebar from './components/layout/Sidebar';
+import SessionKeeper from './components/layout/SessionKeeper';
 import Toasts from './components/common/Toasts';
 import { useSocket } from './api/useSocket';
 import { api } from './api/client';
 import { useStore } from './app/store';
 import { usePermission } from './rbac/usePermission';
 import { watchAudioUnlock } from './utils/audio';
-import { ForgotPassword, ResetPassword } from './pages/AccountPages'; // nhỏ, UserMenu cũng dùng → import tĩnh
+import { FirstPasswordChange, ForgotPassword, ResetPassword } from './pages/AccountPages'; // nhỏ, UserMenu cũng dùng → import tĩnh
 // Mỗi trang một chunk tải khi cần: người dân mở cổng công khai không phải tải giao diện điều hành
 const Login = lazy(() => import('./pages/Login'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -45,22 +46,24 @@ function NoAccess() {
 
 function Shell() {
   useSocket();
-  const { setAuth, auth } = useStore();
+  const setAuth = useStore((s) => s.setAuth);
   // Chuông SOS: mở khoá âm thanh ở lần bấm / gõ phím đầu tiên (trình duyệt chặn tới lúc đó)
   useEffect(() => (useStore.getState().audioReady ? undefined : watchAudioUnlock(useStore.getState().setAudioReady)), []);
   const qc = useQueryClient();
 
-  // Làm mới quyền khi tải lại trang (quyền có thể đã đổi từ phiên trước)
+  // Làm mới quyền khi tải lại trang (quyền có thể đã đổi từ phiên trước). Chỉ lúc mở: token gia hạn định kỳ
+  // (SessionKeeper) không cần tải lại mọi thứ
   useEffect(() => {
     api('/auth/me')
       .then((user) => setAuth({ ...useStore.getState().auth, user }))
       .catch(() => {});
     qc.invalidateQueries();
-  }, [auth?.token]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="flex h-full flex-col print:block print:h-auto">
       <Header />
+      <SessionKeeper />
       <div className="flex min-h-0 flex-1 print:block">
         <Sidebar />
         <main className="min-w-0 flex-1 overflow-auto scroll-thin print:overflow-visible">
@@ -123,8 +126,11 @@ export default function App() {
           {/* Link nhiệm vụ cho trưởng nhóm hiện trường: mã sau dấu #, không cần tài khoản */}
           <Route path="/nhiem-vu" element={<MissionPage />} />
           <Route path="/" element={loggedIn ? <Navigate to="/dashboard" replace /> : <PublicPortal />} />
-          {/* Điều hành — cần đăng nhập */}
-          <Route path="/*" element={loggedIn ? <Shell key={auth.user?.id} /> : <RequireLogin />} />
+          {/* Điều hành — cần đăng nhập; mật khẩu do cấp trên đặt → đổi trước khi vào */}
+          <Route
+            path="/*"
+            element={!loggedIn ? <RequireLogin /> : auth.user?.must_change_password ? <FirstPasswordChange /> : <Shell key={auth.user?.id} />}
+          />
         </Routes>
       </Suspense>
       <Toasts />

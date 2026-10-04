@@ -432,7 +432,8 @@ Mọi biến của backend khai báo ở `backend/app/config.py`. Tệp mẫu: `
 |---|---|---|---|
 | `JWT_SECRET` | chuỗi mẫu | **bắt buộc** ≥ 32 ký tự ngẫu nhiên | Ký phiên đăng nhập |
 | `SECRET_KEY` | trống (dẫn xuất từ JWT_SECRET) | **bắt buộc**, khác JWT_SECRET | Mã hoá API key đối tác và khoá xác thực 2 lớp trong CSDL — đổi khoá = nhập lại key, mọi người cài lại 2 lớp |
-| `JWT_EXPIRE_HOURS` | `12` | tuỳ chọn | Thời hạn phiên |
+| `JWT_EXPIRE_HOURS` | `12` | tuỳ chọn | Thời hạn mỗi token phiên; trang điều hành còn mở thì tự gia hạn |
+| `SESSION_MAX_HOURS` | `72` | tuỳ chọn | Phiên tự gia hạn tới tối đa ngần này giờ kể từ lúc đăng nhập, sau đó phải đăng nhập lại (báo trước 30 phút) |
 | `TOTP_REQUIRED_ROLES` | trống | `super_admin,admin_tinh` | Vai trò bắt buộc xác thực 2 lớp ([11.1](#xac-thuc-2-lop)); trống → cảnh báo khi khởi động; còn tên vai trò cũ → cảnh báo |
 | `TOTP_ISSUER` | `BCH PCTT Cao Bằng` | tuỳ chọn | Tên hiện trong ứng dụng xác thực |
 | `POSTGRES_USER` / `_DB` | `pctt` / `caobang_pctt` | tuỳ chọn | |
@@ -696,8 +697,18 @@ sequenceDiagram
    tin — ghi nhật ký). Cán bộ xã nhận tin ở xã khác: hệ thống nêu vị trí thuộc xã nào, báo trực ban tỉnh tạo phiếu.
    **Chuông SOS**: trình duyệt chặn âm thanh tới lần bấm đầu tiên trên trang — màn hình trực ban mở lại (F5, tự khởi động)
    mà chưa ai bấm thì thanh trên hiện **"Bấm để bật chuông SOS"**; bấm vào trang một lần là chuông kêu được.
+   **Mất kết nối realtime** (mạng chập chờn, máy ngủ, đổi wifi / 4G): nối lại được thì mọi màn hình tải lại, SOS còn chờ
+   xử lý / phản ánh chờ duyệt / yêu cầu chi viện **đến trong lúc mất kết nối** được báo (thông báo + chuông) như lúc nhận
+   trực tiếp. Trình duyệt gửi nhịp tim 25 giây/lần, 60 giây không nhận được gì → coi là mất kết nối (kết nối chết im lặng,
+   thanh trên trước đây vẫn "Trực tuyến") rồi nối lại.
 2. **Phân cấp & SLA**: **Cấp 1** nguy hiểm tính mạng tức thì (vùi lấp, lũ cuốn, mắc kẹt trên mái) — phản hồi < 3 phút;
    **Cấp 2** nước dâng, cô lập, có người già / trẻ nhỏ — < 15 phút; **Cấp 3** ngập cục bộ, thiếu lương thực — < 60 phút.
+   Đồng hồ SLA chạy ở **Chờ xử lý** (từ lúc nhận tin) và ở **Đang điều phối khi chưa có đội nào đang đi** — "Chờ điều
+   động", tính từ lúc chuyển sang cột này hoặc lúc huỷ lệnh trước (`sos_tickets.status_changed_at`). Quá SLA → thẻ nhấp
+   nháy "QUÁ HẠN", tính vào số phiếu quá hạn của trang Cứu hộ và KPI dashboard (`OVERDUE_SQL`). Trước đây kéo phiếu sang
+   "Đang điều phối" là dừng đồng hồ dù chưa ai đi cứu.
+   **Chuyển trạng thái** không cần kéo thả: menu **"Chuyển trạng thái…"** trên thẻ (điện thoại, bàn phím) — chỉ hiện cột
+   được phép (đang có đội → không về Chờ xử lý / Đang điều phối; "Đã cứu an toàn" cần quyền `sos.resolve`).
 3. **Khớp lực lượng & lộ trình**: lọc đơn vị ứng trực gần nhất (dân quân, quân đội, công an PCCC & CNCH), cảnh báo nếu
    lộ trình buộc đi qua vùng nguy hiểm đang hiệu lực, kèm **cảnh báo quanh tuyến** (không chặn đường): trạm mực nước
    trong 2 km đang vượt BĐ II hoặc mất tín hiệu, điểm nguy hiểm đã nhập trong 200 m, xã có mưa dự báo ≥ 100 mm / 24 giờ.
@@ -985,6 +996,18 @@ mình**. PIN sai 5 lần → khoá duyệt 15 phút. Cấp 3 không soạn / duy
 Đổi cấp / phạm vi, đổi mật khẩu, khoá tài khoản → `users.token_version` tăng → phiên cũ bị từ chối (401). Mọi thao tác ghi
 `communications.rbac_audit_log`. Giao diện chỉ ẩn/hiện; backend mới là nơi chặn thật. WebSocket chỉ đẩy sự kiện thuộc
 phạm vi người dùng.
+
+**Mật khẩu do cấp trên đặt** (tạo tài khoản, hoặc cấp trên **đặt lại mật khẩu**): lần đăng nhập tới người dùng chỉ thấy màn
+hình **Đặt mật khẩu của riêng bạn**; máy chủ chặn mọi API khác (403, header `X-Must-Change-Password`) và WebSocket tới khi
+đổi (`users.must_change_password`; chỉ `/auth/me`, `/auth/change-password`, `/auth/refresh` không chặn). Tự đổi mật khẩu
+hoặc đặt lại qua email thì bỏ cờ; Superadmin tự đặt mật khẩu cho mình cũng không bật cờ. Danh sách tài khoản ghi "Chờ tự
+đổi mật khẩu". Nâng cấp lên bản có migration 0018: tài khoản cấp trên đã tạo mà **chưa từng đổi mật khẩu** cũng phải đổi ở
+lần đăng nhập tới.
+
+**Phiên đăng nhập**: mỗi token sống `JWT_EXPIRE_HOURS` (12 giờ); trang điều hành còn mở thì tự gia hạn 10 phút/lần (`POST
+/api/v1/auth/refresh`) tới tối đa `SESSION_MAX_HOURS` (72 giờ) **kể từ lúc đăng nhập** (token mang `auth_time`) — trực ban
+xuyên đêm không bị đăng xuất giữa ca. Còn dưới 30 phút mà không gia hạn được nữa → thanh vàng báo giờ hết hạn, nút **Đăng
+nhập lại**; hết hạn hoặc phiên bị thu hồi → về trang đăng nhập (giữ trang đang mở) kèm thông báo lý do.
 
 **Chuyển từ mô hình cũ** (tự động khi khởi động, `rbac/seed.migrate_roles`, ghi nhật ký "Chuyển sang phân quyền 3 cấp"):
 Lãnh đạo BCH, Trực ban → Quản trị tỉnh; Cán bộ xã → Quản trị xã cùng xã; tài khoản nhiều vai trò → giữ cấp cao nhất.

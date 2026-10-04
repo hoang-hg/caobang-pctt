@@ -146,7 +146,7 @@ def _assert_pin_allowed(role_level: int, pin: str | None) -> None:
 # ---------------------------------------------------------------- users
 USER_COLS = (
     "id, username, full_name, position, email, is_active, created_at, created_by, (pin_hash IS NOT NULL) AS has_pin, "
-    "(totp_enabled_at IS NOT NULL) AS mfa_enabled"
+    "(totp_enabled_at IS NOT NULL) AS mfa_enabled, must_change_password"
 )
 
 
@@ -204,9 +204,11 @@ async def create_user(actor, username, full_name, position, password, pin, role,
         raise HTTPException(409, "Email đã được dùng cho tài khoản khác")
     if await fetch_one("SELECT 1 FROM communications.users WHERE username = :u", {"u": username}):
         raise HTTPException(409, "Tên đăng nhập đã tồn tại")
+    # Mật khẩu do cấp trên đặt → người dùng phải đổi ở lần đăng nhập đầu (app/auth.py current_user)
     row = await fetch_one(
-        """INSERT INTO communications.users (username, full_name, position, password_hash, pin_hash, created_by, email)
-           VALUES (:u, :f, :p, :pw, :pin, :by, :e) RETURNING id""",
+        """INSERT INTO communications.users (username, full_name, position, password_hash, pin_hash, created_by, email,
+                                             must_change_password)
+           VALUES (:u, :f, :p, :pw, :pin, :by, :e, true) RETURNING id""",
         {
             "u": username,
             "f": full_name,
@@ -237,10 +239,13 @@ async def update_user(
         raise HTTPException(409, "Email đã được dùng cho tài khoản khác")
     if is_active is False and target["id"] == actor["id"]:
         raise HTTPException(400, "Không tự khoá tài khoản của mình")
+    # Cấp trên đặt lại mật khẩu → người dùng phải đổi ở lần đăng nhập tới; Superadmin tự đặt cho mình thì không
+    must_change = None if not password else str(target["id"]) != str(actor["id"])
     await execute(
         """UPDATE communications.users SET full_name = COALESCE(CAST(:f AS text), full_name),
                   position = COALESCE(CAST(:p AS text), position),
                   password_hash = COALESCE(CAST(:pw AS text), password_hash),
+                  must_change_password = COALESCE(CAST(:must AS boolean), must_change_password),
                   pin_hash = COALESCE(CAST(:pin AS text), pin_hash),
                   is_active = COALESCE(CAST(:act AS boolean), is_active),
                   email = COALESCE(CAST(:email AS text), email)
@@ -249,6 +254,7 @@ async def update_user(
             "f": full_name,
             "p": position,
             "pw": hash_secret(password) if password else None,
+            "must": must_change,
             "pin": hash_secret(pin) if pin else None,
             "act": is_active,
             "email": email,

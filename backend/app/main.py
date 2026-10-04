@@ -1,5 +1,7 @@
+import json
 import logging
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -163,7 +165,7 @@ async def health_full():
 async def ws_endpoint(ws: WebSocket, token: str = ""):
     """WebSocket cần token (?token=...). Phạm vi nhận sự kiện theo quyền của người dùng."""
     user = await user_from_token(token) if token else None
-    if user is None:
+    if user is None or user["must_change_password"]:  # chưa đổi mật khẩu do cấp trên đặt → chưa nhận tin
         await ws.close(code=4401)
         return
     scopes = {}
@@ -174,7 +176,10 @@ async def ws_endpoint(ws: WebSocket, token: str = ""):
     await hub.connect(client)
     try:
         while True:
-            await ws.receive_text()  # giữ kết nối; client có thể gửi ping
+            # Nhịp tim: trình duyệt gửi "ping" định kỳ, không nhận "pong" → coi như mất kết nối (mạng rớt im lặng), nối
+            # lại rồi tìm SOS đến trong lúc đó (frontend/src/api/useSocket.js). ts = giờ máy chủ, mốc tìm lại.
+            if await ws.receive_text() == "ping":
+                await ws.send_text(json.dumps({"event": "pong", "ts": datetime.now(UTC).isoformat()}))
     except WebSocketDisconnect:
         pass
     finally:

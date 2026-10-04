@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { KeyRound, Loader2, Mail, ShieldAlert } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { KeyRound, Loader2, LogOut, Mail, ShieldAlert } from 'lucide-react';
 import { api } from '../api/client';
 import { useStore } from '../app/store';
 import { Modal } from '../components/common/ui';
@@ -8,7 +9,7 @@ import { Modal } from '../components/common/ui';
 export const PASSWORD_HINT = 'Tối thiểu 8 ký tự, gồm cả chữ và số';
 export const weakPassword = (p) => p.length < 8 || !/\d/.test(p) || !/[A-Za-zÀ-ỹ]/.test(p);
 
-function Shell({ title, children }) {
+function Shell({ title, children, footer }) {
   return (
     <div className="flex min-h-full items-center justify-center bg-bg p-4">
       <div className="card w-full max-w-md p-6">
@@ -21,11 +22,70 @@ function Shell({ title, children }) {
         </div>
         {children}
         <div className="mt-4 flex justify-between text-xs">
-          <Link to="/dang-nhap" className="text-accent hover:underline">← Đăng nhập</Link>
-          <Link to="/" className="text-muted hover:underline">Cổng thông tin công khai</Link>
+          {footer || (
+            <>
+              <Link to="/dang-nhap" className="text-accent hover:underline">← Đăng nhập</Link>
+              <Link to="/" className="text-muted hover:underline">Cổng thông tin công khai</Link>
+            </>
+          )}
         </div>
       </div>
     </div>
+  );
+}
+
+/** Tài khoản cấp trên vừa tạo / vừa đặt lại mật khẩu: phải đặt mật khẩu của riêng mình rồi mới vào hệ thống (máy chủ chặn
+ * mọi chức năng khác tới lúc đó — app/auth.py). */
+export function FirstPasswordChange() {
+  const { auth, setAuth, toast } = useStore();
+  const qc = useQueryClient();
+  const [cur, setCur] = useState('');
+  const [pw, setPw] = useState('');
+  const [pw2, setPw2] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      setAuth(await api('/auth/change-password', { method: 'POST', body: { current_password: cur, new_password: pw } }));
+      toast({ tone: 'good', title: 'Đã đặt mật khẩu mới', body: 'Từ nay đăng nhập bằng mật khẩu này' });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const logout = () => {
+    setAuth(null);
+    qc.clear();
+  };
+  return (
+    <Shell
+      title="Đặt mật khẩu của riêng bạn"
+      footer={
+        <button type="button" className="inline-flex items-center gap-1 text-muted hover:underline" onClick={logout}>
+          <LogOut size={12} /> Đăng xuất
+        </button>
+      }
+    >
+      <form onSubmit={submit} className="flex flex-col gap-3 text-sm">
+        <p className="text-ink-2">
+          Tài khoản <b className="font-mono">{auth?.user?.username}</b> đang dùng mật khẩu do cấp trên đặt. Đặt mật khẩu mới chỉ
+          mình bạn biết để tiếp tục sử dụng hệ thống.
+        </p>
+        <label>Mật khẩu hiện tại (cấp trên đã giao)<input className="input mt-1" type="password" autoComplete="current-password" autoFocus value={cur} onChange={(e) => setCur(e.target.value)} /></label>
+        <label>Mật khẩu mới<input className="input mt-1" type="password" autoComplete="new-password" value={pw} onChange={(e) => setPw(e.target.value)} /></label>
+        <label>Nhập lại mật khẩu mới<input className="input mt-1" type="password" autoComplete="new-password" value={pw2} onChange={(e) => setPw2(e.target.value)} /></label>
+        <div className={pw && weakPassword(pw) ? 'text-xs text-warn' : 'text-xs text-muted'}>{PASSWORD_HINT}</div>
+        {pw2 && pw !== pw2 && <div className="text-xs text-danger">Mật khẩu nhập lại không khớp</div>}
+        {error && <div className="text-danger">{error}</div>}
+        <button className="btn-primary justify-center" disabled={!cur || weakPassword(pw) || pw !== pw2 || busy}>
+          {busy ? <Loader2 size={15} className="animate-spin" /> : <KeyRound size={15} />} Đặt mật khẩu và tiếp tục
+        </button>
+      </form>
+    </Shell>
   );
 }
 
