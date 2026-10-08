@@ -4,7 +4,8 @@
     "<CUM>/<MA_XA>"     một xã/phường (VD "BAOLAC/CB-COBA") — vai trò Cấp 3
     "<CUM>/*"           một cụm (địa bàn huyện cũ) — KHÔNG còn cấp vai trò theo cụm; mẫu này chỉ còn trong nhật ký cũ
 
-Danh sách đơn vị (56 xã) được nạp một lần vào bộ nhớ.
+Danh sách đơn vị (56 xã) được nạp một lần vào bộ nhớ. Tiền tố <CUM> chỉ là phần của chuỗi phạm vi đã cấp (giữ để không
+phải đổi phạm vi của mọi tài khoản) — giao diện, thông báo chỉ hiện tên xã/phường hiện hành, không hiện địa bàn cũ.
 """
 
 from __future__ import annotations
@@ -20,12 +21,17 @@ class Unit:
     id: str
     code: str
     name: str
-    district: str
+    unit_type: str
     domain: str
 
     @property
     def cluster(self) -> str:
         return self.domain.split("/", 1)[0]
+
+    @property
+    def title(self) -> str:
+        """VD "Xã Bạch Đằng", "Phường Thục Phán"."""
+        return f"{'Phường' if self.unit_type == 'phuong' else 'Xã'} {self.name}"
 
 
 _units: list[Unit] = []
@@ -36,10 +42,10 @@ async def load_units(force: bool = False) -> list[Unit]:
     if _units and not force:
         return _units
     rows = await fetch_all(
-        """SELECT id::text AS id, code, name, old_district, rbac_domain FROM spatial_admin.administrative_units
-            WHERE level = 'xa' AND rbac_domain IS NOT NULL ORDER BY old_district, name"""
+        """SELECT id::text AS id, code, name, unit_type, rbac_domain FROM spatial_admin.administrative_units
+            WHERE level = 'xa' AND rbac_domain IS NOT NULL ORDER BY name"""
     )
-    _units = [Unit(r["id"], r["code"], r["name"], r["old_district"], r["rbac_domain"]) for r in rows]
+    _units = [Unit(r["id"], r["code"], r["name"], r["unit_type"], r["rbac_domain"]) for r in rows]
     return _units
 
 
@@ -97,20 +103,17 @@ def is_valid_domain(domain: str) -> bool:
 
 
 def label(domain: str) -> str:
+    """Tên hiển thị của phạm vi: "Toàn tỉnh Cao Bằng" / "Xã Bạch Đằng". Mẫu cụm "<CUM>/*" (không còn cấp, chỉ còn trong
+    nhật ký cũ) trả nguyên chuỗi — không dựng lại tên địa bàn huyện cũ."""
     if domain == GLOBAL_SCOPE:
         return "Toàn tỉnh Cao Bằng"
-    if domain.endswith("/*"):
-        u = next((u for u in _units if u.cluster == domain[:-2]), None)
-        return f"Cụm {u.district}" if u else domain
     u = next((u for u in _units if u.domain == domain), None)
-    return f"{u.name} ({u.district})" if u else domain
+    return u.title if u else domain
 
 
 def scope_tree() -> dict:
     """Phạm vi cấp được: toàn tỉnh (Cấp 1–2) và từng xã/phường (Cấp 3)."""
     return {
         "province": {"domain": GLOBAL_SCOPE, "label": "Toàn tỉnh Cao Bằng"},
-        "communes": [
-            {"domain": u.domain, "code": u.code, "label": u.name, "district": u.district} for u in _units
-        ],
+        "communes": [{"domain": u.domain, "code": u.code, "label": u.title} for u in _units],
     }

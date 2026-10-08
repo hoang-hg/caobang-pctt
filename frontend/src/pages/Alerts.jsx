@@ -149,7 +149,10 @@ function Composer() {
                 onChange={(e) => setCodes(Array.from(e.target.selectedOptions).map((o) => o.value))}
                 aria-label="Chọn xã/phường"
               >
-                {units.map((u) => <option key={u.code} value={u.code}>{u.name} ({u.old_district})</option>)}
+                {/* 56 xã/phường hiện hành, xếp theo tên — không kèm địa bàn huyện cũ */}
+                {[...units].sort((a, b) => a.name.localeCompare(b.name, 'vi')).map((u) => (
+                  <option key={u.code} value={u.code}>{u.unit_type === 'phuong' ? 'Phường' : 'Xã'} {u.name}</option>
+                ))}
               </select>
               <div className="text-[11px] text-muted">Giữ Ctrl để chọn nhiều xã. Hoặc vẽ vùng trên Bản đồ giám sát.</div>
             </>

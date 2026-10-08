@@ -329,7 +329,7 @@ async def _xa_units() -> tuple[list[dict], dict[str, list[str]]]:
 
 async def _check_preset_units(rows: list[Prepared], report: Report) -> None:
     """Nhóm lọc nhanh: mỗi mục là mã hoặc tên xã/phường đang có → ghi mã. Tên trùng nhiều xã → yêu cầu ghi mã. Mã
-    nhóm không được trùng nhóm "Địa bàn … (cũ)" hệ thống tạo (bị ``conflict_where`` bỏ qua → tưởng đã nhập)."""
+    nhóm không được trùng nhóm hệ thống (kind khác 'luu_vuc' — bị ``conflict_where`` bỏ qua → tưởng đã nhập)."""
     units, by_name = await _xa_units()
     by_code = {u["code"].upper(): u["code"] for u in units}
     reserved = {
@@ -340,7 +340,7 @@ async def _check_preset_units(rows: list[Prepared], report: Report) -> None:
             report.error(
                 row.number,
                 "ma",
-                f"Mã {row.values['ma']} là nhóm địa bàn huyện cũ của hệ thống — chọn mã khác",
+                f"Mã {row.values['ma']} trùng mã nhóm hệ thống — chọn mã khác",
             )
         codes: list[str] = []
         unknown: list[str] = []

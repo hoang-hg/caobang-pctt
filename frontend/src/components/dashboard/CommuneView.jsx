@@ -72,7 +72,6 @@ export default function CommuneView({ code, units, onChange, children }) {
           <h2 className="text-lg font-black text-ink">{unitLabel(unit) || 'Chọn xã/phường'}</h2>
           {unit && (
             <p className="text-xs text-muted">
-              {unit.old_district && `Địa bàn huyện cũ: ${unit.old_district} · `}
               Dân số {int(unit.population)} · {int(unit.households)} hộ (dữ liệu nền)
             </p>
           )}
@@ -82,10 +81,7 @@ export default function CommuneView({ code, units, onChange, children }) {
           <select className="input w-auto min-w-[220px] py-1 text-xs" value={code || ''} onChange={(e) => onChange(e.target.value)} aria-label="Chọn xã/phường">
             {!code && <option value="">— Chọn —</option>}
             {units.map((u) => (
-              <option key={u.code} value={u.code}>
-                {unitLabel(u)}
-                {u.old_district ? ` (${u.old_district} cũ)` : ''}
-              </option>
+              <option key={u.code} value={u.code}>{unitLabel(u)}</option>
             ))}
           </select>
         </label>

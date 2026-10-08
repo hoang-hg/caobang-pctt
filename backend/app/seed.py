@@ -160,18 +160,8 @@ async def seed_admin(conn: AsyncConnection) -> dict[str, dict]:
             "INSERT INTO spatial_admin.presets (code, name, description, hazard, kind, unit_codes) VALUES (:c,:n,:d,:h,'luu_vuc',:u)",
             {"c": code, "n": name, "d": desc, "h": hazard, "u": [D.unit_code(n) for n in names]},
         )
-    for i, district in enumerate(D.OLD_DISTRICTS):
-        names = [c[0] for c in D.COMMUNES if c[2] == district]
-        await ex(
-            conn,
-            "INSERT INTO spatial_admin.presets (code, name, description, hazard, kind, unit_codes) VALUES (:c,:n,:d,'tong_hop','dia_ban_cu',:u)",
-            {
-                "c": f"DB_{i:02d}",
-                "n": f"Địa bàn {district} (cũ)",
-                "d": f"{len(names)} xã/phường thuộc địa bàn {district} trước 01/07/2025",
-                "u": [D.unit_code(n) for n in names],
-            },
-        )
+    # Không tạo nhóm lọc "Địa bàn … (cũ)" theo huyện cũ: giao diện chỉ dùng 56 xã/phường sau 01/07/2025
+    # (migration 0019 xoá các nhóm đã tạo trước đây)
 
     rows = await fetch_all(
         "SELECT id, code, name, ST_Y(center) AS lat, ST_X(center) AS lon, population, households FROM spatial_admin.administrative_units WHERE level = 'xa'",

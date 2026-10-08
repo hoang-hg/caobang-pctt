@@ -624,7 +624,7 @@ async def cancel_dispatch(
 @router.get("/evacuation")
 async def evacuation(codes: list[str] = Depends(area_scope("monitoring", "view"))):
     progress = await fetch_all(
-        f"""SELECT u.code, u.name, u.old_district, e.planned_households, e.evacuated_households, e.planned_persons,
+        f"""SELECT u.code, u.name, e.planned_households, e.evacuated_households, e.planned_persons,
                    e.evacuated_persons, e.updated_at
               FROM operations.evacuation_progress e JOIN spatial_admin.administrative_units u ON u.id = e.admin_unit_id
              WHERE {unit_clause('e.admin_unit_id', codes)}

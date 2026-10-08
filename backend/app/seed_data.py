@@ -20,7 +20,9 @@ def unit_code(name: str) -> str:
     return f"CB-{slug(name)}"
 
 
-# (tên, loại, địa bàn huyện cũ, vĩ độ, kinh độ)
+# 56 xã/phường sau sắp xếp 01/07/2025 (Nghị quyết 1657/NQ-UBTVQH15): (tên, loại, địa bàn huyện cũ, vĩ độ, kinh độ).
+# "Địa bàn huyện cũ" chỉ dùng nội bộ để dựng chuỗi phạm vi RBAC "<CUM>/<MA_XA>" (seed.seed_admin) — không hiện trên
+# giao diện. Vĩ độ / kinh độ là tâm xấp xỉ, bị thay bằng điểm nằm trong ranh giới thật (seed/caobang_communes.geojson).
 COMMUNES: list[tuple[str, str, str, float, float]] = [
     # TP. Cao Bằng cũ
     ("Thục Phán", "phuong", "TP. Cao Bằng", 22.676, 106.250),
@@ -90,19 +92,6 @@ COMMUNES: list[tuple[str, str, str, float, float]] = [
     ("Sơn Lộ", "xa", "Bảo Lâm", 22.985, 105.450),
 ]
 
-OLD_DISTRICTS = [
-    "TP. Cao Bằng",
-    "Hòa An",
-    "Thạch An",
-    "Quảng Hòa",
-    "Trùng Khánh",
-    "Hạ Lang",
-    "Hà Quảng",
-    "Nguyên Bình",
-    "Bảo Lạc",
-    "Bảo Lâm",
-]
-
 PRESETS = [
     (
         "LV_BANG_GIANG",
@@ -124,7 +113,7 @@ PRESETS = [
     (
         "VUNG_NUI_CAO",
         "Vùng núi cao & đèo dốc phía Tây",
-        "Bảo Lâm, Bảo Lạc, Nguyên Bình — đèo Khau Cốc Chà, Mẻ Pia, Cao Bắc: trọng điểm sạt lở đất, lũ quét.",
+        "Các xã vùng núi cao phía Tây tỉnh — đèo Khau Cốc Chà, Mẻ Pia, Cao Bắc: trọng điểm sạt lở đất, lũ quét.",
         "sat_lo",
         [c[0] for c in COMMUNES if c[2] in ("Bảo Lâm", "Bảo Lạc", "Nguyên Bình")],
     ),

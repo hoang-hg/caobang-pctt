@@ -24,7 +24,7 @@ async def areas(
 ):
     """Tổng mưa dự báo N giờ tới theo xã (P10/P50/P90), xác suất mưa lớn cao nhất — cho bản đồ & bảng xếp hạng."""
     return await fetch_all(
-        f"""SELECT u.code, u.name, u.old_district,
+        f"""SELECT u.code, u.name,
                    round(sum(a.precip_p10)::numeric, 1)::float AS p10,
                    round(sum(a.precip_p50)::numeric, 1)::float AS p50,
                    round(sum(a.precip_p90)::numeric, 1)::float AS p90,
@@ -34,7 +34,7 @@ async def areas(
               FROM iot_telemetry.area_forecasts a JOIN spatial_admin.administrative_units u ON u.id = a.admin_unit_id
              WHERE a.model = :m AND a.time > now() AND a.time <= now() + make_interval(hours => :h)
                AND {unit_clause('a.admin_unit_id', codes)}
-             GROUP BY u.code, u.name, u.old_district ORDER BY p50 DESC""",
+             GROUP BY u.code, u.name ORDER BY p50 DESC""",
         {"m": model, "h": hours, "codes": codes},
     )
 

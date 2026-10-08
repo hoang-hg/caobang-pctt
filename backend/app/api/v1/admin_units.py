@@ -30,14 +30,15 @@ async def list_units(level: str | None = None):
 
 async def _list_units(level: str | None) -> list[dict]:
     return await fetch_all(
-        """SELECT u.id, u.code, u.name, u.level, u.unit_type, u.old_district, u.population, u.households, u.tags, u.rbac_domain,
+        # Chỉ đơn vị hành chính hiện hành (56 xã/phường sau 01/07/2025) — không trả / không xếp theo địa bàn huyện cũ
+        """SELECT u.id, u.code, u.name, u.level, u.unit_type, u.population, u.households, u.tags, u.rbac_domain,
                   p.code AS parent_code, ST_Y(u.center) AS lat, ST_X(u.center) AS lon,
                   CASE WHEN u.geom IS NULL THEN NULL ELSE
                     json_build_array(ST_XMin(u.geom), ST_YMin(u.geom), ST_XMax(u.geom), ST_YMax(u.geom)) END AS bbox
              FROM spatial_admin.administrative_units u
              LEFT JOIN spatial_admin.administrative_units p ON p.id = u.parent_id
             WHERE CAST(:level AS text) IS NULL OR u.level = :level
-            ORDER BY u.level, u.old_district, u.name""",
+            ORDER BY u.level, u.name""",
         {"level": level},
     )
 
@@ -53,7 +54,7 @@ async def units_geojson(level: str = "xa"):
 
 async def _units_geojson(level: str) -> dict:
     rows = await fetch_all(
-        """SELECT code, name, unit_type, old_district, population, households, tags,
+        """SELECT code, name, unit_type, population, households, tags,
                   ST_AsGeoJSON(ST_SimplifyPreserveTopology(geom, :tol), 5)::json AS geom
              FROM spatial_admin.administrative_units WHERE level = :level AND geom IS NOT NULL""",
         {"level": level, "tol": UNIT_TOLERANCE},
@@ -98,7 +99,7 @@ async def _area(codes: list[str]) -> dict | None:
 @router.get("/tree")
 async def tree():
     rows = await fetch_all(
-        """SELECT u.code, u.name, u.level, u.unit_type, u.old_district, p.code AS parent_code
+        """SELECT u.code, u.name, u.level, u.unit_type, p.code AS parent_code
              FROM spatial_admin.administrative_units u LEFT JOIN spatial_admin.administrative_units p ON p.id = u.parent_id
             ORDER BY u.level, u.name"""
     )
