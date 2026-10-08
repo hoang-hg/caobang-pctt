@@ -124,9 +124,9 @@ export function Tabs({ tabs, value, onChange }) {
   );
 }
 
-export function Section({ title, right, children, className, bodyClass }) {
+export function Section({ title, right, children, className, bodyClass, id }) {
   return (
-    <section className={clsx('card flex min-h-0 flex-col', className)}>
+    <section id={id} className={clsx('card flex min-h-0 flex-col', className)}>
       <div className="flex items-center justify-between gap-2 px-4 pb-1 pt-3">
         <h2 className="card-title">{title}</h2>
         {right}

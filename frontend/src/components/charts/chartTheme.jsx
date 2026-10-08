@@ -20,7 +20,7 @@ export function useChartTheme() {
       muted: rgb('--muted'),
       panel: rgb('--panel'),
       line: rgb('--line'),
-      // Màu trạng thái cố định
+      // Màu trạng thái cố định — trùng biến CSS / labels.js (ALARM, LEVEL) để chip, bản đồ và biểu đồ cùng một màu
       good: '#0ca30c',
       warn: '#fab219',
       serious: '#ec835a',
@@ -40,18 +40,20 @@ export function ChartTooltip({ active, payload, label, labelFormatter, unit = ''
   if (!active || !payload?.length) return null;
   const items = rows ? rows(payload) : payload.filter((p) => p.value != null);
   return (
-    <div className="card px-3 py-2 text-xs shadow-lg">
-      <div className="mb-1 font-semibold text-ink">{labelFormatter ? labelFormatter(label, payload) : label}</div>
-      {items.map((p) => (
-        <div key={p.name || p.dataKey} className="flex items-center gap-2 text-ink-2">
-          <span className="inline-block h-2 w-2 rounded-full" style={{ background: p.color || p.fill || p.stroke }} />
-          <span>{p.name}</span>
-          <span className="ml-auto pl-3 font-mono text-ink">
-            {typeof p.value === 'number' ? p.value.toLocaleString('vi-VN', { maximumFractionDigits: 2 }) : p.value}
-            {p.unit ?? unit}
-          </span>
-        </div>
-      ))}
+    <div className="card px-3.5 py-2.5 text-xs shadow-2xl backdrop-blur-xl bg-panel/95 border border-line/90 rounded-xl ring-1 ring-white/5">
+      <div className="mb-1.5 font-bold text-ink border-b border-line/50 pb-1">{labelFormatter ? labelFormatter(label, payload) : label}</div>
+      <div className="space-y-1">
+        {items.map((p) => (
+          <div key={p.name || p.dataKey} className="flex items-center gap-2 text-ink-2">
+            <span className="inline-block h-2.5 w-2.5 rounded-full shadow-sm" style={{ background: p.color || p.fill || p.stroke }} />
+            <span className="font-medium">{p.name}</span>
+            <span className="ml-auto pl-3 font-mono font-bold text-ink">
+              {typeof p.value === 'number' ? p.value.toLocaleString('vi-VN', { maximumFractionDigits: 2 }) : p.value}
+              {p.unit ?? unit}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

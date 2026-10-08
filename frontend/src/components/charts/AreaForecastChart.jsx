@@ -56,11 +56,32 @@ export default function AreaForecastChart({ height = 250 }) {
   const sel = areas.find((a) => a.code === code);
   return (
     <div>
-      <div className="mb-1 flex flex-wrap items-center gap-2">
-        <select className="input w-auto py-1 text-xs" value={code} onChange={(e) => setCode(e.target.value)} aria-label="Chọn xã">
-          {areas.map((a) => <option key={a.code} value={a.code}>{a.name} — {a.p50} mm (P90 {a.p90})</option>)}
-        </select>
-        {sel && <span className="text-xs text-muted">Tổng 72 giờ: <b className="font-mono text-ink">{sel.p50} mm</b> (P10 {sel.p10} – P90 {sel.p90})</span>}
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-line/60 pb-1.5">
+        <div className="flex items-center gap-2">
+          <select
+            className="input w-auto py-1 px-2.5 text-xs border border-line bg-panel2 font-semibold text-ink rounded-lg focus:border-accent"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            aria-label="Chọn xã"
+          >
+            {areas.map((a) => (
+              <option key={a.code} value={a.code}>
+                {a.name} — {a.p50} mm (P90 {a.p90})
+              </option>
+            ))}
+          </select>
+        </div>
+        {sel && (
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-muted">
+              Tổng 72h: <b className="font-mono text-ink font-bold">{sel.p50} mm</b>
+            </span>
+            <span className="inline-flex items-center gap-1 rounded bg-accent/15 px-2 py-0.5 font-medium text-accent border border-accent/25">
+              <span>Khoảng P10–P90:</span>
+              <b className="font-mono font-bold">{sel.p10} – {sel.p90} mm</b>
+            </span>
+          </div>
+        )}
       </div>
       <Legend items={[
         { label: 'Khoảng P10–P90', color: c.s1 },
