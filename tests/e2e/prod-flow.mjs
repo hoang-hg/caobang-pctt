@@ -247,6 +247,11 @@ res = await until('/public/reservoirs', (d) => d?.reservoirs?.find((r) => r.id =
 ho = res?.reservoirs?.find((r) => r.id === HO);
 check('Cổng công khai hiện ngay số liệu mới', ho?.status_code === 'xa_dieu_tiet' && res.spill_count === 1 && res.no_data_count === 0 &&
   ho?.stale === false);
+// Lịch sử vận hành (migration 0020): trigger ghi một dòng mỗi khi có số liệu vận hành mới — chạy thật, không bộ mô phỏng
+const hist = await call('GET', '/dashboard/reservoir-operations?hours=6', null, admin);
+const last = (hist.data?.reservoirs?.find((r) => r.id === HO)?.series || []).at(-1);
+check('Lịch sử vận hành: lần cập nhật vừa rồi có trong diễn biến của hồ', hist.status === 200 && last?.level === 189.4 &&
+  last?.gates === 1 && last?.inflow === 120 && last?.outflow === 150, JSON.stringify(last));
 
 // ================================================================ 6. Tài khoản: cán bộ xã, lãnh đạo phê duyệt
 const stamp = Date.now().toString(36);

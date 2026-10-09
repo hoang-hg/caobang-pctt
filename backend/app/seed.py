@@ -317,6 +317,46 @@ async def seed_telemetry(conn: AsyncConnection, units: dict[str, dict], now: dat
             },
         )
 
+    # Lịch sử vận hành 48 giờ (dữ liệu MẪU, chỉ khi DEMO_MODE) cho biểu đồ "Vận hành hồ chứa": chạy ĐÚNG mô hình hồ của bộ
+    # mô phỏng (scenario.reservoir_tick, mỗi 20 giây) theo mưa kịch bản của các trạm trong lưu vực, ghi một dòng mỗi 30 phút;
+    # trạng thái cuối thành số liệu hiện tại của hồ → bộ mô phỏng chạy tiếp nối liền, không có bước nhảy
+    rain_params = {st[0]: st[-1] for st in D.STATIONS if st[2] == "luong_mua"}
+    res_rows = await fetch_all(
+        "SELECT id, river, normal_level, spill_gates FROM iot_telemetry.reservoirs WHERE normal_level IS NOT NULL",
+        None,
+        conn,
+    )
+    history = []
+    for r in res_rows:
+        stations = scenario.RESERVOIR_RAIN_STATIONS.get(r["river"], ["CB-RN-01"])
+        state = {**r, "current_level": None, "outflow_m3s": 0, "spill_gates_open": 0}
+        for k in range(48 * 180, 0, -1):  # 48 giờ × 180 bước 20 giây, tới hiện tại
+            t_rel = -k / 180
+            intensity = sum(scenario.value_for("luong_mua", rain_params[s], t_rel) for s in stations) / len(
+                stations
+            )
+            state.update(
+                scenario.reservoir_tick(
+                    state, intensity, rng.uniform(-25, 25), may_change_gates=rng.random() < 0.25
+                )
+            )
+            if k % 90 == 1:  # mỗi 30 phút
+                history.append({"id": r["id"], "t": now + timedelta(hours=t_rel), **state})
+        await ex(
+            conn,
+            """UPDATE iot_telemetry.reservoirs SET current_level = :current_level, spill_gates_open = :spill_gates_open,
+                      inflow_m3s = :inflow_m3s, outflow_m3s = :outflow_m3s, operating_at = :t WHERE id = :id""",
+            {**state, "t": now, "id": r["id"]},
+        )
+    if history:
+        await conn.exec_driver_sql(
+            """INSERT INTO iot_telemetry.reservoir_operations
+                      (reservoir_id, time, current_level, spill_gates_open, inflow_m3s, outflow_m3s)
+               VALUES (%(id)s, %(t)s, %(current_level)s, %(spill_gates_open)s, %(inflow_m3s)s, %(outflow_m3s)s)
+               ON CONFLICT DO NOTHING""",
+            history,
+        )
+
     for cid, name, commune, lat, lon in D.CAMERAS:
         await ex(
             conn,

@@ -4,12 +4,13 @@ import clsx from 'clsx';
 import {
   Waves, AlertTriangle, ShieldCheck, ArrowDownRight, ArrowUpRight,
   Gauge, Compass, RefreshCw, Info, Droplets, MapPin, Zap,
-  CheckCircle2, Search, SlidersHorizontal, Siren, Clock, PencilLine
+  CheckCircle2, Search, SlidersHorizontal, Siren, Clock, PencilLine, ChevronDown
 } from 'lucide-react';
 import { api } from '../../api/client';
 import { useAreaQuery } from '../../api/hooks';
 import { useStore } from '../../app/store';
 import { BackButton, EmptyState, ErrorState, Modal, Skeleton } from '../../components/common/ui';
+import { ReservoirHistory } from '../../components/charts/ReservoirOpsChart';
 import { usePermission } from '../../rbac/usePermission';
 import { ago, time } from '../../utils/format';
 
@@ -72,6 +73,7 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap, areaScope
   const noOperatingData = total > 0 && noDataCount === total;
   const canUpdate = usePermission('monitoring', 'update', '*');
   const [editing, setEditing] = useState(null);
+  const [historyOf, setHistoryOf] = useState(null); // hồ đang mở "Diễn biến vận hành 48 giờ" (chỉ màn hình điều hành)
   const totalInflow = data?.total_inflow_m3s || 0;
   const totalOutflow = data?.total_outflow_m3s || 0;
   const flowBalance = totalOutflow - totalInflow;
@@ -581,6 +583,26 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap, areaScope
                   <p className="text-[11px] opacity-95">{r.downstream_warning}</p>
                 </div>
               </div>
+
+              {/* Diễn biến vận hành 48 giờ (màn hình điều hành — cần đăng nhập): mực nước so MNDBT, Q đến / Q xả */}
+              {areaScoped && (
+                <div className="border-t border-line/60">
+                  <button
+                    type="button"
+                    aria-expanded={historyOf === r.id}
+                    onClick={() => setHistoryOf(historyOf === r.id ? null : r.id)}
+                    className="flex min-h-[40px] w-full items-center gap-1.5 px-3 text-left text-xs font-semibold text-ink-2 hover:bg-panel2/60"
+                  >
+                    <ChevronDown size={14} className={clsx('shrink-0 transition-transform', historyOf !== r.id && '-rotate-90')} aria-hidden="true" />
+                    Diễn biến vận hành 48 giờ
+                  </button>
+                  {historyOf === r.id && (
+                    <div className="px-3 pb-3">
+                      <ReservoirHistory reservoir={r} />
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Footer Thẻ & Hành động */}
               <div className="p-3 bg-panel2/40 border-t border-line/60 flex items-center justify-between text-xs">

@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Area, ComposedChart, Line, ReferenceArea, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { Area, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { api } from '../../api/client';
-import { dateTime, hourLabel, num } from '../../utils/format';
+import { axisTimeLabel, dateTime, hourLabel, num } from '../../utils/format';
 import { alarmLevel, ALARM } from '../../utils/labels';
 import { risk } from '../../utils/risk';
 import { etaWhen, STALE_MS, trendProps, waterTrend } from '../../utils/stations';
@@ -13,6 +13,37 @@ import { axisProps, ChartTooltip, Legend, useChartTheme } from './chartTheme';
 const STALE_BUCKET_MS = 2 * 3600e3;
 const bdLabel = (name, v) => `${name} (${v != null ? `${num(v, 2)} m` : 'chưa khai báo'})`;
 const ROMAN = ['', 'I', 'II', 'III'];
+
+/**
+ * Phần VƯỢT báo động của một đường (thiết kế A.3: "khu vực diện tích giữa đường hiện tại và vạch báo động được tô màu cảnh
+ * báo tương ứng"): chèn điểm cắt chính xác nơi đường đi qua mỗi vạch (nội suy tuyến tính) rồi, với mỗi mức L, thêm khoảng
+ * [vạch L, min(giá trị, vạch kế tiếp)] khi giá trị đã tới vạch L — vùng tô bám đúng đường. `key` = 'obs' | 'fc'; điểm cắt
+ * chỉ mang `cut…` (không mang obs / fc) nên đường và chú thích khi rê chuột không đổi.
+ */
+function exceedance(points, key, levels, suffix) {
+  const cut = `cut${suffix}`;
+  const out = [];
+  points.forEach((p, i) => {
+    out.push(p);
+    const q = points[i + 1];
+    if (!q || p[key] == null || q[key] == null) return;
+    levels
+      .filter(({ v }) => (p[key] - v) * (q[key] - v) < 0)
+      .map(({ v }) => ({ t: p.t + ((v - p[key]) / (q[key] - p[key])) * (q.t - p.t), [cut]: v }))
+      .sort((a, b) => a.t - b.t)
+      .forEach((x) => out.push(x));
+  });
+  return out.map((p) => {
+    const v = p[key] ?? p[cut];
+    if (v == null) return p;
+    const bands = {};
+    levels.forEach(({ lv, v: lo }, i) => {
+      const hi = levels[i + 1]?.v;
+      bands[`x${lv}${suffix}`] = v >= lo ? [lo, hi == null ? v : Math.min(v, hi)] : null;
+    });
+    return { ...p, ...bands };
+  });
+}
 
 /**
  * Mức báo động kế tiếp trên số đo hiện tại và lúc đường dự báo (đúng đường đang vẽ) chạm mức đó — cùng cách backend
@@ -31,8 +62,9 @@ function forecastNext(value, thr, ahead) {
  * Dự báo = bản tin KTTV do trực ban nhập (Dashboard → "Nhập bản tin dự báo"); chưa có bản tin → dự báo mô phỏng
  * (chỉ có khi bật bộ mô phỏng), không có cả hai → chỉ vẽ thực đo và ghi rõ chưa có bản tin.
  * `station` (tuỳ chọn): dòng /stations của trạm — đầu biểu đồ dùng SỐ ĐO MỚI NHẤT thay cho TB giờ, để mức báo động, xu hướng
- * và dự báo khớp với ô KPI / bộ chọn trạm cùng trang (TB giờ trễ hơn: trạm đã qua BĐ II mà TB giờ còn dưới). */
-export default function Hydrograph({ stationId, height = 260, hours = 48, compact = false, station }) {
+ * và dự báo khớp với ô KPI / bộ chọn trạm cùng trang (TB giờ trễ hơn: trạm đã qua BĐ II mà TB giờ còn dưới).
+ * `children(xDomain, xTicks)`: vẽ thêm bên dưới, cùng trục thời gian và mốc giờ (VD vận hành hồ chứa cùng sông); `syncId`: đồng bộ con trỏ. */
+export default function Hydrograph({ stationId, height = 260, hours = 48, compact = false, station, syncId, children }) {
   const c = useChartTheme();
   const { data, isError, refetch } = useQuery({
     queryKey: ['series', stationId, hours],
@@ -41,8 +73,10 @@ export default function Hydrograph({ stationId, height = 260, hours = 48, compac
     refetchInterval: 60_000,
   });
 
-  const { rows, thr, domain, fcLabel, simulated, fcAhead, hourly, hourlyTrend } = useMemo(() => {
-    if (!data) return { rows: [], thr: {}, domain: [0, 1], fcLabel: null, simulated: false, fcAhead: [], hourly: null, hourlyTrend: null };
+  const { rows, thr, levels, exceeded, domain, fcLabel, simulated, fcAhead, hourly, hourlyTrend } = useMemo(() => {
+    if (!data) {
+      return { rows: [], thr: {}, levels: [], exceeded: false, domain: [0, 1], fcLabel: null, simulated: false, fcAhead: [], hourly: null, hourlyTrend: null };
+    }
     const obs = data.observed.map((d) => ({ t: new Date(d.time).getTime(), obs: d.value }));
     const lastObs = obs[obs.length - 1];
     const prevObs = obs[obs.length - 2];
@@ -55,14 +89,19 @@ export default function Hydrograph({ stationId, height = 260, hours = 48, compac
     // Đường "HEC-HMS" chỉ do bộ mô phỏng sinh (hệ thống không chạy mô hình thuỷ văn) → luôn ghi "mô phỏng"
     const label = kttv.length ? `Dự báo KTTV (phát hành ${issued})` : source.length ? 'Dự báo mô phỏng' : null;
     if (lastObs && fc.length) fc.unshift({ t: lastObs.t, fc: lastObs.obs }); // nối liền thực đo → dự báo
-    const merged = [...obs, ...fc].sort((a, b) => a.t - b.t);
     const t = data.station.thresholds || {};
+    // Vạch đã khai báo, từ thấp lên cao — mỗi khoảng giữa hai vạch tô màu của vạch dưới (BĐ I vàng, II cam, III đỏ)
+    const lv = [1, 2, 3].map((n) => ({ lv: n, v: t[`bd${n}`] })).filter((x) => x.v != null).sort((a, b) => a.v - b.v);
+    const merged = [...exceedance(obs, 'obs', lv, 'o'), ...exceedance(fc, 'fc', lv, 'f')].sort((a, b) => a.t - b.t);
     const values = merged.flatMap((r) => [r.obs, r.fc]).filter((x) => x != null);
     const lo = Math.min(...values, t.bd1 ?? Infinity) - 0.4;
     const hi = Math.max(...values, t.bd3 ?? -Infinity) + 0.4;
     return {
       rows: merged,
       thr: t,
+      levels: lv,
+      // Có vùng vượt thật (dày hơn 0) — đường chỉ chạm vạch thì không thêm chú giải
+      exceeded: merged.some((r) => lv.some(({ lv: n }) => ['o', 'f'].some((sx) => r[`x${n}${sx}`]?.[1] > r[`x${n}${sx}`]?.[0]))),
       domain: [Math.floor(lo * 2) / 2, Math.ceil(hi * 2) / 2],
       fcLabel: label,
       simulated: !kttv.length,
@@ -131,6 +170,12 @@ export default function Hydrograph({ stationId, height = 260, hours = 48, compac
     );
   }
   const now = Date.now();
+  const xDomain = [rows[0].t, rows[rows.length - 1].t]; // dùng chung với biểu đồ vẽ thêm bên dưới (children)
+  // Mốc giờ chẵn theo giờ của máy (mỗi 6 / 12 giờ) — hai biểu đồ cùng nhãn, dễ dóng thẳng
+  const tickStep = (xDomain[1] - xDomain[0] > 60 * 3600e3 ? 12 : 6) * 3600e3;
+  const tz = new Date().getTimezoneOffset() * 60e3;
+  const xTicks = [];
+  for (let t = Math.ceil((xDomain[0] - tz) / tickStep) * tickStep + tz; t <= xDomain[1]; t += tickStep) xTicks.push(t);
   const reading = station?.value != null && station.time ? { value: Number(station.value), t: new Date(station.time).getTime() } : null;
   const latest = reading ? { ...reading, raw: true, level: alarmLevel(reading.value, thr), stale: now - reading.t > STALE_MS } : hourly;
   const trend = reading ? waterTrend(station.value, station.time, station.prev_value, station.prev_time) : hourlyTrend;
@@ -144,6 +189,7 @@ export default function Hydrograph({ stationId, height = 260, hours = 48, compac
             items={[
               { label: 'Thực đo', color: c.s1, line: true },
               fcLabel ? { label: fcLabel, color: c.s2, dashed: true } : { label: 'Chưa có bản tin dự báo', color: c.muted, dashed: true },
+              ...(exceeded ? [{ label: 'Phần vượt báo động (tô theo mức; dự báo tô nhạt)', color: c.serious }] : []),
               { label: bdLabel('BĐ I', thr.bd1), color: c.warn, line: true },
               { label: bdLabel('BĐ II', thr.bd2), color: c.serious, line: true },
               { label: bdLabel('BĐ III', thr.bd3), color: c.danger, line: true },
@@ -182,19 +228,23 @@ export default function Hydrograph({ stationId, height = 260, hours = 48, compac
         </div>
       )}
       <ResponsiveContainer width="100%" height={height}>
-        <ComposedChart data={rows} margin={{ top: 8, right: compact ? 8 : 48, bottom: 0, left: -12 }}>
-          <defs>
-            <linearGradient id="hydroObsGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor={c.s1} stopOpacity={0.4} />
-              <stop offset="95%" stopColor={c.s1} stopOpacity={0.02} />
-            </linearGradient>
-          </defs>
+        <ComposedChart data={rows} syncId={syncId} syncMethod="value" margin={{ top: 8, right: compact ? 8 : 48, bottom: 0, left: -12 }}>
           <CartesianGrid stroke={c.grid} vertical={false} />
-          {/* Tô vùng giữa các mốc báo động */}
-          {thr.bd1 != null && <ReferenceArea y1={thr.bd1} y2={thr.bd2} fill={c.warn} fillOpacity={0.08} ifOverflow="hidden" />}
-          {thr.bd2 != null && <ReferenceArea y1={thr.bd2} y2={thr.bd3} fill={c.serious} fillOpacity={0.12} ifOverflow="hidden" />}
-          {thr.bd3 != null && <ReferenceArea y1={thr.bd3} y2={domain[1]} fill={c.danger} fillOpacity={0.15} ifOverflow="hidden" />}
-          <XAxis dataKey="t" type="number" scale="time" domain={['dataMin', 'dataMax']} tickFormatter={hourLabel} minTickGap={40} {...axisProps(c)} />
+          {/* Phần vượt báo động: thực đo tô đậm, dự báo tô nhạt — không hiện trong chú thích khi rê chuột */}
+          {['o', 'f'].flatMap((sfx) => levels.map(({ lv }) => (
+            <Area
+              key={`${sfx}${lv}`}
+              dataKey={`x${lv}${sfx}`}
+              stroke="none"
+              fill={[null, c.warn, c.serious, c.danger][lv]}
+              fillOpacity={sfx === 'o' ? 0.42 : 0.18}
+              connectNulls={false}
+              tooltipType="none"
+              legendType="none"
+              isAnimationActive={false}
+            />
+          )))}
+          <XAxis dataKey="t" type="number" scale="time" domain={xDomain} ticks={xTicks} tickFormatter={axisTimeLabel} minTickGap={40} {...axisProps(c)} />
           <YAxis domain={domain} width={52} tickFormatter={(v) => v.toFixed(1)} {...axisProps(c)} />
           <Tooltip
             content={<ChartTooltip unit=" m" labelFormatter={(l) => new Date(l).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })} />}
@@ -204,10 +254,11 @@ export default function Hydrograph({ stationId, height = 260, hours = 48, compac
           {thr.bd1 != null && <ReferenceLine y={thr.bd1} stroke={c.warn} strokeWidth={1.5} label={compact ? undefined : { value: `BĐ I ${thr.bd1}`, fill: c.warn, fontSize: 10, position: 'right' }} />}
           {thr.bd2 != null && <ReferenceLine y={thr.bd2} stroke={c.serious} strokeWidth={1.5} label={compact ? undefined : { value: `BĐ II ${thr.bd2}`, fill: c.serious, fontSize: 10, position: 'right' }} />}
           {thr.bd3 != null && <ReferenceLine y={thr.bd3} stroke={c.danger} strokeWidth={1.8} label={compact ? undefined : { value: `BĐ III ${thr.bd3}`, fill: c.danger, fontSize: 10, position: 'right' }} />}
-          <Area dataKey="obs" name="Thực đo" stroke={c.s1} strokeWidth={2.5} fill="url(#hydroObsGrad)" dot={false} connectNulls isAnimationActive={false} />
+          <Line dataKey="obs" name="Thực đo" stroke={c.s1} strokeWidth={2.5} dot={false} connectNulls isAnimationActive={false} />
           <Line dataKey="fc" name="Dự báo" stroke={c.s2} strokeWidth={2.2} strokeDasharray="6 4" dot={false} connectNulls isAnimationActive={false} />
         </ComposedChart>
       </ResponsiveContainer>
+      {typeof children === 'function' && children(xDomain, xTicks)}
     </div>
   );
 }
