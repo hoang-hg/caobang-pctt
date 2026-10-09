@@ -53,7 +53,7 @@ export function useSocket() {
       switch (event) {
         case 'reading.new':
           throttle('readings', 10_000, () => inv('kpis', 'stations', 'rainfall', 'landslide'));
-          throttle('series', 30_000, () => inv('series'));
+          throttle('series', 30_000, () => inv('series', 'landslide-sensors')); // heatmap cảm biến sạt lở theo giờ
           break;
         case 'sos.new':
           inv('sos', 'kpis', 'map-layers');

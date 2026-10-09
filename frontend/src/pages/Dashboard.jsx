@@ -13,6 +13,7 @@ import EventLog from '../components/common/EventLog';
 import Hydrograph from '../components/charts/Hydrograph';
 import RainfallChart from '../components/charts/RainfallChart';
 import LandslideScatter from '../components/charts/LandslideScatter';
+import SensorHeatmap from '../components/charts/SensorHeatmap';
 import SuppliesChart from '../components/charts/SuppliesChart';
 import AreaForecastChart from '../components/charts/AreaForecastChart';
 import ForecastBulletinModal from '../components/charts/ForecastBulletinModal';
@@ -552,8 +553,14 @@ export default function Dashboard() {
       )}
 
       {tab === 'sat_lo' && (
-        <div ref={ref} className="card p-3 sm:p-5">
-          <LandslideMonitor onSelectOnMap={openOnMap} />
+        // Cảm biến cảnh báo sớm lên đầu (thiết kế A: heatmap chuỗi thời gian độ nghiêng / độ ẩm đất), rồi điểm đen & đường đèo
+        <div ref={ref} className="flex flex-col gap-2.5 bg-bg sm:gap-3.5">
+          <Section title="Cảm biến cảnh báo sớm sạt lở · 48 giờ qua (độ nghiêng taluy, độ ẩm đất)">
+            <SensorHeatmap />
+          </Section>
+          <div className="card p-3 sm:p-5">
+            <LandslideMonitor onSelectOnMap={openOnMap} />
+          </div>
         </div>
       )}
 

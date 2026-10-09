@@ -44,5 +44,22 @@ const tok = (await (await fetch(BASE + '/auth/login', { method: 'POST', headers:
 const k = await get('/dashboard/kpis', tok);
 check('Dashboard cán bộ xã chỉ thấy điểm đen trong xã', (k.landslides?.points || []).every((p) => p.admin_code === 'CB-COBA'), `${k.landslides?.total} điểm`);
 
+// Heatmap cảm biến cảnh báo sớm (tab Sạt lở): độ nghiêng + độ ẩm đất, giá trị lớn nhất từng giờ trong 48 giờ qua
+const admin = (await (await fetch(BASE + '/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: 'admin', password: 'admin123' }) })).json()).token;
+const hs = await get('/dashboard/landslide-sensors?hours=48', admin);
+const sensors = hs.sensors || [];
+const hourMs = 3_600_000;
+check('Cảm biến sạt lở: chỉ độ nghiêng / độ ẩm đất, có ngưỡng BĐ', sensors.length > 0 &&
+  sensors.every((s) => ['do_nghieng', 'do_am_dat'].includes(s.type) && s.thresholds?.bd1 != null), `${sensors.length} cảm biến`);
+check('Cảm biến sạt lở: chuỗi theo giờ, trong 48 giờ qua, mỗi giờ một giá trị',
+  sensors.every((s) => s.series.length <= 49 && s.series.every((p, i) => new Date(p.time).getTime() % hourMs === 0 &&
+    Date.now() - new Date(p.time).getTime() <= 49 * hourMs && (i === 0 || new Date(p.time) > new Date(s.series[i - 1].time)))) &&
+  sensors.some((s) => s.series.length >= 24), sensors.map((s) => `${s.id} ${s.series.length}`).join(', '));
+check('Cảm biến sạt lở: giờ hiện tại ≥ số đo mới nhất (lấy giá trị lớn nhất trong giờ)',
+  sensors.filter((s) => s.value != null && s.series.length).every((s) => s.series[s.series.length - 1].max >= Math.round(s.value * 100) / 100 - 0.01));
+check('Cảm biến sạt lở: số giờ ngoài 6–168 bị từ chối', (await fetch(BASE + '/dashboard/landslide-sensors?hours=2', { headers: { Authorization: `Bearer ${admin}` } })).status === 422);
+const hsXa = await get('/dashboard/landslide-sensors', tok);
+check('Cảm biến sạt lở: cán bộ xã chỉ thấy cảm biến trong xã', (hsXa.sensors || []).length < sensors.length, `${hsXa.sensors?.length} / ${sensors.length}`);
+
 console.log(failed ? `\n${failed} kiểm tra KHÔNG đạt` : '\nTất cả kiểm tra sạt trượt & đường đèo đạt');
 process.exit(failed ? 1 : 0);
