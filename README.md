@@ -294,7 +294,7 @@ backend/            API + worker (Python, FastAPI) — app/ (api/v1, rbac, servi
 frontend/           giao diện (React, Vite) — src/ (pages, components, api, rbac, app), nginx.conf + nginx/ (snippet),
                     scripts/compress.mjs (nén sẵn khi build), Dockerfile
 tests/e2e/          kiểm thử API qua HTTP (Node) — cần stack dev chạy với DEMO_MODE=true
-tests/ui/           kiểm thử giao diện bằng trình duyệt thật (Playwright) — máy tính + điện thoại
+tests/ui/           kiểm thử giao diện bằng trình duyệt thật (Playwright) — máy tính, máy tính bảng, điện thoại
 tests/load/         kiểm thử tải (k6)
 scripts/maintenance/  script bảo trì CSDL máy dev (có chặn production)
 deploy/             Caddyfile, backup.sh (chạy thật); golive-check.sh, restore-drill.sh, external-monitor.sh
@@ -1602,7 +1602,10 @@ và **điện thoại** (Pixel 7, GPS giả lập ở TP Cao Bằng):
   vị trí của tôi") → mã tra cứu → theo dõi tiến độ, tra cứu mã không tồn tại, `/ban-nhe`;
 - cán bộ: đăng nhập, mọi trang ở thanh menu, menu trên điện thoại, điều động (chọn lực lượng → phát lệnh → báo chưa gửi
   cho đội), duyệt phản ánh (nội dung công khai gợi ý sẵn, không chọn sẵn vị trí chính xác), nhập dữ liệu bằng form +
-  chọn vị trí trên bản đồ.
+  chọn vị trí trên bản đồ;
+- **điện thoại nhỏ 360 px** (Galaxy S8): mọi tab Tổng quan không tràn ngang, "Báo SOS" ở thanh dưới cùng mở form 3 bước;
+- **máy tính bảng / laptop nhỏ** (640 · 820 · 1024 · 1280 px): thanh trên cùng không tràn ngang (kể cả khi có nhãn "Bấm để
+  bật chuông SOS") và luôn mở được bộ lọc xã/phường — từ 1024 px trên thanh, hẹp hơn trong menu ☰.
 
 Mỗi bước **lỗi** khi trang có lỗi JavaScript (màn hình trắng), API trả 5xx, hoặc **tràn ngang trên điện thoại** (phải kéo
 ngang mới đọc hết). Ảnh chụp bước lỗi: artifact `ui-shots` của CI.

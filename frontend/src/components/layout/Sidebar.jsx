@@ -178,8 +178,8 @@ export default function Sidebar() {
                   <X size={18} />
                 </button>
               </div>
-              {/* Header ẩn bộ lọc trên màn hình hẹp → đưa vào menu */}
-              <div className="mb-3 px-3 sm:hidden">
+              {/* Header chỉ hiện bộ lọc từ 1024 px (lg) — dưới mức đó (cũng là lúc có nút ☰) bộ lọc nằm ở đây */}
+              <div className="mb-3 px-3 lg:hidden">
                 <AdminFilter />
               </div>
               {renderNavLinks(true)}

@@ -437,6 +437,40 @@ async function smallPhone(ctx) {
   });
 }
 
+// ================================================================ Máy tính bảng / laptop nhỏ (640–1280 px)
+// Thanh trên cùng không tràn ngang (trước 10/2026 tràn 7–185 px ở 640–1024 px, ô tìm kiếm bị ép mất) và luôn mở được bộ
+// lọc xã/phường: từ 1024 px nằm trên thanh, hẹp hơn nằm trong menu ☰. Mở thẳng trang, không bấm gì trước → nhãn "Bấm để
+// bật chuông SOS" còn hiện (trường hợp chật nhất). Chỉ xem.
+const TABLET = { name: 'Máy tính bảng', opts: { viewport: { width: 820, height: 1180 }, hasTouch: true }, mobile: false };
+async function tablet(ctx) {
+  const { page } = ctx;
+  await step(ctx, 'Đăng nhập cán bộ', async () => {
+    await page.goto(`${ROOT}/dang-nhap`);
+    await page.getByPlaceholder('Nhập tên đăng nhập hoặc email...').fill(STAFF.user);
+    await page.getByPlaceholder('••••••••').fill(STAFF.pass);
+    await page.locator('button[type="submit"]').click();
+    await page.waitForURL(/\/dashboard/, { timeout: 20_000 });
+  });
+  for (const width of [640, 820, 1024, 1280]) {
+    await step(ctx, `Tổng quan ${width} px: thanh trên cùng không tràn, mở được bộ lọc xã/phường`, async () => {
+      await page.setViewportSize({ width, height: 1000 });
+      await page.goto(`${ROOT}/dashboard`);
+      await waitMain(page);
+      const px = await page.evaluate(() => {
+        const header = document.querySelector('header');
+        return Math.max(document.documentElement.scrollWidth - window.innerWidth, header.scrollWidth - header.clientWidth);
+      });
+      if (px > 2) throw new Error(`thanh trên cùng tràn ngang ${px}px`);
+      const filter = page.locator('[title="Lọc dữ liệu theo địa phương"]');
+      if (await visible(filter).count()) return 'bộ lọc trên thanh trên cùng';
+      await page.getByRole('button', { name: /Mở danh mục điều hướng/ }).click();
+      await visible(filter).waitFor({ timeout: 5_000 });
+      await page.getByRole('button', { name: 'Đóng menu' }).first().click();
+      return 'bộ lọc trong menu ☰';
+    });
+  }
+}
+
 // ================================================================
 console.log(`Kiểm thử giao diện: ${ROOT}${READONLY ? ' (chỉ xem)' : ''}`);
 const browser = await chromium.launch();
@@ -455,6 +489,11 @@ try {
   const smallPage = await small.newPage();
   await smallPhone({ page: smallPage, vp: SMALL_PHONE, problems: watch(smallPage) });
   await small.close();
+  const tab = await browser.newContext({ ...TABLET.opts, locale: 'vi-VN' });
+  tab.setDefaultTimeout(15_000);
+  const tabPage = await tab.newPage();
+  await tablet({ page: tabPage, vp: TABLET, problems: watch(tabPage) });
+  await tab.close();
 } finally {
   await browser.close();
 }
