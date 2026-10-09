@@ -333,8 +333,11 @@ chỉ khi `DEMO_MODE`; `DEMO_MODE=false` xoá đoạn `so_do` còn sót mỗi l�
   ErrorState, EmptyState, RiskLegend). Icon `lucide-react`.
 - **Mức rủi ro**: MỘT thang cho cả hệ thống — `src/utils/risk.js`: `risk(level)` với 0 Xanh · 1 Vàng · 2 Cam · 3 Đỏ, `null`
   Xám = chưa có dữ liệu; trả class chip / nền nhạt / chữ / viền trái và mã hex (biểu đồ, bản đồ). Mã nghiệp vụ quy về mức qua
-  `RESERVOIR_LEVEL`, `LANDSLIDE_LEVEL`, `HAZARD_LEVEL`, `rainLevel`, `sosLevel` (`labels.js` PRIORITY / LEVEL / ALARM cũng lấy
-  từ đây). Không tự đặt màu (`#ef4444`, `bg-orange-…`) cho mức rủi ro; chip Xanh/Vàng/Cam chữ đen, Đỏ chữ trắng.
+  `RESERVOIR_LEVEL`, `LANDSLIDE_LEVEL`, `HAZARD_LEVEL`, `TILT_LEVEL`, `rainLevel`, `sosLevel` (`labels.js` PRIORITY / LEVEL /
+  ALARM cũng lấy từ đây). Không tự đặt màu (`#ef4444`, `bg-orange-…`) cho mức rủi ro; chip Xanh/Vàng/Cam chữ đen, Đỏ chữ trắng.
+  Chữ lưu ý / nhắc nhở (không phải mức rủi ro: thiếu dữ liệu đường, ô chưa đủ…) dùng `text-warn`, không `text-amber-500/600`
+  (chỉ 2–3 : 1 trên nền trắng). Số đo (mưa, mực nước) không tô xanh cố định — xanh đọc như "an toàn"; mức để ở nhãn riêng.
+  Màu phân loại / thương hiệu (logo, thẻ điểm sơ tán, huy hiệu vai trò, công cụ đo) không thuộc thang này.
 - **Trạng thái khối dữ liệu**: đang tải → `Skeleton`; lỗi mà chưa có dữ liệu cũ (`isError && !data`) → `ErrorState` có nút
   "Thử lại" — KHÔNG hiện "Chưa có …" khi thực ra là lỗi tải; rỗng thật → `EmptyState` / câu "chưa có" nói rõ cần nhập ở đâu
   (chỉ link tới trang tài khoản có quyền mở). Mất mạng: `utils/useOnline` (Tổng quan có `ConnectionBanner`).

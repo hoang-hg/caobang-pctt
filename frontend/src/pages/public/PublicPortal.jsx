@@ -14,7 +14,7 @@ import { useStore } from '../../app/store';
 import { AdminBoundaries, BaseLayer, RAIN_BINS } from '../../components/map/MapTools';
 import { evacIcon, hazardIcon, pinIcon, stationIcon, reservoirIcon } from '../../components/map/icons';
 import { LEVEL, landslideStatus } from '../../utils/labels';
-import { RISK as RISK_SCALE, risk as riskStyle } from '../../utils/risk';
+import { levelOf, RISK as RISK_SCALE, risk as riskStyle, TILT_LEVEL } from '../../utils/risk';
 import { ago, dateTime } from '../../utils/format';
 import { stationView } from '../../utils/stations';
 import L from 'leaflet';
@@ -278,7 +278,7 @@ function PublicMap({ data, forecast, geo, me, route, target, layers, basemap = '
                   </div>
                   <p className="text-xs text-ink-2 bg-panel2 p-1.5 rounded mt-1 leading-snug">{p.description}</p>
                   {p.tilt_info && (
-                    <div className="text-[11px] text-amber-600 font-semibold">
+                    <div className={clsx('text-[11px] font-semibold', riskStyle(levelOf(TILT_LEVEL, p.tilt_info.tilt_level)).text)}>
                       Độ nghiêng taluy: +{p.tilt_info.current_tilt_deg}° (Ngưỡng {p.tilt_info.alarm_threshold}°)
                     </div>
                   )}
@@ -323,7 +323,7 @@ function PublicMap({ data, forecast, geo, me, route, target, layers, basemap = '
           positions={route.geometry.coordinates.map(([x, y]) => [y, x])}
           pathOptions={
             route.roads?.length
-              ? { color: route.safe ? '#16a34a' : '#f97316', weight: 6, opacity: 0.85 }
+              ? { color: route.safe ? RISK_SCALE[0].hex : RISK_SCALE[2].hex, weight: 6, opacity: 0.85 }
               : { color: '#64748b', weight: 4, opacity: 0.8, dashArray: '8 8' } // chưa có dữ liệu đường: chỉ là hướng chim bay
           }
         />
@@ -520,6 +520,8 @@ export default function PublicPortal() {
   };
 
   const active = overview?.alerts?.active || 0;
+  // Dải cảnh báo: có cảnh báo Đỏ → nền đỏ chữ trắng; còn lại → Cam, chữ ĐEN (chữ trắng trên cam chỉ 2,6 : 1)
+  const onRed = !!overview?.alerts?.has_red;
   const worstRiver = overview?.rivers?.reduce((m, r) => Math.max(m, r.level), 0) || 0;
 
   return (
@@ -596,13 +598,13 @@ export default function PublicPortal() {
             'flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-2xl p-4 sm:p-5 shadow-sm border transition-all',
             active
               ? overview?.alerts?.has_red
-                ? 'bg-gradient-to-r from-red-600 to-rose-700 text-white border-red-500'
-                : 'bg-gradient-to-r from-amber-600 to-orange-600 text-white border-amber-500'
+                ? 'bg-danger text-white border-danger'
+                : 'bg-serious text-black border-serious'
               : 'bg-panel border-line text-ink'
           )}
         >
           <div className="flex items-start gap-3">
-            <div className={clsx('p-2.5 rounded-xl shrink-0', active ? 'bg-white/20 text-white' : 'bg-good/15 text-good')}>
+            <div className={clsx('p-2.5 rounded-xl shrink-0', active ? (onRed ? 'bg-white/20 text-white' : 'bg-black/10 text-black') : 'bg-good/15 text-good')}>
               {active ? <AlertTriangle size={26} /> : <CheckCircle2 size={26} />}
             </div>
             <div>
@@ -611,7 +613,7 @@ export default function PublicPortal() {
                   ? `Đang có ${active} cảnh báo thiên tai khẩn cấp trên địa bàn tỉnh!`
                   : 'Thời tiết hiện tại ổn định – Chưa có cảnh báo khẩn cấp'}
               </div>
-              <div className={clsx('text-xs sm:text-sm mt-1 leading-relaxed', active ? 'text-white/90' : 'text-muted')}>
+              <div className={clsx('text-xs sm:text-sm mt-1 leading-relaxed', active ? (onRed ? 'text-white/90' : 'text-black/80') : 'text-muted')}>
                 Mưa 24h qua: TB <b className="font-mono">{overview?.rain?.avg_24h ?? '–'} mm</b> (cao nhất <b className="font-mono">{overview?.rain?.max_24h ?? '–'} mm</b>) ·
                 Dự báo 24h tới cao nhất <b className="font-mono">{overview?.forecast_24h?.max_24h ?? '–'} mm</b> tại <span className="underline decoration-dotted">{overview?.forecast_24h?.max_name || '–'}</span> ·
                 Sông suối: <b>{['Dưới báo động', 'Trên Báo động I', 'Trên Báo động II', 'Trên Báo động III'][worstRiver]}</b>
@@ -642,10 +644,10 @@ export default function PublicPortal() {
               setActiveTab('hochua');
               scrollToContent();
             }}
-            className="flex items-center justify-between gap-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs cursor-pointer hover:bg-amber-500/15 transition-all group"
+            className="flex items-center justify-between gap-3 p-3 rounded-xl bg-serious/10 border border-serious/50 text-xs cursor-pointer hover:bg-serious/15 transition-all group"
           >
-            <div className="flex items-center gap-2.5 text-amber-900 dark:text-amber-200">
-              <span className="p-1.5 rounded-lg bg-amber-500 text-white shrink-0 animate-pulse">
+            <div className="flex items-center gap-2.5 text-ink">
+              <span className="p-1.5 rounded-lg bg-serious text-black shrink-0 motion-safe:animate-pulse">
                 <Waves size={15} />
               </span>
               <div>
@@ -659,7 +661,7 @@ export default function PublicPortal() {
                 )}
               </div>
             </div>
-            <span className="text-amber-600 font-semibold shrink-0 group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
+            <span className="text-serious font-semibold shrink-0 group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
               Xem chi tiết <ChevronRight size={14} />
             </span>
           </div>
@@ -951,7 +953,7 @@ export default function PublicPortal() {
                               // Chưa có mạng đường chính thức: không có "lộ trình", không ước thời gian di chuyển
                               <>
                                 Khoảng cách chim bay: <b>{route.distance_km} km</b>.{' '}
-                                <span className="font-bold text-amber-500">
+                                <span className="font-bold text-warn">
                                   Chưa có dữ liệu đường tại khu vực này — nét đứt chỉ là hướng chim bay, không phải đường đi. Hãy đi theo chỉ dẫn của cán bộ địa phương.
                                 </span>
                                 {route.hazards?.length > 0 && (
@@ -972,13 +974,13 @@ export default function PublicPortal() {
                               </span>
                             )}
                             {route.roads?.length > 0 && route.offroad_km >= 0.5 && (
-                              <span className="block text-amber-600">
+                              <span className="block text-warn">
                                 Có khoảng {route.offroad_km} km chưa có dữ liệu đường (đoạn nối tới / từ đường chính) — tự quan sát khi di chuyển, không đi qua suối, ngầm tràn đang ngập.
                               </span>
                             )}
                             {/* Trạm mực nước vượt báo động / mất tín hiệu, điểm nguy hiểm, mưa rất to quanh tuyến */}
                             {route.warnings?.length > 0 && (
-                              <ul className="mt-1 list-inside list-disc text-amber-700 dark:text-amber-400">
+                              <ul className="mt-1 list-inside list-disc text-warn">
                                 {route.warnings.map((w) => <li key={w}>{w}</li>)}
                               </ul>
                             )}
@@ -1034,14 +1036,14 @@ export default function PublicPortal() {
               label: 'Hồ chứa & Xả lũ',
               icon: Droplets,
               badge: overview?.reservoirs?.spill_count ? `${overview.reservoirs.spill_count} hồ xả` : null,
-              badgeCls: overview?.reservoirs?.emergency_count > 0 ? 'bg-danger text-white animate-pulse' : 'bg-amber-500 text-white',
+              badgeCls: overview?.reservoirs?.emergency_count > 0 ? 'bg-danger text-white motion-safe:animate-pulse' : 'bg-serious text-black',
             },
             {
               id: 'satlo',
               label: 'Sạt trượt & Đường đèo',
               icon: Mountain,
               badge: overview?.landslides?.blocked_count ? `${overview.landslides.blocked_count} điểm tắc` : null,
-              badgeCls: 'bg-danger text-white animate-pulse',
+              badgeCls: 'bg-danger text-white motion-safe:animate-pulse',
             },
             { id: 'tracuu', label: 'Tra cứu tiến độ (SOS / Phản ánh)', icon: Search },
             { id: 'muanuoc', label: 'Mực nước sông suối', icon: Waves },
@@ -1065,7 +1067,7 @@ export default function PublicPortal() {
                 <Icon size={15} />
                 <span>{tab.label}</span>
                 {tab.badge && (
-                  <span className={clsx('px-1.5 py-0.5 rounded-full text-[10px] font-bold shadow-sm', tab.badgeCls || 'bg-amber-500 text-white')}>
+                  <span className={clsx('px-1.5 py-0.5 rounded-full text-[10px] font-bold shadow-sm', tab.badgeCls || 'bg-serious text-black')}>
                     {tab.badge}
                   </span>
                 )}
@@ -1469,11 +1471,11 @@ export default function PublicPortal() {
                     setActiveTab('satlo');
                     scrollToContent();
                   }}
-                  className="card p-4 sm:p-5 border-l-4 border-l-danger bg-gradient-to-br from-danger/10 via-panel to-panel hover:shadow-lg hover:border-red-600 transition-all cursor-pointer group"
+                  className="card p-4 sm:p-5 border-l-4 border-l-danger bg-gradient-to-br from-danger/10 via-panel to-panel hover:shadow-lg hover:border-danger transition-all cursor-pointer group"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 to-rose-700 text-white shadow-md shadow-red-600/30 group-hover:scale-105 transition-transform">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-danger text-white shadow-md shadow-danger/30 group-hover:scale-105 transition-transform">
                         <Mountain size={24} />
                       </div>
                       <div>
@@ -1503,7 +1505,7 @@ export default function PublicPortal() {
                     </div>
                     <div className="bg-panel2/60 p-2 rounded-lg border border-line/40">
                       <span className="text-[11px] text-muted">Cảm biến nghiêng lớn nhất:</span>
-                      <div className="font-mono text-sm font-bold text-amber-600 mt-0.5 truncate">
+                      <div className="font-mono text-sm font-bold text-ink mt-0.5 truncate">
                         {maxTiltText(map?.landslides)}
                       </div>
                     </div>
@@ -1530,7 +1532,7 @@ export default function PublicPortal() {
                 sub: `${res.river ? `Sông ${res.river} · ` : ''}${res.admin_name}`,
                 value: res.status_code === 'chua_co_so_lieu' ? 'Chưa có số liệu vận hành' : res.spill_gates_open > 0 ? `Mở ${res.spill_gates_open} cửa xả` : 'Đóng cửa xả',
                 status: res.status_label,
-                statusColor: res.status_code === 'xa_khan_cap' ? 'text-danger' : res.status_code === 'xa_dieu_tiet' ? 'text-amber-500' : res.status_code === 'chua_co_so_lieu' ? 'text-muted' : 'text-good',
+                statusColor: res.status_code === 'xa_khan_cap' ? 'text-danger' : res.status_code === 'xa_dieu_tiet' ? 'text-serious' : res.status_code === 'chua_co_so_lieu' ? 'text-muted' : 'text-good',
                 lat: res.lat,
                 lon: res.lon,
                 type: 'reservoir',

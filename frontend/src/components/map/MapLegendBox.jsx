@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { stationView } from '../../utils/stations';
 import { landslideStatus } from '../../utils/labels';
+import { levelOf, risk, TILT_LEVEL } from '../../utils/risk';
 
 /** Biểu tượng theo loại điểm đang chọn — dùng chung cho thẻ chi tiết (chú giải) và thanh nổi trên bản đồ công khai. */
 export const POINT_EMOJI = { rain: '🌧️', water: '💧', reservoir: '🏛️', landslide: '⚠️', evac: '🏠', report: '📸' };
@@ -251,7 +252,7 @@ export default function MapLegendBox({
                 {selectedPoint.raw.tilt_info && (
                   <div className="flex justify-between">
                     <span className="text-muted">Góc nghiêng taluy:</span>
-                    <span className="font-bold text-amber-600">+{selectedPoint.raw.tilt_info.current_tilt_deg}° (Ngưỡng {selectedPoint.raw.tilt_info.alarm_threshold}°)</span>
+                    <span className={clsx('font-bold', risk(levelOf(TILT_LEVEL, selectedPoint.raw.tilt_info.tilt_level)).text)}>+{selectedPoint.raw.tilt_info.current_tilt_deg}° (Ngưỡng {selectedPoint.raw.tilt_info.alarm_threshold}°)</span>
                   </div>
                 )}
                 {selectedPoint.raw.bypass_route && (
@@ -269,7 +270,7 @@ export default function MapLegendBox({
               <>
                 <div className="flex justify-between">
                   <span className="text-muted">Lượng mưa đo được:</span>
-                  <span className="font-mono font-bold text-base text-emerald-600">{selectedPoint.value}</span>
+                  <span className="font-mono font-bold text-base text-ink">{selectedPoint.value}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted">Đánh giá nguy cơ:</span>

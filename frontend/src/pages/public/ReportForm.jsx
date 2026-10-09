@@ -270,7 +270,7 @@ export default function ReportForm({ onClose, myLocation, onTrack }) {
               <label className="text-xs font-semibold uppercase text-muted">
                 Mô tả hiện trường <span className="text-danger">*</span>
               </label>
-              <span className={clsx('text-[11px]', f.description.trim().length < 10 ? 'text-amber-500 font-medium' : 'text-good')}>
+              <span className={clsx('text-[11px]', f.description.trim().length < 10 ? 'text-warn font-medium' : 'text-good')}>
                 {f.description.trim().length < 10 ? `Tối thiểu 10 ký tự (${f.description.trim().length}/10)` : '✓ Đủ độ dài'}
               </span>
             </div>
@@ -419,7 +419,7 @@ export default function ReportForm({ onClose, myLocation, onTrack }) {
           </div>
 
           {!valid && (
-            <div className="text-xs text-amber-500 font-medium">
+            <div className="text-xs text-warn font-medium">
               Vui lòng hoàn thành: {!validDesc && '• Nhập mô tả ít nhất 10 ký tự '} {!validPos && '• Chấm vị trí sự việc trên bản đồ '} {!validToken && '• Hoàn tất bước xác minh chống spam'}
             </div>
           )}

@@ -261,7 +261,7 @@ function ChangesView({ changes }) {
       )}
       {changed.length > 0 && (
         <details open className="text-sm">
-          <summary className="cursor-pointer font-medium text-amber-600">Cập nhật ({changed.length}) — giá trị cũ → mới</summary>
+          <summary className="cursor-pointer font-medium text-warn">Cập nhật ({changed.length}) — giá trị cũ → mới</summary>
           <div className="mt-1 flex flex-col gap-1">
             {changed.map((u) => (
               <div key={u.dong} className="rounded border border-line p-2 text-xs">

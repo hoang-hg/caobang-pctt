@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { api } from '../../api/client';
 import { BackButton } from '../../components/common/ui';
+import { levelOf, risk, TILT_LEVEL } from '../../utils/risk';
 
 const EMPTY = [];
 
@@ -423,7 +424,7 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap }) {
                   {p.tilt_info ? (
                     <div className="p-2 rounded-lg bg-panel2/50 border border-line/40">
                       <div className="text-[10px] text-muted flex items-center gap-1">
-                        <Gauge size={11} className={clsx(p.tilt_info.tilt_level === 'nguy_hiem' ? 'text-danger' : p.tilt_info.tilt_level === 'canh_bao' ? 'text-serious' : 'text-good')} /> Độ nghiêng taluy:
+                        <Gauge size={11} className={risk(levelOf(TILT_LEVEL, p.tilt_info.tilt_level)).text} /> Độ nghiêng taluy:
                       </div>
                       <div className={clsx('font-mono text-xs font-bold mt-0.5', p.tilt_info.tilt_level === 'nguy_hiem' ? 'text-danger' : 'text-ink')}>
                         +{p.tilt_info.current_tilt_deg}°
