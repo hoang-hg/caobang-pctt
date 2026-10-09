@@ -114,5 +114,20 @@ check('Xác nhận đã cứu an toàn', resolved.data?.status === 'hoan_thanh')
 const audit = (await call('GET', '/alerts/audit', null, checker)).data;
 check('Nhật ký pháp lý ghi nhận', audit.some((a) => a.action === 'broadcast.approve'), `${audit.length} bản ghi`);
 
+// Mưa bình quân lưu vực (Phân hệ A): theo diện tích đa giác Thiessen — KPI 24h, biểu đồ mưa giờ, cổng công khai cùng một số
+const kp = (await call('GET', '/dashboard/kpis', null, checker)).data;
+const rf = (await call('GET', '/dashboard/rainfall', null, checker)).data;
+const pub = (await call('GET', '/public/overview')).data;
+const hourly = rf.observed.reduce((a, d) => a + d.mm, 0);
+const near = (a, b, pct) => Math.abs(a - b) <= Math.max(1, pct * b);
+check('Mưa TB lưu vực 24h theo đa giác Thiessen (≥ 2 trạm), không vượt trạm mưa lớn nhất',
+  kp.rain?.avg_method === 'thiessen' && kp.rain.stations >= 2 && kp.rain.avg_24h > 0 && kp.rain.avg_24h <= kp.rain.max_24h, JSON.stringify(kp.rain));
+check('Biểu đồ mưa giờ cùng cách tính, tổng các giờ ≈ KPI 24h', rf.method === 'thiessen' && near(hourly, kp.rain.avg_24h, 0.03),
+  `${hourly.toFixed(1)} / ${kp.rain.avg_24h}`);
+check('Cổng công khai cùng số mưa TB toàn tỉnh', near(pub.rain?.avg_24h, kp.rain.avg_24h, 0.02), `${pub.rain?.avg_24h} / ${kp.rain.avg_24h}`);
+const one = (await call('GET', '/dashboard/kpis?admin_codes=CB-BAOLAC', null, checker)).data;
+check('Vùng chỉ có 1 trạm mưa: lấy đúng số của trạm (không dựng được đa giác)',
+  one.rain?.stations === 1 && one.rain.avg_method === 'trung_binh_cong' && one.rain.avg_24h === one.rain.max_24h, JSON.stringify(one.rain));
+
 console.log(failures ? `\n${failures} kiểm tra THẤT BẠI` : '\nTất cả kiểm tra đạt');
 process.exit(failures ? 1 : 0);

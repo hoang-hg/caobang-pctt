@@ -320,7 +320,7 @@ export default function Dashboard() {
     const rows = [
       ['Phạm vi', filterLabel],
       ['Thời điểm', now.toLocaleString('vi-VN', VN_TIME)],
-      ['Mưa TB 24h các trạm (mm)', k?.rain?.avg_24h],
+      [k?.rain?.avg_method === 'thiessen' ? 'Mưa TB lưu vực 24h – theo diện tích, đa giác Thiessen (mm)' : 'Mưa TB 24h các trạm (mm)', k?.rain?.avg_24h],
       ['Mưa 24h lớn nhất (mm)', k?.rain?.max_24h, k?.rain?.max_station],
       ...waterStations.map((s) => {
         const st = riverState(s);

@@ -54,7 +54,8 @@ export default function RainfallChart({ height = 250 }) {
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line/60 pb-1.5">
         <Legend
           items={[
-            { label: 'Mưa giờ – thực đo', color: c.s1 },
+            // Bình quân lưu vực: trạm đại diện vùng rộng nặng hơn (đa giác Thiessen, backend /dashboard/rainfall)
+            { label: data.method === 'thiessen' ? 'Mưa giờ – TB lưu vực (Thiessen)' : 'Mưa giờ – thực đo', color: c.s1 },
             { label: 'Dự báo mô hình 3 giờ tới', color: c.s2 },
             { label: 'Tích lũy', color: c.s1, line: true },
             { label: 'Tích lũy dự báo', color: c.s2, dashed: true },

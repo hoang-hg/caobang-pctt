@@ -16,9 +16,9 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from app.api.v1.reports import _serve_photo
-from app.area import IN_PROVINCE_SQL
+from app.area import IN_PROVINCE_SQL, thiessen_ctes
 from app.config import settings
-from app.db import fetch_all, fetch_one
+from app.db import fetch_all, fetch_all_no_jit, fetch_one
 from app.infra import ratelimit
 from app.infra.cache import cached, cached_view
 from app.services import lite, map_ops
@@ -61,13 +61,19 @@ def river_level(value: float | None, stale: bool, thresholds: dict) -> tuple[int
 @router.get("/overview")
 async def overview():
     async def build():
-        rain = await fetch_one(
-            """WITH h AS (SELECT r.station_id, time_bucket('1 hour', r.time) AS b, avg(r.value) AS v
-                            FROM iot_telemetry.sensor_readings r JOIN iot_telemetry.monitoring_stations s ON s.id = r.station_id
-                           WHERE s.type = 'luong_mua' AND r.time > now() - interval '24 hours' GROUP BY r.station_id, b),
-                    t AS (SELECT station_id, sum(v) AS mm FROM h GROUP BY station_id)
-               SELECT round(avg(mm)::numeric, 1)::float AS avg_24h, round(max(mm)::numeric, 1)::float AS max_24h FROM t"""
-        )
+        # Mưa TB toàn tỉnh: bình quân theo diện tích (đa giác Thiessen) — cùng số với màn hình điều hành
+        rain = (
+            await fetch_all_no_jit(
+                f"""WITH h AS (SELECT r.station_id, time_bucket('1 hour', r.time) AS b, avg(r.value) AS v
+                                FROM iot_telemetry.sensor_readings r JOIN iot_telemetry.monitoring_stations s ON s.id = r.station_id
+                               WHERE s.type = 'luong_mua' AND r.time > now() - interval '24 hours' GROUP BY r.station_id, b),
+                        tot AS (SELECT station_id AS id, sum(v) AS mm FROM h GROUP BY station_id),
+                        {thiessen_ctes([])}
+                   SELECT round(COALESCE(sum(tot.mm * w.m2) / NULLIF(sum(w.m2), 0), avg(tot.mm))::numeric, 1)::float AS avg_24h,
+                          round(max(tot.mm)::numeric, 1)::float AS max_24h
+                     FROM tot LEFT JOIN w USING (id)"""
+            )
+        )[0]
         rivers = await fetch_all(
             f"""SELECT s.name, s.river, s.alarm_thresholds AS thr, {LATEST_COLS}
                   FROM iot_telemetry.monitoring_stations s {LATEST_JOIN}
