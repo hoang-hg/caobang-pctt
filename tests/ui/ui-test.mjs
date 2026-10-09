@@ -261,6 +261,31 @@ async function staff(ctx, trackCode) {
     await dialog.getByRole('button', { name: 'Huỷ', exact: true }).click();
   });
 
+  // Báo cáo văn bản (PDF định dạng chuẩn, thiết kế A): chỉ dựng PDF ở trình duyệt, không ghi gì lên máy chủ. Kiểm font tiếng
+  // Việt được nhúng (chữ tìm / sao chép được) — cũng là kiểm nginx phục vụ tệp font và CSP không chặn tải font
+  await step(ctx, 'Tổng quan: "Văn bản" — báo cáo PDF định dạng chuẩn qua 3 bước, nhúng font tiếng Việt', async () => {
+    await page.goto(`${ROOT}/dashboard`);
+    await waitMain(page);
+    await page.getByRole('button', { name: 'Soạn báo cáo văn bản định dạng chuẩn (PDF)' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('button', { name: 'Tiếp', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Tiếp', exact: true }).click();
+    await dialog.getByLabel(/Kèm phụ lục/).uncheck(); // không chụp màn hình → nhanh
+    await expectNoOverflow(ctx, 'hộp thoại Báo cáo văn bản', dialog);
+    const [dl] = await Promise.all([
+      page.waitForEvent('download', { timeout: 60_000 }),
+      dialog.getByRole('button', { name: 'Xuất PDF', exact: true }).click(),
+    ]);
+    const buf = fs.readFileSync(await dl.path());
+    const pdf = buf.toString('latin1');
+    const pages = (pdf.match(/\/Type\s*\/Page[^s]/g) || []).length;
+    if (!/\/FontFile2/.test(pdf) || !/Tinos/.test(pdf) || !/\/ToUnicode/.test(pdf)) {
+      throw new Error('PDF không nhúng font tiếng Việt — chữ không tìm / sao chép được');
+    }
+    if (!pages) throw new Error('PDF không có trang nào');
+    return `${pages} trang · ${Math.round(buf.length / 1024)} KB · ${dl.suggestedFilename()}`;
+  });
+
   // Phân quyền 3 cấp: chọn Cấp quyết định phạm vi (Cấp 3 → 1 xã; Cấp 1–2 → toàn tỉnh) và ô PIN (chỉ Cấp 1–2). Không lưu.
   await step(ctx, 'Tạo tài khoản: Cấp 3 chọn 1 xã, không PIN; Cấp 2 toàn tỉnh, có PIN (không lưu)', async () => {
     await page.goto(`${ROOT}/phan-quyen`);

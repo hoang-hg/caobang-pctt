@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import {
-  AlertTriangle, ArrowUpRight, Compass, Droplets, FileDown, FileSpreadsheet, Home, Info, LayoutDashboard, LifeBuoy,
+  AlertTriangle, ArrowUpRight, Compass, Droplets, FileDown, FileSpreadsheet, FileText, Home, Info, LayoutDashboard, LifeBuoy,
   Loader2, MapPin, Minimize2, Monitor, Mountain, Pause, PhoneCall, Play, RefreshCw, Server, ShieldAlert, Siren, Waves, X,
 } from 'lucide-react';
 import { useAreaQuery, usePresets, useUnits } from '../api/hooks';
@@ -27,10 +27,11 @@ import OperationsTable from '../components/dashboard/OperationsTable';
 import CommuneView, { unitLabel } from '../components/dashboard/CommuneView';
 import SystemView from '../components/dashboard/SystemView';
 import QuickIncidentModal from '../components/dashboard/QuickIncidentModal';
+import ReportDocModal from '../components/dashboard/ReportDocModal';
 import { useAllowedCodes, usePermission } from '../rbac/usePermission';
 import { vnFileStamp } from '../utils/format';
 import { risk } from '../utils/risk';
-import { exportSnapshotPdf } from '../utils/exportPdf';
+import { captureSnapshot, exportSnapshotPdf } from '../utils/exportPdf';
 import { exportExcel } from '../utils/exportExcel';
 import { useMediaQuery } from '../utils/useMediaQuery';
 import { useOnline } from '../utils/useOnline';
@@ -139,6 +140,7 @@ export default function Dashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [bulletinOpen, setBulletinOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [docOpen, setDocOpen] = useState(false); // báo cáo văn bản (PDF định dạng chuẩn)
   const [chartsOpen, setChartsOpen] = useState(CHARTS_OPEN);
   const [forceOpen, setForceOpen] = useState(false); // đang chụp PDF trên điện thoại: mở mọi biểu đồ đang thu gọn
   const ref = useRef(null); // vùng chụp PDF của thẻ đang mở
@@ -286,29 +288,58 @@ export default function Dashboard() {
     }
   };
 
-  const doExport = async () => {
-    if (!ref.current) return;
-    setExporting(true);
-    // Điện thoại: biểu đồ đang thu gọn phải mở ra trước khi chụp, nếu không PDF thiếu biểu đồ
+  // Điện thoại: biểu đồ đang thu gọn phải mở ra trước khi chụp, nếu không PDF thiếu biểu đồ
+  const withChartsOpen = async (run) => {
     const folded = isPhone && Object.values(chartsOpen).some((v) => !v);
     try {
       if (folded) {
         setForceOpen(true);
         await new Promise((r) => { setTimeout(r, 500); }); // biểu đồ vừa hiện cần vẽ lại theo bề rộng thật
       }
+      return await run();
+    } finally {
+      setForceOpen(false);
+    }
+  };
+
+  const doExport = async () => {
+    if (!ref.current) return;
+    setExporting(true);
+    try {
       const now = new Date();
-      await exportSnapshotPdf(ref.current, {
+      await withChartsOpen(() => exportSnapshotPdf(ref.current, {
         title: 'BÁO CÁO NHANH TÌNH HÌNH THIÊN TAI – TỈNH CAO BẰNG',
         subtitle: `Phạm vi: ${filterLabel} · Thời điểm: ${now.toLocaleString('vi-VN', VN_TIME)} · Nguồn: Hệ thống điều hành PCTT & TKCN tỉnh`,
         filename: `bao-cao-nhanh-pctt-cao-bang-${vnFileStamp(now, true)}.pdf`,
         layoutWidth: 1280, // điện thoại / iPad: chụp bố cục laptop (~3 trang) thay vì phóng màn hẹp thành ~19 trang
-      });
+      }));
     } catch (e) {
       toast({ tone: 'danger', title: 'Không xuất được PDF', body: e.message });
     } finally {
-      setForceOpen(false);
       setExporting(false);
     }
+  };
+
+  // Báo cáo văn bản (thiết kế A: PDF định dạng chuẩn gửi UBND tỉnh / Ban Chỉ đạo): số liệu đang hiện trên Tổng quan + phụ lục
+  // ảnh chụp tab đang xem. Mô-đun dựng PDF và font chỉ tải khi bấm xuất.
+  const exportDoc = async (form) => {
+    const now = new Date();
+    const snapshot = form.appendix && ref.current
+      ? await withChartsOpen(() => captureSnapshot(ref.current, { layoutWidth: 1280 }))
+      : null;
+    const { exportReportPdf } = await import('../utils/reportPdf');
+    return exportReportPdf({
+      form,
+      at: now,
+      scope: filterLabel,
+      k,
+      stations: waterStations,
+      evacSites: evacQ.data?.sites,
+      author: auth?.user?.full_name,
+      snapshot,
+      snapshotLabel: TABS.find((t) => t.id === tab)?.label,
+      filename: `bao-cao-van-ban-pctt-cao-bang-${vnFileStamp(now, true)}.pdf`,
+    });
   };
 
   // Excel: mỗi chỉ tiêu một dòng (không lặp số tổng ở từng dòng trạm); chưa có số liệu ghi rõ
@@ -434,6 +465,9 @@ export default function Dashboard() {
                 </Link>
                 <button type="button" onClick={doExcel} disabled={!k} className="btn-ghost h-10 min-w-[40px] px-2.5 text-xs lg:h-auto lg:py-1.5" aria-label="Xuất Excel tổng quan" title="Xuất Excel tổng quan">
                   <FileSpreadsheet size={14} /> <span className="hidden md:inline">Excel</span>
+                </button>
+                <button type="button" onClick={() => setDocOpen(true)} disabled={!k} className="btn-ghost h-10 min-w-[40px] px-2.5 text-xs lg:h-auto lg:py-1.5" aria-label="Soạn báo cáo văn bản định dạng chuẩn (PDF)" title="Báo cáo văn bản gửi UBND tỉnh / Ban Chỉ đạo: quốc hiệu, số liệu, đánh giá – kiến nghị, chỗ ký (PDF chữ thật)">
+                  <FileText size={14} /> <span className="hidden md:inline">Văn bản</span>
                 </button>
                 <button type="button" onClick={doExport} disabled={exporting} className="btn-primary h-10 min-w-[40px] px-3 text-xs lg:h-auto lg:py-1.5" aria-label="Xuất PDF báo cáo nhanh" title="Xuất PDF báo cáo nhanh">
                   {exporting ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />} <span className="hidden md:inline">Xuất PDF</span>
@@ -671,6 +705,22 @@ export default function Dashboard() {
       </nav>
 
       {canReport && <QuickIncidentModal open={reportOpen} onClose={() => setReportOpen(false)} />}
+      <ReportDocModal
+        open={docOpen}
+        onClose={(pages) => {
+          setDocOpen(false);
+          if (pages) toast({ tone: 'good', title: `Đã xuất báo cáo văn bản (${pages} trang)`, duration: 3500 });
+        }}
+        onExport={exportDoc}
+        summary={{
+          ready: !!k,
+          scope: filterLabel,
+          tabLabel: TABS.find((t) => t.id === tab)?.label || 'Tổng quan',
+          stations: waterStations.length,
+          reservoirs: k?.reservoirs?.total || 0,
+          landslides: (k?.landslides?.blocked_count || 0) + (k?.landslides?.warning_count || 0),
+        }}
+      />
     </div>
   );
 }
