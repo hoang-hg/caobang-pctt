@@ -587,7 +587,7 @@ export default function Dashboard() {
                     ) : stationsState.loading ? (
                       <Skeleton height={250} />
                     ) : activeStation ? (
-                      <Hydrograph stationId={activeStation} height={250} />
+                      <Hydrograph stationId={activeStation} station={waterStations.find((s) => s.id === activeStation)} height={250} />
                     ) : (
                       <EmptyState height={250}>Chưa có trạm mực nước trong vùng đang xem — nhập danh mục trạm và ngưỡng BĐ I–III (loại "Trạm quan trắc")</EmptyState>
                     )}

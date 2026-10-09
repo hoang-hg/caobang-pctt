@@ -4,7 +4,8 @@ import { Link } from 'react-router-dom';
 import { AlertTriangle, ChevronDown, DatabaseZap, Info, ShieldAlert, Siren } from 'lucide-react';
 import { num } from '../../utils/format';
 import { rainLevel, risk } from '../../utils/risk';
-import { riverState, ROMAN } from './RiverKpi';
+import { trendWords } from '../../utils/stations';
+import { riverState, riverTrend, ROMAN } from './RiverKpi';
 
 const NOTE = 'Tổng hợp tự động từ số liệu hệ thống — không phải cấp độ rủi ro thiên tai do cơ quan có thẩm quyền công bố';
 
@@ -19,7 +20,9 @@ export function situationItems(k, waterStations) {
     const st = riverState(s);
     if (st.level >= 1) {
       const where = s.river ? `Sông ${s.river}` : s.name;
-      items.push({ level: st.level, text: `${where} trên BĐ ${ROMAN[st.level]} (${num(st.value, 2)} m${st.stale ? ', số đo cũ' : ''})` });
+      const trend = !st.stale && riverTrend(s); // số đo cũ: không nói lên / xuống
+      const note = st.stale ? ', số đo cũ' : trend && trend.dir !== 'on_dinh' ? `, ${trendWords(trend)}` : '';
+      items.push({ level: st.level, text: `${where} trên BĐ ${ROMAN[st.level]} (${num(st.value, 2)} m${note})` });
     }
   }
   const sos = k?.sos || {};

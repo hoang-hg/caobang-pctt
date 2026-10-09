@@ -4,17 +4,35 @@ import { Area, ComposedChart, Line, ReferenceArea, ReferenceLine, ResponsiveCont
 import { api } from '../../api/client';
 import { dateTime, hourLabel, num } from '../../utils/format';
 import { alarmLevel, ALARM } from '../../utils/labels';
-import { EmptyState, ErrorState, Skeleton } from '../common/ui';
+import { risk } from '../../utils/risk';
+import { etaWhen, STALE_MS, trendProps, waterTrend } from '../../utils/stations';
+import { EmptyState, ErrorState, Skeleton, TrendTag } from '../common/ui';
 import { axisProps, ChartTooltip, Legend, useChartTheme } from './chartTheme';
 
 // Số đo theo giờ (time_bucket 60 phút): giờ gần nhất cũ hơn 2 giờ → trạm không còn gửi số đo, không hiện như "hiện tại"
 const STALE_BUCKET_MS = 2 * 3600e3;
 const bdLabel = (name, v) => `${name} (${v != null ? `${num(v, 2)} m` : 'chưa khai báo'})`;
+const ROMAN = ['', 'I', 'II', 'III'];
+
+/**
+ * Mức báo động kế tiếp trên số đo hiện tại và lúc đường dự báo (đúng đường đang vẽ) chạm mức đó — cùng cách backend
+ * /stations tính eta_time. Không chạm trong khung dự báo → đỉnh dự báo. null: đã trên BĐ III, chưa khai báo ngưỡng
+ * hoặc chưa có dự báo cho thời gian tới.
+ */
+function forecastNext(value, thr, ahead) {
+  const level = [1, 2, 3].find((lv) => thr[`bd${lv}`] != null && thr[`bd${lv}`] > value);
+  if (!level || !ahead.length) return null;
+  const hit = ahead.find((d) => d.fc >= thr[`bd${level}`]);
+  const peak = ahead.reduce((m, d) => (d.fc > m.fc ? d : m));
+  return { level, hit, peak };
+}
 
 /** Biểu đồ thủy văn: mực nước thực đo (liền) + dự báo (nét đứt) + vạch Báo động I/II/III.
  * Dự báo = bản tin KTTV do trực ban nhập (Dashboard → "Nhập bản tin dự báo"); chưa có bản tin → dự báo mô phỏng
- * (chỉ có khi bật bộ mô phỏng), không có cả hai → chỉ vẽ thực đo và ghi rõ chưa có bản tin. */
-export default function Hydrograph({ stationId, height = 260, hours = 48, compact = false }) {
+ * (chỉ có khi bật bộ mô phỏng), không có cả hai → chỉ vẽ thực đo và ghi rõ chưa có bản tin.
+ * `station` (tuỳ chọn): dòng /stations của trạm — đầu biểu đồ dùng SỐ ĐO MỚI NHẤT thay cho TB giờ, để mức báo động, xu hướng
+ * và dự báo khớp với ô KPI / bộ chọn trạm cùng trang (TB giờ trễ hơn: trạm đã qua BĐ II mà TB giờ còn dưới). */
+export default function Hydrograph({ stationId, height = 260, hours = 48, compact = false, station }) {
   const c = useChartTheme();
   const { data, isError, refetch } = useQuery({
     queryKey: ['series', stationId, hours],
@@ -23,13 +41,16 @@ export default function Hydrograph({ stationId, height = 260, hours = 48, compac
     refetchInterval: 60_000,
   });
 
-  const { rows, thr, domain, fcLabel, latest } = useMemo(() => {
-    if (!data) return { rows: [], thr: {}, domain: [0, 1], fcLabel: null, latest: null };
+  const { rows, thr, domain, fcLabel, simulated, fcAhead, hourly, hourlyTrend } = useMemo(() => {
+    if (!data) return { rows: [], thr: {}, domain: [0, 1], fcLabel: null, simulated: false, fcAhead: [], hourly: null, hourlyTrend: null };
     const obs = data.observed.map((d) => ({ t: new Date(d.time).getTime(), obs: d.value }));
     const lastObs = obs[obs.length - 1];
+    const prevObs = obs[obs.length - 2];
     const kttv = data.forecast.filter((d) => d.model === 'KTTV');
     const source = kttv.length ? kttv : data.forecast.filter((d) => d.model === 'HEC-HMS');
     const fc = source.map((d) => ({ t: new Date(d.time).getTime(), fc: d.value }));
+    const nowT = Date.now();
+    const ahead = fc.filter((d) => d.t > nowT);
     const issued = kttv[0]?.issued_at && new Date(kttv[0].issued_at).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
     // Đường "HEC-HMS" chỉ do bộ mô phỏng sinh (hệ thống không chạy mô hình thuỷ văn) → luôn ghi "mô phỏng"
     const label = kttv.length ? `Dự báo KTTV (phát hành ${issued})` : source.length ? 'Dự báo mô phỏng' : null;
@@ -44,9 +65,13 @@ export default function Hydrograph({ stationId, height = 260, hours = 48, compac
       thr: t,
       domain: [Math.floor(lo * 2) / 2, Math.ceil(hi * 2) / 2],
       fcLabel: label,
-      latest: lastObs?.obs != null
-        ? { value: lastObs.obs, t: lastObs.t, level: alarmLevel(lastObs.obs, t), stale: Date.now() - lastObs.t > STALE_BUCKET_MS }
+      simulated: !kttv.length,
+      fcAhead: ahead,
+      hourly: lastObs?.obs != null
+        ? { value: lastObs.obs, t: lastObs.t, level: alarmLevel(lastObs.obs, t), stale: nowT - lastObs.t > STALE_BUCKET_MS }
         : null,
+      // Xu hướng giữa 2 giờ đo gần nhất (TB giờ) — số đo cũ không nói lên / xuống
+      hourlyTrend: lastObs?.obs != null && prevObs?.obs != null ? waterTrend(lastObs.obs, lastObs.t, prevObs.obs, prevObs.t, STALE_BUCKET_MS) : null,
     };
   }, [data]);
 
@@ -106,6 +131,10 @@ export default function Hydrograph({ stationId, height = 260, hours = 48, compac
     );
   }
   const now = Date.now();
+  const reading = station?.value != null && station.time ? { value: Number(station.value), t: new Date(station.time).getTime() } : null;
+  const latest = reading ? { ...reading, raw: true, level: alarmLevel(reading.value, thr), stale: now - reading.t > STALE_MS } : hourly;
+  const trend = reading ? waterTrend(station.value, station.time, station.prev_value, station.prev_time) : hourlyTrend;
+  const next = latest ? forecastNext(latest.value, thr, fcAhead) : null;
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -124,15 +153,31 @@ export default function Hydrograph({ stationId, height = 260, hours = 48, compac
             // Số đo cũ vẫn giữ cấp đã vượt (mất tín hiệu không xoá được nguy cơ đã biết) nhưng không gọi là "hiện tại"
             <div className="flex items-center gap-2 text-xs">
               <span className="text-muted">
-                {latest.stale ? `Số đo cuối (${dateTime(latest.t)})` : `TB giờ ${hourLabel(latest.t)}`}:{' '}
+                {latest.stale ? `Số đo cuối (${dateTime(latest.t)})` : `${latest.raw ? 'Số đo' : 'TB giờ'} ${hourLabel(latest.t)}`}:{' '}
                 <b className={latest.stale ? 'font-mono text-muted' : 'font-mono text-sm text-ink'}>{num(latest.value, 2)} m</b>
               </span>
+              <TrendTag {...trendProps(trend)} />
               <span
                 className={`chip px-2 py-0 text-[10px] ${latest.stale && !latest.level ? 'bg-panel2 text-muted' : ALARM[latest.level].cls}`}
               >
                 {latest.stale && !latest.level ? 'Mất tín hiệu' : `${ALARM[latest.level].label}${latest.stale ? ' (cũ)' : ''}`}
               </span>
             </div>
+          )}
+          {next && (
+            // Dự báo vượt mức kế tiếp: luôn kèm nguồn (bản tin KTTV / mô phỏng) — mô phỏng không được trông như bản tin
+            <p className="w-full text-xs text-muted">
+              {next.hit ? (
+                <b className={risk(next.level).text}>
+                  Dự báo vượt BĐ {ROMAN[next.level]} ({num(thr[`bd${next.level}`], 2)} m) lúc {etaWhen(next.hit.t)}
+                </b>
+              ) : (
+                <>
+                  Dự báo chưa chạm BĐ {ROMAN[next.level]} — cao nhất <b className="font-mono text-ink">{num(next.peak.fc, 2)} m</b> lúc {etaWhen(next.peak.t)}
+                </>
+              )}
+              {simulated ? ' · theo dự báo mô phỏng, không phải bản tin KTTV' : ' · theo bản tin KTTV'}
+            </p>
           )}
         </div>
       )}

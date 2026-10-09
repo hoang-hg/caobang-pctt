@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import clsx from 'clsx';
-import { AlertTriangle, ArrowLeft, ChevronDown, RefreshCw, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ChevronDown, MoveRight, RefreshCw, TrendingDown, TrendingUp, X } from 'lucide-react';
 import { NO_DATA, RISK } from '../../utils/risk';
 
 export function KpiCard({ label, value, unit, sub, tone, icon: Icon, blink, children }) {
@@ -211,6 +211,30 @@ export function RiskLegend({ className, meaningClass }) {
         <b className="font-semibold text-ink-2">{NO_DATA.name}</b> <span className={meaningClass}>{NO_DATA.meaning.toLowerCase()}</span>
       </span>
     </div>
+  );
+}
+
+/**
+ * Mũi tên xu hướng + chữ ngắn (VD "0,12 m/giờ"). dir: 'len' | 'xuong' | 'on_dinh'. Lên = cam (rủi ro tăng); xuống = xanh
+ * dương (KHÔNG xanh lá — đang xuống chưa chắc đã an toàn); ổn định = xám. `label` đọc cho trình đọc màn hình (role="img").
+ */
+export function TrendTag({ dir, text, label, className }) {
+  if (!dir) return null;
+  const Icon = dir === 'len' ? TrendingUp : dir === 'xuong' ? TrendingDown : MoveRight;
+  return (
+    <span
+      role="img"
+      aria-label={label}
+      title={label}
+      className={clsx(
+        'inline-flex items-center gap-0.5 whitespace-nowrap font-mono font-semibold',
+        dir === 'len' ? 'text-serious' : dir === 'xuong' ? 'text-accent' : 'text-muted',
+        className,
+      )}
+    >
+      <Icon size={12} className="shrink-0" aria-hidden="true" />
+      {text}
+    </span>
   );
 }
 
