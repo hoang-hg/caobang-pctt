@@ -21,10 +21,14 @@ const SEV = {
   info: 'border-l-accent/50 bg-panel2/60 text-ink',
 };
 
-/** Nhật ký sự kiện & luồng cảnh báo nâng cấp cho Trung tâm Điều hành Tác chiến. */
-export default function EventLog({ limit = 50, className }) {
+/**
+ * Nhật ký sự kiện & luồng cảnh báo nâng cấp cho Trung tâm Điều hành Tác chiến. `preview` (số mục): chỉ HIỆN N sự kiện mới
+ * nhất + nút "Xem tất cả" (iPad dọc / điện thoại) — chỉ cắt phần hiển thị, truy vấn (`limit`) giữ nguyên.
+ */
+export default function EventLog({ limit = 50, className, preview }) {
   const q = useAreaQuery('logs', '/dashboard/logs', { limit });
   const data = useMemo(() => q.data || [], [q.data]);
+  const [showAll, setShowAll] = useState(false);
   const [selectedCat, setSelectedCat] = useState('tat_ca');
   const [search, setSearch] = useState('');
   const [onlyDanger, setOnlyDanger] = useState(false);
@@ -55,7 +59,7 @@ export default function EventLog({ limit = 50, className }) {
               key={key}
               onClick={() => { setSelectedCat(key); setOnlyDanger(false); }}
               className={clsx(
-                'flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all',
+                'flex min-h-[32px] items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all',
                 active
                   ? 'bg-accent text-white shadow-sm shadow-accent/25'
                   : 'bg-panel2/70 text-muted hover:text-ink hover:bg-panel2'
@@ -74,14 +78,14 @@ export default function EventLog({ limit = 50, className }) {
           <button
             onClick={() => setOnlyDanger(!onlyDanger)}
             className={clsx(
-              'ml-auto flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold whitespace-nowrap transition-all border',
+              'ml-auto flex min-h-[32px] items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold whitespace-nowrap transition-all border',
               onlyDanger
                 ? 'bg-danger text-white border-danger shadow-sm shadow-danger/25'
                 : 'bg-danger/10 text-danger border-danger/30 hover:bg-danger/20'
             )}
             title="Chỉ hiển thị các cảnh báo mức nguy cấp"
           >
-            <ShieldAlert size={12} className={onlyDanger ? 'animate-bounce' : ''} />
+            <ShieldAlert size={12} className={onlyDanger ? 'motion-safe:animate-bounce' : ''} />
             <span>{dangerCount} khẩn</span>
           </button>
         )}
@@ -95,7 +99,7 @@ export default function EventLog({ limit = 50, className }) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Lọc nhanh nhật ký (tên xã, sự cố, hồ xả...)"
-          className="w-full pl-8 pr-7 py-1 text-xs rounded-lg border border-line bg-panel2/60 text-ink placeholder:text-muted focus:border-accent focus:outline-none"
+          className="w-full min-h-[36px] pl-8 pr-7 py-1 text-xs rounded-lg border border-line bg-panel2/60 text-ink placeholder:text-muted focus:border-accent focus:outline-none"
         />
         {search && (
           <button
@@ -117,7 +121,7 @@ export default function EventLog({ limit = 50, className }) {
             {data.length ? 'Không có sự kiện khớp bộ lọc' : 'Chưa có sự kiện nào trong vùng đang xem'}
           </li>
         ) : (
-          filtered.map((l) => {
+          (preview && !showAll ? filtered.slice(0, preview) : filtered).map((l) => {
             const cat = CAT[l.category] || CAT.he_thong;
             const Icon = l.severity === 'danger' ? Siren : cat.icon || Activity;
             const isDanger = l.severity === 'danger';
@@ -132,7 +136,7 @@ export default function EventLog({ limit = 50, className }) {
               >
                 <div className="flex items-center justify-between gap-1 text-[11px] text-muted mb-1">
                   <div className="flex items-center gap-1.5 font-medium">
-                    <Icon size={13} className={clsx(isDanger ? 'text-danger animate-pulse' : 'text-accent')} />
+                    <Icon size={13} className={clsx(isDanger ? 'text-danger motion-safe:animate-pulse' : 'text-accent')} />
                     <span className="font-mono font-semibold text-ink">{time(l.time)}</span>
                     <span className="text-muted">· {cat.label}</span>
                   </div>
@@ -155,6 +159,11 @@ export default function EventLog({ limit = 50, className }) {
           })
         )}
       </ul>
+      {preview && !showAll && filtered.length > preview && (
+        <button type="button" className="btn-ghost min-h-[40px] w-full justify-center text-xs font-semibold" onClick={() => setShowAll(true)}>
+          Xem tất cả {filtered.length} sự kiện
+        </button>
+      )}
     </div>
   );
 }

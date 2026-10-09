@@ -1,10 +1,8 @@
 import clsx from 'clsx';
-import { Waves } from 'lucide-react';
 import { ALARM } from '../../utils/labels';
 import { NO_DATA, risk } from '../../utils/risk';
 import { stationView } from '../../utils/stations';
 import { num } from '../../utils/format';
-import StatCard, { Badge } from './StatCard';
 
 export const ROMAN = ['', 'I', 'II', 'III'];
 
@@ -26,71 +24,63 @@ export function riverState(s) {
 }
 
 /** "Trạm thủy văn Cao Bằng (sông Bằng Giang)" → "Cao Bằng". */
-const shortName = (s) => s.name.replace(/^Trạm\s+(thủy|thuỷ)\s+văn\s+/i, '').replace(/\s*\(.*\)\s*$/, '');
+export const shortName = (s) => s.name.replace(/^Trạm\s+(thủy|thuỷ)\s+văn\s+/i, '').replace(/\s*\(.*\)\s*$/, '');
+/** Tên ngắn kèm sông: "S. Bằng Giang · Cao Bằng". */
+export const riverName = (s) => (s.river ? `S. ${s.river} · ${shortName(s)}` : shortName(s));
 
-/** Thẻ "Mực nước sông": mọi trạm mực nước trong vùng (kể cả trạm chưa có số đo — hiện xám), bấm trạm → biểu đồ. */
-export default function RiverKpi({ stations, selectedId, onSelect }) {
+/**
+ * Tóm tắt mực nước cho ô KPI: mức nặng nhất trong các trạm ĐÃ đánh giá được (không trạm nào đánh giá được → null, xám),
+ * trạm nặng nhất, số trạm trên BĐ I, số trạm có số đo trong 60 phút qua.
+ */
+export function riverSummary(stations) {
   const rows = stations.map((s) => ({ s, st: riverState(s) }));
-  const fresh = rows.filter((r) => !r.st.noData && !r.st.stale).length;
   const known = rows.filter((r) => r.st.level != null);
-  const worst = known.reduce((m, r) => Math.max(m, r.st.level), 0);
-  const level = known.length ? worst : null;
-  let badge = <Badge level={worst}>{ALARM[worst].label}</Badge>;
-  if (!rows.length) badge = <Badge level={null}>Chưa có trạm</Badge>;
-  else if (!known.length) badge = <Badge level={null}>Chưa đánh giá được</Badge>;
+  const worst = known.reduce((m, r) => (!m || r.st.level > m.st.level ? r : m), null);
+  return {
+    rows,
+    known: known.length,
+    worst,
+    level: worst ? worst.st.level : null,
+    above: known.filter((r) => r.st.level >= 1).length,
+    fresh: rows.filter((r) => !r.st.noData && !r.st.stale).length,
+  };
+}
 
+/**
+ * Chọn trạm cho biểu đồ thủy văn: mỗi trạm một nút (chấm màu theo mức, số đo, nhãn BĐ) trên MỘT hàng cuộn ngang — trước
+ * đây là danh sách trong thẻ KPI "Mực nước sông" (thẻ cao, đẩy bản đồ xuống dưới màn hình đầu).
+ */
+export function StationPicker({ stations, selectedId, onSelect }) {
+  if (!stations.length) return null;
   return (
-    <StatCard
-      icon={Waves}
-      title="Mực nước sông"
-      badge={badge}
-      level={level}
-      alert={level === 3}
-      footer={
-        rows.length
-          ? `${fresh}/${rows.length} trạm có số đo trong 60 phút qua · bấm trạm để xem biểu đồ`
-          : 'Chưa có trạm mực nước trong vùng đang xem'
-      }
-    >
-      {rows.length > 0 && (
-        <ul className="scroll-thin flex max-h-44 flex-col gap-0.5 overflow-y-auto pr-1 print:max-h-none print:overflow-visible">
-          {rows.map(({ s, st }) => {
-            const t = s.thresholds || {};
-            const lo = t.bd1 != null ? t.bd1 - 2 : null;
-            const hi = t.bd3 != null ? t.bd3 + 1 : null;
-            const bar = st.level != null && !st.stale && lo != null && hi > lo
-              ? Math.max(4, Math.min(100, ((st.value - lo) / (hi - lo)) * 100))
-              : null;
-            return (
-              <li key={s.id}>
-                <button
-                  type="button"
-                  onClick={() => onSelect?.(s.id)}
-                  aria-pressed={selectedId === s.id}
-                  title={s.name}
-                  className={clsx('flex min-h-[40px] w-full flex-col justify-center gap-0.5 rounded-md px-1.5 py-1 text-left hover:bg-panel2', selectedId === s.id && 'bg-panel2')}
-                >
-                  <span className="flex items-center justify-between gap-2 text-xs">
-                    <span className="min-w-0 truncate font-medium text-ink-2">
-                      {s.river ? `S. ${s.river}` : shortName(s)}
-                      {s.river && <span className="text-muted"> · {shortName(s)}</span>}
-                    </span>
-                    <span className="flex shrink-0 items-center gap-1.5 font-mono">
-                      <b className={st.level == null ? 'text-muted' : 'text-ink'}>{st.value == null ? '–' : `${num(st.value, 2)} m`}</b>
-                      <span className={clsx('chip px-1.5 py-0 text-[9px]', st.cls)}>{st.label}</span>
-                    </span>
-                  </span>
-                  {bar != null && (
-                    <span className="h-1.5 w-full overflow-hidden rounded-full bg-panel2">
-                      <span className={clsx('block h-full rounded-full', risk(st.level).fill)} style={{ width: `${bar}%` }} />
-                    </span>
-                  )}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </StatCard>
+    <div role="radiogroup" aria-label="Chọn trạm mực nước" className="scroll-thin -mx-1 mb-2 flex gap-1.5 overflow-x-auto px-1 pb-1">
+      {stations.map((s) => {
+        const st = riverState(s);
+        const on = selectedId === s.id;
+        return (
+          <button
+            key={s.id}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            onClick={() => onSelect(s.id)}
+            title={s.name}
+            className={clsx(
+              'flex min-h-[44px] shrink-0 items-center gap-2 rounded-lg border px-2.5 py-1 text-left text-xs transition-colors',
+              on ? 'border-accent bg-accent/10 ring-1 ring-accent' : 'border-line bg-panel2/40 hover:bg-panel2',
+            )}
+          >
+            <span className={clsx('h-2.5 w-2.5 shrink-0 rounded-full', risk(st.level).fill)} aria-hidden="true" />
+            <span className="flex flex-col leading-tight">
+              <span className={clsx('whitespace-nowrap font-semibold', on ? 'text-accent' : 'text-ink')}>{riverName(s)}</span>
+              <span className="flex items-center gap-1.5 whitespace-nowrap">
+                <b className={clsx('font-mono', st.level == null ? 'text-muted' : 'text-ink')}>{st.value == null ? '–' : `${num(st.value, 2)} m`}</b>
+                <span className={clsx('chip px-1.5 py-0 text-[9px]', st.cls)}>{st.label}</span>
+              </span>
+            </span>
+          </button>
+        );
+      })}
+    </div>
   );
 }

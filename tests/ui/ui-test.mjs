@@ -471,6 +471,72 @@ async function tablet(ctx) {
   }
 }
 
+// ================================================================ Màn hình đầu theo thiết bị (lãnh đạo nắm tình hình trong vài giây)
+// Không cuộn vẫn thấy: dải tình huống, đủ 6 ô KPI (không bị thanh đáy che), bản đồ (laptop / iPad), "Việc chờ quyết định"
+// (laptop). Chỉ <main> cuộn — trang không được dài ra ngoài khung (10/2026: caption ẩn của bảng làm cả ứng dụng trôi lên
+// khi cuộn hết, lộ khoảng trắng). Chỉ xem.
+const FIRST_SCREEN = { name: 'Màn hình đầu', opts: { viewport: { width: 1366, height: 768 } }, mobile: false };
+const SCREENS = [
+  ['Laptop 1366×768', 1366, 768, { map: true, decisions: true }],
+  ['Laptop 1440×900', 1440, 900, { map: true, decisions: true }],
+  ['iPad ngang 1180×820', 1180, 820, { map: true }],
+  ['iPad dọc 820×1180', 820, 1180, { map: true }],
+  ['Điện thoại 390×844', 390, 844, {}],
+  ['Điện thoại 360×740', 360, 740, {}],
+];
+async function firstScreen(ctx) {
+  const { page } = ctx;
+  await step(ctx, 'Đăng nhập cán bộ', async () => {
+    await page.goto(`${ROOT}/dang-nhap`);
+    await page.getByPlaceholder('Nhập tên đăng nhập hoặc email...').fill(STAFF.user);
+    await page.getByPlaceholder('••••••••').fill(STAFF.pass);
+    await page.locator('button[type="submit"]').click();
+    await page.waitForURL(/\/dashboard/, { timeout: 20_000 });
+  });
+  for (const [label, width, height, need] of SCREENS) {
+    const parts = ['dải tình huống', '6 KPI', need.map && 'bản đồ', need.decisions && 'việc chờ quyết định'].filter(Boolean).join(', ');
+    await step(ctx, `${label}: không cuộn vẫn thấy ${parts}; chỉ vùng nội dung cuộn`, async () => {
+      await page.setViewportSize({ width, height });
+      await page.goto(`${ROOT}/dashboard`);
+      await waitMain(page);
+      await page.locator('[aria-label="Chỉ số nhanh"] > *').nth(5).waitFor();
+      await page.waitForTimeout(800); // bản đồ / biểu đồ vẽ xong
+      const m = await page.evaluate(() => {
+        const vh = window.innerHeight;
+        const nav = document.querySelector('nav[aria-label="Thao tác nhanh"]');
+        const navTop = nav && nav.getBoundingClientRect().height ? nav.getBoundingClientRect().top : vh; // thanh đáy che phần dưới
+        const tiles = [...document.querySelectorAll('[aria-label="Chỉ số nhanh"] > *')];
+        const map = document.querySelector('.leaflet-container');
+        const dec = document.querySelector('[aria-label="Việc chờ quyết định"]');
+        const strip = document.querySelector('[role="status"]');
+        const main = document.querySelector('main');
+        return {
+          pageExtra: document.documentElement.scrollHeight - vh,
+          wideBy: main ? main.scrollWidth - main.clientWidth : 0,
+          tiles: tiles.length,
+          kpiBottom: Math.round(Math.max(...tiles.map((t) => t.getBoundingClientRect().bottom))),
+          visibleBottom: Math.round(navTop),
+          mapVisible: map ? Math.round(Math.min(navTop, map.getBoundingClientRect().bottom) - map.getBoundingClientRect().top) : 0,
+          decisionTop: dec ? Math.round(dec.getBoundingClientRect().top) : null,
+          stripTop: strip ? Math.round(strip.getBoundingClientRect().top) : null,
+          vh,
+        };
+      });
+      const bad = [
+        m.pageExtra > 1 && `cả trang dài thêm ${m.pageExtra}px ngoài khung (phải chỉ <main> cuộn)`,
+        m.wideBy > 1 && `nội dung tràn ngang ${m.wideBy}px`,
+        m.tiles !== 6 && `có ${m.tiles} ô KPI`,
+        m.kpiBottom > m.visibleBottom && `ô KPI bị che / cắt (đáy ${m.kpiBottom}px > ${m.visibleBottom}px)`,
+        need.map && m.mapVisible < 120 && `bản đồ chỉ thấy ${m.mapVisible}px`,
+        need.decisions && (m.decisionTop == null || m.decisionTop > m.vh - 60) && `"Việc chờ quyết định" ở ${m.decisionTop}px`,
+        (m.stripTop == null || m.stripTop > 200) && 'không thấy dải tình huống ở đầu trang',
+      ].filter(Boolean);
+      if (bad.length) throw new Error(bad.join('; '));
+      return `KPI đáy ${m.kpiBottom}/${m.visibleBottom}px${need.map ? ` · bản đồ thấy ${m.mapVisible}px` : ''}`;
+    });
+  }
+}
+
 // ================================================================
 console.log(`Kiểm thử giao diện: ${ROOT}${READONLY ? ' (chỉ xem)' : ''}`);
 const browser = await chromium.launch();
@@ -494,6 +560,11 @@ try {
   const tabPage = await tab.newPage();
   await tablet({ page: tabPage, vp: TABLET, problems: watch(tabPage) });
   await tab.close();
+  const first = await browser.newContext({ ...FIRST_SCREEN.opts, locale: 'vi-VN' });
+  first.setDefaultTimeout(15_000);
+  const firstPage = await first.newPage();
+  await firstScreen({ page: firstPage, vp: FIRST_SCREEN, problems: watch(firstPage) });
+  await first.close();
 } finally {
   await browser.close();
 }

@@ -385,7 +385,9 @@ export default function OperationsTable({ k, kState, stations, stationsState, on
       )}
 
       {statusBox || (asTable ? (
-        <div className="scroll-thin overflow-x-auto rounded-lg border border-line">
+        // relative: caption sr-only (position: absolute) phải có khối chứa trong vùng cuộn — nếu không nó "lọt" khỏi <main>,
+        // kéo dài cả trang → cuộn hết nội dung thì toàn bộ ứng dụng trôi lên, lộ khoảng trắng (máy tính, iPad)
+        <div className="scroll-thin relative overflow-x-auto rounded-lg border border-line">
           <table ref={tableRef} className={clsx('w-full bg-panel text-left text-xs', pdf ? 'min-w-[1100px]' : 'min-w-[760px]')}>
             <caption className="sr-only">{tabInfo.label} — {filtered.length} mục</caption>
             <thead className="bg-panel2/70 text-[11px] uppercase tracking-wide text-muted">

@@ -127,9 +127,10 @@ export default function TacticalMiniMap({ k, className }) {
         </div>
       </div>
 
-      <div className="grid gap-2 lg:grid-cols-[1fr_260px] [&>*]:min-w-0">
+      {/* Danh sách điểm nóng nằm cạnh bản đồ từ 1280 px; hẹp hơn (iPad, cột trái 3/5) xuống dưới để bản đồ đủ rộng */}
+      <div className="grid gap-2 xl:grid-cols-[minmax(0,1fr)_240px] [&>*]:min-w-0">
         {/* isolate: các lớp Leaflet (z-index tới 1000) không đè dải báo động dính trên cùng khi cuộn */}
-        <div className="relative isolate z-0 h-[260px] overflow-hidden rounded-lg border border-line sm:h-[320px]">
+        <div className="relative isolate z-0 h-[220px] overflow-hidden rounded-lg border border-line sm:h-[300px] xl:h-[320px]">
           <MapContainer center={CENTER} zoom={8} zoomControl={false} scrollWheelZoom={false} className="h-full w-full">
             <BaseLayer basemap="auto" />
             <ZoomControl position="bottomright" />
@@ -202,7 +203,7 @@ export default function TacticalMiniMap({ k, className }) {
           )}
         </div>
 
-        <ul className="scroll-thin flex max-h-[320px] flex-col gap-1 overflow-y-auto pr-1 print:max-h-none print:overflow-visible">
+        <ul className="scroll-thin flex max-h-[200px] flex-col gap-1 overflow-y-auto pr-1 xl:max-h-[320px] print:max-h-none print:overflow-visible">
           {shown.slice(0, 30).map((h) => {
             const isTarget = target && target.lat === h.lat && target.lon === h.lon;
             return (

@@ -3,12 +3,12 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import {
-  AlertTriangle, ArrowUpRight, CloudRain, Compass, Droplets, FileDown, FileSpreadsheet, Home, LayoutDashboard, LifeBuoy,
-  Loader2, MapPin, Mountain, PhoneCall, RefreshCw, Server, ShieldAlert, Siren, Users, Waves, X,
+  AlertTriangle, ArrowUpRight, Compass, Droplets, FileDown, FileSpreadsheet, Home, Info, LayoutDashboard, LifeBuoy,
+  Loader2, MapPin, Mountain, PhoneCall, RefreshCw, Server, ShieldAlert, Siren, Waves, X,
 } from 'lucide-react';
 import { useAreaQuery, usePresets, useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
-import { EmptyState, ErrorState, Progress, RiskLegend, Section, Skeleton } from '../components/common/ui';
+import { EmptyState, ErrorState, RiskLegend, Section, Skeleton } from '../components/common/ui';
 import EventLog from '../components/common/EventLog';
 import Hydrograph from '../components/charts/Hydrograph';
 import RainfallChart from '../components/charts/RainfallChart';
@@ -16,8 +16,9 @@ import LandslideScatter from '../components/charts/LandslideScatter';
 import SuppliesChart from '../components/charts/SuppliesChart';
 import AreaForecastChart from '../components/charts/AreaForecastChart';
 import ForecastBulletinModal from '../components/charts/ForecastBulletinModal';
-import StatCard, { Badge } from '../components/dashboard/StatCard';
-import RiverKpi, { riverState } from '../components/dashboard/RiverKpi';
+import KpiStrip from '../components/dashboard/KpiStrip';
+import DecisionPanel from '../components/dashboard/DecisionPanel';
+import { riverState, StationPicker } from '../components/dashboard/RiverKpi';
 import SituationBar from '../components/dashboard/SituationBar';
 import ConnectionBanner from '../components/dashboard/ConnectionBanner';
 import TacticalMiniMap from '../components/dashboard/TacticalMiniMap';
@@ -26,13 +27,14 @@ import CommuneView, { unitLabel } from '../components/dashboard/CommuneView';
 import SystemView from '../components/dashboard/SystemView';
 import QuickIncidentModal from '../components/dashboard/QuickIncidentModal';
 import { useAllowedCodes, usePermission } from '../rbac/usePermission';
-import { int, minutesSince, num, pct, vnFileStamp } from '../utils/format';
-import { LANDSLIDE_LEVEL, levelOf, RAIN_LABEL, rainLevel, risk } from '../utils/risk';
+import { vnFileStamp } from '../utils/format';
+import { risk } from '../utils/risk';
 import { exportSnapshotPdf } from '../utils/exportPdf';
 import { exportExcel } from '../utils/exportExcel';
+import { useMediaQuery } from '../utils/useMediaQuery';
 import { useOnline } from '../utils/useOnline';
 import ReservoirMonitor from './public/ReservoirMonitor';
-import LandslideMonitor, { maxTiltText } from './public/LandslideMonitor';
+import LandslideMonitor from './public/LandslideMonitor';
 
 const VN_TIME = { timeZone: 'Asia/Ho_Chi_Minh' };
 // Một hàng thẻ duy nhất (trước đây 2 hàng: góc nhìn + chuyên đề, trùng chữ "Tổng hợp"); ?tab= để gửi link / tải lại
@@ -44,227 +46,26 @@ const TABS = [
   { id: 'he_thong', label: 'Hệ thống & dữ liệu', icon: Server },
 ];
 const LEGACY_LEVEL = { tinh: 'tong_hop', xa: 'cap_xa', he_thong: 'he_thong' }; // link cũ ?level=… (trước 10/2026)
-
-/**
- * Khối chỉ số nhanh (thiết kế mục A.2): mưa, mực nước so với BĐ I–III, sơ tán so với kế hoạch, SOS chờ (nhấp nháy khi
- * quá hạn), lực lượng & phương tiện chuyên dụng. Màu theo thang rủi ro chung (utils/risk.js). Thiếu số liệu → "–" và nói
- * rõ chưa có gì; lỗi tải → khung lỗi + "Thử lại" (không giả "chưa có dữ liệu").
- */
-function KpiGrid({ k, kState, evacQ, stationsState, waterStations, rainStations, canSystem, canSos, stationId, onSelectStation, canEvacUpdate, riverRef }) {
-  const grid = 'grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 [&>*]:min-w-0';
-  if (!k && kState.error) return <ErrorState onRetry={kState.refetch}>Không tải được chỉ số tổng quan</ErrorState>;
-  if (!k) {
-    return (
-      <div className={grid} aria-label="Đang tải chỉ số nhanh">
-        {[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} height={128} className={clsx(i === 1 && 'sm:col-span-2')} />)}
-      </div>
-    );
-  }
-  const rain = k.rain;
-  const rainKnown = rain?.avg_24h != null;
-  const rainLv = rainKnown ? rainLevel(rain.max_24h) : null;
-  const ev = k.evacuation || {};
-  const planned = ev.planned_households || 0;
-  const sos = k.sos || {};
-  const sosLv = sos.overdue > 0 || sos.critical > 0 ? 3 : sos.waiting > 0 ? 1 : 0;
-  const fo = k.forces || {};
-  const ve = k.vehicles || {};
-  const sites = evacQ.data?.sites || [];
-  const occupancy = sites.reduce((n, s) => n + (s.current_occupancy || 0), 0);
-  const capacity = sites.reduce((n, s) => n + (s.capacity || 0), 0);
-  const oldest = sos.oldest_waiting ? minutesSince(sos.oldest_waiting) : null;
-  const hasResources = fo.units > 0 || ve.special_total > 0 || ve.heavy_total > 0;
-
-  return (
-    // 3 cột: cột trái Dashboard (cạnh nhật ký 360px) chỉ ~650–1300px — 6 cột làm thẻ quá hẹp, nhãn bị cắt
-    <div className={grid}>
-      <StatCard
-        icon={CloudRain}
-        title="Mưa 24 giờ"
-        level={rainLv}
-        badge={rainLv >= 1 && <Badge level={rainLv}>{RAIN_LABEL[rainLv]}</Badge>}
-        value={num(rain?.avg_24h, 1)}
-        unit={rainKnown ? 'mm · TB các trạm' : undefined}
-        footer={
-          rainKnown ? (
-            <>
-              Trạm lớn nhất: <b className="font-mono text-ink">{num(rain.max_24h, 1)} mm</b>
-              {rain.max_station && ` · ${rain.max_station.replace(/^Trạm đo mưa\s+/i, '')}`}
-            </>
-          ) : (
-            // Không có số đo ≠ không có trạm: trạm có mà im lặng là sự cố kết nối, không được che bằng "chưa có trạm".
-            // Dự báo (Open-Meteo) chỉ là tham khảo, không thay số đo — dẫn tới biểu đồ dự báo ngay trên trang này
-            <span>
-              {rainStations ? `${rainStations} trạm đo mưa chưa gửi số đo 24 giờ qua` : 'Chưa có trạm đo mưa trong vùng đang xem'}
-              {rainStations > 0 && canSystem && (
-                <> · <Link to="/nguon-du-lieu" className="font-semibold text-accent hover:underline">Kiểm tra kết nối trạm →</Link></>
-              )}
-              {' · '}
-              <button
-                type="button"
-                className="font-semibold text-accent hover:underline no-print"
-                onClick={() => document.getElementById('du-bao-72h')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-              >
-                Xem dự báo mưa 72 giờ ↓
-              </button>
-            </span>
-          )
-        }
-      />
-
-      <div ref={riverRef} className="scroll-mt-20 sm:col-span-2">
-        {stationsState.error ? (
-          <ErrorState onRetry={stationsState.refetch} className="h-full">Không tải được danh sách trạm mực nước</ErrorState>
-        ) : stationsState.loading ? (
-          <Skeleton height={128} />
-        ) : (
-          <RiverKpi stations={waterStations} selectedId={stationId} onSelect={onSelectStation} />
-        )}
-      </div>
-
-      <StatCard
-        icon={Home}
-        title="Sơ tán an toàn"
-        level={planned ? undefined : null}
-        badge={planned > 0 && <Badge className="bg-accent/15 text-accent">{pct(ev.evacuated_households, planned)}% kế hoạch</Badge>}
-        value={planned ? `${int(ev.evacuated_households)}/${int(planned)}` : '–'}
-        unit={planned ? 'hộ' : undefined}
-        footer={
-          <div className="flex flex-col gap-0.5">
-            {planned ? (
-              <span>Nhân khẩu: <b className="font-mono text-ink">{int(ev.evacuated_persons)}/{int(ev.planned_persons)}</b></span>
-            ) : (
-              <span>
-                Chưa có kế hoạch sơ tán được cập nhật trong vùng đang xem
-                {/* cập nhật ở Điều hành cứu hộ (/cuu-ho cần sos.view) */}
-                {canEvacUpdate && canSos && <> · <Link to="/cuu-ho" className="font-semibold text-accent hover:underline">Cập nhật</Link></>}
-              </span>
-            )}
-            <span className="text-muted">
-              {evacQ.isError && !evacQ.data
-                ? 'Không tải được danh sách điểm sơ tán'
-                : !evacQ.data ? 'Đang tải điểm sơ tán…'
-                  : sites.length ? `${sites.length} điểm sơ tán · đang ở ${int(occupancy)}/${int(capacity)} chỗ` : 'Chưa có điểm sơ tán trong dữ liệu'}
-            </span>
-          </div>
-        }
-      >
-        {planned > 0 && <Progress value={pct(ev.evacuated_households, planned)} tone="accent" />}
-      </StatCard>
-
-      <StatCard
-        icon={Siren}
-        title="SOS chờ xử lý"
-        level={sosLv}
-        alert={sos.overdue > 0}
-        badge={
-          sos.overdue > 0 ? <Badge level={3}>{sos.overdue} quá hạn</Badge>
-            : sos.critical > 0 ? <Badge className="bg-danger/15 text-danger">{sos.critical} cấp 1</Badge> : null
-        }
-        value={int(sos.waiting)}
-        unit="phiếu mới"
-        footer={
-          <div className="flex flex-col gap-0.5">
-            <span>
-              Đang xử lý <b className="font-mono text-ink">{int(sos.in_progress)}</b> · Xong 24 giờ <b className="font-mono text-ink">{int(sos.resolved_24h)}</b>
-            </span>
-            {oldest != null && (
-              <span>Phiếu chờ lâu nhất: <b className={clsx('font-mono', sos.overdue > 0 ? 'text-danger' : 'text-ink')}>{oldest} phút</b></span>
-            )}
-            {/* như SLA_MINUTES ở backend/app/services/sos.py */}
-            <span className="text-[11px] text-muted">Hạn phản hồi: Cấp 1 · 3′ · Cấp 2 · 15′ · Cấp 3 · 60′</span>
-          </div>
-        }
-      >
-        {canSos && (
-          <Link to="/cuu-ho" className="btn-ghost min-h-[36px] self-start px-2.5 py-0.5 text-[11px] no-print">
-            Điều phối <ArrowUpRight size={11} />
-          </Link>
-        )}
-      </StatCard>
-
-      <StatCard
-        icon={Users}
-        title="Lực lượng & phương tiện"
-        level={hasResources ? undefined : null}
-        value={fo.units > 0 ? int(fo.ready) : '–'}
-        unit={fo.units > 0 ? `/ ${int(fo.total)} người sẵn sàng` : undefined}
-        footer={
-          hasResources ? (
-            <div className="flex flex-col gap-0.5">
-              <span>Đang làm nhiệm vụ: <b className="font-mono text-ink">{int(fo.on_mission)}</b> người · {int(fo.units)} đơn vị</span>
-              <span>Xuồng, xe lội nước hoạt động: <b className="font-mono text-ink">{int(ve.special_active)}/{int(ve.special_total)}</b></span>
-              <span>Máy xúc, máy ủi hoạt động: <b className="font-mono text-ink">{int(ve.heavy_active)}/{int(ve.heavy_total)}</b></span>
-            </div>
-          ) : (
-            'Chưa có dữ liệu lực lượng, phương tiện trong vùng đang xem'
-          )
-        }
-      />
-    </div>
-  );
-}
-
-/** Hai thẻ chuyên đề (hồ chứa, sạt lở đường đèo) — số từ KPI, vạch màu theo mức (khớp màu backend); chưa có danh mục thì
- * nói rõ. Bấm → mở thẻ chuyên đề. */
-function TopicCards({ k, onOpen }) {
-  const rs = k?.reservoirs;
-  const ls = k?.landslides;
-  const rsLv = !rs?.total ? null : rs.emergency_count ? 3 : rs.spill_count ? 2 : 0;
-  const lsLv = !ls?.total ? null : ls.blocked_count ? levelOf(LANDSLIDE_LEVEL, 'cam_duong') : ls.warning_count ? levelOf(LANDSLIDE_LEVEL, 'canh_bao') : 0;
-  const card = 'card min-h-[72px] cursor-pointer border-l-4 p-3.5 text-left transition-shadow hover:shadow-md';
-  return (
-    <div className="grid gap-3 sm:grid-cols-2 [&>*]:min-w-0">
-      <button type="button" onClick={() => onOpen('ho_chua')} className={clsx(card, risk(rsLv).edge)}>
-        <div className="flex items-center justify-between gap-2">
-          <span className="flex items-center gap-2 text-sm font-bold text-ink">
-            <Droplets size={17} className={risk(rsLv).text} aria-hidden="true" /> Hồ chứa & xả lũ
-          </span>
-          <span className="text-[11px] font-semibold text-accent">Mở chuyên đề →</span>
-        </div>
-        <div className="mt-2 flex flex-wrap justify-between gap-x-3 gap-y-1 border-t border-line/60 pt-2 text-xs text-muted">
-          {rs?.total ? (
-            <>
-              <span>Đang xả: <b className="font-mono text-ink">{rs.spill_count}/{rs.total} hồ</b></span>
-              <span>Tổng xả: <b className="font-mono text-ink">{int(rs.total_outflow)} m³/s</b></span>
-              {rs.no_data_count > 0 && <span>{rs.no_data_count} hồ chưa có số liệu vận hành</span>}
-            </>
-          ) : (
-            <span>{k ? 'Chưa có hồ chứa trong dữ liệu của vùng đang xem' : '–'}</span>
-          )}
-        </div>
-      </button>
-
-      <button type="button" onClick={() => onOpen('sat_lo')} className={clsx(card, risk(lsLv).edge)}>
-        <div className="flex items-center justify-between gap-2">
-          <span className="flex items-center gap-2 text-sm font-bold text-ink">
-            <Mountain size={17} className={risk(lsLv).text} aria-hidden="true" /> Sạt lở & đường đèo
-          </span>
-          <span className="text-[11px] font-semibold text-accent">Mở chuyên đề →</span>
-        </div>
-        <div className="mt-2 flex flex-wrap justify-between gap-x-3 gap-y-1 border-t border-line/60 pt-2 text-xs text-muted">
-          {ls?.total ? (
-            <>
-              <span>Cấm đường: <b className="font-mono text-ink">{ls.blocked_count}</b> · Cảnh báo: <b className="font-mono text-ink">{ls.warning_count}</b></span>
-              <span>Nghiêng lớn nhất: <b className="font-mono text-ink">{maxTiltText(ls.points)}</b></span>
-              {ls.no_data_count > 0 && <span>{ls.no_data_count}/{ls.total} điểm chưa có dữ liệu giám sát</span>}
-            </>
-          ) : (
-            <span>{k ? 'Chưa có điểm đen sạt lở trong vùng đang xem' : '–'}</span>
-          )}
-        </div>
-      </button>
-    </div>
-  );
-}
+// Điện thoại: biểu đồ thu gọn được (chỉ ẩn — số liệu vẫn tải như cũ); Thủy văn mở sẵn, còn lại đóng để lãnh đạo không phải
+// cuộn qua 5 biểu đồ mới tới nhật ký / bảng
+const CHARTS_OPEN = { thuy_van: true, mua: false, du_bao: false, sat_lo: false, vat_tu: false };
 
 /** Nút của thanh thao tác điện thoại: cao ≥ 56 px, biểu tượng + chữ. */
 const barBtn = 'flex min-h-[56px] flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-[11px] font-bold active:scale-95';
 
+/**
+ * Dashboard tổng quan (thiết kế mục A). Bố cục theo thiết bị của lãnh đạo — chỉ sắp xếp lại, số liệu / API như cũ:
+ * - laptop (≥ 1280 px) / iPad ngang (≥ 1024 px): dải khẩn → thanh lệnh → thẻ → 6 ô KPI (1 hàng / 3×2) → bản đồ + biểu đồ
+ *   bên trái, "Việc chờ quyết định" + nhật ký cột phải dính khi cuộn → bảng tác chiến;
+ * - iPad dọc: KPI 3×2 → bản đồ cả hàng → (Việc chờ | nhật ký 5 mục) → biểu đồ 2 cột;
+ * - điện thoại: KPI 2×3 → Việc chờ → bản đồ thu gọn → biểu đồ thu gọn được → nhật ký 5 mục → bảng dạng thẻ; thanh đáy.
+ */
 export default function Dashboard() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const online = useOnline();
+  const isLg = useMediaQuery('(min-width: 1024px)'); // laptop / iPad ngang: nhật ký là cột phải, dính khi cuộn
+  const isPhone = !useMediaQuery('(min-width: 640px)');
   const [params, setParams] = useSearchParams();
   const { filter, setFilter, clearFilter, toast, auth, wsStatus, setFocus } = useStore();
   const isFiltered = filter.codes.length > 0;
@@ -304,6 +105,16 @@ export default function Dashboard() {
   const scopeLabel = scopeUnit ? unitLabel(scopeUnit) : `${scope?.length || 0} xã/phường được giao`;
   const filterLabel = isFiltered || scope === null ? filter.label : scopeLabel;
   const role = auth?.user?.assignments?.[0]?.role_name;
+  // Lọc nhanh theo lưu vực (nhóm do BCH xác nhận — README 2.4) — ô chọn trong thanh lệnh (trước đây 1 hàng chip riêng)
+  const basinPresets = useMemo(() => presets.filter((p) => p.kind === 'luu_vuc'), [presets]);
+  const basinValue = filter.presetCode && basinPresets.some((p) => p.code === filter.presetCode)
+    ? filter.presetCode
+    : isFiltered ? 'khac' : '';
+  const pickBasin = (code) => {
+    const p = basinPresets.find((x) => x.code === code);
+    if (p) setFilter({ codes: p.unit_codes, label: p.name, presetCode: p.code });
+    else clearFilter();
+  };
 
   const waterStations = useMemo(() => allStations.filter((s) => s.type === 'muc_nuoc'), [allStations]);
   const rainStations = allStations.filter((s) => s.type === 'luong_mua').length;
@@ -314,6 +125,8 @@ export default function Dashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [bulletinOpen, setBulletinOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [chartsOpen, setChartsOpen] = useState(CHARTS_OPEN);
+  const [forceOpen, setForceOpen] = useState(false); // đang chụp PDF trên điện thoại: mở mọi biểu đồ đang thu gọn
   const ref = useRef(null); // vùng chụp PDF của thẻ đang mở
   const hydroRef = useRef(null);
   const riverRef = useRef(null);
@@ -343,17 +156,35 @@ export default function Dashboard() {
     if (!communeCode) enterCommune(scopeUnits[0].code);
   }, [tab, scopeUnits.length]); // eslint-disable-line react-hooks/exhaustive-deps -- chỉ chọn sẵn 1 lần khi mở thẻ xã
 
-  const selectStation = (id) => {
+  // Chọn trạm (ô KPI mực nước, bảng tác chiến) → mở & cuộn tới biểu đồ thủy văn của trạm đó
+  const focusStation = (id) => {
     setStationId(id);
-    hydroRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setChartsOpen((o) => ({ ...o, thuy_van: true }));
+    setTimeout(() => hydroRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
   };
+  const openChart = (key, id) => {
+    setChartsOpen((o) => ({ ...o, [key]: true }));
+    setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+  };
+  // Biểu đồ thu gọn được chỉ trên điện thoại; máy lớn luôn mở
+  const fold = (key) => ({
+    collapsible: isPhone,
+    open: !isPhone || forceOpen || chartsOpen[key],
+    onToggle: () => setChartsOpen((o) => ({ ...o, [key]: !o[key] })),
+  });
   const openOnMap = (x) => {
     if (x?.lat != null) setFocus({ lat: x.lat, lon: x.lon, zoom: 13, label: x.name });
     navigate('/ban-do');
   };
+  // Nút "Mực nước" ở thanh dưới: tới danh sách trạm + biểu đồ thủy văn (thẻ Cấp xã không có biểu đồ → ô KPI mực nước)
   const goRivers = () => {
-    if (tab !== 'tong_hop' && tab !== 'cap_xa') setTab('tong_hop');
-    setTimeout(() => riverRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+    if (tab === 'cap_xa') {
+      riverRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    if (tab !== 'tong_hop') setTab('tong_hop');
+    setChartsOpen((o) => ({ ...o, thuy_van: true }));
+    setTimeout(() => hydroRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120);
   };
 
   // Làm mới thật: tải lại mọi truy vấn đang hiển thị, báo đúng kết quả (có nguồn lỗi thì nói)
@@ -373,7 +204,13 @@ export default function Dashboard() {
   const doExport = async () => {
     if (!ref.current) return;
     setExporting(true);
+    // Điện thoại: biểu đồ đang thu gọn phải mở ra trước khi chụp, nếu không PDF thiếu biểu đồ
+    const folded = isPhone && Object.values(chartsOpen).some((v) => !v);
     try {
+      if (folded) {
+        setForceOpen(true);
+        await new Promise((r) => { setTimeout(r, 500); }); // biểu đồ vừa hiện cần vẽ lại theo bề rộng thật
+      }
       const now = new Date();
       await exportSnapshotPdf(ref.current, {
         title: 'BÁO CÁO NHANH TÌNH HÌNH THIÊN TAI – TỈNH CAO BẰNG',
@@ -383,6 +220,7 @@ export default function Dashboard() {
     } catch (e) {
       toast({ tone: 'danger', title: 'Không xuất được PDF', body: e.message });
     } finally {
+      setForceOpen(false);
       setExporting(false);
     }
   };
@@ -424,15 +262,15 @@ export default function Dashboard() {
   };
 
   const kpiProps = {
-    k, kState, evacQ, stationsState, waterStations, rainStations, canSystem, canSos, stationId: activeStation,
-    onSelectStation: selectStation, canEvacUpdate, riverRef,
+    k, kState, evacQ, stationsState, waterStations, rainStations, canSos, canResource, canEvacUpdate, riverRef,
+    onOpenTab: setTab,
+    onRain: () => openChart('mua', 'bieu-do-mua'),
   };
-  const logSection = (title, limit) => (
+  // Nhật ký: máy lớn — danh sách đầy đủ cuộn trong khung cố định; iPad dọc / điện thoại — 5 sự kiện mới + "Xem tất cả"
+  const logSection = ({ title, limit, className, listClass = isLg ? 'h-full' : undefined }) => (
     <Section
       title={title}
-      // Dính khi cuộn (thiết kế A.4: ticker luôn thấy bên phải); top-16 chừa chỗ cho dải tình huống dính trên cùng.
-      // Chiều cao CỐ ĐỊNH (không phải max-h): h-full của danh sách mới tính được → cuộn bên trong, không tràn đè bảng bên dưới
-      className="flex flex-col xl:sticky xl:top-16 xl:h-[calc(100vh-8.5rem)] xl:self-start xl:overflow-hidden print:static print:h-auto print:overflow-visible"
+      className={clsx('flex flex-col print:static print:h-auto print:overflow-visible', className)}
       bodyClass="flex min-h-0 flex-1 flex-col"
       right={
         wsStatus === 'online'
@@ -440,7 +278,7 @@ export default function Dashboard() {
           : <span className="chip shrink-0 whitespace-nowrap bg-panel2 px-2 py-0 text-[10px] text-muted">Mất kết nối realtime</span>
       }
     >
-      <EventLog className="h-[60vh] xl:h-full" limit={limit} />
+      <EventLog className={listClass} limit={limit} preview={isLg ? undefined : 5} />
     </Section>
   );
   const rs = k?.reservoirs;
@@ -449,9 +287,10 @@ export default function Dashboard() {
     ho_chua: rs?.spill_count ? { text: `${rs.spill_count} hồ xả`, level: rs.emergency_count ? 3 : 2 } : null,
     sat_lo: ls?.blocked_count ? { text: `${ls.blocked_count} cấm đường`, level: 3 } : ls?.warning_count ? { text: `${ls.warning_count} cảnh báo`, level: 2 } : null,
   };
+  const dataTime = kQ.dataUpdatedAt ? new Date(kQ.dataUpdatedAt).toLocaleTimeString('vi-VN', { ...VN_TIME, hour12: false }) : null;
 
   return (
-    <div className="flex flex-col gap-3.5 p-3.5 pb-28 sm:p-5 sm:pb-5">
+    <div className="flex flex-col gap-2 p-3.5 pb-28 sm:gap-3.5 sm:p-5 sm:pb-5">
       {/* 0. Thông tin khẩn luôn trên cùng: dải tình huống (Cam / Đỏ dính khi cuộn) + mất mạng */}
       {k && (
         <SituationBar
@@ -468,57 +307,73 @@ export default function Dashboard() {
       )}
       <ConnectionBanner updatedAt={kQ.dataUpdatedAt || null} />
 
-      {/* 1. Thanh chỉ huy: tiêu đề + phạm vi + giờ số liệu, thao tác; chú giải thang màu rủi ro */}
-      <div className="card p-3 sm:p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="hidden flex-wrap items-center gap-2 sm:flex">
-              <span className="rounded border border-accent/25 bg-accent/10 px-2 py-0.5 text-[11px] font-black uppercase tracking-wider text-accent">
-                Trung tâm điều hành · Cao Bằng
-              </span>
-              {role && <span className="chip border border-line bg-panel2 text-ink-2">{role}</span>}
-            </div>
-            {/* Điện thoại: tiêu đề chỉ là phạm vi đang xem (ngắn, 1–2 dòng) — "Tổng quan tác chiến" thành dòng nhỏ phía trên */}
-            <div className="text-[11px] font-bold uppercase tracking-wider text-muted sm:hidden">Tổng quan tác chiến</div>
-            <h1 className="flex flex-wrap items-center gap-x-2 text-lg font-black tracking-tight text-ink sm:mt-1 sm:text-xl">
-              <span className="hidden sm:inline">Tổng quan tác chiến</span>
-              <span className="hidden font-normal text-muted sm:inline">/</span>
-              <span className="text-accent">{filterLabel}</span>
-              {isFiltered && tab !== 'cap_xa' && (
-                <button type="button" onClick={clearFilter} className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-panel2 hover:text-ink" title="Bỏ lọc" aria-label="Bỏ lọc, xem toàn bộ phạm vi">
-                  <X size={15} />
-                </button>
-              )}
-            </h1>
-            <p className="mt-0.5 text-xs text-muted">
-              {kQ.dataUpdatedAt
-                ? `Số liệu lúc ${new Date(kQ.dataUpdatedAt).toLocaleTimeString('vi-VN', { ...VN_TIME, hour12: false })} · tự cập nhật khi có sự kiện mới`
-                : kState.error ? 'Chưa tải được số liệu' : 'Đang tải số liệu…'}
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 no-print">
+      {/* 1. Thanh lệnh gọn (2 dòng): phạm vi · thao tác / giờ số liệu · thang màu · lưu vực */}
+      <div className="card px-3 py-2 sm:px-4 sm:py-2.5">
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="flex min-w-0 items-center gap-x-2 text-base font-black tracking-tight text-ink sm:text-lg">
+            <span className="hidden shrink-0 md:inline">Tổng quan tác chiến</span>
+            <span className="hidden font-normal text-muted md:inline">/</span>
+            <span className="min-w-0 truncate text-accent" title={filterLabel}>{filterLabel}</span>
+            {isFiltered && tab !== 'cap_xa' && (
+              <button type="button" onClick={clearFilter} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted hover:bg-panel2 hover:text-ink" title="Bỏ lọc" aria-label="Bỏ lọc, xem toàn bộ phạm vi">
+                <X size={15} />
+              </button>
+            )}
+          </h1>
+          <div className="flex shrink-0 items-center gap-2 no-print">
             {canReport && (
               // Điện thoại: "Báo SOS" ở thanh dưới cùng (vùng ngón cái) — ở đây chỉ hiện từ máy tính bảng trở lên
-              <button type="button" onClick={() => setReportOpen(true)} className="btn-danger hidden px-3 py-1.5 text-xs font-bold sm:inline-flex">
+              <button type="button" onClick={() => setReportOpen(true)} className="btn-danger hidden min-h-[40px] px-3 text-xs font-bold sm:inline-flex lg:min-h-0 lg:py-1.5">
                 <ShieldAlert size={14} /> Báo cáo nhanh
               </button>
             )}
-            <button type="button" onClick={refresh} disabled={refreshing} className="btn-ghost h-10 min-w-[40px] px-2.5 text-xs sm:h-auto sm:py-1.5" aria-label="Làm mới số liệu" title="Làm mới số liệu">
-              <RefreshCw size={14} className={clsx(refreshing && 'animate-spin')} /> <span className="hidden sm:inline">Làm mới</span>
+            <button type="button" onClick={refresh} disabled={refreshing} className="btn-ghost h-10 min-w-[40px] px-2.5 text-xs lg:h-auto lg:py-1.5" aria-label="Làm mới số liệu" title="Làm mới số liệu">
+              <RefreshCw size={14} className={clsx(refreshing && 'animate-spin')} /> <span className="hidden xl:inline">Làm mới</span>
             </button>
-            <Link to="/ban-do" className="btn-ghost hidden px-2.5 py-1.5 text-xs sm:inline-flex">
-              <Compass size={14} /> Bản đồ <ArrowUpRight size={12} />
+            <Link to="/ban-do" className="btn-ghost hidden h-10 px-2.5 text-xs sm:inline-flex lg:h-auto lg:py-1.5" title="Mở Bản đồ giám sát">
+              <Compass size={14} /> <span className="hidden md:inline">Bản đồ</span> <ArrowUpRight size={12} />
             </Link>
-            <button type="button" onClick={doExcel} disabled={!k} className="btn-ghost h-10 min-w-[40px] px-2.5 text-xs sm:h-auto sm:py-1.5" aria-label="Xuất Excel tổng quan" title="Xuất Excel tổng quan">
-              <FileSpreadsheet size={14} /> <span className="hidden sm:inline">Excel</span>
+            <button type="button" onClick={doExcel} disabled={!k} className="btn-ghost h-10 min-w-[40px] px-2.5 text-xs lg:h-auto lg:py-1.5" aria-label="Xuất Excel tổng quan" title="Xuất Excel tổng quan">
+              <FileSpreadsheet size={14} /> <span className="hidden md:inline">Excel</span>
             </button>
-            <button type="button" onClick={doExport} disabled={exporting} className="btn-primary h-10 min-w-[40px] px-3 text-xs sm:h-auto sm:py-1.5" aria-label="Xuất PDF báo cáo nhanh" title="Xuất PDF báo cáo nhanh">
-              {exporting ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />} <span className="hidden sm:inline">Xuất PDF</span>
+            <button type="button" onClick={doExport} disabled={exporting} className="btn-primary h-10 min-w-[40px] px-3 text-xs lg:h-auto lg:py-1.5" aria-label="Xuất PDF báo cáo nhanh" title="Xuất PDF báo cáo nhanh">
+              {exporting ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />} <span className="hidden md:inline">Xuất PDF</span>
             </button>
           </div>
         </div>
-        <RiskLegend className="mt-2.5 border-t border-line/60 pt-2" />
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted">
+          <span className="whitespace-nowrap">
+            {dataTime ? (
+              <>
+                <span className="sm:hidden">Lúc </span><span className="hidden sm:inline">Số liệu lúc </span>
+                <b className="font-mono text-ink-2">{dataTime}</b>
+                <span className="hidden 2xl:inline"> · tự cập nhật khi có sự kiện mới</span>
+              </>
+            ) : kState.error ? 'Chưa tải được số liệu' : 'Đang tải số liệu…'}
+          </span>
+          {role && <span className="chip hidden border border-line bg-panel2 py-0 text-[10px] text-ink-2 2xl:inline-flex">{role}</span>}
+          {/* Thang màu: hiện sẵn từ md; điện thoại gọn vào "Thang màu" (chạm để mở) */}
+          <RiskLegend className="hidden md:flex" meaningClass="hidden xl:inline" />
+          <details className="md:hidden">
+            <summary className="flex min-h-[28px] cursor-pointer list-none items-center gap-1 font-semibold text-accent [&::-webkit-details-marker]:hidden">
+              <Info size={13} aria-hidden="true" /> Thang màu
+            </summary>
+            <RiskLegend className="mt-1" />
+          </details>
+          {/* Tài khoản xã chỉ có xã mình → không có lưu vực để chọn. Điện thoại: chọn lưu vực ở bộ lọc trong menu ☰ (cùng
+              danh sách nhóm) — không chiếm thêm một dòng trước hàng KPI */}
+          {tab === 'tong_hop' && scope === null && basinPresets.length > 0 && (
+            <label className="hidden items-center gap-1.5 no-print sm:flex">
+              <MapPin size={12} aria-hidden="true" />
+              <span className="hidden xl:inline">Lưu vực</span>
+              <select className="input min-h-[32px] w-auto max-w-[13rem] py-0.5 text-[11px]" value={basinValue} onChange={(e) => pickBasin(e.target.value)} aria-label="Lọc theo lưu vực">
+                <option value="">Toàn tỉnh</option>
+                {basinValue === 'khac' && <option value="khac" disabled>{filter.label}</option>}
+                {basinPresets.map((p) => <option key={p.code} value={p.code}>{p.name} ({p.unit_codes.length} xã)</option>)}
+              </select>
+            </label>
+          )}
+        </div>
       </div>
 
       {k && kQ.isError && online && (
@@ -532,7 +387,7 @@ export default function Dashboard() {
       )}
 
       {/* 2. Một hàng thẻ: tổng hợp · chuyên đề · cấp xã · hệ thống (cuộn ngang trong hàng trên điện thoại) */}
-      <div className="scroll-thin -mx-1 flex items-center gap-1.5 overflow-x-auto border-b border-line px-1 pb-2.5 no-print" role="tablist" aria-label="Nội dung tổng quan">
+      <div className="scroll-thin -mx-1 flex items-center gap-1.5 overflow-x-auto border-b border-line px-1 pb-2 no-print sm:pb-2.5" role="tablist" aria-label="Nội dung tổng quan">
         {tabs.map((t) => {
           const badge = tabBadge[t.id];
           return (
@@ -563,10 +418,10 @@ export default function Dashboard() {
       {tab === 'cap_xa' && (
         <div ref={ref} className="flex flex-col gap-3.5">
           <CommuneView code={communeCode} units={scopeUnits} onChange={enterCommune}>
-            <KpiGrid {...kpiProps} />
+            <KpiStrip {...kpiProps} />
             <div className="grid gap-3.5 xl:grid-cols-[1fr_360px] [&>*]:min-w-0">
               <div className="grid gap-3.5 lg:grid-cols-2 [&>*]:min-w-0">
-                <Section title="Mưa & dự báo 3 giờ tới tại xã">
+                <Section id="bieu-do-mua" title="Mưa & dự báo 3 giờ tới tại xã" className="scroll-mt-20">
                   <RainfallChart height={250} />
                 </Section>
                 <Section title="Ngưỡng kích hoạt sạt lở – trạm mưa trong xã">
@@ -576,7 +431,12 @@ export default function Dashboard() {
                   <AreaForecastChart height={220} />
                 </Section>
               </div>
-              {logSection('Nhật ký sự kiện của xã', 40)}
+              {logSection({
+                title: 'Nhật ký sự kiện của xã',
+                limit: 40,
+                className: 'xl:sticky xl:top-16 xl:h-[calc(100vh-8.5rem)] xl:self-start xl:overflow-hidden',
+                listClass: isLg ? 'h-[60vh] xl:h-full' : undefined,
+              })}
             </div>
           </CommuneView>
         </div>
@@ -596,58 +456,29 @@ export default function Dashboard() {
 
       {tab === 'tong_hop' && (
         <>
-          {/* Lọc nhanh theo lưu vực (nhóm do BCH xác nhận — README 2.4); tài khoản xã chỉ có xã mình nên ẩn */}
-          {scope === null && presets.some((p) => p.kind === 'luu_vuc') && (
-            <div className="scroll-thin -mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pb-1 no-print">
-              <span className="mr-1 flex items-center gap-1 whitespace-nowrap text-xs font-bold uppercase tracking-wider text-muted">
-                <MapPin size={13} aria-hidden="true" /> Lưu vực:
-              </span>
-              <button
-                type="button"
-                onClick={clearFilter}
-                aria-pressed={!isFiltered}
-                className={clsx('min-h-[36px] whitespace-nowrap rounded-full border px-3 text-xs font-semibold', !isFiltered ? 'border-accent bg-accent text-white' : 'border-line bg-panel text-ink-2 hover:bg-panel2')}
-              >
-                Toàn tỉnh
-              </button>
-              {presets.filter((p) => p.kind === 'luu_vuc').map((p) => (
-                <button
-                  key={p.code}
-                  type="button"
-                  aria-pressed={filter.presetCode === p.code}
-                  onClick={() => setFilter({ codes: p.unit_codes, label: p.name, presetCode: p.code })}
-                  className={clsx(
-                    'min-h-[36px] whitespace-nowrap rounded-full border px-3 text-xs font-semibold',
-                    filter.presetCode === p.code ? 'border-accent bg-accent text-white' : 'border-line bg-panel text-ink-2 hover:bg-panel2',
-                  )}
-                >
-                  {p.name} <span className="opacity-75">({p.unit_codes.length} xã)</span>
-                </button>
-              ))}
-            </div>
-          )}
-
-          <div ref={ref} className="grid gap-3.5 bg-bg xl:grid-cols-[1fr_360px] [&>*]:min-w-0">
-            <div className="flex min-w-0 flex-col gap-3.5">
-              {/* Khối chỉ số nhanh (Top) → điểm nóng → biểu đồ (Middle): lãnh đạo nắm tình hình trong vài giây */}
-              <KpiGrid {...kpiProps} />
-              <TopicCards k={k} onOpen={setTab} />
-              <TacticalMiniMap k={k} />
-
-              <div className="grid gap-3.5 lg:grid-cols-2 [&>*]:min-w-0">
+          {/* Vùng chụp PDF: KPI + bản đồ + biểu đồ + nhật ký ("Việc chờ quyết định" không in — việc riêng của người xem) */}
+          <div ref={ref} className="flex flex-col gap-2 bg-bg sm:gap-3.5">
+            <KpiStrip {...kpiProps} onRiver={focusStation} />
+            {/* Thứ tự theo thiết bị (chỉ CSS, không nhân đôi component):
+                điện thoại — Việc chờ → bản đồ → biểu đồ → nhật ký; iPad dọc — bản đồ → (Việc chờ | nhật ký) → biểu đồ;
+                laptop / iPad ngang — bản đồ + biểu đồ bên trái, cột phải (Việc chờ + nhật ký) dính khi cuộn */}
+            {/* grid-cols-1 = minmax(0, 1fr): cột không bị nội dung rộng (hàng nút lọc nhật ký) kéo quá bề rộng màn hình; khối bên
+                trong lớp `contents` không nhận [&>*]:min-w-0 nên tự đặt min-w-0 */}
+            <div className="grid grid-cols-1 gap-2.5 sm:gap-3.5 md:grid-cols-2 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] xl:grid-cols-[minmax(0,1fr)_360px] [&>*]:min-w-0">
+              <TacticalMiniMap k={k} className="order-2 md:order-1 md:col-span-2 lg:order-none lg:col-span-1 lg:col-start-1 lg:row-start-1" />
+              <div className="contents lg:sticky lg:top-16 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:flex lg:h-[calc(100vh-8.5rem)] lg:flex-col lg:gap-3.5 lg:self-start print:static print:h-auto">
+                <DecisionPanel k={k} kState={kState} className="order-1 min-w-0 md:order-2 md:self-start lg:order-none lg:shrink-0 lg:self-auto" />
+                {logSection({
+                  title: 'Nhật ký sự kiện & luồng cảnh báo',
+                  limit: 60,
+                  className: 'order-4 min-w-0 md:order-3 lg:order-none lg:min-h-0 lg:flex-1 lg:overflow-hidden',
+                })}
+              </div>
+              <div className="order-3 grid grid-cols-1 gap-2.5 sm:gap-3.5 md:order-4 md:col-span-2 md:grid-cols-2 lg:order-none lg:col-span-1 lg:col-start-1 lg:row-start-2 lg:grid-cols-1 xl:grid-cols-2 [&>*]:min-w-0">
                 <div ref={hydroRef} className="min-w-0 scroll-mt-20">
-                  <Section title="Thủy văn – mực nước thực đo & dự báo">
-                    {/* Chọn trạm ở hàng riêng (trước đây chen cạnh tiêu đề → tiêu đề gãy 3 dòng) */}
-                    {waterStations.length > 0 && (
-                      <label className="mb-2 flex items-center gap-2 text-xs text-muted">
-                        <span className="shrink-0">Trạm</span>
-                        <select className="input min-h-[36px] py-1 text-xs sm:w-auto" value={activeStation || ''} onChange={(e) => setStationId(e.target.value)}>
-                          {waterStations.map((s) => (
-                            <option key={s.id} value={s.id}>{s.name.replace(/^Trạm\s+(thủy|thuỷ)\s+văn\s+/i, '')}</option>
-                          ))}
-                        </select>
-                      </label>
-                    )}
+                  <Section title="Thủy văn – mực nước thực đo & dự báo" {...fold('thuy_van')}>
+                    {/* Danh sách trạm (trước đây nằm trong thẻ KPI cao) — chọn trạm để xem biểu đồ */}
+                    <StationPicker stations={waterStations} selectedId={activeStation} onSelect={setStationId} />
                     {stationsState.error ? (
                       <ErrorState height={250} onRetry={stationsState.refetch}>Không tải được danh sách trạm mực nước</ErrorState>
                     ) : stationsState.loading ? (
@@ -667,25 +498,22 @@ export default function Dashboard() {
                     {bulletinOpen && <ForecastBulletinModal stations={waterStations} stationId={activeStation} onClose={() => setBulletinOpen(false)} />}
                   </Section>
                 </div>
-                <Section title="Cường độ mưa & dự báo 3 giờ tới">
+                <Section id="bieu-do-mua" title="Cường độ mưa & dự báo 3 giờ tới" className="scroll-mt-20" {...fold('mua')}>
                   <RainfallChart height={270} />
                 </Section>
-                <Section id="du-bao-72h" title="Dự báo mưa 72 giờ theo xã – tổ hợp ECMWF + GFS (P10–P90)" className="lg:col-span-2">
+                <Section id="du-bao-72h" title="Dự báo mưa 72 giờ theo xã – tổ hợp ECMWF + GFS (P10–P90)" className="scroll-mt-20 md:col-span-2 lg:col-span-1 xl:col-span-2" {...fold('du_bao')}>
                   <AreaForecastChart height={230} />
                 </Section>
-                <Section title="Ngưỡng kích hoạt sạt lở (mưa tích lũy 72h – cường độ)" className={clsx(!canResource && 'lg:col-span-2')}>
+                <Section title="Ngưỡng kích hoạt sạt lở (mưa tích lũy 72h – cường độ)" className={clsx(!canResource && 'md:col-span-2 lg:col-span-1 xl:col-span-2')} {...fold('sat_lo')}>
                   <LandslideScatter height={240} />
                 </Section>
                 {canResource && (
-                  <Section title="Vật tư cứu trợ theo kho (% định mức dự trữ)">
+                  <Section title="Vật tư cứu trợ theo kho (% định mức dự trữ)" {...fold('vat_tu')}>
                     <SuppliesChart height={240} />
                   </Section>
                 )}
               </div>
             </div>
-
-            {/* Khối nhật ký sự kiện & luồng cảnh báo (Side) */}
-            {logSection('Nhật ký sự kiện & luồng cảnh báo', 60)}
           </div>
 
           <OperationsTable
@@ -693,7 +521,7 @@ export default function Dashboard() {
             kState={kState}
             stations={waterStations}
             stationsState={stationsState}
-            onSelectStation={selectStation}
+            onSelectStation={focusStation}
             scopeLabel={filterLabel}
           />
         </>

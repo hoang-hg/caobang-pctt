@@ -1,4 +1,5 @@
 import clsx from 'clsx';
+import { Link } from 'react-router-dom';
 import { risk } from '../../utils/risk';
 
 /**
@@ -6,13 +7,25 @@ import { risk } from '../../utils/risk';
  * bên trái, nền nhạt từ Vàng trở lên); `null` = chưa có dữ liệu (viền nét đứt, biểu tượng xám — không tô xanh như "bình
  * thường"); bỏ trống = chỉ số không mang mức rủi ro (sơ tán, lực lượng). `alert` = cần xử lý ngay: viền đỏ đậm, chỉ nhãn
  * góc nhấp nháy (cả thẻ nhấp nháy thì không đọc được số) — tắt khi hệ điều hành bật "giảm chuyển động".
+ *
+ * `compact`: ô gọn của hàng KPI (lãnh đạo đọc trong vài giây, vừa 2 cột ở màn 360 px): tiêu đề · số lớn · nhãn mức ·
+ * một dòng ngữ cảnh. `onClick` → cả ô là nút; `to` → cả ô là liên kết (khi đó KHÔNG đặt nút / liên kết khác bên trong).
  */
-export default function StatCard({ icon: Icon, title, badge, value, unit, footer, level, alert, className, children }) {
+export default function StatCard({
+  icon: Icon, title, badge, value, unit, footer, level, alert, className, children, compact = false, onClick, to, hint,
+}) {
   const scale = level === undefined ? null : risk(level);
+  const Tag = to ? Link : onClick ? 'button' : 'div';
+  const tagProps = to ? { to } : onClick ? { type: 'button', onClick } : {};
+  const badgeEl = badge && <span className={clsx('shrink-0', alert && 'motion-safe:animate-blink')}>{badge}</span>;
   return (
-    <div
+    <Tag
+      {...tagProps}
+      title={hint}
       className={clsx(
-        'card flex min-w-0 flex-col justify-between gap-1 p-3',
+        'card flex min-w-0 flex-col text-left',
+        compact ? 'gap-1 p-2 sm:p-2.5' : 'justify-between gap-1 p-3',
+        (to || onClick) && 'transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
         level != null && clsx('border-l-4', scale.edge, level > 0 && scale.soft),
         level === null && 'border-dashed',
         alert && 'ring-2 ring-danger',
@@ -20,21 +33,29 @@ export default function StatCard({ icon: Icon, title, badge, value, unit, footer
       )}
     >
       <div className="flex items-center justify-between gap-2 text-xs font-bold text-muted">
-        <span className="flex min-w-0 items-center gap-1.5 uppercase tracking-wider">
+        <span className={clsx('flex min-w-0 items-center gap-1.5 uppercase', compact ? 'text-[11px] tracking-wide' : 'tracking-wider')}>
           {Icon && <Icon size={15} className={clsx('shrink-0', scale ? scale.text : 'text-accent')} aria-hidden="true" />}
           <span className="truncate">{title}</span>
         </span>
-        {badge && <span className={clsx('shrink-0', alert && 'motion-safe:animate-blink')}>{badge}</span>}
+        {!compact && badgeEl}
       </div>
       {value !== undefined && (
-        <div className="flex items-baseline gap-1.5">
-          <span className="font-mono text-2xl font-black tabular-nums tracking-tight text-ink lg:text-3xl">{value}</span>
-          {unit && <span className="font-mono text-xs font-bold text-muted">{unit}</span>}
+        <div className="flex min-w-0 items-baseline gap-1.5">
+          <span className={clsx('font-mono font-black tabular-nums tracking-tight text-ink', compact ? 'text-xl leading-tight sm:text-2xl' : 'text-2xl lg:text-3xl')}>
+            {value}
+          </span>
+          {unit && <span className={clsx('font-mono font-bold text-muted', compact ? 'truncate text-[11px]' : 'text-xs')}>{unit}</span>}
         </div>
       )}
+      {/* Ô gọn: nhãn mức nằm hàng riêng dưới số (góc phải của ô 2 cột trên điện thoại không đủ chỗ) */}
+      {compact && badgeEl && <div className="flex min-w-0">{badgeEl}</div>}
       {children}
-      {footer && <div className="border-t border-line/60 pt-1.5 text-xs text-ink-2">{footer}</div>}
-    </div>
+      {footer && (
+        <div className={clsx('text-ink-2', compact ? 'line-clamp-1 text-[11px] leading-snug sm:line-clamp-2' : 'border-t border-line/60 pt-1.5 text-xs')}>
+          {footer}
+        </div>
+      )}
+    </Tag>
   );
 }
 
