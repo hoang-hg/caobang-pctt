@@ -65,8 +65,9 @@ def get_downstream_warning(r: dict, status_code: str) -> str:
         return f"Hồ chưa mở cửa xả tràn. Vẫn theo dõi cảnh báo chính thức khi có mưa lớn trên lưu vực sông {river}."
 
 
-async def get_reservoirs_overview() -> dict:
-    """Lấy danh sách chi tiết các hồ chứa kèm thống kê lưu vực."""
+async def get_reservoirs_overview(codes: list[str] | None = None) -> dict:
+    """Lấy danh sách chi tiết các hồ chứa kèm thống kê lưu vực. `codes`: chỉ hồ thuộc các xã này (vùng đang xem / phạm vi
+    được giao của màn hình điều hành) — số đếm, tổng lưu lượng, lưu vực tính trên các hồ còn lại; None / rỗng = toàn tỉnh."""
     rows = await fetch_all(
         """
         SELECT r.id, r.name, r.river, r.capacity_mw, r.normal_level, r.current_level,
@@ -79,6 +80,8 @@ async def get_reservoirs_overview() -> dict:
          ORDER BY r.river, r.name
         """
     )
+    if codes:
+        rows = [r for r in rows if r["admin_code"] in codes]
 
     items = []
     total_inflow = 0.0

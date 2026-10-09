@@ -95,13 +95,10 @@ async def _kpis(codes: list[str]) -> dict:
               FROM resources.vehicles v WHERE {area_clause('v.current_location', codes)}""",
         p,
     )
-    # Tổng quan toàn tỉnh → lọc theo vùng đang xem / phạm vi được giao (codes rỗng = toàn tỉnh)
-    reservoirs = [
-        r for r in (await get_reservoirs_overview())["reservoirs"] if not codes or r["admin_code"] in codes
-    ]
-    landslides = [
-        p for p in (await get_landslides_overview())["points"] if not codes or p["admin_code"] in codes
-    ]
+    # Lọc theo vùng đang xem / phạm vi được giao (codes rỗng = toàn tỉnh) — cùng hàm với tab Hồ chứa / Sạt lở
+    # (/dashboard/reservoirs, /dashboard/landslides) nên ô KPI và tab luôn cùng số
+    res = await get_reservoirs_overview(codes)
+    ls = await get_landslides_overview(codes)
     return {
         "rain": rain,
         "rivers": rivers,
@@ -110,25 +107,36 @@ async def _kpis(codes: list[str]) -> dict:
         "forces": forces,
         "vehicles": vehicles,
         "reservoirs": {
-            "total": len(reservoirs),
-            "spill_count": sum(r["status_code"] in ("xa_dieu_tiet", "xa_khan_cap") for r in reservoirs),
-            "emergency_count": sum(r["status_code"] == "xa_khan_cap" for r in reservoirs),
-            "no_data_count": sum(r["status_code"] == "chua_co_so_lieu" for r in reservoirs),
-            "total_inflow": round(
-                sum(r["inflow_m3s"] or 0 for r in reservoirs), 1
-            ),  # None = hồ chưa có số liệu vận hành
-            "total_outflow": round(sum(r["outflow_m3s"] or 0 for r in reservoirs), 1),
-            "reservoirs": reservoirs,
+            "total": res["total_reservoirs"],
+            "spill_count": res["spill_count"],
+            "emergency_count": res["emergency_count"],
+            "no_data_count": res["no_data_count"],  # hồ chưa có số liệu vận hành
+            "total_inflow": res["total_inflow_m3s"],
+            "total_outflow": res["total_outflow_m3s"],
+            "reservoirs": res["reservoirs"],
         },
         "landslides": {
-            "total": len(landslides),
-            "blocked_count": sum(p["traffic_status"] == "cam_duong" for p in landslides),
-            "warning_count": sum(p["traffic_status"] == "canh_bao" for p in landslides),
-            "safe_count": sum(p["traffic_status"] == "thong_suot" for p in landslides),
-            "no_data_count": sum(p["traffic_status"] == "chua_co_du_lieu" for p in landslides),
-            "points": landslides,
+            "total": ls["total_points"],
+            "blocked_count": ls["blocked_count"],
+            "warning_count": ls["warning_count"],
+            "safe_count": ls["safe_count"],
+            "no_data_count": ls["no_data_count"],
+            "points": ls["points"],
         },
     }
+
+
+@router.get("/dashboard/reservoirs")
+async def reservoirs_in_area(codes: list[str] = Depends(MON)):
+    """Hồ chứa trong vùng đang xem / phạm vi được giao — cùng dạng /public/reservoirs (tab Hồ chứa của Tổng quan theo bộ
+    lọc địa phương, thiết kế mục F.1; cổng công khai vẫn toàn tỉnh)."""
+    return await cached_view("reservoirs", {"codes": codes}, lambda: get_reservoirs_overview(codes))
+
+
+@router.get("/dashboard/landslides")
+async def landslides_in_area(codes: list[str] = Depends(MON)):
+    """Điểm đen sạt lở, đường đèo trong vùng đang xem / phạm vi được giao — cùng dạng /public/landslides."""
+    return await cached_view("landslides", {"codes": codes}, lambda: get_landslides_overview(codes))
 
 
 @router.get("/stations")

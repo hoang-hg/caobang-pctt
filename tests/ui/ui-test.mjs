@@ -286,6 +286,26 @@ async function staff(ctx, trackCode) {
     return `${pages} trang · ${Math.round(buf.length / 1024)} KB · ${dl.suggestedFilename()}`;
   });
 
+  // Tab Hồ chứa / Sạt lở không tải được (giả lập mất kết nối tới 2 API này) → báo rõ, KHÔNG hiện "TRỰC TIẾP", "0 hồ xả",
+  // "Không có hồ xả lũ lớn" hay "Không tìm thấy điểm nguy cơ…" (khẳng định sai là an toàn)
+  await step(ctx, 'Tổng quan: tab Hồ chứa / Sạt lở không tải được → báo rõ, không khẳng định "an toàn"', async () => {
+    const apis = ['**/api/v1/dashboard/reservoirs**', '**/api/v1/dashboard/landslides**'];
+    for (const a of apis) await page.route(a, (r) => r.abort('failed'));
+    try {
+      await page.goto(`${ROOT}/dashboard?tab=ho_chua`);
+      await page.getByText('Không tải được số liệu hồ chứa').waitFor({ timeout: 25_000 });
+      let text = await page.locator('main').innerText();
+      if (/TRỰC TIẾP|Không có hồ xả lũ lớn/.test(text)) throw new Error('tab Hồ chứa vẫn khẳng định "an toàn" khi không tải được');
+      await expectNoOverflow(ctx, 'tab Hồ chứa (lỗi)');
+      await page.goto(`${ROOT}/dashboard?tab=sat_lo`);
+      await page.getByText('Không tải được danh sách điểm đen sạt lở').waitFor({ timeout: 25_000 });
+      text = await page.locator('main').innerText();
+      if (/Không tìm thấy điểm nguy cơ/.test(text)) throw new Error('tab Sạt lở báo "không tìm thấy" khi không tải được');
+    } finally {
+      for (const a of apis) await page.unroute(a);
+    }
+  });
+
   // Phân quyền 3 cấp: chọn Cấp quyết định phạm vi (Cấp 3 → 1 xã; Cấp 1–2 → toàn tỉnh) và ô PIN (chỉ Cấp 1–2). Không lưu.
   await step(ctx, 'Tạo tài khoản: Cấp 3 chọn 1 xã, không PIN; Cấp 2 toàn tỉnh, có PIN (không lưu)', async () => {
     await page.goto(`${ROOT}/phan-quyen`);

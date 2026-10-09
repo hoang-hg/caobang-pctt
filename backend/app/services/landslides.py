@@ -255,8 +255,9 @@ def traffic_status(road_cut: bool, risk: str, near_zone: bool = True, monitored:
     return "thong_suot" if near_zone or monitored else NO_DATA
 
 
-async def get_landslides_overview() -> dict:
-    """Danh sách điểm đen sạt trượt kèm trạng thái tính từ vùng nguy hiểm, đường bị chia cắt và cảm biến."""
+async def get_landslides_overview(codes: list[str] | None = None) -> dict:
+    """Danh sách điểm đen sạt trượt kèm trạng thái tính từ vùng nguy hiểm, đường bị chia cắt và cảm biến. `codes`: chỉ điểm
+    thuộc các xã này (vùng đang xem / phạm vi được giao) — số đếm, tuyến đường tính trên các điểm còn lại; None = toàn tỉnh."""
     dyn = await fetch_all(
         DYNAMIC_SQL,
         {
@@ -282,6 +283,8 @@ async def get_landslides_overview() -> dict:
     monitored_count = 0
     for item in KNOWN_BLACKSPOTS:
         d = dyn_by_code.get(item["code"], {})
+        if codes and d.get("admin_code") not in codes:
+            continue
 
         rain_info = None
         if (rs := sensors.get(item["rain_station_id"])) and rs["rain_24h"] is not None:

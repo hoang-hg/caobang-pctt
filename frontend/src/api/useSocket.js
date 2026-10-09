@@ -121,7 +121,7 @@ export function useSocket() {
           }
           break;
         case 'reservoir.updated': // trực ban nhập số liệu vận hành hồ
-          inv('pub-reservoirs', 'kpis', 'map-layers');
+          inv('pub-reservoirs', 'reservoirs', 'kpis', 'map-layers');
           break;
         case 'evacuation.updated': // xã / trực ban cập nhật tiến độ sơ tán, số người ở điểm sơ tán
           inv('evacuation', 'kpis', 'map-layers');

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import {
@@ -7,25 +7,35 @@ import {
   CheckCircle2, Search, SlidersHorizontal, Siren, Clock, PencilLine
 } from 'lucide-react';
 import { api } from '../../api/client';
+import { useAreaQuery } from '../../api/hooks';
 import { useStore } from '../../app/store';
-import { BackButton, Modal } from '../../components/common/ui';
+import { BackButton, EmptyState, ErrorState, Modal, Skeleton } from '../../components/common/ui';
 import { usePermission } from '../../rbac/usePermission';
-import { ago } from '../../utils/format';
+import { ago, time } from '../../utils/format';
 
 const EMPTY = [];
 
 const REFRESH_INTERVAL = 20_000;
 
-export default function ReservoirMonitor({ onSelectOnMap, onBackToMap }) {
+/**
+ * Giám sát hồ chứa & cảnh báo xả lũ — dùng chung cho cổng công khai (toàn tỉnh) và tab Hồ chứa của Tổng quan (`areaScoped`:
+ * theo bộ lọc địa phương / phạm vi được giao, thiết kế mục F.1 — cùng số với ô KPI). Chưa tải được thì nói rõ, KHÔNG hiện
+ * "0 hồ xả lũ" / "TRỰC TIẾP" (khẳng định sai là an toàn).
+ */
+export default function ReservoirMonitor({ onSelectOnMap, onBackToMap, areaScoped = false }) {
   const [basinFilter, setBasinFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const { data, isFetching, refetch } = useQuery({
+  // Chỉ một trong hai truy vấn chạy: màn hình điều hành theo vùng đang xem, cổng công khai toàn tỉnh
+  const scopedQ = useAreaQuery('reservoirs', '/dashboard/reservoirs', {}, { refetchInterval: REFRESH_INTERVAL, enabled: areaScoped });
+  const publicQ = useQuery({
     queryKey: ['pub-reservoirs'],
     queryFn: () => api('/public/reservoirs'),
     refetchInterval: REFRESH_INTERVAL,
+    enabled: !areaScoped,
   });
+  const { data, isFetching, isError, refetch, dataUpdatedAt } = areaScoped ? scopedQ : publicQ;
 
   const reservoirs = data?.reservoirs || EMPTY; // mảng cố định: useMemo bên dưới không tính lại mỗi lần vẽ khi chưa có dữ liệu
   const basins = data?.basins || [];
@@ -65,57 +75,97 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap }) {
   const totalInflow = data?.total_inflow_m3s || 0;
   const totalOutflow = data?.total_outflow_m3s || 0;
   const flowBalance = totalOutflow - totalInflow;
+  // Sông có hồ đang xả lũ lớn — dải cảnh báo nêu đúng các sông này (trước đây viết cứng "sông Bằng Giang và sông Gâm").
+  // Tên đã có "Sông" / "Suối" (VD "Suối Khuổi Lái") thì giữ nguyên, không thành "sông Suối …"
+  const emergencyRivers = [...new Set(reservoirs.filter((r) => r.status_code === 'xa_khan_cap').map((r) => r.river).filter(Boolean))]
+    .map((n) => (/^(sông|suối)\s/i.test(n) ? n : `sông ${n}`));
+  const riverList = emergencyRivers.length > 1
+    ? `${emergencyRivers.slice(0, -1).join(', ')} và ${emergencyRivers[emergencyRivers.length - 1]}`
+    : emergencyRivers[0];
+
+  const header = (
+    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-panel p-4 sm:p-5 rounded-2xl border border-line shadow-sm">
+      <div>
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sky-600 to-blue-700 text-white shadow-md shadow-sky-600/30">
+            <Waves size={22} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base sm:text-lg font-bold text-ink">
+                Giám Sát Hồ Chứa & Cảnh Báo Xả Lũ Tỉnh Cao Bằng
+              </h1>
+              {!data ? null : isError ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-panel2 text-muted border border-dashed border-line" title="Lần tải lại gần nhất bị lỗi — đang hiện số liệu đã tải trước đó">
+                  <Clock size={11} /> CHƯA CẬP NHẬT ĐƯỢC · SỐ LIỆU LÚC {time(dataUpdatedAt)}
+                </span>
+              ) : noOperatingData ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-panel2 text-muted border border-line">
+                  <Clock size={11} /> CHƯA CÓ SỐ LIỆU VẬN HÀNH
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-good/15 text-good border border-good/30 animate-pulse">
+                  <span className="h-1.5 w-1.5 rounded-full bg-good" />
+                  TRỰC TIẾP
+                </span>
+              )}
+              {staleCount > 0 && (
+                <span className="chip border border-dashed border-line bg-panel2 text-ink-2 text-[11px] font-bold" title="Số liệu vận hành cũ hơn 6 giờ">
+                  {staleCount} hồ số liệu cũ
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-muted mt-0.5">
+              Theo dõi thời gian thực mực nước, lưu lượng về hồ, lưu lượng xả và thông tin an toàn hạ du các lưu vực sông
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 self-start md:self-auto">
+        {onBackToMap && <BackButton onClick={onBackToMap} />}
+        <button
+          onClick={() => refetch()}
+          disabled={isFetching}
+          className="btn-ghost text-xs px-3 py-1.5 flex items-center gap-1.5"
+          title="Làm mới số liệu ngay"
+        >
+          <RefreshCw size={13} className={clsx(isFetching && 'animate-spin text-accent')} />
+          <span>{isFetching ? 'Đang cập nhật…' : 'Cập nhật ngay'}</span>
+        </button>
+      </div>
+    </div>
+  );
+
+  if (!data) {
+    return (
+      <div className="space-y-5">
+        {header}
+        {isError ? (
+          <ErrorState onRetry={refetch}>Không tải được số liệu hồ chứa — chưa biết tình trạng xả lũ</ErrorState>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {[0, 1, 2, 3].map((i) => <Skeleton key={i} height={118} />)}
+          </div>
+        )}
+      </div>
+    );
+  }
+  if (!total) {
+    return (
+      <div className="space-y-5">
+        {header}
+        <EmptyState>
+          {areaScoped ? 'Không có hồ chứa nào trong vùng đang xem.' : 'Chưa có danh mục hồ chứa.'} Danh mục hồ chứa (thủy điện, thủy lợi)
+          nhập ở trang Nhập dữ liệu, loại "Hồ chứa".
+        </EmptyState>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5 animate-in fade-in duration-200">
-      {/* 1. Header & Live Indicator */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-panel p-4 sm:p-5 rounded-2xl border border-line shadow-sm">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sky-600 to-blue-700 text-white shadow-md shadow-sky-600/30">
-              <Waves size={22} />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-base sm:text-lg font-bold text-ink">
-                  Giám Sát Hồ Chứa & Cảnh Báo Xả Lũ Tỉnh Cao Bằng
-                </h1>
-                {noOperatingData ? (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-panel2 text-muted border border-line">
-                    <Clock size={11} /> CHƯA CÓ SỐ LIỆU VẬN HÀNH
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-good/15 text-good border border-good/30 animate-pulse">
-                    <span className="h-1.5 w-1.5 rounded-full bg-good" />
-                    TRỰC TIẾP
-                  </span>
-                )}
-                {staleCount > 0 && (
-                  <span className="chip border border-dashed border-line bg-panel2 text-ink-2 text-[11px] font-bold" title="Số liệu vận hành cũ hơn 6 giờ">
-                    {staleCount} hồ số liệu cũ
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-muted mt-0.5">
-                Theo dõi thời gian thực mực nước, lưu lượng về hồ, lưu lượng xả và thông tin an toàn hạ du các lưu vực sông
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 self-start md:self-auto">
-          {onBackToMap && <BackButton onClick={onBackToMap} />}
-          <button
-            onClick={() => refetch()}
-            disabled={isFetching}
-            className="btn-ghost text-xs px-3 py-1.5 flex items-center gap-1.5"
-            title="Làm mới số liệu ngay"
-          >
-            <RefreshCw size={13} className={clsx(isFetching && 'animate-spin text-accent')} />
-            <span>{isFetching ? 'Đang cập nhật…' : 'Cập nhật ngay'}</span>
-          </button>
-        </div>
-      </div>
+      {header}
 
       {/* 2. Cảnh báo khẩn cấp hạ du (nếu có hồ xả lũ lớn hoặc đang xả lớn) */}
       {emergencyCount > 0 && (
@@ -134,7 +184,7 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap }) {
                 </span>
               </div>
               <p className="text-xs sm:text-sm text-white/95 mt-1.5 leading-relaxed">
-                Người dân các xã hạ du lưu vực <b>sông Bằng Giang</b> và <b>sông Gâm</b> cần khẩn trương thu dọn máy móc,
+                Người dân các xã hạ du lưu vực <b>{riverList}</b> cần khẩn trương thu dọn máy móc,
                 neo đậu tàu thuyền bè chắc chắn, di chuyển gia súc và nông sản khỏi các bãi soi, bãi bồi ven sông.
                 Tuyệt đối không đi thuyền vớt củi, không tắm lội và chú ý biển báo nguy hiểm tại các ngầm tràn!
               </p>
@@ -188,25 +238,27 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap }) {
         {/* Card 3: Xả lũ khẩn cấp */}
         <div className={clsx(
           'card p-4 flex flex-col justify-between border-l-4',
-          emergencyCount > 0 ? 'border-l-danger bg-danger/5 ring-1 ring-danger/30' : 'border-l-good'
+          emergencyCount > 0 ? 'border-l-danger bg-danger/5 ring-1 ring-danger/30' : noOperatingData ? 'border-l-line border-dashed' : 'border-l-good'
         )}>
           <div className="flex items-center justify-between text-muted text-xs">
             <span>Xả lũ lớn</span>
             <div className={clsx(
               'h-8 w-8 rounded-lg flex items-center justify-center font-bold',
-              emergencyCount > 0 ? 'bg-danger/15 text-danger animate-pulse' : 'bg-good/10 text-good'
+              emergencyCount > 0 ? 'bg-danger/15 text-danger animate-pulse' : noOperatingData ? 'bg-panel2 text-muted' : 'bg-good/10 text-good'
             )}>
               <AlertTriangle size={16} />
             </div>
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className={clsx('text-2xl font-black font-mono', emergencyCount > 0 ? 'text-danger' : 'text-good')}>
-              {emergencyCount}
+            <span className={clsx('text-2xl font-black font-mono', emergencyCount > 0 ? 'text-danger' : noOperatingData ? 'text-muted' : 'text-good')}>
+              {noOperatingData ? '–' : emergencyCount}
             </span>
             <span className="text-xs text-muted">hồ mức báo động đỏ</span>
           </div>
-          <div className={clsx('text-[11px] font-medium mt-2 border-t border-line/60 pt-1.5', emergencyCount > 0 ? 'text-danger font-bold' : 'text-good')}>
-            {emergencyCount > 0 ? 'Hạ du cần nâng cao cảnh giác tối đa' : 'Không có hồ xả lũ lớn'}
+          <div className={clsx('text-[11px] font-medium mt-2 border-t border-line/60 pt-1.5', emergencyCount > 0 ? 'text-danger font-bold' : noOperatingData ? 'text-muted' : 'text-good')}>
+            {emergencyCount > 0 ? 'Hạ du cần nâng cao cảnh giác tối đa'
+              : noOperatingData ? 'Chưa có số liệu vận hành — chưa đánh giá được'
+                : noDataCount > 0 ? `Không có hồ xả lũ lớn trong số hồ có số liệu (${noDataCount} hồ chưa có)` : 'Không có hồ xả lũ lớn'}
           </div>
         </div>
 
@@ -220,15 +272,17 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap }) {
           </div>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-2xl font-black font-mono text-indigo-600">
-              {Math.round(totalOutflow).toLocaleString('vi-VN')}
+              {noOperatingData ? '–' : Math.round(totalOutflow).toLocaleString('vi-VN')}
             </span>
             <span className="text-xs text-muted">m³/s</span>
           </div>
           <div className="text-[11px] text-muted mt-2 border-t border-line/60 pt-1.5 flex items-center justify-between">
-            <span>Nước về hồ: <b>{Math.round(totalInflow).toLocaleString('vi-VN')} m³/s</b></span>
-            <span className={clsx('font-bold', flowBalance > 0 ? 'text-serious' : 'text-good')}>
-              {flowBalance > 0 ? `+${Math.round(flowBalance)} m³/s` : `${Math.round(flowBalance)} m³/s`}
-            </span>
+            <span>Nước về hồ: <b>{noOperatingData ? '–' : `${Math.round(totalInflow).toLocaleString('vi-VN')} m³/s`}</b></span>
+            {!noOperatingData && (
+              <span className={clsx('font-bold', flowBalance > 0 ? 'text-serious' : 'text-good')}>
+                {flowBalance > 0 ? `+${Math.round(flowBalance)} m³/s` : `${Math.round(flowBalance)} m³/s`}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -616,6 +670,30 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap }) {
 }
 
 /** Trực ban nhập số liệu vận hành hồ theo báo cáo của đơn vị quản lý hồ (quyền monitoring.update). */
+const MAX_LEVEL_DEVIATION_M = 50; // như backend api/v1/dashboard.py: lệch MNDBT quá chừng này → gần như chắc gõ thừa / thiếu chữ số
+const MAX_FLOW = 100_000; // m³/s — như ReservoirOperationIn (backend)
+const HOUR_MS = 3_600_000;
+
+/** Số người dùng gõ: chấp nhận dấu phẩy thập phân ("195,4"); trống → null; không phải số → NaN. */
+const parseNum = (v) => (String(v ?? '').trim() === '' ? null : Number(String(v).trim().replace(',', '.')));
+/** "YYYY-MM-DDTHH:mm" theo giờ của máy — giá trị cho ô datetime-local. */
+const localInput = (d) => {
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+};
+
+const FieldError = ({ id, children }) => (children ? (
+  <p id={id} className="flex items-center gap-1 text-[11px] font-semibold text-danger">
+    <AlertTriangle size={12} className="shrink-0" aria-hidden="true" /> {children}
+  </p>
+) : null);
+
+/**
+ * Trực ban nhập số liệu vận hành hồ theo báo cáo của đơn vị quản lý hồ. Lỗi hiện ngay dưới ô khi gõ, cùng quy tắc với máy
+ * chủ (PATCH /reservoirs/{id}/operation): mực nước lệch MNDBT quá 50 m (gõ thừa / thiếu chữ số), số cửa xả vượt số cửa của
+ * hồ, lưu lượng âm, thời điểm báo ở tương lai hoặc quá 2 ngày. Nút Lưu không khoá mà không nói vì sao: bấm khi còn lỗi →
+ * hiện lỗi mọi ô và đưa con trỏ tới ô lỗi đầu tiên. "Thời điểm đơn vị báo" là giờ của số liệu (không phải giờ trực ban gõ).
+ */
 function OperationModal({ reservoir: r, onClose }) {
   const qc = useQueryClient();
   const toast = useStore((st) => st.toast);
@@ -624,73 +702,146 @@ function OperationModal({ reservoir: r, onClose }) {
     spill_gates_open: r.spill_gates_open ?? 0,
     inflow_m3s: r.inflow_m3s ?? '',
     outflow_m3s: r.outflow_m3s ?? '',
+    reported_at: localInput(new Date()),
     source: '',
   });
+  const [shown, setShown] = useState({}); // ô đã rời / đã bấm Lưu → hiện lỗi "chưa nhập" của ô đó
   const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState(null);
+  const refs = {
+    current_level: useRef(null), spill_gates_open: useRef(null), inflow_m3s: useRef(null), outflow_m3s: useRef(null), reported_at: useRef(null),
+  };
   const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }));
-  const num = (v) => (v === '' || v === null ? null : Number(v));
-  const valid = f.current_level !== '' && !Number.isNaN(Number(f.current_level)) && Number(f.spill_gates_open) >= 0
-    && (!r.spill_gates || Number(f.spill_gates_open) <= r.spill_gates);
+  const touch = (...keys) => setShown((s) => ({ ...s, ...Object.fromEntries(keys.map((k) => [k, true])) }));
+
+  const level = parseNum(f.current_level);
+  const gates = parseNum(f.spill_gates_open);
+  const inflow = parseNum(f.inflow_m3s);
+  const outflow = parseNum(f.outflow_m3s);
+  const reported = f.reported_at ? new Date(f.reported_at) : null;
+  const now = Date.now();
+  const flowError = (v) => (v == null ? null : !Number.isFinite(v) ? 'Nhập số, VD 591' : v < 0 ? 'Không được âm'
+    : v > MAX_FLOW ? `Tối đa ${MAX_FLOW.toLocaleString('vi-VN')} m³/s` : null);
+  const errors = {
+    current_level: level == null ? 'Nhập mực nước hồ' : !Number.isFinite(level) ? 'Nhập số, VD 195,4'
+      : r.normal_level != null && Math.abs(level - r.normal_level) > MAX_LEVEL_DEVIATION_M
+        ? `Lệch MNDBT (${r.normal_level} m) quá ${MAX_LEVEL_DEVIATION_M} m — kiểm tra lại, có gõ thừa / thiếu chữ số?` : null,
+    spill_gates_open: gates == null ? 'Nhập số cửa xả đang mở (0 nếu đóng hết)' : !Number.isInteger(gates) || gates < 0 ? 'Số nguyên từ 0'
+      : r.spill_gates && gates > r.spill_gates ? `Hồ chỉ có ${r.spill_gates} cửa xả` : gates > 50 ? 'Tối đa 50 cửa' : null,
+    inflow_m3s: flowError(inflow),
+    outflow_m3s: flowError(outflow),
+    reported_at: !reported || Number.isNaN(reported.getTime()) ? 'Chọn thời điểm đơn vị vận hành báo số liệu'
+      : reported.getTime() > now + 5 * 60_000 ? 'Thời điểm ở tương lai'
+        : reported.getTime() < now - 48 * HOUR_MS ? 'Quá 2 ngày — số liệu cũ không nhập ở đây được' : null,
+  };
+  const FIELDS = Object.keys(errors);
+  // Ô bắt buộc còn trống: chỉ báo sau khi rời ô / bấm Lưu; lỗi định dạng, vượt giới hạn: báo ngay khi gõ
+  const empty = { current_level: level == null, spill_gates_open: gates == null, reported_at: !f.reported_at };
+  const err = (k) => (errors[k] && (!empty[k] || shown[k]) ? errors[k] : null);
+  // Lưu ý (không chặn lưu)
+  const aboveNormal = Number.isFinite(level) && r.normal_level != null && level > r.normal_level ? level - r.normal_level : null;
+  const missingOutflow = gates > 0 && outflow == null;
+
   const submit = async () => {
+    const bad = FIELDS.filter((k) => errors[k]);
+    if (bad.length) {
+      touch(...FIELDS);
+      refs[bad[0]].current?.focus();
+      return;
+    }
     setBusy(true);
+    setFailure(null);
     try {
       await api(`/reservoirs/${encodeURIComponent(r.id)}/operation`, {
         method: 'PATCH',
         body: {
-          current_level: Number(f.current_level),
-          spill_gates_open: Number(f.spill_gates_open),
-          inflow_m3s: num(f.inflow_m3s),
-          outflow_m3s: num(f.outflow_m3s),
-          source: f.source || null,
+          current_level: level,
+          spill_gates_open: gates,
+          inflow_m3s: inflow,
+          outflow_m3s: outflow,
+          reported_at: reported.toISOString(),
+          source: f.source.trim() || null,
         },
       });
       toast({ tone: 'good', title: `Đã cập nhật vận hành ${r.name}` });
-      qc.invalidateQueries({ queryKey: ['pub-reservoirs'] });
-      qc.invalidateQueries({ queryKey: ['kpis'] });
+      ['pub-reservoirs', 'reservoirs', 'kpis'].forEach((key) => qc.invalidateQueries({ queryKey: [key] }));
       onClose();
     } catch (e) {
-      toast({ tone: 'danger', title: 'Không cập nhật được', body: e.message });
+      setFailure(e.message); // VD máy chủ từ chối (422) — hiện ngay trong hộp thoại, không mất số đã nhập
     } finally {
       setBusy(false);
     }
   };
+
+  const input = (k) => clsx('input min-h-[44px] text-sm sm:min-h-0', err(k) && 'border-danger');
+  const aria = (k) => ({ ref: refs[k], onBlur: () => touch(k), 'aria-invalid': !!err(k), 'aria-describedby': err(k) ? `loi-ho-${k}` : undefined });
   return (
     <Modal
       open
-      onClose={onClose}
+      onClose={busy ? () => {} : onClose}
       title={`Cập nhật vận hành – ${r.name}`}
       footer={
         <>
-          <button className="btn-ghost" onClick={onClose}>Huỷ</button>
-          <button className="btn-primary" disabled={!valid || busy} onClick={submit}>Lưu số liệu</button>
+          <button type="button" className="btn-ghost min-h-[44px] sm:min-h-0" onClick={onClose} disabled={busy}>Huỷ</button>
+          <button type="button" className="btn-primary min-h-[44px] sm:min-h-0" disabled={busy} onClick={submit}>
+            {busy ? 'Đang lưu…' : 'Lưu số liệu'}
+          </button>
         </>
       }
     >
       <div className="grid gap-3 text-sm sm:grid-cols-2">
         <label className="flex flex-col gap-1">
           Mực nước hồ (m) *
-          <input className="input" type="number" step="0.01" value={f.current_level} onChange={set('current_level')} />
-          <span className="text-[11px] text-muted">MNDBT {r.normal_level ?? '–'} m</span>
+          <input className={input('current_level')} inputMode="decimal" value={f.current_level} onChange={set('current_level')} {...aria('current_level')} />
+          {!err('current_level') && (
+            <span className={clsx('text-[11px]', aboveNormal != null ? 'font-semibold text-serious' : 'text-muted')}>
+              MNDBT {r.normal_level ?? '–'} m{aboveNormal != null && ` — đang cao hơn ${aboveNormal.toFixed(2).replace('.', ',')} m`}
+            </span>
+          )}
+          <FieldError id="loi-ho-current_level">{err('current_level')}</FieldError>
         </label>
         <label className="flex flex-col gap-1">
           Số cửa xả đang mở *
-          <input className="input" type="number" min="0" max={r.spill_gates || undefined} value={f.spill_gates_open} onChange={set('spill_gates_open')} />
-          <span className="text-[11px] text-muted">Hồ có {r.spill_gates || 0} cửa xả tràn</span>
+          <input className={input('spill_gates_open')} inputMode="numeric" value={f.spill_gates_open} onChange={set('spill_gates_open')} {...aria('spill_gates_open')} />
+          {!err('spill_gates_open') && <span className="text-[11px] text-muted">Hồ có {r.spill_gates || 0} cửa xả tràn</span>}
+          <FieldError id="loi-ho-spill_gates_open">{err('spill_gates_open')}</FieldError>
         </label>
         <label className="flex flex-col gap-1">
           Lưu lượng về hồ (m³/s)
-          <input className="input" type="number" min="0" value={f.inflow_m3s} onChange={set('inflow_m3s')} />
+          <input className={input('inflow_m3s')} inputMode="decimal" value={f.inflow_m3s} onChange={set('inflow_m3s')} {...aria('inflow_m3s')} />
+          <FieldError id="loi-ho-inflow_m3s">{err('inflow_m3s')}</FieldError>
         </label>
         <label className="flex flex-col gap-1">
           Tổng lưu lượng xả (m³/s)
-          <input className="input" type="number" min="0" value={f.outflow_m3s} onChange={set('outflow_m3s')} />
+          <input className={input('outflow_m3s')} inputMode="decimal" value={f.outflow_m3s} onChange={set('outflow_m3s')} {...aria('outflow_m3s')} />
+          {!err('outflow_m3s') && missingOutflow && <span className="text-[11px] font-semibold text-serious">Đang mở cửa xả — nên nhập tổng lưu lượng xả để hạ du biết</span>}
+          <FieldError id="loi-ho-outflow_m3s">{err('outflow_m3s')}</FieldError>
         </label>
-        <label className="flex flex-col gap-1 sm:col-span-2">
+        <label className="flex flex-col gap-1">
+          Thời điểm đơn vị vận hành báo *
+          <input
+            type="datetime-local"
+            className={input('reported_at')}
+            value={f.reported_at}
+            max={localInput(new Date(now + 5 * 60_000))}
+            min={localInput(new Date(now - 48 * HOUR_MS))}
+            onChange={set('reported_at')}
+            {...aria('reported_at')}
+          />
+          {!err('reported_at') && <span className="text-[11px] text-muted">Giờ của số liệu (không phải giờ nhập) — dùng cho diễn biến vận hành</span>}
+          <FieldError id="loi-ho-reported_at">{err('reported_at')}</FieldError>
+        </label>
+        <label className="flex flex-col gap-1">
           Nguồn báo cáo
-          <input className="input" maxLength={200} placeholder="VD: Điện thoại trưởng ca Nhà máy TĐ Bằng Giang lúc 14h" value={f.source} onChange={set('source')} />
+          <input className="input min-h-[44px] text-sm sm:min-h-0" maxLength={200} placeholder="VD: Điện thoại trưởng ca Nhà máy TĐ Bằng Giang" value={f.source} onChange={set('source')} />
         </label>
+        {failure && (
+          <p role="alert" className="flex items-start gap-1.5 rounded-lg border border-danger/50 bg-danger/10 p-2.5 text-xs font-semibold text-danger sm:col-span-2">
+            <AlertTriangle size={14} className="mt-0.5 shrink-0" aria-hidden="true" /> Chưa lưu được: {failure}
+          </p>
+        )}
         <p className="text-[11px] text-muted sm:col-span-2">
-          Số liệu hiện ngay trên cổng công khai và bản nhẹ, kèm thời điểm cập nhật; thao tác được ghi nhật ký.
+          Số liệu hiện ngay trên cổng công khai và bản nhẹ, kèm thời điểm báo; thao tác được ghi nhật ký.
         </p>
       </div>
     </Modal>
