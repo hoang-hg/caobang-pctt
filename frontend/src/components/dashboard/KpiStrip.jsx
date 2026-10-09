@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { CloudRain, Droplets, Home, Siren, Users, Waves } from 'lucide-react';
 import { ALARM } from '../../utils/labels';
@@ -8,6 +9,7 @@ import StatCard, { Badge } from './StatCard';
 import { riverName, riverSummary } from './RiverKpi';
 
 const GRID = 'grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2.5 xl:grid-cols-6 [&>*]:min-w-0';
+const WIDE = 980; // vùng KPI rộng từ ~980 px (iPad ngang khi menu thu gọn) → 6 ô một hàng như laptop
 const TILE_H = 112; // chiều cao khung tải — gần bằng ô thật để trang không nhảy
 
 /**
@@ -15,10 +17,23 @@ const TILE_H = 112; // chiều cao khung tải — gần bằng ô thật để 
  * iPad, 2×3 trên điện thoại. Số liệu như trước (KPI, /stations, /evacuation); màu theo thang rủi ro chung. Chạm ô → chi tiết:
  * mưa → biểu đồ mưa, mực nước → trạm nặng nhất trên biểu đồ thủy văn, SOS / sơ tán → Điều hành cứu hộ, lực lượng → Vật tư &
  * Lực lượng (chỉ khi tài khoản mở được trang đó), hồ chứa / sạt lở → thẻ chuyên đề. Thiếu số liệu → "–" và nói rõ.
+ * `large`: chữ số to cho chế độ trình chiếu (màn hình lớn phòng điều hành, đọc từ xa).
  */
 export default function KpiStrip({
   k, kState, evacQ, stationsState, waterStations, rainStations, canSos, canResource, canEvacUpdate, onRiver, onRain, onOpenTab, riverRef,
+  large = false,
 }) {
+  // Xếp 6 ô một hàng theo bề rộng THẬT của vùng KPI (không chỉ theo màn hình): iPad ngang 1180 px thu gọn menu đủ chỗ
+  // như laptop → bản đồ lên màn hình đầu nhiều hơn; mở rộng menu thì trở lại 3×2
+  const gridRef = useRef(null);
+  const [wide, setWide] = useState(false);
+  useEffect(() => {
+    const el = gridRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(([entry]) => setWide(entry.contentRect.width >= WIDE));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [k]);
   if (!k && kState.error) return <ErrorState onRetry={kState.refetch}>Không tải được chỉ số tổng quan</ErrorState>;
   if (!k) {
     return (
@@ -49,7 +64,7 @@ export default function KpiStrip({
   const topicRow = 'flex min-h-[36px] w-full items-center justify-between gap-2 rounded-md px-1.5 text-left text-xs hover:bg-panel2';
 
   return (
-    <div className={GRID} aria-label="Chỉ số nhanh">
+    <div ref={gridRef} className={clsx(GRID, wide && 'sm:grid-cols-6', large && 'kpi-lon')} aria-label="Chỉ số nhanh">
       <StatCard
         compact
         icon={CloudRain}
@@ -139,7 +154,9 @@ export default function KpiStrip({
         footer={
           planned ? (
             <>
+              {/* Thiết kế A.2: số hộ VÀ nhân khẩu đã sơ tán so với kế hoạch */}
               <b className="font-mono text-ink">{int(ev.evacuated_households)}/{int(planned)}</b> hộ
+              {ev.planned_persons > 0 && <> · <b className="font-mono text-ink">{int(ev.evacuated_persons)}/{int(ev.planned_persons)}</b> người</>}
               {evacQ.data ? ` · ${sites.length} điểm sơ tán` : evacQ.isError ? ' · không tải được điểm sơ tán' : ''}
             </>
           ) : 'Chưa có kế hoạch sơ tán trong vùng đang xem'

@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import {
   AlertTriangle, ArrowUpRight, Compass, Droplets, FileDown, FileSpreadsheet, Home, Info, LayoutDashboard, LifeBuoy,
-  Loader2, MapPin, Mountain, PhoneCall, RefreshCw, Server, ShieldAlert, Siren, Waves, X,
+  Loader2, MapPin, Minimize2, Monitor, Mountain, Pause, PhoneCall, Play, RefreshCw, Server, ShieldAlert, Siren, Waves, X,
 } from 'lucide-react';
 import { useAreaQuery, usePresets, useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
@@ -50,6 +50,19 @@ const LEGACY_LEVEL = { tinh: 'tong_hop', xa: 'cap_xa', he_thong: 'he_thong' }; /
 // cuộn qua 5 biểu đồ mới tới nhật ký / bảng
 const CHARTS_OPEN = { thuy_van: true, mua: false, du_bao: false, sat_lo: false, vat_tu: false };
 
+// Chế độ trình chiếu: xoay vòng các chuyên đề lãnh đạo hay xem trên màn hình lớn (mặc định 60 giây, ?xoay=giây, tối thiểu 15)
+const ROTATION = ['tong_hop', 'ho_chua', 'sat_lo'];
+
+/** Đồng hồ lớn của chế độ trình chiếu (thanh trên có đồng hồ — trình chiếu ẩn thanh trên). */
+function LiveClock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return <span className="font-mono text-xl font-black tabular-nums text-ink">{now.toLocaleTimeString('vi-VN', { ...VN_TIME, hour12: false })}</span>;
+}
+
 /** Nút của thanh thao tác điện thoại: cao ≥ 56 px, biểu tượng + chữ. */
 const barBtn = 'flex min-h-[56px] flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-[11px] font-bold active:scale-95';
 
@@ -67,7 +80,7 @@ export default function Dashboard() {
   const isLg = useMediaQuery('(min-width: 1024px)'); // laptop / iPad ngang: nhật ký là cột phải, dính khi cuộn
   const isPhone = !useMediaQuery('(min-width: 640px)');
   const [params, setParams] = useSearchParams();
-  const { filter, setFilter, clearFilter, toast, auth, wsStatus, setFocus } = useStore();
+  const { filter, setFilter, clearFilter, toast, auth, wsStatus, setFocus, presentation, setPresentation } = useStore();
   const isFiltered = filter.codes.length > 0;
 
   // Quyền: nút / thẻ / khối chỉ hiện khi tài khoản mở được — backend vẫn kiểm tra lại mọi thao tác
@@ -187,6 +200,77 @@ export default function Dashboard() {
     setTimeout(() => hydroRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120);
   };
 
+  // ---- Chế độ trình chiếu (thiết kế A.1 — màn hình lớn phòng điều hành): nền tối, chỉ còn nội dung, chữ số to, tự xoay
+  // vòng Tổng hợp → Hồ chứa → Sạt lở, giữ màn hình sáng. Bật bằng nút "Trình chiếu" hoặc link /dashboard?trinh-chieu=1
+  // (máy phòng điều hành tự mở). Thoát: nút "Thoát", phím Esc hoặc rời trang. Không ghi đè lựa chọn sáng / tối đã lưu.
+  const [rotatePaused, setRotatePaused] = useState(false);
+  const rotateSec = Math.max(15, Number(params.get('xoay')) || 60);
+  const enterPresentation = () => {
+    setPresentation(true);
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('trinh-chieu', '1');
+      return next;
+    }, { replace: true });
+    document.documentElement.requestFullscreen?.().catch(() => {});
+  };
+  const exitPresentation = () => {
+    setPresentation(false);
+    setRotatePaused(false);
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('trinh-chieu');
+      next.delete('xoay');
+      return next;
+    }, { replace: true });
+    if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+  };
+  const exitRef = useRef(exitPresentation);
+  exitRef.current = exitPresentation;
+  const rotateRef = useRef(null);
+  rotateRef.current = () => {
+    setTab(ROTATION[(ROTATION.indexOf(tab) + 1) % ROTATION.length]);
+    document.querySelector('main')?.scrollTo(0, 0);
+  };
+  // Mở bằng link ?trinh-chieu=1; rời trang khi đang trình chiếu → trả lại thanh trên / menu cho trang khác
+  useEffect(() => {
+    if (params.get('trinh-chieu') === '1') setPresentation(true);
+    return () => useStore.getState().setPresentation(false);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- chỉ đọc link lúc mở trang
+  useEffect(() => {
+    if (!presentation) return undefined;
+    const root = document.documentElement;
+    const before = useStore.getState().theme;
+    root.classList.add('dark');
+    useStore.setState({ theme: 'dark' }); // biểu đồ đọc bảng màu tối; không ghi vào lựa chọn đã lưu
+    let lock = null;
+    let full = false;
+    const keepAwake = () => navigator.wakeLock?.request('screen').then((l) => { lock = l; }).catch(() => {});
+    keepAwake();
+    const onVisible = () => { if (document.visibilityState === 'visible') keepAwake(); };
+    const onKey = (e) => { if (e.key === 'Escape') exitRef.current(); };
+    const onFull = () => {
+      if (document.fullscreenElement) full = true;
+      else if (full) exitRef.current(); // Esc thoát toàn màn hình → thoát luôn trình chiếu
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    document.addEventListener('fullscreenchange', onFull);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      document.removeEventListener('fullscreenchange', onFull);
+      window.removeEventListener('keydown', onKey);
+      lock?.release?.().catch(() => {});
+      root.classList.toggle('dark', before === 'dark');
+      useStore.setState({ theme: before });
+    };
+  }, [presentation]);
+  useEffect(() => {
+    if (!presentation || rotatePaused) return undefined;
+    const id = setInterval(() => rotateRef.current(), rotateSec * 1000);
+    return () => clearInterval(id);
+  }, [presentation, rotatePaused, rotateSec, tab]); // đổi thẻ bằng tay → đếm lại từ đầu
+
   // Làm mới thật: tải lại mọi truy vấn đang hiển thị, báo đúng kết quả (có nguồn lỗi thì nói)
   const refresh = async () => {
     setRefreshing(true);
@@ -216,6 +300,7 @@ export default function Dashboard() {
         title: 'BÁO CÁO NHANH TÌNH HÌNH THIÊN TAI – TỈNH CAO BẰNG',
         subtitle: `Phạm vi: ${filterLabel} · Thời điểm: ${now.toLocaleString('vi-VN', VN_TIME)} · Nguồn: Hệ thống điều hành PCTT & TKCN tỉnh`,
         filename: `bao-cao-nhanh-pctt-cao-bang-${vnFileStamp(now, true)}.pdf`,
+        layoutWidth: 1280, // điện thoại / iPad: chụp bố cục laptop (~3 trang) thay vì phóng màn hẹp thành ~19 trang
       });
     } catch (e) {
       toast({ tone: 'danger', title: 'Không xuất được PDF', body: e.message });
@@ -303,6 +388,7 @@ export default function Dashboard() {
           canSos={canSos}
           canImportStations={canDataImport}
           canSystem={canSystem}
+          presentation={presentation}
         />
       )}
       <ConnectionBanner updatedAt={kQ.dataUpdatedAt || null} />
@@ -321,24 +407,41 @@ export default function Dashboard() {
             )}
           </h1>
           <div className="flex shrink-0 items-center gap-2 no-print">
-            {canReport && (
-              // Điện thoại: "Báo SOS" ở thanh dưới cùng (vùng ngón cái) — ở đây chỉ hiện từ máy tính bảng trở lên
-              <button type="button" onClick={() => setReportOpen(true)} className="btn-danger hidden min-h-[40px] px-3 text-xs font-bold sm:inline-flex lg:min-h-0 lg:py-1.5">
-                <ShieldAlert size={14} /> Báo cáo nhanh
-              </button>
+            {presentation ? (
+              <>
+                <LiveClock />
+                <button type="button" onClick={() => setRotatePaused((v) => !v)} aria-pressed={rotatePaused} className="btn-ghost px-2.5 py-1.5 text-xs" title={`Tự chuyển chuyên đề sau mỗi ${rotateSec} giây`}>
+                  {rotatePaused ? <Play size={14} /> : <Pause size={14} />} {rotatePaused ? 'Tiếp tục xoay vòng' : 'Tạm dừng xoay vòng'}
+                </button>
+                <button type="button" onClick={exitPresentation} className="btn-ghost px-2.5 py-1.5 text-xs">
+                  <Minimize2 size={14} /> Thoát trình chiếu
+                </button>
+              </>
+            ) : (
+              <>
+                {canReport && (
+                  // Điện thoại: "Báo SOS" ở thanh dưới cùng (vùng ngón cái) — ở đây chỉ hiện từ máy tính bảng trở lên
+                  <button type="button" onClick={() => setReportOpen(true)} className="btn-danger hidden min-h-[40px] px-3 text-xs font-bold sm:inline-flex lg:min-h-0 lg:py-1.5">
+                    <ShieldAlert size={14} /> Báo cáo nhanh
+                  </button>
+                )}
+                <button type="button" onClick={refresh} disabled={refreshing} className="btn-ghost h-10 min-w-[40px] px-2.5 text-xs lg:h-auto lg:py-1.5" aria-label="Làm mới số liệu" title="Làm mới số liệu">
+                  <RefreshCw size={14} className={clsx(refreshing && 'animate-spin')} /> <span className="hidden xl:inline">Làm mới</span>
+                </button>
+                <Link to="/ban-do" className="btn-ghost hidden h-10 px-2.5 text-xs sm:inline-flex lg:h-auto lg:py-1.5" title="Mở Bản đồ giám sát">
+                  <Compass size={14} /> <span className="hidden md:inline">Bản đồ</span> <ArrowUpRight size={12} />
+                </Link>
+                <button type="button" onClick={doExcel} disabled={!k} className="btn-ghost h-10 min-w-[40px] px-2.5 text-xs lg:h-auto lg:py-1.5" aria-label="Xuất Excel tổng quan" title="Xuất Excel tổng quan">
+                  <FileSpreadsheet size={14} /> <span className="hidden md:inline">Excel</span>
+                </button>
+                <button type="button" onClick={doExport} disabled={exporting} className="btn-primary h-10 min-w-[40px] px-3 text-xs lg:h-auto lg:py-1.5" aria-label="Xuất PDF báo cáo nhanh" title="Xuất PDF báo cáo nhanh">
+                  {exporting ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />} <span className="hidden md:inline">Xuất PDF</span>
+                </button>
+                <button type="button" onClick={enterPresentation} className="btn-ghost hidden px-2.5 py-1.5 text-xs lg:inline-flex" aria-label="Chế độ trình chiếu màn hình lớn" title="Trình chiếu trên màn hình lớn phòng điều hành: nền tối, chữ số to, tự xoay vòng chuyên đề">
+                  <Monitor size={14} /> <span className="hidden xl:inline">Trình chiếu</span>
+                </button>
+              </>
             )}
-            <button type="button" onClick={refresh} disabled={refreshing} className="btn-ghost h-10 min-w-[40px] px-2.5 text-xs lg:h-auto lg:py-1.5" aria-label="Làm mới số liệu" title="Làm mới số liệu">
-              <RefreshCw size={14} className={clsx(refreshing && 'animate-spin')} /> <span className="hidden xl:inline">Làm mới</span>
-            </button>
-            <Link to="/ban-do" className="btn-ghost hidden h-10 px-2.5 text-xs sm:inline-flex lg:h-auto lg:py-1.5" title="Mở Bản đồ giám sát">
-              <Compass size={14} /> <span className="hidden md:inline">Bản đồ</span> <ArrowUpRight size={12} />
-            </Link>
-            <button type="button" onClick={doExcel} disabled={!k} className="btn-ghost h-10 min-w-[40px] px-2.5 text-xs lg:h-auto lg:py-1.5" aria-label="Xuất Excel tổng quan" title="Xuất Excel tổng quan">
-              <FileSpreadsheet size={14} /> <span className="hidden md:inline">Excel</span>
-            </button>
-            <button type="button" onClick={doExport} disabled={exporting} className="btn-primary h-10 min-w-[40px] px-3 text-xs lg:h-auto lg:py-1.5" aria-label="Xuất PDF báo cáo nhanh" title="Xuất PDF báo cáo nhanh">
-              {exporting ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />} <span className="hidden md:inline">Xuất PDF</span>
-            </button>
           </div>
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted">
@@ -362,7 +465,7 @@ export default function Dashboard() {
           </details>
           {/* Tài khoản xã chỉ có xã mình → không có lưu vực để chọn. Điện thoại: chọn lưu vực ở bộ lọc trong menu ☰ (cùng
               danh sách nhóm) — không chiếm thêm một dòng trước hàng KPI */}
-          {tab === 'tong_hop' && scope === null && basinPresets.length > 0 && (
+          {tab === 'tong_hop' && !presentation && scope === null && basinPresets.length > 0 && (
             <label className="hidden items-center gap-1.5 no-print sm:flex">
               <MapPin size={12} aria-hidden="true" />
               <span className="hidden xl:inline">Lưu vực</span>
@@ -418,7 +521,7 @@ export default function Dashboard() {
       {tab === 'cap_xa' && (
         <div ref={ref} className="flex flex-col gap-3.5">
           <CommuneView code={communeCode} units={scopeUnits} onChange={enterCommune}>
-            <KpiStrip {...kpiProps} />
+            <KpiStrip {...kpiProps} large={presentation} />
             <div className="grid gap-3.5 xl:grid-cols-[1fr_360px] [&>*]:min-w-0">
               <div className="grid gap-3.5 lg:grid-cols-2 [&>*]:min-w-0">
                 <Section id="bieu-do-mua" title="Mưa & dự báo 3 giờ tới tại xã" className="scroll-mt-20">
@@ -458,7 +561,7 @@ export default function Dashboard() {
         <>
           {/* Vùng chụp PDF: KPI + bản đồ + biểu đồ + nhật ký ("Việc chờ quyết định" không in — việc riêng của người xem) */}
           <div ref={ref} className="flex flex-col gap-2 bg-bg sm:gap-3.5">
-            <KpiStrip {...kpiProps} onRiver={focusStation} />
+            <KpiStrip {...kpiProps} onRiver={focusStation} large={presentation} />
             {/* Thứ tự theo thiết bị (chỉ CSS, không nhân đôi component):
                 điện thoại — Việc chờ → bản đồ → biểu đồ → nhật ký; iPad dọc — bản đồ → (Việc chờ | nhật ký) → biểu đồ;
                 laptop / iPad ngang — bản đồ + biểu đồ bên trái, cột phải (Việc chờ + nhật ký) dính khi cuộn */}
@@ -467,7 +570,7 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 gap-2.5 sm:gap-3.5 md:grid-cols-2 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] xl:grid-cols-[minmax(0,1fr)_360px] [&>*]:min-w-0">
               <TacticalMiniMap k={k} className="order-2 md:order-1 md:col-span-2 lg:order-none lg:col-span-1 lg:col-start-1 lg:row-start-1" />
               <div className="contents lg:sticky lg:top-16 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:flex lg:h-[calc(100vh-8.5rem)] lg:flex-col lg:gap-3.5 lg:self-start print:static print:h-auto">
-                <DecisionPanel k={k} kState={kState} className="order-1 min-w-0 md:order-2 md:self-start lg:order-none lg:shrink-0 lg:self-auto" />
+                {!presentation && <DecisionPanel k={k} kState={kState} className="order-1 min-w-0 md:order-2 md:self-start lg:order-none lg:shrink-0 lg:self-auto" />}
                 {logSection({
                   title: 'Nhật ký sự kiện & luồng cảnh báo',
                   limit: 60,
@@ -488,7 +591,7 @@ export default function Dashboard() {
                     ) : (
                       <EmptyState height={250}>Chưa có trạm mực nước trong vùng đang xem — nhập danh mục trạm và ngưỡng BĐ I–III (loại "Trạm quan trắc")</EmptyState>
                     )}
-                    {canForecast && waterStations.length > 0 && (
+                    {canForecast && !presentation && waterStations.length > 0 && (
                       <div className="mt-2 flex justify-end no-print">
                         <button type="button" className="btn-ghost min-h-[36px] px-2.5 py-1 text-xs" onClick={() => setBulletinOpen(true)}>
                           Nhập bản tin dự báo KTTV
@@ -516,14 +619,16 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <OperationsTable
-            k={k}
-            kState={kState}
-            stations={waterStations}
-            stationsState={stationsState}
-            onSelectStation={focusStation}
-            scopeLabel={filterLabel}
-          />
+          {!presentation && (
+            <OperationsTable
+              k={k}
+              kState={kState}
+              stations={waterStations}
+              stationsState={stationsState}
+              onSelectStation={focusStation}
+              scopeLabel={filterLabel}
+            />
+          )}
         </>
       )}
 

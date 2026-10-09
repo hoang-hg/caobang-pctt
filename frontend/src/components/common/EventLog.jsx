@@ -59,7 +59,7 @@ export default function EventLog({ limit = 50, className, preview }) {
               key={key}
               onClick={() => { setSelectedCat(key); setOnlyDanger(false); }}
               className={clsx(
-                'flex min-h-[32px] items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all',
+                'flex min-h-[32px] items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all [@media(pointer:coarse)]:min-h-[44px]',
                 active
                   ? 'bg-accent text-white shadow-sm shadow-accent/25'
                   : 'bg-panel2/70 text-muted hover:text-ink hover:bg-panel2'
@@ -78,7 +78,7 @@ export default function EventLog({ limit = 50, className, preview }) {
           <button
             onClick={() => setOnlyDanger(!onlyDanger)}
             className={clsx(
-              'ml-auto flex min-h-[32px] items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold whitespace-nowrap transition-all border',
+              'ml-auto flex min-h-[32px] items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold whitespace-nowrap transition-all border [@media(pointer:coarse)]:min-h-[44px]',
               onlyDanger
                 ? 'bg-danger text-white border-danger shadow-sm shadow-danger/25'
                 : 'bg-danger/10 text-danger border-danger/30 hover:bg-danger/20'

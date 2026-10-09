@@ -16,8 +16,32 @@ select, input { line-height: 1.6 !important; min-height: 2.25rem !important; }
 .no-print { display: none !important; }
 `;
 
-/** Chụp snapshot một vùng giao diện ra PDF A4 ngang (tự chuyển sang chế độ Sáng khi chụp để in rõ, tiết kiệm mực). */
-export async function exportSnapshotPdf(element, { title, subtitle, filename }) {
+const sleep = (ms) => new Promise((r) => { setTimeout(r, ms); });
+
+/**
+ * Điện thoại / máy tính bảng dựng trang theo bề rộng màn hình (thẻ meta viewport): chụp nguyên bố cục 360 px rồi phóng ra
+ * A4 thì PDF dài ~19 trang. Tạm cho trình duyệt dựng trang ở bề rộng `width` (bố cục laptop), chụp xong trả lại. Trình
+ * duyệt máy tính bỏ qua thẻ này — cửa sổ đã đủ rộng thì không làm gì; trình duyệt không đổi theo thì chụp như cũ.
+ */
+async function atLayoutWidth(width, run) {
+  const meta = document.querySelector('meta[name="viewport"]');
+  if (!width || !meta || window.innerWidth >= width) return run();
+  const before = meta.getAttribute('content');
+  meta.setAttribute('content', `width=${width}`);
+  try {
+    for (let i = 0; i < 20 && window.innerWidth < width - 2; i += 1) await sleep(100);
+    await sleep(800); // biểu đồ, bản đồ đo lại kích thước theo bố cục mới
+    return await run();
+  } finally {
+    meta.setAttribute('content', before);
+  }
+}
+
+/**
+ * Chụp snapshot một vùng giao diện ra PDF A4 ngang (tự chuyển sang chế độ Sáng khi chụp để in rõ, tiết kiệm mực).
+ * `layoutWidth` (px): điện thoại / máy tính bảng tạm dựng trang ở bề rộng này trước khi chụp (xem atLayoutWidth).
+ */
+export async function exportSnapshotPdf(element, { title, subtitle, filename, layoutWidth }) {
   const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas'), import('jspdf')]);
   const root = document.documentElement;
   const wasDark = root.classList.contains('dark');
@@ -27,7 +51,7 @@ export async function exportSnapshotPdf(element, { title, subtitle, filename }) 
     await new Promise((r) => setTimeout(r, 350));
   }
   try {
-    const canvas = await html2canvas(element, {
+    const canvas = await atLayoutWidth(layoutWidth, () => html2canvas(element, {
       scale: 2,
       backgroundColor: '#ffffff',
       useCORS: true,
@@ -37,7 +61,7 @@ export async function exportSnapshotPdf(element, { title, subtitle, filename }) 
         style.textContent = SNAPSHOT_CSS;
         doc.head.appendChild(style);
       },
-    });
+    }));
     const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();

@@ -75,7 +75,13 @@ export const useStore = create((set, get) => ({
   toggleSound: () => { const soundOn = !get().soundOn; safeSet('pctt_sound', soundOn ? 'on' : 'off'); set({ soundOn }); },
 
   // ---- Điều khiển Sidebar (Thu gọn trên Desktop & Mở Drawer trên Mobile) ----
-  sidebarCollapsed: safeGet('pctt_sidebar_collapsed') === 'true',
+  // Chưa bấm chọn: màn 1024–1279 px (iPad ngang, laptop nhỏ) thu gọn sẵn để nội dung (bản đồ, KPI) đủ rộng; từ 1280 px mở
+  // rộng. Đã bấm "Thu gọn / Mở rộng" thì giữ lựa chọn đó.
+  sidebarCollapsed: (() => {
+    const saved = safeGet('pctt_sidebar_collapsed');
+    if (saved != null) return saved === 'true';
+    return typeof window !== 'undefined' && window.innerWidth < 1280;
+  })(),
   toggleSidebarCollapse: () => {
     const next = !get().sidebarCollapsed;
     safeSet('pctt_sidebar_collapsed', String(next));
@@ -83,6 +89,9 @@ export const useStore = create((set, get) => ({
   },
   mobileMenuOpen: false,
   setMobileMenuOpen: (mobileMenuOpen) => set({ mobileMenuOpen }),
+  // Chế độ trình chiếu (màn hình lớn phòng điều hành, Dashboard): ẩn thanh trên + menu trái — không lưu lại
+  presentation: false,
+  setPresentation: (presentation) => set({ presentation }),
 
   // ---- Cổng công khai đang hiện dữ liệu service worker đã lưu (mất mạng / mạng quá chậm): thời điểm lưu, ISO ----
   savedAt: null,

@@ -114,14 +114,15 @@ export default function TacticalMiniMap({ k, className }) {
               onClick={() => setLevel(f.id)}
               aria-pressed={level === f.id}
               className={clsx(
-                'min-h-[32px] rounded-full border px-2.5 py-0.5 text-[11px] font-semibold',
+                // Màn cảm ứng (điện thoại, iPad): cao 44 px cho ngón tay; dùng chuột giữ gọn 32 px
+                'min-h-[32px] rounded-full border px-2.5 py-0.5 text-[11px] font-semibold [@media(pointer:coarse)]:min-h-[44px] [@media(pointer:coarse)]:px-3',
                 level === f.id ? 'border-accent bg-accent text-white' : 'border-line bg-panel2/60 text-ink-2 hover:text-ink',
               )}
             >
               {f.label} ({count(f.min)})
             </button>
           ))}
-          <Link to="/ban-do" className="btn-ghost px-2 py-0.5 text-[11px]">
+          <Link to="/ban-do" className="btn-ghost px-2 py-0.5 text-[11px] [@media(pointer:coarse)]:min-h-[44px]">
             <Maximize2 size={12} /> Bản đồ đầy đủ
           </Link>
         </div>

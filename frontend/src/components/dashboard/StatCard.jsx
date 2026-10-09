@@ -23,7 +23,8 @@ export default function StatCard({
       {...tagProps}
       title={hint}
       className={clsx(
-        'card flex min-w-0 flex-col text-left',
+        // w-full: ô là <button> / <a> (tự co theo nội dung) nằm trong lớp bọc vẫn phải giãn hết cột
+        'card flex w-full min-w-0 flex-col text-left',
         compact ? 'gap-1 p-2 sm:p-2.5' : 'justify-between gap-1 p-3',
         (to || onClick) && 'transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
         level != null && clsx('border-l-4', scale.edge, level > 0 && scale.soft),
@@ -33,7 +34,7 @@ export default function StatCard({
       )}
     >
       <div className="flex items-center justify-between gap-2 text-xs font-bold text-muted">
-        <span className={clsx('flex min-w-0 items-center gap-1.5 uppercase', compact ? 'text-[11px] tracking-wide' : 'tracking-wider')}>
+        <span className={clsx('flex min-w-0 items-center gap-1.5 uppercase', compact ? 'text-[11px] tracking-wide [.kpi-lon_&]:text-xs' : 'tracking-wider')}>
           {Icon && <Icon size={15} className={clsx('shrink-0', scale ? scale.text : 'text-accent')} aria-hidden="true" />}
           <span className="truncate">{title}</span>
         </span>
@@ -41,7 +42,7 @@ export default function StatCard({
       </div>
       {value !== undefined && (
         <div className="flex min-w-0 items-baseline gap-1.5">
-          <span className={clsx('font-mono font-black tabular-nums tracking-tight text-ink', compact ? 'text-xl leading-tight sm:text-2xl' : 'text-2xl lg:text-3xl')}>
+          <span className={clsx('font-mono font-black tabular-nums tracking-tight text-ink', compact ? 'text-xl leading-tight sm:text-2xl [.kpi-lon_&]:text-4xl' : 'text-2xl lg:text-3xl')}>
             {value}
           </span>
           {unit && <span className={clsx('font-mono font-bold text-muted', compact ? 'truncate text-[11px]' : 'text-xs')}>{unit}</span>}
@@ -51,7 +52,7 @@ export default function StatCard({
       {compact && badgeEl && <div className="flex min-w-0">{badgeEl}</div>}
       {children}
       {footer && (
-        <div className={clsx('text-ink-2', compact ? 'line-clamp-1 text-[11px] leading-snug sm:line-clamp-2' : 'border-t border-line/60 pt-1.5 text-xs')}>
+        <div className={clsx('text-ink-2', compact ? 'line-clamp-1 text-[11px] leading-snug sm:line-clamp-2 [.kpi-lon_&]:text-xs' : 'border-t border-line/60 pt-1.5 text-xs')}>
           {footer}
         </div>
       )}
