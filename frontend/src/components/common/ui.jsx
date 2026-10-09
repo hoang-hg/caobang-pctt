@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import clsx from 'clsx';
-import { AlertTriangle, ArrowLeft, RefreshCw, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ChevronDown, RefreshCw, X } from 'lucide-react';
 import { NO_DATA, RISK } from '../../utils/risk';
 
 export function KpiCard({ label, value, unit, sub, tone, icon: Icon, blink, children }) {
@@ -129,14 +129,27 @@ export function Tabs({ tabs, value, onChange }) {
   );
 }
 
-export function Section({ title, right, children, className, bodyClass, id }) {
+/**
+ * Khung một khối nội dung. `collapsible`: tiêu đề thành nút mở / thu gọn (`open`, `onToggle` do nơi gọi giữ). Khi thu gọn
+ * nội dung chỉ bị ẩn, KHÔNG gỡ khỏi trang — truy vấn số liệu bên trong vẫn chạy như cũ.
+ */
+export function Section({ title, right, children, className, bodyClass, id, collapsible = false, open = true, onToggle }) {
   return (
     <section id={id} className={clsx('card flex min-h-0 flex-col', className)}>
       <div className="flex items-center justify-between gap-2 px-4 pb-1 pt-3">
-        <h2 className="card-title">{title}</h2>
+        {collapsible ? (
+          <h2 className="card-title min-w-0 flex-1">
+            <button type="button" className="flex min-h-[40px] w-full items-center gap-1.5 text-left" aria-expanded={open} onClick={onToggle}>
+              <ChevronDown size={15} className={clsx('shrink-0 transition-transform', !open && '-rotate-90')} aria-hidden="true" />
+              {title}
+            </button>
+          </h2>
+        ) : (
+          <h2 className="card-title">{title}</h2>
+        )}
         {right}
       </div>
-      <div className={clsx('min-h-0 flex-1 px-4 pb-3', bodyClass)}>{children}</div>
+      <div className={clsx('min-h-0 flex-1 px-4 pb-3', bodyClass, collapsible && !open && 'hidden')}>{children}</div>
     </section>
   );
 }
@@ -182,19 +195,20 @@ export const EmptyState = ({ height, className, children }) => (
   </div>
 );
 
-/** Chú giải thang màu rủi ro dùng chung (utils/risk.js): Đỏ → Xanh, cộng Xám = chưa có dữ liệu. */
-export function RiskLegend({ className }) {
+/** Chú giải thang màu rủi ro dùng chung (utils/risk.js): Đỏ → Xanh, cộng Xám = chưa có dữ liệu. `meaningClass`: ẩn / hiện phần
+ * nghĩa ("khẩn cấp", "theo dõi"…) theo bề rộng — nghĩa vẫn có ở title của từng mục. */
+export function RiskLegend({ className, meaningClass }) {
   return (
     <div className={clsx('flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted', className)} aria-label="Thang màu rủi ro">
       {[...RISK].reverse().map((r) => (
-        <span key={r.level} className="inline-flex items-center gap-1 whitespace-nowrap">
+        <span key={r.level} className="inline-flex items-center gap-1 whitespace-nowrap" title={`${r.name}: ${r.meaning.toLowerCase()}`}>
           <span className={clsx('inline-block h-2.5 w-2.5 rounded-sm', r.fill)} aria-hidden="true" />
-          <b className="font-semibold text-ink-2">{r.name}</b> {r.meaning.toLowerCase()}
+          <b className="font-semibold text-ink-2">{r.name}</b> <span className={meaningClass}>{r.meaning.toLowerCase()}</span>
         </span>
       ))}
-      <span className="inline-flex items-center gap-1 whitespace-nowrap">
+      <span className="inline-flex items-center gap-1 whitespace-nowrap" title={`${NO_DATA.name}: ${NO_DATA.meaning.toLowerCase()}`}>
         <span className="inline-block h-2.5 w-2.5 rounded-sm border border-dashed border-muted bg-panel2" aria-hidden="true" />
-        <b className="font-semibold text-ink-2">{NO_DATA.name}</b> {NO_DATA.meaning.toLowerCase()}
+        <b className="font-semibold text-ink-2">{NO_DATA.name}</b> <span className={meaningClass}>{NO_DATA.meaning.toLowerCase()}</span>
       </span>
     </div>
   );

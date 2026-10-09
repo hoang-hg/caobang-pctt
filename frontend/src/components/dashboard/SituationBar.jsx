@@ -41,8 +41,8 @@ export function situationItems(k, waterStations) {
 }
 
 /**
- * Dải tình huống đầu Dashboard — thông tin khẩn luôn ở trên cùng. Mức Cam / Đỏ: dải màu DÍNH trên cùng khi cuộn; trên
- * điện thoại chỉ hiện tình huống nặng nhất + "+N" (bấm để mở hết) để không chiếm nửa màn hình. Mức Vàng: khung vàng.
+ * Dải tình huống đầu Dashboard — thông tin khẩn luôn ở trên cùng, mỗi tình huống một chip. Mức Cam / Đỏ: dải màu DÍNH trên
+ * cùng khi cuộn; điện thoại hiện chip nặng nhất, máy tính 3 chip đầu, còn lại "+N" (bấm để mở hết). Mức Vàng: khung vàng.
  * Không có tình huống: nói "chưa ghi nhận" kèm độ phủ số đo — không nói "an toàn"; chưa có số đo: khung xám chỉ chỗ
  * nhập (chỉ link tới trang tài khoản được mở). Lỗi tải danh sách trạm: nói không tải được, không nói "chưa có trạm".
  */
@@ -58,52 +58,62 @@ export default function SituationBar({ k, waterStations, stationsError, rainKnow
   const noDataNote = stationsError ? 'không tải được danh sách trạm' : !hasData && 'chưa có số đo trạm mực nước / đo mưa';
   const sos = k?.sos || {};
 
+  // Mỗi tình huống một chip, chấm màu theo ĐÚNG mức của tình huống đó (dải tô theo mức nặng nhất). Hiện sẵn: điện thoại
+  // 1 chip, máy tính 3 chip — phần còn lại mở bằng "+N" (đọc trong vài giây thay vì một câu dài nối bằng "·")
+  const chipVis = (i) => (expanded || i === 0 ? '' : i < 3 ? 'hidden sm:inline-flex' : 'hidden');
+  const dot = (lv, ring) => <span className={clsx('h-2 w-2 shrink-0 rounded-full ring-1', risk(lv).fill, ring)} aria-hidden="true" />;
+
   if (worst >= 2) {
     const scale = risk(worst);
     const onRed = worst === 3; // đỏ: chữ trắng; cam: chữ đen (tương phản ≥ 4,5 : 1)
-    const extra = items.length - 1;
+    const chip = clsx('max-w-full items-center gap-1.5 rounded-full border px-2 py-0.5 font-semibold', onRed ? 'border-white/35 bg-white/10' : 'border-black/20 bg-black/5');
+    const ring = onRed ? 'ring-white/80' : 'ring-black/40';
+    const toggle = clsx('items-center justify-center gap-1 whitespace-nowrap rounded-lg border px-2.5 font-bold', onRed ? 'border-white/40' : 'border-black/25');
+    const extraPhone = items.length - 1;
+    const extraDesk = items.length - 3;
     const sosLink = canSos && (sos.overdue > 0 || sos.waiting > 0);
     return (
       <div
         className={clsx(
-          // Điện thoại: chữ một hàng riêng (đủ rộng), nút xuống hàng dưới; máy tính: chữ + nút cùng một hàng
-          'sticky top-0 z-30 -mx-3.5 -mt-3.5 mb-1 flex flex-col gap-2 px-3.5 py-2 text-xs shadow-lg sm:-mx-5 sm:-mt-5 sm:flex-row sm:items-center sm:justify-between sm:px-5 print:static',
+          // Điện thoại: chip một hàng riêng (đủ rộng), nút xuống hàng dưới; máy tính: chip + nút cùng một hàng
+          'sticky top-0 z-30 -mx-3.5 -mt-3.5 mb-1 flex flex-col gap-2 px-3.5 py-1.5 text-xs shadow-lg sm:-mx-5 sm:-mt-5 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-2 print:static',
           scale.chip,
         )}
         role="status"
         aria-live="polite"
         title={NOTE}
       >
-        <div className="flex min-w-0 items-start gap-2 sm:flex-1">
-          <Siren size={16} className={clsx('mt-0.5 shrink-0', onRed && 'motion-safe:animate-pulse')} aria-hidden="true" />
-          <p className="min-w-0 leading-snug">
-            <b className={clsx('mr-1.5 whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider', onRed ? 'bg-white/20' : 'bg-black/10')}>
+        <div className="flex min-w-0 items-start gap-2 sm:flex-1 sm:items-center">
+          <Siren size={16} className={clsx('mt-0.5 shrink-0 sm:mt-0', onRed && 'motion-safe:animate-pulse')} aria-hidden="true" />
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5 leading-snug">
+            <b className={clsx('whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider', onRed ? 'bg-white/20' : 'bg-black/10')}>
               {onRed ? 'Khẩn cấp' : 'Cần chú ý'}
             </b>
             {items.map((it, i) => (
-              <span key={it.text} className={clsx(i > 0 && !expanded && 'hidden sm:inline')}>
-                {i > 0 && ' · '}
+              <span key={it.text} className={clsx('inline-flex', chip, chipVis(i))}>
+                {dot(it.level, ring)}
                 {it.text}
               </span>
             ))}
-            {noDataNote && <span className={clsx('opacity-80', !expanded && 'hidden sm:inline')}> · {noDataNote}</span>}
-          </p>
+            {noDataNote && <span className={clsx('opacity-80', !expanded && 'hidden sm:inline')}>{noDataNote}</span>}
+            {extraDesk > 0 && (
+              <button type="button" onClick={() => setExpanded((v) => !v)} aria-expanded={expanded} className={clsx('hidden min-h-[28px] sm:inline-flex', toggle)}>
+                {expanded ? 'Thu gọn' : `+${extraDesk}`}
+                <ChevronDown size={13} className={clsx('transition-transform', expanded && 'rotate-180')} aria-hidden="true" />
+              </button>
+            )}
+          </div>
         </div>
         {/* Điện thoại không có nút nào (chỉ "Báo cáo nhanh" — nằm ở thanh dưới cùng) → ẩn hàng, không để khoảng trống */}
         <div
           className={clsx(
             'flex flex-wrap items-center gap-2 no-print sm:ml-auto sm:shrink-0 [&>*]:flex-1 sm:[&>*]:flex-none',
-            extra <= 0 && !sosLink && 'hidden sm:flex',
+            extraPhone <= 0 && !sosLink && 'hidden sm:flex',
           )}
         >
-          {extra > 0 && (
-            <button
-              type="button"
-              onClick={() => setExpanded((v) => !v)}
-              aria-expanded={expanded}
-              className={clsx('flex min-h-[40px] items-center justify-center gap-1 whitespace-nowrap rounded-lg border px-2.5 font-bold sm:hidden', onRed ? 'border-white/40' : 'border-black/25')}
-            >
-              {expanded ? 'Thu gọn' : `+${extra} tình huống`}
+          {extraPhone > 0 && (
+            <button type="button" onClick={() => setExpanded((v) => !v)} aria-expanded={expanded} className={clsx('flex min-h-[40px] sm:hidden', toggle)}>
+              {expanded ? 'Thu gọn' : `+${extraPhone} tình huống`}
               <ChevronDown size={13} className={clsx('transition-transform', expanded && 'rotate-180')} aria-hidden="true" />
             </button>
           )}
@@ -139,11 +149,16 @@ export default function SituationBar({ k, waterStations, stationsError, rainKnow
     return (
       <div className={clsx('card flex items-start gap-2 px-3 py-2 text-xs text-ink', risk(1).soft)} role="status" title={NOTE}>
         <AlertTriangle size={15} className="mt-0.5 shrink-0 text-warn" aria-hidden="true" />
-        <p className="leading-snug">
-          <b className="mr-1 text-warn">Theo dõi:</b>
-          {items.map((it) => it.text).join(' · ')}
-          {noDataNote && <span className="text-muted"> · {noDataNote}</span>}
-        </p>
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5 leading-snug">
+          <b className="text-warn">Theo dõi:</b>
+          {items.map((it) => (
+            <span key={it.text} className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-line bg-panel px-2 py-0.5 font-semibold">
+              {dot(it.level, 'ring-black/30')}
+              {it.text}
+            </span>
+          ))}
+          {noDataNote && <span className="text-muted">{noDataNote}</span>}
+        </div>
       </div>
     );
   }
