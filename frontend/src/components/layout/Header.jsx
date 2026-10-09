@@ -50,7 +50,7 @@ export default function Header() {
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-danger to-red-700 text-white shadow-sm shadow-danger/25">
           <ShieldAlert size={20} />
         </div>
-        <div className="hidden leading-tight sm:block">
+        <div className="hidden leading-tight md:block">
           <div className="text-sm font-bold tracking-tight text-ink flex items-center gap-1.5">
             BCH PCTT & TKCN Cao Bằng
             <span className="hidden xl:inline-block rounded bg-danger/10 px-1.5 py-0.5 text-[10px] font-semibold text-danger">TOC</span>
@@ -59,8 +59,9 @@ export default function Header() {
         </div>
       </Link>
 
-      {/* Bộ lọc địa phương */}
-      <div className="hidden sm:block">
+      {/* Bộ lọc địa phương: từ 1024 px (lg). Hẹp hơn — cùng mức có nút ☰ — bộ lọc nằm trong menu ngăn kéo (Sidebar), không
+          chen vào thanh này (trước đây tràn ngang 7–185 px ở 640–1024 px khi có nhãn "Bấm để bật chuông SOS") */}
+      <div className="hidden lg:block">
         <AdminFilter />
       </div>
 
@@ -69,8 +70,10 @@ export default function Header() {
         <OmniSearch />
       </div>
 
-      {/* Cụm công cụ bên phải */}
-      <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
+      {/* Cụm công cụ bên phải — không co (ô tìm kiếm co thay). Nhãn chữ hiện dần theo bề rộng để header không tràn và ô tìm
+          kiếm luôn còn chỗ: tên cơ quan từ md, bộ lọc từ lg, đồng hồ + tên tài khoản từ xl, chữ "Cổng người dân" / "Trực
+          tuyến" / "Bấm để bật chuông SOS" từ 2xl; hẹp hơn chỉ còn biểu tượng (có title / aria-label) */}
+      <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
         {/* Nút xem Cổng công khai cho người dân */}
         <Link
           to="/cong-khai"
@@ -78,9 +81,10 @@ export default function Header() {
           rel="noopener noreferrer"
           className="btn-ghost hidden md:inline-flex text-xs px-2.5 py-1.5 text-accent border-accent/30 bg-accent/5 hover:bg-accent/10"
           title="Mở Cổng thông tin công khai dành cho người dân"
+          aria-label="Cổng người dân"
         >
           <Globe size={14} className="shrink-0" />
-          <span className="font-semibold">Cổng người dân</span>
+          <span className="hidden font-semibold 2xl:inline">Cổng người dân</span>
         </Link>
 
         {/* Trạng thái kết nối WebSocket Realtime */}
@@ -92,7 +96,10 @@ export default function Header() {
           title={`Kết nối thời gian thực: ${wsStatus === 'online' ? 'Đang hoạt động' : wsStatus === 'connecting' ? 'Đang kết nối lại' : 'Mất kết nối'}`}
         >
           <span className={clsx('h-2 w-2 rounded-full shrink-0', wsStatus === 'online' ? 'bg-good animate-pulse' : wsStatus === 'connecting' ? 'bg-warn animate-ping' : 'bg-danger')} />
-          <span className="hidden md:inline font-mono">{wsStatus === 'online' ? 'Trực tuyến' : wsStatus === 'connecting' ? 'Đang nối…' : 'Mất kết nối'}</span>
+          {/* Trực tuyến: chấm xanh là đủ (chữ từ 2xl). Mất kết nối / đang nối: hiện chữ từ sm — trực ban phải thấy ngay */}
+          <span className={clsx('hidden font-mono', wsStatus === 'online' ? '2xl:inline' : 'sm:inline')}>
+            {wsStatus === 'online' ? 'Trực tuyến' : wsStatus === 'connecting' ? 'Đang nối…' : 'Mất kết nối'}
+          </span>
         </span>
 
         {/* Trình duyệt đang chặn âm thanh (trang mở lại, chưa ai bấm) → chuông SOS sẽ im: nhắc bấm để mở khoá */}
@@ -102,7 +109,7 @@ export default function Header() {
             className="chip animate-pulse border border-warn bg-warn/15 px-2.5 py-1 text-[11px] font-semibold text-ink"
             title="Trình duyệt chặn âm thanh tới khi bấm vào trang — bấm để chuông SOS kêu được"
           >
-            <VolumeX size={13} className="text-warn" /> <span className="hidden sm:inline">Bấm để bật chuông SOS</span>
+            <VolumeX size={13} className="text-warn" /> <span className="hidden 2xl:inline">Bấm để bật chuông SOS</span>
           </button>
         )}
 

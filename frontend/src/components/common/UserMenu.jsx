@@ -28,9 +28,9 @@ export default function UserMenu() {
 
   return (
     <div className="relative" ref={ref}>
-      <button className="btn-ghost" onClick={() => setOpen((o) => !o)}>
+      <button className="btn-ghost" onClick={() => setOpen((o) => !o)} title={user.full_name} aria-label={`Tài khoản: ${user.full_name}`}>
         <UserCircle2 size={16} />
-        <span className="hidden max-w-[10rem] truncate lg:inline">{user.full_name}</span>
+        <span className="hidden max-w-[10rem] truncate xl:inline">{user.full_name}</span>
       </button>
       {open && (
         <div className="card absolute right-0 top-11 z-[1200] w-80 p-3 shadow-2xl">
