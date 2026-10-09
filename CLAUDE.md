@@ -324,11 +324,20 @@ chỉ khi `DEMO_MODE`; `DEMO_MODE=false` xoá đoạn `so_do` còn sót mỗi l�
   `useCanAll`, `useAllowedCodes(obj, act)` (null = toàn tỉnh). UI chỉ ẩn/hiện — backend mới chặn thật.
 - **Giao diện**: màu qua biến CSS (`src/index.css`) + token Tailwind (`bg-panel`, `bg-panel2`, `text-ink-2`, `text-muted`,
   `border-line`, `bg-danger`, `text-good`, `text-accent`…); màu trạng thái cố định; hỗ trợ cả sáng và tối. CHỮ màu
-  trạng thái (`text-warn` / `text-serious` / `text-good`) lấy biến `--*-text` (`tailwind.config.js` `textColor`): nền sáng là
-  sắc đậm hơn — vàng / cam / xanh lá gốc không đạt 4,5 : 1 trên nền trắng; màu trạng thái mới làm chữ thì thêm cặp biến
-  tương tự. Bảng màu tối nằm trong `@media screen` → in luôn nền sáng; vùng cuộn cao cố định (`max-h-…` +
+  trạng thái (`text-warn` / `text-serious` / `text-good` / `text-danger`) lấy biến `--*-text` (`tailwind.config.js`
+  `textColor`): nền sáng là sắc đậm hơn — vàng / cam / xanh lá gốc không đạt 4,5 : 1 trên nền trắng; nền tối thì đỏ sáng hơn;
+  màu trạng thái mới làm chữ thì thêm cặp biến tương tự (chữ đỏ trên nền trắng cố định, vd. nút trắng trên dải đỏ:
+  `text-[rgb(var(--danger))]`). Bảng màu tối nằm trong `@media screen` → in luôn nền sáng; vùng cuộn cao cố định (`max-h-…` +
   `overflow-y-auto`) thêm `print:max-h-none print:overflow-visible` để in không bị cắt (mẫu cột Kanban ở RescueCenter). Component
-  dùng chung trong `components/common/ui.jsx` (KpiCard, Modal, Tabs, Section, Empty, Progress, StatusDot). Icon `lucide-react`.
+  dùng chung trong `components/common/ui.jsx` (KpiCard, Modal, Tabs, Section, Empty, Progress, StatusDot, Skeleton,
+  ErrorState, EmptyState, RiskLegend). Icon `lucide-react`.
+- **Mức rủi ro**: MỘT thang cho cả hệ thống — `src/utils/risk.js`: `risk(level)` với 0 Xanh · 1 Vàng · 2 Cam · 3 Đỏ, `null`
+  Xám = chưa có dữ liệu; trả class chip / nền nhạt / chữ / viền trái và mã hex (biểu đồ, bản đồ). Mã nghiệp vụ quy về mức qua
+  `RESERVOIR_LEVEL`, `LANDSLIDE_LEVEL`, `HAZARD_LEVEL`, `rainLevel`, `sosLevel` (`labels.js` PRIORITY / LEVEL / ALARM cũng lấy
+  từ đây). Không tự đặt màu (`#ef4444`, `bg-orange-…`) cho mức rủi ro; chip Xanh/Vàng/Cam chữ đen, Đỏ chữ trắng.
+- **Trạng thái khối dữ liệu**: đang tải → `Skeleton`; lỗi mà chưa có dữ liệu cũ (`isError && !data`) → `ErrorState` có nút
+  "Thử lại" — KHÔNG hiện "Chưa có …" khi thực ra là lỗi tải; rỗng thật → `EmptyState` / câu "chưa có" nói rõ cần nhập ở đâu
+  (chỉ link tới trang tài khoản có quyền mở). Mất mạng: `utils/useOnline` (Tổng quan có `ConnectionBanner`).
 - **Âm báo**: chỉ qua `utils/audio.playAlarm`; trình duyệt chặn âm thanh tới lần bấm / gõ phím đầu tiên — `watchAudioUnlock`
   (Shell) mở khoá, `store.audioReady` = thanh trên nhắc "Bấm để bật chuông SOS".
 - **Biểu đồ** Recharts lấy màu từ `useChartTheme()` (+ `axisProps`, `ChartTooltip`); không dùng 2 trục Y (tách biểu đồ).

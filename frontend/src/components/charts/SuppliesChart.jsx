@@ -3,6 +3,7 @@ import clsx from 'clsx';
 import { AlertCircle } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useAreaQuery } from '../../api/hooks';
+import { EmptyState, ErrorState, Skeleton } from '../common/ui';
 import { axisProps, Legend, useChartTheme } from './chartTheme';
 
 const CATS = [
@@ -39,7 +40,7 @@ function Tip({ active, payload, label }) {
 export default function SuppliesChart({ height = 250 }) {
   const c = useChartTheme();
   const [levelFilter, setLevelFilter] = useState('all');
-  const { data } = useAreaQuery('supplies', '/dashboard/supplies', {}, { refetchInterval: 60_000 });
+  const { data, isError, refetch } = useAreaQuery('supplies', '/dashboard/supplies', {}, { refetchInterval: 60_000 });
 
   const colors = [c.s1, c.s2, c.s3];
 
@@ -54,13 +55,11 @@ export default function SuppliesChart({ height = 250 }) {
     return { rows: filtered, levels: [...new Set(mapped.map((d) => d.level))], criticalCount: critical };
   }, [data, levelFilter]);
 
-  if (!data) return <div style={{ height }} className="animate-pulse rounded-lg bg-panel2" />;
+  if (!data) {
+    return isError ? <ErrorState height={height} onRetry={refetch}>Không tải được số liệu kho vật tư</ErrorState> : <Skeleton height={height} />;
+  }
   if (!data.length) {
-    return (
-      <div style={{ height }} className="flex items-center justify-center rounded-lg border border-dashed border-line px-4 text-center text-xs text-muted">
-        Chưa có kho / tồn kho kèm định mức dự trữ trong vùng đang xem
-      </div>
-    );
+    return <EmptyState height={height}>Chưa có kho / tồn kho kèm định mức dự trữ trong vùng đang xem</EmptyState>;
   }
 
   return (

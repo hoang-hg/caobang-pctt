@@ -14,6 +14,7 @@ import { useStore } from '../../app/store';
 import { AdminBoundaries, BaseLayer, RAIN_BINS } from '../../components/map/MapTools';
 import { evacIcon, hazardIcon, pinIcon, stationIcon, reservoirIcon } from '../../components/map/icons';
 import { LEVEL, landslideStatus } from '../../utils/labels';
+import { RISK as RISK_SCALE, risk as riskStyle } from '../../utils/risk';
 import { ago, dateTime } from '../../utils/format';
 import { stationView } from '../../utils/stations';
 import L from 'leaflet';
@@ -31,9 +32,9 @@ const REFRESH = 60_000;
 const pub = (path, params) => api(`/public${path}`, { params });
 const PROVINCE_COLOR = '#dc2626'; // ranh giới tỉnh: một màu cố định
 const RISK = {
-  cao: { label: 'Nguy cơ CAO', cls: 'bg-danger text-white', icon: AlertTriangle, tip: 'Bạn đang nằm trong vùng có nguy cơ ngập lụt hoặc sạt lở đất. Hãy chủ động di dời tới điểm an toàn!' },
-  trung_binh: { label: 'Cần theo dõi', cls: 'bg-warn text-black', icon: AlertTriangle, tip: 'Khu vực lân cận có nguy cơ hoặc dự báo mưa to. Cần chuẩn bị phương án phòng tránh.' },
-  thap: { label: 'Nguy cơ thấp', cls: 'bg-good text-white', icon: CheckCircle2, tip: 'Vị trí hiện tại an toàn, lượng mưa dự báo trong ngưỡng an toàn.' },
+  cao: { label: 'Nguy cơ CAO', cls: RISK_SCALE[3].chip, icon: AlertTriangle, tip: 'Bạn đang nằm trong vùng có nguy cơ ngập lụt hoặc sạt lở đất. Hãy chủ động di dời tới điểm an toàn!' },
+  trung_binh: { label: 'Cần theo dõi', cls: RISK_SCALE[1].chip, icon: AlertTriangle, tip: 'Khu vực lân cận có nguy cơ hoặc dự báo mưa to. Cần chuẩn bị phương án phòng tránh.' },
+  thap: { label: 'Nguy cơ thấp', cls: RISK_SCALE[0].chip, icon: CheckCircle2, tip: 'Vị trí hiện tại an toàn, lượng mưa dự báo trong ngưỡng an toàn.' },
 };
 const SEV = { do: 'border-danger bg-danger/10', cam: 'border-serious bg-serious/10', vang: 'border-warn bg-warn/10' };
 const rainColor = (mm) => RAIN_BINS.find((b) => mm < b.max).color;
@@ -119,12 +120,12 @@ function PublicMap({ data, forecast, geo, me, route, target, layers, basemap = '
       )}
       {layers.hazard && data?.hazard_zones.map((z, i) => (
         <GeoJSON key={`z${i}-${z.name}`} data={z.geom}
-          style={{ color: z.type === 'ngap' ? '#1d4ed8' : (LEVEL[z.level]?.color || '#ef4444'), weight: 1.5, fillColor: z.type === 'ngap' ? '#2563eb' : (LEVEL[z.level]?.color || '#ef4444'), fillOpacity: 0.3 }}>
+          style={{ color: z.type === 'ngap' ? '#1d4ed8' : (LEVEL[z.level]?.color || LEVEL.do.color), weight: 1.5, fillColor: z.type === 'ngap' ? '#2563eb' : (LEVEL[z.level]?.color || LEVEL.do.color), fillOpacity: 0.3 }}>
           <Tooltip sticky>{z.name}</Tooltip>
         </GeoJSON>
       ))}
       {layers.hazard && data?.blocked_roads.map((r, i) => (
-        <GeoJSON key={`r${i}`} data={r.geom} style={{ color: '#ef4444', weight: 5, dashArray: '6 5' }}>
+        <GeoJSON key={`r${i}`} data={r.geom} style={{ color: LEVEL.do.color, weight: 5, dashArray: '6 5' }}>
           <Tooltip sticky>{r.road_name} – đoạn đang nguy hiểm, hạn chế đi lại</Tooltip>
         </GeoJSON>
       ))}
@@ -626,7 +627,7 @@ export default function PublicPortal() {
               onClick={() => setShowSosModal(true)}
               className={clsx(
                 'btn px-4 py-2 font-bold shadow-md text-xs sm:text-sm',
-                active ? 'bg-white text-danger hover:bg-white/90' : 'bg-danger text-white hover:brightness-110'
+                active ? 'bg-white text-[rgb(var(--danger))] hover:bg-white/90' : 'bg-danger text-white hover:brightness-110'
               )}
             >
               <PhoneCall size={16} /> Cần cứu hộ khẩn cấp
@@ -1555,7 +1556,7 @@ export default function PublicPortal() {
                 sub: `${pt.road_name} · ${pt.admin_name}`,
                 value: pt.traffic_label,
                 status: pt.traffic_label,
-                statusColor: landslideStatus(pt.traffic_status, 'text-amber-500').cls,
+                statusColor: landslideStatus(pt.traffic_status).cls,
                 lat: pt.lat,
                 lon: pt.lon,
                 type: 'landslide',
@@ -1596,7 +1597,7 @@ export default function PublicPortal() {
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {(overview?.rivers || []).map((r) => {
                 // level null = chưa có số liệu / mất tín hiệu (máy chủ tính) → xám, không "Dưới báo động"
-                const badgeCls = r.level == null ? 'bg-panel2 text-muted' : ['bg-good text-white', 'bg-warn text-black', 'bg-serious text-white', 'bg-danger text-white'][r.level];
+                const badgeCls = riskStyle(r.level).chip; // thang màu chung (utils/risk.js), null → xám
                 return (
                   <div key={r.name} className="card p-4 border border-line hover:shadow-md transition-all">
                     <div className="flex items-center justify-between mb-2">

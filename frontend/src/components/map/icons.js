@@ -1,6 +1,8 @@
 import L from 'leaflet';
+import { NO_DATA, RISK } from '../../utils/risk';
 
-const COLORS = { do: '#d03b3b', cam: '#ec835a', vang: '#fab219', good: '#0ca30c', blue: '#2a78d6', gray: '#64748b', violet: '#6d5dd3' };
+// Đỏ / cam / vàng / xanh / xám lấy từ thang màu rủi ro chung (utils/risk.js) — biểu tượng trên bản đồ cùng màu với chip
+const COLORS = { do: RISK[3].hex, cam: RISK[2].hex, vang: RISK[1].hex, good: RISK[0].hex, blue: '#2a78d6', gray: NO_DATA.hex, violet: '#6d5dd3' };
 
 const svg = (path, color, size = 16) =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;

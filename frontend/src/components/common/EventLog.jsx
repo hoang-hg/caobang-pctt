@@ -3,6 +3,7 @@ import clsx from 'clsx';
 import { Activity, AlertTriangle, LifeBuoy, MessageCircle, Settings2, Siren, Search, X, ShieldAlert } from 'lucide-react';
 import { useAreaQuery } from '../../api/hooks';
 import { time } from '../../utils/format';
+import { ErrorState, Skeleton } from './ui';
 
 const CAT = {
   tat_ca: { label: 'Tất cả' },
@@ -22,7 +23,8 @@ const SEV = {
 
 /** Nhật ký sự kiện & luồng cảnh báo nâng cấp cho Trung tâm Điều hành Tác chiến. */
 export default function EventLog({ limit = 50, className }) {
-  const { data = [] } = useAreaQuery('logs', '/dashboard/logs', { limit });
+  const q = useAreaQuery('logs', '/dashboard/logs', { limit });
+  const data = useMemo(() => q.data || [], [q.data]);
   const [selectedCat, setSelectedCat] = useState('tat_ca');
   const [search, setSearch] = useState('');
   const [onlyDanger, setOnlyDanger] = useState(false);
@@ -107,7 +109,10 @@ export default function EventLog({ limit = 50, className }) {
 
       {/* Danh sách ticker sự kiện */}
       <ul className="flex-1 overflow-y-auto pr-1 flex flex-col gap-2 scroll-thin print:max-h-none print:overflow-visible" aria-live="polite">
-        {filtered.length === 0 ? (
+        {!q.data ? (
+          // Chưa tải xong / lỗi tải: không nói "chưa có sự kiện" khi thực ra chưa biết
+          <li>{q.isError ? <ErrorState onRetry={q.refetch}>Không tải được nhật ký sự kiện</ErrorState> : <Skeleton height={160} />}</li>
+        ) : filtered.length === 0 ? (
           <li className="text-center py-8 text-xs text-muted italic">
             {data.length ? 'Không có sự kiện khớp bộ lọc' : 'Chưa có sự kiện nào trong vùng đang xem'}
           </li>

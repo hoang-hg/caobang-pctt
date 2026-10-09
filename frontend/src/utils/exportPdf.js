@@ -1,5 +1,21 @@
 import { useStore } from '../app/store';
 
+/**
+ * CSS chỉ áp vào BẢN SAO DOM mà html2canvas chụp (onclone) — trang đang xem không đổi:
+ * - html2canvas vẽ chữ thấp hơn trình duyệt → ô `truncate` (overflow: hidden), chip bo tròn và ô chọn / ô nhập cắt mất
+ *   nửa dưới chữ (tiêu đề thẻ KPI, tên sông, nhãn mức báo động, tên trạm): cho tràn + giãn dòng; chip thành inline-block
+ *   với đệm dưới dày hơn đệm trên để chữ nằm giữa viên thuốc;
+ * - tắt hiệu ứng nhấp nháy (chụp đúng lúc mờ thì nhãn "quá hạn" gần như trắng);
+ * - bỏ nút / ô thao tác (.no-print) — báo cáo giấy không cần.
+ */
+const SNAPSHOT_CSS = `
+*, *::before, *::after { animation: none !important; transition: none !important; }
+.truncate { overflow: visible !important; text-overflow: clip !important; line-height: 1.6 !important; }
+.chip { display: inline-block !important; line-height: 1.25 !important; vertical-align: middle; padding-top: 1px !important; padding-bottom: 4px !important; }
+select, input { line-height: 1.6 !important; min-height: 2.25rem !important; }
+.no-print { display: none !important; }
+`;
+
 /** Chụp snapshot một vùng giao diện ra PDF A4 ngang (tự chuyển sang chế độ Sáng khi chụp để in rõ, tiết kiệm mực). */
 export async function exportSnapshotPdf(element, { title, subtitle, filename }) {
   const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas'), import('jspdf')]);
@@ -11,7 +27,17 @@ export async function exportSnapshotPdf(element, { title, subtitle, filename }) 
     await new Promise((r) => setTimeout(r, 350));
   }
   try {
-    const canvas = await html2canvas(element, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false });
+    const canvas = await html2canvas(element, {
+      scale: 2,
+      backgroundColor: '#ffffff',
+      useCORS: true,
+      logging: false,
+      onclone: (doc) => {
+        const style = doc.createElement('style');
+        style.textContent = SNAPSHOT_CSS;
+        doc.head.appendChild(style);
+      },
+    });
     const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();

@@ -1,10 +1,13 @@
+import { RISK } from './risk';
+
 export const INCIDENT = {
   ngap_lut: 'Ngập lụt', sat_lo: 'Sạt lở', lu_quet: 'Lũ quét', sap_nha: 'Sập nhà', cap_cuu: 'Cấp cứu', tiep_te: 'Tiếp tế',
 };
+// Màu của PRIORITY / LEVEL / ALARM lấy từ thang màu rủi ro chung (utils/risk.js) — không viết màu riêng ở đây
 export const PRIORITY = {
-  1: { label: 'Cấp 1 · Khẩn cấp sinh tử', short: 'Đỏ', cls: 'bg-danger text-white', tone: 'danger' },
-  2: { label: 'Cấp 2 · Nguy hiểm', short: 'Cam', cls: 'bg-serious text-white', tone: 'serious' },
-  3: { label: 'Cấp 3 · Hỗ trợ', short: 'Vàng', cls: 'bg-warn text-black', tone: 'warn' },
+  1: { label: 'Cấp 1 · Khẩn cấp sinh tử', short: 'Đỏ', cls: RISK[3].chip, tone: 'danger' },
+  2: { label: 'Cấp 2 · Nguy hiểm', short: 'Cam', cls: RISK[2].chip, tone: 'serious' },
+  3: { label: 'Cấp 3 · Hỗ trợ', short: 'Vàng', cls: RISK[1].chip, tone: 'warn' },
 };
 export const SOS_STATUS = { moi: 'Chờ xử lý', dieu_phoi: 'Đang điều phối', thuc_thi: 'Đang thực thi', hoan_thanh: 'Hoàn thành' };
 export const SOURCE = { ZALO: 'Zalo OA', APP: 'Ứng dụng', HOTLINE: 'Tổng đài', SENSOR: 'Cảm biến IoT', CAN_BO: 'Cán bộ' };
@@ -31,10 +34,10 @@ export const RES_STATUS = {
 };
 export const STATION_TYPE = { luong_mua: 'Đo mưa', muc_nuoc: 'Mực nước', do_nghieng: 'Độ nghiêng đất', do_am_dat: 'Độ ẩm đất' };
 export const LEVEL = {
-  do: { label: 'Rất cao', cls: 'bg-danger text-white', color: 'rgb(208 59 59)' },
-  cam: { label: 'Cao', cls: 'bg-serious text-white', color: 'rgb(236 131 90)' },
-  vang: { label: 'Trung bình', cls: 'bg-warn text-black', color: 'rgb(250 178 25)' },
-  an_toan: { label: 'Thấp', cls: 'bg-good text-white', color: 'rgb(12 163 12)' },
+  do: { label: 'Rất cao', cls: RISK[3].chip, color: RISK[3].hex },
+  cam: { label: 'Cao', cls: RISK[2].chip, color: RISK[2].hex },
+  vang: { label: 'Trung bình', cls: RISK[1].chip, color: RISK[1].hex },
+  an_toan: { label: 'Thấp', cls: RISK[0].chip, color: RISK[0].hex },
 };
 export const CATEGORY = { luong_thuc: 'Lương thực', nuoc_uong: 'Nước uống', y_te: 'Y tế', do_dung: 'Đồ dùng cứu sinh' };
 export const CHANNEL = {
@@ -65,11 +68,11 @@ export const SUBMISSION_STATUS = {
 };
 
 /** Điểm đen sạt lở (services/landslides.py): nhãn ngắn + màu chữ theo traffic_status. "chua_co_du_lieu" (không cảm
- * biến / vùng nguy hiểm nào) → xám, KHÔNG xanh như "chưa ghi nhận nguy cơ". `warn`: lớp màu cảnh báo của nơi gọi. */
-export const landslideStatus = (s, warn = 'text-serious') =>
+ * biến / vùng nguy hiểm nào) → xám, KHÔNG xanh như "chưa ghi nhận nguy cơ". Màu theo thang rủi ro chung (utils/risk.js). */
+export const landslideStatus = (s) =>
   ({
     cam_duong: { short: 'Cấm đường', cls: 'text-danger' },
-    canh_bao: { short: 'Cảnh báo', cls: warn },
+    canh_bao: { short: 'Cảnh báo', cls: 'text-serious' },
     chua_co_du_lieu: { short: 'Chưa có dữ liệu', cls: 'text-muted' },
   })[s] || { short: 'Chưa ghi nhận', cls: 'text-good' };
 
@@ -96,9 +99,8 @@ export const alarmLevel = (value, thr = {}) => {
   ['bd1', 'bd2', 'bd3'].forEach((k, i) => { if (thr[k] != null && value >= thr[k]) lv = i + 1; });
   return lv;
 };
-export const ALARM = [
-  { label: 'Dưới BĐ I', cls: 'bg-good text-white', color: 'rgb(12 163 12)' },
-  { label: 'Trên BĐ I', cls: 'bg-warn text-black', color: 'rgb(250 178 25)' },
-  { label: 'Trên BĐ II', cls: 'bg-serious text-white', color: 'rgb(236 131 90)' },
-  { label: 'Trên BĐ III', cls: 'bg-danger text-white', color: 'rgb(208 59 59)' },
-];
+export const ALARM = ['Dưới BĐ I', 'Trên BĐ I', 'Trên BĐ II', 'Trên BĐ III'].map((label, i) => ({
+  label,
+  cls: RISK[i].chip,
+  color: RISK[i].hex,
+}));

@@ -23,6 +23,7 @@ export default {
       },
       // Chữ màu trạng thái: sắc riêng cho nền sáng (src/index.css --*-text); bg-/border-/ring-warn… giữ màu gốc
       textColor: {
+        danger: v('danger-text'),
         serious: v('serious-text'),
         warn: v('warn-text'),
         good: v('good-text'),

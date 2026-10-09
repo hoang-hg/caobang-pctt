@@ -255,7 +255,7 @@ export default function MapLayers({ data, layers, timeline, onDispatch, onCamera
         <GeoJSON
           key={`roads-${theme}-${data.roads.features.filter((f) => f.properties.blocked).length}`}
           data={data.roads}
-          style={(f) => ({ color: f.properties.blocked ? '#ef4444' : theme === 'dark' ? '#fbbf24' : '#b45309', weight: f.properties.blocked ? 4 : 2, opacity: 0.7, dashArray: f.properties.blocked ? '4 4' : undefined })}
+          style={(f) => ({ color: f.properties.blocked ? LEVEL.do.color : theme === 'dark' ? '#fbbf24' : '#b45309', weight: f.properties.blocked ? 4 : 2, opacity: 0.7, dashArray: f.properties.blocked ? '4 4' : undefined })}
           onEachFeature={(f, l) => l.bindTooltip(`${f.properties.road_name}${f.properties.blocked ? ' – đoạn bị chặn (vùng nguy hiểm)' : ''}`, { sticky: true })}
         />
       )}
@@ -272,9 +272,9 @@ export default function MapLayers({ data, layers, timeline, onDispatch, onCamera
               key={`${p.id}-${theme}`}
               data={f}
               style={{
-                color: flood ? '#1d4ed8' : (LEVEL[p.level]?.color || '#ef4444'),
+                color: flood ? '#1d4ed8' : (LEVEL[p.level]?.color || LEVEL.do.color),
                 weight: flood ? 1 : 2,
-                fillColor: flood ? '#2563eb' : (LEVEL[p.level]?.color || '#ef4444'),
+                fillColor: flood ? '#2563eb' : (LEVEL[p.level]?.color || LEVEL.do.color),
                 fillOpacity: depthOpacity,
                 dashArray: p.source === 'sensor' ? '5 4' : undefined,
               }}

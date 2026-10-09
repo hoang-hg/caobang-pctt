@@ -2,13 +2,14 @@ import { useMemo } from 'react';
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useAreaQuery } from '../../api/hooks';
 import { hourLabel, num } from '../../utils/format';
+import { EmptyState, ErrorState, Skeleton } from '../common/ui';
 import { axisProps, ChartTooltip, Legend, useChartTheme } from './chartTheme';
 
 /** Mưa theo giờ (cột) + mưa tích lũy (đường) — 2 biểu đồ chung trục thời gian, KHÔNG dùng 2 trục Y.
  *  Phần 3 giờ tới vẽ nhạt / nét đứt: dự báo mô hình số (Open-Meteo) cho trạm mưa, KHÔNG phải nowcast radar. */
 export default function RainfallChart({ height = 250 }) {
   const c = useChartTheme();
-  const { data } = useAreaQuery('rainfall', '/dashboard/rainfall', {}, { refetchInterval: 60_000 });
+  const { data, isError, refetch } = useAreaQuery('rainfall', '/dashboard/rainfall', {}, { refetchInterval: 60_000 });
 
   const { rows, totalObs, totalFc, maxStation } = useMemo(() => {
     if (!data) return { rows: [], totalObs: 0, totalFc: 0, maxStation: null };
@@ -35,12 +36,14 @@ export default function RainfallChart({ height = 250 }) {
     };
   }, [data]);
 
-  if (!data) return <div style={{ height }} className="animate-pulse rounded-lg bg-panel2" />;
+  if (!data) {
+    return isError ? <ErrorState height={height} onRetry={refetch}>Không tải được số đo mưa</ErrorState> : <Skeleton height={height} />;
+  }
   if (!rows.length) {
     return (
-      <div style={{ height }} className="flex items-center justify-center rounded-lg border border-dashed border-line px-4 text-center text-xs text-muted">
+      <EmptyState height={height}>
         Chưa có số đo mưa 24 giờ qua trong vùng đang xem (chưa có trạm đo mưa hoặc trạm chưa gửi số đo)
-      </div>
+      </EmptyState>
     );
   }
   const nowT = rows.find((r) => r.forecast)?.t;

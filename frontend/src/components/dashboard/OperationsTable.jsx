@@ -1,35 +1,34 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 import {
-  ArrowUpDown, Boxes, ChartLine, ChevronLeft, ChevronRight, FileSpreadsheet, MapPin, Megaphone, Mountain, Search, Siren, Waves, X,
+  ArrowUpDown, Boxes, ChartLine, ChevronLeft, ChevronRight, FileDown, FileSpreadsheet, Loader2, MapPin, Megaphone, Mountain, Search,
+  Siren, Waves, X,
 } from 'lucide-react';
 import { useAreaQuery } from '../../api/hooks';
 import { useStore } from '../../app/store';
 import { usePermission } from '../../rbac/usePermission';
 import { exportExcel } from '../../utils/exportExcel';
+import { exportSnapshotPdf } from '../../utils/exportPdf';
 import { INCIDENT, PRIORITY, SOS_STATUS } from '../../utils/labels';
 import { dateTime, int, minutesSince, num, vnFileStamp } from '../../utils/format';
+import { LANDSLIDE_LEVEL, levelOf, risk, sosLevel } from '../../utils/risk';
 import { slaState } from '../../utils/sla';
+import { useMediaQuery } from '../../utils/useMediaQuery';
+import { ErrorState, Skeleton } from '../common/ui';
 import { riverState } from './RiverKpi';
 
 const TABS = [
-  { id: 'rivers', label: 'Mực nước & trạm thủy văn', icon: Waves },
-  { id: 'landslides', label: 'Điểm đen sạt lở', icon: Mountain },
-  { id: 'sos', label: 'Phiếu SOS đang mở', icon: Siren },
-  { id: 'supplies', label: 'Kho vật tư dự trữ', icon: Boxes },
+  { id: 'rivers', label: 'Mực nước & trạm thủy văn', short: 'Mực nước', noun: 'trạm mực nước', icon: Waves },
+  { id: 'landslides', label: 'Điểm đen sạt lở', short: 'Sạt lở', noun: 'điểm đen sạt lở', icon: Mountain },
+  { id: 'sos', label: 'Phiếu SOS đang mở', short: 'SOS', noun: 'phiếu SOS', icon: Siren, perm: 'sos' },
+  { id: 'supplies', label: 'Kho vật tư dự trữ', short: 'Kho', noun: 'kho vật tư', icon: Boxes, perm: 'resource' },
 ];
-const SEVERITY = [
-  { id: 'all', label: 'Mọi mức' },
-  { id: 'danger', label: 'Đỏ' },
-  { id: 'serious', label: 'Cam' },
-  { id: 'warn', label: 'Vàng' },
-  { id: 'good', label: 'Dưới ngưỡng' },
-  { id: 'muted', label: 'Chưa có dữ liệu' },
+// Lọc theo thang màu rủi ro chung (utils/risk.js) — cùng tên màu ở mọi màn hình
+const LEVEL_FILTERS = [
+  ['all', 'Mọi mức'], ['3', 'Đỏ – khẩn cấp'], ['2', 'Cam – nguy hiểm'], ['1', 'Vàng – theo dõi'], ['0', 'Xanh – dưới ngưỡng'],
+  ['none', 'Xám – chưa có dữ liệu'],
 ];
-const TONE = ['good', 'warn', 'serious', 'danger'];
-const CHIP = { danger: 'bg-danger text-white', serious: 'bg-serious text-white', warn: 'bg-warn text-black', good: 'bg-good text-white', muted: 'bg-panel2 text-muted' };
-const LS_LEVEL = { cam_duong: 3, canh_bao: 2, thong_suot: 0 }; // chua_co_du_lieu → không đánh giá (xám)
 const CATS = [['luong_thuc', 'Lương thực'], ['nuoc_uong', 'Nước uống'], ['do_dung', 'Áo phao & đồ cứu sinh']];
 const WAREHOUSE_LEVEL = { tinh: 'Kho tỉnh', cum: 'Kho cụm', xa: 'Kho xã', da_chien: 'Kho dã chiến' };
 const ALERT_CHANNELS = ['SMS', 'CELL_BROADCAST', 'ZALO_OA', 'LOA']; // như mặc định khung soạn (pages/Alerts.jsx)
@@ -46,30 +45,25 @@ function buildRows(tab, { stations, points, tickets, supplies }) {
       const st = riverState(s);
       return {
         id: s.id, name: s.name, sub: s.river ? `Sông ${s.river}` : '', area: s.admin_name, lat: s.lat, lon: s.lon,
-        level: st.level ?? -1, tone: st.level == null ? 'muted' : TONE[st.level], levelText: st.label,
-        value: st.value, thr: s.thresholds || {}, time: s.value == null ? null : s.time,
+        level: st.level, levelText: st.label, value: st.value, thr: s.thresholds || {}, time: s.value == null ? null : s.time,
       };
     });
   }
   if (tab === 'landslides') {
-    return points.map((p) => {
-      const lv = LS_LEVEL[p.traffic_status] ?? -1;
-      return {
-        id: p.code, name: p.name, sub: p.road_name, area: p.admin_name, adminCode: p.admin_code, lat: p.lat, lon: p.lon,
-        level: lv, tone: lv < 0 ? 'muted' : TONE[lv], levelText: p.traffic_label, risk: p.risk_label,
-        rain24: p.rain_info?.rain_24h_mm, tilt: p.tilt_info?.current_tilt_deg, action: p.response_action,
-      };
-    });
+    return points.map((p) => ({
+      id: p.code, name: p.name, sub: p.road_name, area: p.admin_name, adminCode: p.admin_code, lat: p.lat, lon: p.lon,
+      level: levelOf(LANDSLIDE_LEVEL, p.traffic_status), levelText: p.traffic_label, risk: p.risk_label,
+      rain24: p.rain_info?.rain_24h_mm, tilt: p.tilt_info?.current_tilt_deg, action: p.response_action,
+    }));
   }
   if (tab === 'sos') {
     return tickets
       .filter((t) => t.status !== 'hoan_thanh')
       .map((t) => {
         const late = !!slaState(t, Date.now())?.breached; // cùng quy tắc với Điều hành cứu hộ và KPI (utils/sla)
-        const lv = late || t.priority === 1 ? 3 : t.priority === 2 ? 2 : 1;
         return {
           id: t.id, name: t.code, sub: INCIDENT[t.incident_type], area: t.admin_name, adminCode: t.admin_code, lat: t.lat, lon: t.lon,
-          level: lv, tone: TONE[lv], levelText: late ? 'Quá hạn phản hồi' : PRIORITY[t.priority]?.label, address: t.address,
+          level: sosLevel(t.priority, late), late, levelText: late ? 'Quá hạn phản hồi' : PRIORITY[t.priority]?.label, address: t.address,
           trapped: t.trapped_count, status: SOS_STATUS[t.status], waited: minutesSince(t.received_at), priority: t.priority,
         };
       });
@@ -77,14 +71,42 @@ function buildRows(tab, { stations, points, tickets, supplies }) {
   return supplies.map((w) => {
     const vals = CATS.map(([key]) => w[key]).filter((v) => v != null);
     const low = vals.length ? Math.min(...vals) : null;
-    const lv = low == null ? -1 : low < 20 ? 3 : 0; // định mức: dưới 20% là cạn kiệt (thiết kế mục C)
+    // Đỏ: có mặt hàng < 20% định mức (cạn kiệt — thiết kế mục C); Vàng: < 50% (cần bổ sung — như KPI trang Vật tư)
+    const level = low == null ? null : low < 20 ? 3 : low < 50 ? 1 : 0;
     return {
-      id: w.code, name: w.name, sub: WAREHOUSE_LEVEL[w.level] || w.level, area: '', level: lv,
-      tone: lv < 0 ? 'muted' : TONE[lv], levelText: low == null ? 'Chưa có định mức' : low < 20 ? `Có mặt hàng ${low}% (< 20%)` : `Thấp nhất ${low}%`,
-      pcts: Object.fromEntries(CATS.map(([key]) => [key, w[key]])),
+      id: w.code, name: w.name, sub: WAREHOUSE_LEVEL[w.level] || w.level, area: '', level, pcts: Object.fromEntries(CATS.map(([key]) => [key, w[key]])),
+      levelText: low == null ? 'Chưa có định mức' : low < 20 ? `Có mặt hàng ${low}% (< 20%)` : low < 50 ? `Thấp nhất ${low}% (< 50%)` : `Thấp nhất ${low}%`,
     };
   });
 }
+
+/** Cột dữ liệu từng chuyên đề — dùng chung cho bảng (máy tính, PDF) và thẻ (điện thoại). */
+const COLUMNS = {
+  rivers: [
+    { label: 'Xã/phường', sort: 'area', cell: (r) => r.area || '–' },
+    { label: 'Mực nước', sort: 'value', num: true, cell: (r) => (r.value == null ? '–' : `${num(r.value, 2)} m`) },
+    { label: 'BĐ I / II / III', num: true, cell: (r) => [r.thr.bd1, r.thr.bd2, r.thr.bd3].map((x) => (x == null ? '–' : num(x, 2))).join(' / ') },
+    { label: 'Số đo lúc', sort: 'time', cell: (r) => (r.time ? dateTime(r.time) : 'không có số đo 2 giờ qua') },
+  ],
+  landslides: [
+    { label: 'Xã/phường', sort: 'area', cell: (r) => r.area || '–' },
+    { label: 'Mưa 24h', sort: 'rain24', num: true, cell: (r) => (r.rain24 == null ? '–' : `${num(r.rain24, 1)} mm`) },
+    { label: 'Nghiêng', sort: 'tilt', num: true, cell: (r) => (r.tilt == null ? '–' : `${num(r.tilt, 2)}°`) },
+    { label: 'Nguy cơ', cell: (r) => r.risk || '–' },
+  ],
+  sos: [
+    { label: 'Xã/phường', sort: 'area', cell: (r) => r.area || '–', sub: (r) => r.address },
+    { label: 'Số người', sort: 'trapped', num: true, cell: (r) => r.trapped ?? '?' },
+    { label: 'Trạng thái', cell: (r) => r.status },
+    { label: 'Từ lúc nhận', sort: 'waited', num: true, cell: (r) => `${int(r.waited)} phút`, alarm: (r) => r.late },
+  ],
+  supplies: CATS.map(([key, label]) => ({
+    label,
+    num: true,
+    cell: (r) => (r.pcts[key] == null ? '–' : `${r.pcts[key]}%`),
+    alarm: (r) => r.pcts[key] != null && r.pcts[key] < 20,
+  })),
+};
 
 function excelRows(tab, rows) {
   return rows.map((r, i) => {
@@ -93,21 +115,21 @@ function excelRows(tab, rows) {
       return {
         ...base, 'Mã trạm': r.id, 'Tên trạm': r.name, 'Sông': r.sub, 'Xã/phường': r.area || '',
         'Mực nước (m)': r.value ?? '', 'BĐ I (m)': r.thr.bd1 ?? '', 'BĐ II (m)': r.thr.bd2 ?? '', 'BĐ III (m)': r.thr.bd3 ?? '',
-        'Tình trạng': r.levelText, 'Số đo lúc': r.time ? dateTime(r.time) : '',
+        'Tình trạng': r.levelText, 'Mức màu': risk(r.level).name, 'Số đo lúc': r.time ? dateTime(r.time) : '',
       };
     }
     if (tab === 'landslides') {
       return {
         ...base, 'Mã điểm': r.id, 'Điểm đen': r.name, 'Tuyến đường': r.sub, 'Xã/phường': r.area || '',
         'Mưa 24h (mm)': r.rain24 ?? '', 'Độ nghiêng (°)': r.tilt ?? '', 'Nguy cơ': r.risk || '', 'Giao thông': r.levelText,
-        'Hướng xử lý': r.action || '',
+        'Mức màu': risk(r.level).name, 'Hướng xử lý': r.action || '',
       };
     }
     if (tab === 'sos') {
       return {
         ...base, 'Mã phiếu': r.name, 'Loại sự cố': r.sub, 'Xã/phường': r.area || '', 'Địa chỉ': r.address || '',
         'Số người': r.trapped ?? '', 'Mức ưu tiên': PRIORITY[r.priority]?.label || '', 'Trạng thái': r.status, 'Từ lúc nhận (phút)': r.waited,
-        'Ghi chú': r.levelText === 'Quá hạn phản hồi' ? 'Quá hạn phản hồi' : '',
+        'Ghi chú': r.late ? 'Quá hạn phản hồi' : '',
       };
     }
     return {
@@ -117,44 +139,52 @@ function excelRows(tab, rows) {
   });
 }
 
-const Th = ({ k, sort, onSort, className, children }) => (
-  <th scope="col" className={clsx('p-2.5 font-semibold', k && 'cursor-pointer hover:text-ink', className)} onClick={k ? () => onSort(k) : undefined}>
-    <span className="inline-flex items-center gap-1">
-      {children}
-      {k && <ArrowUpDown size={11} className={sort.key === k ? 'text-accent' : 'opacity-40'} />}
-    </span>
-  </th>
-);
+const Chip = ({ r }) => <span className={clsx('chip whitespace-nowrap px-2 py-0 text-[10px]', risk(r.level).chip)}>{r.levelText}</span>;
 
 /**
  * Bảng tác chiến dưới Dashboard: 4 chuyên đề, mọi dòng từ API thật (trạm, điểm đen sạt lở trong KPI, phiếu SOS, kho).
- * Thao tác chỉ dẫn tới luồng nghiệp vụ có sẵn: bản đồ, Điều hành cứu hộ, khung soạn cảnh báo (vẫn Maker–Checker + PIN).
+ * Tìm kiếm, lọc theo mức màu, sắp xếp, phân trang, xuất Excel / PDF (toàn bộ danh sách đã lọc, không chỉ trang đang xem).
+ * Điện thoại (< 640 px): mỗi dòng là một thẻ, nút to — không phải kéo ngang bảng 760 px. Thao tác chỉ dẫn tới luồng
+ * nghiệp vụ có sẵn: bản đồ, Điều hành cứu hộ, khung soạn cảnh báo (vẫn Maker–Checker + PIN). Chuyên đề / nút chỉ hiện khi
+ * tài khoản có quyền (SOS: sos.view; Kho: resource.view) — backend vẫn kiểm tra lại.
  */
-export default function OperationsTable({ k, stations, onSelectStation, className }) {
+export default function OperationsTable({ k, kState, stations, stationsState, onSelectStation, scopeLabel, className }) {
   const navigate = useNavigate();
   const { toast, setFocus, setAlertDraft } = useStore();
   const canAlert = usePermission('alert', 'create');
+  const canSos = usePermission('sos', 'view');
+  const canResource = usePermission('resource', 'view');
+  const isWide = useMediaQuery('(min-width: 640px)');
+  const tabs = TABS.filter((t) => !t.perm || (t.perm === 'sos' ? canSos : canResource));
   const [tab, setTab] = useState('rivers');
   const [search, setSearch] = useState('');
-  const [severity, setSeverity] = useState('all');
-  const [sort, setSort] = useState({ key: 'level', desc: true });
+  const [levelFilter, setLevelFilter] = useState('all');
+  const [sort, setSort] = useState({ key: 'rank', desc: true });
   const [selected, setSelected] = useState(() => new Set());
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [pdf, setPdf] = useState(false); // đang chụp PDF: vẽ bảng đủ mọi dòng đã lọc, bỏ cột chọn / thao tác
+  const tableRef = useRef(null);
 
   // /sos không cache (cần tươi tuyệt đối) → chỉ tải khi mở tab SOS, không nhân tải cho mọi cán bộ đang xem Dashboard
-  const { data: tickets } = useAreaQuery('sos', '/sos', {}, { refetchInterval: 20_000, enabled: tab === 'sos' });
-  const { data: supplies } = useAreaQuery('supplies', '/dashboard/supplies', {}, { refetchInterval: 60_000 });
+  const ticketsQ = useAreaQuery('sos', '/sos', {}, { refetchInterval: 20_000, enabled: tab === 'sos' && canSos });
+  const suppliesQ = useAreaQuery('supplies', '/dashboard/supplies', {}, { refetchInterval: 60_000, enabled: canResource });
 
-  const loading = (tab === 'sos' && !tickets) || (tab === 'supplies' && !supplies) || (tab === 'landslides' && !k);
+  const state = {
+    rivers: stationsState,
+    landslides: kState,
+    sos: { loading: ticketsQ.isLoading, error: ticketsQ.isError && !ticketsQ.data, refetch: ticketsQ.refetch },
+    supplies: { loading: suppliesQ.isLoading, error: suppliesQ.isError && !suppliesQ.data, refetch: suppliesQ.refetch },
+  }[tab] || {};
   const rows = useMemo(
-    () => buildRows(tab, { stations, points: k?.landslides?.points || [], tickets: tickets || [], supplies: supplies || [] }),
-    [tab, stations, k, tickets, supplies],
+    () => buildRows(tab, { stations, points: k?.landslides?.points || [], tickets: ticketsQ.data || [], supplies: suppliesQ.data || [] })
+      .map((r) => ({ ...r, rank: r.level ?? -1 })),
+    [tab, stations, k, ticketsQ.data, suppliesQ.data],
   );
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const list = rows.filter((r) => (severity === 'all' || r.tone === severity)
+    const list = rows.filter((r) => (levelFilter === 'all' || (levelFilter === 'none' ? r.level == null : r.level === Number(levelFilter)))
       && (!q || [r.id, r.name, r.sub, r.area, r.levelText, r.address].some((x) => x && String(x).toLowerCase().includes(q))));
     const dir = sort.desc ? -1 : 1;
     return list.sort((a, b) => {
@@ -165,21 +195,23 @@ export default function OperationsTable({ k, stations, onSelectStation, classNam
       if (y == null) return -1;
       return (typeof x === 'string' ? x.localeCompare(y, 'vi') : x - y) * dir;
     });
-  }, [rows, search, severity, sort]);
+  }, [rows, search, levelFilter, sort]);
 
   const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const cur = Math.min(page, pages);
-  const visible = filtered.slice((cur - 1) * pageSize, cur * pageSize);
+  const visible = pdf ? filtered : filtered.slice((cur - 1) * pageSize, cur * pageSize);
   const chosen = filtered.filter((r) => selected.has(r.id));
   const allChecked = filtered.length > 0 && chosen.length === filtered.length;
+  const cols = COLUMNS[tab];
+  const tabInfo = TABS.find((t) => t.id === tab);
 
   const switchTab = (id) => {
     setTab(id);
     setSelected(new Set());
-    setSeverity('all');
+    setLevelFilter('all');
     setSearch('');
     setPage(1);
-    setSort({ key: 'level', desc: true });
+    setSort({ key: 'rank', desc: true });
   };
   const toggle = (id) => setSelected((prev) => {
     const next = new Set(prev);
@@ -193,12 +225,34 @@ export default function OperationsTable({ k, stations, onSelectStation, classNam
     navigate('/ban-do');
   };
 
-  const doExport = async (list) => {
+  const doExcel = async (list) => {
     if (!list.length) return;
     try {
-      await exportExcel(excelRows(tab, list), { sheet: TABS.find((t) => t.id === tab).label, filename: `bang-tac-chien-${tab}-${vnFileStamp(new Date(), true)}.xlsx` });
+      await exportExcel(excelRows(tab, list), { sheet: tabInfo.label, filename: `bang-tac-chien-${tab}-${vnFileStamp(new Date(), true)}.xlsx` });
     } catch (e) {
       toast({ tone: 'danger', title: 'Không xuất được tệp Excel', body: e.message });
+    }
+  };
+
+  // PDF như trang Vật tư & Lực lượng (utils/exportPdf: chụp bảng, tiêu đề vẽ qua canvas để giữ dấu tiếng Việt) — vẽ đủ
+  // mọi dòng ĐÃ LỌC dạng bảng (cả trên điện thoại), chụp xong trả lại phân trang
+  const doPdf = async () => {
+    if (!filtered.length || pdf) return;
+    setPdf(true);
+    try {
+      await new Promise((resolve) => { requestAnimationFrame(() => requestAnimationFrame(resolve)); });
+      const now = new Date();
+      const lv = LEVEL_FILTERS.find(([id]) => id === levelFilter)?.[1];
+      await exportSnapshotPdf(tableRef.current, {
+        title: `BẢNG TÁC CHIẾN – ${tabInfo.label.toUpperCase()}`,
+        subtitle: [scopeLabel, `${filtered.length} mục`, levelFilter !== 'all' && lv, search.trim() && `tìm "${search.trim()}"`, now.toLocaleString('vi-VN')]
+          .filter(Boolean).join(' · '),
+        filename: `bang-tac-chien-${tab}-${vnFileStamp(now, true)}.pdf`,
+      });
+    } catch (e) {
+      toast({ tone: 'danger', title: 'Không xuất được PDF', body: e.message });
+    } finally {
+      setPdf(false);
     }
   };
 
@@ -206,12 +260,12 @@ export default function OperationsTable({ k, stations, onSelectStation, classNam
   // mẫu tin, kiểm tra rồi gửi duyệt — lệnh vẫn qua Lãnh đạo phê duyệt (Maker–Checker + PIN), không phát từ đây.
   const codes = [...new Set(chosen.map((r) => r.adminCode).filter(Boolean))];
   const draftAlert = () => {
-    const severityCode = chosen.some((r) => r.tone === 'danger') ? 'do' : chosen.some((r) => r.tone === 'serious') ? 'cam' : 'vang';
+    const top = Math.max(...chosen.map((r) => r.level ?? 0));
     setAlertDraft({
       prefill: {
         title: tab === 'landslides' ? 'Cảnh báo nguy cơ sạt lở' : 'Cảnh báo khẩn cấp',
         body: '',
-        severity: severityCode,
+        severity: top >= 3 ? 'do' : top === 2 ? 'cam' : 'vang',
         codes,
         channels: ALERT_CHANNELS,
         validHours: 48,
@@ -221,57 +275,88 @@ export default function OperationsTable({ k, stations, onSelectStation, classNam
     navigate('/canh-bao');
   };
 
-  const chip = (r) => <span className={clsx('chip whitespace-nowrap px-2 py-0 text-[10px]', CHIP[r.tone])}>{r.levelText}</span>;
-  const mapBtn = (r) => r.lat != null && (
-    <button type="button" className="btn-ghost px-2 py-0.5 text-[11px]" onClick={() => showOnMap(r)} title="Xem trên bản đồ giám sát">
-      <MapPin size={12} /> Bản đồ
-    </button>
-  );
+  const actions = (r, big) => {
+    const cls = clsx('btn-ghost text-[11px]', big ? 'min-h-[40px] flex-1 px-3' : 'px-2 py-0.5');
+    return (
+      <>
+        {tab === 'rivers' && onSelectStation && (
+          <button type="button" className={cls} onClick={() => onSelectStation(r.id)} title="Xem biểu đồ thuỷ văn của trạm">
+            <ChartLine size={12} /> Biểu đồ
+          </button>
+        )}
+        {tab === 'sos' && canSos && <Link to="/cuu-ho" className={cls}>Điều phối</Link>}
+        {tab === 'supplies' && canResource && <Link to="/nguon-luc" className={cls}>Kho</Link>}
+        {tab !== 'supplies' && r.lat != null && (
+          <button type="button" className={cls} onClick={() => showOnMap(r)} title="Xem trên bản đồ giám sát">
+            <MapPin size={12} /> Bản đồ
+          </button>
+        )}
+      </>
+    );
+  };
+
+  const asTable = isWide || pdf;
+  const status = state.loading
+    ? 'loading'
+    : state.error ? 'error' : !visible.length ? 'empty' : 'rows';
+  const statusBox = status === 'loading'
+    ? <Skeleton height={140} />
+    : status === 'error'
+      ? <ErrorState onRetry={state.refetch}>Không tải được danh sách {tabInfo.noun}</ErrorState>
+      : status === 'empty'
+        ? <p className="p-6 text-center text-xs text-muted">{rows.length ? 'Không có mục khớp bộ lọc' : EMPTY[tab]}</p>
+        : null;
 
   return (
     <section className={clsx('card flex flex-col gap-3 p-3 sm:p-4', className)}>
       <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
         <h2 className="card-title">Bảng tác chiến theo chuyên đề</h2>
-        <div className="scroll-thin flex gap-1 overflow-x-auto">
-          {TABS.map((t) => (
+        <div className="scroll-thin -mx-1 flex gap-1 overflow-x-auto px-1 pb-0.5" role="tablist" aria-label="Chuyên đề của bảng">
+          {tabs.map((t) => (
             <button
               key={t.id}
               type="button"
+              role="tab"
+              aria-selected={tab === t.id}
               onClick={() => switchTab(t.id)}
-              aria-pressed={tab === t.id}
               className={clsx(
-                'flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border px-2.5 py-1 text-xs font-semibold',
+                'flex min-h-[36px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border px-2.5 py-1 text-xs font-semibold',
                 tab === t.id ? 'border-accent bg-accent text-white' : 'border-line bg-panel2/60 text-ink-2 hover:text-ink',
               )}
             >
-              <t.icon size={13} /> {t.label}
+              <t.icon size={13} aria-hidden="true" /> <span className="sm:hidden">{t.short}</span><span className="hidden sm:inline">{t.label}</span>
             </button>
           ))}
         </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[200px] flex-1">
-          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted" />
+        <div className="relative min-w-0 flex-[1_1_220px]">
+          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted" aria-hidden="true" />
           <input
-            className="input py-1 pl-8 pr-7 text-xs"
+            className="input min-h-[40px] py-1 pl-8 pr-8 text-xs"
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             placeholder="Tìm theo tên, mã, xã/phường, tình trạng…"
             aria-label="Tìm trong bảng"
           />
           {search && (
-            <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-ink" onClick={() => setSearch('')} aria-label="Xoá tìm kiếm">
-              <X size={12} />
+            <button type="button" className="absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center text-muted hover:text-ink" onClick={() => setSearch('')} aria-label="Xoá tìm kiếm">
+              <X size={13} />
             </button>
           )}
         </div>
-        <select className="input w-auto py-1 text-xs" value={severity} onChange={(e) => { setSeverity(e.target.value); setPage(1); }} aria-label="Lọc theo mức">
-          {SEVERITY.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+        <select className="input min-h-[40px] w-auto py-1 text-xs" value={levelFilter} onChange={(e) => { setLevelFilter(e.target.value); setPage(1); }} aria-label="Lọc theo mức màu">
+          {LEVEL_FILTERS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
         </select>
-        <button type="button" className="btn-ghost px-2.5 py-1 text-xs" onClick={() => doExport(filtered)} disabled={!filtered.length}>
-          <FileSpreadsheet size={13} /> Xuất Excel
-        </button>
+        <div className="flex gap-2">
+          <button type="button" className="btn-ghost min-h-[40px] px-2.5 py-1 text-xs" onClick={() => doExcel(filtered)} disabled={!filtered.length}>
+            <FileSpreadsheet size={13} /> Excel
+          </button>
+          <button type="button" className="btn-ghost min-h-[40px] px-2.5 py-1 text-xs" onClick={doPdf} disabled={!filtered.length || pdf}>
+            {pdf ? <Loader2 size={13} className="animate-spin" /> : <FileDown size={13} />} PDF
+          </button>
+        </div>
       </div>
 
       {chosen.length > 0 && (
@@ -279,13 +364,13 @@ export default function OperationsTable({ k, stations, onSelectStation, classNam
           <span className="flex items-center gap-1.5 rounded-lg bg-accent/15 px-2 py-0.5 font-bold text-accent">
             Đã chọn {chosen.length} mục
           </span>
-          <button type="button" className="btn-primary px-2.5 py-1 text-xs font-semibold" onClick={() => doExport(chosen)}>
+          <button type="button" className="btn-primary min-h-[36px] px-2.5 py-1 text-xs font-semibold" onClick={() => doExcel(chosen)}>
             <FileSpreadsheet size={13} /> Xuất Excel mục đã chọn
           </button>
           {canAlert && (tab === 'landslides' || tab === 'sos') && (
             <button
               type="button"
-              className="btn-danger px-2.5 py-1 text-xs font-bold"
+              className="btn-danger min-h-[36px] px-2.5 py-1 text-xs font-bold"
               onClick={draftAlert}
               disabled={!codes.length}
               title={codes.length ? 'Mở khung soạn cảnh báo, điền sẵn các xã/phường của mục đã chọn' : 'Mục đã chọn chưa gắn xã/phường'}
@@ -293,139 +378,127 @@ export default function OperationsTable({ k, stations, onSelectStation, classNam
               <Megaphone size={13} /> Soạn cảnh báo cho {codes.length} xã/phường
             </button>
           )}
-          <button type="button" className="ml-auto text-xs text-muted hover:text-ink" onClick={() => setSelected(new Set())}>
+          <button type="button" className="ml-auto min-h-[36px] px-1 text-xs text-muted hover:text-ink" onClick={() => setSelected(new Set())}>
             Bỏ chọn
           </button>
         </div>
       )}
 
-      <div className="scroll-thin overflow-x-auto rounded-lg border border-line">
-        <table className="w-full min-w-[760px] text-left text-xs">
-          <thead className="bg-panel2/70 text-[11px] uppercase tracking-wide text-muted">
-            <tr>
-              <th scope="col" className="w-8 p-2.5">
-                <input
-                  type="checkbox"
-                  checked={allChecked}
-                  onChange={() => setSelected(allChecked ? new Set() : new Set(filtered.map((r) => r.id)))}
-                  aria-label="Chọn tất cả"
-                />
-              </th>
-              <Th k="name" sort={sort} onSort={onSort}>{tab === 'sos' ? 'Phiếu' : tab === 'supplies' ? 'Kho' : tab === 'rivers' ? 'Trạm' : 'Điểm'}</Th>
-              {tab !== 'supplies' && <Th k="area" sort={sort} onSort={onSort}>Xã/phường</Th>}
-              {tab === 'rivers' && (
-                <>
-                  <Th k="value" sort={sort} onSort={onSort} className="text-right">Mực nước</Th>
-                  <Th className="text-right">BĐ I / II / III</Th>
-                  <Th k="time" sort={sort} onSort={onSort}>Số đo lúc</Th>
-                </>
-              )}
-              {tab === 'landslides' && (
-                <>
-                  <Th k="rain24" sort={sort} onSort={onSort} className="text-right">Mưa 24h</Th>
-                  <Th k="tilt" sort={sort} onSort={onSort} className="text-right">Nghiêng</Th>
-                  <Th>Nguy cơ</Th>
-                </>
-              )}
-              {tab === 'sos' && (
-                <>
-                  <Th k="trapped" sort={sort} onSort={onSort} className="text-right">Số người</Th>
-                  <Th>Trạng thái</Th>
-                  <Th k="waited" sort={sort} onSort={onSort} className="text-right">Từ lúc nhận</Th>
-                </>
-              )}
-              {tab === 'supplies' && CATS.map(([key, label]) => <Th key={key} className="text-right">{label}</Th>)}
-              <Th k="level" sort={sort} onSort={onSort}>{tab === 'landslides' ? 'Giao thông' : 'Mức'}</Th>
-              <Th className="text-right">Thao tác</Th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-line/60">
-            {loading && (
+      {statusBox || (asTable ? (
+        <div className="scroll-thin overflow-x-auto rounded-lg border border-line">
+          <table ref={tableRef} className={clsx('w-full bg-panel text-left text-xs', pdf ? 'min-w-[1100px]' : 'min-w-[760px]')}>
+            <caption className="sr-only">{tabInfo.label} — {filtered.length} mục</caption>
+            <thead className="bg-panel2/70 text-[11px] uppercase tracking-wide text-muted">
               <tr>
-                <td colSpan={9} className="p-6 text-center text-muted">Đang tải…</td>
-              </tr>
-            )}
-            {!loading && !visible.length && (
-              <tr>
-                <td colSpan={9} className="p-6 text-center text-muted">{rows.length ? 'Không có mục khớp bộ lọc' : EMPTY[tab]}</td>
-              </tr>
-            )}
-            {!loading && visible.map((r) => (
-              <tr key={r.id} className={clsx('hover:bg-panel2/50', selected.has(r.id) && 'bg-accent/5')}>
-                <td className="p-2.5">
-                  <input type="checkbox" checked={selected.has(r.id)} onChange={() => toggle(r.id)} aria-label={`Chọn ${r.name}`} />
-                </td>
-                <td className="max-w-[240px] p-2.5">
-                  <div className="truncate font-semibold text-ink" title={r.name}>{r.name}</div>
-                  {r.sub && <div className="truncate text-muted" title={r.sub}>{r.sub}</div>}
-                </td>
-                {tab !== 'supplies' && (
-                  <td className="max-w-[200px] p-2.5">
-                    <div className="truncate">{r.area || '–'}</div>
-                    {r.address && <div className="truncate text-muted" title={r.address}>{r.address}</div>}
-                  </td>
+                {!pdf && (
+                  <th scope="col" className="w-8 p-2.5">
+                    <input
+                      type="checkbox"
+                      checked={allChecked}
+                      onChange={() => setSelected(allChecked ? new Set() : new Set(filtered.map((r) => r.id)))}
+                      aria-label="Chọn tất cả"
+                    />
+                  </th>
                 )}
-                {tab === 'rivers' && (
-                  <>
-                    <td className={clsx('p-2.5 text-right font-mono font-semibold', r.level < 0 && 'text-muted')}>{r.value == null ? '–' : `${num(r.value, 2)} m`}</td>
-                    <td className="whitespace-nowrap p-2.5 text-right font-mono text-muted">
-                      {[r.thr.bd1, r.thr.bd2, r.thr.bd3].map((x) => (x == null ? '–' : num(x, 2))).join(' / ')}
-                    </td>
-                    <td className="whitespace-nowrap p-2.5 text-muted">{r.time ? dateTime(r.time) : 'không có số đo 2 giờ qua'}</td>
-                  </>
-                )}
-                {tab === 'landslides' && (
-                  <>
-                    <td className="p-2.5 text-right font-mono">{r.rain24 == null ? '–' : `${num(r.rain24, 1)} mm`}</td>
-                    <td className="p-2.5 text-right font-mono">{r.tilt == null ? '–' : `${num(r.tilt, 2)}°`}</td>
-                    <td className="p-2.5">{r.risk || '–'}</td>
-                  </>
-                )}
-                {tab === 'sos' && (
-                  <>
-                    <td className="p-2.5 text-right font-mono">{r.trapped ?? '?'}</td>
-                    <td className="whitespace-nowrap p-2.5">{r.status}</td>
-                    <td className={clsx('whitespace-nowrap p-2.5 text-right font-mono', r.levelText === 'Quá hạn phản hồi' && 'font-bold text-danger')}>{int(r.waited)} phút</td>
-                  </>
-                )}
-                {tab === 'supplies' && CATS.map(([key]) => (
-                  <td key={key} className={clsx('p-2.5 text-right font-mono', r.pcts[key] != null && r.pcts[key] < 20 && 'font-bold text-danger')}>
-                    {r.pcts[key] == null ? '–' : `${r.pcts[key]}%`}
-                  </td>
-                ))}
-                <td className="p-2.5">{chip(r)}</td>
-                <td className="p-2.5">
-                  <div className="flex justify-end gap-1">
-                    {tab === 'rivers' && onSelectStation && (
-                      <button type="button" className="btn-ghost px-2 py-0.5 text-[11px]" onClick={() => onSelectStation(r.id)} title="Xem biểu đồ thuỷ văn của trạm">
-                        <ChartLine size={12} /> Biểu đồ
+                {[{ label: { rivers: 'Trạm', landslides: 'Điểm', sos: 'Phiếu', supplies: 'Kho' }[tab], sort: 'name' }, ...cols,
+                  { label: tab === 'landslides' ? 'Giao thông' : 'Mức', sort: 'rank' }].map((col) => (
+                  <th
+                    key={col.label}
+                    scope="col"
+                    className={clsx('p-2.5 font-semibold', col.num && 'text-right')}
+                    aria-sort={col.sort && sort.key === col.sort ? (sort.desc ? 'descending' : 'ascending') : undefined}
+                  >
+                    {col.sort && !pdf ? (
+                      <button type="button" className="inline-flex items-center gap-1 uppercase hover:text-ink" onClick={() => onSort(col.sort)}>
+                        {col.label}
+                        <ArrowUpDown size={11} className={sort.key === col.sort ? 'text-accent' : 'opacity-40'} aria-hidden="true" />
                       </button>
-                    )}
-                    {tab === 'sos' && <Link to="/cuu-ho" className="btn-ghost px-2 py-0.5 text-[11px]">Điều phối</Link>}
-                    {tab === 'supplies' && <Link to="/nguon-luc" className="btn-ghost px-2 py-0.5 text-[11px]">Kho</Link>}
-                    {tab !== 'supplies' && mapBtn(r)}
-                  </div>
-                </td>
+                    ) : col.label}
+                  </th>
+                ))}
+                {!pdf && <th scope="col" className="p-2.5 text-right font-semibold">Thao tác</th>}
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody className="divide-y divide-line/60">
+              {visible.map((r) => (
+                <tr key={r.id} className={clsx('hover:bg-panel2/50', selected.has(r.id) && !pdf && 'bg-accent/5')}>
+                  {!pdf && (
+                    <td className="p-2.5">
+                      <input type="checkbox" checked={selected.has(r.id)} onChange={() => toggle(r.id)} aria-label={`Chọn ${r.name}`} />
+                    </td>
+                  )}
+                  <td className={clsx('p-2.5', !pdf && 'max-w-[240px]')}>
+                    <div className={clsx('font-semibold text-ink', !pdf && 'truncate')} title={r.name}>{r.name}</div>
+                    {r.sub && <div className={clsx('text-muted', !pdf && 'truncate')} title={r.sub}>{r.sub}</div>}
+                  </td>
+                  {cols.map((col) => (
+                    <td
+                      key={col.label}
+                      className={clsx('p-2.5', col.num && 'whitespace-nowrap text-right font-mono', col.alarm?.(r) && 'font-bold text-danger')}
+                    >
+                      <div className={clsx(!pdf && !col.num && 'max-w-[200px] truncate')}>{col.cell(r)}</div>
+                      {col.sub?.(r) && <div className={clsx('text-muted', !pdf && 'max-w-[200px] truncate')} title={col.sub(r)}>{col.sub(r)}</div>}
+                    </td>
+                  ))}
+                  <td className="p-2.5"><Chip r={r} /></td>
+                  {!pdf && (
+                    <td className="p-2.5">
+                      <div className="flex justify-end gap-1">{actions(r, false)}</div>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        // Điện thoại: mỗi dòng một thẻ — vạch màu trái theo mức, số liệu 2 cột, nút cao ≥ 40 px
+        <ul className="flex flex-col gap-2" aria-label={tabInfo.label}>
+          {visible.map((r) => (
+            <li key={r.id} className={clsx('rounded-xl border border-l-4 bg-panel p-3', risk(r.level).edge, selected.has(r.id) ? 'border-accent' : 'border-line')}>
+              <div className="flex items-start gap-2.5">
+                <input type="checkbox" className="mt-0.5 h-5 w-5 shrink-0" checked={selected.has(r.id)} onChange={() => toggle(r.id)} aria-label={`Chọn ${r.name}`} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <b className="block text-sm leading-snug text-ink">{r.name}</b>
+                      {r.sub && <span className="block text-xs text-muted">{r.sub}</span>}
+                    </div>
+                    <Chip r={r} />
+                  </div>
+                  <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                    {cols.map((col) => (
+                      <div key={col.label} className="min-w-0">
+                        <dt className="text-[11px] text-muted">{col.label}</dt>
+                        <dd className={clsx('break-words font-medium text-ink', col.num && 'font-mono', col.alarm?.(r) && 'font-bold text-danger')}>
+                          {col.cell(r)}
+                          {col.sub?.(r) && <span className="block font-normal text-muted">{col.sub(r)}</span>}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                  <div className="mt-2.5 flex gap-2">{actions(r, true)}</div>
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      ))}
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted no-print">
         <span>
           {filtered.length} mục{filtered.length !== rows.length && ` (trong ${rows.length})`}
         </span>
         <div className="flex items-center gap-2">
-          <select className="input w-auto py-0.5 text-xs" value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }} aria-label="Số dòng mỗi trang">
+          <select className="input min-h-[36px] w-auto py-0.5 text-xs" value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }} aria-label="Số dòng mỗi trang">
             {[10, 20, 50].map((n) => <option key={n} value={n}>{n} dòng</option>)}
           </select>
-          <button type="button" className="btn-ghost px-1.5 py-0.5" onClick={() => setPage(Math.max(1, cur - 1))} disabled={cur <= 1} aria-label="Trang trước">
-            <ChevronLeft size={14} />
+          <button type="button" className="btn-ghost h-9 w-9 p-0" onClick={() => setPage(Math.max(1, cur - 1))} disabled={cur <= 1} aria-label="Trang trước">
+            <ChevronLeft size={15} />
           </button>
           <span className="font-mono">{cur}/{pages}</span>
-          <button type="button" className="btn-ghost px-1.5 py-0.5" onClick={() => setPage(Math.min(pages, cur + 1))} disabled={cur >= pages} aria-label="Trang sau">
-            <ChevronRight size={14} />
+          <button type="button" className="btn-ghost h-9 w-9 p-0" onClick={() => setPage(Math.min(pages, cur + 1))} disabled={cur >= pages} aria-label="Trang sau">
+            <ChevronRight size={15} />
           </button>
         </div>
       </div>

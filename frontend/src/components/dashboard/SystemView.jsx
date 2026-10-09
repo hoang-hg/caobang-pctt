@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import { CheckCircle2, CircleDashed, Cpu, DatabaseZap, PlugZap, Server } from 'lucide-react';
 import { api } from '../../api/client';
 import { STATION_TYPE } from '../../utils/labels';
+import { ErrorState } from '../common/ui';
 import { ago, dateTime, int } from '../../utils/format';
 
 const SOURCE_KIND = { simulator: 'Bộ mô phỏng', iot: 'Thiết bị IoT', external: 'Nguồn ngoài' };
@@ -46,8 +47,10 @@ const Row = ({ label, children }) => (
  */
 export default function SystemView({ k, stations, supplies, evac, unitsCount, canImport }) {
   const { data: health, isError: healthError } = useQuery({ queryKey: ['health'], queryFn: fetchHealth, refetchInterval: 30_000 });
-  const { data: monitor } = useQuery({ queryKey: ['int-monitor'], queryFn: () => api('/integrations/monitor'), refetchInterval: 15_000 });
-  const { data: sources = [] } = useQuery({ queryKey: ['int-sources'], queryFn: () => api('/integrations/sources'), refetchInterval: 20_000 });
+  const monitorQ = useQuery({ queryKey: ['int-monitor'], queryFn: () => api('/integrations/monitor'), refetchInterval: 15_000 });
+  const sourcesQ = useQuery({ queryKey: ['int-sources'], queryFn: () => api('/integrations/sources'), refetchInterval: 20_000 });
+  const monitor = monitorQ.data;
+  const sources = sourcesQ.data || [];
 
   const now = Date.now();
   const byType = Object.keys(STATION_TYPE).map((type) => {
@@ -113,6 +116,7 @@ export default function SystemView({ k, stations, supplies, evac, unitsCount, ca
               {t.total ? `${t.fresh}/${t.total} trạm có số đo trong 60 phút` : <span className="text-muted">chưa có trạm</span>}
             </Row>
           ))}
+          {!monitor && monitorQ.isError && <ErrorState onRetry={monitorQ.refetch}>Không tải được tình trạng thiết bị IoT</ErrorState>}
           {monitor && (
             <>
               <Row label="Nguồn số đo của trạm">
@@ -165,7 +169,8 @@ export default function SystemView({ k, stations, supplies, evac, unitsCount, ca
               </li>
             );
           })}
-          {!sources.length && <li className="py-3 text-center text-xs text-muted">Chưa khai báo nguồn dữ liệu</li>}
+          {!sourcesQ.data && sourcesQ.isError && <li><ErrorState onRetry={sourcesQ.refetch}>Không tải được danh sách nguồn dữ liệu</ErrorState></li>}
+          {sourcesQ.data && !sources.length && <li className="py-3 text-center text-xs text-muted">Chưa khai báo nguồn dữ liệu</li>}
         </ul>
         {monitor?.log?.length > 0 && (
           <div className="border-t border-line/60 pt-2">

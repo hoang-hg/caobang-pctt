@@ -4,6 +4,7 @@ import { Area, ComposedChart, Line, ReferenceArea, ReferenceLine, ResponsiveCont
 import { api } from '../../api/client';
 import { dateTime, hourLabel, num } from '../../utils/format';
 import { alarmLevel, ALARM } from '../../utils/labels';
+import { EmptyState, ErrorState, Skeleton } from '../common/ui';
 import { axisProps, ChartTooltip, Legend, useChartTheme } from './chartTheme';
 
 // Số đo theo giờ (time_bucket 60 phút): giờ gần nhất cũ hơn 2 giờ → trạm không còn gửi số đo, không hiện như "hiện tại"
@@ -15,7 +16,7 @@ const bdLabel = (name, v) => `${name} (${v != null ? `${num(v, 2)} m` : 'chưa k
  * (chỉ có khi bật bộ mô phỏng), không có cả hai → chỉ vẽ thực đo và ghi rõ chưa có bản tin. */
 export default function Hydrograph({ stationId, height = 260, hours = 48, compact = false }) {
   const c = useChartTheme();
-  const { data } = useQuery({
+  const { data, isError, refetch } = useQuery({
     queryKey: ['series', stationId, hours],
     queryFn: () => api(`/stations/${stationId}/series`, { params: { hours } }),
     enabled: !!stationId,
@@ -49,15 +50,17 @@ export default function Hydrograph({ stationId, height = 260, hours = 48, compac
     };
   }, [data]);
 
-  if (!data) return <div style={{ height }} className="animate-pulse rounded-lg bg-panel2" />;
+  if (!data) {
+    return isError ? <ErrorState height={height} onRetry={refetch}>Không tải được số đo của trạm</ErrorState> : <Skeleton height={height} />;
+  }
   if (!rows.length) {
     // Chỉ dùng ngưỡng ĐÃ khai báo — trạm mới nhập có thể mới có 1–2 ngưỡng (README 2.4: được để trống tạm)
     const declared = [['BĐ I', thr.bd1], ['BĐ II', thr.bd2], ['BĐ III', thr.bd3]].filter(([, v]) => v != null);
     if (!declared.length) {
       return (
-        <div style={{ height }} className="flex items-center justify-center rounded-lg border border-dashed border-line px-4 text-center text-xs text-muted">
+        <EmptyState height={height}>
           {data.station?.name || 'Trạm'} chưa có số đo trong {hours} giờ qua và chưa có bản tin dự báo
-        </div>
+        </EmptyState>
       );
     }
     const nowT = Date.now();

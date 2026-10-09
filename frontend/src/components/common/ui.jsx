@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import clsx from 'clsx';
-import { ArrowLeft, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, RefreshCw, X } from 'lucide-react';
+import { NO_DATA, RISK } from '../../utils/risk';
 
 export function KpiCard({ label, value, unit, sub, tone, icon: Icon, blink, children }) {
   const toneCls = {
@@ -77,26 +78,30 @@ export function BackButton({ onClick, children = 'Quay lại Bản đồ', class
 }
 
 /** Hộp thoại — gắn thẳng vào <body> (portal): mở từ trong header (backdrop-blur tạo khung chứa cho `position: fixed`)
- * thì vẫn phủ toàn màn hình, không bị cắt trong dải header. */
+ * thì vẫn phủ toàn màn hình, không bị cắt trong dải header. Hộp thoại không cao quá màn hình: chỉ phần thân cuộn, hàng
+ * nút (footer) luôn thấy — trước đây thân cao tới 75vh cộng tiêu đề + nút vượt màn 740 px, nút chính nằm dưới mép. */
 export function Modal({ open, onClose, title, children, wide, footer }) {
   useEscapeToClose(open, onClose);
   if (!open) return null;
   return createPortal(
     <div className="fixed inset-0 z-[1500] flex items-start justify-center overflow-y-auto bg-black/50 p-4 pt-12" onMouseDown={onClose}>
       <div
-        className={clsx('card w-full shadow-2xl', wide ? 'max-w-4xl' : 'max-w-lg')}
+        className={clsx(
+          'card flex max-h-[calc(100vh-4rem)] w-full flex-col shadow-2xl supports-[height:100dvh]:max-h-[calc(100dvh-4rem)]',
+          wide ? 'max-w-4xl' : 'max-w-lg',
+        )}
         onMouseDown={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
       >
-        <div className="flex items-center justify-between border-b border-line px-4 py-3">
+        <div className="flex shrink-0 items-center justify-between border-b border-line px-4 py-3">
           <h3 className="font-semibold">{title}</h3>
           <button className="rounded p-1 text-muted hover:bg-panel2" onClick={onClose} aria-label="Đóng">
             <X size={18} />
           </button>
         </div>
-        <div className="max-h-[75vh] overflow-y-auto p-4 scroll-thin">{children}</div>
-        {footer && <div className="flex justify-end gap-2 border-t border-line px-4 py-3">{footer}</div>}
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 scroll-thin">{children}</div>
+        {footer && <div className="flex shrink-0 justify-end gap-2 border-t border-line px-4 py-3">{footer}</div>}
       </div>
     </div>,
     document.body,
@@ -139,5 +144,60 @@ export function Section({ title, right, children, className, bodyClass, id }) {
 export const Empty = ({ children = 'Không có dữ liệu trong vùng đang lọc' }) => (
   <div className="py-8 text-center text-sm text-muted">{children}</div>
 );
+
+/* ---- Ba trạng thái của một khối số liệu: đang tải · lỗi · trống (cùng khung, cùng chiều cao → trang không nhảy) ---- */
+
+/** Đang tải: khung xám nhấp nháy đúng chiều cao nội dung sắp hiện. */
+export const Skeleton = ({ height, className }) => (
+  <div style={height ? { height } : undefined} className={clsx('animate-pulse rounded-lg bg-panel2', className)} role="status" aria-label="Đang tải" />
+);
+
+/** Lỗi tải: nói rõ KHÔNG tải được (không giả "chưa có dữ liệu"), có nút thử lại. */
+export function ErrorState({ height, onRetry, className, children = 'Không tải được số liệu từ máy chủ' }) {
+  return (
+    <div
+      role="alert"
+      style={height ? { height } : undefined}
+      className={clsx('flex flex-col items-center justify-center gap-2 rounded-lg border border-danger/40 bg-danger/5 px-4 py-5 text-center text-xs text-danger', className)}
+    >
+      <span className="flex items-center gap-1.5 font-semibold">
+        <AlertTriangle size={14} className="shrink-0" /> {children}
+      </span>
+      {onRetry && (
+        <button type="button" className="btn-ghost min-h-[36px] px-3 py-1 text-xs" onClick={() => onRetry()}>
+          <RefreshCw size={12} /> Thử lại
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Trống: hệ thống tải được nhưng chưa có dữ liệu — nói cần nhập gì / ở đâu. */
+export const EmptyState = ({ height, className, children }) => (
+  <div
+    style={height ? { height } : undefined}
+    className={clsx('flex items-center justify-center rounded-lg border border-dashed border-line px-4 py-5 text-center text-xs text-muted', className)}
+  >
+    <div>{children}</div>
+  </div>
+);
+
+/** Chú giải thang màu rủi ro dùng chung (utils/risk.js): Đỏ → Xanh, cộng Xám = chưa có dữ liệu. */
+export function RiskLegend({ className }) {
+  return (
+    <div className={clsx('flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted', className)} aria-label="Thang màu rủi ro">
+      {[...RISK].reverse().map((r) => (
+        <span key={r.level} className="inline-flex items-center gap-1 whitespace-nowrap">
+          <span className={clsx('inline-block h-2.5 w-2.5 rounded-sm', r.fill)} aria-hidden="true" />
+          <b className="font-semibold text-ink-2">{r.name}</b> {r.meaning.toLowerCase()}
+        </span>
+      ))}
+      <span className="inline-flex items-center gap-1 whitespace-nowrap">
+        <span className="inline-block h-2.5 w-2.5 rounded-sm border border-dashed border-muted bg-panel2" aria-hidden="true" />
+        <b className="font-semibold text-ink-2">{NO_DATA.name}</b> {NO_DATA.meaning.toLowerCase()}
+      </span>
+    </div>
+  );
+}
 
 export const StatusDot = ({ cls }) => <span className={clsx('inline-block h-2 w-2 shrink-0 rounded-full', cls)} />;

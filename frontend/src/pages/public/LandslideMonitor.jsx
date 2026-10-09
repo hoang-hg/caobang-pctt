@@ -109,14 +109,14 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap }) {
 
       {/* 2. Cảnh báo cấm đường khẩn cấp (nếu có điểm tắc đường / cấm xe) */}
       {blockedCount > 0 && (
-        <div className="rounded-2xl p-4 sm:p-5 border border-red-500/50 bg-gradient-to-r from-red-600/95 to-rose-700/95 text-white shadow-lg shadow-red-500/20">
+        <div className="rounded-2xl p-4 sm:p-5 border border-danger/60 bg-danger text-white shadow-lg shadow-danger/20">
           <div className="flex items-start gap-3">
-            <div className="p-2 bg-white/20 rounded-xl text-white shrink-0 mt-0.5 animate-bounce">
+            <div className="p-2 bg-white/20 rounded-xl text-white shrink-0 mt-0.5 motion-safe:animate-bounce">
               <Ban size={24} />
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-black text-sm uppercase tracking-wider bg-white text-danger px-2.5 py-0.5 rounded-md">
+                <span className="font-black text-sm uppercase tracking-wider bg-white text-[rgb(var(--danger))] px-2.5 py-0.5 rounded-md">
                   Cấm Lưu Thông Khẩn Cấp
                 </span>
                 <span className="text-xs font-semibold text-white/90">
@@ -154,7 +154,7 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap }) {
         {/* Card 2: Cấm lưu thông / Tắc đường — chưa có mạng đường thì xám, không khẳng định "không ách tắc" */}
         <div className={clsx(
           'card p-4 flex flex-col justify-between border-l-4',
-          blockedCount > 0 ? 'border-l-red-500 bg-danger/5 ring-1 ring-danger/30' : noRoads ? 'border-l-line' : 'border-l-good'
+          blockedCount > 0 ? 'border-l-danger bg-danger/5 ring-1 ring-danger/30' : noRoads ? 'border-l-line' : 'border-l-good'
         )}>
           <div className="flex items-center justify-between text-muted text-xs">
             <span>Tắc đường / Cấm phương tiện</span>
@@ -181,18 +181,18 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap }) {
         </div>
 
         {/* Card 3: Cảnh báo đá lăn / Nguy cơ cao */}
-        <div className="card p-4 flex flex-col justify-between border-l-4 border-l-amber-500">
+        <div className="card p-4 flex flex-col justify-between border-l-4 border-l-serious">
           <div className="flex items-center justify-between text-muted text-xs">
             <span>Cảnh báo nguy hiểm / Đá lăn</span>
-            <div className="h-8 w-8 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold">
+            <div className="h-8 w-8 rounded-lg bg-serious/10 text-serious flex items-center justify-center font-bold">
               <AlertTriangle size={16} />
             </div>
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-black font-mono text-amber-600">{warningCount}</span>
+            <span className="text-2xl font-black font-mono text-serious">{warningCount}</span>
             <span className="text-xs text-muted">vị trí cần cảnh giác</span>
           </div>
-          <div className="text-[11px] text-amber-600 font-medium mt-2 border-t border-line/60 pt-1.5">
+          <div className="text-[11px] text-serious font-medium mt-2 border-t border-line/60 pt-1.5">
             Hạn chế phương tiện lưu thông ban đêm
           </div>
         </div>
@@ -308,16 +308,17 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap }) {
               className={clsx(
                 'card flex flex-col justify-between overflow-hidden transition-all duration-200 hover:shadow-lg',
                 isBlocked
-                  ? 'border-red-500/80 bg-gradient-to-b from-red-500/5 to-transparent ring-1 ring-red-500/40'
+                  ? 'border-danger/80 bg-gradient-to-b from-danger/5 to-transparent ring-1 ring-danger/40'
                   : isWarning
-                  ? 'border-amber-500/60 bg-gradient-to-b from-amber-500/5 to-transparent'
+                  ? 'border-serious/60 bg-gradient-to-b from-serious/5 to-transparent'
                   : 'border-line hover:border-accent/60'
               )}
             >
               {/* Header Thẻ */}
               <div className="p-4 pb-3 border-b border-line/60">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
+                {/* Thẻ hẹp (điện thoại, lưới 3 cột) → chip trạng thái xuống dòng dưới tên, không ép tên chỉ còn "Đèo Kh…" */}
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0 flex-[1_1_12rem]">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="text-[11px] font-mono font-bold text-muted bg-panel2 px-1.5 py-0.5 rounded">
                         {p.code}
@@ -342,11 +343,11 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap }) {
                   {/* Status Chip */}
                   <span
                     className={clsx(
-                      'chip text-xs font-bold shrink-0 px-2.5 py-1',
+                      'chip text-xs font-bold shrink-0 max-w-full px-2.5 py-1',
                       isBlocked
-                        ? 'bg-danger text-white shadow-sm shadow-danger/30 animate-pulse'
+                        ? 'bg-danger text-white shadow-sm shadow-danger/30 motion-safe:animate-pulse'
                         : isWarning
-                        ? 'bg-amber-500 text-white shadow-sm shadow-amber-500/30'
+                        ? 'bg-serious text-black shadow-sm shadow-serious/30'
                         : isNoData
                         ? 'bg-panel2 text-muted border-line'
                         : 'bg-good/15 text-good border-good/30'
@@ -366,7 +367,7 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap }) {
                 {/* 1. Mô tả hiện trạng địa chất */}
                 <div className="text-xs text-ink-2 leading-relaxed bg-panel2/50 p-2.5 rounded-xl border border-line/50">
                   <b className="text-ink flex items-center gap-1 mb-1">
-                    <AlertOctagon size={13} className={clsx(isBlocked ? 'text-danger' : 'text-amber-600')} />
+                    <AlertOctagon size={13} className={clsx(isBlocked ? 'text-danger' : isWarning ? 'text-serious' : 'text-muted')} />
                     Hiện trạng địa chất & sạt lở:
                   </b>
                   <p className="text-[11px] opacity-95">{p.description}</p>
@@ -422,7 +423,7 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap }) {
                   {p.tilt_info ? (
                     <div className="p-2 rounded-lg bg-panel2/50 border border-line/40">
                       <div className="text-[10px] text-muted flex items-center gap-1">
-                        <Gauge size={11} className={clsx(p.tilt_info.tilt_level === 'nguy_hiem' ? 'text-danger' : 'text-amber-600')} /> Độ nghiêng taluy:
+                        <Gauge size={11} className={clsx(p.tilt_info.tilt_level === 'nguy_hiem' ? 'text-danger' : p.tilt_info.tilt_level === 'canh_bao' ? 'text-serious' : 'text-good')} /> Độ nghiêng taluy:
                       </div>
                       <div className={clsx('font-mono text-xs font-bold mt-0.5', p.tilt_info.tilt_level === 'nguy_hiem' ? 'text-danger' : 'text-ink')}>
                         +{p.tilt_info.current_tilt_deg}°
@@ -434,7 +435,7 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap }) {
                   ) : p.soil_info ? (
                     <div className="p-2 rounded-lg bg-panel2/50 border border-line/40">
                       <div className="text-[10px] text-muted flex items-center gap-1">
-                        <Gauge size={11} className="text-amber-600" /> Độ ẩm đất:
+                        <Gauge size={11} className="text-muted" /> Độ ẩm đất:
                       </div>
                       <div className="font-mono text-xs font-bold text-ink mt-0.5">
                         {p.soil_info.moisture_pct}%
@@ -490,9 +491,9 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap }) {
       )}
 
       {/* 6. Hướng dẫn kỹ năng vượt đèo an toàn trong mùa mưa lũ */}
-      <div className="card p-4 sm:p-5 border-l-4 border-l-amber-500 space-y-3">
+      <div className="card p-4 sm:p-5 border-l-4 border-l-serious space-y-3">
         <h3 className="font-bold text-sm text-ink flex items-center gap-2">
-          <ShieldAlert size={18} className="text-amber-600" />
+          <ShieldAlert size={18} className="text-serious" />
           Kỹ Năng Lái Xe An Toàn Qua Vùng Núi & Đèo Dốc Mùa Mưa Bão
         </h3>
         <div className="grid gap-3 sm:grid-cols-3 text-xs leading-relaxed text-ink-2">
@@ -505,7 +506,7 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap }) {
             </p>
           </div>
           <div className="p-3 rounded-xl bg-panel2/60 border border-line/60">
-            <b className="text-amber-600 flex items-center gap-1 mb-1">
+            <b className="text-serious flex items-center gap-1 mb-1">
               2. Hạ kính nghe ngóng tiếng động lạ
             </b>
             <p className="text-muted">

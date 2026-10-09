@@ -30,8 +30,10 @@ const VIEWPORTS = [
 ];
 const STAFF_PAGES = [
   ['/dashboard', 'Tổng quan'],
-  ['/dashboard?level=xa', 'Tổng quan · cấp xã/phường'],
-  ['/dashboard?level=he_thong', 'Tổng quan · hệ thống & dữ liệu'],
+  ['/dashboard?tab=ho_chua', 'Tổng quan · hồ chứa & xả lũ'],
+  ['/dashboard?tab=sat_lo', 'Tổng quan · sạt lở & đường đèo'],
+  ['/dashboard?tab=cap_xa', 'Tổng quan · cấp xã/phường'],
+  ['/dashboard?tab=he_thong', 'Tổng quan · hệ thống & dữ liệu'],
   ['/ban-do', 'Bản đồ giám sát'],
   ['/cuu-ho', 'Điều hành cứu hộ'],
   ['/phan-anh', 'Phản ánh người dân'],
@@ -242,10 +244,16 @@ async function staff(ctx, trackCode) {
   await step(ctx, 'Tổng quan: "Báo cáo nhanh" mở được, qua bước địa điểm, không tràn (không gửi)', async () => {
     await page.goto(`${ROOT}/dashboard`);
     await waitMain(page);
-    const open = visible(page.getByRole('button', { name: 'Báo cáo nhanh', exact: true }));
+    // Điện thoại: nút nằm ở thanh thao tác dưới cùng ("Báo SOS", vùng ngón cái); máy tính: trên thanh chỉ huy
+    const open = vp.mobile
+      ? page.getByRole('navigation', { name: 'Thao tác nhanh' }).getByRole('button', { name: 'Báo SOS' })
+      : visible(page.getByRole('button', { name: 'Báo cáo nhanh', exact: true }));
     if (!(await open.count())) return 'bỏ qua: tài khoản không có quyền tạo phiếu SOS';
     await open.click();
     const dialog = page.getByRole('dialog');
+    // Bấm "Tiếp" khi chưa chọn → lỗi hiện ngay dưới ô (form không khoá nút mà không nói vì sao)
+    await dialog.getByRole('button', { name: 'Tiếp', exact: true }).click();
+    await dialog.getByText('Chọn loại sự cố').waitFor();
     await dialog.getByRole('button', { name: 'Sạt lở', exact: true }).click();
     await dialog.getByRole('button', { name: 'Tiếp', exact: true }).click(); // không lẫn với loại "Tiếp tế"
     await dialog.getByText('Xã / phường *').waitFor();
@@ -392,6 +400,43 @@ async function staff(ctx, trackCode) {
   });
 }
 
+// ================================================================ Điện thoại nhỏ 360 px (Galaxy S8 / dòng A phổ thông)
+// Màn hình hẹp nhất cán bộ hiện trường hay dùng: mọi thẻ của Tổng quan và form Báo cáo nhanh (mở từ thanh dưới cùng)
+// không tràn ngang. Chỉ xem, không gửi gì.
+const SMALL_PHONE = { name: 'Điện thoại 360px', opts: { ...devices['Galaxy S8'] }, mobile: true };
+async function smallPhone(ctx) {
+  const { page } = ctx;
+  await step(ctx, 'Đăng nhập cán bộ', async () => {
+    await page.goto(`${ROOT}/dang-nhap`);
+    await page.getByPlaceholder('Nhập tên đăng nhập hoặc email...').fill(STAFF.user);
+    await page.getByPlaceholder('••••••••').fill(STAFF.pass);
+    await page.locator('button[type="submit"]').click();
+    await page.waitForURL(/\/dashboard/, { timeout: 20_000 });
+    await waitMain(page);
+  });
+  for (const [path, label] of STAFF_PAGES.filter(([p]) => p.startsWith('/dashboard'))) {
+    await step(ctx, `Trang "${label}" không tràn ngang ở 360 px`, async () => {
+      await page.goto(`${ROOT}${path}`);
+      await waitMain(page);
+      await page.waitForTimeout(800); // biểu đồ / bản đồ vẽ xong
+      await expectNoOverflow(ctx, path);
+    });
+  }
+  await step(ctx, 'Thanh dưới cùng: "Báo SOS" mở form 3 bước, không tràn ở 360 px (không gửi)', async () => {
+    await page.goto(`${ROOT}/dashboard`);
+    await waitMain(page);
+    const sos = page.getByRole('navigation', { name: 'Thao tác nhanh' }).getByRole('button', { name: 'Báo SOS' });
+    if (!(await sos.count())) return 'bỏ qua: tài khoản không có quyền tạo phiếu SOS';
+    await sos.click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('button', { name: 'Sạt lở', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Tiếp', exact: true }).click();
+    await dialog.getByText('Xã / phường *').waitFor();
+    await expectNoOverflow(ctx, 'hộp thoại Báo cáo nhanh', dialog);
+    await dialog.getByRole('button', { name: 'Huỷ', exact: true }).click();
+  });
+}
+
 // ================================================================
 console.log(`Kiểm thử giao diện: ${ROOT}${READONLY ? ' (chỉ xem)' : ''}`);
 const browser = await chromium.launch();
@@ -405,6 +450,11 @@ try {
     await staff(ctx, trackCode);
     await context.close();
   }
+  const small = await browser.newContext({ ...SMALL_PHONE.opts, locale: 'vi-VN' });
+  small.setDefaultTimeout(15_000);
+  const smallPage = await small.newPage();
+  await smallPhone({ page: smallPage, vp: SMALL_PHONE, problems: watch(smallPage) });
+  await small.close();
 } finally {
   await browser.close();
 }
