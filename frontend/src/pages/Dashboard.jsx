@@ -14,6 +14,7 @@ import Hydrograph from '../components/charts/Hydrograph';
 import RainfallChart from '../components/charts/RainfallChart';
 import LandslideScatter from '../components/charts/LandslideScatter';
 import SensorHeatmap from '../components/charts/SensorHeatmap';
+import ReservoirOpsChart from '../components/charts/ReservoirOpsChart';
 import SuppliesChart from '../components/charts/SuppliesChart';
 import AreaForecastChart from '../components/charts/AreaForecastChart';
 import ForecastBulletinModal from '../components/charts/ForecastBulletinModal';
@@ -136,6 +137,7 @@ export default function Dashboard() {
   const rainKnown = k?.rain?.avg_24h != null;
   const [stationId, setStationId] = useState(null);
   const activeStation = waterStations.some((s) => s.id === stationId) ? stationId : waterStations[0]?.id || null;
+  const activeRow = waterStations.find((s) => s.id === activeStation); // dòng /stations của trạm đang xem
   const [exporting, setExporting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [bulletinOpen, setBulletinOpen] = useState(false);
@@ -628,7 +630,10 @@ export default function Dashboard() {
                     ) : stationsState.loading ? (
                       <Skeleton height={250} />
                     ) : activeStation ? (
-                      <Hydrograph stationId={activeStation} station={waterStations.find((s) => s.id === activeStation)} height={250} />
+                      // Thiết kế A.3 "Hydrograph & Vận hành hồ chứa": lưu lượng xả của hồ trên cùng sông, cùng trục thời gian
+                      <Hydrograph stationId={activeStation} station={activeRow} height={250} syncId="thuy-van">
+                        {(xDomain, xTicks) => <ReservoirOpsChart river={activeRow?.river} xDomain={xDomain} xTicks={xTicks} syncId="thuy-van" />}
+                      </Hydrograph>
                     ) : (
                       <EmptyState height={250}>Chưa có trạm mực nước trong vùng đang xem — nhập danh mục trạm và ngưỡng BĐ I–III (loại "Trạm quan trắc")</EmptyState>
                     )}

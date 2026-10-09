@@ -1,5 +1,7 @@
 """Dashboard tổng quan: KPI thời gian thực và dữ liệu biểu đồ (Phân hệ A)."""
 
+import re
+import unicodedata
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -131,6 +133,75 @@ async def reservoirs_in_area(codes: list[str] = Depends(MON)):
     """Hồ chứa trong vùng đang xem / phạm vi được giao — cùng dạng /public/reservoirs (tab Hồ chứa của Tổng quan theo bộ
     lọc địa phương, thiết kế mục F.1; cổng công khai vẫn toàn tỉnh)."""
     return await cached_view("reservoirs", {"codes": codes}, lambda: get_reservoirs_overview(codes))
+
+
+def _river_key(name: str | None) -> str:
+    """Tên sông để so khớp: "sông Bằng Giang" / "Bằng Giang" → "bằng giang" — trạm và hồ nhập từ nguồn khác nhau vẫn khớp
+    (bỏ chữ "sông" / "suối" ở đầu, chữ thường, dấu tiếng Việt chuẩn NFC)."""
+    key = unicodedata.normalize("NFC", (name or "").strip().lower())
+    return re.sub(r"^(sông|suối)\s+", "", key)
+
+
+@router.get("/dashboard/reservoir-operations")
+async def reservoir_operations(
+    codes: list[str] = Depends(MON),
+    hours: int = Query(48, ge=6, le=168),
+    river: str | None = Query(None, max_length=80),
+):
+    """Diễn biến vận hành hồ chứa trong vùng đang xem (thiết kế A.3 "Hydrograph & Vận hành hồ chứa"): mực nước, cửa xả,
+    Q đến / Q xả — giá trị cuối của mỗi khoảng 30 phút. `river` → chỉ hồ trên sông đó (vẽ cạnh biểu đồ thủy văn của trạm
+    cùng sông). Lịch sử có từ khi bật bảng reservoir_operations (migration 0020); hồ chưa có số liệu → chuỗi rỗng."""
+    return await cached_view(
+        "reservoir-operations",
+        {"codes": codes, "hours": hours, "river": river},
+        lambda: _reservoir_operations(codes, hours, river),
+    )
+
+
+async def _reservoir_operations(codes: list[str], hours: int, river: str | None) -> dict:
+    res = [
+        r
+        for r in (await get_reservoirs_overview(codes))["reservoirs"]
+        if not river or _river_key(r["river"]) == _river_key(river)
+    ]
+    rows = (
+        await fetch_all(
+            """SELECT reservoir_id, time_bucket('30 minutes', time) AS t,
+                      last(current_level, time) AS level, last(spill_gates_open, time) AS gates,
+                      last(inflow_m3s, time) AS inflow, last(outflow_m3s, time) AS outflow
+                 FROM iot_telemetry.reservoir_operations
+                WHERE reservoir_id = ANY(:ids) AND time > now() - make_interval(hours => :h)
+                GROUP BY 1, 2 ORDER BY 1, 2""",
+            {"ids": [r["id"] for r in res], "h": hours},
+        )
+        if res
+        else []
+    )
+    series: dict[str, list[dict]] = {}
+    for x in rows:
+        series.setdefault(x["reservoir_id"], []).append(
+            {
+                "time": x["t"],
+                "level": x["level"],
+                "gates": x["gates"],
+                "inflow": x["inflow"],
+                "outflow": x["outflow"],
+            }
+        )
+    keep = (
+        "id",
+        "name",
+        "river",
+        "normal_level",
+        "spill_gates",
+        "spill_gates_open",
+        "status_code",
+        "status_label",
+    )
+    return {
+        "hours": hours,
+        "reservoirs": [{**{k: r[k] for k in keep}, "series": series.get(r["id"], [])} for r in res],
+    }
 
 
 @router.get("/dashboard/landslides")

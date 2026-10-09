@@ -127,6 +127,10 @@ class Simulator:
         if self.tick % 225 == 0:  # ~15 phút: làm mới dự báo & dọn dữ liệu cũ
             await self.refresh_forecasts(now)
             await execute("DELETE FROM iot_telemetry.sensor_readings WHERE time < now() - interval '10 days'")
+            # lịch sử vận hành hồ: bộ mô phỏng ghi mỗi 20 giây (trigger trên reservoirs) → giữ 10 ngày như số đo
+            await execute(
+                "DELETE FROM iot_telemetry.reservoir_operations WHERE time < now() - interval '10 days'"
+            )
 
     # 1 ---------------------------------------------------------------
     async def readings(self, now: datetime) -> list[dict]:
@@ -420,38 +424,26 @@ class Simulator:
     # 3 ---------------------------------------------------------------
     async def reservoirs(self, readings: list[dict]) -> None:
         rain = {r["station_id"]: r["value"] for r in readings if r["type"] == "luong_mua"}
-        basin = {
-            "Gâm": ["CB-RN-04", "CB-RN-05"],
-            "Neo": ["CB-RN-04"],
-            "Bằng Giang": ["CB-RN-01", "CB-RN-02"],
-            "Suối Khuổi Lái": ["CB-RN-01"],
-        }
         res = await fetch_all("SELECT * FROM iot_telemetry.reservoirs")
         for r in res:
             if r["normal_level"] is None:
                 continue  # hồ nhập từ tệp chưa có mực nước dâng bình thường → không có gì để mô phỏng
-            stations = basin.get(r["river"], ["CB-RN-01"])
+            stations = scenario.RESERVOIR_RAIN_STATIONS.get(r["river"], ["CB-RN-01"])
             intensity = sum(rain.get(s, 0) for s in stations) / len(stations)
-            inflow = round(max(60, 120 + intensity * 38 + rng.uniform(-25, 25)))
-            # hồ mới nhập: chưa có mực nước / lưu lượng vận hành (cập nhật qua nguồn dữ liệu) → bắt đầu dưới MNDBT
-            current = r["current_level"] if r["current_level"] is not None else r["normal_level"] - 1.5
-            level = current + (inflow - (r["outflow_m3s"] or 0)) / 25000
-            gates = r["spill_gates_open"]
-            if level > r["normal_level"] - 0.3 and gates < r["spill_gates"]:
-                gates += 1
-            elif level < r["normal_level"] - 1.2 and gates > 0:
-                gates -= 1
-            outflow = round(inflow * 0.55 + gates * 180)
+            # hồ mới nhập (chưa có mực nước / lưu lượng vận hành) → reservoir_tick bắt đầu dưới MNDBT
+            nxt = scenario.reservoir_tick(
+                r, intensity, rng.uniform(-25, 25), may_change_gates=rng.random() < 0.25
+            )
+            inflow, outflow, level, gates = (
+                nxt["inflow_m3s"],
+                nxt["outflow_m3s"],
+                nxt["current_level"],
+                nxt["spill_gates_open"],
+            )
             await execute(
                 """UPDATE iot_telemetry.reservoirs SET inflow_m3s = :i, outflow_m3s = :o, current_level = :l, spill_gates_open = :g,
                           updated_at = now(), operating_at = now() WHERE id = :id""",
-                {
-                    "i": inflow,
-                    "o": outflow,
-                    "l": round(min(level, r["normal_level"] + 0.4), 2),
-                    "g": gates,
-                    "id": r["id"],
-                },
+                {"i": inflow, "o": outflow, "l": level, "g": gates, "id": r["id"]},
             )
             if gates != r["spill_gates_open"]:
                 verb = "mở thêm" if gates > r["spill_gates_open"] else "đóng bớt"

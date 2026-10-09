@@ -50,5 +50,21 @@ const xa = await get('/dashboard/reservoirs', tok);
 check('Cán bộ xã: tab Hồ chứa chỉ hồ trong xã', (xa.reservoirs || []).every((r) => r.admin_code === 'CB-COBA') && xa.total_reservoirs === k.reservoirs.total, `${xa.total_reservoirs} hồ`);
 check('Tab Hồ chứa cần đăng nhập', (await fetch(BASE + '/dashboard/reservoirs')).status === 401);
 
+// Diễn biến vận hành (lịch sử, migration 0020 — bản trình diễn: lịch sử mẫu 48 giờ + bộ mô phỏng ghi mỗi 20 giây)
+const ops = await get('/dashboard/reservoir-operations?hours=48', admin);
+const withSeries = (ops.reservoirs || []).filter((r) => r.series.length > 10);
+check('Diễn biến vận hành: mọi hồ có lịch sử, giá trị cuối mỗi 30 phút, trong 48 giờ qua, theo thứ tự thời gian',
+  withSeries.length === rs.length && withSeries.every((r) => r.series.every((p, i) => new Date(p.time).getTime() % 1_800_000 === 0 &&
+    Date.now() - new Date(p.time).getTime() <= 48.5 * 3600e3 && (i === 0 || new Date(p.time) > new Date(r.series[i - 1].time)))),
+  withSeries.map((r) => `${r.id} ${r.series.length}`).join(', '));
+const ops0 = withSeries[0];
+check('Diễn biến vận hành: không mở quá số cửa của hồ, lưu lượng không âm', withSeries.every((r) => r.series.every((p) =>
+  p.gates >= 0 && (!r.spill_gates || p.gates <= r.spill_gates) && p.inflow >= 0 && p.outflow >= 0)), ops0 && `${ops0.name}: ${JSON.stringify(ops0.series.at(-1))}`);
+const river = rs[0].river;
+const byRiver = await get(`/dashboard/reservoir-operations?river=${encodeURIComponent(`sông ${river}`)}`, admin);
+check('Diễn biến vận hành theo sông ("sông X" khớp "X"): chỉ hồ trên sông đó', byRiver.reservoirs.length === rs.filter((r) => r.river === river).length &&
+  byRiver.reservoirs.every((r) => r.river === river), `${river}: ${byRiver.reservoirs.length} hồ`);
+check('Diễn biến vận hành: số giờ ngoài 6–168 bị từ chối', (await fetch(`${BASE}/dashboard/reservoir-operations?hours=2`, { headers: { Authorization: `Bearer ${admin}` } })).status === 422);
+
 console.log(failed ? `\n${failed} kiểm tra KHÔNG đạt` : '\nTất cả kiểm tra hồ chứa đạt');
 process.exit(failed ? 1 : 0);

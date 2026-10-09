@@ -306,6 +306,29 @@ async function staff(ctx, trackCode) {
     }
   });
 
+  // Thiết kế A.3 "Hydrograph & Vận hành hồ chứa": dưới biểu đồ thủy văn của trạm có hồ trên cùng sông (bản trình diễn: trạm
+  // Cao Bằng – sông Bằng Giang) có biểu đồ lưu lượng xả của các hồ đó, cùng trục thời gian (vạch "Hiện tại" thẳng hàng)
+  await step(ctx, 'Tổng quan: biểu đồ thủy văn kèm vận hành hồ chứa cùng sông, cùng trục thời gian', async () => {
+    await page.goto(`${ROOT}/dashboard`);
+    await waitMain(page);
+    if (!(await page.locator('[aria-label="Chọn trạm mực nước"]').count())) return 'bỏ qua: chưa có trạm mực nước';
+    const sec = page.locator('section', { hasText: 'Thủy văn – mực nước' }).first();
+    const title = sec.getByText(/Vận hành hồ chứa trên sông/);
+    try {
+      await title.waitFor({ timeout: 20_000 });
+    } catch (e) {
+      if (READONLY) return 'bỏ qua: trạm đầu không có hồ trên cùng sông';
+      throw e;
+    }
+    const nowX = await sec.evaluate((el) => [...el.querySelectorAll('.recharts-wrapper')].map((wr) => {
+      const line = [...wr.querySelectorAll('.recharts-reference-line line')].find((l) => l.getAttribute('x1') === l.getAttribute('x2'));
+      return line ? Math.round(+line.getAttribute('x1') + wr.getBoundingClientRect().left) : null;
+    }));
+    if (nowX.length < 2 || nowX[0] == null || nowX[0] !== nowX[1]) throw new Error(`vạch "Hiện tại" lệch giữa 2 biểu đồ: ${nowX.join(' / ')}`);
+    await expectNoOverflow(ctx, 'khối Thủy văn');
+    return await title.innerText();
+  });
+
   // Phân quyền 3 cấp: chọn Cấp quyết định phạm vi (Cấp 3 → 1 xã; Cấp 1–2 → toàn tỉnh) và ô PIN (chỉ Cấp 1–2). Không lưu.
   await step(ctx, 'Tạo tài khoản: Cấp 3 chọn 1 xã, không PIN; Cấp 2 toàn tỉnh, có PIN (không lưu)', async () => {
     await page.goto(`${ROOT}/phan-quyen`);

@@ -47,3 +47,41 @@ def value_for(station_type: str, params: dict, t: float, jitter: float = 0.0) ->
     if station_type == "do_nghieng":
         return round(tilt(params["peak"], t, jitter), 3)
     return round(soil_moisture(params["peak"], t, jitter), 1)
+
+
+# Hồ chứa mô phỏng: trạm mưa đại diện lưu vực của từng sông (nước về hồ theo mưa các trạm này)
+RESERVOIR_RAIN_STATIONS = {
+    "Gâm": ["CB-RN-04", "CB-RN-05"],
+    "Neo": ["CB-RN-04"],
+    "Bằng Giang": ["CB-RN-01", "CB-RN-02"],
+    "Suối Khuổi Lái": ["CB-RN-01"],
+}
+
+
+# Mặt hồ quy đổi: Δmực nước (m) mỗi bước 20 giây = (Q về − Q xả) / RESERVOIR_AREA_FACTOR — 150 000 ≈ mặt hồ 3 km²: lũ về
+# dư 400 m³/s làm hồ lên ~0,5 m/giờ (25 000 trước đây ≈ 0,5 km²: hồ lên / xuống ~1 m mỗi 20 phút, cửa xả đóng mở liên tục)
+RESERVOIR_AREA_FACTOR = 150_000
+
+
+def reservoir_tick(r: dict, intensity: float, noise: float = 0.0, may_change_gates: bool = True) -> dict:
+    """Một bước (20 giây) của hồ mô phỏng: nước về theo mưa lưu vực (mm/h), mực nước theo chênh lệch về – xả, lưu lượng xả
+    = 55 % nước về + 180 m³/s mỗi cửa xả đang mở. Vận hành như trưởng ca: mở thêm 1 cửa khi hồ gần MNDBT mà nước về còn
+    nhiều hơn nước xả; đóng bớt 1 cửa khi hồ đã xuống thấp mà vẫn đang xả nhiều hơn nước về — `may_change_gates` (bên gọi
+    rút thăm) giãn các lần đổi cửa ra vài phút. Dùng chung cho bộ mô phỏng và lịch sử vận hành mẫu 48 giờ (seed) → lịch sử
+    và số liệu đang chạy nối liền. `r`: trạng thái hiện tại (current_level có thể None → bắt đầu dưới MNDBT 1,5 m)."""
+    inflow = round(max(60, 120 + intensity * 38 + noise))
+    outflow_before = r["outflow_m3s"] or 0
+    current = r["current_level"] if r["current_level"] is not None else r["normal_level"] - 1.5
+    level = current + (inflow - outflow_before) / RESERVOIR_AREA_FACTOR
+    gates = r["spill_gates_open"] or 0
+    if may_change_gates:
+        if level > r["normal_level"] - 0.3 and gates < (r["spill_gates"] or 0) and inflow > outflow_before:
+            gates += 1
+        elif level < r["normal_level"] - 1.2 and gates > 0 and inflow < outflow_before:
+            gates -= 1
+    return {
+        "inflow_m3s": inflow,
+        "outflow_m3s": round(inflow * 0.55 + gates * 180),
+        "current_level": round(min(level, r["normal_level"] + 0.4), 3),
+        "spill_gates_open": gates,
+    }

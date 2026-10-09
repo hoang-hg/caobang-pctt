@@ -182,6 +182,33 @@ def test_scenario_is_periodic_and_bounded():
     assert scenario.water_level(178, 3, 7) <= 181.0 + 1e-9
 
 
+def test_reservoir_model_opens_gates_gradually_and_stays_bounded():
+    """Hồ mô phỏng (dùng chung bộ mô phỏng và lịch sử vận hành mẫu): lũ về lớn → mở dần từng cửa, không quá số cửa của hồ,
+    mực nước không vượt MNDBT + 0,4 m; hết lũ, hồ xuống thấp → đóng bớt; xả = 55 % nước về + 180 m³/s mỗi cửa."""
+    r = {
+        "normal_level": 100.0,
+        "spill_gates": 3,
+        "current_level": 99.8,
+        "outflow_m3s": 100,
+        "spill_gates_open": 0,
+    }
+    seen = []
+    for _ in range(600):  # mưa rất to (40 mm/h) trong 200 phút, mỗi bước 20 giây
+        r.update(scenario.reservoir_tick(r, 40.0))
+        seen.append(r["spill_gates_open"])
+        assert r["current_level"] <= 100.4 + 1e-9
+        assert r["outflow_m3s"] == round(r["inflow_m3s"] * 0.55 + r["spill_gates_open"] * 180)
+    assert seen[0] <= 1 and max(seen) == 3
+    assert all(b - a <= 1 for a, b in zip(seen, seen[1:], strict=False))  # mỗi bước mở thêm nhiều nhất 1 cửa
+    r.update(current_level=98.0)  # hết lũ, hồ đã xuống thấp
+    for _ in range(20):
+        r.update(scenario.reservoir_tick(r, 0.0))
+    assert r["spill_gates_open"] < 3
+    # Không rút thăm được đổi cửa (may_change_gates=False) → giữ nguyên số cửa
+    before = r["spill_gates_open"]
+    assert scenario.reservoir_tick(r, 40.0, may_change_gates=False)["spill_gates_open"] == before
+
+
 def test_route_counts_gap_between_disconnected_road_networks():
     # 2 mạng đường rời nhau: nút 1–2 và nút 3–4 cách nhau ~40 km → quãng đường phải gồm cả đoạn chim bay 2→3
     nodes = {1: (22.60, 106.20), 2: (22.61, 106.21), 3: (22.95, 105.70), 4: (22.96, 105.71)}
