@@ -10,24 +10,26 @@ import { api } from '../../api/client';
 import { useStore } from '../../app/store';
 import { BackButton } from '../../components/common/ui';
 
+// Màu từng bước tiến độ (tên màu do backend services/tracking.py trả) theo bảng màu chung của hệ thống (utils/risk.js):
+// chip vàng / cam / xanh lá chữ ĐEN, đỏ chữ trắng — chữ trắng trên hổ phách / cam chỉ đạt 2,1–2,8 : 1, khó đọc ngoài nắng
 const STEP_COLORS = {
   yellow: {
-    badge: 'bg-amber-500 text-white',
-    ring: 'border-amber-500 bg-amber-500/10 text-amber-600',
-    line: 'bg-amber-500',
-    glow: 'ring-amber-500/30 bg-amber-500/10 text-amber-600',
+    badge: 'bg-warn text-black',
+    ring: 'border-warn bg-warn/10 text-warn',
+    line: 'bg-warn',
+    glow: 'ring-warn/30 bg-warn/10 text-warn',
   },
   orange: {
-    badge: 'bg-orange-500 text-white',
-    ring: 'border-orange-500 bg-orange-500/10 text-orange-600',
-    line: 'bg-orange-500',
-    glow: 'ring-orange-500/30 bg-orange-500/10 text-orange-600',
+    badge: 'bg-serious text-black',
+    ring: 'border-serious bg-serious/10 text-serious',
+    line: 'bg-serious',
+    glow: 'ring-serious/30 bg-serious/10 text-serious',
   },
   green: {
-    badge: 'bg-emerald-600 text-white',
-    ring: 'border-emerald-600 bg-emerald-500/10 text-emerald-600',
-    line: 'bg-emerald-600',
-    glow: 'ring-emerald-500/30 bg-emerald-500/10 text-emerald-600',
+    badge: 'bg-good text-black',
+    ring: 'border-good bg-good/10 text-good',
+    line: 'bg-good',
+    glow: 'ring-good/30 bg-good/10 text-good',
   },
   blue: {
     badge: 'bg-blue-600 text-white',
@@ -36,10 +38,10 @@ const STEP_COLORS = {
     glow: 'ring-blue-500/30 bg-blue-500/10 text-blue-600',
   },
   red: {
-    badge: 'bg-red-600 text-white',
-    ring: 'border-red-600 bg-red-500/10 text-red-600',
-    line: 'bg-red-600',
-    glow: 'ring-red-500/30 bg-red-500/10 text-red-600',
+    badge: 'bg-danger text-white',
+    ring: 'border-danger bg-danger/10 text-danger',
+    line: 'bg-danger',
+    glow: 'ring-danger/30 bg-danger/10 text-danger',
   },
 };
 
@@ -271,7 +273,7 @@ export default function TicketTracker({ initialCode = '', initialPhone = '', onQ
                   className={clsx(
                     'flex h-11 w-11 shrink-0 items-center justify-center rounded-xl font-bold shadow-sm',
                     currentItem.type === 'sos'
-                      ? 'bg-gradient-to-br from-red-600 to-rose-600 text-white'
+                      ? 'bg-danger text-white'
                       : 'bg-gradient-to-br from-indigo-600 to-accent text-white'
                   )}
                 >
@@ -446,9 +448,9 @@ export default function TicketTracker({ initialCode = '', initialPhone = '', onQ
                 </div>
 
                 {/* Hộp 2: Lời dặn an toàn & Liên hệ khẩn cấp */}
-                <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 flex flex-col justify-between">
+                <div className="rounded-2xl border border-warn/50 bg-warn/5 p-4 flex flex-col justify-between">
                   <div>
-                    <div className="text-xs font-bold text-amber-700 dark:text-amber-400 flex items-center gap-1.5 mb-1">
+                    <div className="text-xs font-bold text-warn flex items-center gap-1.5 mb-1">
                       <AlertTriangle size={15} />
                       <span>Lời dặn quan trọng cho người dân:</span>
                     </div>
@@ -457,7 +459,7 @@ export default function TicketTracker({ initialCode = '', initialPhone = '', onQ
                     </p>
                   </div>
 
-                  <div className="mt-3 flex items-center justify-between gap-2 pt-2 border-t border-amber-500/20">
+                  <div className="mt-3 flex items-center justify-between gap-2 pt-2 border-t border-warn/30">
                     <span className="text-xs font-semibold text-ink">Cần hỗ trợ khẩn cấp:</span>
                     <a
                       href="tel:112"

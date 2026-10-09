@@ -423,7 +423,7 @@ export default function MapLayers({ data, layers, timeline, onDispatch, onCamera
           <Polyline
             key={f.properties.id}
             positions={f.geometry.coordinates.map(([x, y]) => [y, x])}
-            pathOptions={{ color: f.properties.route_safe ? '#22c55e' : '#f97316', weight: 4, dashArray: '10 6', opacity: 0.9 }}
+            pathOptions={{ color: f.properties.route_safe ? LEVEL.an_toan.color : LEVEL.cam.color, weight: 4, dashArray: '10 6', opacity: 0.9 }}
           >
             <Tooltip sticky>{f.properties.force_name} → {f.properties.ticket_code} ({Math.round(f.properties.progress * 100)}%)</Tooltip>
           </Polyline>

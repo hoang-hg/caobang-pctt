@@ -40,6 +40,7 @@ export const risk = (level) => (Number.isInteger(level) && level >= 0 && level <
 export const RESERVOIR_LEVEL = { binh_thuong: 0, phat_dien: 0, xa_dieu_tiet: 2, xa_khan_cap: 3 }; // services/reservoirs.py
 export const LANDSLIDE_LEVEL = { thong_suot: 0, canh_bao: 2, cam_duong: 3 }; // services/landslides.py TRAFFIC
 export const HAZARD_LEVEL = { an_toan: 0, binh_thuong: 0, vang: 1, cam: 2, do: 3 }; // LEVEL (do/cam/vang), hazard_points
+export const TILT_LEVEL = { binh_thuong: 0, canh_bao: 2, nguy_hiem: 3 }; // cảm biến nghiêng taluy — tilt_info.tilt_level
 export const levelOf = (table, code) => (code in table ? table[code] : null);
 
 /**

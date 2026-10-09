@@ -351,7 +351,7 @@ export function RouteTool({ active, onResult }) {
       {route && (
         <Polyline
           positions={route.geometry.coordinates.map(([x, y]) => [y, x])}
-          pathOptions={{ color: route.safe ? '#16a34a' : '#f97316', weight: 5, opacity: 0.85 }}
+          pathOptions={{ color: route.safe ? COLORS.good : COLORS.cam, weight: 5, opacity: 0.85 }}
         />
       )}
     </>
