@@ -7,7 +7,9 @@ import {
   Ban, ShieldCheck, Navigation, Gauge, Mountain, Milestone, Truck, CircleHelp
 } from 'lucide-react';
 import { api } from '../../api/client';
-import { BackButton } from '../../components/common/ui';
+import { useAreaQuery } from '../../api/hooks';
+import { BackButton, EmptyState, ErrorState, Skeleton } from '../../components/common/ui';
+import { time } from '../../utils/format';
 import { levelOf, risk, TILT_LEVEL } from '../../utils/risk';
 
 const EMPTY = [];
@@ -20,17 +22,26 @@ export const maxTiltText = (points = []) => {
   return top ? `+${top.tilt_info.current_tilt_deg}° (${top.name})` : '–';
 };
 
-export default function LandslideMonitor({ onSelectOnMap, onBackToMap }) {
+/**
+ * Điểm đen sạt lở & trạng thái đường đèo — dùng chung cho cổng công khai (toàn tỉnh) và tab Sạt lở của Tổng quan
+ * (`areaScoped`: theo bộ lọc địa phương / phạm vi được giao — cùng số với ô KPI). Chưa tải được thì nói rõ, không hiện
+ * "Không tìm thấy điểm nguy cơ…" hay số 0.
+ */
+export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScoped = false }) {
   const [corridorFilter, setCorridorFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const { data, isFetching, refetch } = useQuery({
+  // Chỉ một trong hai truy vấn chạy: màn hình điều hành theo vùng đang xem, cổng công khai toàn tỉnh
+  const scopedQ = useAreaQuery('landslides', '/dashboard/landslides', {}, { refetchInterval: REFRESH_INTERVAL, enabled: areaScoped });
+  const publicQ = useQuery({
     queryKey: ['pub-landslides'],
     queryFn: () => api('/public/landslides'),
     refetchInterval: REFRESH_INTERVAL,
+    enabled: !areaScoped,
   });
+  const { data, isFetching, isError, refetch, dataUpdatedAt } = areaScoped ? scopedQ : publicQ;
 
   const points = data?.points || EMPTY; // mảng cố định: useMemo bên dưới không tính lại mỗi lần vẽ khi chưa có dữ liệu
   const corridors = data?.corridors || [];
@@ -62,51 +73,83 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap }) {
   // Chưa có mạng đường → không xác định được đoạn bị chia cắt: "0 điểm" là không biết, không phải "không ách tắc"
   const noRoads = data?.roads_available === false;
 
-  return (
-    <div className="space-y-5 animate-in fade-in duration-200">
-      {/* 1. Header & Live Indicator */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-panel p-4 sm:p-5 rounded-2xl border border-line shadow-sm">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-600 to-red-600 text-white shadow-md shadow-amber-600/30">
-            <Mountain size={22} />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-base sm:text-lg font-bold text-ink">
-                Bản Đồ Điểm Đen Sạt Trượt & Trạng Thái Đường Đèo
-              </h1>
-              {live ? (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-good/15 text-good border border-good/30 animate-pulse">
-                  <span className="h-1.5 w-1.5 rounded-full bg-good" />
-                  TRỰC TIẾP
-                </span>
-              ) : (
-                data && (
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-panel2 text-muted border border-line">
-                    CHƯA CÓ CẢM BIẾN BÁO SỐ ĐO
-                  </span>
-                )
-              )}
-            </div>
-            <p className="text-xs text-muted mt-0.5">
-              Giám sát nguy cơ sạt lở đất đá, ngập ngầm tràn, chia cắt giao thông đèo dốc và cảm biến dịch chuyển taluy
-            </p>
-          </div>
+  const header = (
+    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-panel p-4 sm:p-5 rounded-2xl border border-line shadow-sm">
+      <div className="flex items-center gap-2.5">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-600 to-red-600 text-white shadow-md shadow-amber-600/30">
+          <Mountain size={22} />
         </div>
-
-        <div className="flex items-center gap-2 self-start md:self-auto">
-          {onBackToMap && <BackButton onClick={onBackToMap} />}
-          <button
-            onClick={() => refetch()}
-            disabled={isFetching}
-            className="btn-ghost text-xs px-3 py-1.5 flex items-center gap-1.5"
-            title="Làm mới số liệu ngay"
-          >
-            <RefreshCw size={13} className={clsx(isFetching && 'animate-spin text-accent')} />
-            <span>{isFetching ? 'Đang cập nhật…' : 'Cập nhật ngay'}</span>
-          </button>
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-base sm:text-lg font-bold text-ink">
+              Bản Đồ Điểm Đen Sạt Trượt & Trạng Thái Đường Đèo
+            </h1>
+            {data && isError ? (
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-panel2 text-muted border border-dashed border-line" title="Lần tải lại gần nhất bị lỗi — đang hiện số liệu đã tải trước đó">
+                CHƯA CẬP NHẬT ĐƯỢC · SỐ LIỆU LÚC {time(dataUpdatedAt)}
+              </span>
+            ) : live ? (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-good/15 text-good border border-good/30 animate-pulse">
+                <span className="h-1.5 w-1.5 rounded-full bg-good" />
+                TRỰC TIẾP
+              </span>
+            ) : (
+              data && (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-panel2 text-muted border border-line">
+                  CHƯA CÓ CẢM BIẾN BÁO SỐ ĐO
+                </span>
+              )
+            )}
+          </div>
+          <p className="text-xs text-muted mt-0.5">
+            Giám sát nguy cơ sạt lở đất đá, ngập ngầm tràn, chia cắt giao thông đèo dốc và cảm biến dịch chuyển taluy
+          </p>
         </div>
       </div>
+
+      <div className="flex items-center gap-2 self-start md:self-auto">
+        {onBackToMap && <BackButton onClick={onBackToMap} />}
+        <button
+          onClick={() => refetch()}
+          disabled={isFetching}
+          className="btn-ghost text-xs px-3 py-1.5 flex items-center gap-1.5"
+          title="Làm mới số liệu ngay"
+        >
+          <RefreshCw size={13} className={clsx(isFetching && 'animate-spin text-accent')} />
+          <span>{isFetching ? 'Đang cập nhật…' : 'Cập nhật ngay'}</span>
+        </button>
+      </div>
+    </div>
+  );
+
+  if (!data) {
+    return (
+      <div className="space-y-5">
+        {header}
+        {isError ? (
+          <ErrorState onRetry={refetch}>Không tải được danh sách điểm đen sạt lở — chưa biết tình trạng đường đèo</ErrorState>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {[0, 1, 2, 3].map((i) => <Skeleton key={i} height={118} />)}
+          </div>
+        )}
+      </div>
+    );
+  }
+  if (!totalCount) {
+    return (
+      <div className="space-y-5">
+        {header}
+        <EmptyState>
+          {areaScoped ? 'Không có điểm đen sạt lở, đường đèo nào trong vùng đang xem.' : 'Chưa có danh mục điểm đen sạt lở, đường đèo.'}
+        </EmptyState>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5 animate-in fade-in duration-200">
+      {header}
 
       {/* 2. Cảnh báo cấm đường khẩn cấp (nếu có điểm tắc đường / cấm xe) */}
       {blockedCount > 0 && (

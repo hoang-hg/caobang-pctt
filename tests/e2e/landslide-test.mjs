@@ -61,5 +61,19 @@ check('Cảm biến sạt lở: số giờ ngoài 6–168 bị từ chối', (aw
 const hsXa = await get('/dashboard/landslide-sensors', tok);
 check('Cảm biến sạt lở: cán bộ xã chỉ thấy cảm biến trong xã', (hsXa.sensors || []).length < sensors.length, `${hsXa.sensors?.length} / ${sensors.length}`);
 
+// Tab Sạt lở của Tổng quan theo bộ lọc địa phương: /dashboard/landslides — cùng dạng /public/landslides, cùng số với ô KPI
+const lsAll = await get('/dashboard/landslides', admin);
+check('Tab Sạt lở toàn tỉnh: đủ điểm như cổng công khai', lsAll.total_points === pts.length, `${lsAll.total_points} điểm`);
+const lcodes = [...new Set(pts.map((p) => p.admin_code).filter(Boolean))].slice(0, 3);
+const lpart = await get(`/dashboard/landslides?admin_codes=${lcodes.join(',')}`, admin);
+const lk = await get(`/dashboard/kpis?admin_codes=${lcodes.join(',')}`, admin);
+check('Sạt lở lọc theo xã: chỉ điểm của các xã đó, đếm / tuyến tính lại, cùng số điểm với ô KPI',
+  lpart.points.every((p) => lcodes.includes(p.admin_code)) && lpart.total_points === pts.filter((p) => lcodes.includes(p.admin_code)).length &&
+  lpart.total_points === lk.landslides.total && lpart.corridors.reduce((s, c) => s + c.count, 0) === lpart.total_points &&
+  lpart.blocked_count === lpart.points.filter((p) => p.traffic_status === 'cam_duong').length,
+  `${lcodes.join(', ')}: ${lpart.total_points} điểm`);
+const lxa = await get('/dashboard/landslides', tok);
+check('Cán bộ xã: tab Sạt lở chỉ điểm trong xã', (lxa.points || []).every((p) => p.admin_code === 'CB-COBA'), `${lxa.total_points} điểm`);
+
 console.log(failed ? `\n${failed} kiểm tra KHÔNG đạt` : '\nTất cả kiểm tra sạt trượt & đường đèo đạt');
 process.exit(failed ? 1 : 0);

@@ -582,7 +582,7 @@ export default function Dashboard() {
 
       {tab === 'ho_chua' && (
         <div ref={ref} className="card p-3 sm:p-5">
-          <ReservoirMonitor onSelectOnMap={openOnMap} />
+          <ReservoirMonitor areaScoped onSelectOnMap={openOnMap} />
         </div>
       )}
 
@@ -593,7 +593,7 @@ export default function Dashboard() {
             <SensorHeatmap />
           </Section>
           <div className="card p-3 sm:p-5">
-            <LandslideMonitor onSelectOnMap={openOnMap} />
+            <LandslideMonitor areaScoped onSelectOnMap={openOnMap} />
           </div>
         </div>
       )}
