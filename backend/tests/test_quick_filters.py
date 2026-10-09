@@ -19,7 +19,7 @@ UNITS = [
 def _fake_db(monkeypatch, presets=()):
     async def fetch_all(sql, params=None, conn=None):
         if "kind <> 'luu_vuc'" in sql:
-            return [{"code": "DB_00"}]  # nhóm "Địa bàn … (cũ)" hệ thống tạo
+            return [{"code": "DB_00"}]  # nhóm hệ thống (kind khác 'luu_vuc')
         if "spatial_admin.presets" in sql:
             return list(presets)
         return UNITS
@@ -56,7 +56,7 @@ async def test_names_become_codes_unknown_ambiguous_and_reserved_rejected(monkey
     assert rows[0].values["danh_sach_xa"] == ["CB-BAOLAC", "CB-COCPANG"]  # tên → mã, bỏ mục trùng
     assert rows[1].values["loai_thien_tai"] == "tong_hop"  # để trống → tổng hợp
     errors = [(i.row, i.field, i.message) for i in report.errors]
-    assert any(r == rows[1].number and f == "ma" and "địa bàn huyện cũ" in m for r, f, m in errors)
+    assert any(r == rows[1].number and f == "ma" and "nhóm hệ thống" in m for r, f, m in errors)
     assert any(r == rows[2].number and "Không có xã/phường: Không Có Xã" in m for r, _, m in errors)
     assert any(
         r == rows[2].number and "Tên trùng nhiều xã/phường" in m and "Hoa An" in m for r, _, m in errors

@@ -367,7 +367,7 @@ async def contacts(user: dict = Depends(require_any("contact", "view"))):
     allowed = allowed_codes(user, "contact", "view")
     rows = await fetch_all(
         """SELECT c.id, c.parent_id, c.level, c.org, c.full_name, c.position, c.phone, c.radio_freq, c.status, c.sort,
-                  u.code AS admin_code, u.name AS admin_name, u.old_district
+                  u.code AS admin_code, u.name AS admin_name
              FROM communications.contacts c LEFT JOIN spatial_admin.administrative_units u ON u.id = c.admin_unit_id
             ORDER BY c.sort, c.full_name"""
     )

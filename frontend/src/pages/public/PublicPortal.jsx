@@ -422,13 +422,8 @@ export default function PublicPortal() {
   const { data: units = [] } = useUnits();
   const [selectedCommuneCode, setSelectedCommuneCode] = useState('');
 
-  const sortedUnits = useMemo(() => {
-    return [...units].sort((a, b) => {
-      const dist = (a.old_district || '').localeCompare(b.old_district || '', 'vi');
-      if (dist !== 0) return dist;
-      return (a.name || '').localeCompare(b.name || '', 'vi');
-    });
-  }, [units]);
+  // 56 xã/phường hiện hành xếp theo tên (không nhóm theo địa bàn huyện cũ)
+  const sortedUnits = useMemo(() => [...units].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'vi')), [units]);
 
   const handleSelectCommune = (code) => {
     const u = units.find((x) => x.code === code);
@@ -826,7 +821,7 @@ export default function PublicPortal() {
                     <option value="">-- Danh sách 56 Xã/Phường tỉnh Cao Bằng --</option>
                     {sortedUnits.map((u) => (
                       <option key={u.code} value={u.code}>
-                        {u.name} (Huyện/TP: {u.old_district})
+                        {u.unit_type === 'phuong' ? 'Phường' : 'Xã'} {u.name}
                       </option>
                     ))}
                   </select>
@@ -845,8 +840,9 @@ export default function PublicPortal() {
                       <span className={clsx('chip px-3 py-1 text-xs font-bold', R.cls)}>
                         <RIcon size={14} /> {R.label}
                       </span>
-                      <b className="text-base text-ink">{here.commune.name}</b>
-                      <span className="text-xs text-muted">({here.commune.district})</span>
+                      <b className="text-base text-ink">
+                        {units.find((u) => u.code === here.commune.code)?.unit_type === 'phuong' ? 'Phường' : 'Xã'} {here.commune.name}
+                      </b>
                       {me?.isManual && (
                         <span className="chip px-2 py-0.5 text-[11px] bg-accent/10 text-accent border border-accent/30 font-medium">
                           Đã chọn thủ công
@@ -865,7 +861,7 @@ export default function PublicPortal() {
                         <option value="">-- Đổi xã/phường khác --</option>
                         {sortedUnits.map((u) => (
                           <option key={u.code} value={u.code}>
-                            {u.name} ({u.old_district})
+                            {u.unit_type === 'phuong' ? 'Phường' : 'Xã'} {u.name}
                           </option>
                         ))}
                       </select>

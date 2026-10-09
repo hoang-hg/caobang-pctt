@@ -8,8 +8,11 @@ import { useAllowedCodes } from '../../rbac/usePermission';
 
 const norm = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
 const PRESET_ICON = { ngap_lut: Waves, sat_lo: Mountain, tong_hop: Flag };
+const byName = new Intl.Collator('vi').compare;
+const GROUPS = [['phuong', 'Phường'], ['xa', 'Xã']];
 
-/** Bộ lọc địa phương toàn cục: Toàn tỉnh → preset lưu vực/địa bàn cũ → xã/phường. */
+/** Bộ lọc địa phương toàn cục: Toàn tỉnh → nhóm lọc nhanh theo thiên tai → 56 xã/phường (sau sắp xếp 01/07/2025).
+ * Chỉ dùng đơn vị hành chính hiện hành — không nhóm / hiển thị theo địa bàn huyện cũ. */
 export default function AdminFilter() {
   const { filter, setFilter, clearFilter } = useStore();
   const { data: allUnits = [] } = useUnits();
@@ -29,11 +32,9 @@ export default function AdminFilter() {
   useClickOutside(ref, () => setOpen(false));
 
   const grouped = useMemo(() => {
-    const g = {};
-    units
-      .filter((u) => !q || norm(u.name).includes(norm(q)))
-      .forEach((u) => (g[u.old_district] ||= []).push(u));
-    return g;
+    const list = units.filter((u) => !q || norm(u.name).includes(norm(q))).sort((a, b) => byName(a.name, b.name));
+    return GROUPS.map(([type, label]) => [label, list.filter((u) => (u.unit_type === 'phuong' ? 'phuong' : 'xa') === type)])
+      .filter(([, items]) => items.length);
   }, [units, q]);
 
   const pick = (f) => {
@@ -43,7 +44,6 @@ export default function AdminFilter() {
   };
 
   const hazardPresets = presets.filter((p) => p.kind === 'luu_vuc');
-  const districtPresets = presets.filter((p) => p.kind === 'dia_ban_cu');
 
   return (
     <div className="relative" ref={ref}>
@@ -88,30 +88,18 @@ export default function AdminFilter() {
                     </button>
                   );
                 })}
-                <div className="mt-2 px-2 text-[11px] font-semibold uppercase text-muted">Theo địa bàn huyện cũ</div>
-                <div className="grid grid-cols-2 gap-1">
-                  {districtPresets.map((p) => (
-                    <button
-                      key={p.code}
-                      className={clsx('rounded-md px-2 py-1 text-left text-sm hover:bg-panel2', filter.presetCode === p.code && 'bg-accent/10 text-accent')}
-                      onClick={() => pick({ codes: p.unit_codes, label: p.name, presetCode: p.code })}
-                    >
-                      {p.name.replace('Địa bàn ', '').replace(' (cũ)', '')} <span className="text-xs text-muted">({p.unit_codes.length})</span>
-                    </button>
-                  ))}
-                </div>
-                <div className="mt-2 px-2 text-[11px] font-semibold uppercase text-muted">Xã / phường</div>
+                <div className="mt-2 px-2 text-[11px] font-semibold uppercase text-muted">Xã / phường ({units.length})</div>
               </>
             )}
-            {Object.entries(grouped).map(([district, list]) => (
-              <div key={district} className="mb-1">
-                <div className="px-2 pt-1 text-xs text-muted">{district}</div>
+            {grouped.map(([label, list]) => (
+              <div key={label} className="mb-1">
+                <div className="px-2 pt-1 text-xs text-muted">{label} ({list.length})</div>
                 <div className="flex flex-wrap gap-1 px-1">
                   {list.map((u) => (
                     <button
                       key={u.code}
                       className={clsx('rounded-md border border-line px-2 py-0.5 text-xs hover:border-accent', filter.codes.length === 1 && filter.codes[0] === u.code && 'bg-accent text-white')}
-                      onClick={() => pick({ codes: [u.code], label: `${u.unit_type === 'phuong' ? 'P.' : 'Xã'} ${u.name}`, presetCode: null })}
+                      onClick={() => pick({ codes: [u.code], label: `${u.unit_type === 'phuong' ? 'Phường' : 'Xã'} ${u.name}`, presetCode: null })}
                     >
                       {u.name}
                     </button>
@@ -119,6 +107,7 @@ export default function AdminFilter() {
                 </div>
               </div>
             ))}
+            {q && !grouped.length && <div className="px-2 py-3 text-center text-xs text-muted">Không có xã/phường nào khớp “{q}”</div>}
           </div>
         </div>
       )}

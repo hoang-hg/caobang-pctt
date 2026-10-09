@@ -147,8 +147,8 @@ DATASETS: dict[str, Dataset] = {
             "Nhóm lọc nhanh theo thiên tai",
             "Nhóm xã/phường cho mục “Lọc nhanh theo đặc thù thiên tai” của bộ lọc địa phương và chọn vùng nhận cảnh "
             "báo (VD vùng trũng hạ lưu sông Bằng Giang, lưu vực sông Gâm, vùng đèo dốc sạt lở). Tệp mẫu chứa sẵn các "
-            "nhóm đang dùng — sửa, thêm dòng rồi nhập lại. Danh sách xã ghi mã hoặc tên, cách nhau dấu ;. “Thay toàn "
-            "bộ” xoá nhóm không có trong tệp; nhóm “Địa bàn … (cũ)” do hệ thống tạo, không bị ảnh hưởng.",
+            "nhóm đang dùng — sửa, thêm dòng rồi nhập lại. Danh sách xã ghi mã hoặc tên (56 xã/phường hiện hành), cách "
+            "nhau dấu ;. “Thay toàn bộ” xoá nhóm không có trong tệp.",
             "spatial_admin.presets",
             ("code",),
             (

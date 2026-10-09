@@ -181,7 +181,8 @@ Python trong container.
 
 **Phân quyền (bắt buộc cho mọi endpoint nội bộ)** — chi tiết README §8
 - **3 cấp, mỗi cấp 1 vai trò** (`super_admin` / `admin_tinh` phạm vi `*`, `admin_xa` phạm vi `CUM/MA_XA` — cột
-  `administrative_units.rbac_domain`; không còn phạm vi cụm `CUM/*`), **mỗi tài khoản 1 vai trò**, không vai trò tuỳ
+  `administrative_units.rbac_domain`; không còn phạm vi cụm `CUM/*`; `CUM` = địa bàn huyện cũ chỉ nằm trong chuỗi phạm vi,
+  giao diện / API chỉ dùng 56 xã/phường hiện hành — không trả `old_district`, không nhóm theo huyện cũ), **mỗi tài khoản 1 vai trò**, không vai trò tuỳ
   chỉnh. Quyền mới → gán vào vai trò của cấp phù hợp, không thêm vai trò. Quản lý tài khoản chỉ cấp trên → cấp dưới
   (`management.assert_can_manage_user`) — cùng cấp không đổi mật khẩu / PIN / 2 lớp của nhau.
 - `require_permission(obj, act, scope_loader)`: một tài nguyên cụ thể (loader trong `scope_loaders.py` đọc xã của

@@ -30,6 +30,8 @@ const VIEWPORTS = [
 ];
 const STAFF_PAGES = [
   ['/dashboard', 'Tổng quan'],
+  ['/dashboard?level=xa', 'Tổng quan · cấp xã/phường'],
+  ['/dashboard?level=he_thong', 'Tổng quan · hệ thống & dữ liệu'],
   ['/ban-do', 'Bản đồ giám sát'],
   ['/cuu-ho', 'Điều hành cứu hộ'],
   ['/phan-anh', 'Phản ánh người dân'],
@@ -235,6 +237,21 @@ async function staff(ctx, trackCode) {
       await waitMain(page);
     });
   }
+
+  // Báo cáo nhanh trên Tổng quan tạo phiếu SOS thật (POST /sos) → chỉ mở, qua bước chọn địa điểm rồi huỷ, không gửi
+  await step(ctx, 'Tổng quan: "Báo cáo nhanh" mở được, qua bước địa điểm, không tràn (không gửi)', async () => {
+    await page.goto(`${ROOT}/dashboard`);
+    await waitMain(page);
+    const open = visible(page.getByRole('button', { name: 'Báo cáo nhanh', exact: true }));
+    if (!(await open.count())) return 'bỏ qua: tài khoản không có quyền tạo phiếu SOS';
+    await open.click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('button', { name: 'Sạt lở', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Tiếp', exact: true }).click(); // không lẫn với loại "Tiếp tế"
+    await dialog.getByText('Xã / phường *').waitFor();
+    await expectNoOverflow(ctx, 'hộp thoại Báo cáo nhanh', dialog);
+    await dialog.getByRole('button', { name: 'Huỷ', exact: true }).click();
+  });
 
   // Phân quyền 3 cấp: chọn Cấp quyết định phạm vi (Cấp 3 → 1 xã; Cấp 1–2 → toàn tỉnh) và ô PIN (chỉ Cấp 1–2). Không lưu.
   await step(ctx, 'Tạo tài khoản: Cấp 3 chọn 1 xã, không PIN; Cấp 2 toàn tỉnh, có PIN (không lưu)', async () => {

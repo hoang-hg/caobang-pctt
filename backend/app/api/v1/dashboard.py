@@ -83,7 +83,10 @@ async def _kpis(codes: list[str]) -> dict:
         f"""SELECT count(*) FILTER (WHERE status = 'nhiem_vu') AS active, count(*) FILTER (WHERE status = 'san_sang') AS ready,
                    count(*) FILTER (WHERE status = 'bao_duong') AS maintenance,
                    count(*) FILTER (WHERE vehicle_type IN ('xuong','ca_no','ghe','xe_loi_nuoc')) AS special_total,
-                   count(*) FILTER (WHERE vehicle_type IN ('xuong','ca_no','ghe','xe_loi_nuoc') AND status = 'nhiem_vu') AS special_active
+                   count(*) FILTER (WHERE vehicle_type IN ('xuong','ca_no','ghe','xe_loi_nuoc') AND status = 'nhiem_vu') AS special_active,
+                   -- Máy xúc / máy ủi thông tuyến sau sạt lở (thiên tai chính của Cao Bằng, bên cạnh xuồng, xe lội nước)
+                   count(*) FILTER (WHERE vehicle_type IN ('may_xuc','may_ui')) AS heavy_total,
+                   count(*) FILTER (WHERE vehicle_type IN ('may_xuc','may_ui') AND status = 'nhiem_vu') AS heavy_active
               FROM resources.vehicles v WHERE {area_clause('v.current_location', codes)}""",
         p,
     )

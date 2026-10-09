@@ -18,6 +18,7 @@ import EditTicketModal from '../components/common/EditTicketModal';
 import { Can, useAllowedCodes, usePermission } from '../rbac/usePermission';
 import { INCIDENT, PRIORITY, SOURCE, VULNERABLE } from '../utils/labels';
 import { int, pct, time } from '../utils/format';
+import { hasActiveTeam, slaState } from '../utils/sla';
 
 const COLUMNS = [
   { key: 'moi', title: 'Chờ xử lý', hint: 'Tín hiệu mới – cần tiếp nhận ngay', tone: 'border-t-danger', bgHint: 'bg-danger/5' },
@@ -41,24 +42,6 @@ const mmss = (sec) => {
   const m = Math.floor((s % 3600) / 60);
   return h ? `${h}h${String(m).padStart(2, '0')}` : `${m}:${String(s % 60).padStart(2, '0')}`;
 };
-
-const hasActiveTeam = (t) => t.dispatch_status === 'dang_di' || t.dispatch_status === 'da_den';
-
-/** Đồng hồ SLA của phiếu: "Chờ xử lý" tính từ lúc nhận tin; "Đang điều phối" mà chưa có đội nào đang đi ("Chờ điều động")
- * tính từ lúc chuyển sang cột này / lúc huỷ lệnh trước — kéo sang "Đang điều phối" không dừng được đồng hồ khi chưa ai đi
- * cứu. Cùng quy tắc với KPI quá hạn của dashboard (backend app/services/sos.py OVERDUE_SQL). */
-function slaClock(t) {
-  if (t.status === 'moi') return { label: 'Chờ', since: t.received_at };
-  if (t.status === 'dieu_phoi' && !hasActiveTeam(t)) return { label: 'Chờ điều động', since: t.status_changed_at || t.acknowledged_at || t.received_at };
-  return null;
-}
-
-function slaState(t, now) {
-  const clock = slaClock(t);
-  if (!clock) return null;
-  const waitedSec = (now - new Date(clock.since).getTime()) / 1000;
-  return { ...clock, waitedSec, breached: waitedSec > t.sla_minutes * 60 };
-}
 
 function TicketCard({ t, now, onDispatch, onResolve, onFocus, onArrived, onLink, onCancel, onEdit, onMove }) {
   const canUpdate = usePermission('sos', 'update', t.admin_code);

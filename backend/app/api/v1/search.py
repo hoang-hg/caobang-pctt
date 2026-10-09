@@ -44,7 +44,7 @@ async def search(q: str, limit: int = 12, user: dict = Depends(require_any("moni
           SELECT 'hanh_chinh' AS kind, CASE WHEN u.unit_type = 'phuong' THEN 'Phường ' WHEN u.unit_type = 'xa' THEN 'Xã '
                  ELSE '' END || u.name AS label,
                  CASE WHEN u.level = 'thon' THEN CASE WHEN par.unit_type = 'phuong' THEN 'Phường ' ELSE 'Xã ' END || par.name
-                      ELSE COALESCE('Địa bàn ' || u.old_district || ' cũ', 'Tỉnh Cao Bằng') END AS sub,
+                      ELSE 'Tỉnh Cao Bằng' END AS sub,  -- chỉ đơn vị hiện hành, không ghi địa bàn huyện cũ
                  ST_Y(COALESCE(u.center, par.center)) AS lat, ST_X(COALESCE(u.center, par.center)) AS lon,
                  CASE WHEN u.level = 'thon' THEN par.code ELSE u.code END AS admin_code, u.code AS ref,
                  similarity(spatial_admin.norm(u.name), (SELECT n FROM q)) AS score

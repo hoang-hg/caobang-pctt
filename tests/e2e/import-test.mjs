@@ -165,11 +165,11 @@ const sos = (await call('POST', '/sos/parse', { text: `Nước lũ dâng nhanh �
 check('Xóm: tin SOS nhắc xóm mới → nhận ra đúng xã (không cần khởi động lại)',
   sos?.place?.unit_code === 'CB-PHUCHOA' && sos.place.kind === 'thon', JSON.stringify(sos?.place));
 
-// ---- Nhóm lọc nhanh theo thiên tai: tệp mẫu = các nhóm đang dùng; xã ghi theo tên hoặc mã; "thay toàn bộ" không đụng
-// nhóm "Địa bàn … (cũ)" do hệ thống tạo
+// ---- Nhóm lọc nhanh theo thiên tai: tệp mẫu = các nhóm đang dùng; xã ghi theo tên hoặc mã. Hệ thống chỉ dùng 56
+// xã/phường sau 01/07/2025 — không còn nhóm "Địa bàn … (cũ)" theo huyện cũ (migration 0019)
 const presets = async () => (await call('GET', '/admin-units/presets', null, admin)).data || [];
 const groupsBefore = (await presets()).filter((p) => p.kind === 'luu_vuc');
-const oldDistricts = (await presets()).filter((p) => p.kind === 'dia_ban_cu').length;
+check('Không còn nhóm lọc "Địa bàn … (cũ)" theo huyện cũ', !(await presets()).some((p) => p.kind === 'dia_ban_cu'));
 const tplRes = await fetch(`${BASE}/data-import/datasets/nhom_loc_nhanh/template`, { headers: { Authorization: `Bearer ${admin}` } });
 const groupsCsv = new Uint8Array(await tplRes.arrayBuffer());
 const groupsText = new TextDecoder().decode(groupsCsv);
@@ -184,14 +184,13 @@ const added = (await presets()).find((p) => p.code === `LV_GAM_${stamp}`);
 check('Nhóm lọc nhanh: thêm nhóm — xã ghi theo tên được đổi thành mã', ag.status === 200 && ag.data.result.created === 1
   && added?.unit_codes?.join() === 'CB-BAOLAC,CB-COCPANG' && added?.kind === 'luu_vuc' && added?.hazard === 'ngap_lut',
   JSON.stringify(added || ag.data?.report?.errors?.slice(0, 2)));
-const badGroup = await upload('nhom_loc_nhanh', 'validate', 'nhom.csv', 'ma,ten,danh_sach_xa\nDB_00,Trùng nhóm cũ,Không Có Xã\n', admin);
-check('Nhóm lọc nhanh: xã không có / mã trùng nhóm địa bàn cũ → lỗi',
-  badGroup.data?.errors?.some((e) => e.field === 'danh_sach_xa') && badGroup.data?.errors?.some((e) => e.field === 'ma'));
+const badGroup = await upload('nhom_loc_nhanh', 'validate', 'nhom.csv', `ma,ten,danh_sach_xa\nLV_LOI_${stamp},Nhóm lỗi,Không Có Xã\n`, admin);
+check('Nhóm lọc nhanh: xã không có trong 56 xã/phường → lỗi', badGroup.data?.errors?.some((e) => e.field === 'danh_sach_xa'));
 const restore = await upload('nhom_loc_nhanh', 'apply', 'nhom.csv', groupsCsv, admin, 'replace');
 const groupsAfter = await presets();
-check('Nhóm lọc nhanh: thay toàn bộ bằng tệp mẫu cũ → bỏ nhóm vừa thêm, nhóm địa bàn cũ giữ nguyên',
+check('Nhóm lọc nhanh: thay toàn bộ bằng tệp mẫu cũ → bỏ nhóm vừa thêm, các nhóm khác giữ nguyên',
   restore.status === 200 && restore.data.result.deleted === 1 && !groupsAfter.some((p) => p.code === `LV_GAM_${stamp}`)
-  && groupsAfter.filter((p) => p.kind === 'dia_ban_cu').length === oldDistricts && oldDistricts > 0,
+  && groupsAfter.filter((p) => p.kind === 'luu_vuc').length === groupsBefore.length,
   JSON.stringify(restore.data?.result || restore.data?.report?.errors?.slice(0, 2)));
 
 // ---- Ranh giới xã: nhập lại chính ranh giới hiện có + dân số mới

@@ -41,12 +41,12 @@ Sửa chức năng, cấu hình hay quy trình thì cập nhật đúng mục tr
 
 | # | Phân hệ | Trang | Nội dung chính |
 |---|---|---|---|
-| A | Dashboard tổng quan | `/dashboard` | KPI thời gian thực (mưa lưu vực, mực nước so với BĐ I/II/III, sơ tán, SOS chờ > 15′ nhấp nháy, lực lượng, phương tiện); hydrograph thực đo + dự báo (bản tin KTTV do trực ban nhập); mưa giờ + tích luỹ + dự báo mô hình 3 giờ tới; ngưỡng sạt lở; vật tư theo kho; dự báo mưa 72 giờ theo xã; nhật ký sự kiện; **xuất PDF báo cáo nhanh** |
+| A | Dashboard tổng quan | `/dashboard` | 3 góc nhìn: **Tổng hợp** (tỉnh / vùng lọc) · **Cấp xã/phường** (`?level=xa`: tiến độ sơ tán, điểm sơ tán, SOS đang mở, lực lượng, danh bạ, xóm của 1 xã) · **Hệ thống & dữ liệu** (`?level=he_thong`, quyền `integration.view`: máy chủ, trạm & thiết bị, nguồn dữ liệu, dữ liệu nền còn thiếu). Dải tình huống tự tổng hợp từ số liệu (trạm vượt BĐ, SOS quá hạn / cấp 1, sạt lở cấm đường, hồ xả, mưa ≥ 50 mm/24h — **không phải cấp độ rủi ro thiên tai chính thức**); KPI (mưa TB các trạm, mực nước so với BĐ I/II/III — trạm không có số đo / mất tín hiệu / chưa khai báo ngưỡng hiện xám, sơ tán, SOS chờ, quá hạn SLA nhấp nháy, lực lượng, xuồng – xe lội nước, máy xúc – máy ủi); bản đồ điểm nóng; hydrograph thực đo + dự báo (bản tin KTTV do trực ban nhập); mưa giờ + tích luỹ + dự báo mô hình 3 giờ tới; ngưỡng sạt lở; vật tư theo kho; dự báo mưa 72 giờ theo xã; nhật ký sự kiện; bảng tác chiến 4 chuyên đề (xuất Excel, **soạn cảnh báo cho xã đã chọn** → khung soạn, vẫn Maker–Checker); **Báo cáo nhanh** (quyền `sos.create`) tạo phiếu SOS thật; **xuất PDF / Excel báo cáo nhanh**. Thiếu dữ liệu → ghi rõ "chưa có", không điền số mẫu |
 | B | Bản đồ giám sát | `/ban-do` | 4 nhóm lớp (thuỷ văn, vùng nguy hiểm, lực lượng – vật tư, SOS), radar mưa, thanh thời gian −12h…+24h (số đo quá khứ, bản tin dự báo), popup có biểu đồ mini, trạm mất tín hiệu ghi rõ, **vùng ngập theo kịch bản BĐ I–III**, **bản tin bão** do trực ban nhập, **đánh dấu điểm sự cố** (có hạn hiệu lực), phản ánh của người dân, cập nhật số người ở điểm sơ tán, **kéo–thả đội cứu hộ vào điểm SOS**, khoanh vùng → đếm hộ dân → soạn cảnh báo, đo khoảng cách, **tìm đường an toàn A→B** |
 | C | Vật tư & Lực lượng | `/nguon-luc` | Lực lượng / Kho vật tư / Phương tiện; cảnh báo kho < 20% định mức, sắp hết hạn; **báo tình trạng (bảo dưỡng / hỏng) và nhiên liệu từng phương tiện**; nhiên liệu dự trữ (cập nhật được); điều động nhanh; **xuất / nhập kho**; xuất Excel/PDF |
 | D | Điều hành cứu hộ | `/cuu-ho` | Kanban 4 cột, SLA cấp 1/2/3 (3′/15′/60′), tiếp nhận đa kênh + bóc tách tin nhắn, khớp lực lượng gần nhất theo kỹ năng, ETA, tiến độ sơ tán theo xã (xã / trực ban cập nhật) & sức chứa |
 | E | Cảnh báo & Hotline | `/canh-bao` | Mẫu tin có tham số, phát theo xã / vùng vẽ, 5 kênh, **Maker–Checker + PIN**, bảng theo dõi giao nhận, danh bạ Tỉnh → Xã → Thôn, IVR, nhật ký pháp lý |
-| F | Bộ lọc địa phương & Sáng/Tối | toàn cục | 56 xã/phường (sau 01/07/2025), nhóm lọc nhanh theo thiên tai (BCH tự sửa qua Nhập dữ liệu), địa bàn huyện cũ; Omni-search (địa danh, xóm, mã SOS, toạ độ thập phân / độ-phút-giây / link Google Maps); giao diện sáng/tối theo hệ điều hành, in luôn nền sáng |
+| F | Bộ lọc địa phương & Sáng/Tối | toàn cục | Chỉ 56 xã/phường sau 01/07/2025 (Nghị quyết 1657/NQ-UBTVQH15: 3 phường, 53 xã — không nhóm / hiện theo địa bàn huyện cũ), nhóm lọc nhanh theo thiên tai (BCH tự sửa qua Nhập dữ liệu); Omni-search (địa danh, xóm, mã SOS, toạ độ thập phân / độ-phút-giây / link Google Maps); giao diện sáng/tối theo hệ điều hành, in luôn nền sáng |
 | G | Nguồn dữ liệu & IoT | `/nguon-du-lieu` | Dự báo tổ hợp ECMWF + GFS theo xã; OpenWeather; cổng IoT HTTP / MQTT / LoRaWAN; kiểm tra số đo; cảnh báo mất tín hiệu; giám sát kết nối |
 | H | Phản ánh của người dân | `/phan-anh` | Cán bộ đúng địa bàn duyệt / từ chối / chuyển SOS phản ánh có ảnh của người dân |
 | I | Phân quyền | `/phan-quyen` | 3 cấp, mỗi cấp 1 vai trò (Quản trị hệ thống · Quản trị tỉnh · Quản trị xã/phường), mỗi tài khoản 1 vai trò; chỉ cấp trên quản lý cấp dưới; nhật ký phân quyền |
@@ -161,7 +161,7 @@ graph LR
 |---|---|---|---|---|
 | Ranh giới xã/phường (`ranh_gioi_xa`) | `administrative_units` | GeoJSON vùng | mã xã có sẵn — chỉ cập nhật | — |
 | Xóm / tổ dân phố (`xom`) | `administrative_units` (cấp thôn) | CSV / Excel | `ma` — trống = tự sinh `<mã xã>-<tên>` | ✓ chỉ xóm của các xã có trong tệp |
-| Nhóm lọc nhanh theo thiên tai (`nhom_loc_nhanh`) | `presets` | CSV / Excel | `ma` | ✓ chỉ nhóm thiên tai (nhóm "Địa bàn … (cũ)" giữ nguyên) |
+| Nhóm lọc nhanh theo thiên tai (`nhom_loc_nhanh`) | `presets` | CSV / Excel | `ma` | ✓ |
 | Điểm sơ tán (`diem_so_tan`) 🌐 | `evacuation_sites` | CSV / Excel / GeoJSON điểm | `ma` | ✓ |
 | Vùng nguy hiểm (`vung_nguy_hiem`) 🌐 | `hazard_zones` | GeoJSON vùng | `ma` | ✓ (không xoá vùng do cảm biến tạo) |
 | Điểm nguy hiểm (`diem_nguy_hiem`) 🌐 | `hazard_points` | CSV / Excel / GeoJSON điểm | `ma` | ✓ |
@@ -199,8 +199,8 @@ graph LR
   báo): tệp mẫu tải về **chứa sẵn các nhóm đang dùng** — danh sách xã của từng nhóm hiện do người lập trình đặt, BCH xác
   nhận / sửa rồi nhập lại; thêm nhóm mới bằng dòng mới (VD lưu vực sông Gâm, sông Quây Sơn, đèo Mã Phục). Cột
   `danh_sach_xa` ghi **mã hoặc tên** xã/phường, cách nhau `;` ("Xã Bảo Lạc; CB-COCPANG"); tên trùng nhiều xã → ghi mã.
-  `loai_thien_tai`: `ngap_lut` / `sat_lo` / `tong_hop` (biểu tượng trên bộ lọc). Nhóm "Địa bàn … (cũ)" do hệ thống
-  tạo từ địa bàn huyện cũ, không sửa qua tệp.
+  `loai_thien_tai`: `ngap_lut` / `sat_lo` / `tong_hop` (biểu tượng trên bộ lọc). Hệ thống chỉ dùng 56 xã/phường sau
+  01/07/2025 — không còn nhóm lọc theo địa bàn huyện cũ (migration 0019 đã xoá các nhóm "Địa bàn … (cũ)" tạo trước đây).
 - Thứ tự khi nhập lần đầu: ranh giới xã → xóm → kho → tồn kho → lực lượng → phương tiện → phần còn lại.
 
 Dòng lệnh (tệp lớn, người vận hành máy chủ):
@@ -963,8 +963,9 @@ tuỳ chỉnh. Casbin `rbac_with_domains`; danh mục quyền và 3 vai trò là
 └── …                      56 xã/phường (cột administrative_units.rbac_domain)
 ```
 
-Tiền tố `<CUM>` (địa bàn huyện cũ) chỉ còn trong mã phạm vi để khớp dữ liệu; **không còn cấp vai trò theo cụm**. Yêu cầu
-ở phạm vi toàn tỉnh không khớp quyền cấp xã.
+Tiền tố `<CUM>` (địa bàn huyện cũ) chỉ còn trong mã phạm vi để khớp dữ liệu đã cấp; **không còn cấp vai trò theo cụm** và
+**không hiện trên giao diện**: tên phạm vi, danh sách chọn xã, thông báo lỗi chỉ ghi "Xã …" / "Phường …" (56 xã/phường hiện
+hành). Yêu cầu ở phạm vi toàn tỉnh không khớp quyền cấp xã.
 
 ### 8.1. Danh mục quyền
 

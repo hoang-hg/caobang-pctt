@@ -313,7 +313,7 @@ async def locate(lat: float = Query(..., ge=20, le=25), lon: float = Query(..., 
 async def _locate(lat: float, lon: float) -> dict:
     pt = {"lat": lat, "lon": lon}
     unit = await fetch_one(
-        f"""SELECT u.id, u.code, u.name, u.old_district, {IN_PROVINCE_SQL} AS in_province
+        f"""SELECT u.id, u.code, u.name, {IN_PROVINCE_SQL} AS in_province
              FROM spatial_admin.administrative_units u, spatial_admin.administrative_units p
             WHERE u.level = 'xa' AND p.code = 'CB'
             ORDER BY u.geom <-> ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) LIMIT 1""",
@@ -363,7 +363,8 @@ async def _locate(lat: float, lon: float) -> dict:
     else:
         risk = "thap"
     return {
-        "commune": {"code": unit["code"], "name": unit["name"], "district": unit["old_district"]},
+        # Chỉ xã/phường hiện hành (không trả địa bàn huyện cũ — giao diện chỉ dùng 56 xã/phường sau 01/07/2025)
+        "commune": {"code": unit["code"], "name": unit["name"]},
         "risk": risk,
         "advice": RISK_ADVICE[risk],
         "hazards": hazards,
