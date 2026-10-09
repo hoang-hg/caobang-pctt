@@ -1,8 +1,8 @@
 import { alarmLevel } from './labels';
-import { dateTime } from './format';
+import { dateTime, num, time } from './format';
 import { RISK } from './risk';
 
-const STALE_MS = 60 * 60 * 1000; // như STALE_MINUTES ở backend (app/services/readings.py)
+export const STALE_MS = 60 * 60 * 1000; // như STALE_MINUTES ở backend (app/services/readings.py)
 // Chữ màu theo thang rủi ro chung — trước đây BĐ I tô cam, BĐ II tô đỏ: lệch với biểu tượng trên bản đồ và chip ALARM
 const COLOR = RISK.map((r) => r.text);
 
@@ -37,4 +37,37 @@ export function stationView(s) {
       : { level: null, value: `${value} (cũ)`, status: `Mất tín hiệu · số đo lúc ${dateTime(s.time)}`, statusColor: 'text-muted', marker: '?' };
   }
   return { level, value, status, statusColor: COLOR[level], marker: rain ? String(Math.round(v)) : v.toFixed(1) };
+}
+
+/**
+ * Xu hướng mực nước (m/giờ) giữa hai số đo cách nhau ≥ 30 phút (backend /stations: prev_value / prev_time ~1 giờ trước).
+ * Số đo mới nhất cũ hơn `maxAgeMs` (mặc định 60 phút = mất tín hiệu) → null — không nói "đang lên / xuống" khi không biết.
+ * Dưới ±0,02 m/giờ coi là ổn định (dao động của cảm biến). dir: 'len' | 'xuong' | 'on_dinh'.
+ */
+export function waterTrend(value, at, prevValue, prevAt, maxAgeMs = STALE_MS) {
+  if (value == null || prevValue == null || !at || !prevAt) return null;
+  const t = new Date(at).getTime();
+  const hours = (t - new Date(prevAt).getTime()) / 3_600_000;
+  if (!(hours >= 0.5) || Date.now() - t > maxAgeMs) return null;
+  const rate = (Number(value) - Number(prevValue)) / hours;
+  return { rate, dir: rate >= 0.02 ? 'len' : rate <= -0.02 ? 'xuong' : 'on_dinh' };
+}
+
+/** Lời của xu hướng: "đang lên 0,12 m/giờ" / "đang xuống …" / "ổn định". */
+export const trendWords = (t) => (t.dir === 'len' ? `đang lên ${num(t.rate, 2)} m/giờ` : t.dir === 'xuong' ? `đang xuống ${num(-t.rate, 2)} m/giờ` : 'ổn định');
+
+/** Props cho <TrendTag>: chữ "0,12 m/giờ" / "ổn định"; `who` (tên trạm) đứng đầu lời đọc. null khi không biết xu hướng. */
+export const trendProps = (t, who = 'Mực nước') => t && {
+  dir: t.dir,
+  text: t.dir === 'on_dinh' ? 'ổn định' : `${num(Math.abs(t.rate), 2)} m/giờ`,
+  label: `${who} ${trendWords(t)}`,
+};
+
+/** Nguồn đường dự báo mực nước: bản tin KTTV do trực ban nhập, hay đường "HEC-HMS" chỉ bộ mô phỏng sinh. */
+export const forecastSource = (model) => (model === 'KTTV' ? 'bản tin KTTV' : 'dự báo mô phỏng');
+
+/** Giờ của một mốc dự báo: hôm nay → "21:00", ngày khác → "01:00 ngày 10/10" (đọc liền sau "lúc …"). */
+export function etaWhen(t) {
+  const d = new Date(t);
+  return d.toDateString() === new Date().toDateString() ? time(d) : `${time(d)} ngày ${d.getDate()}/${d.getMonth() + 1}`;
 }

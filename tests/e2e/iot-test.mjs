@@ -117,6 +117,52 @@ check('Thiết bị HTTP trực tuyến', devs.find((d) => d.id === HTTP_ID)?.st
 const mon = (await call('GET', '/integrations/monitor', null, A)).data;
 check('Giám sát kết nối: MQTT broker đã kết nối, có nhật ký tiếp nhận', mon.mqtt_connected && mon.log.length > 0);
 
+// /stations cho Tổng quan: số đo ~1 giờ trước (mũi tên xu hướng), mức báo động kế tiếp và lúc dự báo chạm mức đó
+const water = (await call('GET', '/stations?type=muc_nuoc', null, A)).data;
+const FIELDS = ['prev_value', 'prev_time', 'next_level', 'next_threshold', 'eta_time', 'eta_model'];
+check('/stations: trạm mực nước có trường xu hướng & dự báo', water.length > 0 && water.every((s) => FIELDS.every((f) => f in s)));
+const gapMin = (s) => (new Date(s.time) - new Date(s.prev_time)) / 60_000;
+check('/stations: có số đo trước để tính xu hướng, cách số đo mới nhất 45–90 phút',
+  water.some((s) => s.prev_value != null) && water.every((s) => s.prev_time == null || (gapMin(s) >= 45 && gapMin(s) <= 90)),
+  water.map((s) => `${s.id} ${s.prev_time ? Math.round(gapMin(s)) : '–'}′`).join(', '));
+const nextOf = (s) => [1, 2, 3].find((lv) => s.thresholds?.[`bd${lv}`] != null && s.thresholds[`bd${lv}`] > s.value) ?? null;
+check('/stations: mức kế tiếp = ngưỡng thấp nhất trên số đo hiện tại',
+  water.every((s) => s.value == null || (s.next_level === nextOf(s) && (s.next_level == null || s.next_threshold === s.thresholds[`bd${s.next_level}`]))),
+  water.map((s) => `${s.id} ${s.value}→${s.next_level ?? '–'}`).join(', '));
+// Bản tin KTTV chạm mức kế tiếp → eta_time = điểm dự báo đầu tiên ≥ ngưỡng, eta_model = KTTV; gỡ bản tin → hết KTTV.
+// Chỉ thử trên trạm CHƯA có bản tin KTTV (chạy trên stack dev không xoá bản tin người dùng đã nhập)
+let target = null;
+// (bỏ CB-WL-02 — vừa nhận số đo LoRaWAN ở trên; bỏ trạm sát ngưỡng — nước lên qua ngưỡng giữa chừng thì mức kế tiếp đổi)
+for (const s of water.filter((x) => x.id !== 'CB-WL-02' && x.next_level != null && x.value != null && x.next_threshold - x.value > 0.1)) {
+  const sr = (await call('GET', `/stations/${s.id}/series?hours=1`, null, A)).data;
+  if (!sr.forecast.some((f) => f.model === 'KTTV')) { target = s; break; }
+}
+if (target) {
+  const t0 = Date.now();
+  const points = [1, 2, 3, 4, 5, 6].map((h) => ({
+    time: new Date(Math.floor((t0 + h * 3600e3) / 60_000) * 60_000).toISOString(),
+    value: Math.round((target.value + ((target.next_threshold + 0.3 - target.value) * h) / 6) * 1000) / 1000,
+  }));
+  const firstHit = points.find((p) => p.value >= target.next_threshold);
+  const put = await call('PUT', `/stations/${target.id}/forecast`, { points, source: 'Kiểm thử E2E' }, A);
+  let row;
+  for (let i = 0; i < 10 && row?.eta_model !== 'KTTV'; i += 1) {
+    if (i) await sleep(1000);
+    row = (await call('GET', '/stations?type=muc_nuoc', null, A)).data.find((s) => s.id === target.id);
+  }
+  check(`Bản tin KTTV chạm BĐ ${target.next_level} → /stations báo giờ chạm theo bản tin (${target.id})`,
+    put.status === 200 && row?.eta_model === 'KTTV' && new Date(row.eta_time).getTime() === new Date(firstHit.time).getTime(),
+    `${put.status} ${row?.eta_time} ${row?.eta_model} (chờ ${firstHit.time})`);
+  const del = await call('DELETE', `/stations/${target.id}/forecast`, null, A);
+  for (let i = 0; i < 10 && row?.eta_model === 'KTTV'; i += 1) {
+    if (i) await sleep(1000);
+    row = (await call('GET', '/stations?type=muc_nuoc', null, A)).data.find((s) => s.id === target.id);
+  }
+  check('Gỡ bản tin KTTV → giờ chạm không còn theo bản tin', del.status === 204 && row?.eta_model !== 'KTTV', `${row?.eta_model}`);
+} else {
+  check('Có trạm mực nước dưới BĐ III, chưa có bản tin KTTV để thử giờ chạm', false);
+}
+
 // Dọn dẹp: xoá thiết bị → trạm trở lại mô phỏng
 for (const id of [HTTP_ID, MQTT_ID, LORA_ID]) await call('DELETE', `/integrations/devices/${id}`, null, A);
 const after = (await call('GET', '/stations', null, A)).data;

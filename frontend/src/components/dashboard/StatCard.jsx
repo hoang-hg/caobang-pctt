@@ -10,9 +10,10 @@ import { risk } from '../../utils/risk';
  *
  * `compact`: ô gọn của hàng KPI (lãnh đạo đọc trong vài giây, vừa 2 cột ở màn 360 px): tiêu đề · số lớn · nhãn mức ·
  * một dòng ngữ cảnh. `onClick` → cả ô là nút; `to` → cả ô là liên kết (khi đó KHÔNG đặt nút / liên kết khác bên trong).
+ * `aside`: thông tin phụ cạnh nhãn mức của ô gọn (VD mũi tên xu hướng) — không nhấp nháy theo `alert`.
  */
 export default function StatCard({
-  icon: Icon, title, badge, value, unit, footer, level, alert, className, children, compact = false, onClick, to, hint,
+  icon: Icon, title, badge, aside, value, unit, footer, level, alert, className, children, compact = false, onClick, to, hint,
 }) {
   const scale = level === undefined ? null : risk(level);
   const Tag = to ? Link : onClick ? 'button' : 'div';
@@ -49,7 +50,12 @@ export default function StatCard({
         </div>
       )}
       {/* Ô gọn: nhãn mức nằm hàng riêng dưới số (góc phải của ô 2 cột trên điện thoại không đủ chỗ) */}
-      {compact && badgeEl && <div className="flex min-w-0">{badgeEl}</div>}
+      {compact && (badgeEl || aside) && (
+        <div className="flex min-w-0 items-center gap-1.5">
+          {badgeEl}
+          {aside}
+        </div>
+      )}
       {children}
       {footer && (
         <div className={clsx('text-ink-2', compact ? 'line-clamp-1 text-[11px] leading-snug sm:line-clamp-2 [.kpi-lon_&]:text-xs' : 'border-t border-line/60 pt-1.5 text-xs')}>

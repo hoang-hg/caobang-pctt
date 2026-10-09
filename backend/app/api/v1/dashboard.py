@@ -132,12 +132,40 @@ async def stations(type: str | None = None, codes: list[str] = Depends(MON)):
 
 
 async def _stations(type: str | None, codes: list[str]) -> list[dict]:
+    # prev_*: số đo gần mốc 1 giờ trước số đo mới nhất (45–90 phút) → giao diện tính xu hướng lên / xuống.
+    # next_* / eta_*: mức báo động kế tiếp trên số đo hiện tại và lúc đường dự báo chạm mức đó — bản tin KTTV nếu có,
+    # không thì đường "HEC-HMS" (chỉ bộ mô phỏng sinh; giao diện ghi rõ "mô phỏng"), như biểu đồ thủy văn.
     return await fetch_all(
         f"""SELECT s.id, s.name, s.type, s.river, s.unit, s.alarm_thresholds AS thresholds, s.status, s.source,
-                   ST_Y(s.location) AS lat, ST_X(s.location) AS lon, u.name AS admin_name, l.value, l.time
+                   ST_Y(s.location) AS lat, ST_X(s.location) AS lon, u.name AS admin_name, l.value, l.time,
+                   p.value AS prev_value, p.time AS prev_time,
+                   nx.level AS next_level, nx.threshold AS next_threshold, eta.time AS eta_time, eta.model AS eta_model
               FROM iot_telemetry.monitoring_stations s
               LEFT JOIN spatial_admin.administrative_units u ON u.id = s.admin_unit_id
               LEFT JOIN ({LATEST_READINGS}) l ON l.station_id = s.id
+              LEFT JOIN LATERAL (
+                  SELECT r.value, r.time FROM iot_telemetry.sensor_readings r
+                   WHERE r.station_id = s.id
+                     AND r.time BETWEEN l.time - interval '90 minutes' AND l.time - interval '45 minutes'
+                   ORDER BY abs(extract(epoch FROM (l.time - interval '60 minutes' - r.time))) LIMIT 1
+              ) p ON true
+              LEFT JOIN LATERAL (
+                  SELECT v.level, v.threshold FROM (VALUES
+                      (1, (s.alarm_thresholds->>'bd1')::float),
+                      (2, (s.alarm_thresholds->>'bd2')::float),
+                      (3, (s.alarm_thresholds->>'bd3')::float)) AS v(level, threshold)
+                   WHERE s.type = 'muc_nuoc' AND v.threshold IS NOT NULL AND v.threshold > l.value
+                   ORDER BY v.level LIMIT 1
+              ) nx ON true
+              LEFT JOIN LATERAL (
+                  SELECT f.time, f.model FROM iot_telemetry.forecasts f
+                   WHERE f.station_id = s.id AND f.time > now() AND f.value >= nx.threshold
+                     AND f.model = CASE WHEN EXISTS (
+                         SELECT 1 FROM iot_telemetry.forecasts k
+                          WHERE k.station_id = s.id AND k.model = 'KTTV' AND k.time > now()
+                     ) THEN 'KTTV' ELSE 'HEC-HMS' END
+                   ORDER BY f.time LIMIT 1
+              ) eta ON true
              WHERE (CAST(:type AS text) IS NULL OR s.type = :type) AND {area_clause('s.location', codes)}
              ORDER BY s.type, s.id""",
         {"type": type, "codes": codes},
