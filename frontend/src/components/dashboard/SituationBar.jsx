@@ -45,9 +45,13 @@ export function situationItems(k, waterStations) {
  * cùng khi cuộn; điện thoại hiện chip nặng nhất, máy tính 3 chip đầu, còn lại "+N" (bấm để mở hết). Mức Vàng: khung vàng.
  * Không có tình huống: nói "chưa ghi nhận" kèm độ phủ số đo — không nói "an toàn"; chưa có số đo: khung xám chỉ chỗ
  * nhập (chỉ link tới trang tài khoản được mở). Lỗi tải danh sách trạm: nói không tải được, không nói "chưa có trạm".
+ * `presentation` (chế độ trình chiếu màn hình lớn): hiện đủ mọi tình huống, ẩn nút thao tác — màn hình chỉ để xem.
  */
-export default function SituationBar({ k, waterStations, stationsError, rainKnown, canReport, onReport, canSos, canImportStations, canSystem }) {
-  const [expanded, setExpanded] = useState(false);
+export default function SituationBar({
+  k, waterStations, stationsError, rainKnown, canReport, onReport, canSos, canImportStations, canSystem, presentation = false,
+}) {
+  const [opened, setExpanded] = useState(false);
+  const expanded = opened || presentation;
   const items = situationItems(k, waterStations);
   const worst = items[0]?.level || 0;
   const fresh = waterStations.filter((s) => {
@@ -96,7 +100,7 @@ export default function SituationBar({ k, waterStations, stationsError, rainKnow
               </span>
             ))}
             {noDataNote && <span className={clsx('opacity-80', !expanded && 'hidden sm:inline')}>{noDataNote}</span>}
-            {extraDesk > 0 && (
+            {extraDesk > 0 && !presentation && (
               <button type="button" onClick={() => setExpanded((v) => !v)} aria-expanded={expanded} className={clsx('hidden min-h-[28px] sm:inline-flex', toggle)}>
                 {expanded ? 'Thu gọn' : `+${extraDesk}`}
                 <ChevronDown size={13} className={clsx('transition-transform', expanded && 'rotate-180')} aria-hidden="true" />
@@ -109,6 +113,7 @@ export default function SituationBar({ k, waterStations, stationsError, rainKnow
           className={clsx(
             'flex flex-wrap items-center gap-2 no-print sm:ml-auto sm:shrink-0 [&>*]:flex-1 sm:[&>*]:flex-none',
             extraPhone <= 0 && !sosLink && 'hidden sm:flex',
+            presentation && '!hidden',
           )}
         >
           {extraPhone > 0 && (

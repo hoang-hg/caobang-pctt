@@ -47,6 +47,8 @@ function NoAccess() {
 function Shell() {
   useSocket();
   const setAuth = useStore((s) => s.setAuth);
+  // Chế độ trình chiếu của Dashboard (màn hình lớn phòng điều hành): chỉ còn nội dung, không thanh trên / menu trái
+  const presentation = useStore((s) => s.presentation);
   // Chuông SOS: mở khoá âm thanh ở lần bấm / gõ phím đầu tiên (trình duyệt chặn tới lúc đó)
   useEffect(() => (useStore.getState().audioReady ? undefined : watchAudioUnlock(useStore.getState().setAudioReady)), []);
   const qc = useQueryClient();
@@ -62,10 +64,10 @@ function Shell() {
 
   return (
     <div className="flex h-full flex-col print:block print:h-auto">
-      <Header />
+      {!presentation && <Header />}
       <SessionKeeper />
       <div className="flex min-h-0 flex-1 print:block">
-        <Sidebar />
+        {!presentation && <Sidebar />}
         <main className="min-w-0 flex-1 overflow-auto scroll-thin print:overflow-visible">
           <Suspense fallback={<PageLoading />}>
             <Routes>

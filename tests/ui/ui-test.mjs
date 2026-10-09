@@ -535,6 +535,20 @@ async function firstScreen(ctx) {
       return `KPI đáy ${m.kpiBottom}/${m.visibleBottom}px${need.map ? ` · bản đồ thấy ${m.mapVisible}px` : ''}`;
     });
   }
+  // Màn hình lớn phòng điều hành: link ?trinh-chieu=1 (xoay vòng 15 giây — mức nhỏ nhất) → chỉ còn nội dung, nền tối,
+  // tự sang chuyên đề kế tiếp; Esc trả lại thanh trên. Chỉ xem.
+  await step(ctx, 'Chế độ trình chiếu: ẩn thanh trên / menu, nền tối, tự chuyển chuyên đề; Esc thoát', async () => {
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await page.goto(`${ROOT}/dashboard?trinh-chieu=1&xoay=15`);
+    await waitMain(page);
+    await page.locator('[aria-label="Chỉ số nhanh"] > *').nth(5).waitFor();
+    if (await page.locator('header').count()) throw new Error('vẫn còn thanh trên');
+    if (!(await page.evaluate(() => document.documentElement.classList.contains('dark')))) throw new Error('chưa chuyển nền tối');
+    await page.waitForURL(/tab=ho_chua/, { timeout: 25_000 });
+    await page.keyboard.press('Escape');
+    await page.locator('header').waitFor({ timeout: 5_000 });
+    return 'tự sang Hồ chứa sau 15 giây';
+  });
 }
 
 // ================================================================
