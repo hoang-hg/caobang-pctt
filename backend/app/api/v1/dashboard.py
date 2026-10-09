@@ -5,9 +5,9 @@ from datetime import UTC, datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app.area import area_clause, unit_clause
+from app.area import area_clause, thiessen_ctes, unit_clause
 from app.auth import audit
-from app.db import execute, fetch_all, fetch_one, transaction
+from app.db import execute, fetch_all, fetch_all_no_jit, fetch_one, transaction
 from app.infra.cache import cached_view, invalidate
 from app.rbac.authz import area_scope, require_any, require_permission
 from app.services.events import log_event
@@ -37,19 +37,24 @@ async def kpis(codes: list[str] = Depends(MON)):
 
 async def _kpis(codes: list[str]) -> dict:
     p = {"codes": codes}
-    rain = await fetch_one(
-        f"""
+    rain = (
+        await fetch_all_no_jit(
+            f"""
         WITH h AS (
           SELECT s.id, s.name, time_bucket('1 hour', r.time) AS b, avg(r.value) AS v
             FROM iot_telemetry.sensor_readings r JOIN iot_telemetry.monitoring_stations s ON s.id = r.station_id
            WHERE s.type = 'luong_mua' AND r.time > now() - interval '24 hours' AND {area_clause('s.location', codes)}
            GROUP BY s.id, s.name, b),
-        tot AS (SELECT id, name, sum(v) AS mm FROM h GROUP BY id, name)
-        SELECT round(avg(mm)::numeric, 1) AS avg_24h, round(max(mm)::numeric, 1) AS max_24h,
+        tot AS (SELECT id, name, sum(v) AS mm FROM h GROUP BY id, name),
+        {thiessen_ctes(codes)}
+        SELECT round(COALESCE(sum(tot.mm * w.m2) / NULLIF(sum(w.m2), 0), avg(tot.mm))::numeric, 1) AS avg_24h,
+               CASE WHEN sum(w.m2) > 0 THEN 'thiessen' ELSE 'trung_binh_cong' END AS avg_method,
+               count(*) AS stations, round(max(tot.mm)::numeric, 1) AS max_24h,
                (SELECT name FROM tot ORDER BY mm DESC LIMIT 1) AS max_station
-          FROM tot""",
-        p,
-    )
+          FROM tot LEFT JOIN w USING (id)""",
+            p,
+        )
+    )[0]
     rivers = await fetch_all(
         f"""SELECT s.id, s.name, s.river, s.alarm_thresholds AS thresholds, l.value, l.time
               FROM iot_telemetry.monitoring_stations s JOIN ({LATEST_READINGS}) l ON l.station_id = s.id
@@ -202,29 +207,42 @@ async def station_series(
 
 @router.get("/dashboard/rainfall")
 async def rainfall(codes: list[str] = Depends(MON), hours: int = 24):
-    """Mưa giờ (trung bình các trạm trong vùng) + tích lũy + nowcast QPF 3h."""
+    """Mưa giờ (bình quân lưu vực theo đa giác Thiessen của các trạm trong vùng) + tích lũy + dự báo mô hình 3h."""
     return await cached_view("rainfall", {"codes": codes, "hours": hours}, lambda: _rainfall(codes, hours))
 
 
 async def _rainfall(codes: list[str], hours: int) -> dict:
     p = {"codes": codes, "h": hours}
-    observed = await fetch_all(
-        f"""SELECT b AS time, round(avg(v)::numeric, 1)::float AS mm, round(max(v)::numeric, 1)::float AS max_mm FROM (
-              SELECT r.station_id, time_bucket('1 hour', r.time) AS b, avg(r.value) AS v
+    # Mỗi giờ: bình quân theo diện tích (Thiessen) của các trạm có số đo giờ đó — trạm thiếu số liệu giờ nào thì trọng số
+    # của các trạm còn lại được chia lại; max_mm = trạm mưa lớn nhất trong giờ (cực đại cục bộ)
+    observed = await fetch_all_no_jit(
+        f"""WITH h AS (
+              SELECT r.station_id AS id, time_bucket('1 hour', r.time) AS b, avg(r.value) AS v
                 FROM iot_telemetry.sensor_readings r JOIN iot_telemetry.monitoring_stations s ON s.id = r.station_id
                WHERE s.type = 'luong_mua' AND r.time > now() - make_interval(hours => :h) AND {area_clause('s.location', codes)}
-               GROUP BY r.station_id, b) x
-            GROUP BY b ORDER BY b""",
+               GROUP BY 1, 2),
+            tot AS (SELECT DISTINCT id FROM h),
+            {thiessen_ctes(codes)}
+            SELECT h.b AS time, round(COALESCE(sum(h.v * w.m2) / NULLIF(sum(w.m2), 0), avg(h.v))::numeric, 1)::float AS mm,
+                   round(max(h.v)::numeric, 1)::float AS max_mm, COALESCE(sum(w.m2), 0) > 0 AS weighted
+              FROM h LEFT JOIN w USING (id) GROUP BY h.b ORDER BY h.b""",
         p,
     )
-    nowcast = await fetch_all(
-        f"""SELECT f.time, round(avg(f.value)::numeric, 1)::float AS mm, round(max(f.value)::numeric, 1)::float AS max_mm
-              FROM iot_telemetry.forecasts f JOIN iot_telemetry.monitoring_stations s ON s.id = f.station_id
-             WHERE f.model = 'QPF-NOWCAST' AND f.time > now() AND {area_clause('s.location', codes)}
-             GROUP BY f.time ORDER BY f.time""",
+    nowcast = await fetch_all_no_jit(
+        f"""WITH h AS (
+              SELECT f.station_id AS id, f.time AS b, f.value AS v
+                FROM iot_telemetry.forecasts f JOIN iot_telemetry.monitoring_stations s ON s.id = f.station_id
+               WHERE f.model = 'QPF-NOWCAST' AND f.time > now() AND {area_clause('s.location', codes)}),
+            tot AS (SELECT DISTINCT id FROM h),
+            {thiessen_ctes(codes)}
+            SELECT h.b AS time, round(COALESCE(sum(h.v * w.m2) / NULLIF(sum(w.m2), 0), avg(h.v))::numeric, 1)::float AS mm,
+                   round(max(h.v)::numeric, 1)::float AS max_mm
+              FROM h LEFT JOIN w USING (id) GROUP BY h.b ORDER BY h.b""",
         p,
     )
-    return {"observed": observed, "nowcast": nowcast}
+    flags = [r.pop("weighted") for r in observed]
+    method = "thiessen" if flags and all(flags) else "trung_binh_cong"
+    return {"observed": observed, "nowcast": nowcast, "method": method}
 
 
 @router.get("/dashboard/landslide-risk")

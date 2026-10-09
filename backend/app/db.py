@@ -44,6 +44,15 @@ async def fetch_all(
         return [dict(r) for r in result.mappings().all()]
 
 
+async def fetch_all_no_jit(sql: str, params: dict[str, Any] | None = None) -> list[dict]:
+    """Truy vấn có hàm PostGIS nặng (chi phí ước lượng cao) → PostgreSQL bật JIT, mất 60–200 ms biên dịch cho truy vấn chạy
+    chỉ ~40 ms. Tắt JIT riêng trong transaction này (SET LOCAL), không đổi cấu hình chung của CSDL."""
+    async with engine.begin() as c:
+        await c.execute(text("SET LOCAL jit = off"))
+        result = await c.execute(text(sql), params or {})
+        return [dict(r) for r in result.mappings().all()]
+
+
 async def fetch_one(
     sql: str, params: dict[str, Any] | None = None, conn: AsyncConnection | None = None
 ) -> dict | None:

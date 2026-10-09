@@ -16,7 +16,7 @@ const TILE_H = 112; // chiều cao khung tải — gần bằng ô thật để 
 const HOUR = 3_600_000;
 
 /**
- * Mưa của giờ TRỌN gần nhất (trung bình các trạm — cùng số liệu cột "Mưa giờ" của biểu đồ mưa) so với giờ trước đó. Giờ
+ * Mưa của giờ TRỌN gần nhất (bình quân lưu vực — cùng số liệu cột "Mưa giờ" của biểu đồ mưa) so với giờ trước đó. Giờ
  * đang chạy chưa đủ số đo nên bỏ; giờ trọn gần nhất cũ hơn 2 giờ (trạm ngừng gửi) → null. Chênh dưới 0,5 mm = tương đương.
  */
 function lastHourRain(data) {
@@ -107,7 +107,7 @@ export default function KpiStrip({
         value={num(rain?.avg_24h, 1)}
         unit={rainKnown ? 'mm TB' : undefined}
         onClick={onRain}
-        hint="Xem biểu đồ mưa giờ và dự báo 3 giờ tới"
+        hint={`${rain?.avg_method === 'thiessen' ? `TB lưu vực theo diện tích (đa giác Thiessen) của ${rain.stations} trạm` : rain?.stations === 1 ? 'Số đo của 1 trạm trong vùng' : 'Trung bình cộng các trạm'} — bấm xem biểu đồ mưa giờ và dự báo 3 giờ tới`}
         footer={
           rainKnown ? (
             <>
