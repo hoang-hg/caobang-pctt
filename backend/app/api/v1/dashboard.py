@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.area import area_clause, thiessen_ctes, unit_clause
@@ -304,6 +304,35 @@ def classify_landslide(rain_72h: float, intensity: float, tilt: float | None) ->
     if intensity >= threshold_intensity("vang", rain_72h) or rain_72h >= 180:
         return "vang"
     return "an_toan"
+
+
+@router.get("/dashboard/landslide-sensors")
+async def landslide_sensors(codes: list[str] = Depends(MON), hours: int = Query(48, ge=6, le=168)):
+    """Cảm biến cảnh báo sớm sạt lở (độ nghiêng taluy, độ ẩm đất) trong vùng: số đo mới nhất + giá trị LỚN NHẤT từng giờ
+    trong `hours` giờ qua → heatmap chuỗi thời gian (giờ không có số đo = không có ô). Mức Vàng / Cam / Đỏ do giao diện
+    so với ngưỡng BĐ I / II / III khai báo cho từng cảm biến."""
+    return await cached_view(
+        "landslide-sensors", {"codes": codes, "hours": hours}, lambda: _landslide_sensors(codes, hours)
+    )
+
+
+async def _landslide_sensors(codes: list[str], hours: int) -> dict:
+    sensors = await fetch_all(
+        f"""SELECT s.id, s.name, s.type, s.unit, s.alarm_thresholds AS thresholds, u.name AS admin_name, l.value, l.time,
+                   COALESCE((
+                     SELECT json_agg(json_build_object('time', x.b, 'max', x.v) ORDER BY x.b)
+                       FROM (SELECT time_bucket('1 hour', r.time) AS b, round(max(r.value)::numeric, 2)::float AS v
+                               FROM iot_telemetry.sensor_readings r
+                              WHERE r.station_id = s.id AND r.time > now() - make_interval(hours => :h)
+                              GROUP BY 1) x), '[]'::json) AS series
+              FROM iot_telemetry.monitoring_stations s
+              LEFT JOIN spatial_admin.administrative_units u ON u.id = s.admin_unit_id
+              LEFT JOIN ({LATEST_READINGS}) l ON l.station_id = s.id
+             WHERE s.type IN ('do_nghieng', 'do_am_dat') AND {area_clause('s.location', codes)}
+             ORDER BY s.type, s.id""",
+        {"codes": codes, "h": hours},
+    )
+    return {"hours": hours, "sensors": sensors}
 
 
 @router.get("/dashboard/supplies")
