@@ -8,9 +8,11 @@
    Theme tokens (RGB channels, để Tailwind dùng được alpha).
    Sáng: nền #F9FAFB, chữ #1F2937 — cho hiện trường & in báo cáo.
    Tối (mặc định Trung tâm điều hành): nền #111827.
-   Màu trạng thái (đỏ/cam/vàng/xanh) của nền, huy hiệu, bản đồ cố định, không đổi theo theme. CHỮ màu trạng thái
-   (text-warn / text-serious / text-good — tailwind.config.js) dùng --*-text: ở nền sáng là sắc đậm hơn, vì vàng / cam /
-   xanh lá của nền chỉ đạt tương phản 1,8 / 2,6 / 3,4 : 1 trên nền trắng (cần ≥ 4,5 : 1 — dưới nắng không đọc được).
+   Màu trạng thái (đỏ/cam/vàng/xanh) của nền, huy hiệu, bản đồ cố định, không đổi theo theme — thang màu rủi ro dùng
+   chung ở src/utils/risk.js. CHỮ màu trạng thái (text-danger / -warn / -serious / -good — tailwind.config.js) dùng
+   --*-text: ở nền sáng là sắc đậm hơn, vì vàng / cam / xanh lá của nền chỉ đạt tương phản 1,8 / 2,6 / 3,4 : 1 trên nền
+   trắng; ở nền tối đỏ là sắc sáng hơn (cần ≥ 4,5 : 1 — dưới nắng không đọc được). Chữ đỏ trên nền TRẮNG cố định (nút
+   trong dải báo động) dùng text-[rgb(var(--danger))] — không theo theme.
    Bảng màu tối chỉ áp cho màn hình (@media screen): in ra giấy luôn dùng bảng màu sáng.
    ------------------------------------------------------------------ */
 :root {
@@ -28,6 +30,7 @@
   --serious: 236 131 90;
   --warn: 250 178 25;
   --good: 12 163 12;
+  --danger-text: 208 59 59; /* #D03B3B — 4,8 : 1 trên nền trắng */
   --serious-text: 194 65 12; /* #C2410C — 5,2 : 1 trên nền trắng */
   --warn-text: 161 98 7; /* #A16207 — 4,9 : 1 */
   --good-text: 21 128 61; /* #15803D — 5,0 : 1 */
@@ -53,6 +56,7 @@
     --muted: 148 163 184;
     --accent: 57 135 229;
     --info: 57 135 229;
+    --danger-text: 248 113 113; /* #F87171 — đỏ gốc chỉ 3,4 : 1 trên nền tối, sắc sáng hơn đạt 5,9 : 1 */
     --serious-text: 236 131 90; /* nền tối: chính màu trạng thái đã đủ tương phản */
     --warn-text: 250 178 25;
     --good-text: 12 163 12;

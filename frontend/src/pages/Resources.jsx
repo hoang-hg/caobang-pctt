@@ -16,6 +16,7 @@ import { FuelDepotModal, ReceiveModal, VehicleModal } from '../components/common
 import { BaseLayer } from '../components/map/MapTools';
 import { vehicleIcon } from '../components/map/icons';
 import { CATEGORY, FORCE_TYPE, INCIDENT, PRIORITY, RES_STATUS, SKILL, VEHICLE, VEHICLE_CAT } from '../utils/labels';
+import { RISK } from '../utils/risk';
 import { dateTime, int, time, vnFileStamp } from '../utils/format';
 import { exportExcel } from '../utils/exportExcel';
 import { exportSnapshotPdf } from '../utils/exportPdf';
@@ -230,7 +231,7 @@ export default function Resources() {
                             <td className={clsx('py-1 pl-2 text-right font-mono', low && 'font-semibold text-danger')}>{int(i.quantity)} {i.unit}</td>
                             <td className="py-1 pl-2 text-right">
                               {low && <span className="chip bg-danger text-white">Cạn kiệt</span>}
-                              {exp && <span className="chip bg-serious text-white" title={`Hạn dùng ${i.expiry_date}`}>Sắp hết hạn</span>}
+                              {exp && <span className={`chip ${RISK[2].chip}`} title={`Hạn dùng ${i.expiry_date}`}>Sắp hết hạn</span>}
                             </td>
                           </tr>
                         );

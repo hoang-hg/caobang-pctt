@@ -1,12 +1,11 @@
 import clsx from 'clsx';
 import { Waves } from 'lucide-react';
 import { ALARM } from '../../utils/labels';
+import { NO_DATA, risk } from '../../utils/risk';
 import { stationView } from '../../utils/stations';
 import { num } from '../../utils/format';
 import StatCard, { Badge } from './StatCard';
 
-const TONE = [undefined, 'warn', 'serious', 'danger'];
-const BAR = ['bg-good', 'bg-warn', 'bg-serious', 'bg-danger'];
 export const ROMAN = ['', 'I', 'II', 'III'];
 
 /**
@@ -15,15 +14,15 @@ export const ROMAN = ['', 'I', 'II', 'III'];
  * động vẫn giữ cấp đó (mất tín hiệu không xoá được nguy cơ đã biết) — quy tắc của utils/stations.stationView.
  */
 export function riverState(s) {
-  if (s.value == null) return { level: null, value: null, noData: true, stale: false, label: 'Không có số đo', cls: 'bg-panel2 text-muted' };
+  if (s.value == null) return { level: null, value: null, noData: true, stale: false, label: 'Không có số đo', cls: NO_DATA.chip };
   const value = Number(s.value);
   if (s.thresholds?.bd1 == null) {
-    return { level: null, value, noData: false, stale: false, label: 'Chưa khai báo ngưỡng', cls: 'bg-panel2 text-muted' };
+    return { level: null, value, noData: false, stale: false, label: 'Chưa khai báo ngưỡng', cls: NO_DATA.chip };
   }
   const view = stationView(s);
   const stale = view.marker === '?';
-  if (view.level == null) return { level: null, value, noData: false, stale, label: 'Mất tín hiệu', cls: 'bg-panel2 text-muted' };
-  return { level: view.level, value, noData: false, stale, label: `${ALARM[view.level].label}${stale ? ' (cũ)' : ''}`, cls: ALARM[view.level].cls };
+  if (view.level == null) return { level: null, value, noData: false, stale, label: 'Mất tín hiệu', cls: NO_DATA.chip };
+  return { level: view.level, value, noData: false, stale, label: `${ALARM[view.level].label}${stale ? ' (cũ)' : ''}`, cls: risk(view.level).chip };
 }
 
 /** "Trạm thủy văn Cao Bằng (sông Bằng Giang)" → "Cao Bằng". */
@@ -35,18 +34,18 @@ export default function RiverKpi({ stations, selectedId, onSelect }) {
   const fresh = rows.filter((r) => !r.st.noData && !r.st.stale).length;
   const known = rows.filter((r) => r.st.level != null);
   const worst = known.reduce((m, r) => Math.max(m, r.st.level), 0);
-  const tone = known.length ? TONE[worst] : 'muted';
-  let badge = <Badge className={ALARM[worst].cls}>{ALARM[worst].label}</Badge>;
-  if (!rows.length) badge = <Badge className="bg-panel2 text-muted">Chưa có trạm</Badge>;
-  else if (!known.length) badge = <Badge className="bg-panel2 text-muted">Chưa đánh giá được</Badge>;
+  const level = known.length ? worst : null;
+  let badge = <Badge level={worst}>{ALARM[worst].label}</Badge>;
+  if (!rows.length) badge = <Badge level={null}>Chưa có trạm</Badge>;
+  else if (!known.length) badge = <Badge level={null}>Chưa đánh giá được</Badge>;
 
   return (
     <StatCard
       icon={Waves}
       title="Mực nước sông"
       badge={badge}
-      tone={tone}
-      blink={worst === 3}
+      level={level}
+      alert={level === 3}
       footer={
         rows.length
           ? `${fresh}/${rows.length} trạm có số đo trong 60 phút qua · bấm trạm để xem biểu đồ`
@@ -69,7 +68,7 @@ export default function RiverKpi({ stations, selectedId, onSelect }) {
                   onClick={() => onSelect?.(s.id)}
                   aria-pressed={selectedId === s.id}
                   title={s.name}
-                  className={clsx('flex w-full flex-col gap-0.5 rounded-md px-1.5 py-1 text-left hover:bg-panel2', selectedId === s.id && 'bg-panel2')}
+                  className={clsx('flex min-h-[40px] w-full flex-col justify-center gap-0.5 rounded-md px-1.5 py-1 text-left hover:bg-panel2', selectedId === s.id && 'bg-panel2')}
                 >
                   <span className="flex items-center justify-between gap-2 text-xs">
                     <span className="min-w-0 truncate font-medium text-ink-2">
@@ -83,7 +82,7 @@ export default function RiverKpi({ stations, selectedId, onSelect }) {
                   </span>
                   {bar != null && (
                     <span className="h-1.5 w-full overflow-hidden rounded-full bg-panel2">
-                      <span className={clsx('block h-full rounded-full', BAR[st.level])} style={{ width: `${bar}%` }} />
+                      <span className={clsx('block h-full rounded-full', risk(st.level).fill)} style={{ width: `${bar}%` }} />
                     </span>
                   )}
                 </button>

@@ -2,6 +2,7 @@ import { CartesianGrid, ComposedChart, Line, ResponsiveContainer, Scatter, Toolt
 import { useAreaQuery } from '../../api/hooks';
 import { num } from '../../utils/format';
 import { LEVEL } from '../../utils/labels';
+import { EmptyState, ErrorState, Skeleton } from '../common/ui';
 import { axisProps, Legend, useChartTheme } from './chartTheme';
 
 const RISK_ORDER = ['do', 'cam', 'vang', 'an_toan'];
@@ -27,13 +28,15 @@ function Tip({ active, payload }) {
  * (api/v1/dashboard.py THRESHOLD_A) — chưa hiệu chỉnh theo số liệu sạt lở của tỉnh, nên ghi rõ dưới biểu đồ. */
 export default function LandslideScatter({ height = 250 }) {
   const c = useChartTheme();
-  const { data } = useAreaQuery('landslide', '/dashboard/landslide-risk', {}, { refetchInterval: 60_000 });
-  if (!data) return <div style={{ height }} className="animate-pulse rounded-lg bg-panel2" />;
+  const { data, isError, refetch } = useAreaQuery('landslide', '/dashboard/landslide-risk', {}, { refetchInterval: 60_000 });
+  if (!data) {
+    return isError ? <ErrorState height={height} onRetry={refetch}>Không tải được số liệu ngưỡng sạt lở</ErrorState> : <Skeleton height={height} />;
+  }
   if (!data.points.length) {
     return (
-      <div style={{ height }} className="flex items-center justify-center rounded-lg border border-dashed border-line px-4 text-center text-xs text-muted">
+      <EmptyState height={height}>
         Chưa có trạm đo mưa nào có số đo 72 giờ qua trong vùng đang xem — chưa đánh giá được ngưỡng kích hoạt sạt lở
-      </div>
+      </EmptyState>
     );
   }
   const color = { do: c.danger, cam: c.serious, vang: c.warn, an_toan: c.good };

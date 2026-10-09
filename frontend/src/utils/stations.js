@@ -1,8 +1,10 @@
 import { alarmLevel } from './labels';
 import { dateTime } from './format';
+import { RISK } from './risk';
 
 const STALE_MS = 60 * 60 * 1000; // như STALE_MINUTES ở backend (app/services/readings.py)
-const COLOR = ['text-good', 'text-serious', 'text-danger', 'text-danger'];
+// Chữ màu theo thang rủi ro chung — trước đây BĐ I tô cam, BĐ II tô đỏ: lệch với biểu tượng trên bản đồ và chip ALARM
+const COLOR = RISK.map((r) => r.text);
 
 /**
  * Hiển thị số liệu một trạm quan trắc. Trạm CHƯA có số đo, hoặc MẤT TÍN HIỆU (số đo cuối cũ hơn 60 phút — cổng công

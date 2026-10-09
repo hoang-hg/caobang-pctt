@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Area, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { api } from '../../api/client';
 import { useAreaQuery } from '../../api/hooks';
+import { usePermission } from '../../rbac/usePermission';
+import { EmptyState, ErrorState, Skeleton } from '../common/ui';
 import { axisProps, Legend, useChartTheme } from './chartTheme';
 
 const fmtTime = (t) => new Date(t).toLocaleString('vi-VN', { hour: '2-digit', day: '2-digit', month: '2-digit' });
@@ -25,12 +28,14 @@ function Tip({ active, payload }) {
 /** Dự báo mưa 72 giờ theo xã: dải tin cậy P10–P90 (tổ hợp ECMWF + GFS), đường P50, P50 từng mô hình. */
 export default function AreaForecastChart({ height = 250 }) {
   const c = useChartTheme();
-  const { data: areas = [] } = useAreaQuery('forecast-areas', '/forecast/areas', { hours: 72 }, { refetchInterval: 10 * 60_000 });
+  const areasQ = useAreaQuery('forecast-areas', '/forecast/areas', { hours: 72 }, { refetchInterval: 10 * 60_000 });
+  const areas = useMemo(() => areasQ.data || [], [areasQ.data]);
+  const canSystem = usePermission('integration', 'view');
   const [code, setCode] = useState('');
   useEffect(() => {
     if (areas.length && !areas.some((a) => a.code === code)) setCode(areas[0].code);
   }, [areas, code]);
-  const { data } = useQuery({
+  const { data, isError, refetch } = useQuery({
     queryKey: ['forecast-series', code],
     queryFn: () => api(`/forecast/areas/${code}`),
     enabled: !!code,
@@ -50,10 +55,25 @@ export default function AreaForecastChart({ height = 250 }) {
     }));
   }, [data]);
 
+  if (!areasQ.data) {
+    return areasQ.isError
+      ? <ErrorState height={height} onRetry={areasQ.refetch}>Không tải được dự báo mưa theo xã</ErrorState>
+      : <Skeleton height={height} />;
+  }
   if (!areas.length) {
-    return <div className="py-10 text-center text-sm text-muted">Chưa có dữ liệu dự báo — bật nguồn Open-Meteo tại trang Nguồn dữ liệu.</div>;
+    return (
+      <EmptyState height={height}>
+        Chưa có dữ liệu dự báo mưa theo xã — nguồn dự báo Open-Meteo chưa chạy
+        {canSystem ? <> · <Link to="/nguon-du-lieu" className="font-semibold text-accent hover:underline">Kiểm tra nguồn dữ liệu →</Link></> : ' (báo cấp tỉnh kiểm tra)'}
+      </EmptyState>
+    );
   }
   const sel = areas.find((a) => a.code === code);
+  const series = data
+    ? null
+    : isError
+      ? <ErrorState height={height} onRetry={refetch}>Không tải được dự báo của xã đã chọn</ErrorState>
+      : <Skeleton height={height} />;
   return (
     <div>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-line/60 pb-1.5">
@@ -89,18 +109,20 @@ export default function AreaForecastChart({ height = 250 }) {
         { label: 'ECMWF P50', color: c.s2, dashed: true },
         { label: 'GFS P50', color: c.s3, dashed: true },
       ]} />
-      <ResponsiveContainer width="100%" height={height}>
-        <ComposedChart data={rows} margin={{ top: 6, right: 8, bottom: 0, left: -12 }}>
-          <CartesianGrid stroke={c.grid} vertical={false} />
-          <XAxis dataKey="t" type="number" scale="time" domain={['dataMin', 'dataMax']} tickFormatter={fmtTime} minTickGap={50} {...axisProps(c)} />
-          <YAxis width={44} {...axisProps(c)} label={{ value: 'mm/h', angle: -90, position: 'insideLeft', fill: c.axis, fontSize: 10, dx: 14 }} />
-          <Tooltip content={<Tip />} cursor={{ stroke: c.axis, strokeDasharray: '3 3' }} />
-          <Area dataKey="band" stroke="none" fill={c.s1} fillOpacity={0.18} isAnimationActive={false} />
-          <Line dataKey="p50" stroke={c.s1} strokeWidth={2} dot={false} isAnimationActive={false} />
-          <Line dataKey="ecmwf" stroke={c.s2} strokeWidth={1.5} strokeDasharray="5 4" dot={false} isAnimationActive={false} />
-          <Line dataKey="gfs" stroke={c.s3} strokeWidth={1.5} strokeDasharray="2 3" dot={false} isAnimationActive={false} />
-        </ComposedChart>
-      </ResponsiveContainer>
+      {series || (
+        <ResponsiveContainer width="100%" height={height}>
+          <ComposedChart data={rows} margin={{ top: 6, right: 8, bottom: 0, left: -12 }}>
+            <CartesianGrid stroke={c.grid} vertical={false} />
+            <XAxis dataKey="t" type="number" scale="time" domain={['dataMin', 'dataMax']} tickFormatter={fmtTime} minTickGap={50} {...axisProps(c)} />
+            <YAxis width={44} {...axisProps(c)} label={{ value: 'mm/h', angle: -90, position: 'insideLeft', fill: c.axis, fontSize: 10, dx: 14 }} />
+            <Tooltip content={<Tip />} cursor={{ stroke: c.axis, strokeDasharray: '3 3' }} />
+            <Area dataKey="band" stroke="none" fill={c.s1} fillOpacity={0.18} isAnimationActive={false} />
+            <Line dataKey="p50" stroke={c.s1} strokeWidth={2} dot={false} isAnimationActive={false} />
+            <Line dataKey="ecmwf" stroke={c.s2} strokeWidth={1.5} strokeDasharray="5 4" dot={false} isAnimationActive={false} />
+            <Line dataKey="gfs" stroke={c.s3} strokeWidth={1.5} strokeDasharray="2 3" dot={false} isAnimationActive={false} />
+          </ComposedChart>
+        </ResponsiveContainer>
+      )}
       <div className="mt-1 text-[11px] text-muted">
         Nguồn: Open-Meteo · ECMWF IFS ({data?.series?.ECMWF_ENS?.[0]?.members || 51} thành phần) + NOAA GEFS ({data?.series?.GFS_ENS?.[0]?.members || 31}) ·
         phát hành {sel?.issued_at ? new Date(sel.issued_at).toLocaleString('vi-VN') : '–'}

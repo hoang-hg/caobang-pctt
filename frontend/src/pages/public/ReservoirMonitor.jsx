@@ -91,7 +91,7 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap }) {
                   </span>
                 )}
                 {staleCount > 0 && (
-                  <span className="chip bg-amber-500/15 text-amber-700 dark:text-amber-300 text-[11px] font-bold" title="Số liệu vận hành cũ hơn 6 giờ">
+                  <span className="chip border border-dashed border-line bg-panel2 text-ink-2 text-[11px] font-bold" title="Số liệu vận hành cũ hơn 6 giờ">
                     {staleCount} hồ số liệu cũ
                   </span>
                 )}
@@ -119,14 +119,14 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap }) {
 
       {/* 2. Cảnh báo khẩn cấp hạ du (nếu có hồ xả lũ lớn hoặc đang xả lớn) */}
       {emergencyCount > 0 && (
-        <div className="rounded-2xl p-4 sm:p-5 border border-red-500/50 bg-gradient-to-r from-red-600/95 to-rose-700/95 text-white shadow-lg shadow-red-500/20">
+        <div className="rounded-2xl p-4 sm:p-5 border border-danger/60 bg-danger text-white shadow-lg shadow-danger/20">
           <div className="flex items-start gap-3">
-            <div className="p-2 bg-white/20 rounded-xl text-white shrink-0 mt-0.5 animate-bounce">
+            <div className="p-2 bg-white/20 rounded-xl text-white shrink-0 mt-0.5 motion-safe:animate-bounce">
               <Siren size={24} />
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-black text-sm uppercase tracking-wider bg-white text-danger px-2.5 py-0.5 rounded-md">
+                <span className="font-black text-sm uppercase tracking-wider bg-white text-[rgb(var(--danger))] px-2.5 py-0.5 rounded-md">
                   Cảnh Báo Xả Lũ Mức Cao
                 </span>
                 <span className="text-xs font-semibold text-white/90">
@@ -163,18 +163,18 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap }) {
         </div>
 
         {/* Card 2: Đang xả tràn */}
-        <div className="card p-4 flex flex-col justify-between border-l-4 border-l-amber-500">
+        <div className="card p-4 flex flex-col justify-between border-l-4 border-l-serious">
           <div className="flex items-center justify-between text-muted text-xs">
             <span>Đang mở cửa xả tràn</span>
-            <div className="h-8 w-8 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold">
+            <div className="h-8 w-8 rounded-lg bg-serious/10 text-serious flex items-center justify-center font-bold">
               <Waves size={16} />
             </div>
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-black font-mono text-amber-600">{spillCount}</span>
+            <span className="text-2xl font-black font-mono text-serious">{spillCount}</span>
             <span className="text-xs text-muted">/ {data?.total_reservoirs ?? 0} hồ đang xả</span>
           </div>
-          <div className="text-[11px] text-amber-600 font-medium mt-2 border-t border-line/60 pt-1.5">
+          <div className="text-[11px] text-serious font-medium mt-2 border-t border-line/60 pt-1.5">
             {spillCount > 0
               ? 'Mở cửa xả đón lũ & bảo vệ an toàn đập'
               : noOperatingData
@@ -188,7 +188,7 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap }) {
         {/* Card 3: Xả lũ khẩn cấp */}
         <div className={clsx(
           'card p-4 flex flex-col justify-between border-l-4',
-          emergencyCount > 0 ? 'border-l-red-500 bg-danger/5 ring-1 ring-danger/30' : 'border-l-good'
+          emergencyCount > 0 ? 'border-l-danger bg-danger/5 ring-1 ring-danger/30' : 'border-l-good'
         )}>
           <div className="flex items-center justify-between text-muted text-xs">
             <span>Xả lũ lớn</span>
@@ -226,7 +226,7 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap }) {
           </div>
           <div className="text-[11px] text-muted mt-2 border-t border-line/60 pt-1.5 flex items-center justify-between">
             <span>Nước về hồ: <b>{Math.round(totalInflow).toLocaleString('vi-VN')} m³/s</b></span>
-            <span className={clsx('font-bold', flowBalance > 0 ? 'text-amber-600' : 'text-good')}>
+            <span className={clsx('font-bold', flowBalance > 0 ? 'text-serious' : 'text-good')}>
               {flowBalance > 0 ? `+${Math.round(flowBalance)} m³/s` : `${Math.round(flowBalance)} m³/s`}
             </span>
           </div>
@@ -273,11 +273,11 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap }) {
 
           {/* Ô tìm kiếm & Lọc trạng thái */}
           <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-            <div className="relative flex-1 sm:w-56">
+            <div className="relative min-w-0 flex-[1_1_10rem] sm:w-56">
               <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted" />
               <input
                 type="text"
-                placeholder="Tìm tên hồ, huyện, xã…"
+                placeholder="Tìm tên hồ, sông, xã/phường…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="input pl-8 py-1.5 text-xs w-full"
@@ -287,7 +287,7 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap }) {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="input py-1.5 text-xs w-auto font-medium"
+              className="input py-1.5 text-xs w-auto flex-[1_1_auto] sm:flex-none font-medium"
             >
               <option value="all">Mọi trạng thái</option>
               <option value="xa_khan_cap">🔴 Xả lũ lớn</option>
@@ -318,7 +318,7 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap }) {
                   <span>·</span>
                   <span>
                     Số hồ đang xả tràn:{' '}
-                    <b className={clsx('font-bold', basinData.spilling_count > 0 ? 'text-amber-600' : 'text-good')}>
+                    <b className={clsx('font-bold', basinData.spilling_count > 0 ? 'text-serious' : 'text-good')}>
                       {basinData.spilling_count} / {basinData.reservoirs_count} hồ
                     </b>
                   </span>
@@ -346,16 +346,17 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap }) {
               className={clsx(
                 'card flex flex-col justify-between overflow-hidden transition-all duration-200 hover:shadow-lg',
                 isEmergency
-                  ? 'border-red-500/80 bg-gradient-to-b from-red-500/5 to-transparent ring-1 ring-red-500/40'
+                  ? 'border-danger/80 bg-gradient-to-b from-danger/5 to-transparent ring-1 ring-danger/40'
                   : isSpilling
-                  ? 'border-amber-500/60 bg-gradient-to-b from-amber-500/5 to-transparent'
+                  ? 'border-serious/60 bg-gradient-to-b from-serious/5 to-transparent'
                   : 'border-line hover:border-accent/60'
               )}
             >
               {/* Header Thẻ */}
               <div className="p-4 pb-3 border-b border-line/60">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
+                {/* Thẻ hẹp (điện thoại, lưới 3 cột) → chip trạng thái xuống dòng dưới tên, không ép tên chỉ còn "Đèo Kh…" */}
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0 flex-[1_1_12rem]">
                     <div className="flex items-center gap-1.5">
                       <span className="text-[11px] font-mono font-bold text-muted bg-panel2 px-1.5 py-0.5 rounded">
                         {r.id}
@@ -382,11 +383,11 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap }) {
                   {/* Status Badge */}
                   <span
                     className={clsx(
-                      'chip text-xs font-bold shrink-0 px-2.5 py-1',
+                      'chip text-xs font-bold shrink-0 max-w-full px-2.5 py-1',
                       isEmergency
-                        ? 'bg-danger text-white shadow-sm shadow-danger/30 animate-pulse'
+                        ? 'bg-danger text-white shadow-sm shadow-danger/30 motion-safe:animate-pulse'
                         : isSpilling
-                        ? 'bg-amber-500 text-white shadow-sm shadow-amber-500/30'
+                        ? 'bg-serious text-black shadow-sm shadow-serious/30'
                         : noData
                         ? 'bg-panel2 text-muted border-line'
                         : 'bg-good/15 text-good border-good/30'
@@ -432,7 +433,7 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap }) {
                     <div
                       className={clsx(
                         'h-full rounded-full transition-all duration-500',
-                        isEmergency ? 'bg-danger' : isSpilling ? 'bg-amber-500' : 'bg-good'
+                        isEmergency ? 'bg-danger' : isSpilling ? 'bg-serious' : 'bg-good'
                       )}
                       style={{ width: `${Math.min(100, Math.max(10, (r.current_level / r.normal_level) * 100))}%` }}
                     />
@@ -452,7 +453,7 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap }) {
                 <div className="bg-panel2/60 rounded-xl p-2.5 border border-line/60">
                   <div className="flex items-center justify-between text-xs text-muted mb-2">
                     <span className="font-semibold text-ink-2">Trạng thái cửa xả tràn:</span>
-                    <b className={clsx('font-mono font-bold', gatesOpen > 0 ? (isEmergency ? 'text-danger' : 'text-amber-600') : 'text-good')}>
+                    <b className={clsx('font-mono font-bold', gatesOpen > 0 ? (isEmergency ? 'text-danger' : 'text-serious') : 'text-good')}>
                       {gatesOpen > 0 ? `Mở ${gatesOpen}/${gatesTotal} cửa` : `Đóng (0/${gatesTotal} cửa)`}
                     </b>
                   </div>
@@ -468,8 +469,8 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap }) {
                             'flex flex-col items-center justify-center py-1.5 px-1 rounded-md text-[10px] font-bold transition-all border',
                             isOpen
                               ? isEmergency
-                                ? 'bg-red-500 text-white border-red-600 shadow-sm animate-pulse'
-                                : 'bg-amber-500 text-white border-amber-600 shadow-sm'
+                                ? 'bg-danger text-white border-danger shadow-sm motion-safe:animate-pulse'
+                                : 'bg-serious text-black border-serious shadow-sm'
                               : 'bg-panel text-muted border-line/80'
                           )}
                           title={`Cửa xả số ${idx + 1}: ${isOpen ? 'Đang mở' : 'Đóng'}`}
@@ -496,11 +497,11 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap }) {
 
                   <div className="p-2.5 rounded-xl bg-panel2/50 border border-line/60">
                     <div className="text-[11px] text-muted flex items-center gap-1">
-                      <ArrowUpRight size={13} className={clsx(gatesOpen > 0 ? 'text-amber-600' : 'text-good')} />
+                      <ArrowUpRight size={13} className={clsx(gatesOpen > 0 ? 'text-serious' : 'text-good')} />
                       Xả về hạ du (Outflow)
                     </div>
                     <div className="mt-1 flex items-baseline gap-1 font-mono">
-                      <span className={clsx('text-base font-bold', isEmergency ? 'text-danger' : isSpilling ? 'text-amber-600' : 'text-ink')}>
+                      <span className={clsx('text-base font-bold', isEmergency ? 'text-danger' : isSpilling ? 'text-serious' : 'text-ink')}>
                         {r.outflow_m3s}
                       </span>
                       <span className="text-[11px] text-muted">m³/s</span>
@@ -514,9 +515,9 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap }) {
                   className={clsx(
                     'p-2.5 rounded-xl text-xs leading-relaxed border',
                     isEmergency
-                      ? 'bg-red-500/10 border-red-500/30 text-danger'
+                      ? 'bg-danger/10 border-danger/30 text-danger'
                       : isSpilling
-                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-800 dark:text-amber-300'
+                      ? 'bg-serious/10 border-serious/30 text-serious'
                       : 'bg-good/5 border-good/20 text-ink-2'
                   )}
                 >
@@ -531,7 +532,7 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap }) {
               <div className="p-3 bg-panel2/40 border-t border-line/60 flex items-center justify-between text-xs">
                 <span className="flex items-center gap-1.5 text-[11px] text-muted">
                   {r.updated_at ? <>Số liệu vận hành: {ago(r.updated_at)}</> : 'Chưa có số liệu vận hành'}
-                  {r.stale && <span className="chip bg-amber-500/15 text-amber-700 dark:text-amber-300 text-[10px] font-bold">Số liệu cũ</span>}
+                  {r.stale && <span className="chip border border-dashed border-line bg-panel2 text-ink-2 text-[10px] font-bold">Số liệu cũ</span>}
                 </span>
                 {canUpdate && (
                   <button
@@ -593,7 +594,7 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap }) {
             </p>
           </div>
           <div className="p-3 rounded-xl bg-panel2/60 border border-line/60">
-            <b className="text-amber-600 flex items-center gap-1 mb-1">
+            <b className="text-serious flex items-center gap-1 mb-1">
               🟠 Cấp 2: Mở xả tràn điều tiết đón lũ
             </b>
             <p className="text-muted">

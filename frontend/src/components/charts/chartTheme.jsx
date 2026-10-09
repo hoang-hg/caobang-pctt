@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useStore } from '../../app/store';
+import { RISK } from '../../utils/risk';
 
 /** Màu biểu đồ đọc từ biến CSS → đổi Sáng/Tối là đổi ngay, không tải lại trang. */
 export function useChartTheme() {
@@ -20,11 +21,11 @@ export function useChartTheme() {
       muted: rgb('--muted'),
       panel: rgb('--panel'),
       line: rgb('--line'),
-      // Màu trạng thái cố định — trùng biến CSS / labels.js (ALARM, LEVEL) để chip, bản đồ và biểu đồ cùng một màu
-      good: '#0ca30c',
-      warn: '#fab219',
-      serious: '#ec835a',
-      danger: '#d03b3b',
+      // Màu trạng thái cố định — thang màu rủi ro chung (utils/risk.js): chip, bản đồ và biểu đồ cùng một màu
+      good: RISK[0].hex,
+      warn: RISK[1].hex,
+      serious: RISK[2].hex,
+      danger: RISK[3].hex,
     };
   }, [theme]);
 }

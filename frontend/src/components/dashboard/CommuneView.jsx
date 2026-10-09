@@ -6,24 +6,27 @@ import { BookUser, Home, MapPinned, PhoneCall, Shield, Siren, Users } from 'luci
 import { api } from '../../api/client';
 import { useAreaQuery } from '../../api/hooks';
 import { usePermission } from '../../rbac/usePermission';
-import { Progress } from '../common/ui';
+import { ErrorState, Progress, Skeleton } from '../common/ui';
 import { FORCE_TYPE, INCIDENT, PRIORITY, SOS_STATUS } from '../../utils/labels';
 import { dateTime, int, minutesSince, pct } from '../../utils/format';
 import { slaState } from '../../utils/sla';
 
 export const unitLabel = (u) => (u ? `${u.unit_type === 'phuong' ? 'Phường' : 'Xã'} ${u.name}` : '');
 
-/** Khung một mục của góc nhìn xã: tiêu đề + nội dung, nội dung trống thì ghi rõ chưa có dữ liệu gì. */
-function Panel({ icon: Icon, title, right, empty, children, className }) {
+/** Khung một mục của góc nhìn xã: tiêu đề + nội dung. Đang tải / lỗi tải (`q` = kết quả useQuery) → khung tải / lỗi kèm
+ * "Thử lại" — không nói "chưa có dữ liệu" khi thực ra chưa biết; tải xong mà trống thì ghi rõ cần nhập gì (`empty`). */
+function Panel({ icon: Icon, title, right, empty, q, children, className }) {
+  let body = empty ? <p className="rounded-lg border border-dashed border-line px-3 py-4 text-center text-xs text-muted">{empty}</p> : children;
+  if (q && !q.data) body = q.isError ? <ErrorState onRetry={q.refetch}>Không tải được dữ liệu</ErrorState> : <Skeleton height={72} />;
   return (
     <section className={clsx('card flex min-w-0 flex-col gap-2 p-3', className)}>
       <div className="flex items-center justify-between gap-2">
         <h3 className="card-title">
-          <Icon size={15} className="text-accent" /> {title}
+          <Icon size={15} className="text-accent" aria-hidden="true" /> {title}
         </h3>
         {right}
       </div>
-      {empty ? <p className="rounded-lg border border-dashed border-line px-3 py-4 text-center text-xs text-muted">{empty}</p> : children}
+      {body}
     </section>
   );
 }
@@ -40,29 +43,31 @@ export default function CommuneView({ code, units, onChange, children }) {
   const unit = units.find((u) => u.code === code);
   const canEvac = usePermission('evacuation', 'update', code);
   const canRes = usePermission('resource', 'view', code);
+  const canSos = usePermission('sos', 'view', code);
   const canContacts = usePermission('contact', 'view');
 
-  const { data: evac } = useAreaQuery('evacuation', '/evacuation', {}, { refetchInterval: 30_000 });
-  const { data: tickets = [] } = useAreaQuery('sos', '/sos', {}, { refetchInterval: 20_000 });
-  const { data: forces = [] } = useAreaQuery('forces', '/resources/forces', {}, { enabled: canRes });
-  const { data: contacts = [] } = useQuery({
+  const evacQ = useAreaQuery('evacuation', '/evacuation', {}, { refetchInterval: 30_000 });
+  const sosQ = useAreaQuery('sos', '/sos', {}, { refetchInterval: 20_000, enabled: canSos });
+  const forcesQ = useAreaQuery('forces', '/resources/forces', {}, { enabled: canRes });
+  const contactsQ = useQuery({
     queryKey: ['contacts'],
     queryFn: () => api('/alerts/contacts'),
     staleTime: 5 * 60_000,
     enabled: canContacts,
   });
-  const { data: hamlets = [] } = useQuery({
+  const hamletsQ = useQuery({
     queryKey: ['units', 'thon'],
     queryFn: () => api('/admin-units', { params: { level: 'thon' } }),
     staleTime: Infinity,
   });
 
+  const evac = evacQ.data;
   const progress = evac?.progress?.find((p) => p.code === code);
   const sites = (evac?.sites || []).filter((s) => s.admin_code === code);
-  const open = tickets.filter((t) => t.admin_code === code && t.status !== 'hoan_thanh');
-  const localForces = forces; // đóng quân trong ranh giới xã (kể cả đơn vị cấp tỉnh — ghi rõ cấp)
-  const book = useMemo(() => flatten(contacts).filter((c) => c.admin_code === code && c.level !== 'tinh'), [contacts, code]);
-  const myHamlets = hamlets.filter((h) => h.parent_code === code);
+  const open = (sosQ.data || []).filter((t) => t.admin_code === code && t.status !== 'hoan_thanh');
+  const localForces = forcesQ.data || []; // đóng quân trong ranh giới xã (kể cả đơn vị cấp tỉnh — ghi rõ cấp)
+  const book = useMemo(() => flatten(contactsQ.data || []).filter((c) => c.admin_code === code && c.level !== 'tinh'), [contactsQ.data, code]);
+  const myHamlets = (hamletsQ.data || []).filter((h) => h.parent_code === code);
 
   return (
     <div className="flex flex-col gap-3">
@@ -99,7 +104,8 @@ export default function CommuneView({ code, units, onChange, children }) {
             <Panel
               icon={Home}
               title="Tiến độ sơ tán"
-              right={canEvac && <Link to="/cuu-ho" className="text-xs font-semibold text-accent hover:underline">Cập nhật →</Link>}
+              q={evacQ}
+              right={canEvac && canSos && <Link to="/cuu-ho" className="text-xs font-semibold text-accent hover:underline">Cập nhật →</Link>}
               empty={!progress && 'Xã chưa cập nhật kế hoạch / tiến độ sơ tán (Điều hành cứu hộ → Giám sát sơ tán nhân dân)'}
             >
               {progress && (
@@ -122,6 +128,7 @@ export default function CommuneView({ code, units, onChange, children }) {
             <Panel
               icon={MapPinned}
               title={`Điểm sơ tán · ${sites.length}`}
+              q={evacQ}
               empty={!sites.length && 'Chưa có điểm sơ tán của xã trong dữ liệu (nhập loại "Điểm sơ tán")'}
             >
               <ul className="scroll-thin flex max-h-56 flex-col gap-2 overflow-y-auto pr-1 print:max-h-none print:overflow-visible">
@@ -140,36 +147,39 @@ export default function CommuneView({ code, units, onChange, children }) {
               </ul>
             </Panel>
 
-            <Panel
-              icon={Siren}
-              title={`Phiếu SOS đang mở · ${open.length}`}
-              right={<Link to="/cuu-ho" className="text-xs font-semibold text-accent hover:underline">Điều phối →</Link>}
-              empty={!open.length && 'Không có phiếu SOS đang mở ở xã này'}
-            >
-              <ul className="scroll-thin flex max-h-56 flex-col gap-1.5 overflow-y-auto pr-1 print:max-h-none print:overflow-visible">
-                {open.map((t) => {
-                  const waited = minutesSince(t.received_at);
-                  const late = !!slaState(t, Date.now())?.breached; // cùng quy tắc với KPI quá hạn (utils/sla)
-                  return (
-                    <li key={t.id} className={clsx('rounded-md border px-2 py-1.5 text-xs', late ? 'border-danger/60 bg-danger/10' : 'border-line')}>
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-mono font-semibold text-ink">{t.code}</span>
-                        <span className={clsx('chip px-1.5 py-0 text-[10px]', PRIORITY[t.priority]?.cls)}>{PRIORITY[t.priority]?.short}</span>
-                      </div>
-                      <div className="text-ink-2">
-                        {INCIDENT[t.incident_type]} · {t.trapped_count ?? '?'} người · {SOS_STATUS[t.status]}
-                      </div>
-                      <div className={late ? 'font-semibold text-danger' : 'text-muted'}>
-                        Tiếp nhận {waited} phút trước{late && ' — quá hạn phản hồi'}
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            </Panel>
+            {canSos && (
+              <Panel
+                icon={Siren}
+                title={`Phiếu SOS đang mở · ${open.length}`}
+                q={sosQ}
+                right={<Link to="/cuu-ho" className="text-xs font-semibold text-accent hover:underline">Điều phối →</Link>}
+                empty={!open.length && 'Không có phiếu SOS đang mở ở xã này'}
+              >
+                <ul className="scroll-thin flex max-h-56 flex-col gap-1.5 overflow-y-auto pr-1 print:max-h-none print:overflow-visible">
+                  {open.map((t) => {
+                    const waited = minutesSince(t.received_at);
+                    const late = !!slaState(t, Date.now())?.breached; // cùng quy tắc với KPI quá hạn (utils/sla)
+                    return (
+                      <li key={t.id} className={clsx('rounded-md border px-2 py-1.5 text-xs', late ? 'border-danger/60 bg-danger/10' : 'border-line')}>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-mono font-semibold text-ink">{t.code}</span>
+                          <span className={clsx('chip px-1.5 py-0 text-[10px]', PRIORITY[t.priority]?.cls)}>{PRIORITY[t.priority]?.short}</span>
+                        </div>
+                        <div className="text-ink-2">
+                          {INCIDENT[t.incident_type]} · {t.trapped_count ?? '?'} người · {SOS_STATUS[t.status]}
+                        </div>
+                        <div className={late ? 'font-semibold text-danger' : 'text-muted'}>
+                          Tiếp nhận {waited} phút trước{late && ' — quá hạn phản hồi'}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </Panel>
+            )}
 
             {canRes && (
-              <Panel icon={Shield} title={`Lực lượng tại xã · ${localForces.length}`} empty={!localForces.length && 'Chưa có dữ liệu lực lượng của xã (nhập loại "Lực lượng")'}>
+              <Panel icon={Shield} title={`Lực lượng tại xã · ${localForces.length}`} q={forcesQ} empty={!localForces.length && 'Chưa có dữ liệu lực lượng của xã (nhập loại "Lực lượng")'}>
                 <ul className="scroll-thin flex max-h-56 flex-col gap-1.5 overflow-y-auto pr-1 print:max-h-none print:overflow-visible">
                   {localForces.map((f) => (
                     <li key={f.id} className="text-xs">
@@ -197,7 +207,7 @@ export default function CommuneView({ code, units, onChange, children }) {
             )}
 
             {canContacts && (
-              <Panel icon={BookUser} title="Danh bạ BCH xã / thôn" empty={!book.length && 'Chưa có danh bạ cấp xã trong dữ liệu (nhập loại "Danh bạ & đường dây nóng")'}>
+              <Panel icon={BookUser} title="Danh bạ BCH xã / thôn" q={contactsQ} empty={!book.length && 'Chưa có danh bạ cấp xã trong dữ liệu (nhập loại "Danh bạ & đường dây nóng")'}>
                 <ul className="scroll-thin flex max-h-56 flex-col gap-1.5 overflow-y-auto pr-1 print:max-h-none print:overflow-visible">
                   {book.map((c) => (
                     <li key={c.id} className="flex items-center justify-between gap-2 text-xs">
@@ -217,7 +227,7 @@ export default function CommuneView({ code, units, onChange, children }) {
               </Panel>
             )}
 
-            <Panel icon={Users} title={`Xóm / tổ dân phố · ${myHamlets.length}`} empty={!myHamlets.length && 'Chưa có danh sách xóm chính thức của xã (nhập loại "Xóm / tổ dân phố")'}>
+            <Panel icon={Users} title={`Xóm / tổ dân phố · ${myHamlets.length}`} q={hamletsQ} empty={!myHamlets.length && 'Chưa có danh sách xóm chính thức của xã (nhập loại "Xóm / tổ dân phố")'}>
               <div className="flex flex-wrap gap-1.5">
                 {myHamlets.map((h) => (
                   <span key={h.code} className="chip bg-panel2 text-ink-2">{h.name}</span>

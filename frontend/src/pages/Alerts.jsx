@@ -18,7 +18,7 @@ const PARAM_LABEL = {
   luong_mua: 'Lượng mưa (mm)', diem_so_tan: 'Điểm sơ tán', ten_suoi: 'Tên suối', so_gio: 'Số giờ', tram: 'Trạm đo',
   muc_nuoc: 'Mực nước (m)', cap_bao_dong: 'Cấp báo động', nguy_co: 'Nguy cơ', ten_bao: 'Tên bão/ATNĐ',
 };
-const SEV_CLS = { do: 'bg-danger text-white', cam: 'bg-serious text-white', vang: 'bg-warn text-black' };
+const SEV_CLS = { do: LEVEL.do.cls, cam: LEVEL.cam.cls, vang: LEVEL.vang.cls }; // thang màu rủi ro chung (utils/risk.js)
 
 function Composer() {
   const qc = useQueryClient();

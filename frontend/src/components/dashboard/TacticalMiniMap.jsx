@@ -7,13 +7,12 @@ import { useAreaQuery } from '../../api/hooks';
 import { useStore } from '../../app/store';
 import { useChartTheme } from '../charts/chartTheme';
 import { AreaFocus, BaseLayer } from '../map/MapTools';
-import { ALARM, INCIDENT, SOS_STATUS } from '../../utils/labels';
+import { INCIDENT, SOS_STATUS } from '../../utils/labels';
+import { HAZARD_LEVEL, LANDSLIDE_LEVEL, levelOf, RESERVOIR_LEVEL, risk, sosLevel } from '../../utils/risk';
 import { stationView } from '../../utils/stations';
 import { num } from '../../utils/format';
 
 const CENTER = [22.75, 106.05];
-const LEVEL_NAME = ['', 'Vàng', 'Cam', 'Đỏ'];
-const HAZARD_LEVEL = { do: 3, cam: 2, vang: 1 };
 const FILTERS = [
   { id: 'all', label: 'Tất cả', min: 1 },
   { id: 'serious', label: 'Cam trở lên', min: 2 },
@@ -28,7 +27,8 @@ const coords = (f) => {
 
 /**
  * Điểm nóng lấy từ dữ liệu thật: trạm mực nước vượt báo động (số đo cũ vẫn giữ cấp đã vượt), phiếu SOS đang mở, điểm
- * sạt lở cấm đường / cảnh báo, hồ đang xả, điểm sự cố cán bộ đánh dấu. Mức 1–3 = Vàng / Cam / Đỏ.
+ * sạt lở cấm đường / cảnh báo, hồ đang xả, điểm sự cố cán bộ đánh dấu. Mức theo thang màu rủi ro chung (utils/risk.js),
+ * khớp màu backend: hồ xả điều tiết = Cam, xả khẩn cấp = Đỏ; sạt lở cảnh báo = Cam, cấm đường = Đỏ.
  */
 function buildHotspots(layers, k) {
   const out = [];
@@ -46,30 +46,32 @@ function buildHotspots(layers, k) {
       name: `${t.code} · ${INCIDENT[t.incident_type] || 'Sự cố'}`,
       lat: t.lat,
       lon: t.lon,
-      level: t.priority === 1 ? 3 : t.priority === 2 ? 2 : 1,
+      level: sosLevel(t.priority),
       detail: `${SOS_STATUS[t.status] || t.status}${t.trapped_count ? ` · ${t.trapped_count} người` : ''}${t.address ? ` · ${t.address}` : ''}`,
       to: '/cuu-ho',
     });
   }
   for (const p of k?.landslides?.points || []) {
-    if (p.traffic_status !== 'cam_duong' && p.traffic_status !== 'canh_bao') continue;
-    out.push({ id: `ls-${p.code}`, kind: 'Sạt lở', name: p.name, lat: p.lat, lon: p.lon, level: p.traffic_status === 'cam_duong' ? 3 : 2, detail: `${p.traffic_label} · ${p.road_name}` });
+    const level = levelOf(LANDSLIDE_LEVEL, p.traffic_status);
+    if (!(level >= 1)) continue;
+    out.push({ id: `ls-${p.code}`, kind: 'Sạt lở', name: p.name, lat: p.lat, lon: p.lon, level, detail: `${p.traffic_label} · ${p.road_name}` });
   }
   for (const r of k?.reservoirs?.reservoirs || []) {
-    if (r.status_code !== 'xa_khan_cap' && r.status_code !== 'xa_dieu_tiet') continue;
+    const level = levelOf(RESERVOIR_LEVEL, r.status_code);
+    if (!(level >= 1)) continue;
     out.push({
       id: `hc-${r.id}`,
       kind: 'Hồ chứa',
       name: r.name,
       lat: r.lat,
       lon: r.lon,
-      level: r.status_code === 'xa_khan_cap' ? 3 : 1,
+      level,
       detail: `${r.status_label}${r.outflow_m3s != null ? ` · xả ${num(r.outflow_m3s)} m³/s` : ''}`,
     });
   }
   for (const f of layers?.hazard_points?.features || []) {
     const h = coords(f);
-    out.push({ id: `hz-${h.id}`, kind: 'Sự cố', name: h.name, lat: h.lat, lon: h.lon, level: HAZARD_LEVEL[h.level] || 1, detail: h.description || '' });
+    out.push({ id: `hz-${h.id}`, kind: 'Sự cố', name: h.name, lat: h.lat, lon: h.lon, level: levelOf(HAZARD_LEVEL, h.level) || 1, detail: h.description || '' });
   }
   return out.filter((h) => h.lat != null && h.lon != null).sort((a, b) => b.level - a.level);
 }
@@ -86,7 +88,7 @@ function FlyTo({ target }) {
 /** Bản đồ điểm nóng thu nhỏ cho lãnh đạo: nền bản đồ chung của hệ thống (BaseLayer — tự lưu trữ / có ghi công), vùng
  * đang lọc (AreaFocus), điểm nóng từ /map/layers + KPI. Không có điểm nóng → nói rõ, không vẽ điểm minh hoạ. */
 export default function TacticalMiniMap({ k, className }) {
-  const { data: layers } = useAreaQuery('map-layers', '/map/layers', {}, { refetchInterval: 30_000 });
+  const { data: layers, isError: layersError, refetch } = useAreaQuery('map-layers', '/map/layers', {}, { refetchInterval: 30_000 });
   const { data: area } = useAreaQuery('area', '/admin-units/area', {}, { staleTime: Infinity });
   const filtered = useStore((s) => s.filter.codes.length > 0);
   const c = useChartTheme(); // màu nhấn theo giao diện sáng / tối (Leaflet cần mã màu cụ thể, không đọc được biến CSS)
@@ -112,7 +114,7 @@ export default function TacticalMiniMap({ k, className }) {
               onClick={() => setLevel(f.id)}
               aria-pressed={level === f.id}
               className={clsx(
-                'rounded-full border px-2.5 py-0.5 text-[11px] font-semibold',
+                'min-h-[32px] rounded-full border px-2.5 py-0.5 text-[11px] font-semibold',
                 level === f.id ? 'border-accent bg-accent text-white' : 'border-line bg-panel2/60 text-ink-2 hover:text-ink',
               )}
             >
@@ -143,7 +145,7 @@ export default function TacticalMiniMap({ k, className }) {
                   pathOptions={{
                     color: isSelected ? c.s1 : '#ffffff',
                     weight: isSelected ? 3 : 2,
-                    fillColor: ALARM[h.level].color,
+                    fillColor: risk(h.level).hex,
                     fillOpacity: 0.95,
                   }}
                   eventHandlers={{
@@ -154,7 +156,7 @@ export default function TacticalMiniMap({ k, className }) {
                   <Popup>
                     <div className="text-xs">
                       <b>{h.name}</b>
-                      <div>{h.kind} · mức {LEVEL_NAME[h.level]}</div>
+                      <div>{h.kind} · mức {risk(h.level).name}</div>
                       {h.detail && <div>{h.detail}</div>}
                       {h.to && <Link to={h.to} className="font-semibold">Mở Điều hành cứu hộ →</Link>}
                     </div>
@@ -183,7 +185,17 @@ export default function TacticalMiniMap({ k, className }) {
               )}
             </Pane>
           </MapContainer>
-          {!hotspots.length && (
+          {/* Chưa tải xong / lỗi tải lớp bản đồ: KHÔNG nói "chưa ghi nhận điểm nóng" khi thực ra chưa biết */}
+          {!layers && layersError && (
+            <div role="alert" className="absolute inset-x-2 top-2 z-[500] flex flex-wrap items-center justify-center gap-2 rounded-lg border border-danger/40 bg-panel/95 px-3 py-2 text-center text-xs text-danger shadow">
+              Không tải được các lớp bản đồ điểm nóng
+              <button type="button" className="btn-ghost min-h-[32px] px-2 py-0.5 text-xs" onClick={() => refetch()}>Thử lại</button>
+            </div>
+          )}
+          {!layers && !layersError && (
+            <div className="pointer-events-none absolute inset-x-2 top-2 z-[500] rounded-lg bg-panel/90 px-3 py-2 text-center text-xs text-muted shadow">Đang tải điểm nóng…</div>
+          )}
+          {layers && !hotspots.length && (
             <div className="pointer-events-none absolute inset-x-2 top-2 z-[500] rounded-lg bg-panel/90 px-3 py-2 text-center text-xs text-ink-2 shadow">
               Chưa ghi nhận điểm nóng (trạm vượt báo động, SOS đang mở, sạt lở cấm đường, hồ xả, sự cố) trong vùng đang xem
             </div>
@@ -203,7 +215,7 @@ export default function TacticalMiniMap({ k, className }) {
                     isTarget ? 'border-accent bg-accent/15 ring-1 ring-accent' : 'border-line/60 hover:bg-panel2',
                   )}
                 >
-                  <span className="mt-1 inline-block h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: ALARM[h.level].color }} />
+                  <span className="mt-1 inline-block h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: risk(h.level).hex }} />
                   <span className="min-w-0">
                     <span className={clsx('block truncate', isTarget ? 'font-bold text-accent' : 'font-semibold text-ink')}>{h.name}</span>
                     <span className="block truncate text-muted">{h.kind}{h.detail ? ` · ${h.detail}` : ''}</span>
@@ -212,7 +224,7 @@ export default function TacticalMiniMap({ k, className }) {
               </li>
             );
           })}
-          {!shown.length && <li className="py-6 text-center text-xs text-muted">Không có điểm nóng ở mức đã chọn</li>}
+          {layers && !shown.length && <li className="py-6 text-center text-xs text-muted">Không có điểm nóng ở mức đã chọn</li>}
           {shown.length > 30 && <li className="text-center text-[11px] text-muted">… và {shown.length - 30} điểm khác — xem bản đồ đầy đủ</li>}
         </ul>
       </div>
