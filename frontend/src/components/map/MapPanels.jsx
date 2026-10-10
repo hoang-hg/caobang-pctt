@@ -1,12 +1,21 @@
 import { Fragment, useMemo, useState } from 'react';
 import clsx from 'clsx';
-import { Circle as CircleIcon, Clock, Compass, MapPin, Megaphone, PenTool, Route, Ruler, Search, Send, X } from 'lucide-react';
-import { useEscapeToClose } from '../common/ui';
+import {
+  Activity, AlertTriangle, Circle as CircleIcon, Clock, CloudRain, Compass, Droplets, MapPin, Megaphone, Mountain, PenTool, Route, Ruler, Search,
+  Send, Siren, Waves, X,
+} from 'lucide-react';
+import { ShowMore, TrendTag, useEscapeToClose } from '../common/ui';
 import { Can } from '../../rbac/usePermission';
 import { ALARM, alarmLevel, INCIDENT, PRIORITY, STATION_TYPE } from '../../utils/labels';
 import { ago, int } from '../../utils/format';
 import { fmtVn } from '../../utils/bulletin';
 import { risk } from '../../utils/risk';
+import { trendProps } from '../../utils/stations';
+import { useShowMore } from '../../utils/useShowMore';
+
+// Biểu tượng từng loại điểm nóng (hotspots.js)
+const HOT_ICON = { sos: Siren, river: Waves, reservoir: Droplets, landslide: Mountain, rain: CloudRain, sensor: Activity, hazard: AlertTriangle };
+const HOT_STEP = 10;
 
 // Cấp ưu tiên phiếu SOS → tên màu (cấp 1 Đỏ, 2 Cam, 3 Vàng — mức thang màu = 4 − cấp)
 const PRIO_CHIPS = [[1, 'Đỏ'], [2, 'Cam'], [3, 'Vàng']];
@@ -152,10 +161,19 @@ export function LayerList({ groups, layers, setLayers, unavailable, notes, count
  * Bảng Cảnh báo khẩn cấp (thiết kế B.1 — feed bên phải): phiếu SOS đang mở + trạm vượt báo động / mất tín hiệu. Tài khoản
  * không có quyền xem SOS chỉ thấy thẻ Cảm biến. Chạm một mục → bản đồ bay tới (`onFocus`).
  */
-export function AlertsList({ tab, setTab, sos, sensorAlerts, silentStations, noDataCount, canSos, canDispatch, onFocus, onDispatch, touch }) {
+/**
+ * Bảng cảnh báo khẩn cấp: tab Điểm nóng (lãnh đạo — mọi loại rủi ro xếp Đỏ → Vàng, hotspots.js), Phiếu SOS (khi xem được
+ * SOS), Cảm biến (vượt báo động, mất tín hiệu). `hotNote`: số liệu điểm nóng chưa đủ (đang tải / không tải được) — nói rõ
+ * thay vì để danh sách thiếu trông như "không có gì".
+ */
+export function AlertsList({
+  tab, setTab, sos, sensorAlerts, silentStations, noDataCount, hotspots = [], hotNote, canSos, canDispatch, onFocus, onDispatch, touch,
+}) {
   const [search, setSearch] = useState('');
   const [prio, setPrio] = useState(0); // 0 = mọi mức; 1 / 2 / 3 = cấp ưu tiên (Đỏ / Cam / Vàng — cùng màu trên bản đồ)
-  const active = canSos ? tab : 'sensors';
+  const tabs = canSos ? ['diem_nong', 'sos', 'sensors'] : ['diem_nong', 'sensors'];
+  const active = tabs.includes(tab) ? tab : 'diem_nong';
+  const hot = useShowMore(hotspots, HOT_STEP, 'diem-nong');
   const perPrio = useMemo(() => Object.fromEntries([1, 2, 3].map((n) => [n, sos.filter((s) => s.priority === n).length])), [sos]);
   const shown = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -179,6 +197,7 @@ export function AlertsList({ tab, setTab, sos, sensorAlerts, silentStations, noD
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="space-y-2 border-b border-line bg-panel2/40 px-3 py-2">
         <div className="flex gap-1">
+          {tabBtn('diem_nong', `Điểm nóng (${hotspots.length})`)}
           {canSos && tabBtn('sos', `Phiếu SOS (${sos.length})`)}
           {tabBtn('sensors', `Cảm biến (${sensorAlerts.length + silentStations.length})`)}
         </div>
@@ -219,6 +238,44 @@ export function AlertsList({ tab, setTab, sos, sensorAlerts, silentStations, noD
       </div>
 
       <div className="scroll-thin min-h-0 flex-1 space-y-2 overflow-y-auto p-2.5">
+        {active === 'diem_nong' && (
+          <>
+            {hotNote && <p className="rounded-lg border border-dashed border-line px-2.5 py-1.5 text-[11px] text-muted" role="status">{hotNote}</p>}
+            {hot.visible.map((h) => {
+              const Icon = HOT_ICON[h.kind] || AlertTriangle;
+              const sc = risk(h.level);
+              return (
+                <button
+                  key={h.id}
+                  type="button"
+                  className={clsx(item, 'flex items-start gap-2 border-l-4 p-2.5 hover:bg-panel2/80', sc.edge)}
+                  onClick={() => onFocus(h.bounds ? { bounds: h.bounds, label: h.name } : { lat: h.lat, lon: h.lon, zoom: 13, label: h.name })}
+                  aria-label={`${sc.name}: ${h.name} — ${h.detail}. Xem trên bản đồ`}
+                >
+                  <Icon size={15} className={clsx('mt-0.5 shrink-0', sc.text)} aria-hidden="true" />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <b className="truncate text-xs font-bold text-ink">{h.name}</b>
+                      {h.trend && <TrendTag {...trendProps(h.trend, h.name)} className="shrink-0 text-[10px]" />}
+                    </span>
+                    <span className="mt-0.5 block text-[11px] leading-snug text-ink-2">{h.detail}</span>
+                  </span>
+                  <span className={clsx('chip shrink-0 px-1.5 py-0 text-[10px] font-bold', sc.chip)}>{sc.name}</span>
+                </button>
+              );
+            })}
+            <ShowMore list={hot} step={HOT_STEP} noun="điểm" />
+            {!hotspots.length && !hotNote && (
+              <div className="px-2 py-8 text-center text-xs text-muted">
+                Không có điểm nóng trong vùng đang xem
+                <span className="mt-1 block">
+                  Chưa ghi nhận {canSos ? 'SOS cấp 1, ' : ''}trạm trên báo động, hồ xả, sạt lở cấm đường, mưa từ 50 mm/24 giờ hay sự cố mức Cam / Đỏ.
+                </span>
+              </div>
+            )}
+          </>
+        )}
+
         {active === 'sos' && (
           <>
             {shown.map((s) => (
@@ -303,6 +360,38 @@ export function AlertsList({ tab, setTab, sos, sensorAlerts, silentStations, noD
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Chế độ xem bản đồ: "Tình hình" — chỉ giữ lớp rủi ro (SOS, trạm, hồ, vùng nguy hiểm, sạt lở, sự cố) cho lãnh đạo nắm tình
+ * hình; "Tác nghiệp" — đủ lớp như trước (thêm lực lượng, phương tiện, kho, lộ trình, điểm sơ tán, phản ánh, camera). Chỉ
+ * đổi lớp đang bật — không đổi số liệu. `touch`: nút cao 44 px.
+ */
+export const VIEW_MODES = [
+  ['tinh_hinh', 'Tình hình', 'Chỉ lớp rủi ro: SOS, trạm, hồ, vùng nguy hiểm, sạt lở, sự cố — mở tab Điểm nóng'],
+  ['tac_nghiep', 'Tác nghiệp', 'Đủ lớp: thêm lực lượng, phương tiện, kho, lộ trình, điểm sơ tán, phản ánh, camera'],
+];
+export function ViewModeSwitch({ mode, onChange, touch, className }) {
+  return (
+    <div role="group" aria-label="Chế độ xem bản đồ" className={clsx('flex gap-0.5 rounded-xl border border-line bg-panel/95 p-0.5 shadow-lg backdrop-blur-md', className)}>
+      {VIEW_MODES.map(([id, label, hint]) => (
+        <button
+          key={id}
+          type="button"
+          aria-pressed={mode === id}
+          title={hint}
+          onClick={() => onChange(id)}
+          className={clsx(
+            'flex-1 whitespace-nowrap rounded-lg px-3 text-xs font-semibold transition-colors',
+            touch ? 'min-h-[44px]' : 'min-h-[32px] [@media(pointer:coarse)]:min-h-[44px]',
+            mode === id ? 'bg-accent text-white shadow-sm' : 'text-ink-2 hover:bg-panel2',
+          )}
+        >
+          {label}
+        </button>
+      ))}
     </div>
   );
 }

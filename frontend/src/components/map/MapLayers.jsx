@@ -139,7 +139,7 @@ function SosPopup({ p, onDispatch }) {
   );
 }
 
-const INCIDENT_TYPE = { sat_lo: 'Sạt lở', giao_thong: 'Sự cố giao thông', ha_tang: 'Sự cố hạ tầng' };
+export const INCIDENT_TYPE = { sat_lo: 'Sạt lở', giao_thong: 'Sự cố giao thông', ha_tang: 'Sự cố hạ tầng' };
 const POINT_SOURCE = { import: 'bản đồ điểm nguy hiểm', officer: 'cán bộ đánh dấu', report: 'từ phản ánh của người dân' };
 
 function HazardPopup({ p }) {
