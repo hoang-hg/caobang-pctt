@@ -1,5 +1,6 @@
 import { Fragment } from 'react';
 import { RiskLegend } from '../common/ui';
+import { RADAR_BINS } from './MapTools';
 import {
   cameraIcon, COLORS, evacIcon, forceIcon, hazardIcon, reportIcon, reservoirIcon, sosIcon, stationIcon, stormIcon, vehicleIcon,
   warehouseIcon,
@@ -16,6 +17,32 @@ const Ico = ({ icon }) => (
 );
 
 const Swatch = ({ style }) => <span className="mx-0.5 inline-block h-4 w-8 shrink-0 rounded-sm border" style={style} aria-hidden="true" />;
+
+const twoTone = ([a, b]) => `linear-gradient(90deg, ${a} 50%, ${b} 50%)`;
+
+/**
+ * Thang màu radar (cường độ mưa lúc chụp ảnh). `layout`: `grid` 2 cột (chú giải), `list` một cột (thẻ góc bản đồ máy
+ * tính, cùng kiểu thẻ mưa dự báo), `compact` một hàng ô màu, nhãn khi rê chuột (chip góc bản đồ điện thoại).
+ */
+export function RadarScale({ layout = 'grid' }) {
+  if (layout === 'compact') {
+    return (
+      <div className="flex gap-1">
+        {RADAR_BINS.map((b) => <span key={b.label} className="h-2.5 w-5 rounded-sm" style={{ background: twoTone(b.colors) }} title={b.label} />)}
+      </div>
+    );
+  }
+  return (
+    <ul className={layout === 'list' ? 'space-y-1' : 'grid grid-cols-2 gap-1'}>
+      {RADAR_BINS.map((b) => (
+        <li key={b.label} className="flex items-center gap-1.5">
+          <span className="h-3 w-5 shrink-0 rounded-sm" style={{ background: twoTone(b.colors) }} aria-hidden="true" />
+          {b.label}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 const Row = ({ sym, children }) => (
   <li className="flex items-center gap-2 py-0.5">
@@ -101,9 +128,10 @@ const ROWS = {
 /**
  * Chú giải bản đồ cán bộ: thang màu rủi ro dùng chung + biểu tượng của các lớp ĐANG BẬT (thứ tự như bảng lớp). Lớp mưa
  * dự báo có thang màu riêng (một sắc độ xanh, không phải màu rủi ro): `rain` = thang đang vẽ (MapTools `rainScale`), không
- * vẽ được thì `rainNote` ghi vì sao (thời điểm đã qua, đang tải, lỗi, chưa có số liệu).
+ * vẽ được thì `rainNote` ghi vì sao (thời điểm đã qua, đang tải, lỗi, chưa có số liệu). Radar: `radarNote` = giờ của ảnh
+ * đang hiện hoặc vì sao không có ảnh; bảng màu radar trùng sắc vàng / cam / đỏ nên ghi rõ không phải màu rủi ro.
  */
-export default function MapLegend({ layers, order, rain, rainNote }) {
+export default function MapLegend({ layers, order, rain, rainNote, radarNote }) {
   const keys = order.filter((k) => layers[k] && ROWS[k]);
   return (
     <div className="space-y-2 text-xs">
@@ -131,6 +159,17 @@ export default function MapLegend({ layers, order, rain, rainNote }) {
           ) : (
             <p className="text-muted">{rainNote}</p>
           )}
+        </div>
+      )}
+      {layers.radar && (
+        <div>
+          <div className="mb-1 font-bold text-ink">Radar mưa (RainViewer)</div>
+          <p className="mb-1 text-muted">{radarNote}</p>
+          <RadarScale />
+          <p className="mt-1 text-muted">
+            Màu là cường độ mưa lúc chụp ảnh — không phải lượng mưa cộng dồn, cũng không phải màu rủi ro. Kéo thanh thời gian
+            về −1h, −2h để xem ảnh trước (chỉ lưu khoảng 2 giờ).
+          </p>
         </div>
       )}
     </div>

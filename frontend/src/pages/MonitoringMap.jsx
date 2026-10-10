@@ -8,14 +8,17 @@ import { api } from '../api/client';
 import { useAreaQuery, useUnitsGeo } from '../api/hooks';
 import { useStore } from '../app/store';
 import MapLayers, { floodScenarioStates, StormLayer, stormQuery } from '../components/map/MapLayers';
-import MapLegend from '../components/map/MapLegend';
+import MapLegend, { RadarScale } from '../components/map/MapLegend';
 import {
   AlertsList, DEFAULT_LAYERS, DrawnStats, LAYER_GROUPS, LAYER_ORDER, LayerList, layerCounts, Sheet, TimeControl, ToolHint, toolList,
 } from '../components/map/MapPanels';
 import IncidentModal from '../components/map/IncidentModal';
 import StormBulletinModal from '../components/map/StormBulletinModal';
 import OccupancyModal from '../components/common/OccupancyModal';
-import { AdminBoundaries, AreaFocus, BASEMAPS, BaseLayer, DrawTool, FocusHandler, ForecastChoropleth, MeasureTool, RadarLayer, rainScale, RouteTool } from '../components/map/MapTools';
+import {
+  AdminBoundaries, AreaFocus, BASEMAPS, BaseLayer, DrawTool, FocusHandler, ForecastChoropleth, MeasureTool, RadarLayer, radarFrameAt, rainScale,
+  RouteTool, useRadarFrames,
+} from '../components/map/MapTools';
 import DispatchModal from '../components/common/DispatchModal';
 import CameraModal from '../components/common/CameraModal';
 import IssueModal from '../components/common/IssueModal';
@@ -45,6 +48,19 @@ function rainNoteOf(offset, q) {
   if (q.isError) return 'Không tải được mưa dự báo';
   if (q.isPending) return 'Đang tải mưa dự báo…';
   return 'Chưa có số liệu mưa dự báo cho thời điểm này';
+}
+
+// Lớp radar: giờ của ảnh đang hiện (để không nhầm ảnh cũ là "thời gian thực"), hoặc vì sao không có ảnh
+function radarNoteOf(offset, q, frame) {
+  if (frame) {
+    const old = offset === 0 && Date.now() / 1000 - frame.time > 30 * 60;
+    return `Ảnh lúc ${fmtVn(frame.time * 1000)}${old ? ' — ảnh cũ, nguồn chậm cập nhật' : ''}`;
+  }
+  if (offset > 0) return 'Radar chỉ có ảnh đã qua — giờ tới xem lớp Mưa dự báo theo xã';
+  if (q.isError) return 'Không tải được ảnh radar (RainViewer)';
+  if (q.isPending) return 'Đang tải ảnh radar…';
+  if (offset < 0 && q.data?.radar?.past?.length) return 'Không có ảnh radar cho thời điểm này (chỉ lưu khoảng 2 giờ qua)';
+  return 'Chưa có ảnh radar';
 }
 const floatCard = 'card border border-line bg-panel/95 shadow-2xl backdrop-blur-md';
 const roundBtn = 'card flex flex-col items-center justify-center gap-0.5 border border-line bg-panel/95 text-[10px] font-bold text-ink-2 shadow-lg backdrop-blur-md active:scale-95';
@@ -114,6 +130,11 @@ export default function MonitoringMap() {
   const fcAreas = fcQ.data;
   const rain = offset >= 0 && fcAreas?.length ? rainScale(fcAreas) : null;
   const rainNote = rain ? null : rainNoteOf(offset, fcQ);
+  // Radar theo thanh thời gian (thiết kế B.1): hiện tại = ảnh mới nhất; kéo về −1h, −2h = ảnh gần thời điểm đó nhất
+  // (RainViewer chỉ lưu ~2 giờ); xa hơn hoặc giờ tới = không có ảnh
+  const radarQ = useRadarFrames(layers.radar);
+  const radarFrame = layers.radar ? radarFrameAt(radarQ.data, offset) : null;
+  const radarNote = layers.radar ? radarNoteOf(offset, radarQ, radarFrame) : null;
   const { data: timeline } = useQuery({
     queryKey: ['timeline', offset],
     queryFn: () => api('/map/timeline', { params: { offset_h: offset } }),
@@ -131,6 +152,7 @@ export default function MonitoringMap() {
   const unknownLevels = scenarioStates.filter((x) => x.level == null).length;
   const notes = {
     forecast: layers.forecast ? (rain ? `${rain.short} (P50)` : rainNote) : null,
+    radar: radarNote,
     floodScenario: scenarioStates.length
       ? `${scenarioStates.filter((x) => x.active).length}/${scenarioStates.length} vùng đang ngập theo mực nước ${offset ? `lúc ${fmtVn(Date.now() + offset * 3600_000)}` : 'hiện tại'}${unknownLevels ? ` · ${unknownLevels} vùng chưa có số đo trạm` : ''}`
       : null,
@@ -265,7 +287,7 @@ export default function MonitoringMap() {
       <div className="relative isolate min-h-0 w-full flex-1 select-none overflow-hidden">
         <MapContainer center={[22.75, 106.05]} zoom={9} zoomControl={false} zoomSnap={0.25} className="h-full w-full">
           <BaseLayer basemap={basemap} />
-          {layers.radar && <RadarLayer />}
+          {radarFrame && <RadarLayer host={radarQ.data.host} frame={radarFrame} />}
           <ZoomControl position="bottomright" />
           <ScaleControl position="bottomleft" imperial={false} />
           {layers.forecast && offset >= 0 && <ForecastChoropleth geo={unitsGeo} areas={fcAreas} />}
@@ -297,29 +319,71 @@ export default function MonitoringMap() {
 
         {wide ? (
           <>
-            {/* Bảng lớp dữ liệu – Trái (thu gọn: chỉ còn nút có chữ, không để dải trắng mép bản đồ) */}
-            <div className="pointer-events-none absolute bottom-[8rem] left-3 top-3 z-[1000] flex items-start">
-              {leftOpen && (
-                <div className={clsx(floatCard, 'pointer-events-auto flex max-h-full w-[18rem] flex-col overflow-hidden')}>
-                  <div className="flex items-center justify-between border-b border-line bg-panel2/40 px-3.5 py-2">
-                    <div className="flex items-center gap-2 text-sm font-bold text-ink">
-                      <Layers size={16} className="text-accent" aria-hidden="true" />
-                      <span className="whitespace-nowrap">Lớp dữ liệu</span>
+            {/* Cột trái: bảng lớp dữ liệu (trên; thu gọn: chỉ còn nút có chữ) + thẻ thang màu radar / mưa dự báo, chú giải (dưới).
+                Chung một cột để bảng lớp tự co lại (cuộn) phía trên các thẻ — không để thẻ đè lên cuối danh sách lớp */}
+            <div className="pointer-events-none absolute bottom-9 left-3 top-3 z-[1000] flex flex-col items-start gap-2">
+              <div className="flex min-h-[7rem] flex-1 items-start">
+                {leftOpen && (
+                  <div className={clsx(floatCard, 'pointer-events-auto flex max-h-full w-[18rem] flex-col overflow-hidden')}>
+                    <div className="flex items-center justify-between border-b border-line bg-panel2/40 px-3.5 py-2">
+                      <div className="flex items-center gap-2 text-sm font-bold text-ink">
+                        <Layers size={16} className="text-accent" aria-hidden="true" />
+                        <span className="whitespace-nowrap">Lớp dữ liệu</span>
+                      </div>
+                      {layerActions}
                     </div>
-                    {layerActions}
+                    <div className="scroll-thin flex-1 overflow-y-auto p-3">{layerList}</div>
                   </div>
-                  <div className="scroll-thin flex-1 overflow-y-auto p-3">{layerList}</div>
+                )}
+                <button
+                  type="button"
+                  className={clsx(floatCard, 'pointer-events-auto flex h-10 items-center justify-center gap-1.5 text-xs font-semibold text-ink-2 hover:bg-panel2', leftOpen ? 'ml-1.5 w-8' : 'px-3')}
+                  onClick={() => setLeftOpen((o) => !o)}
+                  aria-expanded={leftOpen}
+                  aria-label={leftOpen ? 'Thu gọn bảng lớp dữ liệu' : undefined}
+                  title={leftOpen ? 'Thu gọn' : undefined}
+                >
+                  {leftOpen ? <ChevronLeft size={16} /> : <><Layers size={16} className="text-accent" aria-hidden="true" /> Lớp dữ liệu</>}
+                </button>
+              </div>
+              {legendOpen && (
+                <div className={clsx(floatCard, 'scroll-thin pointer-events-auto max-h-[min(28rem,calc(100vh-14rem))] min-h-0 w-[19rem] overflow-y-auto p-3')}>
+                  <MapLegend layers={layers} order={LAYER_ORDER} rain={rain} rainNote={rainNote} radarNote={radarNote} />
+                </div>
+              )}
+              {!legendOpen && layers.radar && (
+                <div className={clsx(floatCard, 'pointer-events-auto max-w-[15rem] shrink-0 p-2.5 text-xs')}>
+                  <div className="font-bold text-ink">Radar mưa</div>
+                  <p className={clsx('mb-1', !radarFrame && 'text-muted')}>{radarNote}</p>
+                  {radarFrame && <RadarScale layout="list" />}
+                </div>
+              )}
+              {!legendOpen && layers.forecast && (
+                <div className={clsx(floatCard, 'pointer-events-auto max-w-[15rem] shrink-0 p-2.5 text-xs')}>
+                  {rain ? (
+                    <>
+                      <div className="mb-1 font-bold text-ink">{rain.title}</div>
+                      <div className="space-y-1">
+                        {rain.bins.map((b) => (
+                          <div key={b.label} className="flex items-center gap-2">
+                            <span className="h-3 w-5 rounded-sm shadow-sm" style={{ background: b.color }} aria-hidden="true" />
+                            <span>{b.label}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-muted">{rainNote}</p>
+                  )}
                 </div>
               )}
               <button
                 type="button"
-                className={clsx(floatCard, 'pointer-events-auto flex h-10 items-center justify-center gap-1.5 text-xs font-semibold text-ink-2 hover:bg-panel2', leftOpen ? 'ml-1.5 w-8' : 'px-3')}
-                onClick={() => setLeftOpen((o) => !o)}
-                aria-expanded={leftOpen}
-                aria-label={leftOpen ? 'Thu gọn bảng lớp dữ liệu' : undefined}
-                title={leftOpen ? 'Thu gọn' : undefined}
+                className={clsx(floatCard, 'pointer-events-auto flex min-h-[34px] shrink-0 items-center gap-1.5 px-3 text-xs font-semibold text-ink-2 hover:bg-panel2')}
+                onClick={() => setLegendOpen((o) => !o)}
+                aria-expanded={legendOpen}
               >
-                {leftOpen ? <ChevronLeft size={16} /> : <><Layers size={16} className="text-accent" aria-hidden="true" /> Lớp dữ liệu</>}
+                <Info size={14} className="text-accent" aria-hidden="true" /> {legendOpen ? 'Ẩn chú giải' : 'Chú giải'}
               </button>
             </div>
 
@@ -371,44 +435,9 @@ export default function MonitoringMap() {
               </div>
             </div>
 
-            {/* Chú giải – Trái dưới */}
-            <div className="absolute bottom-9 left-3 z-[1000] flex flex-col items-start gap-2">
-              {legendOpen && (
-                <div className={clsx(floatCard, 'scroll-thin max-h-[min(28rem,calc(100vh-14rem))] w-[19rem] overflow-y-auto p-3')}>
-                  <MapLegend layers={layers} order={LAYER_ORDER} rain={rain} rainNote={rainNote} />
-                </div>
-              )}
-              {!legendOpen && layers.forecast && (
-                <div className={clsx(floatCard, 'max-w-[15rem] p-2.5 text-xs')}>
-                  {rain ? (
-                    <>
-                      <div className="mb-1 font-bold text-ink">{rain.title}</div>
-                      <div className="space-y-1">
-                        {rain.bins.map((b) => (
-                          <div key={b.label} className="flex items-center gap-2">
-                            <span className="h-3 w-5 rounded-sm shadow-sm" style={{ background: b.color }} aria-hidden="true" />
-                            <span>{b.label}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  ) : (
-                    <p className="text-muted">{rainNote}</p>
-                  )}
-                </div>
-              )}
-              <button
-                type="button"
-                className={clsx(floatCard, 'flex min-h-[34px] items-center gap-1.5 px-3 text-xs font-semibold text-ink-2 hover:bg-panel2')}
-                onClick={() => setLegendOpen((o) => !o)}
-                aria-expanded={legendOpen}
-              >
-                <Info size={14} className="text-accent" aria-hidden="true" /> {legendOpen ? 'Ẩn chú giải' : 'Chú giải'}
-              </button>
-            </div>
-
-            {/* Thanh thời gian – Đáy */}
-            <div className={clsx(floatCard, 'absolute bottom-3 left-1/2 z-[1000] w-[min(600px,calc(100%-14rem))] -translate-x-1/2 px-4 py-2')}>
+            {/* Thanh thời gian – Đáy, giữa; màn hẹp thì dịch sang phải để không đè cột trái (thẻ chú giải rộng 19rem) và nút phóng
+                to / thu nhỏ (phải dưới) */}
+            <div className={clsx(floatCard, 'absolute bottom-3 left-[max(calc(50%-300px),20.25rem)] z-[1000] w-[min(600px,calc(100%-23.75rem))] px-4 py-2')}>
               <TimeControl offset={offset} setOffset={setOffset} />
             </div>
           </>
@@ -441,17 +470,29 @@ export default function MonitoringMap() {
               {drawnCard}
             </div>
 
-            {layers.forecast && !sheet && (
-              <div className={clsx(floatCard, 'absolute bottom-2 left-2 z-[1000] max-w-[13rem] px-2 py-1.5 text-[10px]')}>
-                {rain ? (
-                  <>
-                    <div className="mb-0.5 font-bold text-ink">{rain.short} (P50)</div>
-                    <div className="flex gap-1">
-                      {rain.bins.map((b) => <span key={b.label} className="h-2.5 w-5 rounded-sm" style={{ background: b.color }} title={b.label} />)}
-                    </div>
-                  </>
-                ) : (
-                  <span className="text-muted">{rainNote}</span>
+            {/* Thang màu radar / mưa dự báo — trên thước tỉ lệ và dòng ghi nguồn (Leaflet, RainViewer) ở đáy bản đồ */}
+            {(layers.forecast || layers.radar) && !sheet && (
+              <div className="absolute bottom-9 left-2 z-[1000] flex max-w-[13rem] flex-col items-start gap-1.5 text-[10px]">
+                {layers.radar && (
+                  <div className={clsx(floatCard, 'px-2 py-1.5')}>
+                    <div className="font-bold text-ink">Radar mưa</div>
+                    <div className={clsx(radarFrame ? 'mb-0.5' : 'text-muted')}>{radarNote}</div>
+                    {radarFrame && <RadarScale layout="compact" />}
+                  </div>
+                )}
+                {layers.forecast && (
+                  <div className={clsx(floatCard, 'px-2 py-1.5')}>
+                    {rain ? (
+                      <>
+                        <div className="mb-0.5 font-bold text-ink">{rain.short} (P50)</div>
+                        <div className="flex gap-1">
+                          {rain.bins.map((b) => <span key={b.label} className="h-2.5 w-5 rounded-sm" style={{ background: b.color }} title={b.label} />)}
+                        </div>
+                      </>
+                    ) : (
+                      <span className="text-muted">{rainNote}</span>
+                    )}
+                  </div>
                 )}
               </div>
             )}
@@ -492,7 +533,7 @@ export default function MonitoringMap() {
             )}
             {sheet === 'legend' && (
               <Sheet title="Chú giải bản đồ" onClose={() => setSheet(null)}>
-                <MapLegend layers={layers} order={LAYER_ORDER} rain={rain} rainNote={rainNote} />
+                <MapLegend layers={layers} order={LAYER_ORDER} rain={rain} rainNote={rainNote} radarNote={radarNote} />
               </Sheet>
             )}
           </>
