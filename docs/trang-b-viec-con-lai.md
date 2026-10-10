@@ -4,15 +4,16 @@
 chung (màu rủi ro thống nhất, thông tin khẩn trên cùng, thao tác chính dễ bấm, bảng / form có báo lỗi khi nhập, trạng thái
 tải / trống / lỗi / mất mạng, 360 px, theo phân quyền).
 
-- Cập nhật: 10/10/2026 — mã nguồn `main` gồm PR #53 → #58 (bố cục, màu hồ, lọc SOS, form, tài liệu này; mưa dự báo theo
-  thanh thời gian — G1 ở PR #57; radar theo thanh thời gian — G2 ở PR #58).
+- Cập nhật: 10/10/2026 — mã nguồn `main` gồm PR #53 → #62 (bố cục, màu hồ, lọc SOS, form, tài liệu này; mưa dự báo theo
+  thanh thời gian — G1 ở PR #57; radar theo thanh thời gian — G2 ở PR #58; bố cục cho người quản lý — G3 ở PR #59 → #62).
 - Máy chủ thử vẫn chạy **v1.0.3**, **chưa có** các thay đổi trên — xem V1 trong `docs/trang-a-viec-con-lai.md` (triển khai
   chung cho mọi trang).
 - Dữ liệu nền dùng chung với trang A: `docs/trang-a-viec-con-lai.md` mục 2 (D1), 4 (D3), 7 (radar), README 2.2 / 2.4.
 
 **Kết luận:** về chức năng, bản đồ đã có gần đủ những gì mục B mô tả; giao diện đã sửa theo các yêu cầu chung
-(PR #53 → #55); mưa dự báo và radar đã đổi theo thanh thời gian (G1, G2 — PR #57, #58). Việc làm được ngay mà không cần
-dữ liệu mới đã hết. Còn lại:
+(PR #53 → #55); mưa dự báo và radar đã đổi theo thanh thời gian (G1, G2 — PR #57, #58); bố cục cho người quản lý trên
+laptop, iPad, điện thoại (G3 — PR #59 → #62): 6 chỉ số "Tình hình", tab Điểm nóng, chế độ xem Tình hình | Tác nghiệp,
+vùng chạm ≥ 44 px trên màn cảm ứng. Việc làm được ngay mà không cần dữ liệu mới đã hết. Còn lại:
 
 - **Cần quyết định trước khi vận hành chính thức — giấy phép radar:** điều khoản RainViewer (nguồn radar đang dùng) chỉ
   cho dùng cá nhân / giáo dục (BD6).
@@ -45,7 +46,8 @@ dữ liệu mới đã hết. Còn lại:
 | B.4 SOS nhấp nháy + âm thanh → xem lớp → kéo – thả đội vào SOS → hộp thoại xác nhận → điều động | Đạt — lệnh điều động 2 bước (Lực lượng → Vật tư & xác nhận, có tóm tắt) |
 | B.4 Theo dõi đội di chuyển thời gian thực | Không có GPS (BD8): lộ trình chuyển "đã đến" khi trưởng nhóm báo qua link nhiệm vụ |
 | B.5 Leaflet, nền OSM / tự lưu trữ, WebSocket, GeoJSON | Đạt |
-| Yêu cầu giao diện chung (màu rủi ro, khẩn trên cùng, thao tác dễ bấm, form báo lỗi, trạng thái, 360 px, phân quyền) | Đạt — PR #53 → #55 |
+| Yêu cầu giao diện chung (màu rủi ro, khẩn trên cùng, thao tác dễ bấm, form báo lỗi, trạng thái, 360 px, phân quyền) | Đạt — PR #53 → #55; vùng chạm ≥ 44 px trên màn cảm ứng — PR #61 |
+| Lãnh đạo nắm tình hình trong vài giây (KPI, bản đồ, cảnh báo nổi bật) trên laptop, iPad, điện thoại | Đạt — 6 chỉ số "Tình hình" cùng số Tổng quan, tab Điểm nóng, chế độ xem Tình hình / Tác nghiệp (G3, PR #59 → #62) |
 
 ## 2. Bảng tổng hợp việc còn lại
 
@@ -53,6 +55,7 @@ dữ liệu mới đã hết. Còn lại:
 |---|---|---|---|---|
 | G1 | **Mưa dự báo theo thanh thời gian** (lượng mưa giờ tại thời điểm đang kéo) | Không cần dữ liệu (thêm tham số API) | — | **Đã làm** (PR #57) |
 | G2 | **Radar các khung đã qua** theo thanh thời gian (−2 giờ → hiện tại) | Không cần dữ liệu | — | **Đã làm** (PR #58) |
+| G3 | **Bố cục cho người quản lý** (laptop, iPad, điện thoại): chỉ số Tình hình, Điểm nóng, chế độ xem, vùng chạm 44 px | Không cần dữ liệu (không đổi API) | — | **Đã làm** (PR #59 → #62) |
 | BD1 | Dữ liệu nền cho các lớp (trạm, hồ, lực lượng, kho, điểm sơ tán, vùng nguy hiểm) | Dữ liệu | như trang A D1 | **Cao nhất** |
 | BD2 | **Camera CCTV thật**: danh sách camera + máy chủ chuyển luồng | Dữ liệu + hạ tầng + lập trình | Đơn vị quản lý camera (giao thông, thủy điện, công an) | Trung bình |
 | BD3 | **Mạng đường** (tìm đường an toàn, đoạn bị chặn) | Dữ liệu + lập trình | như trang A D3 | Trung bình |
@@ -113,6 +116,37 @@ mở bản đồ lâu thì ảnh "thời gian thực" đứng yên. Nay:
 - **Giới hạn của nguồn** (RainViewer gói miễn phí, từ 01/01/2026): chỉ ảnh ~2 giờ qua, 10 phút / ảnh, phóng tối đa mức 7,
   một bảng màu, 100 lượt tải / phút / IP — nhiều máy chung một IP ở trung tâm điều hành có thể chạm giới hạn; không còn ảnh dự
   báo, ảnh mây vệ tinh. Điều khoản dùng: BD6.
+
+### G3 — Bố cục cho người quản lý: laptop, iPad, điện thoại (đã làm — PR #59 → #62)
+
+Đề xuất duyệt ngày 10/10/2026: mặc định chế độ Tác nghiệp; điện thoại luôn hiện hàng chỉ số. Rà trước khi làm (tài khoản
+cấp tỉnh): người quản lý chỉ thấy 1–3 tình huống đầu và "+9 / +11 tình huống"; muốn biết mực nước, hồ xả, sơ tán, lực
+lượng phải sang Tổng quan; iPad ngang dùng bố cục cho chuột — 50 nút nhỏ hơn 44 px.
+
+| Thiết bị | Bố cục |
+|---|---|
+| Laptop, iPad ngang (≥ 1024 px) | 6 chỉ số "Tình hình" (2×3) ở đầu bảng Cảnh báo khẩn cấp — thu gọn được, máy nhớ; tab Điểm nóng · Phiếu SOS · Cảm biến; chế độ xem trên nút "Lớp dữ liệu". Bản đồ không nhỏ đi |
+| iPad dọc (768–1023 px) | 1 hàng 6 chỉ số dưới dải khẩn cấp; chế độ xem ở góc trên trái bản đồ; thanh ngón cái như cũ |
+| Điện thoại (< 768 px) | 1 hàng chỉ số vuốt ngang, ô 44 px — thấy trọn 3 ô đầu: SOS, Mực nước, Hồ · Sạt lở; chế độ xem trong bảng Lớp |
+
+- **6 chỉ số** cùng số, cùng màu dải KPI ở Tổng quan (công thức dùng chung `kpiFacts.js`), theo vùng đang lọc. Chạm một ô →
+  bật lớp liên quan, mở đúng danh sách, đưa bản đồ tới vừa khung các điểm. Số hiện cho mọi tài khoản xem bản đồ; thao tác xem
+  SOS / lực lượng / sơ tán cần quyền lớp đó (như ô KPI ở Tổng quan).
+- **Điểm nóng:** gộp SOS cấp 1 (một dòng), trạm trên báo động, cảm biến vượt ngưỡng, hồ đang xả, sạt lở cấm đường / cảnh báo,
+  trạm mưa 24 giờ lớn nhất từ 50 mm, sự cố mức Cam / Đỏ — xếp Đỏ → Vàng, 10 dòng + "Xem thêm"; chỉ sắp xếp lại số liệu đã
+  tải, nói rõ khi số liệu chưa đủ hoặc không có điểm nóng.
+- **Chế độ xem:** Tình hình (chỉ lớp rủi ro, mở sẵn Điểm nóng) hoặc Tác nghiệp (như trước — quay về thì trả lại đúng các lớp
+  đang bật); mặc định Tác nghiệp, máy nhớ lựa chọn.
+- **Màn cảm ứng:** mọi vùng chạm của trang Bản đồ ≥ 44 px — trước: iPad ngang 50 chỗ nhỏ hơn, iPad dọc 14, điện thoại 11;
+  nay 0. Đầu trang nới vùng chạm vô hình (`.touch-hit`) để không tràn ở 360 px; laptop dùng chuột giữ cỡ gọn.
+- **Không đổi logic, API, luồng dữ liệu:** không thêm API / lượt gọi máy chủ — dùng `/dashboard/kpis`, `/stations`,
+  `/map/layers` trang đã tải; chế độ xem chỉ lưu trên máy.
+- **Sửa kèm:** chú giải trạm mưa ghi đúng "cường độ mưa đo mới nhất (mm/giờ)" (trước ghi nhầm "mưa 24 giờ"); cụm thẻ góc
+  trên trái (điện thoại) không chặn kéo bản đồ; thanh thời gian không đè đáy bảng cảnh báo trên iPad ngang.
+- **Kiểm thử:** `tests/ui/ui-test.mjs` khối "Người quản lý" — laptop 1366, iPad ngang, iPad dọc, điện thoại 360.
+- **Ghi nhận ngoài trang B:** trang Tổng quan còn 9–16 nút riêng nhỏ hơn 44 px trên màn cảm ứng (thanh công cụ Làm mới /
+  Excel / PDF / Báo cáo văn bản / Trình chiếu, tab chuyên đề 40 px, lọc lưu vực, dòng Hồ đang xả / Cấm đường) — sửa cùng
+  cách nếu cần.
 
 ## 4. Việc chờ dữ liệu / hệ thống bên ngoài
 
@@ -196,13 +230,18 @@ link nhiệm vụ. Chỉ xem lại nếu có thiết bị định vị gắn tr�
      ảnh (G2) — nếu đã chọn nguồn radar khác RainViewer (BD6) thì kiểm tra lại với nguồn đó.
 3. Dùng thử với cán bộ hiện trường trên điện thoại (thanh ngón cái, bảng trượt, Báo SOS) và trực ban trên máy tính (kéo –
    thả điều động, lệnh 2 bước).
+4. Dùng thử với lãnh đạo (cùng V3 của trang A) trên laptop, iPad, điện thoại: đọc 6 chỉ số "Tình hình" trong vài giây, chạm
+   từng ô, tab Điểm nóng, chế độ xem Tình hình — ghi lại chỉ số / loại điểm nóng còn thiếu.
 
 ## 6. Tham chiếu mã nguồn
 
 | Phần | Tệp |
 |---|---|
 | Trang bản đồ, bố cục máy tính / điện thoại | `frontend/src/pages/MonitoringMap.jsx` |
-| Bảng lớp, cảnh báo, thanh thời gian, công cụ, bảng trượt | `frontend/src/components/map/MapPanels.jsx` |
+| Bảng lớp, cảnh báo (tab Điểm nóng), thanh thời gian, chế độ xem (`ViewModeSwitch`), công cụ, bảng trượt | `frontend/src/components/map/MapPanels.jsx` |
+| Chỉ số "Tình hình" (lưới / hàng / vuốt ngang) — công thức dùng chung dải KPI Tổng quan | `frontend/src/components/map/MapKpis.jsx`, `components/dashboard/kpiFacts.js` |
+| Gom điểm nóng (chỉ sắp xếp lại số liệu đã tải) | `frontend/src/components/map/hotspots.js` |
+| Vùng chạm 44 px trên màn cảm ứng (`.touch-hit`, phóng to / thu nhỏ Leaflet) | `frontend/src/index.css` |
 | Các lớp, popup, kéo – thả điều động | `frontend/src/components/map/MapLayers.jsx` |
 | Biểu tượng (thang màu chung), chú giải (gồm thang màu radar `RadarScale`) | `frontend/src/components/map/icons.js`, `MapLegend.jsx` |
 | Nền bản đồ, radar (`useRadarFrames`, `radarFrameAt`, bảng màu `RADAR_BINS`), mưa dự báo theo xã (`ForecastChoropleth`, thang `rainScale`), đo, khoanh vùng, tìm đường | `frontend/src/components/map/MapTools.jsx` |
@@ -213,7 +252,7 @@ link nhiệm vụ. Chỉ xem lại nếu có thiết bị định vị gắn tr�
 | API bản đồ | `backend/app/api/v1/map_layers.py` (`/map/layers`, `/map/timeline`, `/map/area-stats`, `/map/storm-track`, `/map/incidents`) |
 | Dự báo mưa theo xã (số liệu từng giờ; khung giờ `hours`, `offset_h`) | `backend/app/api/v1/forecast.py` (`/forecast/areas`) |
 | Trạng thái hồ (dùng chung Dashboard) | `backend/app/services/reservoirs.py` (`classify_reservoir_status`) |
-| Kiểm thử | `tests/ui/ui-test.mjs` (bước "Bản đồ giám sát", "Điều động"), `tests/e2e/prod-flow.mjs` (trạng thái hồ trên bản đồ), `tests/e2e/iot-test.mjs` (khung giờ mưa dự báo) |
+| Kiểm thử | `tests/ui/ui-test.mjs` (bước "Bản đồ giám sát", "Điều động", khối "Người quản lý" — laptop, iPad ngang / dọc, điện thoại), `tests/e2e/prod-flow.mjs` (trạng thái hồ trên bản đồ), `tests/e2e/iot-test.mjs` (khung giờ mưa dự báo) |
 
 ## 7. Các thay đổi đã làm cho trang B (để tra cứu)
 
@@ -225,3 +264,7 @@ link nhiệm vụ. Chỉ xem lại nếu có thiết bị định vị gắn tr�
 | #56 | Tài liệu này |
 | #57 | Mưa dự báo theo xã đổi theo thanh thời gian (G1): API `/forecast/areas` thêm khung giờ `offset_h`, thang mưa 1 giờ, chú giải / ghi chú lớp ghi đúng khung đang tô, báo rõ đang tải / lỗi / chưa có số liệu |
 | #58 | Radar theo thanh thời gian (G2): ảnh ~2 giờ qua, ghi giờ ảnh, tự tải lại 5 phút, báo lỗi, chú giải màu radar; bảng lớp không còn bị thẻ thang màu đè (màn ≥ 1440 px), thanh thời gian không che thẻ chú giải; ghi nguồn RainViewer có liên kết; tài liệu ghi điều khoản RainViewer (BD6) |
+| #59 | Người quản lý — bước 1: 6 chỉ số "Tình hình" (cùng số Tổng quan, `kpiFacts.js`) trên laptop / iPad / điện thoại, chạm ô → bản đồ bay tới; sửa chú giải trạm mưa (cường độ mm/giờ) |
+| #60 | Người quản lý — bước 2: tab Điểm nóng (xếp Đỏ → Vàng, SOS cấp 1 gộp một dòng), chế độ xem Tình hình / Tác nghiệp (máy nhớ) |
+| #61 | Người quản lý — bước 3: vùng chạm ≥ 44 px trên màn cảm ứng (trang Bản đồ, đầu trang, menu, dải khẩn cấp); thanh thời gian không đè bảng cảnh báo trên iPad ngang |
+| #62 | Người quản lý — bước 4: khối kiểm thử "Người quản lý" trong ui-test; tài liệu này (G3), README |

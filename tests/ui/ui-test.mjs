@@ -732,6 +732,103 @@ async function firstScreen(ctx) {
   });
 }
 
+// ================================================================ Bản đồ cho người quản lý (trang B) — laptop, iPad, điện thoại
+// 6 chỉ số "Tình hình" thấy ngay (2 cột trong bảng cảnh báo / 1 hàng / 1 hàng vuốt ngang ô 44 px); tab Điểm nóng đứng đầu,
+// xếp Đỏ → Cam → Vàng; chế độ xem "Tình hình" bớt điểm trên bản đồ, "Tác nghiệp" trả lại như cũ; máy cảm ứng: mọi vùng chạm
+// của trang ≥ 44 px (tính cả vùng chạm vô hình .touch-hit của đầu trang). Chỉ xem — chế độ xem chỉ lưu trên máy.
+const MANAGER_DEVICES = [
+  ['Laptop 1366×768', { viewport: { width: 1366, height: 768 } }, 'grid'],
+  ['iPad ngang', devices['iPad Pro 11 landscape'], 'grid'],
+  ['iPad dọc', devices['iPad Pro 11'], 'row'],
+  ['Điện thoại 360', devices['Galaxy S8'], 'scroll'],
+];
+const HOT_LEVEL = { Đỏ: 3, Cam: 2, Vàng: 1 };
+const LAYOUT_NAME = { grid: '2 cột trong bảng cảnh báo', row: '1 hàng 6 ô', scroll: '1 hàng vuốt ngang, ô 44 px' };
+
+async function managerMap(ctx, layout) {
+  const { page, vp } = ctx;
+  const kpis = page.locator('section[aria-label^="Tình hình"]').first();
+  const compact = layout !== 'grid';
+  const markers = () => page.locator('.leaflet-marker-pane .leaflet-marker-icon').count();
+  await step(ctx, `Mở Bản đồ: 6 chỉ số "Tình hình" (${LAYOUT_NAME[layout]}), không tràn ngang`, async () => {
+    await page.goto(`${ROOT}/dang-nhap`);
+    await page.getByPlaceholder('Nhập tên đăng nhập hoặc email...').fill(STAFF.user);
+    await page.getByPlaceholder('••••••••').fill(STAFF.pass);
+    await page.locator('button[type="submit"]').click();
+    await page.waitForURL(/\/dashboard/, { timeout: 20_000 });
+    await page.goto(`${ROOT}/ban-do`);
+    await kpis.waitFor({ timeout: 20_000 });
+    await page.locator('.leaflet-marker-pane .leaflet-marker-icon').first().waitFor({ timeout: 20_000 });
+    await page.waitForTimeout(800);
+    const r = await kpis.evaluate((s) => {
+      const tiles = [...s.querySelectorAll('[title]')]; // ô chỉ số (nút hoặc ô chỉ hiện số) đều có title
+      const box = tiles.map((t) => t.getBoundingClientRect());
+      const strip = tiles[0]?.parentElement;
+      return {
+        n: tiles.length,
+        cols: new Set(box.map((b) => Math.round(b.left))).size,
+        rows: new Set(box.map((b) => Math.round(b.top))).size,
+        minH: Math.round(Math.min(...box.map((b) => b.height))),
+        scrolls: strip ? strip.scrollWidth > strip.clientWidth : false,
+        first: tiles[0]?.innerText.replace(/\s+/g, ' ') || '',
+      };
+    });
+    const bad = [
+      r.n !== 6 && `có ${r.n} chỉ số`,
+      layout === 'grid' && r.cols !== 2 && `${r.cols} cột`,
+      layout === 'row' && r.rows !== 1 && `${r.rows} hàng`,
+      layout === 'scroll' && (!r.scrolls || r.minH < 44) && `hàng không vuốt được hoặc ô thấp (${r.minH}px)`,
+    ].filter(Boolean);
+    if (bad.length) throw new Error(bad.join('; '));
+    if (vp.mobile) await expectNoOverflow(ctx, 'Bản đồ (người quản lý)');
+    return `ô đầu: ${r.first}`;
+  });
+  await step(ctx, 'Tab Điểm nóng đứng đầu, xếp Đỏ → Cam → Vàng; chế độ xem "Tình hình" bớt điểm, "Tác nghiệp" trả lại như cũ', async () => {
+    const bar = page.getByRole('navigation', { name: 'Thao tác nhanh' });
+    if (compact) await bar.getByRole('button', { name: /^Cảnh báo/ }).click();
+    const tabs = await page.locator('button[aria-pressed]').filter({ hasText: /^(Điểm nóng|Phiếu SOS|Cảm biến) \(\d+\)$/ }).allInnerTexts();
+    if (!/^Điểm nóng/.test(tabs[0] || '')) throw new Error(`tab đầu: ${tabs[0] || 'không có'}`);
+    await page.getByRole('button', { name: /^Điểm nóng \(/ }).first().click();
+    const levels = await page.locator('button[aria-label$="Xem trên bản đồ"]').filter({ has: page.locator('span.chip') })
+      .evaluateAll((els, map) => els.map((e) => map[e.querySelector('span.chip').textContent.trim()] ?? 0), HOT_LEVEL);
+    if (levels.some((x, i) => i > 0 && levels[i - 1] < x)) throw new Error(`điểm nóng không xếp theo mức: ${levels.join(',')}`);
+    if (!levels.length) await page.getByText('Không có điểm nóng trong vùng đang xem').waitFor({ timeout: 5_000 });
+    if (compact) await page.keyboard.press('Escape');
+    // Chế độ xem: trên bản đồ (máy tính, iPad) — điện thoại trong bảng Lớp
+    if (layout === 'scroll') await bar.getByRole('button', { name: /^Lớp/ }).click();
+    const modes = page.getByRole('group', { name: 'Chế độ xem bản đồ' }).first();
+    const before = await markers();
+    await modes.getByRole('button', { name: 'Tình hình' }).click();
+    await page.waitForTimeout(800);
+    const situation = await markers();
+    await modes.getByRole('button', { name: 'Tác nghiệp' }).click();
+    await page.waitForTimeout(800);
+    const back = await markers();
+    if (layout === 'scroll') await page.keyboard.press('Escape');
+    if (!(situation < before) || back < before - 2) throw new Error(`số điểm: ${before} → Tình hình ${situation} → Tác nghiệp ${back}`);
+    return `${levels.length} điểm nóng đang hiện · ${before} → ${situation} → ${back} điểm trên bản đồ`;
+  });
+  if (await page.evaluate(() => matchMedia('(pointer: coarse)').matches)) {
+    await step(ctx, 'Màn cảm ứng: mọi vùng chạm của trang Bản đồ ≥ 44 px', async () => {
+      const small = await page.evaluate(() => {
+        const vis = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden' && r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth; };
+        return [...document.querySelectorAll('button, a[href], input, select, [role="button"]')]
+          .filter((el) => vis(el) && !el.closest('.leaflet-marker-pane, .leaflet-control-attribution, .leaflet-popup') && !(el.type === 'checkbox' && el.closest('label')))
+          .map((el) => {
+            const r = el.getBoundingClientRect();
+            let w = r.width;
+            let h = r.height;
+            const after = el.classList.contains('touch-hit') && getComputedStyle(el, '::after');
+            if (after && after.content !== 'none') { w = Math.max(w, parseFloat(after.width) || 0); h = Math.max(h, parseFloat(after.height) || 0); }
+            return { size: Math.round(el.type === 'range' ? h : Math.min(w, h)), what: (el.getAttribute('aria-label') || el.innerText || el.title || el.tagName).replace(/\s+/g, ' ').trim().slice(0, 30) };
+          })
+          .filter((x) => x.size < 44);
+      });
+      if (small.length) throw new Error(`${small.length} vùng chạm < 44 px: ${small.slice(0, 5).map((s) => `${s.what} ${s.size}px`).join(', ')}`);
+    });
+  }
+}
+
 // ================================================================
 console.log(`Kiểm thử giao diện: ${ROOT}${READONLY ? ' (chỉ xem)' : ''}`);
 const browser = await chromium.launch();
@@ -760,6 +857,13 @@ try {
   const firstPage = await first.newPage();
   await firstScreen({ page: firstPage, vp: FIRST_SCREEN, problems: watch(firstPage) });
   await first.close();
+  for (const [label, opts, layout] of MANAGER_DEVICES) {
+    const mctx = await browser.newContext({ ...opts, locale: 'vi-VN' });
+    mctx.setDefaultTimeout(15_000);
+    const mPage = await mctx.newPage();
+    await managerMap({ page: mPage, vp: { name: `Người quản lý · ${label}`, mobile: layout === 'scroll' }, problems: watch(mPage) }, layout);
+    await mctx.close();
+  }
 } finally {
   await browser.close();
 }
