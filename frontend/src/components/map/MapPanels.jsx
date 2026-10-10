@@ -21,7 +21,7 @@ export const LAYER_GROUPS = [
     items: [
       { key: 'stations', label: 'Trạm đo mưa, mực nước, cảm biến IoT' },
       { key: 'reservoirs', label: 'Hồ chứa & đập thủy điện' },
-      { key: 'forecast', label: 'Mưa dự báo 24h theo xã (ECMWF + GFS)' },
+      { key: 'forecast', label: 'Mưa dự báo theo xã (ECMWF + GFS)' }, // ghi chú dưới tên: 24 giờ tới / 1 giờ theo thanh thời gian
       { key: 'radar', label: 'Radar mưa thời gian thực' },
       { key: 'storm', label: 'Quỹ đạo bão / áp thấp' },
     ],

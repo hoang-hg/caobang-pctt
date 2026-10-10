@@ -15,7 +15,7 @@ import {
 import IncidentModal from '../components/map/IncidentModal';
 import StormBulletinModal from '../components/map/StormBulletinModal';
 import OccupancyModal from '../components/common/OccupancyModal';
-import { AdminBoundaries, AreaFocus, BASEMAPS, BaseLayer, DrawTool, FocusHandler, ForecastChoropleth, MeasureTool, RadarLayer, RAIN_BINS, RouteTool } from '../components/map/MapTools';
+import { AdminBoundaries, AreaFocus, BASEMAPS, BaseLayer, DrawTool, FocusHandler, ForecastChoropleth, MeasureTool, RadarLayer, rainScale, RouteTool } from '../components/map/MapTools';
 import DispatchModal from '../components/common/DispatchModal';
 import CameraModal from '../components/common/CameraModal';
 import IssueModal from '../components/common/IssueModal';
@@ -28,6 +28,7 @@ import { usePermission } from '../rbac/usePermission';
 import { alarmLevel } from '../utils/labels';
 import { time } from '../utils/format';
 import { fmtVn } from '../utils/bulletin';
+import { useDebounced } from '../utils/useDebounced';
 import { useMediaQuery } from '../utils/useMediaQuery';
 import { useOnline } from '../utils/useOnline';
 
@@ -37,6 +38,14 @@ function PickPoint({ active, onPick }) {
   return null;
 }
 
+// Lớp mưa dự báo không vẽ được → vì sao (ghi thay thang màu ở chú giải, ghi chú lớp, thẻ góc bản đồ). Kéo thanh thời
+// gian về quá khứ: không có dự báo — chỉ số đo của trạm (lớp Trạm)
+function rainNoteOf(offset, q) {
+  if (offset < 0) return 'Thời điểm đã qua: không có dự báo mưa — xem số đo các trạm mưa';
+  if (q.isError) return 'Không tải được mưa dự báo';
+  if (q.isPending) return 'Đang tải mưa dự báo…';
+  return 'Chưa có số liệu mưa dự báo cho thời điểm này';
+}
 const floatCard = 'card border border-line bg-panel/95 shadow-2xl backdrop-blur-md';
 const roundBtn = 'card flex flex-col items-center justify-center gap-0.5 border border-line bg-panel/95 text-[10px] font-bold text-ink-2 shadow-lg backdrop-blur-md active:scale-95';
 
@@ -92,7 +101,19 @@ export default function MonitoringMap() {
   const waterStations = useMemo(() => (stationsQ.data || []).filter((s) => s.type === 'muc_nuoc'), [stationsQ.data]);
   const { data: area } = useAreaQuery('area', '/admin-units/area', {}, { staleTime: Infinity });
   const { data: unitsGeo } = useUnitsGeo();
-  const { data: fcAreas } = useAreaQuery('forecast-areas', '/forecast/areas', { hours: 24 }, { enabled: layers.forecast, refetchInterval: 10 * 60_000 });
+  // Mưa dự báo theo thanh thời gian (thiết kế B.1): hiện tại = tổng 24 giờ tới; kéo tới +N giờ = mưa trong giờ chứa thời
+  // điểm đó (VD thanh chỉ 21:57 → mưa 21:00–22:00), chỉ tải khi đã dừng tay; quá khứ = không có dự báo. Trong lúc tải
+  // khung mới vẫn giữ lớp cũ — thang màu / nhãn lấy theo chính số liệu đang vẽ (rainScale), không lệch nhau
+  const fcOffset = useDebounced(offset, 300);
+  const fcQ = useAreaQuery(
+    'forecast-areas',
+    '/forecast/areas',
+    fcOffset > 0 ? { hours: 1, offset_h: fcOffset } : { hours: 24 },
+    { enabled: layers.forecast && fcOffset >= 0, refetchInterval: 10 * 60_000, placeholderData: (prev) => prev },
+  );
+  const fcAreas = fcQ.data;
+  const rain = offset >= 0 && fcAreas?.length ? rainScale(fcAreas) : null;
+  const rainNote = rain ? null : rainNoteOf(offset, fcQ);
   const { data: timeline } = useQuery({
     queryKey: ['timeline', offset],
     queryFn: () => api('/map/timeline', { params: { offset_h: offset } }),
@@ -109,6 +130,7 @@ export default function MonitoringMap() {
   // Ghi chú dưới tên lớp (không khoá lớp): vùng kịch bản nào đang hiện theo mực nước tại thời điểm đang xem
   const unknownLevels = scenarioStates.filter((x) => x.level == null).length;
   const notes = {
+    forecast: layers.forecast ? (rain ? `${rain.short} (P50)` : rainNote) : null,
     floodScenario: scenarioStates.length
       ? `${scenarioStates.filter((x) => x.active).length}/${scenarioStates.length} vùng đang ngập theo mực nước ${offset ? `lúc ${fmtVn(Date.now() + offset * 3600_000)}` : 'hiện tại'}${unknownLevels ? ` · ${unknownLevels} vùng chưa có số đo trạm` : ''}`
       : null,
@@ -246,7 +268,7 @@ export default function MonitoringMap() {
           {layers.radar && <RadarLayer />}
           <ZoomControl position="bottomright" />
           <ScaleControl position="bottomleft" imperial={false} />
-          {layers.forecast && <ForecastChoropleth geo={unitsGeo} areas={fcAreas} />}
+          {layers.forecast && offset >= 0 && <ForecastChoropleth geo={unitsGeo} areas={fcAreas} />}
           {layers.admin && <AdminBoundaries geo={unitsGeo} basemap={basemap} />}
           <AreaFocus
             area={area}
@@ -353,20 +375,26 @@ export default function MonitoringMap() {
             <div className="absolute bottom-9 left-3 z-[1000] flex flex-col items-start gap-2">
               {legendOpen && (
                 <div className={clsx(floatCard, 'scroll-thin max-h-[min(28rem,calc(100vh-14rem))] w-[19rem] overflow-y-auto p-3')}>
-                  <MapLegend layers={layers} order={LAYER_ORDER} />
+                  <MapLegend layers={layers} order={LAYER_ORDER} rain={rain} rainNote={rainNote} />
                 </div>
               )}
               {!legendOpen && layers.forecast && (
-                <div className={clsx(floatCard, 'p-2.5 text-xs')}>
-                  <div className="mb-1 font-bold text-ink">Mưa dự báo 24 giờ tới (P50)</div>
-                  <div className="space-y-1">
-                    {RAIN_BINS.map((b) => (
-                      <div key={b.label} className="flex items-center gap-2">
-                        <span className="h-3 w-5 rounded-sm shadow-sm" style={{ background: b.color }} aria-hidden="true" />
-                        <span>{b.label}</span>
+                <div className={clsx(floatCard, 'max-w-[15rem] p-2.5 text-xs')}>
+                  {rain ? (
+                    <>
+                      <div className="mb-1 font-bold text-ink">{rain.title}</div>
+                      <div className="space-y-1">
+                        {rain.bins.map((b) => (
+                          <div key={b.label} className="flex items-center gap-2">
+                            <span className="h-3 w-5 rounded-sm shadow-sm" style={{ background: b.color }} aria-hidden="true" />
+                            <span>{b.label}</span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    </>
+                  ) : (
+                    <p className="text-muted">{rainNote}</p>
+                  )}
                 </div>
               )}
               <button
@@ -414,11 +442,17 @@ export default function MonitoringMap() {
             </div>
 
             {layers.forecast && !sheet && (
-              <div className={clsx(floatCard, 'absolute bottom-2 left-2 z-[1000] px-2 py-1.5 text-[10px]')}>
-                <div className="mb-0.5 font-bold text-ink">Mưa dự báo 24h (P50)</div>
-                <div className="flex gap-1">
-                  {RAIN_BINS.map((b) => <span key={b.label} className="h-2.5 w-5 rounded-sm" style={{ background: b.color }} title={b.label} />)}
-                </div>
+              <div className={clsx(floatCard, 'absolute bottom-2 left-2 z-[1000] max-w-[13rem] px-2 py-1.5 text-[10px]')}>
+                {rain ? (
+                  <>
+                    <div className="mb-0.5 font-bold text-ink">{rain.short} (P50)</div>
+                    <div className="flex gap-1">
+                      {rain.bins.map((b) => <span key={b.label} className="h-2.5 w-5 rounded-sm" style={{ background: b.color }} title={b.label} />)}
+                    </div>
+                  </>
+                ) : (
+                  <span className="text-muted">{rainNote}</span>
+                )}
               </div>
             )}
 
@@ -458,7 +492,7 @@ export default function MonitoringMap() {
             )}
             {sheet === 'legend' && (
               <Sheet title="Chú giải bản đồ" onClose={() => setSheet(null)}>
-                <MapLegend layers={layers} order={LAYER_ORDER} />
+                <MapLegend layers={layers} order={LAYER_ORDER} rain={rain} rainNote={rainNote} />
               </Sheet>
             )}
           </>

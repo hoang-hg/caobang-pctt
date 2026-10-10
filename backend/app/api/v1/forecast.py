@@ -1,6 +1,6 @@
 """Dự báo mưa theo xã (tổ hợp ECMWF/GFS từ Open-Meteo, OpenWeather) — /api/v1/forecast/*"""
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.area import unit_clause
 from app.db import fetch_all, fetch_one
@@ -20,9 +20,17 @@ async def models(_: dict = Depends(require_any("monitoring", "view"))):
 
 @router.get("/areas")
 async def areas(
-    model: str = "BLEND", hours: int = 24, codes: list[str] = Depends(area_scope("monitoring", "view"))
+    model: str = "BLEND",
+    hours: int = Query(24, ge=1, le=240),
+    offset_h: int = Query(0, ge=0, le=240),
+    codes: list[str] = Depends(area_scope("monitoring", "view")),
 ):
-    """Tổng mưa dự báo N giờ tới theo xã (P10/P50/P90), xác suất mưa lớn cao nhất — cho bản đồ & bảng xếp hạng."""
+    """Tổng mưa dự báo theo xã (P10/P50/P90), xác suất mưa lớn cao nhất — cho bản đồ & bảng xếp hạng.
+
+    Khung giờ: từ `offset_h` tới `offset_h + hours` giờ tính từ bây giờ (mặc định 24 giờ tới). Thanh thời gian của bản đồ
+    kéo tới +N giờ → `offset_h=N&hours=1` = mưa trong giờ chứa thời điểm đó (số liệu theo giờ: mỗi mốc `time` là lượng
+    mưa của 1 giờ trước mốc, nên mốc đầu tiên sau +N giờ là giờ chứa +N).
+    `window_from` / `window_to`: mốc giờ đầu / cuối có số liệu trong khung."""
     return await fetch_all(
         f"""SELECT u.code, u.name,
                    round(sum(a.precip_p10)::numeric, 1)::float AS p10,
@@ -30,12 +38,13 @@ async def areas(
                    round(sum(a.precip_p90)::numeric, 1)::float AS p90,
                    round(max(a.precip_p90)::numeric, 1)::float AS max_hourly_p90,
                    round(max(a.prob_heavy)::numeric, 2)::float AS max_prob_heavy,
-                   max(a.issued_at) AS issued_at
+                   max(a.issued_at) AS issued_at,
+                   min(a.time) AS window_from, max(a.time) AS window_to
               FROM iot_telemetry.area_forecasts a JOIN spatial_admin.administrative_units u ON u.id = a.admin_unit_id
-             WHERE a.model = :m AND a.time > now() AND a.time <= now() + make_interval(hours => :h)
+             WHERE a.model = :m AND a.time > now() + make_interval(hours => :o) AND a.time <= now() + make_interval(hours => :e)
                AND {unit_clause('a.admin_unit_id', codes)}
              GROUP BY u.code, u.name ORDER BY p50 DESC""",
-        {"m": model, "h": hours, "codes": codes},
+        {"m": model, "o": offset_h, "e": offset_h + hours, "codes": codes},
     )
 
 
