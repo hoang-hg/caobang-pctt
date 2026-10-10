@@ -32,7 +32,7 @@ export default function Header() {
     <header className="no-print sticky top-0 z-[1100] flex h-14 shrink-0 items-center gap-2 border-b border-line bg-panel/95 px-3 backdrop-blur-md">
       {/* Nút mở menu trên Mobile */}
       <button
-        className="btn-ghost relative p-1.5 lg:hidden text-ink-2"
+        className="btn-ghost touch-hit relative p-1.5 lg:hidden text-ink-2"
         onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
         aria-label={urgent ? `Mở danh mục điều hướng (${urgent} việc khẩn chờ xử lý)` : 'Mở danh mục điều hướng'}
         title="Danh mục menu"
@@ -46,7 +46,7 @@ export default function Header() {
       </button>
 
       {/* Logo & Tiêu đề cơ quan */}
-      <Link to="/dashboard" className="flex items-center gap-2.5 pr-2 transition-opacity hover:opacity-90">
+      <Link to="/dashboard" className="touch-hit flex items-center gap-2.5 pr-2 transition-opacity hover:opacity-90">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-danger to-red-700 text-white shadow-sm shadow-danger/25">
           <ShieldAlert size={20} />
         </div>
@@ -79,7 +79,7 @@ export default function Header() {
           to="/cong-khai"
           target="_blank"
           rel="noopener noreferrer"
-          className="btn-ghost hidden md:inline-flex text-xs px-2.5 py-1.5 text-accent border-accent/30 bg-accent/5 hover:bg-accent/10"
+          className="btn-ghost touch-hit hidden md:inline-flex text-xs px-2.5 py-1.5 text-accent border-accent/30 bg-accent/5 hover:bg-accent/10"
           title="Mở Cổng thông tin công khai dành cho người dân"
           aria-label="Cổng người dân"
         >
@@ -106,7 +106,7 @@ export default function Header() {
         {soundOn && !audioReady && (
           <button
             type="button"
-            className="chip animate-pulse border border-warn bg-warn/15 px-2.5 py-1 text-[11px] font-semibold text-ink"
+            className="chip touch-hit animate-pulse border border-warn bg-warn/15 px-2.5 py-1 text-[11px] font-semibold text-ink"
             title="Trình duyệt chặn âm thanh tới khi bấm vào trang — bấm để chuông SOS kêu được"
           >
             <VolumeX size={13} className="text-warn" /> <span className="hidden 2xl:inline">Bấm để bật chuông SOS</span>
@@ -115,7 +115,7 @@ export default function Header() {
 
         {/* Nút bật/tắt âm báo SOS */}
         <button
-          className={clsx('btn-ghost p-2 transition-colors', soundOn ? 'text-accent' : 'text-muted')}
+          className={clsx('btn-ghost touch-hit p-2 transition-colors', soundOn ? 'text-accent' : 'text-muted')}
           onClick={toggleSound}
           title={soundOn ? 'Âm báo SOS: BẬT (bấm để tắt)' : 'Âm báo SOS: TẮT (bấm để bật)'}
           aria-label="Bật tắt âm báo SOS"
@@ -125,7 +125,7 @@ export default function Header() {
 
         {/* Nút đổi giao diện Sáng / Tối */}
         <button
-          className="btn-ghost p-2 transition-transform active:rotate-45"
+          className="btn-ghost touch-hit p-2 transition-transform active:rotate-45"
           onClick={toggleTheme}
           title={theme === 'dark' ? 'Chuyển sang nền Sáng' : 'Chuyển sang nền Tối'}
           aria-label="Đổi nền sáng tối"

@@ -80,7 +80,7 @@ export default function Sidebar() {
             }}
             className={({ isActive }) =>
               clsx(
-                'group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150',
+                'group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150 [@media(pointer:coarse)]:min-h-[44px]',
                 isActive
                   ? 'bg-accent/15 text-accent shadow-sm font-semibold'
                   : 'text-ink-2 hover:bg-panel2 hover:text-ink',
@@ -142,7 +142,7 @@ export default function Sidebar() {
 
           <button
             onClick={toggleSidebarCollapse}
-            className="btn-ghost w-full justify-center py-2 text-xs text-muted hover:text-ink"
+            className="btn-ghost w-full justify-center py-2 text-xs text-muted hover:text-ink [@media(pointer:coarse)]:min-h-[44px]"
             title={sidebarCollapsed ? 'Mở rộng thanh menu' : 'Thu gọn thanh menu'}
             aria-label="Thu gọn hoặc mở rộng thanh menu"
           >

@@ -141,7 +141,7 @@ export function LayerList({ groups, layers, setLayers, unavailable, notes, count
                   {key === 'storm' && canStorm && (
                     <button
                       type="button"
-                      className={clsx('ml-8 text-[11px] font-medium text-accent hover:underline', touch && 'min-h-[40px]')}
+                      className={clsx('ml-8 text-[11px] font-medium text-accent hover:underline', touch && 'min-h-[44px]')}
                       onClick={onStorm}
                     >
                       Nhập / cập nhật bản tin bão
@@ -294,7 +294,7 @@ export function AlertsList({
                 {s.status === 'moi' && canDispatch && (
                   <button
                     type="button"
-                    className={clsx('mx-1.5 mb-1.5 inline-flex items-center gap-1 rounded-lg px-2 text-[11px] font-bold text-danger hover:bg-danger/10', touch ? 'min-h-[40px]' : 'min-h-[26px]')}
+                    className={clsx('mx-1.5 mb-1.5 inline-flex items-center gap-1 rounded-lg px-2 text-[11px] font-bold text-danger hover:bg-danger/10', touch ? 'min-h-[44px]' : 'min-h-[26px]')}
                     onClick={() => onDispatch(s)}
                   >
                     <Send size={12} aria-hidden="true" /> Điều phối lực lượng
@@ -412,7 +412,7 @@ export function TimeControl({ offset, setOffset, touch }) {
           step={1}
           value={offset}
           onChange={(e) => setOffset(Number(e.target.value))}
-          className={clsx('min-w-0 flex-1 accent-[rgb(var(--accent))]', touch && 'h-10')}
+          className={clsx('min-w-0 flex-1 accent-[rgb(var(--accent))]', touch && 'h-11')}
           aria-label="Thanh trượt thời gian"
           aria-valuetext={offset === 0 ? 'Hiện tại' : `${offset > 0 ? '+' : ''}${offset} giờ — ${when}`}
         />

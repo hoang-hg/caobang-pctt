@@ -109,7 +109,7 @@ export default function SituationBar({
             ))}
             {noDataNote && <span className={clsx('opacity-80', !expanded && 'hidden sm:inline')}>{noDataNote}</span>}
             {extraDesk > 0 && !presentation && (
-              <button type="button" onClick={() => setExpanded((v) => !v)} aria-expanded={expanded} className={clsx('hidden min-h-[28px] sm:inline-flex', toggle)}>
+              <button type="button" onClick={() => setExpanded((v) => !v)} aria-expanded={expanded} className={clsx('hidden min-h-[28px] sm:inline-flex [@media(pointer:coarse)]:min-h-[44px]', toggle)}>
                 {expanded ? 'Thu gọn' : `+${extraDesk}`}
                 <ChevronDown size={13} className={clsx('transition-transform', expanded && 'rotate-180')} aria-hidden="true" />
               </button>
@@ -125,7 +125,7 @@ export default function SituationBar({
           )}
         >
           {extraPhone > 0 && (
-            <button type="button" onClick={() => setExpanded((v) => !v)} aria-expanded={expanded} className={clsx('flex min-h-[40px] sm:hidden', toggle)}>
+            <button type="button" onClick={() => setExpanded((v) => !v)} aria-expanded={expanded} className={clsx('flex min-h-[40px] sm:hidden [@media(pointer:coarse)]:min-h-[44px]', toggle)}>
               {expanded ? 'Thu gọn' : `+${extraPhone} tình huống`}
               <ChevronDown size={13} className={clsx('transition-transform', expanded && 'rotate-180')} aria-hidden="true" />
             </button>
@@ -134,7 +134,8 @@ export default function SituationBar({
             <Link
               to="/cuu-ho"
               className={clsx(
-                'flex min-h-[40px] items-center justify-center gap-1 whitespace-nowrap rounded-lg border px-2.5 font-bold shadow-sm active:scale-95 sm:min-h-[36px]',
+                // Màn cảm ứng: 44 px (! để thắng sm:min-h-[36px] khi cả hai cùng khớp — iPad)
+                'flex min-h-[40px] items-center justify-center gap-1 whitespace-nowrap rounded-lg border px-2.5 font-bold shadow-sm active:scale-95 sm:min-h-[36px] [@media(pointer:coarse)]:!min-h-[44px]',
                 onRed ? 'border-white/40 bg-white/15 hover:bg-white/25' : 'border-black/25 bg-black/10 hover:bg-black/15',
               )}
               title="Mở Điều hành cứu hộ để xử lý các phiếu SOS"
@@ -148,7 +149,7 @@ export default function SituationBar({
             <button
               type="button"
               onClick={onReport}
-              className="hidden min-h-[36px] items-center gap-1 rounded-lg bg-white px-2.5 font-black text-[rgb(var(--danger))] shadow-sm active:scale-95 sm:flex"
+              className="hidden min-h-[36px] items-center gap-1 rounded-lg bg-white px-2.5 font-black text-[rgb(var(--danger))] shadow-sm active:scale-95 sm:flex [@media(pointer:coarse)]:min-h-[44px]"
             >
               <ShieldAlert size={13} aria-hidden="true" /> Báo cáo nhanh
             </button>

@@ -48,7 +48,7 @@ export default function AdminFilter() {
   return (
     <div className="relative" ref={ref}>
       <button
-        className={clsx('btn-ghost max-w-[16rem]', filter.codes.length && 'border-accent text-accent')}
+        className={clsx('btn-ghost touch-hit max-w-[16rem]', filter.codes.length && 'border-accent text-accent')}
         onClick={() => setOpen((o) => !o)}
         title="Lọc dữ liệu theo địa phương"
       >
