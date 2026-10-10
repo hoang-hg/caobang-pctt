@@ -1,17 +1,43 @@
-# Trang A – Tổng quan: việc còn lại khi có dữ liệu thật
+# Trang A – Tổng quan: đối chiếu thiết kế và việc còn lại
 
 Đối chiếu với mục **A. Thiết kế chi tiết cho Dashboard Tổng quan & Biểu đồ Dữ liệu** (tài liệu thiết kế Part 1) và các yêu cầu
 giao diện bổ sung (màu rủi ro thống nhất, thông tin khẩn trên cùng, bảng có tìm / lọc / phân trang / xuất file, form chia bước
 có báo lỗi khi nhập, trạng thái tải / trống / lỗi / mất mạng, 360 px, theo phân quyền).
 
-- Cập nhật: 10/10/2026 — mã nguồn `main` gồm PR #36 → #51 (G1, G2 ở PR #50; 3 ô KPI và nhật ký vận hành hồ ở PR #51).
-- Máy chủ thử vẫn chạy **v1.0.3** (04/10/2026), **chưa có** các thay đổi trên. Cần tag + triển khai trước khi kiểm tra với dữ
-  liệu thật.
+- Cập nhật: 10/10/2026 — mã nguồn `main` gồm PR #36 → #52 (G1, G2 ở PR #50; 3 ô KPI và nhật ký vận hành hồ ở PR #51).
+- Máy chủ thử vẫn chạy **v1.0.3** (04/10/2026), **chưa có** các thay đổi trên. Cần tag + triển khai (V1) trước khi kiểm tra
+  với dữ liệu thật.
 - Hiện trạng từng nhóm dữ liệu: README mục **2.2**. Cách nhập: README mục **2.4**. Kiểm tra trước khi mở cổng: `docs/GO-LIVE.md`.
 
-**Kết luận:** phần chức năng của mục A đã đủ theo thiết kế; 2 việc giao diện còn lại (G1, G2) đã làm xong. Lần rà cuối
-(10/10/2026) sửa thêm 3 ô KPI trên điện thoại và nhật ký vận hành hồ (PR #51). Các mục D1 → D6, 7 → 11 dưới đây còn thiếu vì
-**chưa có dữ liệu hoặc chưa có hệ thống bên ngoài để nối**. Không điền số mẫu / ngưỡng tự đặt để "lấp chỗ trống".
+**Kết luận:** phần chức năng của mục A đã đủ theo thiết kế (bảng đối chiếu ngay dưới); 2 việc giao diện G1, G2 đã làm xong;
+lần rà cuối (10/10/2026) sửa thêm 3 ô KPI trên điện thoại và nhật ký vận hành hồ (PR #51). Còn lại hai nhóm việc:
+
+- **Không cần dữ liệu thật** — làm được ngay: V1 triển khai, V2 thử tải lại với đủ API hiện nay, V3 cho người dùng thật dùng
+  thử (mục 12).
+- **Chờ dữ liệu hoặc hệ thống bên ngoài**: D1 → D6, điểm 7 → 11. Không điền số mẫu / ngưỡng tự đặt để "lấp chỗ trống".
+
+## Đối chiếu với thiết kế mục A (rà ngày 10/10/2026)
+
+| Yêu cầu của thiết kế | Hiện trạng |
+|---|---|
+| A.1 Lưới 3 khối: chỉ số nhanh (trên), biểu đồ (giữa), nhật ký (bên); màn hình lớn, thu gọn cho máy tính bảng | Đạt — bố cục laptop / iPad / điện thoại, nhật ký cột phải; chế độ trình chiếu cho màn hình lớn |
+| A.1 Nền tối mặc định | Đạt theo mục F.3: theo cài đặt Sáng / Tối của hệ điều hành và nhớ lựa chọn; trình chiếu luôn nền tối. Máy phòng điều hành cần đặt nền tối một lần (V1) |
+| A.2 Mưa trung bình lưu vực (mm/24h) và mưa cực đại cục bộ | Đạt — bình quân theo diện tích (đa giác Thiessen); dòng "Lớn nhất" thấy cả trên điện thoại. Cần trạm đo mưa (D1) |
+| A.2 Mực nước sông so với BĐ I, II, III | Đạt — kèm xu hướng, giờ dự báo vượt BĐ. Cần ngưỡng BĐ thật (D1) |
+| A.2 Hộ / nhân khẩu đã sơ tán trên kế hoạch | Đạt. Cần kế hoạch sơ tán (D1) |
+| A.2 SOS chờ xử lý, nhấp nháy đỏ khi quá 15 phút chưa có lực lượng | Đạt |
+| A.2 Quân số ứng trực / làm nhiệm vụ; xuồng, xe lội nước đang hoạt động | Đạt. Cần danh sách lực lượng, phương tiện (D1) |
+| A.3 Biểu đồ thủy văn: thực đo + dự báo, vạch BĐ I–III, tô phần vượt; vận hành hồ chứa | Đạt — dự báo lấy bản tin KTTV nhập tay (D5), chưa nối mô hình HEC-HMS (điểm 9); số liệu hồ nhập tay (D4) |
+| A.3 Mưa: cột theo giờ + đường tích luỹ, 1–3 giờ tới nét đứt (QPF) | Đạt — 1–3 giờ tới là dự báo mô hình số, chưa phải radar (điểm 8); chưa đánh giá ngập úng đô thị (điểm 7) |
+| A.3 Sạt lở: scatter / heatmap chuỗi thời gian, phân loại Đỏ / Cam / Vàng | Đạt — có cả hai; ngưỡng mưa còn minh hoạ (điểm 11); danh mục điểm đen viết cứng (D2) |
+| A.3 Vật tư: cột chồng theo kho, phần trống là thiếu so với định mức | Đạt. Cần tồn kho, định mức dự trữ (D1) |
+| A.4 Nhật ký cột phải, cập nhật tức thì: vận hành hồ (có lưu lượng xả), cứu hộ | Đạt |
+| A.4 Báo cáo thiệt hại của người dân qua Zalo OA / ứng dụng | Cổng tiếp nhận đã có, đang tắt — chờ bên gửi (điểm 10) |
+| A.5 PostgreSQL + PostGIS, API JSON nội bộ, số liệu IoT | Đạt — ảnh radar chưa có nguồn (điểm 8) |
+| A.5 Vận hành mượt, độ trễ thấp | Đã tối ưu và đo ngày 27/09/2026; cần đo lại với đủ API trang A hiện nay (V2) |
+| A.5 Xuất PDF snapshot định dạng chuẩn gửi UBND tỉnh / Ban Chỉ đạo | Đạt — PDF ảnh chụp + báo cáo văn bản thể thức Nghị định 30/2020 |
+| A.5 Cấu trúc CSDL PostgreSQL / PostGIS liên kết quan trắc với điều hành | Đạt — các schema nghiệp vụ, `backend/alembic/sql/` |
+| Yêu cầu giao diện chung (màu rủi ro, khẩn trên cùng, bảng, form nhiều bước, trạng thái, 360 px, phân quyền) | Đạt |
 
 ---
 
@@ -19,6 +45,9 @@ có báo lỗi khi nhập, trạng thái tải / trống / lỗi / mất mạng,
 
 | # | Việc | Phụ thuộc | Cần ai cung cấp | Ưu tiên |
 |---|---|---|---|---|
+| V1 | **Triển khai** bản mới lên máy chủ (tag); đặt nền tối cho màn hình phòng điều hành | Không cần dữ liệu | Chủ dự án quyết định tag | **Cao nhất** — máy chủ còn v1.0.3 |
+| V2 | **Thử tải lại** (k6) với đủ API trang A đang gọi | Không cần dữ liệu (chạy lại khi có D1) | — | Cao — trước khi mở cổng |
+| V3 | **Dùng thử với lãnh đạo, trực ban** (máy tính, iPad, điện thoại, màn hình lớn) | Người dùng thật; tốt nhất sau D1 | BCH tỉnh (bố trí buổi dùng thử) | Cao |
 | D1 | Nhập dữ liệu nền cho các khối của trang A (trạm, ngưỡng BĐ, hồ chứa, kế hoạch sơ tán, lực lượng, kho…) | Dữ liệu | Đài KTTV, Sở Công Thương, các xã, BCH | **Cao nhất** — chưa có thì trang A chỉ hiện "chưa có" |
 | D2 | Danh mục chính thức **điểm đen sạt lở & đường đèo** (hiện viết cứng 12 điểm trong mã) | Dữ liệu + lập trình | Sở Xây dựng / đơn vị quản lý đường bộ, Sở NN&MT | Cao |
 | D3 | **Mạng đường** (xác định đoạn bị chia cắt ở tab Sạt lở, chỉ đường an toàn) | Dữ liệu + lập trình | Sở Xây dựng / OSM đã hiệu chỉnh | Trung bình |
@@ -195,9 +224,51 @@ Thiết kế A.3: phần 1–3 giờ tới của biểu đồ mưa dùng dự b�
     xem).
 - **Khi có dữ liệu thật:** xem lại bước 9 thẻ có hợp không (hằng `PAGE` trong `ReservoirMonitor.jsx`, `LandslideMonitor.jsx`).
 
-## 12. Khi có dữ liệu: trình tự đề nghị
+## 12. Việc chưa làm, không cần dữ liệu thật (V1 – V3)
 
-1. **Triển khai** bản mới nhất (tag), để có migration `0020` (lịch sử vận hành hồ) và các cải tiến từ PR #36 → #51.
+### V1 — Triển khai, đặt nền tối cho phòng điều hành
+
+- **Hiện trạng:** máy chủ thử chạy v1.0.3 (04/10/2026); `main` đã có PR #36 → #52, gồm migration `0020` (lịch sử vận hành
+  hồ). Người dùng trên máy chủ chưa thấy các thay đổi của trang A.
+- **Việc làm:**
+  - tag phiên bản mới, cập nhật máy chủ theo README mục 10.4 / 10.8 (sao lưu CSDL trước khi cập nhật);
+  - kiểm tra theo `docs/GO-LIVE.md`, chạy `UI_READONLY=1 node tests/ui/ui-test.mjs <địa chỉ>`;
+  - màn hình lớn phòng điều hành mở `/dashboard?trinh-chieu=1` (luôn nền tối, chữ to, tự xoay chuyên đề); máy tính trực ban
+    mở `/dashboard?theme=dark` một lần (trình duyệt nhớ). Lý do: giao diện theo cài đặt Sáng / Tối của hệ điều hành (mục F.3),
+    Windows mặc định để Sáng, trong khi thiết kế A.1 / F.2 muốn nền tối cho phòng điều hành.
+
+### V2 — Thử tải lại với đủ API trang A đang gọi
+
+- **Hiện trạng:** `tests/load/load.js` (README mục 12.2), lần đo gần nhất 27/09/2026 — trước PR #36 → #51. Kịch bản "Cán bộ"
+  tải lại 9 API mỗi 5 giây: `/dashboard/kpis`, `/stations`, `/dashboard/rainfall`, `/dashboard/landslide-risk`,
+  `/dashboard/supplies`, `/dashboard/logs`, `/sos`, `/map/layers`, `/resources/summary`.
+- **Lệch so với trang A hiện nay:**
+  - thiếu `/dashboard/reservoirs`, `/dashboard/landslides`, `/dashboard/landslide-sensors` (tab Hồ chứa / Sạt lở),
+    `/dashboard/reservoir-operations` (biểu đồ vận hành hồ), `/evacuation`, `/admin-units/area`, `/forecast/areas`,
+    `/resources/forces`;
+  - `/resources/summary` nay thuộc trang Vật tư & Lực lượng, Tổng quan không gọi;
+  - `/dashboard/rainfall` nay tính mưa bình quân lưu vực theo đa giác Thiessen, nặng hơn lúc đo.
+- **Việc làm:**
+  - sửa danh sách API của kịch bản Cán bộ theo trang A hiện nay (`pages/Dashboard.jsx`, `components/dashboard`,
+    `components/charts`, hai tab Hồ chứa / Sạt lở), theo đúng tần suất tải lại của từng khối (VD biểu đồ vận hành hồ 60 giây);
+  - chạy trên stack thử, rồi trên máy chủ thật (máy riêng chạy k6, trỏ vào máy chủ);
+  - đạt ngưỡng của README 12.2 (cán bộ p95 < 1,5 giây, lỗi < 1%), ghi kết quả vào README 12.2;
+  - chạy lại sau khi nhập D1: dữ liệu thật nhiều trạm, hồ, phiếu hơn dữ liệu mẫu.
+
+### V3 — Dùng thử với lãnh đạo và trực ban
+
+- **Hiện trạng:** đã kiểm thử tự động (ui-test 83 bước trên máy tính, máy tính bảng, điện thoại; e2e; job Production của CI)
+  và rà theo thiết kế; **chưa** có buổi dùng thử với người dùng thật.
+- **Việc làm:** một buổi với lãnh đạo BCH và trực ban, mỗi người dùng đúng thiết bị của mình, tốt nhất khi đã có D1:
+  - lãnh đạo: nắm tình hình trong khoảng 5 giây từ màn hình đầu (dải tình huống + 6 ô KPI);
+  - trực ban: cập nhật vận hành hồ, nhập bản tin dự báo, xuất báo cáo văn bản;
+  - cán bộ hiện trường trên điện thoại: đọc ô KPI, nút Báo SOS;
+  - màn hình lớn: chế độ trình chiếu.
+- Ghi góp ý thành danh sách sửa (câu chữ, thứ tự khối, ngưỡng màu) rồi bổ sung vào tài liệu này.
+
+## 13. Khi có dữ liệu: trình tự đề nghị
+
+1. **Triển khai** bản mới nhất (V1), để có migration `0020` (lịch sử vận hành hồ) và các cải tiến từ PR #36 → #52.
 2. **Nhập dữ liệu nền** (mục 2) theo README 2.4; người thứ hai đối chiếu.
 3. **Kiểm tra trang A** bằng mắt với dữ liệu thật:
    - 6 ô KPI có số (không còn "chưa có"); ô Mực nước có mức BĐ, mũi tên xu hướng;
@@ -208,11 +279,11 @@ Thiết kế A.3: phần 1–3 giờ tới của biểu đồ mưa dùng dự b�
    - bảng tác chiến, thẻ Hồ chứa: đủ hồ của vùng, file Excel khớp số liệu tab Hồ chứa;
    - báo cáo văn bản (nút "Văn bản") xuất đủ các mục.
 4. **Chạy kiểm thử trên máy chủ** (chỉ đọc, không ghi dữ liệu): `UI_READONLY=1 node tests/ui/ui-test.mjs <địa chỉ>`; làm theo
-   `docs/GO-LIVE.md`.
+   `docs/GO-LIVE.md`; **chạy lại thử tải** với dữ liệu thật (V2).
 5. Làm tiếp các mục D4 → D6, 7 → 11 khi có dữ liệu / thoả thuận tương ứng.
-6. Một buổi cho lãnh đạo và trực ban dùng thử để chỉnh câu chữ, bố cục theo thói quen thực tế.
+6. **Dùng thử** với lãnh đạo và trực ban (V3) để chỉnh câu chữ, bố cục theo thói quen thực tế.
 
-## 13. Tham chiếu mã nguồn (cho người phát triển)
+## 14. Tham chiếu mã nguồn (cho người phát triển)
 
 | Phần | Tệp |
 |---|---|
@@ -232,9 +303,9 @@ Thiết kế A.3: phần 1–3 giờ tới của biểu đồ mưa dùng dự b�
 | Mưa bình quân lưu vực (Thiessen) | `backend/app/area.py` (`thiessen_ctes`), `backend/app/db.py` (`fetch_all_no_jit`) |
 | Hạn phản hồi SOS, quy tắc 15 phút | `backend/app/services/sos.py` (`OVERDUE_SQL`, `NO_TEAM_15M_SQL`) |
 | Mô hình hồ của bộ mô phỏng (chỉ bản trình diễn) | `backend/app/services/scenario.py` (`reservoir_tick`) |
-| Kiểm thử | `tests/ui/ui-test.mjs`, `tests/e2e/smoke.mjs`, `reservoir-test.mjs`, `landslide-test.mjs`, `iot-test.mjs`, `prod-flow.mjs` |
+| Kiểm thử | `tests/ui/ui-test.mjs`, `tests/e2e/smoke.mjs`, `reservoir-test.mjs`, `landslide-test.mjs`, `iot-test.mjs`, `prod-flow.mjs`; thử tải `tests/load/load.js` (README 12.2, V2) |
 
-## 14. Các thay đổi đã làm cho trang A (để tra cứu)
+## 15. Các thay đổi đã làm cho trang A (để tra cứu)
 
 | PR | Nội dung |
 |---|---|
@@ -254,3 +325,4 @@ Thiết kế A.3: phần 1–3 giờ tới của biểu đồ mưa dùng dự b�
 | #49 | Tài liệu này |
 | #50 | Thẻ Hồ chứa trong bảng tác chiến (G1); "Xem thêm", mục khẩn lên đầu ở tab Hồ chứa / Sạt lở (G2) |
 | #51 | Ô KPI trên điện thoại thấy đủ mưa lớn nhất, số người sơ tán, "xuồng, xe lội nước"; nhật ký vận hành hồ ghi lưu lượng xả; tài liệu thêm D4 – D6 |
+| #52 | Tài liệu: bảng đối chiếu từng yêu cầu mục A; việc không cần dữ liệu thật V1 – V3 (triển khai, thử tải, dùng thử) |
