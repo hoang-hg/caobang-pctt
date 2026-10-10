@@ -4,16 +4,18 @@
 chung (màu rủi ro thống nhất, thông tin khẩn trên cùng, thao tác chính dễ bấm, bảng / form có báo lỗi khi nhập, trạng thái
 tải / trống / lỗi / mất mạng, 360 px, theo phân quyền).
 
-- Cập nhật: 10/10/2026 — mã nguồn `main` gồm PR #53 → #57 (bố cục, màu hồ, lọc SOS, form, tài liệu này; mưa dự báo theo
-  thanh thời gian — G1 ở PR #57).
+- Cập nhật: 10/10/2026 — mã nguồn `main` gồm PR #53 → #58 (bố cục, màu hồ, lọc SOS, form, tài liệu này; mưa dự báo theo
+  thanh thời gian — G1 ở PR #57; radar theo thanh thời gian — G2 ở PR #58).
 - Máy chủ thử vẫn chạy **v1.0.3**, **chưa có** các thay đổi trên — xem V1 trong `docs/trang-a-viec-con-lai.md` (triển khai
   chung cho mọi trang).
 - Dữ liệu nền dùng chung với trang A: `docs/trang-a-viec-con-lai.md` mục 2 (D1), 4 (D3), 7 (radar), README 2.2 / 2.4.
 
 **Kết luận:** về chức năng, bản đồ đã có gần đủ những gì mục B mô tả; giao diện đã sửa theo các yêu cầu chung
-(PR #53 → #55); mưa dự báo đã đổi theo thanh thời gian (G1, PR #57). Còn lại:
+(PR #53 → #55); mưa dự báo và radar đã đổi theo thanh thời gian (G1, G2 — PR #57, #58). Việc làm được ngay mà không cần
+dữ liệu mới đã hết. Còn lại:
 
-- **Không cần dữ liệu mới** — làm được ngay: G2 radar các khung đã qua (mục 3, ưu tiên thấp).
+- **Cần quyết định trước khi vận hành chính thức — giấy phép radar:** điều khoản RainViewer (nguồn radar đang dùng) chỉ
+  cho dùng cá nhân / giáo dục (BD6).
 - **Chờ dữ liệu hoặc hệ thống bên ngoài**: BD1 → BD7 (mục 4). GPS lực lượng **không làm** theo quyết định ngày
   29/09/2026 (BD8).
 
@@ -23,12 +25,12 @@ tải / trống / lỗi / mất mạng, 360 px, theo phân quyền).
 |---|---|
 | B.1 Bản đồ toàn màn, bảng nổi | Đạt — máy tính: bảng nổi thu gọn được; điện thoại: bản đồ toàn màn (360 px thấy ~93%, trước ~3%), bảng trượt từ đáy |
 | B.1 Bảng lớp dữ liệu (trái) | Đạt — 4 nhóm lớp, số đối tượng từng lớp, lớp trống ghi "chưa có … (nhập loại …)" |
-| B.1 Thanh thời gian & radar (đáy): bão, mưa, ngập 12 giờ qua / 24 giờ tới | Đạt — thanh −12h…+24h đổi trạm (số đo quá khứ / bản tin dự báo), vùng ngập kịch bản, vị trí tâm bão, **mưa dự báo theo xã** (hiện tại: tổng 24 giờ tới; kéo tới +N giờ: mưa trong giờ đó; giờ đã qua: xem trạm mưa — G1). Radar chỉ khung mới nhất (G2) |
+| B.1 Thanh thời gian & radar (đáy): bão, mưa, ngập 12 giờ qua / 24 giờ tới | Đạt — thanh −12h…+24h đổi trạm (số đo quá khứ / bản tin dự báo), vùng ngập kịch bản, vị trí tâm bão, **mưa dự báo theo xã** (hiện tại: tổng 24 giờ tới; kéo tới +N giờ: mưa trong giờ đó; giờ đã qua: xem trạm mưa — G1), **radar** ảnh ~2 giờ qua (−2h → hiện tại, ghi giờ ảnh — G2) |
 | B.1 Bảng cảnh báo khẩn cấp (phải): feed SOS + cảnh báo cảm biến | Đạt — cập nhật tức thì (WebSocket); lọc SOS Đỏ / Cam / Vàng, tìm kiếm; trạm vượt báo động, mất tín hiệu |
 | B.1 Công cụ (phải trên): nền bản đồ, đo khoảng cách, khoanh vùng | Đạt — nền Địa lý / Vệ tinh / Địa hình / Ban đêm, đo, khoanh đa giác / tròn, đánh dấu sự cố |
 | B.2 Trạm mưa, mực nước; bấm xem biểu đồ so với BĐ I–III | Đạt — màu theo báo động, mất tín hiệu xám nét đứt. Cần trạm + ngưỡng thật (BD1) |
 | B.2 Hồ chứa: vị trí, lưu lượng xả | Đạt — màu theo trạng thái (Đỏ xả lũ lớn, Cam xả điều tiết, Xám chưa có số liệu), popup có lưu lượng; số liệu vận hành nhập tay (trang A D4) |
-| B.2 Radar thời tiết, mây vệ tinh (ảnh mờ) | Đạt một phần — radar RainViewer (chỉ để xem); **chưa có mây vệ tinh**; radar KTTV chưa có nguồn (BD6) |
+| B.2 Radar thời tiết, mây vệ tinh (ảnh mờ) | Đạt một phần — radar RainViewer: ảnh ~2 giờ qua theo thanh thời gian, ghi giờ ảnh, chú giải màu (G2). **Chưa có mây vệ tinh** (RainViewer đã bỏ từ 01/01/2026); radar KTTV chưa có nguồn; **điều khoản RainViewer chỉ cho dùng cá nhân / giáo dục** (BD6) |
 | B.2 Quỹ đạo bão: tâm, đường đi dự kiến, vùng gió mạnh | Đạt — trực ban dán bản tin; nét liền đã qua, nét đứt dự báo, vòng gió mạnh |
 | B.2 Vùng ngập (xanh trong suốt, càng đậm càng sâu; nội suy DEM + mực nước) | Đạt một phần — vùng ngập nhập tay / cảm biến, tô đậm theo độ sâu; vùng ngập kịch bản BĐ I–III theo mực nước trạm. **Chưa nội suy từ DEM** (BD4) |
 | B.2 Điểm nóng sạt lở (tam giác, Đỏ = rất cao); sự cố giao thông / hạ tầng | Đạt — cán bộ đánh dấu sự cố ngay trên bản đồ, tự ẩn khi hết hạn |
@@ -50,13 +52,13 @@ tải / trống / lỗi / mất mạng, 360 px, theo phân quyền).
 | # | Việc | Phụ thuộc | Cần ai cung cấp | Ưu tiên |
 |---|---|---|---|---|
 | G1 | **Mưa dự báo theo thanh thời gian** (lượng mưa giờ tại thời điểm đang kéo) | Không cần dữ liệu (thêm tham số API) | — | **Đã làm** (PR #57) |
-| G2 | **Radar các khung đã qua** theo thanh thời gian (−2 giờ → hiện tại) | Không cần dữ liệu | — | Thấp |
+| G2 | **Radar các khung đã qua** theo thanh thời gian (−2 giờ → hiện tại) | Không cần dữ liệu | — | **Đã làm** (PR #58) |
 | BD1 | Dữ liệu nền cho các lớp (trạm, hồ, lực lượng, kho, điểm sơ tán, vùng nguy hiểm) | Dữ liệu | như trang A D1 | **Cao nhất** |
 | BD2 | **Camera CCTV thật**: danh sách camera + máy chủ chuyển luồng | Dữ liệu + hạ tầng + lập trình | Đơn vị quản lý camera (giao thông, thủy điện, công an) | Trung bình |
 | BD3 | **Mạng đường** (tìm đường an toàn, đoạn bị chặn) | Dữ liệu + lập trình | như trang A D3 | Trung bình |
 | BD4 | **Vùng ngập nội suy từ DEM** + mực nước | Dữ liệu + mô hình | Sở NN&MT (DEM), đơn vị thủy văn | Trung bình |
 | BD5 | **Dân cư chi tiết** để khoanh vùng đếm đúng số hộ | Dữ liệu | Công an (dân cư), các xã, Sở NN&MT | Trung bình |
-| BD6 | **Radar KTTV, mây vệ tinh** | Tích hợp | Đài KTTV (như trang A điểm 8) | Trung bình |
+| BD6 | **Radar KTTV, mây vệ tinh**; **giấy phép radar đang dùng** (RainViewer chỉ cho dùng cá nhân / giáo dục) | Tích hợp hoặc thoả thuận | Đài KTTV (như trang A điểm 8); RainViewer | **Cao** (trước khi vận hành chính thức) |
 | BD7 | **Gửi cảnh báo SMS / Cell Broadcast thật** cho vùng khoanh | Hợp đồng + tích hợp | Nhà mạng (README mục 6) | Cao (khi vận hành) |
 | BD8 | GPS lực lượng / phương tiện trực tiếp | — | — | **Không làm** (quyết định 29/09/2026) |
 
@@ -85,11 +87,32 @@ Trước đây lớp mưa dự báo luôn tô tổng 24 giờ tới, kéo thanh 
 - **Lưu ý khi dùng:** mưa 1 giờ của dự báo tổ hợp kém chắc chắn hơn tổng 24 giờ — dùng để thấy mưa **dồn vào lúc nào, ở xã
   nào**, không thay bản tin của Đài KTTV. Thang 1 giờ là thang hiển thị, không phải cấp cảnh báo.
 
-### G2 — Radar các khung đã qua
+### G2 — Radar các khung đã qua theo thanh thời gian (đã làm — PR #58)
 
-- **Hiện trạng:** lớp radar chỉ hiện khung mới nhất của RainViewer (`MapTools.jsx`, `RadarLayer`).
-- **Việc làm:** khi kéo thanh về −1 / −2 giờ thì hiện khung radar gần nhất trong quá khứ (RainViewer có sẵn các khung ~2 giờ
-  qua); ngoài khoảng đó ghi "không có ảnh radar cho thời điểm này". Giá trị thấp vì chỉ có ~2 giờ.
+Trước đây lớp radar chỉ hiện ảnh mới nhất, không ghi ảnh lúc mấy giờ, tải lỗi thì im lặng; danh sách ảnh chỉ tải một lần nên
+mở bản đồ lâu thì ảnh "thời gian thực" đứng yên. Nay:
+
+| Thanh thời gian | Lớp radar |
+|---|---|
+| Hiện tại | Ảnh mới nhất (thường cách 3–13 phút) |
+| −1h, −2h | Ảnh gần thời điểm đó nhất (ảnh cách nhau 10 phút; lệch tối đa nửa nấc thanh — 30 phút) |
+| −3h trở về trước | Ẩn lớp, ghi "Không có ảnh radar cho thời điểm này (chỉ lưu khoảng 2 giờ qua)" |
+| Giờ tới | Ẩn lớp, ghi "Radar chỉ có ảnh đã qua — giờ tới xem lớp Mưa dự báo theo xã" |
+
+- Giờ ảnh ghi dưới tên lớp, trên thẻ góc trái bản đồ (điện thoại: chip góc dưới bên trái) và trong chú giải; ảnh mới nhất cũ
+  hơn 30 phút thì ghi thêm "ảnh cũ, nguồn chậm cập nhật".
+- Tự tải lại danh sách ảnh 5 phút một lần khi lớp đang bật; báo rõ "Đang tải ảnh radar…", "Không tải được ảnh radar
+  (RainViewer)".
+- Chú giải màu radar theo bảng "Universal Blue" của RainViewer: xanh — mưa nhỏ, vừa; vàng → cam — mưa to; đỏ — mưa rất to;
+  hồng — dông rất mạnh. Ghi rõ là cường độ mưa lúc chụp, **không phải màu rủi ro** (bảng màu radar trùng sắc vàng / cam / đỏ
+  của thang rủi ro).
+- Sửa kèm (bố cục máy tính): ở màn ≥ 1440 px (bảng lớp mở sẵn) thẻ thang màu radar / mưa dự báo **đè lên cuối bảng lớp** — các
+  lớp Lực lượng, Xuồng – xe… bị che, không bấm được. Nay bảng lớp và các thẻ chung một cột, bảng lớp tự co lại (cuộn) phía
+  trên; thanh thời gian dịch sang phải ở màn hẹp để không che góc thẻ chú giải; chip trên điện thoại nâng lên khỏi thước tỉ lệ
+  và dòng ghi nguồn.
+- **Giới hạn của nguồn** (RainViewer gói miễn phí, từ 01/01/2026): chỉ ảnh ~2 giờ qua, 10 phút / ảnh, phóng tối đa mức 7,
+  một bảng màu, 100 lượt tải / phút / IP — nhiều máy chung một IP ở trung tâm điều hành có thể chạm giới hạn; không còn ảnh dự
+  báo, ảnh mây vệ tinh. Điều khoản dùng: BD6.
 
 ## 4. Việc chờ dữ liệu / hệ thống bên ngoài
 
@@ -132,10 +155,19 @@ Như `docs/trang-a-viec-con-lai.md` mục 4 (D3). Khi có: "Tìm đường an to
 - **Việc lập trình khi có:** đếm theo điểm xóm / nhà nằm trong vùng thay cho tỉ lệ diện tích; ghi rõ "ước tính" hay "đếm" trên
   bảng phân tích.
 
-### BD6 — Radar KTTV, mây vệ tinh
+### BD6 — Radar KTTV, mây vệ tinh; giấy phép radar RainViewer
 
-Như `docs/trang-a-viec-con-lai.md` mục 7 (điểm 8). Thêm: thiết kế B.2 muốn **lớp mây vệ tinh** — hiện chưa có; cần nguồn ảnh
-vệ tinh (Đài KTTV hoặc dịch vụ ảnh mây có điều khoản dùng phù hợp).
+- Như `docs/trang-a-viec-con-lai.md` mục 7 (điểm 8). Thiết kế B.2 muốn **lớp mây vệ tinh** — chưa có: RainViewer đã bỏ ảnh
+  mây vệ tinh từ 01/01/2026 (danh sách ảnh trả về rỗng, kiểm tra 10/10/2026). Cần nguồn ảnh vệ tinh (Đài KTTV hoặc dịch vụ
+  ảnh mây có điều khoản dùng phù hợp).
+- **Giấy phép radar đang dùng:** theo rainviewer.com/api.html (xem 10/10/2026), API miễn phí "chỉ cho mục đích cá nhân và
+  giáo dục" — hệ thống điều hành chính thức của tỉnh không thuộc hai mục đích này. RainViewer không công bố gói cho tổ chức;
+  hỏi qua `support@rainviewer.com`. Trước khi vận hành chính thức cần **chọn một**:
+  1. có văn bản đồng ý của RainViewer cho trường hợp này;
+  2. thay bằng radar của Đài KTTV — lớp radar và thanh thời gian dùng lại được, cần nguồn ảnh dạng ô (tile) kèm danh sách
+     khung có giờ;
+  3. gỡ lớp radar khỏi bản chạy thật (hiện lớp tắt sẵn nhưng người dùng tự bật được — cần sửa nhỏ).
+- RainViewer đề nghị ghi nguồn kèm liên kết: dòng ghi nguồn bản đồ có "Radar © RainViewer" liên kết tới rainviewer.com.
 
 ### BD7 — Gửi cảnh báo SMS / Cell Broadcast thật cho vùng khoanh
 
@@ -159,7 +191,9 @@ link nhiệm vụ. Chỉ xem lại nếu có thiết bị định vị gắn tr�
    - khoanh thử một vùng đã biết dân số → so ước tính với số thật (BD5);
    - tìm đường an toàn khi đã có mạng đường (BD3);
    - bật lớp "Mưa dự báo theo xã", kéo thanh tới +6h / +12h: khung giờ trên chú giải khớp giờ trên thanh; đợt có mưa, so vài
-     xã với bản tin mưa của Đài KTTV (G1).
+     xã với bản tin mưa của Đài KTTV (G1);
+   - bật lớp "Radar mưa": giờ ảnh trên thẻ cách hiện tại không quá 15 phút; kéo −1h, −2h thấy ảnh cũ hơn, −3h báo không có
+     ảnh (G2) — nếu đã chọn nguồn radar khác RainViewer (BD6) thì kiểm tra lại với nguồn đó.
 3. Dùng thử với cán bộ hiện trường trên điện thoại (thanh ngón cái, bảng trượt, Báo SOS) và trực ban trên máy tính (kéo –
    thả điều động, lệnh 2 bước).
 
@@ -170,8 +204,8 @@ link nhiệm vụ. Chỉ xem lại nếu có thiết bị định vị gắn tr�
 | Trang bản đồ, bố cục máy tính / điện thoại | `frontend/src/pages/MonitoringMap.jsx` |
 | Bảng lớp, cảnh báo, thanh thời gian, công cụ, bảng trượt | `frontend/src/components/map/MapPanels.jsx` |
 | Các lớp, popup, kéo – thả điều động | `frontend/src/components/map/MapLayers.jsx` |
-| Biểu tượng (thang màu chung), chú giải | `frontend/src/components/map/icons.js`, `MapLegend.jsx` |
-| Nền bản đồ, radar, mưa dự báo theo xã (`ForecastChoropleth`, thang `rainScale`), đo, khoanh vùng, tìm đường | `frontend/src/components/map/MapTools.jsx` |
+| Biểu tượng (thang màu chung), chú giải (gồm thang màu radar `RadarScale`) | `frontend/src/components/map/icons.js`, `MapLegend.jsx` |
+| Nền bản đồ, radar (`useRadarFrames`, `radarFrameAt`, bảng màu `RADAR_BINS`), mưa dự báo theo xã (`ForecastChoropleth`, thang `rainScale`), đo, khoanh vùng, tìm đường | `frontend/src/components/map/MapTools.jsx` |
 | Chờ dừng tay khi kéo thanh thời gian (lớp mưa dự báo) | `frontend/src/utils/useDebounced.js` |
 | Thanh thao tác điện thoại (dùng chung Dashboard) | `frontend/src/components/common/QuickActionBar.jsx` |
 | Form: sự cố, bản tin bão, số người sơ tán, xuất kho, điều động | `components/map/IncidentModal.jsx`, `StormBulletinModal.jsx`, `components/common/OccupancyModal.jsx`, `IssueModal.jsx`, `DispatchModal.jsx` |
@@ -190,3 +224,4 @@ link nhiệm vụ. Chỉ xem lại nếu có thiết bị định vị gắn tr�
 | #55 | Form mở từ bản đồ báo lỗi ngay khi nhập; lệnh điều động 2 bước; xác nhận kết thúc theo dõi bão; quân số tự hạ theo số người sẵn sàng |
 | #56 | Tài liệu này |
 | #57 | Mưa dự báo theo xã đổi theo thanh thời gian (G1): API `/forecast/areas` thêm khung giờ `offset_h`, thang mưa 1 giờ, chú giải / ghi chú lớp ghi đúng khung đang tô, báo rõ đang tải / lỗi / chưa có số liệu |
+| #58 | Radar theo thanh thời gian (G2): ảnh ~2 giờ qua, ghi giờ ảnh, tự tải lại 5 phút, báo lỗi, chú giải màu radar; bảng lớp không còn bị thẻ thang màu đè (màn ≥ 1440 px), thanh thời gian không che thẻ chú giải; ghi nguồn RainViewer có liên kết; tài liệu ghi điều khoản RainViewer (BD6) |

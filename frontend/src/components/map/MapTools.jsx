@@ -141,25 +141,57 @@ export function BaseLayer({ basemap }) {
   return <LocalBaseLayer key={b.local} source={local} flavor={b.local} fallback={external} />;
 }
 
-/** Radar mưa thời gian thực (RainViewer, ảnh mờ opacity). */
-export function RadarLayer() {
-  const { data } = useQuery({
+/**
+ * Danh sách khung ảnh radar RainViewer: ~2 giờ qua, 10 phút một khung (gói miễn phí không còn ảnh dự báo, ảnh mây vệ
+ * tinh). Tải lại 5 phút một lần khi lớp đang bật — mở bản đồ lâu thì ảnh "thời gian thực" vẫn là ảnh mới.
+ */
+export function useRadarFrames(enabled) {
+  return useQuery({
     queryKey: ['rainviewer'],
-    queryFn: async () => (await fetch('https://api.rainviewer.com/public/weather-maps.json')).json(),
+    queryFn: async () => {
+      const res = await fetch('https://api.rainviewer.com/public/weather-maps.json');
+      if (!res.ok) throw new Error(`RainViewer ${res.status}`);
+      return res.json();
+    },
+    enabled,
     staleTime: 5 * 60_000,
-    retry: 0,
+    refetchInterval: 5 * 60_000,
   });
-  const frame = data?.radar?.past?.at(-1);
-  if (!frame || !data?.host) return null;
+}
+
+/**
+ * Khung radar cho thời điểm trên thanh thời gian (`offsetH` giờ so với bây giờ): hiện tại = khung mới nhất; giờ đã qua =
+ * khung gần nhất, lệch không quá nửa nấc thanh (30 phút); giờ tới, hoặc xa hơn ~2 giờ qua → null (không có ảnh).
+ */
+export function radarFrameAt(data, offsetH, now = Date.now()) {
+  const past = data?.radar?.past;
+  if (!past?.length || !data.host || offsetH > 0) return null;
+  if (offsetH === 0) return past.at(-1);
+  const t = now / 1000 + offsetH * 3600;
+  const best = past.reduce((a, f) => (Math.abs(f.time - t) < Math.abs(a.time - t) ? f : a));
+  return Math.abs(best.time - t) <= 30 * 60 ? best : null;
+}
+
+// Bảng màu "Universal Blue" (mã 2 trong địa chỉ ảnh — gói miễn phí chỉ còn bảng này), phần mưa, theo bảng CSV của
+// rainviewer.com/api/color-schemes.html: 20–30 dBZ xanh, 35–40 vàng → cam, 45–50 đỏ, ≥ 55 hồng. Mỗi nhóm 2 sắc.
+export const RADAR_BINS = [
+  { colors: ['#00a3e0', '#005588'], label: 'Mưa nhỏ – vừa' },
+  { colors: ['#ffee00', '#ffaa00'], label: 'Mưa to' },
+  { colors: ['#ff4400', '#c10000'], label: 'Mưa rất to' },
+  { colors: ['#ffaaff', '#ff77ff'], label: 'Dông rất mạnh' },
+];
+
+/** Radar mưa (RainViewer, ảnh mờ opacity): khung `frame` lấy từ `useRadarFrames` / `radarFrameAt`. */
+export function RadarLayer({ host, frame }) {
   return (
     <TileLayer
-      url={`${data.host}${frame.path}/256/{z}/{x}/{y}/2/1_1.png`}
+      url={`${host}${frame.path}/256/{z}/{x}/{y}/2/1_1.png`}
       opacity={0.55}
       zIndex={400}
       tileSize={256}
       maxNativeZoom={7}
       maxZoom={18}
-      attribution="Radar © RainViewer"
+      attribution='Radar © <a href="https://www.rainviewer.com/" target="_blank" rel="noopener noreferrer">RainViewer</a>'
     />
   );
 }
