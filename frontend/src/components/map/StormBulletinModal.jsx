@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import clsx from 'clsx';
 import { api } from '../../api/client';
 import { useStore } from '../../app/store';
-import { Modal } from '../common/ui';
+import { FieldError, Modal } from '../common/ui';
 import { fmtVn, nowVn } from '../../utils/bulletin';
 import { parseStormTable, stormClass } from '../../utils/stormTable';
 import { stormQuery } from './MapLayers';
@@ -11,7 +12,8 @@ const SAMPLE =
   '19:00 02/10\t19,8N\t110,5E\t14\t17\t300\n13:00 03/10\t20,6N\t108,9E\t13\t16\t250\n01:00 04/10\t21,4N\t107,2E\t11\t14\t200\n13:00 04/10\t22,1N\t105,8E\t7\t9';
 
 /** Trực ban nhập bản tin bão / ATNĐ của Trung tâm Dự báo KTTV quốc gia (quyền monitoring.update): dán bảng mốc tâm bão
- * (đã qua, hiện tại, dự báo). Bản tin mới cùng tên thay bản đang theo dõi; bão tan → "Kết thúc theo dõi". */
+ * (đã qua, hiện tại, dự báo). Bản tin mới cùng tên thay bản đang theo dõi; bão tan → "Kết thúc theo dõi" (hỏi xác nhận).
+ * Lỗi hiện ngay dưới ô: bảng mốc báo ngay khi dán; tên / giờ phát hành sau khi rời ô hoặc bấm "Lưu bản tin". */
 export default function StormBulletinModal({ onClose }) {
   const qc = useQueryClient();
   const toast = useStore((s) => s.toast);
@@ -22,9 +24,21 @@ export default function StormBulletinModal({ onClose }) {
   const [source, setSource] = useState('');
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
+  const [shown, setShown] = useState({}); // ô đã được "chạm" (rời ô / bấm Lưu) → hiện lỗi của ô đó
+  const refs = { name: useRef(null), issued: useRef(null), table: useRef(null) };
   const { points, errors } = useMemo(() => parseStormTable(text), [text]);
   const issuedIso = `${issued}:00+07:00`;
   const hasCurrent = points.some((p) => p.time <= issuedIso);
+  const fieldErrors = {
+    name: name.trim().length < 2 ? 'Nhập tên bão / ATNĐ — VD: Bão số 3 (YAGI)' : null,
+    issued: !issued ? 'Chọn thời điểm phát hành bản tin (giờ Việt Nam)' : null,
+    table: errors.length > 0
+      ? `Bảng có ${errors.length} dòng chưa đúng — xem danh sách ở phần Xem trước`
+      : points.length < 2 ? 'Cần ít nhất 2 mốc tâm bão' : !hasCurrent ? 'Cần một mốc tại hoặc trước giờ phát hành (vị trí hiện tại)' : null,
+  };
+  // Bảng: báo ngay khi đã dán gì đó; tên / giờ: sau khi rời ô hoặc bấm Lưu
+  const err = (k) => (shown[k] || (k === 'table' && text.trim()) ? fieldErrors[k] : null);
+  const touch = (...keys) => setShown((x) => ({ ...x, ...Object.fromEntries(keys.map((k) => [k, true])) }));
 
   const run = async (request, done) => {
     setBusy(true);
@@ -39,12 +53,23 @@ export default function StormBulletinModal({ onClose }) {
       setBusy(false);
     }
   };
-  const save = () =>
+  const save = () => {
+    const bad = ['name', 'issued', 'table'].filter((k) => fieldErrors[k]);
+    if (bad.length) {
+      touch(...bad);
+      refs[bad[0]].current?.focus();
+      return;
+    }
     run(
       () => api('/map/storm-bulletins', { method: 'POST', body: { name: name.trim(), issued_at: issuedIso, source: source || null, points } }),
       `Đã nhập bản tin ${name.trim()}`,
     );
-  const end = (s) => run(() => api(`/map/storm-bulletins/${s.id}`, { method: 'DELETE' }), `Đã kết thúc theo dõi ${s.name}`);
+  };
+  // Kết thúc theo dõi xoá quỹ đạo khỏi bản đồ — hỏi lại trước (bấm nhầm khi bão còn đang vào)
+  const end = (s) => {
+    if (!window.confirm(`Kết thúc theo dõi ${s.name}? Quỹ đạo bão sẽ ẩn khỏi bản đồ điều hành và cổng công khai.`)) return;
+    run(() => api(`/map/storm-bulletins/${s.id}`, { method: 'DELETE' }), `Đã kết thúc theo dõi ${s.name}`);
+  };
 
   return (
     <Modal
@@ -55,11 +80,8 @@ export default function StormBulletinModal({ onClose }) {
       footer={
         <>
           <button className="btn-ghost" onClick={onClose}>Huỷ</button>
-          <button
-            className="btn-primary"
-            disabled={busy || name.trim().length < 2 || points.length < 2 || errors.length > 0 || !hasCurrent}
-            onClick={save}
-          >
+          {/* Giữ focus ở ô đang nhập khi nhấn nút: lỗi hiện lúc rời ô đẩy nút xuống giữa lúc nhấn và nhả chuột → mất cú bấm */}
+          <button type="button" className="btn-primary" disabled={busy} onMouseDown={(e) => e.preventDefault()} onClick={save}>
             Lưu bản tin
           </button>
         </>
@@ -73,19 +95,40 @@ export default function StormBulletinModal({ onClose }) {
               {active.map((s) => (
                 <div key={s.id} className="flex items-center justify-between gap-2 py-0.5">
                   <span>{s.name} · phát hành {fmtVn(s.issued_at)}</span>
-                  <button className="text-danger hover:underline" disabled={busy} onClick={() => end(s)}>Kết thúc theo dõi</button>
+                  <button type="button" className="min-h-[36px] text-danger hover:underline" disabled={busy} onClick={() => end(s)}>Kết thúc theo dõi</button>
                 </div>
               ))}
             </div>
           )}
           <label className="flex flex-col gap-1">
             Tên bão / ATNĐ * <span className="text-[11px] text-muted">Trùng tên bản tin đang theo dõi → bản mới thay bản cũ</span>
-            <input className="input" maxLength={120} placeholder="VD: Bão số 3 (YAGI)" value={name} onChange={(e) => setName(e.target.value)} />
+            <input
+              ref={refs.name}
+              className={clsx('input', err('name') && 'border-danger')}
+              maxLength={120}
+              placeholder="VD: Bão số 3 (YAGI)"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onBlur={() => touch('name')}
+              aria-invalid={!!err('name')}
+              aria-describedby="loi-ten-bao"
+            />
+            <FieldError id="loi-ten-bao">{err('name')}</FieldError>
           </label>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="flex flex-col gap-1">
               Phát hành lúc (giờ VN) *
-              <input className="input" type="datetime-local" value={issued} onChange={(e) => setIssued(e.target.value)} />
+              <input
+                ref={refs.issued}
+                className={clsx('input', err('issued') && 'border-danger')}
+                type="datetime-local"
+                value={issued}
+                onChange={(e) => setIssued(e.target.value)}
+                onBlur={() => touch('issued')}
+                aria-invalid={!!err('issued')}
+                aria-describedby="loi-gio-phat-hanh"
+              />
+              <FieldError id="loi-gio-phat-hanh">{err('issued')}</FieldError>
             </label>
             <label className="flex flex-col gap-1">
               Nguồn
@@ -94,7 +137,17 @@ export default function StormBulletinModal({ onClose }) {
           </div>
           <label className="flex flex-col gap-1">
             Dán bảng mốc tâm bão: thời điểm · vĩ độ · kinh độ · cấp gió · cấp giật · bán kính gió mạnh cấp 6 (km)
-            <textarea className="input min-h-[150px] font-mono text-xs" placeholder={SAMPLE} value={text} onChange={(e) => setText(e.target.value)} spellCheck={false} />
+            <textarea
+              ref={refs.table}
+              className={clsx('input min-h-[150px] font-mono text-xs', err('table') && 'border-danger')}
+              placeholder={SAMPLE}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              spellCheck={false}
+              aria-invalid={!!err('table')}
+              aria-describedby="loi-bang-moc"
+            />
+            <FieldError id="loi-bang-moc">{err('table')}</FieldError>
             <span className="text-[11px] text-muted">
               Mỗi dòng một mốc, cột cách nhau bằng Tab (dán từ Excel) hoặc dấu ;. Hai cột cuối có thể bỏ trống. Cần ít nhất một
               mốc tại hoặc trước giờ phát hành (vị trí hiện tại).

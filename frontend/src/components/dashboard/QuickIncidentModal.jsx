@@ -8,7 +8,7 @@ import { api, ApiError } from '../../api/client';
 import { useUnits } from '../../api/hooks';
 import { useStore } from '../../app/store';
 import { useAllowedCodes } from '../../rbac/usePermission';
-import { Modal } from '../common/ui';
+import { FieldError, Modal } from '../common/ui';
 import { INCIDENT, PRIORITY, VULNERABLE } from '../../utils/labels';
 import { useOnline } from '../../utils/useOnline';
 import { unitLabel } from './CommuneView';
@@ -25,13 +25,6 @@ const PHONE_RE = /^(?:\+?84|0)\d{9,10}$/;
 const cleanPhone = (s) => s.replace(/[\s.\-()]/g, '');
 // Mã tin gốc (external_id, tối đa 120 ký tự) cho một lần báo cáo; randomUUID chỉ có ở https / localhost
 const newReportId = () => `bao-cao-nhanh-${globalThis.crypto?.randomUUID?.() || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`}`;
-
-/** Lỗi của một ô, hiện ngay dưới ô (aria-describedby trỏ tới). */
-const FieldError = ({ id, children }) => (children ? (
-  <p id={id} className="flex items-center gap-1 text-[11px] font-semibold text-danger">
-    <AlertTriangle size={12} className="shrink-0" aria-hidden="true" /> {children}
-  </p>
-) : null);
 
 /**
  * Báo cáo nhanh của cán bộ → TẠO PHIẾU SOS THẬT (POST /sos, nguồn "Cán bộ"), cùng đường với ô tiếp nhận ở Điều hành

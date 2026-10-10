@@ -9,7 +9,7 @@ import {
 import { api } from '../../api/client';
 import { useAreaQuery } from '../../api/hooks';
 import { useStore } from '../../app/store';
-import { BackButton, EmptyState, ErrorState, Modal, ShowMore, Skeleton } from '../../components/common/ui';
+import { BackButton, EmptyState, ErrorState, FieldError, Modal, ShowMore, Skeleton } from '../../components/common/ui';
 import { ReservoirHistory } from '../../components/charts/ReservoirOpsChart';
 import { usePermission } from '../../rbac/usePermission';
 import { ago, time } from '../../utils/format';
@@ -709,12 +709,6 @@ const localInput = (d) => {
   const p = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 };
-
-const FieldError = ({ id, children }) => (children ? (
-  <p id={id} className="flex items-center gap-1 text-[11px] font-semibold text-danger">
-    <AlertTriangle size={12} className="shrink-0" aria-hidden="true" /> {children}
-  </p>
-) : null);
 
 /**
  * Trực ban nhập số liệu vận hành hồ theo báo cáo của đơn vị quản lý hồ. Lỗi hiện ngay dưới ô khi gõ, cùng quy tắc với máy

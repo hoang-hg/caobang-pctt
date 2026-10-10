@@ -488,6 +488,9 @@ async function staff(ctx, trackCode) {
       return 'chỉ xem';
     }
     await dialog.getByRole('radio').first().check();
+    // Lệnh điều động 2 bước: Lực lượng → Vật tư & xác nhận (tóm tắt lệnh) → Phát lệnh
+    await dialog.getByRole('button', { name: /^Tiếp/ }).click();
+    await dialog.getByText('Tóm tắt lệnh — kiểm tra trước khi phát').waitFor({ timeout: 5_000 });
     await dialog.getByRole('button', { name: 'Phát lệnh khẩn cấp' }).click();
     await dialog.getByText(/Đã ghi lệnh điều động SOS-/).waitFor({ timeout: 20_000 });
     // Chưa tích hợp SMS / Push → phải nói rõ hệ thống CHƯA gửi tin cho đội
