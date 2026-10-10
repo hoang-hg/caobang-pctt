@@ -306,6 +306,57 @@ async function staff(ctx, trackCode) {
     }
   });
 
+  // Bảng tác chiến có thẻ Hồ chứa (tìm / lọc / phân trang / xuất Excel như các thẻ khác); tab Hồ chứa hiện 9 thẻ rồi "Xem
+  // thêm", hồ khẩn luôn ở đầu. Nhân bản danh sách hồ ngay trong trình duyệt (không ghi gì lên máy chủ) để luôn có > 9 thẻ
+  await step(ctx, 'Tổng quan: bảng tác chiến có thẻ Hồ chứa; tab Hồ chứa hiện 9 thẻ + "Xem thêm", hồ khẩn lên đầu', async () => {
+    await page.goto(`${ROOT}/dashboard`);
+    await waitMain(page);
+    const table = page.locator('section', { hasText: 'Bảng tác chiến theo chuyên đề' }).first();
+    await table.getByRole('tablist', { name: 'Chuyên đề của bảng' }).getByRole('tab', { name: /Hồ chứa/ }).click();
+    const rows = table.locator(vp.mobile ? 'ul[aria-label="Hồ chứa & xả lũ"] > li' : 'tbody tr');
+    await rows.first().or(table.getByText('Chưa có hồ chứa trong vùng đang xem')).waitFor({ timeout: 20_000 });
+    const inTable = await rows.count();
+    if (!inTable) return 'bỏ qua: chưa có hồ chứa';
+    if (!(await table.getByText(/Mực nước \/ MNDBT/i).count())) throw new Error('thẻ Hồ chứa thiếu cột Mực nước / MNDBT');
+    const [xl] = await Promise.all([
+      page.waitForEvent('download', { timeout: 30_000 }),
+      table.getByRole('button', { name: 'Excel', exact: true }).click(),
+    ]);
+    if (!/^bang-tac-chien-reservoirs-.*\.xlsx$/.test(xl.suggestedFilename())) throw new Error(`tệp Excel lạ: ${xl.suggestedFilename()}`);
+
+    const RANK = { xa_khan_cap: 0, xa_dieu_tiet: 1, chua_co_so_lieu: 2, binh_thuong: 3 };
+    const status = {};
+    const api = '**/api/v1/dashboard/reservoirs**';
+    await page.route(api, async (route) => {
+      const res = await route.fetch();
+      const json = await res.json();
+      const base = json.reservoirs || [];
+      const times = Math.ceil(10 / Math.max(base.length, 1));
+      json.reservoirs = Array.from({ length: times }, (_, i) => base.map((r) => ({ ...r, id: `${r.id}-${i}`, name: `${r.name} · ${i + 1}` }))).flat();
+      for (const r of json.reservoirs) status[r.name] = r.status_code;
+      await route.fulfill({ response: res, json });
+    });
+    try {
+      await page.goto(`${ROOT}/dashboard?tab=ho_chua`);
+      await page.getByText(/Đang hiện 9\/\d+ hồ/).waitFor({ timeout: 20_000 });
+      const titles = (await page.locator('main h3').allInnerTexts()).map((t) => t.trim()).filter((t) => t in status);
+      const rank = (n) => RANK[status[n]] ?? 2;
+      const shown = titles.slice(0, 9).map(rank);
+      const want = Object.keys(status).map(rank).sort((a, b) => a - b).slice(0, 9);
+      if (shown.join() !== want.join()) throw new Error(`9 thẻ đầu chưa xếp hồ khẩn lên đầu: ${shown.join(',')} (cần ${want.join(',')})`);
+      const more = page.getByRole('button', { name: /^Xem thêm \d+ hồ$/ });
+      if (vp.mobile && (await more.evaluate((el) => el.getBoundingClientRect().height)) < 44) throw new Error('nút "Xem thêm" thấp hơn 44 px');
+      await more.click();
+      const total = Object.keys(status).length;
+      await page.waitForFunction(([n, names]) => [...document.querySelectorAll('main h3')].filter((h) => names.includes(h.textContent.trim())).length >= Math.min(n, 18),
+        [total, Object.keys(status)], { timeout: 10_000 });
+      await expectNoOverflow(ctx, 'tab Hồ chứa (Xem thêm)');
+      return `${inTable} hồ trong bảng · tab: 9/${total} → Xem thêm`;
+    } finally {
+      await page.unroute(api);
+    }
+  });
+
   // Thiết kế A.2: ô SOS nhấp nháy đỏ khi có phiếu chờ quá 15 phút chưa có lực lượng tiếp nhận — kể cả khi chưa phiếu nào
   // quá hạn theo cấp (cấp 3 hạn 60 phút). Sửa phản hồi KPI ngay trong trình duyệt để có đúng trường hợp đó
   await step(ctx, 'Tổng quan: ô SOS nhấp nháy khi có phiếu chờ quá 15 phút chưa có đội (chưa quá hạn theo cấp)', async () => {

@@ -4,13 +4,14 @@
 giao diện bổ sung (màu rủi ro thống nhất, thông tin khẩn trên cùng, bảng có tìm / lọc / phân trang / xuất file, form chia bước
 có báo lỗi khi nhập, trạng thái tải / trống / lỗi / mất mạng, 360 px, theo phân quyền).
 
-- Cập nhật: 10/10/2026 — mã nguồn `main` tại `dd6b9bb` (gồm PR #36 → #48).
+- Cập nhật: 10/10/2026 — mã nguồn `main` gồm PR #36 → #50 (G1, G2 đã làm ở PR #50).
 - Máy chủ thử vẫn chạy **v1.0.3** (04/10/2026), **chưa có** các thay đổi trên. Cần tag + triển khai trước khi kiểm tra với dữ
   liệu thật.
 - Hiện trạng từng nhóm dữ liệu: README mục **2.2**. Cách nhập: README mục **2.4**. Kiểm tra trước khi mở cổng: `docs/GO-LIVE.md`.
 
-**Kết luận:** phần chức năng của mục A đã đủ theo thiết kế. Các mục dưới đây còn thiếu vì **chưa có dữ liệu hoặc chưa có hệ
-thống bên ngoài để nối**, cộng 2 việc giao diện nhỏ chưa làm. Không điền số mẫu / ngưỡng tự đặt để "lấp chỗ trống".
+**Kết luận:** phần chức năng của mục A đã đủ theo thiết kế; 2 việc giao diện còn lại (G1, G2) đã làm xong. Các mục D1 → 11
+dưới đây còn thiếu vì **chưa có dữ liệu hoặc chưa có hệ thống bên ngoài để nối**. Không điền số mẫu / ngưỡng tự đặt để "lấp
+chỗ trống".
 
 ---
 
@@ -26,8 +27,8 @@ thống bên ngoài để nối**, cộng 2 việc giao diện nhỏ chưa làm.
 | 9 | **Dự báo mực nước từ mô hình thủy văn (HEC-HMS…)** | Tích hợp | Đài KTTV / đơn vị chạy mô hình | Trung bình |
 | 10 | **Báo cáo thiệt hại của người dân qua Zalo OA / ứng dụng** vào nhật ký | Tích hợp | Tài khoản Zalo OA của tỉnh, bên phát triển ứng dụng | Thấp – trung bình |
 | 11 | **Ngưỡng sạt lở hiệu chỉnh** (ngưỡng mưa I–D, ngưỡng cảm biến nghiêng / độ ẩm đất) | Dữ liệu | Viện / đơn vị nghiên cứu sạt lở, Sở NN&MT | Trung bình |
-| G1 | Thẻ **Hồ chứa** trong bảng tác chiến (tìm, lọc, phân trang, xuất Excel / PDF) | Chỉ giao diện | — | Có thể làm ngay |
-| G2 | **"Xem thêm" / phân trang** cho danh sách thẻ ở tab Hồ chứa và tab Sạt lở | Chỉ giao diện | — | Có thể làm ngay |
+| G1 | Thẻ **Hồ chứa** trong bảng tác chiến (tìm, lọc, phân trang, xuất Excel / PDF) | Chỉ giao diện | — | **Đã làm** (PR #50) |
+| G2 | **"Xem thêm" / phân trang** cho danh sách thẻ ở tab Hồ chứa và tab Sạt lở | Chỉ giao diện | — | **Đã làm** (PR #50) |
 
 ---
 
@@ -133,26 +134,42 @@ Thiết kế A.3: phần 1–3 giờ tới của biểu đồ mưa dùng dự b�
 - **Việc lập trình khi có:** đưa hệ số ngưỡng I–D ra cấu hình / dữ liệu (không sửa mã mỗi lần đổi), bỏ chữ "minh hoạ"; cập nhật
   ngưỡng cảm biến bằng nhập lại `tram_quan_trac`.
 
-## 10. Việc giao diện còn lại (không cần dữ liệu, chưa làm)
+## 10. Việc giao diện G1, G2 (đã làm — PR #50)
 
-- **G1 — Thẻ "Hồ chứa" trong bảng tác chiến** (tab Tổng hợp): bảng hiện có 4 thẻ Mực nước / Sạt lở / SOS / Kho nhưng chưa có
-  Hồ chứa, nên danh sách hồ chưa xuất được Excel / PDF và chưa phân trang. Làm: thêm thẻ (tìm, lọc theo trạng thái xả / mức màu,
-  sắp xếp, phân trang, xuất Excel / PDF), dùng dữ liệu theo vùng có sẵn (`GET /api/v1/dashboard/reservoirs`).
-- **G2 — "Xem thêm" / phân trang** cho danh sách thẻ ở tab Hồ chứa và tab Sạt lở (dùng chung cổng công khai): hiện 6 hồ / 12
-  điểm thì ổn, dữ liệu thật vài chục mục sẽ rất dài.
+- **G1 — Thẻ "Hồ chứa & xả lũ" trong bảng tác chiến** (tab Tổng hợp). Bảng nay có 5 thẻ: Mực nước / Hồ chứa / Sạt lở / SOS /
+  Kho.
+  - Mỗi hồ một dòng: xã/phường, mực nước / MNDBT, số cửa xả đang mở / tổng số, Q đến / Q xả, giờ số liệu, trạng thái.
+  - Màu trạng thái theo thang chung: xả lũ lớn Đỏ, đang xả điều tiết Cam, chưa xả Xanh, chưa có số liệu Xám. Số liệu quá cũ
+    ghi "(số liệu cũ)".
+  - Tìm, lọc theo mức màu, sắp xếp từng cột (mặc định hồ nặng nhất lên đầu), phân trang; điện thoại hiện mỗi hồ một thẻ.
+  - Xuất Excel (thêm MNDBT, chênh so MNDBT, Q đến / Q xả, khuyến cáo hạ du) và PDF.
+  - Dữ liệu lấy từ số liệu ô KPI của **vùng đang xem** (cùng nguồn `GET /api/v1/dashboard/reservoirs`), không gọi thêm API.
+  - Chọn dòng → "Xuất Excel mục đã chọn". **Không có** nút "Soạn cảnh báo" (giống thẻ Mực nước): xã đặt đập không phải vùng
+    hạ du; khuyến cáo hạ du xem ở tab Hồ chứa.
+- **G2 — "Xem thêm"** cho danh sách thẻ ở tab Hồ chứa và tab Sạt lở (dùng chung cổng công khai).
+  - Hiện 9 thẻ đầu, kèm dòng "Đang hiện 9/N", nút "Xem thêm 9 …" và (khi còn nhiều) "Xem tất cả N". Nút cao 44 px trên điện
+    thoại.
+  - Thẻ xếp **nặng nhất lên đầu** để mục khẩn không bị ẩn sau "Xem thêm":
+    - hồ: xả lũ lớn → đang xả → chưa có số liệu → chưa xả;
+    - điểm sạt lở: cấm đường → cảnh báo → chưa có dữ liệu → thông suốt.
+  - Đổi bộ lọc / tìm kiếm → về lại 9 thẻ đầu.
+  - "Xuất PDF" của Tổng quan ở hai tab này vẫn chụp **đủ mọi thẻ** (tạm mở hết khi chụp, chụp xong trả lại như người dùng đang
+    xem).
+- **Khi có dữ liệu thật:** xem lại bước 9 thẻ có hợp không (hằng `PAGE` trong `ReservoirMonitor.jsx`, `LandslideMonitor.jsx`).
 
 ## 11. Khi có dữ liệu: trình tự đề nghị
 
-1. **Triển khai** bản mới nhất (tag), để có migration `0020` (lịch sử vận hành hồ) và các cải tiến từ PR #36 → #48.
+1. **Triển khai** bản mới nhất (tag), để có migration `0020` (lịch sử vận hành hồ) và các cải tiến từ PR #36 → #50.
 2. **Nhập dữ liệu nền** (mục 2) theo README 2.4; người thứ hai đối chiếu.
 3. **Kiểm tra trang A** bằng mắt với dữ liệu thật:
    - 6 ô KPI có số (không còn "chưa có"); ô Mực nước có mức BĐ, mũi tên xu hướng;
    - biểu đồ thủy văn có vạch BĐ I–III, tô phần vượt; dưới có vận hành hồ của sông đó (sau khi đã có số liệu vận hành);
-   - tab Hồ chứa / Sạt lở đúng vùng đang lọc; heatmap cảm biến có ô màu;
+   - tab Hồ chứa / Sạt lở đúng vùng đang lọc, mục khẩn ở đầu danh sách; heatmap cảm biến có ô màu;
+   - bảng tác chiến, thẻ Hồ chứa: đủ hồ của vùng, file Excel khớp số liệu tab Hồ chứa;
    - báo cáo văn bản (nút "Văn bản") xuất đủ các mục.
 4. **Chạy kiểm thử trên máy chủ** (chỉ đọc, không ghi dữ liệu): `UI_READONLY=1 node tests/ui/ui-test.mjs <địa chỉ>`; làm theo
    `docs/GO-LIVE.md`.
-5. Làm tiếp các mục 7 → 11 khi có dữ liệu tương ứng; G1, G2 làm được bất cứ lúc nào.
+5. Làm tiếp các mục 7 → 11 khi có dữ liệu tương ứng.
 6. Một buổi cho lãnh đạo và trực ban dùng thử để chỉnh câu chữ, bố cục theo thói quen thực tế.
 
 ## 12. Tham chiếu mã nguồn (cho người phát triển)
@@ -165,7 +182,8 @@ Thiết kế A.3: phần 1–3 giờ tới của biểu đồ mưa dùng dự b�
 | Biểu đồ thủy văn, vận hành hồ | `frontend/src/components/charts/Hydrograph.jsx`, `ReservoirOpsChart.jsx` |
 | Biểu đồ mưa, ngưỡng sạt lở, cảm biến sạt lở, vật tư | `RainfallChart.jsx`, `LandslideScatter.jsx`, `SensorHeatmap.jsx`, `SuppliesChart.jsx` (cùng thư mục `charts`) |
 | Tab Hồ chứa / Sạt lở (dùng chung cổng công khai) | `frontend/src/pages/public/ReservoirMonitor.jsx`, `LandslideMonitor.jsx` |
-| Bảng tác chiến | `frontend/src/components/dashboard/OperationsTable.jsx` |
+| Nút "Xem thêm" của danh sách thẻ | `frontend/src/utils/useShowMore.js`, `ShowMore` trong `frontend/src/components/common/ui.jsx` |
+| Bảng tác chiến (5 thẻ) | `frontend/src/components/dashboard/OperationsTable.jsx` |
 | Xuất PDF ảnh chụp / báo cáo văn bản | `frontend/src/utils/exportPdf.js`, `reportPdf.js`, `components/dashboard/ReportDocModal.jsx` |
 | API trang A | `backend/app/api/v1/dashboard.py` (`/dashboard/kpis`, `/stations`, `/dashboard/rainfall`, `/dashboard/reservoirs`, `/dashboard/landslides`, `/dashboard/landslide-sensors`, `/dashboard/reservoir-operations`, `/dashboard/landslide-risk`, `/dashboard/supplies`) |
 | Mưa bình quân lưu vực (Thiessen) | `backend/app/area.py` (`thiessen_ctes`), `backend/app/db.py` (`fetch_all_no_jit`) |
@@ -190,3 +208,5 @@ Thiết kế A.3: phần 1–3 giờ tới của biểu đồ mưa dùng dự b�
 | #46 | Tab Hồ chứa / Sạt lở: trạng thái tải / lỗi, theo bộ lọc vùng; form cập nhật vận hành báo lỗi khi nhập |
 | #47 | Biểu đồ thủy văn tô phần vượt báo động; lịch sử + biểu đồ vận hành hồ chứa |
 | #48 | Ô SOS nhấp nháy khi có phiếu chờ quá 15 phút chưa có đội tiếp nhận |
+| #49 | Tài liệu này |
+| #50 | Thẻ Hồ chứa trong bảng tác chiến (G1); "Xem thêm", mục khẩn lên đầu ở tab Hồ chứa / Sạt lở (G2) |
