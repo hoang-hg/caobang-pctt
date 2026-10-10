@@ -253,3 +253,10 @@ export function ShowMore({ list, step, noun }) {
 }
 
 export const StatusDot = ({ cls }) => <span className={clsx('inline-block h-2 w-2 shrink-0 rounded-full', cls)} />;
+
+/** Lỗi của một ô nhập, hiện ngay dưới ô (ô đặt aria-invalid + aria-describedby trỏ tới `id`). Dùng chung mọi form. */
+export const FieldError = ({ id, children }) => (children ? (
+  <p id={id} className="flex items-center gap-1 text-[11px] font-semibold text-danger">
+    <AlertTriangle size={12} className="shrink-0" aria-hidden="true" /> {children}
+  </p>
+) : null);

@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import clsx from 'clsx';
 import { AlertTriangle, Check, ChevronLeft, ChevronRight, FileText, Loader2, RotateCcw, X } from 'lucide-react';
-import { Modal } from '../common/ui';
+import { FieldError, Modal } from '../common/ui';
 
 const STEPS = ['Thông tin văn bản', 'Đánh giá & người ký', 'Xem lại & xuất'];
 const STEP_FIELDS = [['issuer', 'parent', 'number', 'recipients'], ['assessment', 'signerTitle', 'signerName'], []];
@@ -31,12 +31,6 @@ const save = (f) => {
   } catch { /* chế độ riêng tư / chặn lưu trữ: lần sau dùng mặc định */ }
 };
 const nonEmpty = (t) => String(t || '').split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
-
-const FieldError = ({ id, children }) => (children ? (
-  <p id={id} className="flex items-center gap-1 text-[11px] font-semibold text-danger">
-    <AlertTriangle size={12} className="shrink-0" aria-hidden="true" /> {children}
-  </p>
-) : null);
 
 /**
  * Soạn báo cáo nhanh dạng VĂN BẢN (PDF định dạng chuẩn gửi UBND tỉnh / Ban Chỉ đạo — thiết kế A) trong 3 bước: thông tin
