@@ -6,6 +6,7 @@ import 'leaflet-draw';
 import { api } from '../../api/client';
 import { useStore } from '../../app/store';
 import { pinIcon, COLORS } from './icons';
+import { fmtVn } from '../../utils/bulletin';
 
 // Bản đồ nền tự lưu trữ trên máy chủ tỉnh (deploy/fetch-basemap.sh → data/tiles, nginx phục vụ /tiles/): vector
 // OpenStreetMap vùng Cao Bằng và các tỉnh lân cận, không phụ thuộc Google / CARTO, chạy được khi mất kết nối quốc tế.
@@ -366,22 +367,45 @@ export const RAIN_BINS = [
   { max: 100, color: '#1c5cab', label: '50–100' },
   { max: Infinity, color: '#0d366b', label: '≥ 100 mm' },
 ];
-const rainColor = (mm) => RAIN_BINS.find((b) => mm < b.max).color;
+// Mưa trong 1 giờ (thanh thời gian kéo tới +N giờ): ≥ 20 mm/giờ là mưa rất to — thang riêng, dùng thang tổng 24 giờ thì gần
+// như mọi xã cùng một màu nhạt
+export const RAIN_BINS_HOURLY = [
+  { max: 1, color: '#cde2fb', label: '< 1 mm' },
+  { max: 5, color: '#86b6ef', label: '1–5' },
+  { max: 10, color: '#3987e5', label: '5–10' },
+  { max: 20, color: '#1c5cab', label: '10–20' },
+  { max: Infinity, color: '#0d366b', label: '≥ 20 mm' },
+];
 
-/** Lớp mưa dự báo 24 giờ tới (P50 kết hợp ECMWF/GFS) tô theo xã. */
+/** Kiểu số liệu của lớp mưa dự báo, xác định theo CHÍNH số liệu (khung 1 giờ: mốc đầu = mốc cuối) → thang màu, nhãn luôn
+ * khớp số đang vẽ — kể cả khi bản đồ còn giữ số cũ trong lúc tải khung giờ mới. */
+export function rainScale(areas) {
+  const a = areas?.[0];
+  if (a?.window_to && a.window_from === a.window_to) {
+    // Mốc giờ = lượng mưa của 1 giờ TRƯỚC mốc → ghi khoảng giờ, VD "Mưa 21:00–22:00 10-10"
+    const from = new Date(Date.parse(a.window_to) - 3600e3).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+    const span = `Mưa ${from}–${fmtVn(a.window_to)}`;
+    return { hourly: true, bins: RAIN_BINS_HOURLY, title: `${span} (dự báo, P50)`, short: span };
+  }
+  return { hourly: false, bins: RAIN_BINS, title: 'Mưa dự báo 24 giờ tới (P50)', short: 'Mưa 24h tới' };
+}
+
+/** Lớp mưa dự báo (P50 kết hợp ECMWF/GFS) tô theo xã: tổng 24 giờ tới, hoặc mưa 1 giờ tại thời điểm trên thanh thời gian. */
 export function ForecastChoropleth({ geo, areas }) {
   const byCode = useMemo(() => Object.fromEntries((areas || []).map((a) => [a.code, a])), [areas]);
   if (!geo || !areas?.length) return null;
+  const scale = rainScale(areas);
+  const color = (mm) => scale.bins.find((b) => mm < b.max).color;
   const data = { ...geo, features: geo.features.filter((f) => byCode[f.properties.code]) };
   return (
     <GeoJSON
-      key={`fc-${areas.map((a) => a.p50).join(',')}`}
+      key={`fc-${scale.short}-${areas.map((a) => a.p50).join(',')}`}
       data={data}
-      style={(f) => ({ color: '#ffffff', weight: 1, fillColor: rainColor(byCode[f.properties.code].p50), fillOpacity: 0.65 })}
+      style={(f) => ({ color: '#ffffff', weight: 1, fillColor: color(byCode[f.properties.code].p50), fillOpacity: 0.65 })}
       onEachFeature={(f, layer) => {
         const a = byCode[f.properties.code];
         layer.bindTooltip(
-          `<b>${a.name}</b><br/>Mưa 24h tới: <b>${a.p50} mm</b> (P10 ${a.p10} – P90 ${a.p90})<br/>Xác suất mưa ≥ 5 mm/h: ${Math.round(a.max_prob_heavy * 100)}%`,
+          `<b>${a.name}</b><br/>${scale.short}: <b>${a.p50} mm</b> (P10 ${a.p10} – P90 ${a.p90})<br/>Xác suất mưa ≥ 5 mm/h: ${Math.round(a.max_prob_heavy * 100)}%`,
           { sticky: true },
         );
       }}

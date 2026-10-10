@@ -28,6 +28,8 @@ const A = auth(admin);
 check('Quản trị xã không xem được nguồn dữ liệu → 403', (await call('GET', '/integrations/sources', null, auth(xa))).status === 403);
 const sources = (await call('GET', '/integrations/sources', null, A)).data;
 const om = sources.find((s) => s.code === 'OPEN_METEO_ENS');
+check('Dự báo theo xã: khung giờ sai (hours=0, offset_h âm) → 422',
+  (await call('GET', '/forecast/areas?hours=0', null, A)).status === 422 && (await call('GET', '/forecast/areas?offset_h=-1', null, A)).status === 422);
 if (om?.status === 'ok') {
   check('Nguồn Open-Meteo đồng bộ thành công', true, JSON.stringify(om?.stats?.members));
   const models = (await call('GET', '/forecast/models', null, A)).data;
@@ -37,6 +39,17 @@ if (om?.status === 'ok') {
     `nhiều nhất ${areas[0].name}: ${areas[0].p50} mm (P90 ${areas[0].p90})`);
   const series = (await call('GET', `/forecast/areas/${areas[0].code}`, null, A)).data;
   check('Chuỗi dự báo theo giờ của 1 xã', series.series.BLEND?.length >= 48);
+  // Khung giờ dời được (thanh thời gian bản đồ): 0–12h + 12–24h = 24h từng xã; khung 1 giờ ở +6h = đúng 1 mốc giờ 5–6 giờ tới
+  const [a24, a12, b12, h6] = await Promise.all(['?hours=24', '?hours=12', '?hours=12&offset_h=12', '?hours=1&offset_h=5']
+    .map(async (q) => (await call('GET', `/forecast/areas${q}`, null, A)).data));
+  const p50 = (rows) => Object.fromEntries(rows.map((r) => [r.code, r.p50]));
+  const [m12a, m12b] = [p50(a12), p50(b12)];
+  check('Mưa dự báo: 2 khung 12 giờ liền nhau cộng lại = tổng 24 giờ (từng xã)',
+    a24.length === 56 && a24.every((r) => Math.abs((m12a[r.code] ?? 0) + (m12b[r.code] ?? 0) - r.p50) <= 0.15));
+  const lead = Date.parse(h6[0]?.window_to) - Date.now();
+  check('Mưa dự báo khung 1 giờ (+6h): đúng 1 mốc giờ, trong khoảng 5–6 giờ tới',
+    h6.length === 56 && h6.every((r) => r.window_from === r.window_to) && lead > 5 * 3600e3 - 60e3 && lead <= 6 * 3600e3 + 60e3,
+    `${h6[0]?.window_to} · ${Math.round(lead / 60e3)} phút tới`);
 } else {
   console.log(`SKIP  Kiểm tra dự báo Open-Meteo (nguồn ${om?.status || 'không có'} — không có Internet hoặc OPEN_METEO_ENABLED=false)`);
 }
