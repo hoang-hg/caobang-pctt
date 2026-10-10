@@ -125,6 +125,13 @@ check('Mưa TB lưu vực 24h theo đa giác Thiessen (≥ 2 trạm), không vư
 check('Biểu đồ mưa giờ cùng cách tính, tổng các giờ ≈ KPI 24h', rf.method === 'thiessen' && near(hourly, kp.rain.avg_24h, 0.03),
   `${hourly.toFixed(1)} / ${kp.rain.avg_24h}`);
 check('Cổng công khai cùng số mưa TB toàn tỉnh', near(pub.rain?.avg_24h, kp.rain.avg_24h, 0.02), `${pub.rain?.avg_24h} / ${kp.rain.avg_24h}`);
+// Ô SOS (thiết kế A.2): số phiếu chờ quá 15 phút chưa có lực lượng tiếp nhận — phiếu "chờ xử lý" lâu nhất đã quá 15 phút
+// thì phải được đếm; không vượt số phiếu đang mở
+const s15 = kp.sos || {};
+const oldestMin = s15.oldest_waiting ? (Date.now() - new Date(s15.oldest_waiting).getTime()) / 60_000 : 0;
+check('KPI SOS: đếm phiếu chờ quá 15 phút chưa có đội tiếp nhận', Number.isInteger(s15.no_team_15m) && s15.no_team_15m >= 0 &&
+  (oldestMin <= 15.5 || s15.no_team_15m >= 1) && s15.no_team_15m <= s15.waiting + s15.in_progress,
+  `${s15.no_team_15m} phiếu (chờ lâu nhất ${Math.round(oldestMin)}′, quá hạn theo cấp ${s15.overdue})`);
 const one = (await call('GET', '/dashboard/kpis?admin_codes=CB-BAOLAC', null, checker)).data;
 check('Vùng chỉ có 1 trạm mưa: lấy đúng số của trạm (không dựng được đa giác)',
   one.rain?.stations === 1 && one.rain.avg_method === 'trung_binh_cong' && one.rain.avg_24h === one.rain.max_24h, JSON.stringify(one.rain));

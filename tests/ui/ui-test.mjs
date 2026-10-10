@@ -306,6 +306,27 @@ async function staff(ctx, trackCode) {
     }
   });
 
+  // Thiết kế A.2: ô SOS nhấp nháy đỏ khi có phiếu chờ quá 15 phút chưa có lực lượng tiếp nhận — kể cả khi chưa phiếu nào
+  // quá hạn theo cấp (cấp 3 hạn 60 phút). Sửa phản hồi KPI ngay trong trình duyệt để có đúng trường hợp đó
+  await step(ctx, 'Tổng quan: ô SOS nhấp nháy khi có phiếu chờ quá 15 phút chưa có đội (chưa quá hạn theo cấp)', async () => {
+    const kpis = '**/api/v1/dashboard/kpis**';
+    await page.route(kpis, async (route) => {
+      const res = await route.fetch();
+      const json = await res.json();
+      json.sos = { ...json.sos, overdue: 0, critical: 0, no_team_15m: 2 };
+      await route.fulfill({ response: res, json });
+    });
+    try {
+      await page.goto(`${ROOT}/dashboard`);
+      const tile = page.locator('[aria-label="Chỉ số nhanh"] > *').nth(2);
+      await tile.getByText('2 chờ quá 15′').waitFor({ timeout: 20_000 });
+      const st = await tile.evaluate((el) => ({ ring: el.className.includes('ring-danger'), blink: !!el.querySelector('[class*="animate-blink"]') }));
+      if (!st.ring || !st.blink) throw new Error(`ô SOS chưa nhấp nháy đỏ: ${JSON.stringify(st)}`);
+    } finally {
+      await page.unroute(kpis);
+    }
+  });
+
   // Thiết kế A.3 "Hydrograph & Vận hành hồ chứa": dưới biểu đồ thủy văn của trạm có hồ trên cùng sông (bản trình diễn: trạm
   // Cao Bằng – sông Bằng Giang) có biểu đồ lưu lượng xả của các hồ đó, cùng trục thời gian (vạch "Hiện tại" thẳng hàng)
   await step(ctx, 'Tổng quan: biểu đồ thủy văn kèm vận hành hồ chứa cùng sông, cùng trục thời gian', async () => {
