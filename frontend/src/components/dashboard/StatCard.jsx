@@ -11,9 +11,11 @@ import { risk } from '../../utils/risk';
  * `compact`: ô gọn của hàng KPI (lãnh đạo đọc trong vài giây, vừa 2 cột ở màn 360 px): tiêu đề · số lớn · nhãn mức ·
  * một dòng ngữ cảnh. `onClick` → cả ô là nút; `to` → cả ô là liên kết (khi đó KHÔNG đặt nút / liên kết khác bên trong).
  * `aside`: thông tin phụ cạnh nhãn mức của ô gọn (VD mũi tên xu hướng) — không nhấp nháy theo `alert`.
+ * `footerRows`: chân ô gọn là vài dòng ngắn, mỗi dòng tự cắt phần chữ thừa — bỏ giới hạn 1–2 dòng của câu ngữ cảnh thường.
  */
 export default function StatCard({
-  icon: Icon, title, badge, aside, value, unit, footer, level, alert, className, children, compact = false, onClick, to, hint,
+  icon: Icon, title, badge, aside, value, unit, footer, footerRows = false, level, alert, className, children, compact = false,
+  onClick, to, hint,
 }) {
   const scale = level === undefined ? null : risk(level);
   const Tag = to ? Link : onClick ? 'button' : 'div';
@@ -58,7 +60,14 @@ export default function StatCard({
       )}
       {children}
       {footer && (
-        <div className={clsx('text-ink-2', compact ? 'line-clamp-1 text-[11px] leading-snug sm:line-clamp-2 [.kpi-lon_&]:text-xs' : 'border-t border-line/60 pt-1.5 text-xs')}>
+        <div
+          className={clsx(
+            'text-ink-2',
+            compact
+              ? clsx('text-[11px] leading-snug [.kpi-lon_&]:text-xs', !footerRows && 'line-clamp-1 sm:line-clamp-2')
+              : 'border-t border-line/60 pt-1.5 text-xs',
+          )}
+        >
           {footer}
         </div>
       )}

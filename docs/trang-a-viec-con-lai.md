@@ -4,14 +4,14 @@
 giao diện bổ sung (màu rủi ro thống nhất, thông tin khẩn trên cùng, bảng có tìm / lọc / phân trang / xuất file, form chia bước
 có báo lỗi khi nhập, trạng thái tải / trống / lỗi / mất mạng, 360 px, theo phân quyền).
 
-- Cập nhật: 10/10/2026 — mã nguồn `main` gồm PR #36 → #50 (G1, G2 đã làm ở PR #50).
+- Cập nhật: 10/10/2026 — mã nguồn `main` gồm PR #36 → #51 (G1, G2 ở PR #50; 3 ô KPI và nhật ký vận hành hồ ở PR #51).
 - Máy chủ thử vẫn chạy **v1.0.3** (04/10/2026), **chưa có** các thay đổi trên. Cần tag + triển khai trước khi kiểm tra với dữ
   liệu thật.
 - Hiện trạng từng nhóm dữ liệu: README mục **2.2**. Cách nhập: README mục **2.4**. Kiểm tra trước khi mở cổng: `docs/GO-LIVE.md`.
 
-**Kết luận:** phần chức năng của mục A đã đủ theo thiết kế; 2 việc giao diện còn lại (G1, G2) đã làm xong. Các mục D1 → 11
-dưới đây còn thiếu vì **chưa có dữ liệu hoặc chưa có hệ thống bên ngoài để nối**. Không điền số mẫu / ngưỡng tự đặt để "lấp
-chỗ trống".
+**Kết luận:** phần chức năng của mục A đã đủ theo thiết kế; 2 việc giao diện còn lại (G1, G2) đã làm xong. Lần rà cuối
+(10/10/2026) sửa thêm 3 ô KPI trên điện thoại và nhật ký vận hành hồ (PR #51). Các mục D1 → D6, 7 → 11 dưới đây còn thiếu vì
+**chưa có dữ liệu hoặc chưa có hệ thống bên ngoài để nối**. Không điền số mẫu / ngưỡng tự đặt để "lấp chỗ trống".
 
 ---
 
@@ -22,6 +22,9 @@ chỗ trống".
 | D1 | Nhập dữ liệu nền cho các khối của trang A (trạm, ngưỡng BĐ, hồ chứa, kế hoạch sơ tán, lực lượng, kho…) | Dữ liệu | Đài KTTV, Sở Công Thương, các xã, BCH | **Cao nhất** — chưa có thì trang A chỉ hiện "chưa có" |
 | D2 | Danh mục chính thức **điểm đen sạt lở & đường đèo** (hiện viết cứng 12 điểm trong mã) | Dữ liệu + lập trình | Sở Xây dựng / đơn vị quản lý đường bộ, Sở NN&MT | Cao |
 | D3 | **Mạng đường** (xác định đoạn bị chia cắt ở tab Sạt lở, chỉ đường an toàn) | Dữ liệu + lập trình | Sở Xây dựng / OSM đã hiệu chỉnh | Trung bình |
+| D4 | **Số liệu vận hành hồ chứa tự động** (mực nước, cửa xả, Q đến / Q xả) — hiện trực ban nhập tay | Thoả thuận + lập trình | Chủ đập, Sở Công Thương | Trung bình – cao (mùa lũ) |
+| D5 | **Bản tin dự báo của Đài KTTV dạng số** (mực nước, mưa) — hiện trực ban nhập tay | Thoả thuận + lập trình | Đài KTTV Cao Bằng / Cục KTTV | Trung bình |
+| D6 | **Cấp độ rủi ro thiên tai chính thức** — hiện màu mưa / dải tình huống là màu theo dõi tự tính | Dữ liệu | Đài KTTV (bản tin), BCH tỉnh | Thấp – trung bình |
 | 7 | **Đánh giá nhanh nguy cơ ngập úng đô thị** trên biểu đồ mưa | Dữ liệu + lập trình | Sở Xây dựng / đơn vị thoát nước TP Cao Bằng | Trung bình |
 | 8 | **Dự báo mưa 1–3 giờ từ radar (QPF)** | Tích hợp | Đài KTTV (sản phẩm radar) | Trung bình |
 | 9 | **Dự báo mực nước từ mô hình thủy văn (HEC-HMS…)** | Tích hợp | Đài KTTV / đơn vị chạy mô hình | Trung bình |
@@ -41,7 +44,7 @@ xám, không tô xanh như "an toàn"), nhưng chưa dùng để điều hành �
 |---|---|---|---|
 | Ô Mưa, biểu đồ mưa, mưa TB lưu vực (đa giác Thiessen) | Trạm đo mưa + số đo tự động | `tram_quan_trac` + kết nối thiết bị (HTTP / MQTT / LoRaWAN, README 6.4–6.5) | Đài KTTV Cao Bằng, VRain |
 | Ô Mực nước, biểu đồ thủy văn, dự báo vượt BĐ | Trạm mực nước + **ngưỡng BĐ I / II / III** + số đo | `tram_quan_trac` | Đài KTTV Cao Bằng |
-| Tab Hồ chứa, biểu đồ vận hành hồ | Danh mục hồ (MNDBT, số cửa xả, sông) + số liệu vận hành | `ho_chua`; số liệu vận hành: trực ban nhập ở tab Hồ chứa (nút "Cập nhật vận hành") tới khi có nguồn tự động | Chủ đập, Sở Công Thương |
+| Tab Hồ chứa, biểu đồ vận hành hồ | Danh mục hồ (MNDBT, số cửa xả, sông) + số liệu vận hành | `ho_chua`; số liệu vận hành: trực ban nhập ở tab Hồ chứa (nút "Cập nhật vận hành") tới khi có nguồn tự động (D4) | Chủ đập, Sở Công Thương |
 | Heatmap cảm biến sạt lở | Trạm độ nghiêng / độ ẩm đất + ngưỡng | `tram_quan_trac` (loại `do_nghieng`, `do_am_dat`) | Đơn vị lắp đặt cảm biến |
 | Ô Sơ tán | Kế hoạch và tiến độ sơ tán (hộ, nhân khẩu) theo xã | Xã cập nhật ở Điều hành cứu hộ → Giám sát sơ tán | Phương án ứng phó của từng xã |
 | Ô Lực lượng, phương tiện | Lực lượng, xuồng, xe lội nước, máy xúc | `luc_luong`, `phuong_tien` | BCH Quân sự, Công an, đội xung kích |
@@ -74,7 +77,42 @@ Lưu ý:
 - **Việc lập trình khi có:** loại dữ liệu nhập mạng đường; sau đó trạng thái "đường bị chia cắt" ở tab Sạt lở và chỉ đường an
   toàn tự chạy.
 
-## 5. Điểm 7 — Đánh giá nhanh nguy cơ ngập úng đô thị
+## 5. D4, D5, D6 — Nguồn tự động và cấp độ chính thức (bổ sung khi rà lại 10/10/2026)
+
+Hệ thống hiện chỉ có bộ nối dự báo thời tiết (Open-Meteo, OpenWeather — `backend/app/integrations/adapters/`) và cổng nhận số
+đo trạm IoT. Ba nguồn dưới đây README mục 6.7 ghi "⛔ cần thoả thuận"; tới khi có, trực ban **nhập tay** nên số liệu chỉ mới
+như lần nhập gần nhất.
+
+### D4 — Số liệu vận hành hồ chứa tự động
+
+- **Hiện trạng:** trực ban nhập ở tab Hồ chứa (nút "Cập nhật vận hành": mực nước, số cửa xả mở, Q đến, Q xả, giờ báo, nguồn).
+  Từ đó có lịch sử vận hành (trigger migration 0020), biểu đồ vận hành dưới biểu đồ thủy văn và dòng nhật ký "Cập nhật vận hành
+  …, lưu lượng xả … m³/s".
+- **Cần:** cách lấy số liệu từ chủ đập hoặc hệ thống giám sát vận hành hồ của Sở Công Thương (API / FTP / tệp), tần suất cập
+  nhật khi đang xả lũ, mã hồ khớp danh mục đã nhập (`ho_chua`).
+- **Việc lập trình khi có:** bộ nối ghi vào bảng hồ chứa như form trực ban (lịch sử tự có nhờ trigger); ghi nhật ký vận hành
+  **kèm lưu lượng xả** khi số cửa xả đổi (như bộ mô phỏng); giữ nút nhập tay làm dự phòng.
+
+### D5 — Bản tin dự báo của Đài KTTV dạng số
+
+- **Hiện trạng:** đường dự báo trên biểu đồ thủy văn và giờ "dự báo vượt BĐ" ở ô Mực nước lấy từ bản tin KTTV do trực ban nhập
+  (nút "Nhập bản tin dự báo KTTV", README 7.4). Dự báo mưa 3 giờ tới / 72 giờ là dự báo mô hình số Open-Meteo, không phải bản
+  tin KTTV.
+- **Cần:** bản tin dự báo mực nước (theo trạm) và mưa (theo khu vực) dạng số — API hoặc tệp, kèm số / giờ phát hành.
+- **Việc lập trình khi có:** bộ nối đọc bản tin → ghi như nút nhập tay (mã `KTTV`), giữ nhãn nguồn trên biểu đồ. Khác với điểm 9
+  (kết quả chạy mô hình): bản tin KTTV là dự báo chính thức, ưu tiên cao nhất.
+
+### D6 — Cấp độ rủi ro thiên tai chính thức
+
+- **Hiện trạng:** màu ô Mưa và chip mưa ở dải tình huống dùng ngưỡng theo dõi tự tính: mưa 24 giờ ≥ 50 mm Vàng, ≥ 100 mm Cam,
+  ≥ 200 mm Đỏ (`rainLevel` trong `frontend/src/utils/risk.js`, theo thuật ngữ mưa to / mưa rất to của KTTV). Giao diện ghi rõ
+  đây **không phải** cấp độ rủi ro thiên tai chính thức.
+- **Cần:** cấp độ rủi ro thiên tai do cơ quan KTTV công bố trong bản tin (Quyết định 18/2021/QĐ-TTg) theo loại thiên tai và khu
+  vực; nếu tỉnh có ngưỡng mưa riêng cho vùng núi thì kèm văn bản.
+- **Việc lập trình khi có:** nhập (hoặc bộ nối D5 đọc) cấp độ rủi ro trong bản tin → chip riêng ở đầu dải tình huống, ghi số
+  bản tin và giờ phát hành; giữ màu theo dõi tự tính như hiện nay để thấy diễn biến giữa hai bản tin.
+
+## 6. Điểm 7 — Đánh giá nhanh nguy cơ ngập úng đô thị
 
 Thiết kế A.3: phần 1–3 giờ tới của biểu đồ mưa dùng dự báo mưa cực ngắn "để đánh giá nhanh nguy cơ ngập úng đô thị cục bộ".
 
@@ -86,7 +124,7 @@ Thiết kế A.3: phần 1–3 giờ tới của biểu đồ mưa dùng dự b�
   ở dải tình huống ("Nguy cơ ngập úng … theo dự báo …", ghi rõ nguồn dự báo).
 - **Kiểm tra:** nhập ngưỡng cho 1 phường, chọn phường đó ở bộ lọc → thấy vạch ngưỡng; dự báo vượt ngưỡng → có cảnh báo.
 
-## 6. Điểm 8 — Dự báo mưa 1–3 giờ từ radar (QPF)
+## 7. Điểm 8 — Dự báo mưa 1–3 giờ từ radar (QPF)
 
 - **Hiện trạng:** phần 3 giờ tới lấy từ **dự báo mô hình số Open-Meteo** cho từng trạm mưa
   (`backend/app/integrations/adapters/open_meteo.py`, lưu ở bảng `forecasts` với mã `QPF-NOWCAST`), giao diện ghi rõ "Dự báo
@@ -100,7 +138,7 @@ Thiết kế A.3: phần 1–3 giờ tới của biểu đồ mưa dùng dự b�
   - `GET /api/v1/dashboard/rainfall` và biểu đồ mưa ưu tiên radar khi có, ghi "Nowcast radar"; không có thì giữ dự báo mô
     hình như hiện nay.
 
-## 7. Điểm 9 — Dự báo mực nước từ mô hình thủy văn (HEC-HMS…)
+## 8. Điểm 9 — Dự báo mực nước từ mô hình thủy văn (HEC-HMS…)
 
 - **Hiện trạng:** đường dự báo trên biểu đồ thủy văn là **bản tin KTTV do trực ban nhập** (nút "Nhập bản tin dự báo KTTV",
   `PUT /api/v1/stations/{mã}/forecast`, mã `KTTV`, README 7.4); chưa có bản tin thì dùng đường do **bộ mô phỏng** sinh, giao diện ghi rõ
@@ -116,14 +154,14 @@ Thiết kế A.3: phần 1–3 giờ tới của biểu đồ mưa dùng dự b�
   - Thêm nguồn "Kết quả mô hình thủy văn" (nhập tệp hoặc API) với nhãn riêng; thứ tự ưu tiên: bản tin KTTV → kết quả mô hình →
     mô phỏng (chỉ ở bản trình diễn).
 
-## 8. Điểm 10 — Báo cáo của người dân qua Zalo OA / ứng dụng
+## 9. Điểm 10 — Báo cáo của người dân qua Zalo OA / ứng dụng
 
 - **Hiện trạng:** cổng tiếp nhận tự động `POST /api/v1/sos/intake` đã có nhưng **đang tắt** cho tới khi đặt `INTAKE_API_KEY`
   và có bên gửi (README 2.1, 6.6). Phản ánh của người dân từ cổng công khai đã vào nhật ký (nhóm "Người dân").
 - **Cần:** tài khoản Zalo OA (và mẫu ZNS nếu gửi tin), bên phát triển ứng dụng / dịch vụ trung gian gọi cổng tiếp nhận.
 - **Việc lập trình khi có:** cấu hình khoá, kiểm thử luồng tin → phiếu SOS / phản ánh → hiện ở nhật ký và bảng tác chiến.
 
-## 9. Điểm 11 — Ngưỡng sạt lở hiệu chỉnh
+## 10. Điểm 11 — Ngưỡng sạt lở hiệu chỉnh
 
 - **Hiện trạng:**
   - Biểu đồ "Ngưỡng kích hoạt sạt lở" (mưa tích luỹ 72 giờ – cường độ mưa) dùng đường ngưỡng **minh hoạ**
@@ -134,7 +172,7 @@ Thiết kế A.3: phần 1–3 giờ tới của biểu đồ mưa dùng dự b�
 - **Việc lập trình khi có:** đưa hệ số ngưỡng I–D ra cấu hình / dữ liệu (không sửa mã mỗi lần đổi), bỏ chữ "minh hoạ"; cập nhật
   ngưỡng cảm biến bằng nhập lại `tram_quan_trac`.
 
-## 10. Việc giao diện G1, G2 (đã làm — PR #50)
+## 11. Việc giao diện G1, G2 (đã làm — PR #50)
 
 - **G1 — Thẻ "Hồ chứa & xả lũ" trong bảng tác chiến** (tab Tổng hợp). Bảng nay có 5 thẻ: Mực nước / Hồ chứa / Sạt lở / SOS /
   Kho.
@@ -157,27 +195,32 @@ Thiết kế A.3: phần 1–3 giờ tới của biểu đồ mưa dùng dự b�
     xem).
 - **Khi có dữ liệu thật:** xem lại bước 9 thẻ có hợp không (hằng `PAGE` trong `ReservoirMonitor.jsx`, `LandslideMonitor.jsx`).
 
-## 11. Khi có dữ liệu: trình tự đề nghị
+## 12. Khi có dữ liệu: trình tự đề nghị
 
-1. **Triển khai** bản mới nhất (tag), để có migration `0020` (lịch sử vận hành hồ) và các cải tiến từ PR #36 → #50.
+1. **Triển khai** bản mới nhất (tag), để có migration `0020` (lịch sử vận hành hồ) và các cải tiến từ PR #36 → #51.
 2. **Nhập dữ liệu nền** (mục 2) theo README 2.4; người thứ hai đối chiếu.
 3. **Kiểm tra trang A** bằng mắt với dữ liệu thật:
    - 6 ô KPI có số (không còn "chưa có"); ô Mực nước có mức BĐ, mũi tên xu hướng;
+   - trên điện thoại vẫn đọc được: mưa lớn nhất, số hộ và số người đã sơ tán, xuồng – xe lội nước đang làm nhiệm vụ;
+   - nhập thử một lần "Cập nhật vận hành" có lưu lượng xả → nhật ký ghi "… lưu lượng xả … m³/s";
    - biểu đồ thủy văn có vạch BĐ I–III, tô phần vượt; dưới có vận hành hồ của sông đó (sau khi đã có số liệu vận hành);
    - tab Hồ chứa / Sạt lở đúng vùng đang lọc, mục khẩn ở đầu danh sách; heatmap cảm biến có ô màu;
    - bảng tác chiến, thẻ Hồ chứa: đủ hồ của vùng, file Excel khớp số liệu tab Hồ chứa;
    - báo cáo văn bản (nút "Văn bản") xuất đủ các mục.
 4. **Chạy kiểm thử trên máy chủ** (chỉ đọc, không ghi dữ liệu): `UI_READONLY=1 node tests/ui/ui-test.mjs <địa chỉ>`; làm theo
    `docs/GO-LIVE.md`.
-5. Làm tiếp các mục 7 → 11 khi có dữ liệu tương ứng.
+5. Làm tiếp các mục D4 → D6, 7 → 11 khi có dữ liệu / thoả thuận tương ứng.
 6. Một buổi cho lãnh đạo và trực ban dùng thử để chỉnh câu chữ, bố cục theo thói quen thực tế.
 
-## 12. Tham chiếu mã nguồn (cho người phát triển)
+## 13. Tham chiếu mã nguồn (cho người phát triển)
 
 | Phần | Tệp |
 |---|---|
 | Trang Tổng quan, các tab | `frontend/src/pages/Dashboard.jsx` |
-| 6 ô KPI | `frontend/src/components/dashboard/KpiStrip.jsx`, `StatCard.jsx`, `RiverKpi.jsx` |
+| 6 ô KPI | `frontend/src/components/dashboard/KpiStrip.jsx`, `StatCard.jsx` (chân ô nhiều dòng: `footerRows`), `RiverKpi.jsx` |
+| Ngưỡng màu mưa (theo dõi, không phải cấp độ chính thức) | `frontend/src/utils/risk.js` (`rainLevel`) |
+| Cập nhật vận hành hồ + dòng nhật ký | `backend/app/api/v1/dashboard.py` (`update_reservoir_operation`) |
+| Bộ nối nguồn ngoài (chưa có cho hồ chứa, bản tin KTTV) | `backend/app/integrations/` |
 | Dải tình huống, Việc chờ quyết định | `frontend/src/components/dashboard/SituationBar.jsx`, `DecisionPanel.jsx` |
 | Biểu đồ thủy văn, vận hành hồ | `frontend/src/components/charts/Hydrograph.jsx`, `ReservoirOpsChart.jsx` |
 | Biểu đồ mưa, ngưỡng sạt lở, cảm biến sạt lở, vật tư | `RainfallChart.jsx`, `LandslideScatter.jsx`, `SensorHeatmap.jsx`, `SuppliesChart.jsx` (cùng thư mục `charts`) |
@@ -191,7 +234,7 @@ Thiết kế A.3: phần 1–3 giờ tới của biểu đồ mưa dùng dự b�
 | Mô hình hồ của bộ mô phỏng (chỉ bản trình diễn) | `backend/app/services/scenario.py` (`reservoir_tick`) |
 | Kiểm thử | `tests/ui/ui-test.mjs`, `tests/e2e/smoke.mjs`, `reservoir-test.mjs`, `landslide-test.mjs`, `iot-test.mjs`, `prod-flow.mjs` |
 
-## 13. Các thay đổi đã làm cho trang A (để tra cứu)
+## 14. Các thay đổi đã làm cho trang A (để tra cứu)
 
 | PR | Nội dung |
 |---|---|
@@ -210,3 +253,4 @@ Thiết kế A.3: phần 1–3 giờ tới của biểu đồ mưa dùng dự b�
 | #48 | Ô SOS nhấp nháy khi có phiếu chờ quá 15 phút chưa có đội tiếp nhận |
 | #49 | Tài liệu này |
 | #50 | Thẻ Hồ chứa trong bảng tác chiến (G1); "Xem thêm", mục khẩn lên đầu ở tab Hồ chứa / Sạt lở (G2) |
+| #51 | Ô KPI trên điện thoại thấy đủ mưa lớn nhất, số người sơ tán, "xuồng, xe lội nước"; nhật ký vận hành hồ ghi lưu lượng xả; tài liệu thêm D4 – D6 |
