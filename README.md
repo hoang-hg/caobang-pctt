@@ -300,6 +300,7 @@ scripts/maintenance/  script bảo trì CSDL máy dev (có chặn production)
 deploy/             Caddyfile, backup.sh (chạy thật); golive-check.sh, restore-drill.sh, external-monitor.sh
 docs/GO-LIVE.md     kiểm tra trước khi mở cổng cho người dân (Go / No-Go) + biên bản
 docs/trang-a-viec-con-lai.md  trang Tổng quan: đối chiếu thiết kế mục A, việc còn lại (triển khai, thử tải, dùng thử; dữ liệu thật…)
+docs/trang-b-viec-con-lai.md  trang Bản đồ: đối chiếu thiết kế mục B, việc còn lại (mưa theo thanh thời gian, camera, DEM, dân cư…)
 mqtt/  db/init/     cấu hình Mosquitto (dev + thật); extension PostgreSQL khi khởi tạo
 docker-compose.yml  dev / trình diễn / CI     docker-compose.prod.yml  chạy thật
 .env.example        mẫu dev                    .env.production.example  mẫu chạy thật
