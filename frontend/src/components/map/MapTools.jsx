@@ -225,12 +225,27 @@ export function AreaFocus({ area, filtered, padding = {} }) {
   );
 }
 
-export function FocusHandler() {
+/**
+ * Bay tới chỗ được chọn (`focus` trong store): { lat, lon, zoom, label } → bay tới một điểm, cắm dấu 8 giây; { bounds:
+ * [[lat, lon], …] } → khung vừa đủ nhiều điểm (VD chạm một chỉ số "Tình hình"), không cắm dấu. `padding` ({ topLeft,
+ * bottomRight } px): chừa chỗ các bảng nổi để điểm không nằm dưới bảng.
+ */
+export function FocusHandler({ padding } = {}) {
   const map = useMap();
   const focus = useStore((s) => s.focus);
   const [marker, setMarker] = useState(null);
+  const pad = useRef(padding);
+  pad.current = padding;
   useEffect(() => {
     if (!focus) return;
+    if (focus.bounds) {
+      setMarker(null);
+      const b = L.latLngBounds(focus.bounds);
+      if (!b.isValid()) return;
+      if (b.getNorthEast().equals(b.getSouthWest())) map.flyTo(b.getCenter(), focus.zoom || 13, { duration: 0.8 });
+      else map.flyToBounds(b, { duration: 0.8, maxZoom: 13, paddingTopLeft: pad.current?.topLeft, paddingBottomRight: pad.current?.bottomRight });
+      return;
+    }
     map.flyTo([focus.lat, focus.lon], focus.zoom || 14, { duration: 0.8 });
     setMarker(focus);
     const id = setTimeout(() => setMarker(null), 8000);

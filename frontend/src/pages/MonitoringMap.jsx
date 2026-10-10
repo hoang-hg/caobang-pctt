@@ -9,6 +9,8 @@ import { useAreaQuery, useUnitsGeo } from '../api/hooks';
 import { useStore } from '../app/store';
 import MapLayers, { floodScenarioStates, StormLayer, stormQuery } from '../components/map/MapLayers';
 import MapLegend, { RadarScale } from '../components/map/MapLegend';
+import MapKpis from '../components/map/MapKpis';
+import { riverSummary } from '../components/dashboard/RiverKpi';
 import {
   AlertsList, DEFAULT_LAYERS, DrawnStats, LAYER_GROUPS, LAYER_ORDER, LayerList, layerCounts, Sheet, TimeControl, ToolHint, toolList,
 } from '../components/map/MapPanels';
@@ -79,6 +81,7 @@ export default function MonitoringMap() {
   const { filter, setAlertDraft, setFocus } = useStore();
   const wide = useMediaQuery('(min-width: 1024px)');
   const roomy = useMediaQuery('(min-width: 1440px)');
+  const mid = useMediaQuery('(min-width: 768px)'); // iPad dọc: chỉ số "Tình hình" đủ chỗ 1 hàng 6 ô
   const online = useOnline();
   const [layers, setLayers] = useState(DEFAULT_LAYERS);
   const [basemap, setBasemap] = useState('auto');
@@ -185,6 +188,62 @@ export default function MonitoringMap() {
   const noDataCount = stationList.filter((p) => p.value == null).length;
   const alertCount = canSos ? sos.length : sensorAlerts.length + silentStations.length;
 
+  // Chạm một chỉ số "Tình hình" → hỏi bản đồ: bật lớp liên quan, mở đúng danh sách, khung bản đồ vừa các điểm đó. Chỉ đổi
+  // trạng thái giao diện; điểm lấy từ số liệu đã tải (/map/layers, /stations, /dashboard/kpis)
+  const onPickKpi = (key) => {
+    const k = kQ.data || {};
+    const pts = (fc, keep = () => true) => (fc?.features || [])
+      .filter((f) => f.geometry?.type === 'Point' && keep(f.properties))
+      .map((f) => [f.geometry.coordinates[1], f.geometry.coordinates[0]]);
+    const at = (list) => list.filter((x) => x.lat != null && x.lon != null).map((x) => [Number(x.lat), Number(x.lon)]);
+    const show = (...keys) => setLayers((l) => ({ ...l, ...Object.fromEntries(keys.map((x) => [x, true])) }));
+    const fly = (bounds, label) => { if (bounds.length) setFocus({ bounds, label }); };
+    const openAlerts = (tab) => { setRightTab(tab); if (wide) setRightOpen(true); else setSheet('alerts'); };
+    if (key === 'sos') {
+      show('sos');
+      openAlerts('sos');
+      fly(pts(data?.sos), 'Phiếu SOS');
+    } else if (key === 'river') {
+      show('stations');
+      openAlerts('sensors');
+      const above = riverSummary(waterStations).rows.filter((r) => r.st.level >= 1).map((r) => r.s);
+      fly(at(above.length ? above : waterStations), 'Trạm mực nước');
+    } else if (key === 'rain') {
+      show('stations');
+      // Các trạm mưa từ 50 mm/24 giờ (mưa to); chưa có thì 3 trạm mưa nhiều nhất
+      const rain = (data?.stations.features || []).filter((f) => f.properties.type === 'luong_mua' && f.properties.value != null)
+        .sort((a, b) => b.properties.value - a.properties.value);
+      const heavy = rain.filter((f) => f.properties.value >= 50);
+      fly(pts({ features: heavy.length ? heavy : rain.slice(0, 3) }), 'Mưa lớn nhất');
+    } else if (key === 'evac') {
+      show('evac');
+      fly(pts(data?.evacuation_sites), 'Điểm sơ tán');
+    } else if (key === 'forces') {
+      show('forces');
+      fly(pts(data?.forces), 'Lực lượng');
+    } else if (key === 'topic') {
+      show('reservoirs', 'landslide', 'hazardPoints');
+      // Hồ đang xả + điểm sạt lở cấm đường / cảnh báo; không có thì mọi hồ chứa
+      const hot = [
+        ...pts(data?.reservoirs, (p) => p.status_code === 'xa_dieu_tiet' || p.status_code === 'xa_khan_cap'),
+        ...at((k.landslides?.points || []).filter((p) => p.traffic_status === 'cam_duong' || p.traffic_status === 'canh_bao')),
+      ];
+      fly(hot.length ? hot : pts(data?.reservoirs), 'Hồ chứa · Sạt lở');
+    }
+  };
+  const kpiProps = {
+    k: kQ.data,
+    kState: { error: kQ.isError, refetch: kQ.refetch },
+    stations: { list: waterStations, loading: stationsQ.isPending, error: stationsQ.isError },
+    onPick: onPickKpi,
+    // Lớp SOS, lực lượng, điểm sơ tán chỉ mở được khi có quyền xem (như lớp trên bảng lớp) — không thì ô chỉ hiện số
+    pickable: { rain: true, river: true, topic: true, sos: canSos, evac: canResource, forces: canResource },
+  };
+  // Khung nhìn (vùng đang lọc, điểm cần bay tới) chừa chỗ các bảng nổi
+  const mapPad = wide
+    ? { topLeft: [leftOpen ? 300 : 60, 30], bottomRight: [rightOpen ? 350 : 60, 100] }
+    : { topLeft: [16, 16], bottomRight: [16, 16] };
+
   const setAllLayers = (val) => {
     const next = {};
     Object.keys(DEFAULT_LAYERS).forEach((k) => { next[k] = val; });
@@ -281,6 +340,8 @@ export default function MonitoringMap() {
             </button>
           </div>
         )}
+        {/* Điện thoại, iPad dọc: chỉ số "Tình hình" luôn thấy ngay dưới dải khẩn cấp (máy tính: trong bảng Cảnh báo khẩn cấp) */}
+        {!wide && <MapKpis layout={mid ? 'row' : 'scroll'} className="border-b border-line bg-panel" {...kpiProps} />}
       </div>
 
       {/* Vùng bản đồ: `isolate` giữ z-index của Leaflet bên trong, không đè thanh thao tác / hộp thoại */}
@@ -292,13 +353,7 @@ export default function MonitoringMap() {
           <ScaleControl position="bottomleft" imperial={false} />
           {layers.forecast && offset >= 0 && <ForecastChoropleth geo={unitsGeo} areas={fcAreas} />}
           {layers.admin && <AdminBoundaries geo={unitsGeo} basemap={basemap} />}
-          <AreaFocus
-            area={area}
-            filtered={filter.codes.length > 0}
-            padding={wide
-              ? { topLeft: [leftOpen ? 300 : 60, 30], bottomRight: [rightOpen ? 350 : 60, 100] }
-              : { topLeft: [16, 16], bottomRight: [16, 16] }}
-          />
+          <AreaFocus area={area} filtered={filter.codes.length > 0} padding={mapPad} />
           {layers.storm && !unavailable.storm && <StormLayer offset={offset} />}
           <MapLayers
             data={data}
@@ -311,7 +366,7 @@ export default function MonitoringMap() {
             onOccupancy={setOccupancy}
           />
           <PickPoint active={tool === 'incident'} onPick={(pt) => { setTool(null); setIncident(pt); }} />
-          <FocusHandler />
+          <FocusHandler padding={mapPad} />
           <DrawTool mode={tool === 'polygon' || tool === 'circle' ? tool : null} onDrawn={onDrawn} />
           <MeasureTool active={tool === 'measure'} />
           <RouteTool active={tool === 'route'} onResult={setRouteInfo} />
@@ -429,6 +484,7 @@ export default function MonitoringMap() {
                       </div>
                       {canSos && <span className="chip bg-danger text-[11px] font-bold text-white">{sos.length} SOS</span>}
                     </div>
+                    <MapKpis layout="grid" className="border-b border-line" {...kpiProps} />
                     {alertsList}
                   </div>
                 )}
