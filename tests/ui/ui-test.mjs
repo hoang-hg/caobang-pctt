@@ -810,21 +810,76 @@ async function managerMap(ctx, layout) {
   });
   if (await page.evaluate(() => matchMedia('(pointer: coarse)').matches)) {
     await step(ctx, 'Màn cảm ứng: mọi vùng chạm của trang Bản đồ ≥ 44 px', async () => {
-      const small = await page.evaluate(() => {
-        const vis = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden' && r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth; };
-        return [...document.querySelectorAll('button, a[href], input, select, [role="button"]')]
-          .filter((el) => vis(el) && !el.closest('.leaflet-marker-pane, .leaflet-control-attribution, .leaflet-popup') && !(el.type === 'checkbox' && el.closest('label')))
-          .map((el) => {
-            const r = el.getBoundingClientRect();
-            let w = r.width;
-            let h = r.height;
-            const after = el.classList.contains('touch-hit') && getComputedStyle(el, '::after');
-            if (after && after.content !== 'none') { w = Math.max(w, parseFloat(after.width) || 0); h = Math.max(h, parseFloat(after.height) || 0); }
-            return { size: Math.round(el.type === 'range' ? h : Math.min(w, h)), what: (el.getAttribute('aria-label') || el.innerText || el.title || el.tagName).replace(/\s+/g, ' ').trim().slice(0, 30) };
-          })
-          .filter((x) => x.size < 44);
-      });
+      const small = await smallTargets(page, { onScreen: true });
       if (small.length) throw new Error(`${small.length} vùng chạm < 44 px: ${small.slice(0, 5).map((s) => `${s.what} ${s.size}px`).join(', ')}`);
+    });
+  }
+}
+
+/**
+ * Vùng chạm nhỏ hơn 44 px trên trang (máy cảm ứng): nút, liên kết, ô nhập / chọn, `summary` — tính cả vùng chạm vô hình
+ * `.touch-hit` (::after). Bỏ điểm trên bản đồ, dòng ghi nguồn, popup, biểu đồ; ô chọn nằm trong nhãn thì nhãn là vùng chạm.
+ * `onScreen`: chỉ phần đang thấy (bản đồ); không thì cả phần phải cuộn mới thấy (trang dài như Tổng quan).
+ */
+const smallTargets = (page, { onScreen = false } = {}) => page.evaluate((only) => {
+  const shown = (el) => {
+    const r = el.getBoundingClientRect();
+    const s = getComputedStyle(el);
+    const on = !only || (r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth);
+    return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && on;
+  };
+  return [...document.querySelectorAll('button, a[href], input, select, [role="button"], summary')]
+    .filter((el) => shown(el) && !el.closest('.leaflet-marker-pane, .leaflet-control-attribution, .leaflet-popup, .recharts-wrapper')
+      && !(el.type === 'checkbox' && el.closest('label')))
+    .map((el) => {
+      const r = el.getBoundingClientRect();
+      let w = r.width;
+      let h = r.height;
+      const after = el.classList.contains('touch-hit') && getComputedStyle(el, '::after');
+      if (after && after.content !== 'none') { w = Math.max(w, parseFloat(after.width) || 0); h = Math.max(h, parseFloat(after.height) || 0); }
+      return { size: Math.round(el.type === 'range' ? h : Math.min(w, h)), what: (el.getAttribute('aria-label') || el.innerText || el.title || el.tagName).replace(/\s+/g, ' ').trim().slice(0, 30) };
+    })
+    .filter((x) => x.size < 44);
+}, onScreen);
+
+// ================================================================ Tổng quan trên màn cảm ứng (iPad, điện thoại)
+// Mọi vùng chạm của 5 tab ≥ 44 px (thanh công cụ, tab, bảng tác chiến, lọc, nhật ký, Hồ chứa, Sạt lở, Cấp xã, Hệ thống);
+// điện thoại cảm ứng 360×740: vẫn thấy trọn 6 ô KPI dù nút cao hơn (phép đo "Màn hình đầu" chạy không cảm ứng). Chỉ xem.
+const DASH_TOUCH = [
+  ['iPad ngang', devices['iPad Pro 11 landscape']],
+  ['Điện thoại 360', devices['Galaxy S8']],
+];
+const DASH_TABS = [['', 'Tổng hợp'], ['ho_chua', 'Hồ chứa'], ['sat_lo', 'Sạt lở'], ['cap_xa', 'Cấp xã'], ['he_thong', 'Hệ thống']];
+async function dashTouch(ctx) {
+  const { page } = ctx;
+  await step(ctx, 'Tổng quan: mọi vùng chạm của 5 tab ≥ 44 px', async () => {
+    await page.goto(`${ROOT}/dang-nhap`);
+    await page.getByPlaceholder('Nhập tên đăng nhập hoặc email...').fill(STAFF.user);
+    await page.getByPlaceholder('••••••••').fill(STAFF.pass);
+    await page.locator('button[type="submit"]').click();
+    await page.waitForURL(/\/dashboard/, { timeout: 20_000 });
+    const bad = [];
+    for (const [tab, name] of DASH_TABS) {
+      await page.goto(`${ROOT}/dashboard${tab ? `?tab=${tab}` : ''}`);
+      await waitMain(page);
+      await page.waitForTimeout(1500);
+      for (const s of await smallTargets(page)) bad.push(`${name}: ${s.what} ${s.size}px`);
+    }
+    if (bad.length) throw new Error(`${bad.length} vùng chạm < 44 px — ${bad.slice(0, 5).join(', ')}`);
+  });
+  if (ctx.vp.mobile) {
+    await step(ctx, 'Tổng quan: điện thoại cảm ứng vẫn thấy trọn 6 ô KPI (không bị thanh đáy che)', async () => {
+      await page.goto(`${ROOT}/dashboard`);
+      await page.locator('[aria-label="Chỉ số nhanh"] > *').nth(5).waitFor();
+      await page.waitForTimeout(800);
+      const m = await page.evaluate(() => {
+        const nav = document.querySelector('nav[aria-label="Thao tác nhanh"]');
+        const navTop = nav && nav.getBoundingClientRect().height ? nav.getBoundingClientRect().top : innerHeight;
+        const tiles = [...document.querySelectorAll('[aria-label="Chỉ số nhanh"] > *')];
+        return { bottom: Math.round(Math.max(...tiles.map((t) => t.getBoundingClientRect().bottom))), visible: Math.round(navTop) };
+      });
+      if (m.bottom > m.visible) throw new Error(`ô KPI bị che: đáy ${m.bottom}px > ${m.visible}px`);
+      return `KPI đáy ${m.bottom}/${m.visible}px`;
     });
   }
 }
@@ -863,6 +918,13 @@ try {
     const mPage = await mctx.newPage();
     await managerMap({ page: mPage, vp: { name: `Người quản lý · ${label}`, mobile: layout === 'scroll' }, problems: watch(mPage) }, layout);
     await mctx.close();
+  }
+  for (const [label, opts] of DASH_TOUCH) {
+    const dctx = await browser.newContext({ ...opts, locale: 'vi-VN' });
+    dctx.setDefaultTimeout(15_000);
+    const dPage = await dctx.newPage();
+    await dashTouch({ page: dPage, vp: { name: `Tổng quan cảm ứng · ${label}`, mobile: !!opts.isMobile && opts.viewport.width < 768 }, problems: watch(dPage) });
+    await dctx.close();
   }
 } finally {
   await browser.close();

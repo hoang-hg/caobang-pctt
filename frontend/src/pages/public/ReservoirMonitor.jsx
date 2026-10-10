@@ -134,7 +134,7 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap, areaScope
         <button
           onClick={() => refetch()}
           disabled={isFetching}
-          className="btn-ghost text-xs px-3 py-1.5 flex items-center gap-1.5"
+          className="btn-ghost tap text-xs px-3 py-1.5 flex items-center gap-1.5"
           title="Làm mới số liệu ngay"
         >
           <RefreshCw size={13} className={clsx(isFetching && 'animate-spin text-accent')} />
@@ -305,7 +305,7 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap, areaScope
             <button
               onClick={() => setBasinFilter('all')}
               className={clsx(
-                'px-3 py-1.5 rounded-lg text-xs font-medium transition-all shrink-0',
+                'tap px-3 py-1.5 rounded-lg text-xs font-medium transition-all shrink-0',
                 basinFilter === 'all'
                   ? 'bg-accent text-white shadow-sm font-bold'
                   : 'bg-panel text-ink hover:bg-panel2 border border-line'
@@ -320,7 +320,7 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap, areaScope
                   key={b}
                   onClick={() => setBasinFilter(b)}
                   className={clsx(
-                    'px-3 py-1.5 rounded-lg text-xs font-medium transition-all shrink-0',
+                    'tap px-3 py-1.5 rounded-lg text-xs font-medium transition-all shrink-0',
                     basinFilter === b
                       ? 'bg-accent text-white shadow-sm font-bold'
                       : 'bg-panel text-ink hover:bg-panel2 border border-line'
@@ -341,14 +341,14 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap, areaScope
                 placeholder="Tìm tên hồ, sông, xã/phường…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="input pl-8 py-1.5 text-xs w-full"
+                className="input tap pl-8 py-1.5 text-xs w-full"
               />
             </div>
 
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="input py-1.5 text-xs w-auto flex-[1_1_auto] sm:flex-none font-medium"
+              className="input tap py-1.5 text-xs w-auto flex-[1_1_auto] sm:flex-none font-medium"
             >
               <option value="all">Mọi trạng thái</option>
               <option value="xa_khan_cap">🔴 Xả lũ lớn</option>
@@ -596,7 +596,7 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap, areaScope
                     type="button"
                     aria-expanded={historyOf === r.id}
                     onClick={() => setHistoryOf(historyOf === r.id ? null : r.id)}
-                    className="flex min-h-[40px] w-full items-center gap-1.5 px-3 text-left text-xs font-semibold text-ink-2 hover:bg-panel2/60"
+                    className="tap flex min-h-[40px] w-full items-center gap-1.5 px-3 text-left text-xs font-semibold text-ink-2 hover:bg-panel2/60"
                   >
                     <ChevronDown size={14} className={clsx('shrink-0 transition-transform', historyOf !== r.id && '-rotate-90')} aria-hidden="true" />
                     Diễn biến vận hành 48 giờ
@@ -619,7 +619,7 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap, areaScope
                   <button
                     type="button"
                     onClick={() => setEditing(r)}
-                    className="btn-ghost text-xs px-2.5 py-1 flex items-center gap-1"
+                    className="btn-ghost tap text-xs px-2.5 py-1 flex items-center gap-1"
                     title="Nhập số liệu vận hành theo báo cáo của đơn vị quản lý hồ"
                   >
                     <PencilLine size={13} /> Cập nhật vận hành
@@ -628,7 +628,7 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap, areaScope
                 {onSelectOnMap && (
                   <button
                     onClick={() => onSelectOnMap(r)}
-                    className="btn-ghost text-xs px-2.5 py-1 text-accent flex items-center gap-1 hover:bg-accent/10 hover:border-accent/40"
+                    className="btn-ghost tap text-xs px-2.5 py-1 text-accent flex items-center gap-1 hover:bg-accent/10 hover:border-accent/40"
                   >
                     <Compass size={13} /> Xem bản đồ
                   </button>

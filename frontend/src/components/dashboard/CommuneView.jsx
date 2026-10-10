@@ -83,7 +83,7 @@ export default function CommuneView({ code, units, onChange, children }) {
         </div>
         <label className="flex items-center gap-2 text-xs text-muted">
           <span>Xã/phường</span>
-          <select className="input w-auto min-w-[220px] py-1 text-xs" value={code || ''} onChange={(e) => onChange(e.target.value)} aria-label="Chọn xã/phường">
+          <select className="input tap w-auto min-w-[220px] py-1 text-xs" value={code || ''} onChange={(e) => onChange(e.target.value)} aria-label="Chọn xã/phường">
             {!code && <option value="">— Chọn —</option>}
             {units.map((u) => (
               <option key={u.code} value={u.code}>{unitLabel(u)}</option>
@@ -105,7 +105,7 @@ export default function CommuneView({ code, units, onChange, children }) {
               icon={Home}
               title="Tiến độ sơ tán"
               q={evacQ}
-              right={canEvac && canSos && <Link to="/cuu-ho" className="text-xs font-semibold text-accent hover:underline">Cập nhật →</Link>}
+              right={canEvac && canSos && <Link to="/cuu-ho" className="touch-hit text-xs font-semibold text-accent hover:underline">Cập nhật →</Link>}
               empty={!progress && 'Xã chưa cập nhật kế hoạch / tiến độ sơ tán (Điều hành cứu hộ → Giám sát sơ tán nhân dân)'}
             >
               {progress && (
@@ -152,7 +152,7 @@ export default function CommuneView({ code, units, onChange, children }) {
                 icon={Siren}
                 title={`Phiếu SOS đang mở · ${open.length}`}
                 q={sosQ}
-                right={<Link to="/cuu-ho" className="text-xs font-semibold text-accent hover:underline">Điều phối →</Link>}
+                right={<Link to="/cuu-ho" className="touch-hit text-xs font-semibold text-accent hover:underline">Điều phối →</Link>}
                 empty={!open.length && 'Không có phiếu SOS đang mở ở xã này'}
               >
                 <ul className="scroll-thin flex max-h-56 flex-col gap-1.5 overflow-y-auto pr-1 print:max-h-none print:overflow-visible">
@@ -194,7 +194,7 @@ export default function CommuneView({ code, units, onChange, children }) {
                           {f.commander ? ` · ${f.commander}` : ''}
                         </span>
                         {f.contact_phone && (
-                          <a href={`tel:${f.contact_phone}`} className="shrink-0 font-semibold text-accent">
+                          <a href={`tel:${f.contact_phone}`} className="tap inline-flex shrink-0 items-center font-semibold text-accent">
                             <PhoneCall size={11} className="mr-0.5 inline" />
                             {f.contact_phone}
                           </a>
@@ -216,7 +216,7 @@ export default function CommuneView({ code, units, onChange, children }) {
                         <span className="block truncate text-muted">{c.position}{c.org ? ` · ${c.org}` : ''}</span>
                       </span>
                       {c.phone && (
-                        <a href={`tel:${c.phone}`} className="shrink-0 font-semibold text-accent">
+                        <a href={`tel:${c.phone}`} className="tap inline-flex shrink-0 items-center font-semibold text-accent">
                           <PhoneCall size={11} className="mr-0.5 inline" />
                           {c.phone}
                         </a>
