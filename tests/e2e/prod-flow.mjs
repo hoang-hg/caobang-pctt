@@ -243,6 +243,11 @@ const op = await call('PATCH', `/reservoirs/${HO}/operation`, {
 }, admin);
 check('Cập nhật vận hành: mở 1/3 cửa → "Đang xả điều tiết"', op.status === 200 && op.data?.status_code === 'xa_dieu_tiet' && !!op.data?.updated_at,
   `HTTP ${op.status} ${op.data?.status_code || JSON.stringify(op.data).slice(0, 100)}`);
+// Thiết kế A.4: nhật ký vận hành ghi cả lưu lượng xả (VD "Hồ … xả tràn lưu lượng 500 m³/s")
+const opLogs = await call('GET', '/dashboard/logs?limit=20', null, admin);
+const opLog = (Array.isArray(opLogs.data) ? opLogs.data : []).find((l) => l.message?.startsWith('Cập nhật vận hành'));
+check('Nhật ký vận hành ghi lưu lượng xả trực ban nhập', opLogs.status === 200 && !!opLog?.message.includes('lưu lượng xả 150 m³/s'),
+  opLog?.message || `HTTP ${opLogs.status}`);
 res = await until('/public/reservoirs', (d) => d?.reservoirs?.find((r) => r.id === HO)?.status_code === 'xa_dieu_tiet');
 ho = res?.reservoirs?.find((r) => r.id === HO);
 check('Cổng công khai hiện ngay số liệu mới', ho?.status_code === 'xa_dieu_tiet' && res.spill_count === 1 && res.no_data_count === 0 &&

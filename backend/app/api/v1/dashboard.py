@@ -519,8 +519,10 @@ async def update_reservoir_operation(
         if body.spill_gates_open
         else "chưa mở cửa xả"
     )
+    # Thiết kế A.4: nhật ký vận hành ghi cả lưu lượng xả (VD "Hồ … xả tràn lưu lượng 500 m³/s"), như bộ mô phỏng
+    flow = f", lưu lượng xả {body.outflow_m3s:g} m³/s" if body.outflow_m3s is not None else ""
     await log_event(
-        f"Cập nhật vận hành {res['name']}: mực nước {body.current_level:.2f} m, {gates}"
+        f"Cập nhật vận hành {res['name']}: mực nước {body.current_level:.2f} m, {gates}{flow}"
         + (f" — nguồn: {body.source}" if body.source else "")
         + f" ({user['full_name']})",
         "canh_bao" if body.spill_gates_open else "van_hanh",

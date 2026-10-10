@@ -110,18 +110,21 @@ export default function KpiStrip({
         unit={rainKnown ? 'mm TB' : undefined}
         onClick={onRain}
         hint={`${rain?.avg_method === 'thiessen' ? `TB lưu vực theo diện tích (đa giác Thiessen) của ${rain.stations} trạm` : rain?.stations === 1 ? 'Số đo của 1 trạm trong vùng' : 'Trung bình cộng các trạm'} — bấm xem biểu đồ mưa giờ và dự báo 3 giờ tới`}
+        // Thiết kế A.2: mưa cực đại cục bộ ở dòng đầu — điện thoại chỉ đủ chỗ 1 dòng; mưa giờ + xu hướng từ máy tính bảng trở lên
+        footerRows={rainKnown}
         footer={
           rainKnown ? (
             <>
+              <span className="block truncate">
+                Lớn nhất <b className="font-mono text-ink">{num(rain.max_24h, 1)} mm</b>
+                {rain.max_station && ` · ${rain.max_station.replace(/^Trạm đo mưa\s+/i, '')}`}
+              </span>
               {hourRain && (
-                <>
+                <span className="hidden truncate sm:block">
                   {hourRain.span} <b className="font-mono text-ink">{num(hourRain.mm, 1)} mm</b>{' '}
                   <TrendTag dir={hourRain.dir} label={hourRain.label} className="align-middle" />
-                  {' · '}
-                </>
+                </span>
               )}
-              Lớn nhất <b className="font-mono text-ink">{num(rain.max_24h, 1)} mm</b>
-              {rain.max_station && ` · ${rain.max_station.replace(/^Trạm đo mưa\s+/i, '')}`}
             </>
           ) : rainStations ? `${rainStations} trạm đo mưa chưa gửi số đo 24 giờ qua` : 'Chưa có trạm đo mưa trong vùng đang xem'
         }
@@ -203,13 +206,19 @@ export default function KpiStrip({
         unit={planned ? 'kế hoạch' : undefined}
         to={canSos ? '/cuu-ho' : undefined}
         hint={canEvacUpdate ? 'Cập nhật tiến độ sơ tán ở Điều hành cứu hộ' : undefined}
+        // Thiết kế A.2: số hộ VÀ nhân khẩu đã sơ tán so với kế hoạch — mỗi số một dòng (điện thoại vẫn thấy cả hai);
+        // số điểm sơ tán từ máy tính bảng trở lên
+        footerRows={planned > 0}
         footer={
           planned ? (
             <>
-              {/* Thiết kế A.2: số hộ VÀ nhân khẩu đã sơ tán so với kế hoạch */}
-              <b className="font-mono text-ink">{int(ev.evacuated_households)}/{int(planned)}</b> hộ
-              {ev.planned_persons > 0 && <> · <b className="font-mono text-ink">{int(ev.evacuated_persons)}/{int(ev.planned_persons)}</b> người</>}
-              {evacQ.data ? ` · ${sites.length} điểm sơ tán` : evacQ.isError ? ' · không tải được điểm sơ tán' : ''}
+              <span className="block truncate"><b className="font-mono text-ink">{int(ev.evacuated_households)}/{int(planned)}</b> hộ</span>
+              {ev.planned_persons > 0 && (
+                <span className="block truncate"><b className="font-mono text-ink">{int(ev.evacuated_persons)}/{int(ev.planned_persons)}</b> người</span>
+              )}
+              {(evacQ.data || evacQ.isError) && (
+                <span className="hidden truncate sm:block">{evacQ.data ? `${sites.length} điểm sơ tán` : 'không tải được điểm sơ tán'}</span>
+              )}
             </>
           ) : 'Chưa có kế hoạch sơ tán trong vùng đang xem'
         }
@@ -225,10 +234,18 @@ export default function KpiStrip({
         value={fo.units > 0 ? int(fo.ready) : '–'}
         unit={fo.units > 0 ? `/ ${int(fo.total)} sẵn sàng` : undefined}
         to={canResource ? '/nguon-luc' : undefined}
+        hint="Quân số sẵn sàng / tổng số; phương tiện: đang làm nhiệm vụ / tổng số"
+        // Thiết kế A.2: quân số làm nhiệm vụ + phương tiện chuyên dụng (xuồng, xe lội nước — số đã gồm ca nô, ghe) đang hoạt
+        // động; thêm máy xúc, máy ủi thông tuyến sau sạt lở. Mỗi chỉ số một dòng, số đứng trước: ô hẹp chỉ cắt đuôi chữ
+        footerRows={hasResources}
         footer={
-          hasResources
-            ? `Nhiệm vụ ${int(fo.on_mission)} người · Xuồng ${int(ve.special_active)}/${int(ve.special_total)} · Máy xúc ${int(ve.heavy_active)}/${int(ve.heavy_total)}`
-            : 'Chưa có dữ liệu lực lượng, phương tiện'
+          hasResources ? (
+            <>
+              <span className="block truncate">Nhiệm vụ: <b className="font-mono text-ink">{int(fo.on_mission)}</b> người</span>
+              <span className="block truncate"><b className="font-mono text-ink">{int(ve.special_active)}/{int(ve.special_total)}</b> xuồng, xe lội nước</span>
+              <span className="block truncate"><b className="font-mono text-ink">{int(ve.heavy_active)}/{int(ve.heavy_total)}</b> máy xúc, máy ủi</span>
+            </>
+          ) : 'Chưa có dữ liệu lực lượng, phương tiện'
         }
       />
 
