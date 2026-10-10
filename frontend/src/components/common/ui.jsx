@@ -238,4 +238,18 @@ export function TrendTag({ dir, text, label, className }) {
   );
 }
 
+/** Nút "Xem thêm" của danh sách hiện dần (utils/useShowMore): còn mục ẩn thì hiện "Đang hiện a/b", "Xem thêm", "Xem tất cả". */
+export function ShowMore({ list, step, noun }) {
+  const rest = list.total - list.shown;
+  if (rest <= 0) return null;
+  const btn = 'btn-ghost min-h-[44px] px-3 text-xs sm:min-h-[36px]';
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-2 text-xs">
+      <span className="text-muted">Đang hiện {list.shown}/{list.total} {noun}</span>
+      <button type="button" className={btn} onClick={list.more}>Xem thêm {Math.min(step, rest)} {noun}</button>
+      {rest > step && <button type="button" className={btn} onClick={list.all}>Xem tất cả {list.total}</button>}
+    </div>
+  );
+}
+
 export const StatusDot = ({ cls }) => <span className={clsx('inline-block h-2 w-2 shrink-0 rounded-full', cls)} />;

@@ -144,7 +144,7 @@ export default function Dashboard() {
   const [reportOpen, setReportOpen] = useState(false);
   const [docOpen, setDocOpen] = useState(false); // báo cáo văn bản (PDF định dạng chuẩn)
   const [chartsOpen, setChartsOpen] = useState(CHARTS_OPEN);
-  const [forceOpen, setForceOpen] = useState(false); // đang chụp PDF trên điện thoại: mở mọi biểu đồ đang thu gọn
+  const [forceOpen, setForceOpen] = useState(false); // đang chụp PDF: mở mọi biểu đồ đang thu gọn, hiện đủ thẻ tab Hồ chứa / Sạt lở
   const ref = useRef(null); // vùng chụp PDF của thẻ đang mở
   const hydroRef = useRef(null);
   const riverRef = useRef(null);
@@ -290,9 +290,10 @@ export default function Dashboard() {
     }
   };
 
-  // Điện thoại: biểu đồ đang thu gọn phải mở ra trước khi chụp, nếu không PDF thiếu biểu đồ
+  // Trước khi chụp phải mở ra hết, nếu không PDF thiếu nội dung: biểu đồ đang thu gọn (điện thoại), thẻ hồ / điểm sạt lở đang
+  // ẩn sau "Xem thêm" (tab Hồ chứa / Sạt lở)
   const withChartsOpen = async (run) => {
-    const folded = isPhone && Object.values(chartsOpen).some((v) => !v);
+    const folded = (isPhone && Object.values(chartsOpen).some((v) => !v)) || tab === 'ho_chua' || tab === 'sat_lo';
     try {
       if (folded) {
         setForceOpen(true);
@@ -585,7 +586,7 @@ export default function Dashboard() {
 
       {tab === 'ho_chua' && (
         <div ref={ref} className="card p-3 sm:p-5">
-          <ReservoirMonitor areaScoped onSelectOnMap={openOnMap} />
+          <ReservoirMonitor areaScoped showAll={forceOpen} onSelectOnMap={openOnMap} />
         </div>
       )}
 
@@ -596,7 +597,7 @@ export default function Dashboard() {
             <SensorHeatmap />
           </Section>
           <div className="card p-3 sm:p-5">
-            <LandslideMonitor areaScoped onSelectOnMap={openOnMap} />
+            <LandslideMonitor areaScoped showAll={forceOpen} onSelectOnMap={openOnMap} />
           </div>
         </div>
       )}

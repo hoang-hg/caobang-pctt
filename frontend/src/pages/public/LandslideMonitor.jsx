@@ -8,13 +8,17 @@ import {
 } from 'lucide-react';
 import { api } from '../../api/client';
 import { useAreaQuery } from '../../api/hooks';
-import { BackButton, EmptyState, ErrorState, Skeleton } from '../../components/common/ui';
+import { BackButton, EmptyState, ErrorState, ShowMore, Skeleton } from '../../components/common/ui';
 import { time } from '../../utils/format';
+import { useShowMore } from '../../utils/useShowMore';
 import { levelOf, risk, TILT_LEVEL } from '../../utils/risk';
 
 const EMPTY = [];
 
 const REFRESH_INTERVAL = 20_000;
+const PAGE = 9; // thẻ hiện mỗi lần (3 hàng × 3 cột trên máy tính)
+// Cấm đường → cảnh báo → chưa có dữ liệu giám sát (chưa biết) → thông suốt: mục khẩn luôn ở đầu, không bị ẩn sau "Xem thêm"
+const TRAFFIC_ORDER = { cam_duong: 0, canh_bao: 1, chua_co_du_lieu: 2, thong_suot: 3 };
 
 /** Độ nghiêng taluy lớn nhất trong các điểm đen có cảm biến, VD "+1.2° (Đèo Mẻ Pia)". */
 export const maxTiltText = (points = []) => {
@@ -25,9 +29,9 @@ export const maxTiltText = (points = []) => {
 /**
  * Điểm đen sạt lở & trạng thái đường đèo — dùng chung cho cổng công khai (toàn tỉnh) và tab Sạt lở của Tổng quan
  * (`areaScoped`: theo bộ lọc địa phương / phạm vi được giao — cùng số với ô KPI). Chưa tải được thì nói rõ, không hiện
- * "Không tìm thấy điểm nguy cơ…" hay số 0.
+ * "Không tìm thấy điểm nguy cơ…" hay số 0. `showAll`: hiện đủ mọi thẻ, bỏ "Xem thêm" (Tổng quan đang chụp PDF).
  */
-export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScoped = false }) {
+export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScoped = false, showAll = false }) {
   const [corridorFilter, setCorridorFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -60,8 +64,9 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScope
         if (!matchName && !matchAdmin && !matchRoad && !matchDesc) return false;
       }
       return true;
-    });
+    }).sort((a, b) => (TRAFFIC_ORDER[a.traffic_status] ?? 2) - (TRAFFIC_ORDER[b.traffic_status] ?? 2));
   }, [points, corridorFilter, statusFilter, categoryFilter, searchQuery]);
+  const shownPts = useShowMore(filteredPoints, PAGE, `${corridorFilter}|${statusFilter}|${categoryFilter}|${searchQuery}`, showAll);
 
   const blockedCount = data?.blocked_count || 0;
   const warningCount = data?.warning_count || 0;
@@ -340,7 +345,7 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScope
 
       {/* 5. Danh sách thẻ chi tiết từng điểm đen sạt trượt */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {filteredPoints.map((p) => {
+        {shownPts.visible.map((p) => {
           const isBlocked = p.traffic_status === 'cam_duong';
           const isWarning = p.traffic_status === 'canh_bao';
           const isSafe = p.traffic_status === 'thong_suot';
@@ -514,6 +519,7 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScope
           );
         })}
       </div>
+      <ShowMore list={shownPts} step={PAGE} noun="điểm" />
 
       {filteredPoints.length === 0 && (
         <div className="card p-12 text-center text-muted text-sm space-y-2">

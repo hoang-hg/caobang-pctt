@@ -9,21 +9,25 @@ import {
 import { api } from '../../api/client';
 import { useAreaQuery } from '../../api/hooks';
 import { useStore } from '../../app/store';
-import { BackButton, EmptyState, ErrorState, Modal, Skeleton } from '../../components/common/ui';
+import { BackButton, EmptyState, ErrorState, Modal, ShowMore, Skeleton } from '../../components/common/ui';
 import { ReservoirHistory } from '../../components/charts/ReservoirOpsChart';
 import { usePermission } from '../../rbac/usePermission';
 import { ago, time } from '../../utils/format';
+import { useShowMore } from '../../utils/useShowMore';
 
 const EMPTY = [];
 
 const REFRESH_INTERVAL = 20_000;
+const PAGE = 9; // thẻ hiện mỗi lần (3 hàng × 3 cột trên máy tính) — dữ liệu thật vài chục hồ không làm trang quá dài
+// Xả lũ lớn → đang xả → chưa có số liệu (chưa biết) → chưa xả: mục khẩn luôn ở đầu, không bị ẩn sau "Xem thêm"
+const STATUS_ORDER = { xa_khan_cap: 0, xa_dieu_tiet: 1, chua_co_so_lieu: 2, binh_thuong: 3 };
 
 /**
  * Giám sát hồ chứa & cảnh báo xả lũ — dùng chung cho cổng công khai (toàn tỉnh) và tab Hồ chứa của Tổng quan (`areaScoped`:
  * theo bộ lọc địa phương / phạm vi được giao, thiết kế mục F.1 — cùng số với ô KPI). Chưa tải được thì nói rõ, KHÔNG hiện
- * "0 hồ xả lũ" / "TRỰC TIẾP" (khẳng định sai là an toàn).
+ * "0 hồ xả lũ" / "TRỰC TIẾP" (khẳng định sai là an toàn). `showAll`: hiện đủ mọi thẻ, bỏ "Xem thêm" (Tổng quan đang chụp PDF).
  */
-export default function ReservoirMonitor({ onSelectOnMap, onBackToMap, areaScoped = false }) {
+export default function ReservoirMonitor({ onSelectOnMap, onBackToMap, areaScoped = false, showAll = false }) {
   const [basinFilter, setBasinFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -53,8 +57,9 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap, areaScope
         if (!matchName && !matchAdmin && !matchRiver) return false;
       }
       return true;
-    });
+    }).sort((a, b) => (STATUS_ORDER[a.status_code] ?? 2) - (STATUS_ORDER[b.status_code] ?? 2));
   }, [reservoirs, basinFilter, statusFilter, searchQuery]);
+  const shownRes = useShowMore(filteredReservoirs, PAGE, `${basinFilter}|${statusFilter}|${searchQuery}`, showAll);
 
   const uniqueBasins = useMemo(() => {
     const set = new Set();
@@ -387,7 +392,7 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap, areaScope
 
       {/* 5. Danh sách thẻ chi tiết từng hồ chứa */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {filteredReservoirs.map((r) => {
+        {shownRes.visible.map((r) => {
           const isEmergency = r.status_code === 'xa_khan_cap';
           const isSpilling = r.status_code === 'xa_dieu_tiet';
           const isNormal = r.status_code === 'binh_thuong';
@@ -633,6 +638,7 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap, areaScope
           );
         })}
       </div>
+      <ShowMore list={shownRes} step={PAGE} noun="hồ" />
 
       {editing && <OperationModal reservoir={editing} onClose={() => setEditing(null)} />}
 

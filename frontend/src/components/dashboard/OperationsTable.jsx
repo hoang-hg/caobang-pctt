@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 import {
-  ArrowUpDown, Boxes, ChartLine, ChevronLeft, ChevronRight, FileDown, FileSpreadsheet, Loader2, MapPin, Megaphone, Mountain, Search,
+  ArrowUpDown, Boxes, ChartLine, ChevronLeft, ChevronRight, Droplets, FileDown, FileSpreadsheet, Loader2, MapPin, Megaphone, Mountain, Search,
   Siren, Waves, X,
 } from 'lucide-react';
 import { useAreaQuery } from '../../api/hooks';
@@ -12,7 +12,7 @@ import { exportExcel } from '../../utils/exportExcel';
 import { exportSnapshotPdf } from '../../utils/exportPdf';
 import { INCIDENT, PRIORITY, SOS_STATUS } from '../../utils/labels';
 import { dateTime, int, minutesSince, num, vnFileStamp } from '../../utils/format';
-import { LANDSLIDE_LEVEL, levelOf, risk, sosLevel } from '../../utils/risk';
+import { LANDSLIDE_LEVEL, levelOf, RESERVOIR_LEVEL, risk, sosLevel } from '../../utils/risk';
 import { slaState } from '../../utils/sla';
 import { useMediaQuery } from '../../utils/useMediaQuery';
 import { ErrorState, Skeleton } from '../common/ui';
@@ -20,6 +20,7 @@ import { riverState } from './RiverKpi';
 
 const TABS = [
   { id: 'rivers', label: 'Mực nước & trạm thủy văn', short: 'Mực nước', noun: 'trạm mực nước', icon: Waves },
+  { id: 'reservoirs', label: 'Hồ chứa & xả lũ', short: 'Hồ chứa', noun: 'hồ chứa', icon: Droplets },
   { id: 'landslides', label: 'Điểm đen sạt lở', short: 'Sạt lở', noun: 'điểm đen sạt lở', icon: Mountain },
   { id: 'sos', label: 'Phiếu SOS đang mở', short: 'SOS', noun: 'phiếu SOS', icon: Siren, perm: 'sos' },
   { id: 'supplies', label: 'Kho vật tư dự trữ', short: 'Kho', noun: 'kho vật tư', icon: Boxes, perm: 'resource' },
@@ -34,18 +35,32 @@ const WAREHOUSE_LEVEL = { tinh: 'Kho tỉnh', cum: 'Kho cụm', xa: 'Kho xã', d
 const ALERT_CHANNELS = ['SMS', 'CELL_BROADCAST', 'ZALO_OA', 'LOA']; // như mặc định khung soạn (pages/Alerts.jsx)
 const EMPTY = {
   rivers: 'Chưa có trạm mực nước trong vùng đang xem (nhập loại "Trạm quan trắc")',
+  reservoirs: 'Chưa có hồ chứa trong vùng đang xem (nhập loại "Hồ chứa")',
   landslides: 'Chưa có điểm đen sạt lở trong vùng đang xem',
   sos: 'Không có phiếu SOS đang mở trong vùng đang xem',
   supplies: 'Chưa có kho / tồn kho kèm định mức dự trữ trong vùng đang xem',
 };
 
-function buildRows(tab, { stations, points, tickets, supplies }) {
+function buildRows(tab, { stations, reservoirs, points, tickets, supplies }) {
   if (tab === 'rivers') {
     return stations.map((s) => {
       const st = riverState(s);
       return {
         id: s.id, name: s.name, sub: s.river ? `Sông ${s.river}` : '', area: s.admin_name, lat: s.lat, lon: s.lon,
         level: st.level, levelText: st.label, value: st.value, thr: s.thresholds || {}, time: s.value == null ? null : s.time,
+      };
+    });
+  }
+  if (tab === 'reservoirs') {
+    // Mức theo trạng thái máy chủ (services/reservoirs.py): xả lũ lớn Đỏ, xả điều tiết Cam, chưa xả Xanh, chưa có số liệu Xám
+    return reservoirs.map((r) => {
+      const has = !!r.updated_at; // có số liệu vận hành (thời điểm số liệu, không phải lần nhập danh mục)
+      return {
+        id: r.id, name: r.name, sub: r.river ? `Sông ${r.river}` : '', area: r.admin_name, lat: r.lat, lon: r.lon,
+        level: levelOf(RESERVOIR_LEVEL, r.status_code), levelText: `${r.status_label}${r.stale ? ' (số liệu cũ)' : ''}`,
+        waterLevel: has ? r.current_level : null, normal: r.normal_level, diff: has ? r.level_diff : null,
+        gatesOpen: has ? r.spill_gates_open : null, gates: r.spill_gates, inflow: r.inflow_m3s, outflow: r.outflow_m3s,
+        time: r.updated_at, stale: r.stale, warning: r.downstream_warning,
       };
     });
   }
@@ -88,6 +103,14 @@ const COLUMNS = {
     { label: 'BĐ I / II / III', num: true, cell: (r) => [r.thr.bd1, r.thr.bd2, r.thr.bd3].map((x) => (x == null ? '–' : num(x, 2))).join(' / ') },
     { label: 'Số đo lúc', sort: 'time', cell: (r) => (r.time ? dateTime(r.time) : 'không có số đo 2 giờ qua') },
   ],
+  // Đơn vị nối với số bằng dấu cách không ngắt: thẻ điện thoại hẹp xuống dòng sau "/" chứ không để "m" lẻ một dòng
+  reservoirs: [
+    { label: 'Xã/phường', sort: 'area', cell: (r) => r.area || '–' },
+    { label: 'Mực nước / MNDBT', sort: 'diff', num: true, cell: (r) => (r.waterLevel == null ? '–' : `${num(r.waterLevel, 2)} / ${num(r.normal, 2)} m`) },
+    { label: 'Cửa xả mở', sort: 'gatesOpen', num: true, cell: (r) => (r.gatesOpen == null ? '–' : `${int(r.gatesOpen)}/${int(r.gates)}`) },
+    { label: 'Q đến / Q xả', sort: 'outflow', num: true, cell: (r) => (r.inflow == null ? '–' : `${int(r.inflow)} / ${int(r.outflow)} m³/s`) },
+    { label: 'Số liệu lúc', sort: 'time', cell: (r) => (r.time ? `${dateTime(r.time)}${r.stale ? ' (cũ)' : ''}` : 'chưa có số liệu vận hành') },
+  ],
   landslides: [
     { label: 'Xã/phường', sort: 'area', cell: (r) => r.area || '–' },
     { label: 'Mưa 24h', sort: 'rain24', num: true, cell: (r) => (r.rain24 == null ? '–' : `${num(r.rain24, 1)} mm`) },
@@ -118,6 +141,14 @@ function excelRows(tab, rows) {
         'Tình trạng': r.levelText, 'Mức màu': risk(r.level).name, 'Số đo lúc': r.time ? dateTime(r.time) : '',
       };
     }
+    if (tab === 'reservoirs') {
+      return {
+        ...base, 'Mã hồ': r.id, 'Tên hồ': r.name, 'Sông': r.sub, 'Xã/phường': r.area || '',
+        'Mực nước (m)': r.waterLevel ?? '', 'MNDBT (m)': r.normal ?? '', 'Chênh so MNDBT (m)': r.diff ?? '',
+        'Cửa xả đang mở': r.gatesOpen ?? '', 'Tổng số cửa xả': r.gates ?? '', 'Q đến (m³/s)': r.inflow ?? '', 'Q xả (m³/s)': r.outflow ?? '',
+        'Trạng thái': r.levelText, 'Mức màu': risk(r.level).name, 'Số liệu lúc': r.time ? dateTime(r.time) : '', 'Khuyến cáo hạ du': r.warning || '',
+      };
+    }
     if (tab === 'landslides') {
       return {
         ...base, 'Mã điểm': r.id, 'Điểm đen': r.name, 'Tuyến đường': r.sub, 'Xã/phường': r.area || '',
@@ -142,7 +173,8 @@ function excelRows(tab, rows) {
 const Chip = ({ r }) => <span className={clsx('chip whitespace-nowrap px-2 py-0 text-[10px]', risk(r.level).chip)}>{r.levelText}</span>;
 
 /**
- * Bảng tác chiến dưới Dashboard: 4 chuyên đề, mọi dòng từ API thật (trạm, điểm đen sạt lở trong KPI, phiếu SOS, kho).
+ * Bảng tác chiến dưới Dashboard: 5 chuyên đề, mọi dòng từ API thật (trạm; hồ chứa và điểm đen sạt lở trong KPI — cùng vùng
+ * đang xem, không thêm lượt gọi; phiếu SOS; kho).
  * Tìm kiếm, lọc theo mức màu, sắp xếp, phân trang, xuất Excel / PDF (toàn bộ danh sách đã lọc, không chỉ trang đang xem).
  * Điện thoại (< 640 px): mỗi dòng là một thẻ, nút to — không phải kéo ngang bảng 760 px. Thao tác chỉ dẫn tới luồng
  * nghiệp vụ có sẵn: bản đồ, Điều hành cứu hộ, khung soạn cảnh báo (vẫn Maker–Checker + PIN). Chuyên đề / nút chỉ hiện khi
@@ -172,12 +204,15 @@ export default function OperationsTable({ k, kState, stations, stationsState, on
 
   const state = {
     rivers: stationsState,
+    reservoirs: kState,
     landslides: kState,
     sos: { loading: ticketsQ.isLoading, error: ticketsQ.isError && !ticketsQ.data, refetch: ticketsQ.refetch },
     supplies: { loading: suppliesQ.isLoading, error: suppliesQ.isError && !suppliesQ.data, refetch: suppliesQ.refetch },
   }[tab] || {};
   const rows = useMemo(
-    () => buildRows(tab, { stations, points: k?.landslides?.points || [], tickets: ticketsQ.data || [], supplies: suppliesQ.data || [] })
+    () => buildRows(tab, {
+      stations, reservoirs: k?.reservoirs?.reservoirs || [], points: k?.landslides?.points || [], tickets: ticketsQ.data || [], supplies: suppliesQ.data || [],
+    })
       .map((r) => ({ ...r, rank: r.level ?? -1 })),
     [tab, stations, k, ticketsQ.data, suppliesQ.data],
   );
@@ -402,8 +437,8 @@ export default function OperationsTable({ k, kState, stations, stationsState, on
                     />
                   </th>
                 )}
-                {[{ label: { rivers: 'Trạm', landslides: 'Điểm', sos: 'Phiếu', supplies: 'Kho' }[tab], sort: 'name' }, ...cols,
-                  { label: tab === 'landslides' ? 'Giao thông' : 'Mức', sort: 'rank' }].map((col) => (
+                {[{ label: { rivers: 'Trạm', reservoirs: 'Hồ', landslides: 'Điểm', sos: 'Phiếu', supplies: 'Kho' }[tab], sort: 'name' }, ...cols,
+                  { label: { landslides: 'Giao thông', reservoirs: 'Trạng thái' }[tab] || 'Mức', sort: 'rank' }].map((col) => (
                   <th
                     key={col.label}
                     scope="col"
