@@ -6,47 +6,61 @@ tải / trống / lỗi / mất mạng, 360 px, theo phân quyền).
 
 - Cập nhật: 10/10/2026 — mã nguồn `main` gồm PR #53 → #62 (bố cục, màu hồ, lọc SOS, form, tài liệu này; mưa dự báo theo
   thanh thời gian — G1 ở PR #57; radar theo thanh thời gian — G2 ở PR #58; bố cục cho người quản lý — G3 ở PR #59 → #62).
+- Rà lại lần 2 (10/10/2026): đối chiếu **từng ý** của mục B với mã nguồn — thêm 4 việc giao diện (G4 → G7, mục 3) và 3
+  việc chờ dữ liệu / tích hợp (BD9 → BD11, mục 4); sửa lại các dòng tương ứng ở mục 1.
 - Máy chủ thử vẫn chạy **v1.0.3**, **chưa có** các thay đổi trên — xem V1 trong `docs/trang-a-viec-con-lai.md` (triển khai
   chung cho mọi trang).
 - Dữ liệu nền dùng chung với trang A: `docs/trang-a-viec-con-lai.md` mục 2 (D1), 4 (D3), 7 (radar), README 2.2 / 2.4.
 
-**Kết luận:** về chức năng, bản đồ đã có gần đủ những gì mục B mô tả; giao diện đã sửa theo các yêu cầu chung
-(PR #53 → #55); mưa dự báo và radar đã đổi theo thanh thời gian (G1, G2 — PR #57, #58); bố cục cho người quản lý trên
-laptop, iPad, điện thoại (G3 — PR #59 → #62): 6 chỉ số "Tình hình", tab Điểm nóng, chế độ xem Tình hình | Tác nghiệp,
-vùng chạm ≥ 44 px trên màn cảm ứng. Việc làm được ngay mà không cần dữ liệu mới đã hết. Còn lại:
+**Kết luận:** bản đồ đã có gần đủ những gì mục B mô tả: giao diện theo các yêu cầu chung (PR #53 → #55); mưa dự báo, radar
+theo thanh thời gian (G1, G2 — PR #57, #58); bố cục cho người quản lý trên laptop, iPad, điện thoại (G3 — PR #59 → #62).
+Rà lần 2 theo từng ý của mục B thấy **còn 4 việc giao diện làm được ngay, không cần dữ liệu mới** (mục 3) — thứ tự đề xuất:
+
+1. **G7 — khoanh vùng, tìm đường báo lỗi** khi mất mạng / máy chủ lỗi: nay bảng "Phân tích vùng khoanh" quay mãi "Đang tính
+   toán…", tìm đường không báo gì; kết quả khoanh vùng ghi thêm các xã trong vùng. Không đổi API.
+2. **G5 — 12 điểm đen sạt lở, đèo dốc lên bản đồ** (tam giác theo màu mức, trạng thái Cấm đường / Cảnh báo) — B.2; nay chỉ
+   có ở Tổng quan và cổng công khai, bấm "xem trên bản đồ" chỉ hiện ghim 8 giây. Không đổi API (số liệu đã tải).
+3. **G4 — dòng diễn biến theo thời gian** trong bảng Cảnh báo khẩn cấp (SOS mới, trạm vượt báo động, lệnh điều động… mới
+   nhất trên cùng) — B.1 "feed cuộn liên tục"; nay các tab chỉ có trạng thái hiện tại. Sửa nhỏ phía máy chủ (trả và ghi
+   kèm toạ độ cho nhật ký sự kiện).
+4. **G6 — popup hồ chứa, xuồng – xe đủ như B.3**: hồ có biểu đồ mini, nút thao tác, nhãn lưu lượng xả (m³/s) ngay trên
+   biểu tượng; xuồng – xe có nút gọi. Sửa nhỏ API (thêm số điện thoại đơn vị vào lớp xe).
+
+Còn lại:
 
 - **Cần quyết định trước khi vận hành chính thức — giấy phép radar:** điều khoản RainViewer (nguồn radar đang dùng) chỉ
   cho dùng cá nhân / giáo dục (BD6).
-- **Chờ dữ liệu hoặc hệ thống bên ngoài**: BD1 → BD7 (mục 4). GPS lực lượng **không làm** theo quyết định ngày
-  29/09/2026 (BD8).
+- **Chờ dữ liệu hoặc hệ thống bên ngoài**: BD1 → BD7, BD9 → BD11 (mục 4) — mới thêm: số điện thoại tài xế, đơn vị vận hành
+  hồ cho nút gọi (BD9); tự gửi lệnh điều động tới đội (BD10); SOS từ Zalo OA / ứng dụng (BD11). GPS lực lượng **không
+  làm** theo quyết định ngày 29/09/2026 (BD8).
 
-## 1. Đối chiếu với thiết kế mục B (rà ngày 10/10/2026)
+## 1. Đối chiếu với thiết kế mục B (rà ngày 10/10/2026, lần 2 theo từng ý)
 
 | Yêu cầu của thiết kế | Hiện trạng |
 |---|---|
 | B.1 Bản đồ toàn màn, bảng nổi | Đạt — máy tính: bảng nổi thu gọn được; điện thoại: bản đồ toàn màn (360 px thấy ~93%, trước ~3%), bảng trượt từ đáy |
 | B.1 Bảng lớp dữ liệu (trái) | Đạt — 4 nhóm lớp, số đối tượng từng lớp, lớp trống ghi "chưa có … (nhập loại …)" |
 | B.1 Thanh thời gian & radar (đáy): bão, mưa, ngập 12 giờ qua / 24 giờ tới | Đạt — thanh −12h…+24h đổi trạm (số đo quá khứ / bản tin dự báo), vùng ngập kịch bản, vị trí tâm bão, **mưa dự báo theo xã** (hiện tại: tổng 24 giờ tới; kéo tới +N giờ: mưa trong giờ đó; giờ đã qua: xem trạm mưa — G1), **radar** ảnh ~2 giờ qua (−2h → hiện tại, ghi giờ ảnh — G2) |
-| B.1 Bảng cảnh báo khẩn cấp (phải): feed SOS + cảnh báo cảm biến | Đạt — cập nhật tức thì (WebSocket); lọc SOS Đỏ / Cam / Vàng, tìm kiếm; trạm vượt báo động, mất tín hiệu |
+| B.1 Bảng cảnh báo khẩn cấp (phải): **dòng thời gian cuộn liên tục** (feed) SOS + cảnh báo cảm biến | Đạt một phần — cập nhật tức thì (WebSocket); tab Điểm nóng, Phiếu SOS (lọc Đỏ / Cam / Vàng, tìm kiếm), Cảm biến (trạm vượt báo động, mất tín hiệu). Mỗi tab là **trạng thái hiện tại** xếp theo mức — **chưa có dòng diễn biến theo thời gian** (SOS mới, trạm vừa vượt báo động, lệnh điều động… mới nhất trên cùng) (G4) |
 | B.1 Công cụ (phải trên): nền bản đồ, đo khoảng cách, khoanh vùng | Đạt — nền Địa lý / Vệ tinh / Địa hình / Ban đêm, đo, khoanh đa giác / tròn, đánh dấu sự cố |
 | B.2 Trạm mưa, mực nước; bấm xem biểu đồ so với BĐ I–III | Đạt — màu theo báo động, mất tín hiệu xám nét đứt. Cần trạm + ngưỡng thật (BD1) |
-| B.2 Hồ chứa: vị trí, lưu lượng xả | Đạt — màu theo trạng thái (Đỏ xả lũ lớn, Cam xả điều tiết, Xám chưa có số liệu), popup có lưu lượng; số liệu vận hành nhập tay (trang A D4) |
+| B.2 Hồ chứa: vị trí, hiển thị lưu lượng đang xả (m³/s) | Đạt — màu theo trạng thái (Đỏ xả lũ lớn, Cam xả điều tiết, Xám chưa có số liệu), popup có lưu lượng; số liệu vận hành nhập tay (trang A D4). Nhãn trên biểu tượng mới ghi số cửa đang mở — thêm lưu lượng xả để thấy không cần bấm (G6) |
 | B.2 Radar thời tiết, mây vệ tinh (ảnh mờ) | Đạt một phần — radar RainViewer: ảnh ~2 giờ qua theo thanh thời gian, ghi giờ ảnh, chú giải màu (G2). **Chưa có mây vệ tinh** (RainViewer đã bỏ từ 01/01/2026); radar KTTV chưa có nguồn; **điều khoản RainViewer chỉ cho dùng cá nhân / giáo dục** (BD6) |
 | B.2 Quỹ đạo bão: tâm, đường đi dự kiến, vùng gió mạnh | Đạt — trực ban dán bản tin; nét liền đã qua, nét đứt dự báo, vòng gió mạnh |
 | B.2 Vùng ngập (xanh trong suốt, càng đậm càng sâu; nội suy DEM + mực nước) | Đạt một phần — vùng ngập nhập tay / cảm biến, tô đậm theo độ sâu; vùng ngập kịch bản BĐ I–III theo mực nước trạm. **Chưa nội suy từ DEM** (BD4) |
-| B.2 Điểm nóng sạt lở (tam giác, Đỏ = rất cao); sự cố giao thông / hạ tầng | Đạt — cán bộ đánh dấu sự cố ngay trên bản đồ, tự ẩn khi hết hạn |
+| B.2 Điểm nóng sạt lở (tam giác cảnh báo ở vùng đồi núi, đèo dốc; Đỏ = rất cao); sự cố giao thông / hạ tầng | Đạt một phần — lớp hiện điểm nguy hiểm nhập từ tệp (loại `diem_nguy_hiem`, BD1) và sự cố cán bộ đánh dấu ngay trên bản đồ (tự ẩn khi hết hạn), tam giác theo màu mức. **12 điểm đen sạt lở, đèo dốc** có trạng thái Cấm đường / Cảnh báo (Tổng quan → Sạt lở & đường đèo) **chưa vẽ trên bản đồ** (G5) |
 | B.2 Lực lượng cứu hộ (GPS trực tiếp) | **Không làm** GPS (BD8) — hiện vị trí đơn vị đã nhập, ghi rõ trên bảng lớp |
 | B.2 Kho vật tư: biểu đồ tròn % hàng còn | Đạt — kèm "Ra lệnh xuất kho" |
 | B.2 Điểm sơ tán: sức chứa "Đang chứa a/b" | Đạt — kèm cập nhật số người (nút ±1 / ±10) |
-| B.2 SOS: bàn tay nhấp nháy đỏ | Đạt — màu theo cấp, nhấp nháy khi mới; âm thanh khi có SOS cấp 1–2 (nếu bật loa) |
-| B.3 Popup thông minh: chi tiết, biểu đồ mini, nút thao tác nhanh | Đạt — gọi chỉ huy / thủ kho, ra lệnh xuất kho, điều phối, cập nhật số người, xem camera |
+| B.2 SOS: bàn tay nhấp nháy đỏ tại toạ độ người dân gửi qua App / Zalo / Tổng đài | Đạt — màu theo cấp, nhấp nháy khi mới; âm thanh khi có SOS cấp 1–2 (nếu bật loa). Nguồn hiện có: trực ban / tổng đài nhập, cảm biến tự tạo phiếu. **Zalo OA / ứng dụng**: cổng tiếp nhận có sẵn nhưng đang tắt — chờ bên gửi (BD11) |
+| B.3 Popup thông minh (hồ chứa, trạm đo, xe cứu hộ…): chi tiết, biểu đồ mini, nút thao tác nhanh (VD gọi tài xế, ra lệnh xuất kho) | Đạt một phần — trạm đo có biểu đồ (mực nước kèm BĐ I–III); kho: biểu đồ tròn, gọi thủ kho, ra lệnh xuất kho; lực lượng: gọi chỉ huy; SOS: điều phối; điểm sơ tán: cập nhật số người; camera. **Hồ chứa** chỉ có bảng số, chưa có biểu đồ mini và nút thao tác (G6); **xuồng – xe** chưa có nút gọi — chưa có số tài xế (BD9), tạm gọi chỉ huy đơn vị (G6) |
 | B.3 Camera CCTV xem trực tiếp trên bản đồ | **Mô phỏng** — giao diện có, hình là mô phỏng; chưa có nguồn camera, chưa có cách khai báo (BD2) |
-| B.3 Khoanh vùng → đếm nhà dân → gửi SMS sơ tán đồng loạt | Đạt một phần — khoanh vùng → **ước tính** dân số / số hộ theo tỉ lệ diện tích xã (BD5) → soạn cảnh báo (qua phê duyệt). Gửi SMS / Cell Broadcast thật chờ hợp đồng nhà mạng (BD7) |
-| B.3 Tìm đường an toàn né ngập / sạt lở | Đạt khi có mạng đường — chạy thật chưa nhập mạng đường nên chưa né được (BD3) |
-| B.4 SOS nhấp nháy + âm thanh → xem lớp → kéo – thả đội vào SOS → hộp thoại xác nhận → điều động | Đạt — lệnh điều động 2 bước (Lực lượng → Vật tư & xác nhận, có tóm tắt) |
+| B.3 Khoanh vùng → đếm nhà dân → gửi SMS sơ tán đồng loạt | Đạt một phần — khoanh vùng → **ước tính** dân số / số hộ theo tỉ lệ diện tích xã (BD5) → soạn cảnh báo (qua phê duyệt). Gửi SMS / Cell Broadcast thật chờ hợp đồng nhà mạng (BD7). Tính lỗi / mất mạng thì bảng kết quả quay mãi, chưa ghi các xã trong vùng (G7) |
+| B.3 Tìm đường an toàn né ngập / sạt lở (A = lực lượng, B = điểm cứu hộ) | Đạt khi có mạng đường — chạy thật chưa nhập mạng đường nên chưa né được (BD3). Lỗi máy chủ / mất mạng thì không báo gì (G7) |
+| B.4 SOS nhấp nháy + âm thanh → xem lớp → kéo – thả đội vào SOS → hộp thoại xác nhận → **tự động gửi lệnh kèm toạ độ cho đội** | Đạt một phần — kéo – thả, lệnh điều động 2 bước (Lực lượng → Vật tư & xác nhận, có tóm tắt), tạo link nhiệm vụ có toạ độ và chỉ đường. **Chưa tự gửi cho đội**: hộp thoại ghi rõ, trực ban gọi hoặc sao chép nội dung lệnh gửi qua Zalo / SMS (BD10) |
 | B.4 Theo dõi đội di chuyển thời gian thực | Không có GPS (BD8): lộ trình chuyển "đã đến" khi trưởng nhóm báo qua link nhiệm vụ |
-| B.5 Leaflet, nền OSM / tự lưu trữ, WebSocket, GeoJSON | Đạt |
-| Yêu cầu giao diện chung (màu rủi ro, khẩn trên cùng, thao tác dễ bấm, form báo lỗi, trạng thái, 360 px, phân quyền) | Đạt — PR #53 → #55; vùng chạm ≥ 44 px trên màn cảm ứng — PR #61 |
+| B.5 Leaflet, nền OSM / tự lưu trữ, WebSocket đẩy SOS và vị trí xuồng, GeoJSON | Đạt — WebSocket đẩy SOS, trạng thái lực lượng, phương tiện, kho, hồ; vị trí xuồng không có vì không làm GPS (BD8) |
+| Yêu cầu giao diện chung (màu rủi ro, khẩn trên cùng, thao tác dễ bấm, form báo lỗi, trạng thái, 360 px, phân quyền) | Đạt một phần — PR #53 → #55; vùng chạm ≥ 44 px trên màn cảm ứng — PR #61. Còn: khoanh vùng, tìm đường chưa báo lỗi / mất mạng (G7). Danh sách trên bản đồ là danh sách xem nhanh (tìm, lọc); bảng đầy đủ có xuất Excel ở Tổng quan → "Bảng tác chiến theo chuyên đề" |
 | Lãnh đạo nắm tình hình trong vài giây (KPI, bản đồ, cảnh báo nổi bật) trên laptop, iPad, điện thoại | Đạt — 6 chỉ số "Tình hình" cùng số Tổng quan, tab Điểm nóng, chế độ xem Tình hình / Tác nghiệp (G3, PR #59 → #62) |
 
 ## 2. Bảng tổng hợp việc còn lại
@@ -56,6 +70,10 @@ vùng chạm ≥ 44 px trên màn cảm ứng. Việc làm được ngay mà kh�
 | G1 | **Mưa dự báo theo thanh thời gian** (lượng mưa giờ tại thời điểm đang kéo) | Không cần dữ liệu (thêm tham số API) | — | **Đã làm** (PR #57) |
 | G2 | **Radar các khung đã qua** theo thanh thời gian (−2 giờ → hiện tại) | Không cần dữ liệu | — | **Đã làm** (PR #58) |
 | G3 | **Bố cục cho người quản lý** (laptop, iPad, điện thoại): chỉ số Tình hình, Điểm nóng, chế độ xem, vùng chạm 44 px | Không cần dữ liệu (không đổi API) | — | **Đã làm** (PR #59 → #62) |
+| G4 | **Dòng diễn biến theo thời gian** trong bảng Cảnh báo khẩn cấp (B.1 feed): SOS mới, trạm vượt báo động, lệnh điều động… mới nhất trên cùng | Không cần dữ liệu; dùng nhật ký sự kiện đã có, API `/dashboard/logs` thêm toạ độ (sửa nhỏ) | — | Cao |
+| G5 | **12 điểm đen sạt lở, đèo dốc trên bản đồ** (B.2): tam giác theo màu mức, popup trạng thái đường | Không cần dữ liệu, không đổi API (số liệu đã tải ở `/dashboard/kpis`) | — | Cao |
+| G6 | **Popup hồ chứa, xuồng – xe** (B.3): hồ có biểu đồ mini + nút thao tác, nhãn lưu lượng xả; xuồng – xe gọi chỉ huy đơn vị | Không cần dữ liệu; API biểu đồ có sẵn, lớp xe thêm số điện thoại đơn vị (sửa nhỏ) | — | Trung bình |
+| G7 | **Khoanh vùng, tìm đường báo lỗi** khi mất mạng / máy chủ lỗi; kết quả khoanh vùng ghi các xã trong vùng | Không cần dữ liệu, không đổi API | — | Cao (đang thiếu trạng thái lỗi) |
 | BD1 | Dữ liệu nền cho các lớp (trạm, hồ, lực lượng, kho, điểm sơ tán, vùng nguy hiểm) | Dữ liệu | như trang A D1 | **Cao nhất** |
 | BD2 | **Camera CCTV thật**: danh sách camera + máy chủ chuyển luồng | Dữ liệu + hạ tầng + lập trình | Đơn vị quản lý camera (giao thông, thủy điện, công an) | Trung bình |
 | BD3 | **Mạng đường** (tìm đường an toàn, đoạn bị chặn) | Dữ liệu + lập trình | như trang A D3 | Trung bình |
@@ -64,6 +82,9 @@ vùng chạm ≥ 44 px trên màn cảm ứng. Việc làm được ngay mà kh�
 | BD6 | **Radar KTTV, mây vệ tinh**; **giấy phép radar đang dùng** (RainViewer chỉ cho dùng cá nhân / giáo dục) | Tích hợp hoặc thoả thuận | Đài KTTV (như trang A điểm 8); RainViewer | **Cao** (trước khi vận hành chính thức) |
 | BD7 | **Gửi cảnh báo SMS / Cell Broadcast thật** cho vùng khoanh | Hợp đồng + tích hợp | Nhà mạng (README mục 6) | Cao (khi vận hành) |
 | BD8 | GPS lực lượng / phương tiện trực tiếp | — | — | **Không làm** (quyết định 29/09/2026) |
+| BD9 | **Số điện thoại cho nút gọi trong popup**: tài xế / người lái xuồng, xe; đơn vị vận hành hồ | Dữ liệu + sửa nhỏ (thêm cột, mẫu nhập) | Đơn vị quản lý phương tiện; chủ hồ, nhà máy thủy điện | Trung bình |
+| BD10 | **Tự gửi lệnh điều động tới trưởng nhóm** (SMS / Zalo ZNS / thông báo đẩy) kèm link nhiệm vụ | Hợp đồng + tích hợp | Nhà mạng, Zalo OA của tỉnh (cùng hợp đồng BD7) | Cao (khi vận hành) |
+| BD11 | **SOS từ Zalo OA / ứng dụng** tự lên bản đồ | Tích hợp (cổng `POST /api/v1/sos/intake` có sẵn, đang tắt) | Zalo OA của tỉnh, bên phát triển ứng dụng (README 6.6) | Cao (khi vận hành) |
 
 ## 3. Việc giao diện không cần dữ liệu mới
 
@@ -147,6 +168,75 @@ lượng phải sang Tổng quan; iPad ngang dùng bố cục cho chuột — 50
 - **Trang Tổng quan:** cũng đã sửa vùng chạm ≥ 44 px trên màn cảm ứng ở cả 5 tab — PR #63, ghi ở
   `docs/trang-a-viec-con-lai.md` (trước 78–86 chỗ nhỏ hơn 44 px, nay 0).
 
+### G4 — Dòng diễn biến theo thời gian trong bảng Cảnh báo khẩn cấp (chưa làm)
+
+Thiết kế B.1: bảng bên phải là "dòng thời gian cuộn liên tục (feed) các tín hiệu SOS từ người dân hoặc cảnh báo từ cảm biến
+tự động". Nay cả ba tab (Điểm nóng, Phiếu SOS, Cảm biến) là **trạng thái lúc này** xếp theo mức: SOS xếp theo cấp rồi phiếu
+cũ trước; Cảm biến chỉ có trạm đang vượt báo động / mất tín hiệu, không biết trạm vượt lúc nào; không thấy việc vừa xảy ra
+(lệnh điều động, đội đã đến, hồ mở thêm cửa xả…).
+
+- **Nguồn có sẵn:** nhật ký sự kiện (`operations.event_logs`) — đang hiện ở Tổng quan ("Nhật ký sự kiện",
+  `components/common/EventLog.jsx`), API `GET /dashboard/logs` (lọc theo vùng), đẩy tức thì qua WebSocket `log.new`
+  (`useSocket.js` đã chèn mục mới lên đầu). Đã ghi: SOS mới (nguồn, số người, nghi trùng), đổi trạng thái SOS, lệnh điều
+  động / huỷ lệnh / đội đã đến, trạm mực nước vượt báo động, cảm biến sạt lở vượt BĐ II tự khoanh vùng, thiết bị mất / có lại
+  tín hiệu, cập nhật vận hành hồ, xuất kho, tiến độ sơ tán, cảnh báo hết hiệu lực.
+- **Đề xuất giao diện:** thêm tab **Diễn biến** cạnh Điểm nóng · Phiếu SOS · Cảm biến. Mỗi dòng: giờ (VD 08:12), biểu tượng
+  loại, nội dung, viền màu theo mức (Đỏ / Cam / thông tin). Mục mới chèn lên đầu, nháy nhẹ vài giây; người dùng đang cuộn xem
+  dòng cũ thì **không nhảy** — hiện nút "N mục mới". Lọc nhanh Tất cả / Cứu hộ / Cảnh báo / Vận hành; chạm dòng có toạ độ →
+  bản đồ bay tới. Tài khoản không xem được SOS thì ẩn mục cứu hộ (như tab Phiếu SOS).
+- **Sửa nhỏ phía máy chủ** (không đổi luồng dữ liệu):
+  1. `/dashboard/logs` trả thêm `lat`, `lon` — cột `location` đã có, chỉ chưa trả ra;
+  2. ba loại dòng đang ghi **không kèm toạ độ**: trạm mực nước "vượt Báo động" (`simulator.check_triggers` — dùng cho cả số
+     đo thật qua `integrations/ingest.py`), "MẤT TÍN HIỆU thiết bị", "Cập nhật vận hành hồ" → không gắn xã: lọc theo vùng
+     không loại được (tài khoản cấp xã thấy cả trạm, hồ xã khác) và không bay tới được. Truyền toạ độ trạm / hồ vào
+     `log_event` (hàm này tự gán xã gần nhất).
+- **Không thay** tab Điểm nóng: Điểm nóng trả lời "đang nguy ở đâu", Diễn biến trả lời "vừa xảy ra gì".
+
+### G5 — 12 điểm đen sạt lở, đèo dốc trên bản đồ (chưa làm)
+
+Thiết kế B.2: "icon tam giác cảnh báo tại các khu vực đồi núi đèo dốc; Đỏ = nguy cơ rất cao". Hệ thống có danh mục **12 điểm
+đen sạt lở, đèo dốc** (Đèo Khau Cốc Chà, Đèo Mẻ Pia, Khu vực Ca Thành… — `backend/app/services/landslides.py`) với trạng
+thái tính từ vùng nguy hiểm, đường bị chia cắt, cảm biến nghiêng / độ ẩm đất: **Cấm đường / Cảnh báo / Thông suốt / Chưa có
+số liệu**. Danh mục hiện ở Tổng quan (tab "Sạt lở & đường đèo", Bảng tác chiến) và cổng công khai — **không có trên bản đồ
+giám sát**: bấm "xem trên bản đồ" chỉ hiện ghim 8 giây rồi mất; tab Điểm nóng chỉ liệt kê điểm Cấm đường / Cảnh báo.
+
+- **Số liệu đã tải:** trang bản đồ đã gọi `/dashboard/kpis` (6 chỉ số, Điểm nóng) — trong đó có `landslides.points` (toạ độ,
+  tuyến đường, xã, trạng thái, số đo nghiêng / độ ẩm / mưa 24 giờ, hướng xử lý), lọc theo vùng. Không thêm API, không thêm
+  lượt gọi.
+- **Đề xuất giao diện:** lớp "Điểm đen sạt lở, đèo dốc" trong nhóm Cảnh báo & Vùng nguy hiểm (có trong chế độ Tình hình), số
+  điểm trên bảng lớp; tam giác theo thang màu chung (`LANDSLIDE_LEVEL`): Đỏ — Cấm đường, Cam — Cảnh báo, Xanh — Thông suốt,
+  Xám nét đứt — Chưa có số liệu (không coi là an toàn); popup: tên, tuyến đường, xã, trạng thái, số đo nghiêng / độ ẩm đất
+  (số mới nhất trong 6 giờ qua), mưa 24 giờ, hướng xử lý.
+- **Lưu ý:** toạ độ 12 điểm trong danh mục nên được cán bộ địa phương xác nhận (BD1) — lên bản đồ thì sai lệch dễ thấy. Khi
+  tỉnh nhập điểm sạt lở từ tệp (loại `diem_nguy_hiem`) trùng các điểm này thì tránh vẽ hai biểu tượng chồng nhau.
+
+### G6 — Popup hồ chứa, xuồng – xe đủ như B.3 (chưa làm)
+
+Thiết kế B.3: bấm đối tượng bất kỳ ("Hồ chứa, Trạm đo, Xe cứu hộ") → chi tiết, **biểu đồ mini**, **nút hành động nhanh** (VD
+"Gọi điện cho tài xế", "Ra lệnh xuất kho"). Trạm đo, kho, lực lượng, SOS, điểm sơ tán đã đủ; còn hai loại:
+
+| Đối tượng | Hiện có | Đề xuất bổ sung |
+|---|---|---|
+| Hồ chứa | Trạng thái, giờ số liệu, bảng mực nước / MNDBT / lưu lượng về, xả / cửa xả mở | **Biểu đồ mini** 48 giờ (mực nước so MNDBT, lưu lượng về / xả) từ `GET /dashboard/reservoir-operations` (đã có — như biểu đồ vận hành hồ ở Tổng quan, `ReservoirOpsChart.jsx`), chỉ tải khi mở popup; nút **Cập nhật vận hành** (quyền `monitoring.update`; tách form `OperationModal` khỏi `pages/public/ReservoirMonitor.jsx` để dùng chung); nhãn trên biểu tượng hồ đang xả ghi cả lưu lượng, VD "2 cửa · 350 m³/s" |
+| Xuồng, xe, thiết bị | Mã, loại, đơn vị, trạng thái, nhiên liệu | Nút **Gọi chỉ huy đơn vị** — tạm, tới khi có số tài xế (BD9): lớp xe trong `/map/layers` thêm số điện thoại đơn vị (`forces.contact_phone`) — sửa nhỏ API |
+
+- Biểu đồ mini làm như ở trạm (`Hydrograph`, `MiniSeries`): ghi rõ đang tải / lỗi / chưa có lịch sử; hồ chưa có số liệu
+  vận hành thì không vẽ, giữ dòng "Chưa có số liệu vận hành…" như hiện nay.
+
+### G7 — Khoanh vùng, tìm đường: báo lỗi và đủ kết quả (chưa làm)
+
+Yêu cầu chung "trạng thái tải / trống / lỗi / mất mạng" chưa đạt ở hai công cụ gọi máy chủ trên bản đồ:
+
+- **Khoanh vùng** (`MonitoringMap.jsx` — `onDrawn` gọi `POST /map/area-stats`): máy chủ lỗi hoặc mất mạng thì bảng "Phân tích
+  vùng khoanh" **quay mãi** "Đang tính toán không gian địa lý…" — không báo lỗi, không có nút thử lại.
+- **Tìm đường** (`MapTools.jsx` — `POST /map/route`): lỗi thì điểm B đã đặt nhưng không có lộ trình, dòng hướng dẫn vẫn "Chạm
+  chọn điểm A … rồi điểm B" — người dùng không biết là lỗi.
+- **Kết quả khoanh vùng chưa hiện hết số API đã trả:** các xã trong vùng (`admin_codes` — cần để biết cảnh báo cho xã nào),
+  số lực lượng trong vùng (`forces`), vùng nguy hiểm đang hiệu lực (`hazard_zones`); "Thuê bao di động" là ước tính (82%
+  dân số ước tính) nhưng chưa ghi "ước tính".
+- Có thể thêm: xuất Excel số liệu vùng khoanh và danh sách xã (`utils/exportExcel.js`) để gửi kèm văn bản chỉ đạo.
+- Không đổi API.
+
 ## 4. Việc chờ dữ liệu / hệ thống bên ngoài
 
 ### BD1 — Dữ liệu nền cho các lớp
@@ -215,6 +305,36 @@ Ngày 29/09/2026 chủ dự án quyết định **không làm** chia sẻ vị t
 vị. Bản đồ hiện **vị trí đơn vị đã nhập** (ghi rõ trên bảng lớp); lộ trình điều động chuyển "đã đến" khi trưởng nhóm báo qua
 link nhiệm vụ. Chỉ xem lại nếu có thiết bị định vị gắn trên phương tiện.
 
+### BD9 — Số điện thoại cho nút gọi trong popup
+
+- **Hiện trạng:** thiết kế B.3 lấy ví dụ "Gọi điện cho tài xế". Bảng `resources.vehicles` và mẫu nhập "Phương tiện" không có
+  người lái / số điện thoại; bảng hồ chứa và mẫu nhập "Hồ chứa" không có số trực vận hành. Popup lực lượng, kho, điểm sơ tán
+  đã có nút gọi (số chỉ huy, thủ kho, điểm sơ tán).
+- **Cần:** với mỗi xuồng, xe: người lái (hoặc tổ lái) và số điện thoại; với mỗi hồ: số trực vận hành của nhà máy / chủ hồ.
+- **Việc lập trình khi có:** thêm cột và trường trong mẫu nhập; nút "Gọi tài xế" (thay nút tạm "Gọi chỉ huy đơn vị" của G6),
+  "Gọi trực vận hành hồ". Số cá nhân chỉ hiện cho tài khoản xem được lớp lực lượng – phương tiện (như số chỉ huy hiện nay).
+
+### BD10 — Tự gửi lệnh điều động tới đội
+
+- **Hiện trạng:** thiết kế B.4 "hộp thoại xác nhận hiện ra, tự động gửi lệnh điều động kèm toạ độ GPS cho Đội". Nay lệnh tạo
+  xong, hộp thoại ghi rõ "Hệ thống chưa gửi tin cho đội — gọi hoặc nhắn trưởng nhóm ngay", có nút gọi và sao chép nội dung
+  lệnh kèm **link nhiệm vụ** (toạ độ, chỉ đường Google Maps, nút báo đã đến). README 2.1: "Báo lệnh điều động tới trưởng
+  nhóm" ⛔.
+- **Cần:** kênh gửi — SMS Brandname, Zalo ZNS (cùng hợp đồng BD7) hoặc thông báo đẩy nếu đội dùng ứng dụng.
+- **Việc lập trình khi có:** gửi theo kênh ngay khi tạo lệnh, ghi nhật ký gửi / nhận. Giao diện đã có nhánh "Đã gửi lệnh tới
+  trưởng nhóm …" (`DispatchModal.jsx`, `notification.sent`) — máy chủ trả `sent: true` khi gửi được là đủ.
+
+### BD11 — SOS từ Zalo OA / ứng dụng
+
+- **Hiện trạng:** thiết kế B.2 vẽ SOS "tại toạ độ người dân gửi yêu cầu cứu hộ qua App / Zalo / Tổng đài". Nay phiếu SOS đến
+  từ trực ban / tổng đài nhập và cảm biến tự tạo. Cổng `POST /api/v1/sos/intake` cho Zalo OA / ứng dụng / tổng đài đã có
+  (nguồn `ZALO`, `APP`, `HOTLINE`; chống trùng bằng `external_id`) nhưng **tắt** tới khi đặt `INTAKE_API_KEY` và có bên gửi
+  (README 6.6).
+- **Cần:** tài khoản Zalo OA của tỉnh và dịch vụ chuyển tin tới cổng, hoặc ứng dụng của tỉnh gọi cổng; thống nhất cách lấy
+  toạ độ (chia sẻ vị trí trong Zalo, GPS của ứng dụng).
+- **Việc lập trình khi có:** bản đồ không phải sửa — phiếu vào là hiện ngay (WebSocket `sos.new`, nhấp nháy, âm thanh); chỉ
+  cấu hình khoá, kiểm thử với bên gửi. Liên quan trang A điểm 10 (báo cáo thiệt hại qua Zalo OA / ứng dụng).
+
 ## 5. Kiểm tra khi có dữ liệu thật
 
 1. Triển khai bản mới (V1 của trang A).
@@ -252,6 +372,7 @@ link nhiệm vụ. Chỉ xem lại nếu có thiết bị định vị gắn tr�
 | Dự báo mưa theo xã (số liệu từng giờ; khung giờ `hours`, `offset_h`) | `backend/app/api/v1/forecast.py` (`/forecast/areas`) |
 | Trạng thái hồ (dùng chung Dashboard) | `backend/app/services/reservoirs.py` (`classify_reservoir_status`) |
 | Kiểm thử | `tests/ui/ui-test.mjs` (bước "Bản đồ giám sát", "Điều động", khối "Người quản lý" — laptop, iPad ngang / dọc, điện thoại), `tests/e2e/prod-flow.mjs` (trạng thái hồ trên bản đồ), `tests/e2e/iot-test.mjs` (khung giờ mưa dự báo) |
+| Dùng lại cho G4 → G6: nhật ký sự kiện, điểm đen sạt lở, vận hành hồ | `components/common/EventLog.jsx`, `backend/app/services/events.py` (`log_event`), `backend/app/services/landslides.py` (`KNOWN_BLACKSPOTS`), `components/charts/ReservoirOpsChart.jsx`, `pages/public/ReservoirMonitor.jsx` (`OperationModal`) |
 
 ## 7. Các thay đổi đã làm cho trang B (để tra cứu)
 
@@ -267,3 +388,4 @@ link nhiệm vụ. Chỉ xem lại nếu có thiết bị định vị gắn tr�
 | #60 | Người quản lý — bước 2: tab Điểm nóng (xếp Đỏ → Vàng, SOS cấp 1 gộp một dòng), chế độ xem Tình hình / Tác nghiệp (máy nhớ) |
 | #61 | Người quản lý — bước 3: vùng chạm ≥ 44 px trên màn cảm ứng (trang Bản đồ, đầu trang, menu, dải khẩn cấp); thanh thời gian không đè bảng cảnh báo trên iPad ngang |
 | #62 | Người quản lý — bước 4: khối kiểm thử "Người quản lý" trong ui-test; tài liệu này (G3), README |
+| #64 | Tài liệu này: rà lần 2 theo từng ý của mục B — thêm G4 → G7 (dòng diễn biến, điểm đen sạt lở, popup hồ / xe, báo lỗi khoanh vùng – tìm đường), BD9 → BD11 (số gọi tài xế, tự gửi lệnh điều động, SOS từ Zalo OA / ứng dụng) |
