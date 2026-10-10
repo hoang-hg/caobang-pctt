@@ -41,7 +41,14 @@ const ROWS = {
       <Row sym={<Ico icon={stationIcon('muc_nuoc', null, undefined, true)} />}>Xám, nét đứt: mất tín hiệu / chưa có số đo</Row>
     </>
   ),
-  reservoirs: () => <Row sym={<Ico icon={reservoirIcon(2)} />}><b>Hồ chứa</b> — viền cam: đang mở cửa xả (số cửa)</Row>,
+  reservoirs: () => (
+    <>
+      <Row sym={<Ico icon={reservoirIcon(3, 3)} />}><b>Hồ chứa</b> xả lũ lớn (Đỏ) — nhãn = số cửa xả đang mở</Row>
+      <Row sym={<Ico icon={reservoirIcon(1, 2)} />}>Hồ đang xả điều tiết (Cam)</Row>
+      <Row sym={<Ico icon={reservoirIcon(0, 0)} />}>Hồ chưa xả tràn (Xanh)</Row>
+      <Row sym={<Ico icon={reservoirIcon(0, null)} />}>Xám, nét đứt: chưa có số liệu vận hành</Row>
+    </>
+  ),
   storm: () => <Row sym={<Ico icon={stormIcon()} />}><b>Tâm bão</b> — nét liền: đã qua, nét đứt: dự báo; vòng tròn: gió mạnh</Row>,
   flood: () => (
     <Row sym={<Swatch style={{ background: 'rgba(37,99,235,.45)', borderColor: '#1d4ed8' }} />}>

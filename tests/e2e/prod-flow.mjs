@@ -223,6 +223,20 @@ let res = await until('/public/reservoirs', (d) => d?.reservoirs?.some((r) => r.
 let ho = res?.reservoirs?.find((r) => r.id === HO);
 check('Hồ mới nhập: "Chưa có số liệu vận hành" (không khẳng định chưa xả)', ho?.status_code === 'chua_co_so_lieu' &&
   ho?.updated_at === null && res.no_data_count === 1 && res.spill_count === 0, `${ho?.status_code} ${ho?.status_label}`);
+// Bản đồ điều hành dùng cùng cách tính trạng thái hồ (map_layers.py → services/reservoirs.py) → biểu tượng cùng thang màu:
+// chưa có số liệu = Xám, không vẽ như hồ bình thường
+const mapHo = async (want) => {
+  let p;
+  for (let i = 0; i < 16; i++) {
+    p = (await call('GET', '/map/layers', null, admin)).data?.reservoirs?.features?.find((f) => f.properties.id === HO)?.properties;
+    if (p?.status_code === want) return p;
+    await sleep(1000);
+  }
+  return p;
+};
+const hoMap0 = await mapHo('chua_co_so_lieu');
+check('Bản đồ điều hành: hồ mới nhập "Chưa có số liệu vận hành"', hoMap0?.status_code === 'chua_co_so_lieu' && hoMap0?.operating_at === null,
+  `${hoMap0?.status_code} ${hoMap0?.status_label}`);
 const ov = await until('/public/overview', (d) => d?.reservoirs?.no_data_count === 1);
 check('Tổng quan công khai đếm hồ chưa có số liệu', ov?.reservoirs?.no_data_count === 1 && ov?.reservoirs?.spill_count === 0);
 // Trạm vừa nhập, chưa có thiết bị: không được báo "dưới báo động" / "an toàn"
@@ -252,6 +266,9 @@ res = await until('/public/reservoirs', (d) => d?.reservoirs?.find((r) => r.id =
 ho = res?.reservoirs?.find((r) => r.id === HO);
 check('Cổng công khai hiện ngay số liệu mới', ho?.status_code === 'xa_dieu_tiet' && res.spill_count === 1 && res.no_data_count === 0 &&
   ho?.stale === false);
+const hoMap1 = await mapHo('xa_dieu_tiet');
+check('Bản đồ điều hành: hồ vừa cập nhật → "Đang xả điều tiết", số liệu mới', hoMap1?.status_code === 'xa_dieu_tiet' && hoMap1?.stale === false &&
+  !!hoMap1?.operating_at, `${hoMap1?.status_code} stale=${hoMap1?.stale}`);
 // Lịch sử vận hành (migration 0020): trigger ghi một dòng mỗi khi có số liệu vận hành mới — chạy thật, không bộ mô phỏng
 const hist = await call('GET', '/dashboard/reservoir-operations?hours=6', null, admin);
 const last = (hist.data?.reservoirs?.find((r) => r.id === HO)?.series || []).at(-1);

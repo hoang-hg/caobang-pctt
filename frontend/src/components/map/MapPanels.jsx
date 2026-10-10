@@ -6,6 +6,10 @@ import { Can } from '../../rbac/usePermission';
 import { ALARM, alarmLevel, INCIDENT, PRIORITY, STATION_TYPE } from '../../utils/labels';
 import { ago, int } from '../../utils/format';
 import { fmtVn } from '../../utils/bulletin';
+import { risk } from '../../utils/risk';
+
+// Cấp ưu tiên phiếu SOS → tên màu (cấp 1 Đỏ, 2 Cam, 3 Vàng — mức thang màu = 4 − cấp)
+const PRIO_CHIPS = [[1, 'Đỏ'], [2, 'Cam'], [3, 'Vàng']];
 
 /**
  * Các lớp của bản đồ giám sát (thiết kế B.2, 4 nhóm). `perm`: quyền xem cần có — API trả lớp rỗng khi thiếu quyền
@@ -150,12 +154,15 @@ export function LayerList({ groups, layers, setLayers, unavailable, notes, count
  */
 export function AlertsList({ tab, setTab, sos, sensorAlerts, silentStations, noDataCount, canSos, canDispatch, onFocus, onDispatch, touch }) {
   const [search, setSearch] = useState('');
+  const [prio, setPrio] = useState(0); // 0 = mọi mức; 1 / 2 / 3 = cấp ưu tiên (Đỏ / Cam / Vàng — cùng màu trên bản đồ)
   const active = canSos ? tab : 'sensors';
+  const perPrio = useMemo(() => Object.fromEntries([1, 2, 3].map((n) => [n, sos.filter((s) => s.priority === n).length])), [sos]);
   const shown = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return sos;
-    return sos.filter((s) => s.code?.toLowerCase().includes(q) || s.address?.toLowerCase().includes(q) || s.admin_name?.toLowerCase().includes(q));
-  }, [sos, search]);
+    return sos.filter((s) => (!prio || s.priority === prio)
+      && (!q || s.code?.toLowerCase().includes(q) || s.address?.toLowerCase().includes(q) || s.admin_name?.toLowerCase().includes(q)));
+  }, [sos, search, prio]);
+  const prioName = PRIO_CHIPS.find(([n]) => n === prio)?.[1];
   const tabBtn = (id, label) => (
     <button
       key={id}
@@ -187,6 +194,28 @@ export function AlertsList({ tab, setTab, sos, sensorAlerts, silentStations, noD
             />
           </div>
         )}
+        {active === 'sos' && (
+          <div className="flex flex-wrap gap-1" role="group" aria-label="Lọc phiếu SOS theo mức">
+            {[[0, 'Tất cả', sos.length], ...PRIO_CHIPS.map(([n, name]) => [n, name, perPrio[n]])].map(([n, name, count]) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setPrio(n)}
+                aria-pressed={prio === n}
+                className={clsx(
+                  'inline-flex flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-full border px-2 text-[11px] font-semibold',
+                  touch ? 'min-h-[44px]' : 'min-h-[26px]',
+                  prio === n
+                    ? (n ? clsx('border-transparent', risk(4 - n).chip) : 'border-accent bg-accent text-white')
+                    : 'border-line text-ink-2 hover:bg-panel2',
+                )}
+              >
+                {n > 0 && prio !== n && <span className={clsx('h-2 w-2 shrink-0 rounded-full', risk(4 - n).fill)} aria-hidden="true" />}
+                {name} <span className="font-mono">{count}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="scroll-thin min-h-0 flex-1 space-y-2 overflow-y-auto p-2.5">
@@ -196,7 +225,7 @@ export function AlertsList({ tab, setTab, sos, sensorAlerts, silentStations, noD
               <div key={s.id} className={item}>
                 <button type="button" className="w-full rounded-xl p-2.5 text-left hover:bg-panel2/80" onClick={() => onFocus({ lat: s.lat, lon: s.lon, zoom: 15, label: s.code })}>
                   <div className="flex items-center gap-2">
-                    <span className={clsx('h-2.5 w-2.5 shrink-0 rounded-full', s.status === 'moi' && 'animate-blink', { 1: 'bg-danger', 2: 'bg-serious', 3: 'bg-warn' }[s.priority])} />
+                    <span className={clsx('h-2.5 w-2.5 shrink-0 rounded-full', s.status === 'moi' && 'animate-blink', risk(4 - s.priority).fill)} />
                     <b className="text-sm font-bold text-ink">{s.code}</b>
                     <span className="text-xs text-muted">{PRIORITY[s.priority]?.short || `Cấp ${s.priority}`}</span>
                     <span className="ml-auto text-[11px] text-muted">{ago(s.received_at)}</span>
@@ -218,7 +247,9 @@ export function AlertsList({ tab, setTab, sos, sensorAlerts, silentStations, noD
             ))}
             {!shown.length && (
               <div className="py-8 text-center text-xs text-muted">
-                {search ? 'Không tìm thấy phiếu phù hợp' : 'Không có phiếu SOS đang mở trong vùng đang xem'}
+                {search
+                  ? 'Không tìm thấy phiếu phù hợp'
+                  : prio ? `Không có phiếu mức ${prioName} đang mở trong vùng đang xem` : 'Không có phiếu SOS đang mở trong vùng đang xem'}
               </div>
             )}
           </>
