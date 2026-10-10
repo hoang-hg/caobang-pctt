@@ -63,7 +63,7 @@ const ROWS = {
       <Row sym={<Ico icon={stationIcon('muc_nuoc', 2, '2.1')} />}>
         <b>Trạm mực nước</b> — viền theo báo động BĐ I / II / III (Vàng / Cam / Đỏ), số = mực nước (m)
       </Row>
-      <Row sym={<Ico icon={stationIcon('luong_mua', 0, '12')} />}><b>Trạm đo mưa</b> — số = mưa 24 giờ (mm)</Row>
+      <Row sym={<Ico icon={stationIcon('luong_mua', 0, '12')} />}><b>Trạm đo mưa</b> — số = cường độ mưa đo mới nhất (mm/giờ)</Row>
       <Row sym={<Ico icon={stationIcon('muc_nuoc', null, undefined, true)} />}>Xám, nét đứt: mất tín hiệu / chưa có số đo</Row>
     </>
   ),

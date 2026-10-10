@@ -210,11 +210,11 @@ export default function MonitoringMap() {
       fly(at(above.length ? above : waterStations), 'Trạm mực nước');
     } else if (key === 'rain') {
       show('stations');
-      // Các trạm mưa từ 50 mm/24 giờ (mưa to); chưa có thì 3 trạm mưa nhiều nhất
-      const rain = (data?.stations.features || []).filter((f) => f.properties.type === 'luong_mua' && f.properties.value != null)
-        .sort((a, b) => b.properties.value - a.properties.value);
-      const heavy = rain.filter((f) => f.properties.value >= 50);
-      fly(pts({ features: heavy.length ? heavy : rain.slice(0, 3) }), 'Mưa lớn nhất');
+      // Trạm có mưa 24 giờ lớn nhất — đúng trạm ô "Mưa 24 giờ" ghi (số trên điểm trạm là cường độ mưa mới nhất, mm/giờ,
+      // không so được với ngưỡng mưa 24 giờ); chưa xác định được thì mọi trạm mưa
+      const rainSt = { features: (data?.stations.features || []).filter((f) => f.properties.type === 'luong_mua') };
+      const top = pts(rainSt, (p) => p.name === k.rain?.max_station);
+      fly(top.length ? top : pts(rainSt), 'Mưa 24 giờ lớn nhất');
     } else if (key === 'evac') {
       show('evac');
       fly(pts(data?.evacuation_sites), 'Điểm sơ tán');
