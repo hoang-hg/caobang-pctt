@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import {
   AlertTriangle, ArrowUpRight, Compass, Droplets, FileDown, FileSpreadsheet, FileText, Home, Info, LayoutDashboard, LifeBuoy,
-  Loader2, MapPin, Minimize2, Monitor, Mountain, Pause, PhoneCall, Play, RefreshCw, Server, ShieldAlert, Siren, Waves, X,
+  Loader2, MapPin, Minimize2, Monitor, Mountain, Pause, Play, RefreshCw, Server, ShieldAlert, Waves, X,
 } from 'lucide-react';
 import { useAreaQuery, usePresets, useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
@@ -29,6 +29,7 @@ import CommuneView, { unitLabel } from '../components/dashboard/CommuneView';
 import SystemView from '../components/dashboard/SystemView';
 import QuickIncidentModal from '../components/dashboard/QuickIncidentModal';
 import ReportDocModal from '../components/dashboard/ReportDocModal';
+import QuickActionBar from '../components/common/QuickActionBar';
 import { useAllowedCodes, usePermission } from '../rbac/usePermission';
 import { vnFileStamp } from '../utils/format';
 import { risk } from '../utils/risk';
@@ -65,9 +66,6 @@ function LiveClock() {
   }, []);
   return <span className="font-mono text-xl font-black tabular-nums text-ink">{now.toLocaleTimeString('vi-VN', { ...VN_TIME, hour12: false })}</span>;
 }
-
-/** Nút của thanh thao tác điện thoại: cao ≥ 56 px, biểu tượng + chữ. */
-const barBtn = 'flex min-h-[56px] flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-[11px] font-bold active:scale-95';
 
 /**
  * Dashboard tổng quan (thiết kế mục A). Bố cục theo thiết bị của lãnh đạo — chỉ sắp xếp lại, số liệu / API như cũ:
@@ -680,36 +678,15 @@ export default function Dashboard() {
         </>
       )}
 
-      {/* Thanh thao tác nhanh trên điện thoại: "Báo SOS" ở GIỮA, nổi lên (vùng ngón cái của cả hai tay); 112 ở mép
-          ngoài, tách khỏi Báo SOS để không bấm nhầm; chỉ hiện nút tài khoản có quyền dùng */}
-      <nav
-        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 items-end gap-1 border-t border-line bg-panel/95 px-2 pb-[calc(0.375rem+env(safe-area-inset-bottom))] pt-1.5 shadow-2xl backdrop-blur sm:hidden print:hidden"
-        aria-label="Thao tác nhanh"
-      >
-        <button type="button" onClick={goRivers} className={clsx(barBtn, 'text-ink')}>
-          <Waves size={18} className="text-accent" aria-hidden="true" /> Mực nước
-        </button>
-        <Link to="/ban-do" className={clsx(barBtn, 'text-ink')}>
-          <Compass size={18} className="text-accent" aria-hidden="true" /> Bản đồ
-        </Link>
-        {canReport ? (
-          <button
-            type="button"
-            onClick={() => setReportOpen(true)}
-            className={clsx(barBtn, '-mt-5 min-h-[64px] bg-danger text-xs font-black text-white shadow-lg shadow-danger/30 ring-4 ring-panel')}
-          >
-            <Siren size={22} aria-hidden="true" /> Báo SOS
-          </button>
-        ) : <span />}
-        {canSos ? (
-          <Link to="/cuu-ho" className={clsx(barBtn, 'text-ink')}>
-            <LifeBuoy size={18} className="text-accent" aria-hidden="true" /> Cứu hộ
-          </Link>
-        ) : <span />}
-        <a href="tel:112" className={clsx(barBtn, 'text-danger')} title="Gọi điện khẩn cấp 112">
-          <PhoneCall size={18} aria-hidden="true" /> Gọi 112
-        </a>
-      </nav>
+      {/* Thanh thao tác nhanh trên điện thoại (khung chung: Báo SOS giữa, 112 mép phải); chỉ hiện nút tài khoản có quyền dùng */}
+      <QuickActionBar
+        slots={[
+          { key: 'muc-nuoc', label: 'Mực nước', icon: Waves, onClick: goRivers },
+          { key: 'ban-do', label: 'Bản đồ', icon: Compass, to: '/ban-do' },
+          canSos ? { key: 'cuu-ho', label: 'Cứu hộ', icon: LifeBuoy, to: '/cuu-ho' } : null,
+        ]}
+        onSos={canReport ? () => setReportOpen(true) : null}
+      />
 
       {canReport && <QuickIncidentModal open={reportOpen} onClose={() => setReportOpen(false)} />}
       <ReportDocModal
