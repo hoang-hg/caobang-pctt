@@ -299,6 +299,7 @@ tests/load/         kiểm thử tải (k6)
 scripts/maintenance/  script bảo trì CSDL máy dev (có chặn production)
 deploy/             Caddyfile, backup.sh (chạy thật); golive-check.sh, restore-drill.sh, external-monitor.sh
 docs/GO-LIVE.md     kiểm tra trước khi mở cổng cho người dân (Go / No-Go) + biên bản
+docs/trang-a-viec-con-lai.md  trang Tổng quan: việc còn lại khi có dữ liệu thật (radar, mô hình thủy văn, ngưỡng…)
 mqtt/  db/init/     cấu hình Mosquitto (dev + thật); extension PostgreSQL khi khởi tạo
 docker-compose.yml  dev / trình diễn / CI     docker-compose.prod.yml  chạy thật
 .env.example        mẫu dev                    .env.production.example  mẫu chạy thật
