@@ -14,7 +14,7 @@ import { useStore } from '../../app/store';
 import { AdminBoundaries, BaseLayer, RAIN_BINS } from '../../components/map/MapTools';
 import { evacIcon, hazardIcon, pinIcon, stationIcon, reservoirIcon } from '../../components/map/icons';
 import { LEVEL, landslideStatus } from '../../utils/labels';
-import { levelOf, RISK as RISK_SCALE, risk as riskStyle, TILT_LEVEL } from '../../utils/risk';
+import { levelOf, RESERVOIR_LEVEL, RISK as RISK_SCALE, risk as riskStyle, TILT_LEVEL } from '../../utils/risk';
 import { ago, dateTime } from '../../utils/format';
 import { stationView } from '../../utils/stations';
 import L from 'leaflet';
@@ -204,7 +204,7 @@ function PublicMap({ data, forecast, geo, me, route, target, layers, basemap = '
           <Marker
             key={r.id}
             position={[r.lat, r.lon]}
-            icon={reservoirIcon(r.spill_gates_open)}
+            icon={reservoirIcon(r.spill_gates_open, levelOf(RESERVOIR_LEVEL, r.status_code))}
             eventHandlers={{
               click: () => onSelectPoint?.({
                 id: r.id,

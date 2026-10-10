@@ -70,8 +70,15 @@ export const reportIcon = (status) =>
 
 export const stormIcon = () => badge(P.storm, { bg: '#a855f7', stroke: '#fff', ring: '#fff', size: 26 });
 
-export const reservoirIcon = (gatesOpen) =>
-  badge(P.dam, { bg: '#e0f2fe', stroke: '#075985', ring: gatesOpen ? COLORS.cam : '#075985', size: 28, shape: 'square', label: gatesOpen ? `${gatesOpen} cửa` : undefined });
+/** Hồ chứa: viền theo thang màu chung (`level` = RESERVOIR_LEVEL của trạng thái máy chủ) — 3 xả lũ lớn Đỏ, 2 xả điều tiết
+ * Cam, 0 chưa xả Xanh; null = chưa có số liệu vận hành → xám nét đứt (không vẽ như hồ bình thường). Nhãn = số cửa đang mở. */
+export const reservoirIcon = (gatesOpen, level) => {
+  const ring = level == null ? COLORS.gray : ALARM_COLOR[level];
+  return badge(P.dam, {
+    bg: '#e0f2fe', stroke: '#075985', ring, size: 28, shape: 'square', dashed: level == null,
+    label: level != null && gatesOpen ? `${gatesOpen} cửa` : undefined,
+  });
+};
 
 export const warehouseIcon = (pctValue) =>
   badge(P.box, { bg: '#fff', stroke: '#7c3aed', ring: pctValue == null ? '#7c3aed' : pctValue < 20 ? COLORS.do : pctValue < 50 ? COLORS.cam : '#7c3aed', size: 26, shape: 'square' }); // null = kho chưa có số liệu tồn kho

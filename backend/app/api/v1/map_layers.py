@@ -27,6 +27,7 @@ from app.services.broadcast import estimate_audience
 from app.services.events import log_event
 from app.services.readings import LATEST_COLS, LATEST_JOIN, vn_time
 from app.services.reports import CATEGORY as REPORT_CATEGORY
+from app.services.reservoirs import OPERATING_STALE, classify_reservoir_status
 from app.services.safe_routing import plan_route
 from app.ws.hub import hub
 
@@ -73,10 +74,16 @@ async def _layers(codes: list[str], res_codes: list[str], sos_codes: list[str], 
     )
     reservoirs = await fetch_all(
         f"""SELECT id, name, river, capacity_mw, normal_level, current_level, inflow_m3s, outflow_m3s, spill_gates_open, spill_gates,
-                   updated_at, ST_Y(location) AS lat, ST_X(location) AS lon
+                   updated_at, operating_at, ST_Y(location) AS lat, ST_X(location) AS lon
               FROM iot_telemetry.reservoirs WHERE {area_clause('location', codes)}""",
         p,
     )
+    # Trạng thái hồ theo đúng cách tính của Dashboard / cổng công khai (services/reservoirs.py) → biểu tượng cùng thang màu:
+    # xả lũ lớn Đỏ, xả điều tiết Cam, chưa xả Xanh, chưa có số liệu vận hành Xám (không vẽ như hồ "bình thường")
+    now = datetime.now(UTC)
+    for r in reservoirs:
+        r["status_code"], r["status_label"], _ = classify_reservoir_status(r)
+        r["stale"] = r["operating_at"] is not None and now - r["operating_at"] > OPERATING_STALE
     hazard_zones = await fetch_all(
         f"""SELECT id, type, level, name, depth_m, source, valid_until, ST_AsGeoJSON(geom, 5)::json AS geom
               FROM iot_telemetry.hazard_zones WHERE valid_until > now() AND {area_clause('geom', codes)}""",

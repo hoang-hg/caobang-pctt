@@ -14,6 +14,7 @@ import { cameraIcon, evacIcon, forceIcon, hazardIcon, reportIcon, reservoirIcon,
 import { ALARM, alarmLevel, CATEGORY, FORCE_TYPE, INCIDENT, LEVEL, PRIORITY, REPORT_STATUS, RES_STATUS, SKILL, SOS_STATUS, SOURCE, STATION_TYPE, VEHICLE } from '../../utils/labels';
 import { ago, num } from '../../utils/format';
 import { fmtVn } from '../../utils/bulletin';
+import { levelOf, RESERVOIR_LEVEL, risk } from '../../utils/risk';
 
 const ll = (f) => [f.geometry.coordinates[1], f.geometry.coordinates[0]];
 const Tel = ({ phone, label = 'Gọi' }) =>
@@ -338,21 +339,37 @@ export default function MapLayers({ data, layers, timeline, onDispatch, onCamera
       {layers.reservoirs &&
         data.reservoirs.features.map((f) => {
           const p = f.properties;
+          // Trạng thái theo cách tính của Dashboard (map_layers.py → services/reservoirs.py); chưa có số liệu → Xám
+          const lv = levelOf(RESERVOIR_LEVEL, p.status_code);
           return (
-            <Marker key={p.id} position={ll(f)} icon={reservoirIcon(p.spill_gates_open)}>
+            <Marker key={p.id} position={ll(f)} icon={reservoirIcon(p.spill_gates_open, lv)}>
               <Popup>
                 <div className="w-60">
                   <b>{p.name}</b>
                   <div className="text-xs text-muted">Sông {p.river}{p.capacity_mw ? ` · ${p.capacity_mw} MW` : ''}</div>
-                  <table className="mt-1 w-full text-xs">
-                    <tbody>
-                      <tr><td>Mực nước hồ</td><td className="text-right font-mono">{num(p.current_level, 2)} m</td></tr>
-                      <tr><td>MNDBT</td><td className="text-right font-mono">{num(p.normal_level, 1)} m</td></tr>
-                      <tr><td>Lưu lượng về</td><td className="text-right font-mono">{num(p.inflow_m3s)} m³/s</td></tr>
-                      <tr><td>Lưu lượng xả</td><td className="text-right font-mono font-semibold">{num(p.outflow_m3s)} m³/s</td></tr>
-                      <tr><td>Cửa xả mở</td><td className="text-right font-mono">{p.spill_gates_open}/{p.spill_gates}</td></tr>
-                    </tbody>
-                  </table>
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                    {p.status_label && <span className={clsx('chip text-[11px]', risk(lv).chip)}>{p.status_label}</span>}
+                    {p.operating_at && (
+                      <span className={clsx('text-[11px]', p.stale ? 'font-semibold text-warn' : 'text-muted')}>
+                        Số liệu lúc {fmtVn(p.operating_at)}{p.stale ? ' — đã cũ' : ''}
+                      </span>
+                    )}
+                  </div>
+                  {p.status_code === 'chua_co_so_lieu' ? (
+                    <p className="mt-1 text-xs text-muted">
+                      Chưa có số liệu vận hành (mực nước, cửa xả, lưu lượng) — trực ban nhập ở Tổng quan → Hồ chứa. MNDBT {num(p.normal_level, 1)} m.
+                    </p>
+                  ) : (
+                    <table className="mt-1 w-full text-xs">
+                      <tbody>
+                        <tr><td>Mực nước hồ</td><td className="text-right font-mono">{num(p.current_level, 2)} m</td></tr>
+                        <tr><td>MNDBT</td><td className="text-right font-mono">{num(p.normal_level, 1)} m</td></tr>
+                        <tr><td>Lưu lượng về</td><td className="text-right font-mono">{num(p.inflow_m3s)} m³/s</td></tr>
+                        <tr><td>Lưu lượng xả</td><td className="text-right font-mono font-semibold">{num(p.outflow_m3s)} m³/s</td></tr>
+                        <tr><td>Cửa xả mở</td><td className="text-right font-mono">{p.spill_gates_open}/{p.spill_gates}</td></tr>
+                      </tbody>
+                    </table>
+                  )}
                 </div>
               </Popup>
             </Marker>
