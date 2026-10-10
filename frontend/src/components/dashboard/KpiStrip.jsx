@@ -3,11 +3,12 @@ import clsx from 'clsx';
 import { CloudRain, Droplets, Home, Siren, Users, Waves } from 'lucide-react';
 import { useAreaQuery } from '../../api/hooks';
 import { ALARM } from '../../utils/labels';
-import { int, minutesSince, num, pct } from '../../utils/format';
-import { LANDSLIDE_LEVEL, levelOf, RAIN_LABEL, rainLevel, risk } from '../../utils/risk';
+import { int, minutesSince, num } from '../../utils/format';
+import { RAIN_LABEL, risk } from '../../utils/risk';
 import { trendProps } from '../../utils/stations';
 import { ErrorState, Progress, Skeleton, TrendTag } from '../common/ui';
 import StatCard, { Badge } from './StatCard';
+import { evacFacts, rainFacts, resourceFacts, sosFacts, topicFacts } from './kpiFacts';
 import { riverName, riverSummary, ROMAN, shortName } from './RiverKpi';
 
 const GRID = 'grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2.5 xl:grid-cols-6 [&>*]:min-w-0';
@@ -70,8 +71,7 @@ export default function KpiStrip({
     );
   }
   const rain = k.rain;
-  const rainKnown = rain?.avg_24h != null;
-  const rainLv = rainKnown ? rainLevel(rain.max_24h) : null;
+  const { known: rainKnown, level: rainLv } = rainFacts(rain);
   const hourRain = lastHourRain(rainQ.data);
   const river = riverSummary(waterStations);
   const lead = river.level >= 1 ? river.worst : null; // trạm nặng nhất (đã trên BĐ I) — mũi tên xu hướng của ô
@@ -80,22 +80,18 @@ export default function KpiStrip({
   const next = river.next && river.next.eta.level > (river.level ?? 0) ? river.next : null;
   const riverTarget = next ? next.s : river.worst?.s || river.rows[0]?.s;
   const sos = k.sos || {};
-  // Nhấp nháy đỏ (thiết kế A.2): quá hạn phản hồi theo cấp, HOẶC chờ quá 15 phút chưa có lực lượng tiếp nhận (mọi cấp)
-  const sosLate = sos.overdue > 0 || sos.no_team_15m > 0;
-  const sosLv = sosLate || sos.critical > 0 ? 3 : sos.waiting > 0 ? 1 : 0;
+  // Mức / số chính dùng chung với bảng "Tình hình" của Bản đồ giám sát (kpiFacts) — hai nơi luôn cùng số, cùng màu
+  const { late: sosLate, level: sosLv } = sosFacts(sos);
   const oldest = sos.oldest_waiting ? minutesSince(sos.oldest_waiting) : null;
   const ev = k.evacuation || {};
-  const planned = ev.planned_households || 0;
-  const evPct = planned ? pct(ev.evacuated_households, planned) : null;
+  const { planned, pct: evPct } = evacFacts(ev);
   const sites = evacQ.data?.sites || [];
   const fo = k.forces || {};
   const ve = k.vehicles || {};
-  const hasResources = fo.units > 0 || ve.special_total > 0 || ve.heavy_total > 0;
+  const hasResources = resourceFacts(fo, ve).has;
   const rs = k.reservoirs || {};
   const ls = k.landslides || {};
-  const rsLv = !rs.total ? null : rs.emergency_count ? 3 : rs.spill_count ? 2 : 0;
-  const lsLv = !ls.total ? null : ls.blocked_count ? levelOf(LANDSLIDE_LEVEL, 'cam_duong') : ls.warning_count ? levelOf(LANDSLIDE_LEVEL, 'canh_bao') : 0;
-  const topicLv = rsLv == null && lsLv == null ? null : Math.max(rsLv ?? 0, lsLv ?? 0);
+  const { rsLv, lsLv, level: topicLv } = topicFacts(rs, ls);
   const topicRow = 'flex min-h-[36px] w-full items-center justify-between gap-2 rounded-md px-1.5 text-left text-xs hover:bg-panel2';
 
   return (
