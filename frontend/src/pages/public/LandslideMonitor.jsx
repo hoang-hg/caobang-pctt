@@ -117,7 +117,7 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScope
         <button
           onClick={() => refetch()}
           disabled={isFetching}
-          className="btn-ghost text-xs px-3 py-1.5 flex items-center gap-1.5"
+          className="btn-ghost tap text-xs px-3 py-1.5 flex items-center gap-1.5"
           title="Làm mới số liệu ngay"
         >
           <RefreshCw size={13} className={clsx(isFetching && 'animate-spin text-accent')} />
@@ -277,7 +277,7 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScope
           <button
             onClick={() => setCorridorFilter('all')}
             className={clsx(
-              'px-3 py-1.5 rounded-lg text-xs font-medium transition-all shrink-0',
+              'tap px-3 py-1.5 rounded-lg text-xs font-medium transition-all shrink-0',
               corridorFilter === 'all'
                 ? 'bg-accent text-white shadow-sm font-bold'
                 : 'bg-panel text-ink hover:bg-panel2 border border-line'
@@ -290,7 +290,7 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScope
               key={c.name}
               onClick={() => setCorridorFilter(c.name)}
               className={clsx(
-                'px-3 py-1.5 rounded-lg text-xs font-medium transition-all shrink-0',
+                'tap px-3 py-1.5 rounded-lg text-xs font-medium transition-all shrink-0',
                 corridorFilter === c.name
                   ? 'bg-accent text-white shadow-sm font-bold'
                   : 'bg-panel text-ink hover:bg-panel2 border border-line'
@@ -308,7 +308,7 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScope
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="input py-1 text-xs w-auto font-medium"
+              className="input tap py-1 text-xs w-auto font-medium"
             >
               <option value="all">Tất cả trạng thái</option>
               <option value="cam_duong">⛔ Cấm lưu thông / Tắc đường</option>
@@ -321,7 +321,7 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScope
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="input py-1 text-xs w-auto font-medium"
+              className="input tap py-1 text-xs w-auto font-medium"
             >
               <option value="all">Mọi loại hình</option>
               <option value="deo_doc">Đường đèo dốc huyết mạch</option>
@@ -337,7 +337,7 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScope
               placeholder="Tìm tên đèo, xã, tuyến đường…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="input pl-8 py-1.5 text-xs w-full"
+              className="input tap pl-8 py-1.5 text-xs w-full"
             />
           </div>
         </div>
@@ -509,7 +509,7 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScope
                 {onSelectOnMap && (
                   <button
                     onClick={() => onSelectOnMap(p)}
-                    className="btn-ghost text-xs px-2.5 py-1 text-accent flex items-center gap-1 hover:bg-accent/10 hover:border-accent/40"
+                    className="btn-ghost tap text-xs px-2.5 py-1 text-accent flex items-center gap-1 hover:bg-accent/10 hover:border-accent/40"
                   >
                     <Compass size={13} /> Xem trên bản đồ
                   </button>

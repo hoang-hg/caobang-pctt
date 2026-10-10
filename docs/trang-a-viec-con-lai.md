@@ -4,7 +4,8 @@
 giao diện bổ sung (màu rủi ro thống nhất, thông tin khẩn trên cùng, bảng có tìm / lọc / phân trang / xuất file, form chia bước
 có báo lỗi khi nhập, trạng thái tải / trống / lỗi / mất mạng, 360 px, theo phân quyền).
 
-- Cập nhật: 10/10/2026 — mã nguồn `main` gồm PR #36 → #52 (G1, G2 ở PR #50; 3 ô KPI và nhật ký vận hành hồ ở PR #51).
+- Cập nhật: 10/10/2026 — mã nguồn `main` gồm PR #36 → #52 (G1, G2 ở PR #50; 3 ô KPI và nhật ký vận hành hồ ở PR #51) và
+  PR #63 (vùng chạm ≥ 44 px trên màn cảm ứng ở cả 5 tab).
 - Máy chủ thử vẫn chạy **v1.0.3** (04/10/2026), **chưa có** các thay đổi trên. Cần tag + triển khai (V1) trước khi kiểm tra
   với dữ liệu thật.
 - Hiện trạng từng nhóm dữ liệu: README mục **2.2**. Cách nhập: README mục **2.4**. Kiểm tra trước khi mở cổng: `docs/GO-LIVE.md`.
@@ -38,6 +39,7 @@ lần rà cuối (10/10/2026) sửa thêm 3 ô KPI trên điện thoại và nh�
 | A.5 Xuất PDF snapshot định dạng chuẩn gửi UBND tỉnh / Ban Chỉ đạo | Đạt — PDF ảnh chụp + báo cáo văn bản thể thức Nghị định 30/2020 |
 | A.5 Cấu trúc CSDL PostgreSQL / PostGIS liên kết quan trắc với điều hành | Đạt — các schema nghiệp vụ, `backend/alembic/sql/` |
 | Yêu cầu giao diện chung (màu rủi ro, khẩn trên cùng, bảng, form nhiều bước, trạng thái, 360 px, phân quyền) | Đạt |
+| Thao tác chính dễ bấm trên điện thoại / iPad (nút to) | Đạt — mọi vùng chạm của 5 tab ≥ 44 px trên màn cảm ứng, máy dùng chuột giữ cỡ gọn (PR #63). Giới hạn: điện thoại đang hiện thanh trình duyệt (VD iPhone Safari, vùng xem 390×664) thì hàng ô KPI cuối nằm dưới thanh đáy — kéo nhẹ là thấy; đã có từ trước PR #63 |
 
 ---
 
@@ -326,3 +328,4 @@ Thiết kế A.3: phần 1–3 giờ tới của biểu đồ mưa dùng dự b�
 | #50 | Thẻ Hồ chứa trong bảng tác chiến (G1); "Xem thêm", mục khẩn lên đầu ở tab Hồ chứa / Sạt lở (G2) |
 | #51 | Ô KPI trên điện thoại thấy đủ mưa lớn nhất, số người sơ tán, "xuồng, xe lội nước"; nhật ký vận hành hồ ghi lưu lượng xả; tài liệu thêm D4 – D6 |
 | #52 | Tài liệu: bảng đối chiếu từng yêu cầu mục A; việc không cần dữ liệu thật V1 – V3 (triển khai, thử tải, dùng thử) |
+| #63 | Vùng chạm ≥ 44 px trên màn cảm ứng ở cả 5 tab (thanh công cụ, tab, bảng tác chiến — ô chọn, tiêu đề cột, phân trang, lọc —, nhật ký, Hồ chứa, Sạt lở, Cấp xã, Hệ thống): trước 78–86 chỗ nhỏ hơn 44 px, nay 0; điện thoại 360×740 vẫn thấy đủ 6 ô KPI. Tiện ích `.tap` / `.tap-sq` (`index.css`); ui-test khối "Tổng quan cảm ứng" |

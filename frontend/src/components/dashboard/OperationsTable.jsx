@@ -311,7 +311,7 @@ export default function OperationsTable({ k, kState, stations, stationsState, on
   };
 
   const actions = (r, big) => {
-    const cls = clsx('btn-ghost text-[11px]', big ? 'min-h-[40px] flex-1 px-3' : 'px-2 py-0.5');
+    const cls = clsx('btn-ghost tap text-[11px]', big ? 'min-h-[40px] flex-1 px-3' : 'px-2 py-0.5');
     return (
       <>
         {tab === 'rivers' && onSelectStation && (
@@ -355,7 +355,7 @@ export default function OperationsTable({ k, kState, stations, stationsState, on
               aria-selected={tab === t.id}
               onClick={() => switchTab(t.id)}
               className={clsx(
-                'flex min-h-[36px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border px-2.5 py-1 text-xs font-semibold',
+                'tap flex min-h-[36px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border px-2.5 py-1 text-xs font-semibold',
                 tab === t.id ? 'border-accent bg-accent text-white' : 'border-line bg-panel2/60 text-ink-2 hover:text-ink',
               )}
             >
@@ -369,26 +369,26 @@ export default function OperationsTable({ k, kState, stations, stationsState, on
         <div className="relative min-w-0 flex-[1_1_220px]">
           <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted" aria-hidden="true" />
           <input
-            className="input min-h-[40px] py-1 pl-8 pr-8 text-xs"
+            className="input tap min-h-[40px] py-1 pl-8 pr-8 text-xs"
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             placeholder="Tìm theo tên, mã, xã/phường, tình trạng…"
             aria-label="Tìm trong bảng"
           />
           {search && (
-            <button type="button" className="absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center text-muted hover:text-ink" onClick={() => setSearch('')} aria-label="Xoá tìm kiếm">
+            <button type="button" className="tap-sq absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center text-muted hover:text-ink [@media(pointer:coarse)]:right-0" onClick={() => setSearch('')} aria-label="Xoá tìm kiếm">
               <X size={13} />
             </button>
           )}
         </div>
-        <select className="input min-h-[40px] w-auto py-1 text-xs" value={levelFilter} onChange={(e) => { setLevelFilter(e.target.value); setPage(1); }} aria-label="Lọc theo mức màu">
+        <select className="input tap min-h-[40px] w-auto py-1 text-xs" value={levelFilter} onChange={(e) => { setLevelFilter(e.target.value); setPage(1); }} aria-label="Lọc theo mức màu">
           {LEVEL_FILTERS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
         </select>
         <div className="flex gap-2">
-          <button type="button" className="btn-ghost min-h-[40px] px-2.5 py-1 text-xs" onClick={() => doExcel(filtered)} disabled={!filtered.length}>
+          <button type="button" className="btn-ghost tap min-h-[40px] px-2.5 py-1 text-xs" onClick={() => doExcel(filtered)} disabled={!filtered.length}>
             <FileSpreadsheet size={13} /> Excel
           </button>
-          <button type="button" className="btn-ghost min-h-[40px] px-2.5 py-1 text-xs" onClick={doPdf} disabled={!filtered.length || pdf}>
+          <button type="button" className="btn-ghost tap min-h-[40px] px-2.5 py-1 text-xs" onClick={doPdf} disabled={!filtered.length || pdf}>
             {pdf ? <Loader2 size={13} className="animate-spin" /> : <FileDown size={13} />} PDF
           </button>
         </div>
@@ -399,13 +399,13 @@ export default function OperationsTable({ k, kState, stations, stationsState, on
           <span className="flex items-center gap-1.5 rounded-lg bg-accent/15 px-2 py-0.5 font-bold text-accent">
             Đã chọn {chosen.length} mục
           </span>
-          <button type="button" className="btn-primary min-h-[36px] px-2.5 py-1 text-xs font-semibold" onClick={() => doExcel(chosen)}>
+          <button type="button" className="btn-primary tap min-h-[36px] px-2.5 py-1 text-xs font-semibold" onClick={() => doExcel(chosen)}>
             <FileSpreadsheet size={13} /> Xuất Excel mục đã chọn
           </button>
           {canAlert && (tab === 'landslides' || tab === 'sos') && (
             <button
               type="button"
-              className="btn-danger min-h-[36px] px-2.5 py-1 text-xs font-bold"
+              className="btn-danger tap min-h-[36px] px-2.5 py-1 text-xs font-bold"
               onClick={draftAlert}
               disabled={!codes.length}
               title={codes.length ? 'Mở khung soạn cảnh báo, điền sẵn các xã/phường của mục đã chọn' : 'Mục đã chọn chưa gắn xã/phường'}
@@ -413,7 +413,7 @@ export default function OperationsTable({ k, kState, stations, stationsState, on
               <Megaphone size={13} /> Soạn cảnh báo cho {codes.length} xã/phường
             </button>
           )}
-          <button type="button" className="ml-auto min-h-[36px] px-1 text-xs text-muted hover:text-ink" onClick={() => setSelected(new Set())}>
+          <button type="button" className="tap ml-auto min-h-[36px] px-1 text-xs text-muted hover:text-ink" onClick={() => setSelected(new Set())}>
             Bỏ chọn
           </button>
         </div>
@@ -428,13 +428,16 @@ export default function OperationsTable({ k, kState, stations, stationsState, on
             <thead className="bg-panel2/70 text-[11px] uppercase tracking-wide text-muted">
               <tr>
                 {!pdf && (
-                  <th scope="col" className="w-8 p-2.5">
-                    <input
-                      type="checkbox"
-                      checked={allChecked}
-                      onChange={() => setSelected(allChecked ? new Set() : new Set(filtered.map((r) => r.id)))}
-                      aria-label="Chọn tất cả"
-                    />
+                  <th scope="col" className="w-8 p-0">
+                    {/* Ô chọn nằm trong nhãn phủ cả ô bảng — màn cảm ứng chạm trúng dễ (≥ 44 px), không phải nhắm ô 13 px */}
+                    <label className="tap-sq flex cursor-pointer items-center justify-center p-2.5">
+                      <input
+                        type="checkbox"
+                        checked={allChecked}
+                        onChange={() => setSelected(allChecked ? new Set() : new Set(filtered.map((r) => r.id)))}
+                        aria-label="Chọn tất cả"
+                      />
+                    </label>
                   </th>
                 )}
                 {[{ label: { rivers: 'Trạm', reservoirs: 'Hồ', landslides: 'Điểm', sos: 'Phiếu', supplies: 'Kho' }[tab], sort: 'name' }, ...cols,
@@ -446,7 +449,7 @@ export default function OperationsTable({ k, kState, stations, stationsState, on
                     aria-sort={col.sort && sort.key === col.sort ? (sort.desc ? 'descending' : 'ascending') : undefined}
                   >
                     {col.sort && !pdf ? (
-                      <button type="button" className="inline-flex items-center gap-1 uppercase hover:text-ink" onClick={() => onSort(col.sort)}>
+                      <button type="button" className="tap-sq inline-flex items-center gap-1 uppercase hover:text-ink" onClick={() => onSort(col.sort)}>
                         {col.label}
                         <ArrowUpDown size={11} className={sort.key === col.sort ? 'text-accent' : 'opacity-40'} aria-hidden="true" />
                       </button>
@@ -460,8 +463,10 @@ export default function OperationsTable({ k, kState, stations, stationsState, on
               {visible.map((r) => (
                 <tr key={r.id} className={clsx('hover:bg-panel2/50', selected.has(r.id) && !pdf && 'bg-accent/5')}>
                   {!pdf && (
-                    <td className="p-2.5">
-                      <input type="checkbox" checked={selected.has(r.id)} onChange={() => toggle(r.id)} aria-label={`Chọn ${r.name}`} />
+                    <td className="p-0">
+                      <label className="tap-sq flex cursor-pointer items-center justify-center p-2.5">
+                        <input type="checkbox" checked={selected.has(r.id)} onChange={() => toggle(r.id)} aria-label={`Chọn ${r.name}`} />
+                      </label>
                     </td>
                   )}
                   <td className={clsx('p-2.5', !pdf && 'max-w-[240px]')}>
@@ -494,7 +499,9 @@ export default function OperationsTable({ k, kState, stations, stationsState, on
           {visible.map((r) => (
             <li key={r.id} className={clsx('rounded-xl border border-l-4 bg-panel p-3', risk(r.level).edge, selected.has(r.id) ? 'border-accent' : 'border-line')}>
               <div className="flex items-start gap-2.5">
-                <input type="checkbox" className="mt-0.5 h-5 w-5 shrink-0" checked={selected.has(r.id)} onChange={() => toggle(r.id)} aria-label={`Chọn ${r.name}`} />
+                <label className="tap-sq -m-2 flex shrink-0 cursor-pointer items-start justify-center p-2">
+                  <input type="checkbox" className="mt-0.5 h-5 w-5" checked={selected.has(r.id)} onChange={() => toggle(r.id)} aria-label={`Chọn ${r.name}`} />
+                </label>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -527,14 +534,14 @@ export default function OperationsTable({ k, kState, stations, stationsState, on
           {filtered.length} mục{filtered.length !== rows.length && ` (trong ${rows.length})`}
         </span>
         <div className="flex items-center gap-2">
-          <select className="input min-h-[36px] w-auto py-0.5 text-xs" value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }} aria-label="Số dòng mỗi trang">
+          <select className="input tap min-h-[36px] w-auto py-0.5 text-xs" value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }} aria-label="Số dòng mỗi trang">
             {[10, 20, 50].map((n) => <option key={n} value={n}>{n} dòng</option>)}
           </select>
-          <button type="button" className="btn-ghost h-9 w-9 p-0" onClick={() => setPage(Math.max(1, cur - 1))} disabled={cur <= 1} aria-label="Trang trước">
+          <button type="button" className="btn-ghost tap-sq h-9 w-9 p-0" onClick={() => setPage(Math.max(1, cur - 1))} disabled={cur <= 1} aria-label="Trang trước">
             <ChevronLeft size={15} />
           </button>
           <span className="font-mono">{cur}/{pages}</span>
-          <button type="button" className="btn-ghost h-9 w-9 p-0" onClick={() => setPage(Math.min(pages, cur + 1))} disabled={cur >= pages} aria-label="Trang sau">
+          <button type="button" className="btn-ghost tap-sq h-9 w-9 p-0" onClick={() => setPage(Math.min(pages, cur + 1))} disabled={cur >= pages} aria-label="Trang sau">
             <ChevronRight size={15} />
           </button>
         </div>

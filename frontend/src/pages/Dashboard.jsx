@@ -435,7 +435,7 @@ export default function Dashboard() {
             <span className="hidden font-normal text-muted md:inline">/</span>
             <span className="min-w-0 truncate text-accent" title={filterLabel}>{filterLabel}</span>
             {isFiltered && tab !== 'cap_xa' && (
-              <button type="button" onClick={clearFilter} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted hover:bg-panel2 hover:text-ink" title="Bỏ lọc" aria-label="Bỏ lọc, xem toàn bộ phạm vi">
+              <button type="button" onClick={clearFilter} className="tap-sq flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted hover:bg-panel2 hover:text-ink" title="Bỏ lọc" aria-label="Bỏ lọc, xem toàn bộ phạm vi">
                 <X size={15} />
               </button>
             )}
@@ -455,26 +455,26 @@ export default function Dashboard() {
               <>
                 {canReport && (
                   // Điện thoại: "Báo SOS" ở thanh dưới cùng (vùng ngón cái) — ở đây chỉ hiện từ máy tính bảng trở lên
-                  <button type="button" onClick={() => setReportOpen(true)} className="btn-danger hidden min-h-[40px] px-3 text-xs font-bold sm:inline-flex lg:min-h-0 lg:py-1.5">
+                  <button type="button" onClick={() => setReportOpen(true)} className="btn-danger tap hidden min-h-[40px] px-3 text-xs font-bold sm:inline-flex lg:min-h-0 lg:py-1.5">
                     <ShieldAlert size={14} /> Báo cáo nhanh
                   </button>
                 )}
-                <button type="button" onClick={refresh} disabled={refreshing} className="btn-ghost h-10 min-w-[40px] px-2.5 text-xs lg:h-auto lg:py-1.5" aria-label="Làm mới số liệu" title="Làm mới số liệu">
+                <button type="button" onClick={refresh} disabled={refreshing} className="btn-ghost tap-sq h-10 min-w-[40px] px-2.5 text-xs lg:h-auto lg:py-1.5" aria-label="Làm mới số liệu" title="Làm mới số liệu">
                   <RefreshCw size={14} className={clsx(refreshing && 'animate-spin')} /> <span className="hidden xl:inline">Làm mới</span>
                 </button>
-                <Link to="/ban-do" className="btn-ghost hidden h-10 px-2.5 text-xs sm:inline-flex lg:h-auto lg:py-1.5" title="Mở Bản đồ giám sát">
+                <Link to="/ban-do" className="btn-ghost tap hidden h-10 px-2.5 text-xs sm:inline-flex lg:h-auto lg:py-1.5" title="Mở Bản đồ giám sát">
                   <Compass size={14} /> <span className="hidden md:inline">Bản đồ</span> <ArrowUpRight size={12} />
                 </Link>
-                <button type="button" onClick={doExcel} disabled={!k} className="btn-ghost h-10 min-w-[40px] px-2.5 text-xs lg:h-auto lg:py-1.5" aria-label="Xuất Excel tổng quan" title="Xuất Excel tổng quan">
+                <button type="button" onClick={doExcel} disabled={!k} className="btn-ghost tap-sq h-10 min-w-[40px] px-2.5 text-xs lg:h-auto lg:py-1.5" aria-label="Xuất Excel tổng quan" title="Xuất Excel tổng quan">
                   <FileSpreadsheet size={14} /> <span className="hidden md:inline">Excel</span>
                 </button>
-                <button type="button" onClick={() => setDocOpen(true)} disabled={!k} className="btn-ghost h-10 min-w-[40px] px-2.5 text-xs lg:h-auto lg:py-1.5" aria-label="Soạn báo cáo văn bản định dạng chuẩn (PDF)" title="Báo cáo văn bản gửi UBND tỉnh / Ban Chỉ đạo: quốc hiệu, số liệu, đánh giá – kiến nghị, chỗ ký (PDF chữ thật)">
+                <button type="button" onClick={() => setDocOpen(true)} disabled={!k} className="btn-ghost tap-sq h-10 min-w-[40px] px-2.5 text-xs lg:h-auto lg:py-1.5" aria-label="Soạn báo cáo văn bản định dạng chuẩn (PDF)" title="Báo cáo văn bản gửi UBND tỉnh / Ban Chỉ đạo: quốc hiệu, số liệu, đánh giá – kiến nghị, chỗ ký (PDF chữ thật)">
                   <FileText size={14} /> <span className="hidden md:inline">Văn bản</span>
                 </button>
-                <button type="button" onClick={doExport} disabled={exporting} className="btn-primary h-10 min-w-[40px] px-3 text-xs lg:h-auto lg:py-1.5" aria-label="Xuất PDF báo cáo nhanh" title="Xuất PDF báo cáo nhanh">
+                <button type="button" onClick={doExport} disabled={exporting} className="btn-primary tap-sq h-10 min-w-[40px] px-3 text-xs lg:h-auto lg:py-1.5" aria-label="Xuất PDF báo cáo nhanh" title="Xuất PDF báo cáo nhanh">
                   {exporting ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />} <span className="hidden md:inline">Xuất PDF</span>
                 </button>
-                <button type="button" onClick={enterPresentation} className="btn-ghost hidden px-2.5 py-1.5 text-xs lg:inline-flex" aria-label="Chế độ trình chiếu màn hình lớn" title="Trình chiếu trên màn hình lớn phòng điều hành: nền tối, chữ số to, tự xoay vòng chuyên đề">
+                <button type="button" onClick={enterPresentation} className="btn-ghost tap-sq hidden px-2.5 py-1.5 text-xs lg:inline-flex" aria-label="Chế độ trình chiếu màn hình lớn" title="Trình chiếu trên màn hình lớn phòng điều hành: nền tối, chữ số to, tự xoay vòng chuyên đề">
                   <Monitor size={14} /> <span className="hidden xl:inline">Trình chiếu</span>
                 </button>
               </>
@@ -495,7 +495,7 @@ export default function Dashboard() {
           {/* Thang màu: hiện sẵn từ md; điện thoại gọn vào "Thang màu" (chạm để mở) */}
           <RiskLegend className="hidden md:flex" meaningClass="hidden xl:inline" />
           <details className="md:hidden">
-            <summary className="flex min-h-[28px] cursor-pointer list-none items-center gap-1 font-semibold text-accent [&::-webkit-details-marker]:hidden">
+            <summary className="touch-hit flex min-h-[28px] cursor-pointer list-none items-center gap-1 font-semibold text-accent [&::-webkit-details-marker]:hidden">
               <Info size={13} aria-hidden="true" /> Thang màu
             </summary>
             <RiskLegend className="mt-1" />
@@ -506,7 +506,7 @@ export default function Dashboard() {
             <label className="hidden items-center gap-1.5 no-print sm:flex">
               <MapPin size={12} aria-hidden="true" />
               <span className="hidden xl:inline">Lưu vực</span>
-              <select className="input min-h-[32px] w-auto max-w-[13rem] py-0.5 text-[11px]" value={basinValue} onChange={(e) => pickBasin(e.target.value)} aria-label="Lọc theo lưu vực">
+              <select className="input tap min-h-[32px] w-auto max-w-[13rem] py-0.5 text-[11px]" value={basinValue} onChange={(e) => pickBasin(e.target.value)} aria-label="Lọc theo lưu vực">
                 <option value="">Toàn tỉnh</option>
                 {basinValue === 'khac' && <option value="khac" disabled>{filter.label}</option>}
                 {basinPresets.map((p) => <option key={p.code} value={p.code}>{p.name} ({p.unit_codes.length} xã)</option>)}
@@ -538,7 +538,7 @@ export default function Dashboard() {
               aria-selected={tab === t.id}
               onClick={() => setTab(t.id)}
               className={clsx(
-                'flex min-h-[40px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border px-3 text-xs font-bold',
+                'tap flex min-h-[40px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border px-3 text-xs font-bold',
                 tab === t.id ? 'border-accent bg-accent text-white' : 'border-line bg-panel text-ink-2 hover:bg-panel2 hover:text-ink',
               )}
             >
@@ -639,7 +639,7 @@ export default function Dashboard() {
                     )}
                     {canForecast && !presentation && waterStations.length > 0 && (
                       <div className="mt-2 flex justify-end no-print">
-                        <button type="button" className="btn-ghost min-h-[36px] px-2.5 py-1 text-xs" onClick={() => setBulletinOpen(true)}>
+                        <button type="button" className="btn-ghost tap min-h-[36px] px-2.5 py-1 text-xs" onClick={() => setBulletinOpen(true)}>
                           Nhập bản tin dự báo KTTV
                         </button>
                       </div>

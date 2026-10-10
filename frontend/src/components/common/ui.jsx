@@ -139,7 +139,7 @@ export function Section({ title, right, children, className, bodyClass, id, coll
       <div className="flex items-center justify-between gap-2 px-4 pb-1 pt-3">
         {collapsible ? (
           <h2 className="card-title min-w-0 flex-1">
-            <button type="button" className="flex min-h-[40px] w-full items-center gap-1.5 text-left" aria-expanded={open} onClick={onToggle}>
+            <button type="button" className="tap flex min-h-[40px] w-full items-center gap-1.5 text-left" aria-expanded={open} onClick={onToggle}>
               <ChevronDown size={15} className={clsx('shrink-0 transition-transform', !open && '-rotate-90')} aria-hidden="true" />
               {title}
             </button>

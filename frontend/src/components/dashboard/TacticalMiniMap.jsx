@@ -191,7 +191,7 @@ export default function TacticalMiniMap({ k, className }) {
           {!layers && layersError && (
             <div role="alert" className="absolute inset-x-2 top-2 z-[500] flex flex-wrap items-center justify-center gap-2 rounded-lg border border-danger/40 bg-panel/95 px-3 py-2 text-center text-xs text-danger shadow">
               Không tải được các lớp bản đồ điểm nóng
-              <button type="button" className="btn-ghost min-h-[32px] px-2 py-0.5 text-xs" onClick={() => refetch()}>Thử lại</button>
+              <button type="button" className="btn-ghost tap min-h-[32px] px-2 py-0.5 text-xs" onClick={() => refetch()}>Thử lại</button>
             </div>
           )}
           {!layers && !layersError && (

@@ -99,12 +99,13 @@ export default function EventLog({ limit = 50, className, preview }) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Lọc nhanh nhật ký (tên xã, sự cố, hồ xả...)"
-          className="w-full min-h-[36px] pl-8 pr-7 py-1 text-xs rounded-lg border border-line bg-panel2/60 text-ink placeholder:text-muted focus:border-accent focus:outline-none"
+          className="tap w-full min-h-[36px] pl-8 pr-7 py-1 text-xs rounded-lg border border-line bg-panel2/60 text-ink placeholder:text-muted focus:border-accent focus:outline-none"
         />
         {search && (
           <button
             onClick={() => setSearch('')}
-            className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-muted hover:text-ink"
+            className="tap-sq absolute right-2 top-1/2 flex -translate-y-1/2 items-center justify-center rounded p-0.5 text-muted hover:text-ink [@media(pointer:coarse)]:right-0"
+            aria-label="Xoá tìm kiếm"
           >
             <X size={12} />
           </button>
@@ -160,7 +161,7 @@ export default function EventLog({ limit = 50, className, preview }) {
         )}
       </ul>
       {preview && !showAll && filtered.length > preview && (
-        <button type="button" className="btn-ghost min-h-[40px] w-full justify-center text-xs font-semibold" onClick={() => setShowAll(true)}>
+        <button type="button" className="btn-ghost tap min-h-[40px] w-full justify-center text-xs font-semibold" onClick={() => setShowAll(true)}>
           Xem tất cả {filtered.length} sự kiện
         </button>
       )}

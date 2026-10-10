@@ -57,9 +57,15 @@ export default function AdminFilter() {
         <ChevronDown size={14} />
       </button>
       {filter.codes.length > 0 && (
-        <button className="absolute -right-2 -top-2 rounded-full bg-panel2 p-0.5 text-muted hover:text-ink" onClick={clearFilter} title="Bỏ lọc">
-          <X size={12} />
-        </button>
+        <>
+          <button className="absolute -right-2 -top-2 rounded-full bg-panel2 p-0.5 text-muted hover:text-ink [@media(pointer:coarse)]:hidden" onClick={clearFilter} title="Bỏ lọc">
+            <X size={12} />
+          </button>
+          {/* Màn cảm ứng: nút bỏ lọc riêng 44 px cạnh bộ lọc — chấm ✕ ở góc quá nhỏ, nới vùng chạm thì đè lên nút bộ lọc */}
+          <button className="btn-ghost tap-sq ml-1 hidden p-0 [@media(pointer:coarse)]:inline-flex" onClick={clearFilter} title="Bỏ lọc" aria-label="Bỏ lọc">
+            <X size={14} />
+          </button>
+        </>
       )}
       {open && (
         <div className="card absolute left-0 top-11 z-[1200] w-[min(26rem,calc(100vw-2rem))] p-3 shadow-2xl bg-panel/95 backdrop-blur-md border border-line">

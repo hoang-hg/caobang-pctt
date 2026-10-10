@@ -144,9 +144,8 @@ lượng phải sang Tổng quan; iPad ngang dùng bố cục cho chuột — 50
 - **Sửa kèm:** chú giải trạm mưa ghi đúng "cường độ mưa đo mới nhất (mm/giờ)" (trước ghi nhầm "mưa 24 giờ"); cụm thẻ góc
   trên trái (điện thoại) không chặn kéo bản đồ; thanh thời gian không đè đáy bảng cảnh báo trên iPad ngang.
 - **Kiểm thử:** `tests/ui/ui-test.mjs` khối "Người quản lý" — laptop 1366, iPad ngang, iPad dọc, điện thoại 360.
-- **Ghi nhận ngoài trang B:** trang Tổng quan còn 9–16 nút riêng nhỏ hơn 44 px trên màn cảm ứng (thanh công cụ Làm mới /
-  Excel / PDF / Báo cáo văn bản / Trình chiếu, tab chuyên đề 40 px, lọc lưu vực, dòng Hồ đang xả / Cấm đường) — sửa cùng
-  cách nếu cần.
+- **Trang Tổng quan:** cũng đã sửa vùng chạm ≥ 44 px trên màn cảm ứng ở cả 5 tab — PR #63, ghi ở
+  `docs/trang-a-viec-con-lai.md` (trước 78–86 chỗ nhỏ hơn 44 px, nay 0).
 
 ## 4. Việc chờ dữ liệu / hệ thống bên ngoài
 

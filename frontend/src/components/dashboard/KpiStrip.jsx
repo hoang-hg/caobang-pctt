@@ -92,7 +92,8 @@ export default function KpiStrip({
   const rs = k.reservoirs || {};
   const ls = k.landslides || {};
   const { rsLv, lsLv, level: topicLv } = topicFacts(rs, ls);
-  const topicRow = 'flex min-h-[36px] w-full items-center justify-between gap-2 rounded-md px-1.5 text-left text-xs hover:bg-panel2';
+  // Màn cảm ứng: vùng chạm vô hình 44 px (.touch-hit) — dòng cao thật 44 px đẩy ô KPI cuối xuống dưới thanh đáy điện thoại 360 px
+  const topicRow = 'touch-hit flex min-h-[36px] w-full items-center justify-between gap-2 rounded-md px-1.5 text-left text-xs hover:bg-panel2';
 
   return (
     <div ref={gridRef} className={clsx(GRID, wide && 'sm:grid-cols-6', large && 'kpi-lon')} aria-label="Chỉ số nhanh">

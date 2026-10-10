@@ -109,7 +109,7 @@ export default function SystemView({ k, stations, supplies, evac, unitsCount, ca
         )}
       </Box>
 
-      <Box icon={Cpu} title="Trạm quan trắc & thiết bị IoT" right={<Link to="/nguon-du-lieu" className="text-xs font-semibold text-accent hover:underline">Quản lý →</Link>}>
+      <Box icon={Cpu} title="Trạm quan trắc & thiết bị IoT" right={<Link to="/nguon-du-lieu" className="touch-hit text-xs font-semibold text-accent hover:underline">Quản lý →</Link>}>
         <div>
           {byType.map((t) => (
             <Row key={t.type} label={STATION_TYPE[t.type]}>
@@ -136,7 +136,7 @@ export default function SystemView({ k, stations, supplies, evac, unitsCount, ca
         </div>
       </Box>
 
-      <Box icon={DatabaseZap} title="Dữ liệu nền cho Dashboard" right={canImport && <Link to="/nhap-du-lieu" className="text-xs font-semibold text-accent hover:underline">Nhập dữ liệu →</Link>}>
+      <Box icon={DatabaseZap} title="Dữ liệu nền cho Dashboard" right={canImport && <Link to="/nhap-du-lieu" className="touch-hit text-xs font-semibold text-accent hover:underline">Nhập dữ liệu →</Link>}>
         <p className="text-[11px] text-muted">Đếm trong vùng đang xem. Thiếu dữ liệu nào thì ô tương ứng trên Dashboard hiện "chưa có".</p>
         <ul className="flex flex-col">
           {readiness.map(([label, n, hint]) => (
