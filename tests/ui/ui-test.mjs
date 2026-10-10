@@ -229,6 +229,44 @@ async function staff(ctx, trackCode) {
     });
   }
 
+  // Thiết kế B: bảng nổi không che bản đồ (điện thoại trước đây chỉ thấy 3%); điện thoại có thanh ngón cái Lớp · Cảnh báo ·
+  // Báo SOS · Thời gian · Gọi 112, mỗi nút mở bảng trượt từ đáy; máy tính có bảng Cảnh báo khẩn cấp và chú giải
+  await step(ctx, 'Bản đồ giám sát: bảng nổi không che bản đồ; thanh ngón cái (điện thoại) / bảng cảnh báo, chú giải (máy tính)', async () => {
+    await page.goto(`${ROOT}/ban-do`);
+    await page.locator('.leaflet-container').waitFor({ timeout: 20_000 });
+    await page.waitForTimeout(1500);
+    const free = await page.evaluate(() => {
+      const m = document.querySelector('.leaflet-container').getBoundingClientRect();
+      let ok = 0;
+      let all = 0;
+      for (let i = 0; i < 12; i += 1) {
+        for (let j = 0; j < 12; j += 1) {
+          const x = m.left + ((i + 0.5) * m.width) / 12;
+          const y = m.top + ((j + 0.5) * m.height) / 12;
+          if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) continue;
+          all += 1;
+          const el = document.elementFromPoint(x, y);
+          if (el?.closest('.leaflet-container') && !el.closest('.leaflet-control')) ok += 1;
+        }
+      }
+      return Math.round((100 * ok) / Math.max(all, 1));
+    });
+    if (free < (vp.mobile ? 80 : 50)) throw new Error(`bảng nổi che bản đồ: chỉ thấy ${free}%`);
+    if (vp.mobile) {
+      const bar = page.getByRole('navigation', { name: 'Thao tác nhanh' });
+      await bar.getByRole('button', { name: /^Lớp/ }).click();
+      await page.getByRole('region', { name: 'Lớp dữ liệu bản đồ' }).waitFor({ timeout: 5_000 });
+      await page.keyboard.press('Escape');
+    } else {
+      await page.getByText('Cảnh báo khẩn cấp').first().waitFor({ timeout: 10_000 });
+      await page.getByRole('button', { name: 'Chú giải' }).click();
+      await page.getByText(/Thang màu rủi ro/).first().waitFor({ timeout: 5_000 });
+      await page.getByRole('button', { name: 'Ẩn chú giải' }).click();
+    }
+    await expectNoOverflow(ctx, 'Bản đồ giám sát');
+    return `bản đồ thấy ${free}%`;
+  });
+
   if (vp.mobile) {
     await step(ctx, 'Menu điều hướng trên điện thoại mở / chuyển trang được', async () => {
       await page.goto(`${ROOT}/dashboard`);

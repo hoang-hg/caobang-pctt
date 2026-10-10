@@ -49,9 +49,12 @@ export function situationItems(k, waterStations) {
  * Không có tình huống: nói "chưa ghi nhận" kèm độ phủ số đo — không nói "an toàn"; chưa có số đo: khung xám chỉ chỗ
  * nhập (chỉ link tới trang tài khoản được mở). Lỗi tải danh sách trạm: nói không tải được, không nói "chưa có trạm".
  * `presentation` (chế độ trình chiếu màn hình lớn): hiện đủ mọi tình huống, ẩn nút thao tác — màn hình chỉ để xem.
+ * `compact` (đầu trang Bản đồ): một dải mỏng sát mép, không dính / không lề âm (trang không cuộn); trạng thái "chưa ghi
+ * nhận tình huống" chỉ hiện từ máy tính bảng trở lên — điện thoại dành chỗ cho bản đồ.
  */
 export default function SituationBar({
   k, waterStations, stationsError, rainKnown, canReport, onReport, canSos, canImportStations, canSystem, presentation = false,
+  compact = false,
 }) {
   const [opened, setExpanded] = useState(false);
   const expanded = opened || presentation;
@@ -83,7 +86,9 @@ export default function SituationBar({
       <div
         className={clsx(
           // Điện thoại: chip một hàng riêng (đủ rộng), nút xuống hàng dưới; máy tính: chip + nút cùng một hàng
-          'sticky top-0 z-30 -mx-3.5 -mt-3.5 mb-1 flex flex-col gap-2 px-3.5 py-1.5 text-xs shadow-lg sm:-mx-5 sm:-mt-5 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-2 print:static',
+          compact
+            ? 'flex flex-col gap-1.5 px-3 py-1.5 text-xs shadow-md sm:flex-row sm:items-center sm:justify-between sm:px-4'
+            : 'sticky top-0 z-30 -mx-3.5 -mt-3.5 mb-1 flex flex-col gap-2 px-3.5 py-1.5 text-xs shadow-lg sm:-mx-5 sm:-mt-5 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-2 print:static',
           scale.chip,
         )}
         role="status"
@@ -155,7 +160,11 @@ export default function SituationBar({
 
   if (worst === 1) {
     return (
-      <div className={clsx('card flex items-start gap-2 px-3 py-2 text-xs text-ink', risk(1).soft)} role="status" title={NOTE}>
+      <div
+        className={clsx(compact ? 'flex items-start gap-2 border-b px-3 py-1.5 text-xs text-ink' : 'card flex items-start gap-2 px-3 py-2 text-xs text-ink', risk(1).soft)}
+        role="status"
+        title={NOTE}
+      >
         <AlertTriangle size={15} className="mt-0.5 shrink-0 text-warn" aria-hidden="true" />
         <div className="flex min-w-0 flex-wrap items-center gap-1.5 leading-snug">
           <b className="text-warn">Theo dõi:</b>
@@ -177,12 +186,18 @@ export default function SituationBar({
       ? { to: '/nhap-du-lieu', text: 'Nhập danh mục trạm →' }
       : canSystem ? { to: '/nguon-du-lieu', text: 'Xem nguồn dữ liệu →' } : null;
     return (
-      <div className="card flex flex-wrap items-center gap-2 border-dashed px-3 py-2 text-xs text-muted" role="status">
+      <div
+        className={clsx(
+          'flex flex-wrap items-center gap-2 border-dashed text-xs text-muted',
+          compact ? 'border-b border-line px-3 py-1.5' : 'card px-3 py-2',
+        )}
+        role="status"
+      >
         <DatabaseZap size={15} className="shrink-0" aria-hidden="true" />
         <span className="min-w-0 flex-1">
           {stationsError
-            ? 'Không tải được danh sách trạm quan trắc — Dashboard chưa đánh giá được mực nước. Bấm "Làm mới" để thử lại.'
-            : 'Chưa có số đo trạm mực nước / đo mưa trong vùng đang xem — Dashboard chưa đánh giá được tình hình mưa, lũ.'}
+            ? `Không tải được danh sách trạm quan trắc — ${compact ? 'chưa' : 'Dashboard chưa'} đánh giá được mực nước.${compact ? '' : ' Bấm "Làm mới" để thử lại.'}`
+            : `Chưa có số đo trạm mực nước / đo mưa trong vùng đang xem — ${compact ? 'chưa' : 'Dashboard chưa'} đánh giá được tình hình mưa, lũ.`}
           {!stationsError && !link && ' Báo cấp tỉnh kiểm tra danh mục trạm.'}
         </span>
         {!stationsError && link && (
@@ -193,7 +208,11 @@ export default function SituationBar({
   }
 
   return (
-    <div className="card flex items-start gap-2 px-3 py-2 text-xs text-ink-2" role="status" title={NOTE}>
+    <div
+      className={clsx('items-start gap-2 text-xs text-ink-2', compact ? 'hidden border-b border-line px-3 py-1.5 sm:flex' : 'card flex px-3 py-2')}
+      role="status"
+      title={NOTE}
+    >
       <Info size={15} className="mt-0.5 shrink-0 text-muted" aria-hidden="true" />
       <span>
         Chưa ghi nhận trạm vượt báo động, SOS quá hạn, sạt lở cấm đường, hồ xả hay mưa ≥ 50 mm/24h trong vùng đang xem
