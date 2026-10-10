@@ -137,8 +137,12 @@ export function reportContent({ k, stations = [], evacSites, assessment }) {
     rows: lsPoints.map((p, i) => [String(i + 1), p.name, p.road_name || '–', p.admin_name || '–', p.traffic_label || '–']),
   } : null;
 
-  const sosText = `Đang chờ xử lý ${int(sos.waiting)} phiếu${sos.overdue || sos.critical
-    ? ` (${[sos.overdue && `${int(sos.overdue)} phiếu quá hạn phản hồi`, sos.critical && `${int(sos.critical)} phiếu cấp 1 chưa xong`].filter(Boolean).join(', ')})` : ''}; đang xử lý ${int(sos.in_progress)} phiếu; đã hoàn thành trong 24 giờ qua ${int(sos.resolved_24h)} phiếu.`;
+  const sosText = `Đang chờ xử lý ${int(sos.waiting)} phiếu${sos.overdue || sos.no_team_15m || sos.critical
+    ? ` (${[
+      sos.overdue && `${int(sos.overdue)} phiếu quá hạn phản hồi`,
+      sos.no_team_15m && `${int(sos.no_team_15m)} phiếu chờ quá 15 phút chưa có đội tiếp nhận`,
+      sos.critical && `${int(sos.critical)} phiếu cấp 1 chưa xong`,
+    ].filter(Boolean).join(', ')})` : ''}; đang xử lý ${int(sos.in_progress)} phiếu; đã hoàn thành trong 24 giờ qua ${int(sos.resolved_24h)} phiếu.`;
   const evacText = ev.planned_households
     ? `Đã sơ tán ${int(ev.evacuated_households)}/${int(ev.planned_households)} hộ (${pct(ev.evacuated_households, ev.planned_households)}% kế hoạch)${
       ev.planned_persons ? `, ${int(ev.evacuated_persons)}/${int(ev.planned_persons)} nhân khẩu` : ''}${Array.isArray(evacSites) ? `; ${int(evacSites.length)} điểm sơ tán trong phạm vi báo cáo` : ''}.`

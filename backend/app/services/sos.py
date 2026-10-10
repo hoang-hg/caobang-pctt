@@ -16,15 +16,25 @@ _SLA_INTERVAL = (
     + " ".join(f"WHEN {p} THEN {m}" for p, m in SLA_MINUTES.items())
     + " ELSE 15 END)"
 )
-# Quá hạn: "Chờ xử lý" quá SLA kể từ lúc nhận tin; hoặc "Đang điều phối" mà chưa có đội nào đang đi / ở hiện trường
-# ("Chờ điều động") quá SLA kể từ lúc chuyển sang cột này / lúc huỷ lệnh trước — kéo phiếu sang "Đang điều phối" không
-# dừng được đồng hồ khi chưa ai đi cứu
-OVERDUE_SQL = (
-    f"((t.status = 'moi' AND t.received_at < now() - {_SLA_INTERVAL})"
-    f" OR (t.status = 'dieu_phoi' AND t.status_changed_at < now() - {_SLA_INTERVAL}"
-    " AND NOT EXISTS (SELECT 1 FROM operations.dispatch_orders o"
-    " WHERE o.ticket_id = t.id AND o.status IN ('dang_di', 'da_den'))))"
-)
+
+
+def no_team_sql(interval: str) -> str:
+    """Phiếu CHƯA CÓ LỰC LƯỢNG TIẾP NHẬN quá `interval` (biểu thức SQL): "Chờ xử lý" kể từ lúc nhận tin; hoặc "Đang điều
+    phối" mà chưa có đội nào đang đi / ở hiện trường ("Chờ điều động") kể từ lúc chuyển sang cột này / lúc huỷ lệnh trước
+    — kéo phiếu sang "Đang điều phối" không dừng được đồng hồ khi chưa ai đi cứu."""
+    return (
+        f"((t.status = 'moi' AND t.received_at < now() - {interval})"
+        f" OR (t.status = 'dieu_phoi' AND t.status_changed_at < now() - {interval}"
+        " AND NOT EXISTS (SELECT 1 FROM operations.dispatch_orders o"
+        " WHERE o.ticket_id = t.id AND o.status IN ('dang_di', 'da_den'))))"
+    )
+
+
+# Quá hạn phản hồi theo cấp ưu tiên (SLA) — trung tâm cứu hộ, "Việc chờ quyết định" và KPI "quá hạn" dùng chung
+OVERDUE_SQL = no_team_sql(_SLA_INTERVAL)
+# Ô KPI SOS của Tổng quan nhấp nháy đỏ thêm khi có phiếu chờ quá 15 phút chưa có lực lượng tiếp nhận, mọi cấp ưu tiên
+# (thiết kế A.2) — phiếu cấp 3 (hạn 60 phút) chờ 15–60 phút vẫn được báo ở ô KPI, hạn của trung tâm cứu hộ không đổi
+NO_TEAM_15M_SQL = no_team_sql("interval '15 minutes'")
 
 SOURCE_LABEL = {
     "ZALO": "Zalo OA",

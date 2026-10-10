@@ -80,7 +80,9 @@ export default function KpiStrip({
   const next = river.next && river.next.eta.level > (river.level ?? 0) ? river.next : null;
   const riverTarget = next ? next.s : river.worst?.s || river.rows[0]?.s;
   const sos = k.sos || {};
-  const sosLv = sos.overdue > 0 || sos.critical > 0 ? 3 : sos.waiting > 0 ? 1 : 0;
+  // Nhấp nháy đỏ (thiết kế A.2): quá hạn phản hồi theo cấp, HOẶC chờ quá 15 phút chưa có lực lượng tiếp nhận (mọi cấp)
+  const sosLate = sos.overdue > 0 || sos.no_team_15m > 0;
+  const sosLv = sosLate || sos.critical > 0 ? 3 : sos.waiting > 0 ? 1 : 0;
   const oldest = sos.oldest_waiting ? minutesSince(sos.oldest_waiting) : null;
   const ev = k.evacuation || {};
   const planned = ev.planned_households || 0;
@@ -172,19 +174,20 @@ export default function KpiStrip({
         icon={Siren}
         title="SOS chờ xử lý"
         level={sosLv}
-        alert={sos.overdue > 0}
+        alert={sosLate}
         badge={
           sos.overdue > 0 ? <Badge level={3}>{sos.overdue} quá hạn</Badge>
-            : sos.critical > 0 ? <Badge className="bg-danger/15 text-danger">{sos.critical} cấp 1</Badge> : null
+            : sos.no_team_15m > 0 ? <Badge level={3}>{sos.no_team_15m} chờ quá 15′</Badge>
+              : sos.critical > 0 ? <Badge className="bg-danger/15 text-danger">{sos.critical} cấp 1</Badge> : null
         }
         value={int(sos.waiting)}
         unit="phiếu mới"
         to={canSos ? '/cuu-ho' : undefined}
-        hint="Hạn phản hồi (như backend services/sos.py): Cấp 1 · 3 phút · Cấp 2 · 15 phút · Cấp 3 · 60 phút"
+        hint="Nhấp nháy đỏ khi có phiếu quá hạn phản hồi theo cấp (Cấp 1 · 3 phút · Cấp 2 · 15 phút · Cấp 3 · 60 phút, như trang Điều hành cứu hộ) hoặc chờ quá 15 phút mà chưa có đội tiếp nhận"
         footer={
           <>
             {oldest != null && (
-              <>Chờ lâu nhất <b className={clsx('font-mono', sos.overdue > 0 ? 'text-danger' : 'text-ink')}>{oldest}′</b> · </>
+              <>Chờ lâu nhất <b className={clsx('font-mono', sos.overdue > 0 || oldest > 15 ? 'text-danger' : 'text-ink')}>{oldest}′</b> · </>
             )}
             Đang xử lý <b className="font-mono text-ink">{int(sos.in_progress)}</b> · Xong 24 giờ <b className="font-mono text-ink">{int(sos.resolved_24h)}</b>
           </>
