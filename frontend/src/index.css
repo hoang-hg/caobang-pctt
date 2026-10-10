@@ -110,7 +110,18 @@ body {
 .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: rgb(var(--panel)); color: rgb(var(--ink)); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.15); border-radius: 0.75rem; border: 1px solid rgb(var(--line)); }
 .leaflet-popup-content { margin: 12px 14px; font-size: 13px; line-height: 1.4; }
 .leaflet-bar a, .leaflet-bar a:hover { background: rgb(var(--panel)); color: rgb(var(--ink)); border-color: rgb(var(--line)); border-radius: 0.5rem; }
+/* Màn cảm ứng (iPad, điện thoại): nút phóng to / thu nhỏ 44 px — mặc định Leaflet 30 px, khó chạm */
+@media (pointer: coarse) {
+  .leaflet-bar a { width: 44px !important; height: 44px !important; line-height: 44px !important; font-size: 22px !important; }
+}
 .leaflet-draw-toolbar a { background-color: rgb(var(--panel)); }
+
+/* Màn cảm ứng: nới vùng chạm của nút nhỏ lên ≥ 44 × 44 px mà KHÔNG đổi bố cục — đầu trang điện thoại 360 px không đủ chỗ
+   cho nút 44 px thật. Vùng chạm vô hình căn giữa nút (thuộc về nút khi chạm). */
+@media (pointer: coarse) {
+  .touch-hit { position: relative; }
+  .touch-hit::after { content: ''; position: absolute; left: 50%; top: 50%; width: max(100%, 44px); height: max(100%, 44px); transform: translate(-50%, -50%); }
+}
 .leaflet-tooltip { background: rgb(var(--panel)); color: rgb(var(--ink)); border-color: rgb(var(--line)); border-radius: 0.375rem; font-size: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
 
 .map-icon { background: none; border: none; }

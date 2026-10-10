@@ -54,9 +54,9 @@ export default function OmniSearch() {
 
   return (
     <div className="relative hidden w-full max-w-md md:block" ref={ref}>
-      <Search size={15} className="pointer-events-none absolute left-3 top-2.5 text-muted" />
+      <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
       <input
-        className="input pl-9"
+        className="input pl-9 [@media(pointer:coarse)]:min-h-[44px]"
         placeholder="Tìm địa danh, mã SOS, toạ độ GPS, link Google Maps…"
         value={q}
         onChange={(e) => setQ(e.target.value)}

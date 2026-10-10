@@ -242,7 +242,7 @@ export function TrendTag({ dir, text, label, className }) {
 export function ShowMore({ list, step, noun }) {
   const rest = list.total - list.shown;
   if (rest <= 0) return null;
-  const btn = 'btn-ghost min-h-[44px] px-3 text-xs sm:min-h-[36px]';
+  const btn = 'btn-ghost min-h-[44px] px-3 text-xs sm:min-h-[36px] [@media(pointer:coarse)]:!min-h-[44px]'; // iPad: vẫn 44 px
   return (
     <div className="flex flex-wrap items-center justify-center gap-2 text-xs">
       <span className="text-muted">Đang hiện {list.shown}/{list.total} {noun}</span>

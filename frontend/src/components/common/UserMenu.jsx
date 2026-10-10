@@ -28,7 +28,7 @@ export default function UserMenu() {
 
   return (
     <div className="relative" ref={ref}>
-      <button className="btn-ghost" onClick={() => setOpen((o) => !o)} title={user.full_name} aria-label={`Tài khoản: ${user.full_name}`}>
+      <button className="btn-ghost touch-hit" onClick={() => setOpen((o) => !o)} title={user.full_name} aria-label={`Tài khoản: ${user.full_name}`}>
         <UserCircle2 size={16} />
         <span className="hidden max-w-[10rem] truncate xl:inline">{user.full_name}</span>
       </button>

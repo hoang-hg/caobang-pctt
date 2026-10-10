@@ -94,6 +94,9 @@ export default function MonitoringMap() {
   const wide = useMediaQuery('(min-width: 1024px)');
   const roomy = useMediaQuery('(min-width: 1440px)');
   const mid = useMediaQuery('(min-width: 768px)'); // iPad dọc: chỉ số "Tình hình" đủ chỗ 1 hàng 6 ô
+  // Màn cảm ứng: iPad ngang dùng bố cục rộng (bảng nổi) nhưng mọi nút, dòng chọn phải ≥ 44 px như điện thoại
+  const coarse = useMediaQuery('(pointer: coarse)');
+  const touch = !wide || coarse;
   const online = useOnline();
   const [mode, setMode] = useState(readMode); // tinh_hinh | tac_nghiep
   const [layers, setLayers] = useState(() => (mode === 'tinh_hinh' ? situationLayers(DEFAULT_LAYERS) : DEFAULT_LAYERS));
@@ -288,12 +291,12 @@ export default function MonitoringMap() {
   };
   const layerActions = (
     <div className="flex shrink-0 items-center gap-1 whitespace-nowrap text-[11px]">
-      <button type="button" onClick={() => setAllLayers(true)} className={clsx('px-1.5 font-medium text-muted hover:text-accent', !wide && 'min-h-[44px]')}>Bật hết</button>
+      <button type="button" onClick={() => setAllLayers(true)} className={clsx('px-1.5 font-medium text-muted hover:text-accent', touch && 'min-h-[44px]')}>Bật hết</button>
       <span className="text-muted/40" aria-hidden="true">·</span>
       <button
         type="button"
         onClick={() => setLayers(mode === 'tinh_hinh' ? situationLayers(DEFAULT_LAYERS) : DEFAULT_LAYERS)}
-        className={clsx('px-1.5 font-medium text-muted hover:text-accent', !wide && 'min-h-[44px]')}
+        className={clsx('px-1.5 font-medium text-muted hover:text-accent', touch && 'min-h-[44px]')}
         title={mode === 'tinh_hinh' ? 'Lớp mặc định của chế độ Tình hình' : 'Lớp mặc định'}
       >
         Mặc định
@@ -310,7 +313,7 @@ export default function MonitoringMap() {
       counts={counts}
       canStorm={canStorm}
       onStorm={() => setStormForm(true)}
-      touch={!wide}
+      touch={touch}
     />
   );
   const alertsList = (
@@ -328,7 +331,7 @@ export default function MonitoringMap() {
       // Điện thoại: chạm một mục → đóng bảng để thấy chỗ bản đồ bay tới
       onFocus={(f) => { setFocus(f); if (!wide) setSheet(null); }}
       onDispatch={(s) => setDispatch({ ticket: s })}
-      touch={!wide}
+      touch={touch}
     />
   );
   const tools = toolList(canIncident);
@@ -343,7 +346,7 @@ export default function MonitoringMap() {
       drawn={drawn}
       onClose={() => setDrawn(null)}
       onAlert={() => { setAlertDraft(drawn); navigate('/canh-bao'); }}
-      touch={!wide}
+      touch={touch}
       className={wide ? 'w-[19rem]' : 'pointer-events-auto w-full'}
     />
   );
@@ -439,7 +442,7 @@ export default function MonitoringMap() {
                 )}
                 <button
                   type="button"
-                  className={clsx(floatCard, 'pointer-events-auto flex h-10 items-center justify-center gap-1.5 text-xs font-semibold text-ink-2 hover:bg-panel2', leftOpen ? 'ml-1.5 w-8' : 'px-3')}
+                  className={clsx(floatCard, 'pointer-events-auto flex h-10 items-center justify-center gap-1.5 text-xs font-semibold text-ink-2 hover:bg-panel2 [@media(pointer:coarse)]:h-11', leftOpen ? 'ml-1.5 w-8 [@media(pointer:coarse)]:w-11' : 'px-3')}
                   onClick={() => setLeftOpen((o) => !o)}
                   aria-expanded={leftOpen}
                   aria-label={leftOpen ? 'Thu gọn bảng lớp dữ liệu' : undefined}
@@ -481,7 +484,7 @@ export default function MonitoringMap() {
               )}
               <button
                 type="button"
-                className={clsx(floatCard, 'pointer-events-auto flex min-h-[34px] shrink-0 items-center gap-1.5 px-3 text-xs font-semibold text-ink-2 hover:bg-panel2')}
+                className={clsx(floatCard, 'pointer-events-auto flex min-h-[34px] shrink-0 items-center gap-1.5 px-3 text-xs font-semibold text-ink-2 hover:bg-panel2 [@media(pointer:coarse)]:min-h-[44px]')}
                 onClick={() => setLegendOpen((o) => !o)}
                 aria-expanded={legendOpen}
               >
@@ -490,16 +493,17 @@ export default function MonitoringMap() {
             </div>
 
             {/* Phải: công cụ bản đồ (góc phải trên) xếp ngay cạnh bảng Cảnh báo khẩn cấp — cùng một hàng, tự nhường chỗ */}
-            <div className="pointer-events-none absolute bottom-[7.5rem] right-3 top-3 z-[1000] flex items-start gap-2">
+            {/* Đáy chừa chỗ thanh thời gian — màn cảm ứng thanh cao hơn (nấc giờ 44 px) nên chừa nhiều hơn */}
+            <div className="pointer-events-none absolute bottom-[7.5rem] right-3 top-3 z-[1000] flex items-start gap-2 [@media(pointer:coarse)]:bottom-[9rem]">
               <div className="pointer-events-auto flex flex-col items-end gap-2">
                 <div className={clsx(floatCard, 'flex items-center gap-1 p-1.5')}>
-                  {basemapSelect('input w-auto border-0 bg-transparent px-2 py-1 text-xs focus:ring-0')}
+                  {basemapSelect('input w-auto border-0 bg-transparent px-2 py-1 text-xs focus:ring-0 [@media(pointer:coarse)]:min-h-[44px]')}
                   <div className="mx-0.5 h-4 w-px bg-line/80" aria-hidden="true" />
                   {tools.map(([t, Icon, label]) => (
                     <button
                       key={t}
                       type="button"
-                      className={clsx('btn h-9 w-9 justify-center rounded-lg p-0 text-xs transition-colors', tool === t ? 'bg-accent text-white shadow-sm' : 'text-ink-2 hover:bg-panel2')}
+                      className={clsx('btn h-9 w-9 justify-center rounded-lg p-0 text-xs transition-colors [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11', tool === t ? 'bg-accent text-white shadow-sm' : 'text-ink-2 hover:bg-panel2')}
                       onClick={() => toggleTool(t)}
                       title={label}
                       aria-label={label}
@@ -515,7 +519,7 @@ export default function MonitoringMap() {
               <div className="pointer-events-auto flex h-full items-start">
                 <button
                   type="button"
-                  className={clsx(floatCard, 'flex h-10 items-center justify-center gap-1.5 text-xs font-semibold hover:bg-panel2', rightOpen ? 'mr-1.5 w-8 text-ink-2' : 'px-3 text-danger')}
+                  className={clsx(floatCard, 'flex h-10 items-center justify-center gap-1.5 text-xs font-semibold hover:bg-panel2 [@media(pointer:coarse)]:h-11', rightOpen ? 'mr-1.5 w-8 text-ink-2 [@media(pointer:coarse)]:w-11' : 'px-3 text-danger')}
                   onClick={() => setRightOpen((o) => !o)}
                   aria-expanded={rightOpen}
                   aria-label={rightOpen ? 'Thu gọn bảng cảnh báo khẩn cấp' : undefined}
@@ -541,7 +545,7 @@ export default function MonitoringMap() {
             {/* Thanh thời gian – Đáy, giữa; màn hẹp thì dịch sang phải để không đè cột trái (thẻ chú giải rộng 19rem) và nút phóng
                 to / thu nhỏ (phải dưới) */}
             <div className={clsx(floatCard, 'absolute bottom-3 left-[max(calc(50%-300px),20.25rem)] z-[1000] w-[min(600px,calc(100%-23.75rem))] px-4 py-2')}>
-              <TimeControl offset={offset} setOffset={setOffset} />
+              <TimeControl offset={offset} setOffset={setOffset} touch={coarse} />
             </div>
           </>
         ) : (
