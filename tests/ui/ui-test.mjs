@@ -894,43 +894,54 @@ const ROUTE_TOOL = 'Tìm đường an toàn A → B (tránh vùng nguy hiểm)';
 const POLYGON_TOOL = 'Khoanh vùng nguy cơ (đa giác)';
 
 /**
- * Ba đỉnh tam giác cạnh 2·d px ở chỗ trống của bản đồ — không trúng biểu tượng (kể cả vòng nhấp nháy của SOS lan ra), bảng
- * nổi, nút; ưu tiên tâm nằm trong ranh giới xã (lớp ranh giới là path SVG), gần giữa bản đồ.
+ * Ba đỉnh tam giác (đỉnh cách tâm `k` ô lưới 10 px) ở chỗ trống của bản đồ — không trúng biểu tượng, bảng nổi, nút; ưu tiên
+ * tâm nằm trong ranh giới xã (lớp ranh giới là path SVG), gần giữa bản đồ. Dò lưới MỘT lần (elementFromPoint mỗi ô) rồi tra
+ * bảng — dò lại từng điểm cho mọi ứng viên tốn hàng trăm nghìn lượt, làm sập trang bản dev.
  */
-const freeTriangle = (page, d) => page.evaluate((half) => {
+const freeTriangle = (page, k) => page.evaluate((half) => {
+  const G = 10;
   const box = document.querySelector('.leaflet-container').getBoundingClientRect();
-  const free1 = (x, y) => {
-    const e = document.elementFromPoint(x, y);
-    return !!e?.closest('.leaflet-container')
-      && !e.closest('.leaflet-marker-icon, .leaflet-control, .leaflet-popup, .card, button, section, nav, [role="status"], .sos-pulse');
-  };
-  let r = 28; // cả vùng ±r px quanh điểm phải trống; bản đồ quá dày thì nới dần
-  const free = (x, y) => [-r, 0, r].every((dx) => [-r, 0, r].every((dy) => free1(x + dx, y + dy)));
-  const found = [];
-  for (; r >= 0 && !found.length; r -= 14) {
-    for (let y = box.top + half + 10; y < box.bottom - half - 10; y += 12) {
-      for (let x = box.left + half + 10; x < box.right - half - 10; x += 12) {
-        const pts = [[x - half, y - half], [x + half, y - half], [x, y + half], [x, y], [x - half / 2, y], [x + half / 2, y]];
-        if (pts.every(([a, b]) => free(a, b))) found.push([x, y]);
-      }
+  const W = Math.floor(box.width / G);
+  const H = Math.floor(box.height / G);
+  const cell = []; // 0 = vướng, 1 = trống, 2 = trống và trong ranh giới xã
+  for (let j = 0; j < H; j += 1) {
+    for (let i = 0; i < W; i += 1) {
+      const e = document.elementFromPoint(box.left + i * G + G / 2, box.top + j * G + G / 2);
+      const free = !!e?.closest('.leaflet-container')
+        && !e.closest('.leaflet-marker-icon, .leaflet-control, .leaflet-popup, .card, button, section, nav, [role="status"], .sos-pulse');
+      cell.push(free ? (e.tagName.toLowerCase() === 'path' ? 2 : 1) : 0);
     }
   }
-  if (!found.length) throw new Error('bản đồ không còn chỗ trống để bấm');
-  const cx = (box.left + box.right) / 2;
-  const cy = (box.top + box.bottom) / 2;
-  const inside = ([x, y]) => (document.elementFromPoint(x, y)?.tagName.toLowerCase() === 'path' ? 0 : 1);
-  found.sort((a, b) => inside(a) - inside(b) || Math.hypot(a[0] - cx, a[1] - cy) - Math.hypot(b[0] - cx, b[1] - cy));
-  const [x, y] = found[0];
-  return [[x - half, y - half], [x + half, y - half], [x, y + half]];
-}, d);
+  const at = (i, j) => (i >= 0 && j >= 0 && i < W && j < H ? cell[j * W + i] : 0);
+  for (let m = 3; m >= 0; m -= 1) { // cả vùng ±m ô quanh mỗi điểm phải trống; bản đồ quá dày thì nới dần
+    const ok = (i, j) => [-m, 0, m].every((di) => [-m, 0, m].every((dj) => at(i + di, j + dj) > 0));
+    let best = null;
+    for (let j = half; j < H - half; j += 1) {
+      for (let i = half; i < W - half; i += 1) {
+        const pts = [[i - half, j - half], [i + half, j - half], [i, j + half], [i, j], [i - half / 2, j], [i + half / 2, j]];
+        if (pts.every(([a, b]) => ok(Math.round(a), Math.round(b)))) {
+          const score = (at(i, j) === 2 ? 0 : 1e6) + Math.hypot(i - W / 2, j - H / 2);
+          if (!best || score < best.score) best = { i, j, score };
+        }
+      }
+    }
+    if (best) {
+      const px = (i, j) => [box.left + i * G + G / 2, box.top + j * G + G / 2];
+      return [px(best.i - half, best.j - half), px(best.i + half, best.j - half), px(best.i, best.j + half)];
+    }
+  }
+  throw new Error('bản đồ không còn chỗ trống để bấm');
+}, k);
 
 async function mapTools(ctx, phone) {
   const { page } = ctx;
   const tap = ([x, y]) => (phone ? page.touchscreen.tap(x, y) : page.mouse.click(x, y));
   const pick = async (label) => {
-    if (phone) await page.getByRole('button', { name: 'Công cụ' }).click();
+    if (phone) await page.getByRole('button', { name: 'Công cụ', exact: true }).click();
     await visible(page.locator(`button[title="${label}"]`)).click();
     await page.waitForTimeout(300);
+    // Bản đồ đứng yên (bay tới vùng đang lọc xong) rồi mới chọn điểm bấm
+    await page.waitForFunction(() => !document.querySelector('.leaflet-zoom-anim, .leaflet-pan-anim'), null, { timeout: 10_000 });
   };
   const hint = visible(page.locator('div.card[role="status"]').filter({ hasText: 'Đang dùng: Dò đường an toàn' }));
   const card = visible(page.locator('div.card').filter({ hasText: 'Phân tích vùng khoanh' }));
@@ -947,6 +958,12 @@ async function mapTools(ctx, phone) {
     await page.goto(`${ROOT}/ban-do`);
     await page.locator('.leaflet-marker-pane .leaflet-marker-icon').first().waitFor({ timeout: 20_000 });
     await page.waitForTimeout(800);
+    // Khối này kiểm tra công cụ, không kiểm tra biểu tượng: bản đồ dày điểm (SOS nhấp nháy lan rộng, mức thu phóng khác nhau
+    // giữa máy) làm cú bấm chọn điểm A / B có lúc trúng biểu tượng → mở popup (CI 11/10/2026). Biểu tượng dữ liệu không nhận
+    // bấm trong khối này; điểm vẽ, con trỏ vẽ của leaflet-draw vẫn nhận.
+    await page.addStyleTag({
+      content: '.leaflet-marker-icon:not(.leaflet-mouse-marker):not(.leaflet-editing-icon) { pointer-events: none !important; }',
+    });
   });
 
   await step(ctx, 'Tìm đường: mất mạng / máy chủ lỗi → báo lỗi + Thử lại; có mạng → có lộ trình; chọn lại A khi đang tìm → bỏ kết quả cũ', async () => {
@@ -962,7 +979,7 @@ async function mapTools(ctx, phone) {
     });
     try {
       await pick(ROUTE_TOOL);
-      const pts = await freeTriangle(page, phone ? 40 : 60);
+      const pts = await freeTriangle(page, phone ? 4 : 6);
       await tap(pts[0]);
       await page.waitForTimeout(200);
       await tap(pts[1]);
@@ -984,7 +1001,7 @@ async function mapTools(ctx, phone) {
       if (!/Chạm chọn điểm A/.test(txt) || /9\.9 km/.test(txt)) throw new Error(`kết quả lượt cũ vẫn hiện: ${txt.slice(0, 90)}`);
       await hint.getByRole('button', { name: 'Tắt công cụ' }).click();
     } finally {
-      await page.unroute('**/api/v1/map/route');
+      await page.unroute('**/api/v1/map/route').catch(() => {});
       forget();
     }
   });
@@ -1006,10 +1023,16 @@ async function mapTools(ctx, phone) {
       const hadCard = (await card.count()) > 0;
       await pick(POLYGON_TOOL);
       const oldClosed = !hadCard || (await card.count()) === 0;
-      const pts = await freeTriangle(page, phone ? 40 : 60);
-      for (const pt of pts) {
+      const pts = await freeTriangle(page, phone ? 4 : 6);
+      for (const [i, pt] of pts.entries()) {
+        const hit = await page.evaluate(([x, y]) => {
+          const e = document.elementFromPoint(x, y);
+          return `${e?.tagName}.${String(e?.getAttribute('class') || '').split(' ').slice(0, 2).join('.')}`;
+        }, pt);
         await tap(pt);
         await page.waitForTimeout(250);
+        const n = await page.locator('.leaflet-editing-icon').count();
+        if (n !== i + 1) throw new Error(`cú bấm thứ ${i + 1} (${pt.map(Math.round)}) không thêm điểm vẽ — trúng ${hit}, có ${n} điểm`);
       }
       if (!phone) await page.mouse.move(pts[0][0] + 3, pts[0][1] + 3);
       await page.waitForTimeout(200);
@@ -1053,7 +1076,7 @@ async function mapTools(ctx, phone) {
       if (phone) await expectNoOverflow(ctx, 'Bản đồ (khoanh vùng)');
       return `${units.trim()} · chú thích "${tip}"`;
     } finally {
-      await page.unroute('**/api/v1/map/area-stats');
+      await page.unroute('**/api/v1/map/area-stats').catch(() => {});
       forget();
     }
   });
