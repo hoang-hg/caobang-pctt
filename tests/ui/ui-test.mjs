@@ -53,7 +53,24 @@ const check = (name, cond, extra = '') => {
   console.log(`${cond ? 'PASS' : 'FAIL'}  ${name}${extra ? ' — ' + extra : ''}`);
   if (!cond) failures += 1;
 };
-const slug = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').replace(/[^\w]+/g, '-').slice(0, 80);
+// Lỗi ngoài luồng (VD handler route chạy dở sau khi bước đã gỡ route) → ghi thành 1 kiểm tra lỗi rồi chạy tiếp, không làm
+// dừng cả bộ kiểm thử giữa chừng (mất kết quả các bước sau)
+process.on('unhandledRejection', (e) => check('Lỗi ngoài luồng của bộ kiểm thử', false, String(e?.message || e).split('\n')[0]));
+
+/**
+ * Handler route an toàn: bước kết thúc (`unroute`) đúng lúc một yêu cầu còn chạy dở trong handler (trang tự tải lại theo chu
+ * kỳ) → Playwright đã trả yêu cầu đó theo mặc định, `fulfill` / `abort` ném "Route is already handled!" ngoài luồng và làm
+ * dừng cả tiến trình (CI 11/10/2026, bước ô SOS nhấp nháy). Lỗi trong handler: yêu cầu chưa được trả → cho đi tiếp; đã trả
+ * → bỏ qua.
+ */
+const safeRoute = (handler) => async (route, request) => {
+  try {
+    await handler(route, request);
+  } catch {
+    await route.continue().catch(() => {});
+  }
+};
+const slug =(s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').replace(/[^\w]+/g, '-').slice(0, 80);
 
 /** Theo dõi lỗi của trang: lỗi JavaScript không bắt (React sập → màn hình trắng) và API trả 5xx. */
 function watch(page) {
@@ -328,7 +345,7 @@ async function staff(ctx, trackCode) {
   // "Không có hồ xả lũ lớn" hay "Không tìm thấy điểm nguy cơ…" (khẳng định sai là an toàn)
   await step(ctx, 'Tổng quan: tab Hồ chứa / Sạt lở không tải được → báo rõ, không khẳng định "an toàn"', async () => {
     const apis = ['**/api/v1/dashboard/reservoirs**', '**/api/v1/dashboard/landslides**'];
-    for (const a of apis) await page.route(a, (r) => r.abort('failed'));
+    for (const a of apis) await page.route(a, safeRoute((r) => r.abort('failed')));
     try {
       await page.goto(`${ROOT}/dashboard?tab=ho_chua`);
       await page.getByText('Không tải được số liệu hồ chứa').waitFor({ timeout: 25_000 });
@@ -365,7 +382,7 @@ async function staff(ctx, trackCode) {
     const RANK = { xa_khan_cap: 0, xa_dieu_tiet: 1, chua_co_so_lieu: 2, binh_thuong: 3 };
     const status = {};
     const api = '**/api/v1/dashboard/reservoirs**';
-    await page.route(api, async (route) => {
+    await page.route(api, safeRoute(async (route) => {
       const res = await route.fetch();
       const json = await res.json();
       const base = json.reservoirs || [];
@@ -373,7 +390,7 @@ async function staff(ctx, trackCode) {
       json.reservoirs = Array.from({ length: times }, (_, i) => base.map((r) => ({ ...r, id: `${r.id}-${i}`, name: `${r.name} · ${i + 1}` }))).flat();
       for (const r of json.reservoirs) status[r.name] = r.status_code;
       await route.fulfill({ response: res, json });
-    });
+    }));
     try {
       await page.goto(`${ROOT}/dashboard?tab=ho_chua`);
       await page.getByText(/Đang hiện 9\/\d+ hồ/).waitFor({ timeout: 20_000 });
@@ -399,12 +416,12 @@ async function staff(ctx, trackCode) {
   // quá hạn theo cấp (cấp 3 hạn 60 phút). Sửa phản hồi KPI ngay trong trình duyệt để có đúng trường hợp đó
   await step(ctx, 'Tổng quan: ô SOS nhấp nháy khi có phiếu chờ quá 15 phút chưa có đội (chưa quá hạn theo cấp)', async () => {
     const kpis = '**/api/v1/dashboard/kpis**';
-    await page.route(kpis, async (route) => {
+    await page.route(kpis, safeRoute(async (route) => {
       const res = await route.fetch();
       const json = await res.json();
       json.sos = { ...json.sos, overdue: 0, critical: 0, no_team_15m: 2 };
       await route.fulfill({ response: res, json });
-    });
+    }));
     try {
       await page.goto(`${ROOT}/dashboard`);
       const tile = page.locator('[aria-label="Chỉ số nhanh"] > *').nth(2);
@@ -968,7 +985,7 @@ async function mapTools(ctx, phone) {
 
   await step(ctx, 'Tìm đường: mất mạng / máy chủ lỗi → báo lỗi + Thử lại; có mạng → có lộ trình; chọn lại A khi đang tìm → bỏ kết quả cũ', async () => {
     let mode = 'abort';
-    await page.route('**/api/v1/map/route', async (route) => {
+    await page.route('**/api/v1/map/route', safeRoute(async (route) => {
       if (mode === 'abort') return route.abort('internetdisconnected');
       if (mode === '500') return route.fulfill({ status: 500, body: 'Internal Server Error' });
       if (mode === 'slow') {
@@ -976,7 +993,7 @@ async function mapTools(ctx, phone) {
         return route.fulfill(fake({ distance_km: 9.9, duration_min: 9, safe: true, roads: ['GIẢ LẬP'], offroad_km: 0, warnings: [], hazards: [], geometry: { type: 'LineString', coordinates: [[106.2, 22.6], [106.3, 22.7]] } }));
       }
       return route.continue();
-    });
+    }));
     try {
       await pick(ROUTE_TOOL);
       const pts = await freeTriangle(page, phone ? 4 : 6);
@@ -1001,7 +1018,7 @@ async function mapTools(ctx, phone) {
       if (!/Chạm chọn điểm A/.test(txt) || /9\.9 km/.test(txt)) throw new Error(`kết quả lượt cũ vẫn hiện: ${txt.slice(0, 90)}`);
       await hint.getByRole('button', { name: 'Tắt công cụ' }).click();
     } finally {
-      await page.unroute('**/api/v1/map/route').catch(() => {});
+      await page.unroute('**/api/v1/map/route');
       forget();
     }
   });
@@ -1009,7 +1026,7 @@ async function mapTools(ctx, phone) {
   await step(ctx, 'Khoanh vùng: chú thích tiếng Việt; mất mạng / máy chủ lỗi → báo lỗi + Thử lại; ghi xã trong vùng; 20 xã không tràn; đóng khi đang tính không mở lại', async () => {
     let mode = 'abort';
     const codes = await page.evaluate(async () => (await (await fetch('/api/v1/admin-units/geojson')).json()).features.map((f) => f.properties.code));
-    await page.route('**/api/v1/map/area-stats', async (route) => {
+    await page.route('**/api/v1/map/area-stats', safeRoute(async (route) => {
       if (mode === 'abort') return route.abort('internetdisconnected');
       if (mode === '500') return route.fulfill({ status: 500, body: 'Internal Server Error' });
       if (mode === 'many') {
@@ -1017,7 +1034,7 @@ async function mapTools(ctx, phone) {
       }
       if (mode === 'slow') await new Promise((r) => { setTimeout(r, 1500); });
       return route.continue();
-    });
+    }));
     // Vẽ đa giác 3 đỉnh; trả chú thích leaflet-draw lúc sắp khép vùng và bảng kết quả cũ đã đóng khi chọn công cụ chưa
     const draw = async () => {
       const hadCard = (await card.count()) > 0;
@@ -1076,7 +1093,7 @@ async function mapTools(ctx, phone) {
       if (phone) await expectNoOverflow(ctx, 'Bản đồ (khoanh vùng)');
       return `${units.trim()} · chú thích "${tip}"`;
     } finally {
-      await page.unroute('**/api/v1/map/area-stats').catch(() => {});
+      await page.unroute('**/api/v1/map/area-stats');
       forget();
     }
   });
