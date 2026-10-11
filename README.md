@@ -1637,7 +1637,10 @@ và **điện thoại** (Pixel 7, GPS giả lập ở TP Cao Bằng):
   cảnh báo / 1 hàng / 1 hàng vuốt ngang ô 44 px), tab Điểm nóng đứng đầu và xếp Đỏ → Cam → Vàng, chế độ xem "Tình hình" bớt
   điểm trên bản đồ còn "Tác nghiệp" trả lại như cũ; máy cảm ứng: mọi vùng chạm của trang ≥ 44 px;
 - **Tổng quan trên màn cảm ứng** (iPad ngang, điện thoại 360): mọi vùng chạm của 5 tab ≥ 44 px (kể cả phần phải cuộn mới
-  thấy); điện thoại cảm ứng 360×740 vẫn thấy trọn 6 ô KPI dù nút cao hơn.
+  thấy); điện thoại cảm ứng 360×740 vẫn thấy trọn 6 ô KPI dù nút cao hơn;
+- **Công cụ bản đồ** (laptop 1366×768, điện thoại 360): tìm đường và khoanh vùng khi mất mạng / máy chủ lỗi 500 (giả lập)
+  báo lỗi kèm "Thử lại", có mạng thì có kết quả; kết quả về muộn của lượt cũ (đã chọn lại điểm A, đã đóng bảng) bị bỏ qua;
+  chú thích khi vẽ bằng tiếng Việt, có diện tích; bảng kết quả ghi xã trong vùng, 20 xã không tràn màn hình.
 
 Mỗi bước **lỗi** khi trang có lỗi JavaScript (màn hình trắng), API trả 5xx, hoặc **tràn ngang trên điện thoại** (phải kéo
 ngang mới đọc hết). Ảnh chụp bước lỗi: artifact `ui-shots` của CI.

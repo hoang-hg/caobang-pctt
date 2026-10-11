@@ -4,8 +4,9 @@
 chung (màu rủi ro thống nhất, thông tin khẩn trên cùng, thao tác chính dễ bấm, bảng / form có báo lỗi khi nhập, trạng thái
 tải / trống / lỗi / mất mạng, 360 px, theo phân quyền).
 
-- Cập nhật: 10/10/2026 — mã nguồn `main` gồm PR #53 → #62 (bố cục, màu hồ, lọc SOS, form, tài liệu này; mưa dự báo theo
-  thanh thời gian — G1 ở PR #57; radar theo thanh thời gian — G2 ở PR #58; bố cục cho người quản lý — G3 ở PR #59 → #62).
+- Cập nhật: 11/10/2026 — mã nguồn `main` gồm PR #53 → #62 (bố cục, màu hồ, lọc SOS, form, tài liệu này; mưa dự báo theo
+  thanh thời gian — G1 ở PR #57; radar theo thanh thời gian — G2 ở PR #58; bố cục cho người quản lý — G3 ở PR #59 → #62);
+  khoanh vùng, tìm đường báo lỗi — G7 ở PR #65.
 - Rà lại lần 2 (10/10/2026): đối chiếu **từng ý** của mục B với mã nguồn — thêm 4 việc giao diện (G4 → G7, mục 3) và 3
   việc chờ dữ liệu / tích hợp (BD9 → BD11, mục 4); sửa lại các dòng tương ứng ở mục 1.
 - Máy chủ thử vẫn chạy **v1.0.3**, **chưa có** các thay đổi trên — xem V1 trong `docs/trang-a-viec-con-lai.md` (triển khai
@@ -14,16 +15,16 @@ tải / trống / lỗi / mất mạng, 360 px, theo phân quyền).
 
 **Kết luận:** bản đồ đã có gần đủ những gì mục B mô tả: giao diện theo các yêu cầu chung (PR #53 → #55); mưa dự báo, radar
 theo thanh thời gian (G1, G2 — PR #57, #58); bố cục cho người quản lý trên laptop, iPad, điện thoại (G3 — PR #59 → #62).
-Rà lần 2 theo từng ý của mục B thấy **còn 4 việc giao diện làm được ngay, không cần dữ liệu mới** (mục 3) — thứ tự đề xuất:
+Rà lần 2 theo từng ý của mục B thấy 4 việc giao diện làm được ngay, không cần dữ liệu mới (mục 3). **Đã làm G7** (PR #65):
+khoanh vùng, tìm đường báo lỗi khi mất mạng / máy chủ lỗi, có "Thử lại"; kết quả khoanh vùng ghi các xã trong vùng; sửa
+kèm lỗi sẵn có của thư viện vẽ (chú thích tiếng Anh, diện tích không hiện). **Còn 3 việc**, thứ tự đề xuất:
 
-1. **G7 — khoanh vùng, tìm đường báo lỗi** khi mất mạng / máy chủ lỗi: nay bảng "Phân tích vùng khoanh" quay mãi "Đang tính
-   toán…", tìm đường không báo gì; kết quả khoanh vùng ghi thêm các xã trong vùng. Không đổi API.
-2. **G5 — 12 điểm đen sạt lở, đèo dốc lên bản đồ** (tam giác theo màu mức, trạng thái Cấm đường / Cảnh báo) — B.2; nay chỉ
+1. **G5 — 12 điểm đen sạt lở, đèo dốc lên bản đồ** (tam giác theo màu mức, trạng thái Cấm đường / Cảnh báo) — B.2; nay chỉ
    có ở Tổng quan và cổng công khai, bấm "xem trên bản đồ" chỉ hiện ghim 8 giây. Không đổi API (số liệu đã tải).
-3. **G4 — dòng diễn biến theo thời gian** trong bảng Cảnh báo khẩn cấp (SOS mới, trạm vượt báo động, lệnh điều động… mới
+2. **G4 — dòng diễn biến theo thời gian** trong bảng Cảnh báo khẩn cấp (SOS mới, trạm vượt báo động, lệnh điều động… mới
    nhất trên cùng) — B.1 "feed cuộn liên tục"; nay các tab chỉ có trạng thái hiện tại. Sửa nhỏ phía máy chủ (trả và ghi
    kèm toạ độ cho nhật ký sự kiện).
-4. **G6 — popup hồ chứa, xuồng – xe đủ như B.3**: hồ có biểu đồ mini, nút thao tác, nhãn lưu lượng xả (m³/s) ngay trên
+3. **G6 — popup hồ chứa, xuồng – xe đủ như B.3**: hồ có biểu đồ mini, nút thao tác, nhãn lưu lượng xả (m³/s) ngay trên
    biểu tượng; xuồng – xe có nút gọi. Sửa nhỏ API (thêm số điện thoại đơn vị vào lớp xe).
 
 Còn lại:
@@ -55,12 +56,12 @@ Còn lại:
 | B.2 SOS: bàn tay nhấp nháy đỏ tại toạ độ người dân gửi qua App / Zalo / Tổng đài | Đạt — màu theo cấp, nhấp nháy khi mới; âm thanh khi có SOS cấp 1–2 (nếu bật loa). Nguồn hiện có: trực ban / tổng đài nhập, cảm biến tự tạo phiếu. **Zalo OA / ứng dụng**: cổng tiếp nhận có sẵn nhưng đang tắt — chờ bên gửi (BD11) |
 | B.3 Popup thông minh (hồ chứa, trạm đo, xe cứu hộ…): chi tiết, biểu đồ mini, nút thao tác nhanh (VD gọi tài xế, ra lệnh xuất kho) | Đạt một phần — trạm đo có biểu đồ (mực nước kèm BĐ I–III); kho: biểu đồ tròn, gọi thủ kho, ra lệnh xuất kho; lực lượng: gọi chỉ huy; SOS: điều phối; điểm sơ tán: cập nhật số người; camera. **Hồ chứa** chỉ có bảng số, chưa có biểu đồ mini và nút thao tác (G6); **xuồng – xe** chưa có nút gọi — chưa có số tài xế (BD9), tạm gọi chỉ huy đơn vị (G6) |
 | B.3 Camera CCTV xem trực tiếp trên bản đồ | **Mô phỏng** — giao diện có, hình là mô phỏng; chưa có nguồn camera, chưa có cách khai báo (BD2) |
-| B.3 Khoanh vùng → đếm nhà dân → gửi SMS sơ tán đồng loạt | Đạt một phần — khoanh vùng → **ước tính** dân số / số hộ theo tỉ lệ diện tích xã (BD5) → soạn cảnh báo (qua phê duyệt). Gửi SMS / Cell Broadcast thật chờ hợp đồng nhà mạng (BD7). Tính lỗi / mất mạng thì bảng kết quả quay mãi, chưa ghi các xã trong vùng (G7) |
-| B.3 Tìm đường an toàn né ngập / sạt lở (A = lực lượng, B = điểm cứu hộ) | Đạt khi có mạng đường — chạy thật chưa nhập mạng đường nên chưa né được (BD3). Lỗi máy chủ / mất mạng thì không báo gì (G7) |
+| B.3 Khoanh vùng → đếm nhà dân → gửi SMS sơ tán đồng loạt | Đạt một phần — khoanh vùng → **ước tính** dân số / số hộ theo tỉ lệ diện tích xã (BD5) → soạn cảnh báo (qua phê duyệt). Gửi SMS / Cell Broadcast thật chờ hợp đồng nhà mạng (BD7). Kết quả ghi các xã trong vùng; mất mạng / máy chủ lỗi thì báo lỗi, có "Thử lại" (G7, PR #65) |
+| B.3 Tìm đường an toàn né ngập / sạt lở (A = lực lượng, B = điểm cứu hộ) | Đạt khi có mạng đường — chạy thật chưa nhập mạng đường nên chưa né được (BD3). Mất mạng / máy chủ lỗi thì báo lỗi, có "Thử lại" (G7, PR #65) |
 | B.4 SOS nhấp nháy + âm thanh → xem lớp → kéo – thả đội vào SOS → hộp thoại xác nhận → **tự động gửi lệnh kèm toạ độ cho đội** | Đạt một phần — kéo – thả, lệnh điều động 2 bước (Lực lượng → Vật tư & xác nhận, có tóm tắt), tạo link nhiệm vụ có toạ độ và chỉ đường. **Chưa tự gửi cho đội**: hộp thoại ghi rõ, trực ban gọi hoặc sao chép nội dung lệnh gửi qua Zalo / SMS (BD10) |
 | B.4 Theo dõi đội di chuyển thời gian thực | Không có GPS (BD8): lộ trình chuyển "đã đến" khi trưởng nhóm báo qua link nhiệm vụ |
 | B.5 Leaflet, nền OSM / tự lưu trữ, WebSocket đẩy SOS và vị trí xuồng, GeoJSON | Đạt — WebSocket đẩy SOS, trạng thái lực lượng, phương tiện, kho, hồ; vị trí xuồng không có vì không làm GPS (BD8) |
-| Yêu cầu giao diện chung (màu rủi ro, khẩn trên cùng, thao tác dễ bấm, form báo lỗi, trạng thái, 360 px, phân quyền) | Đạt một phần — PR #53 → #55; vùng chạm ≥ 44 px trên màn cảm ứng — PR #61. Còn: khoanh vùng, tìm đường chưa báo lỗi / mất mạng (G7). Danh sách trên bản đồ là danh sách xem nhanh (tìm, lọc); bảng đầy đủ có xuất Excel ở Tổng quan → "Bảng tác chiến theo chuyên đề" |
+| Yêu cầu giao diện chung (màu rủi ro, khẩn trên cùng, thao tác dễ bấm, form báo lỗi, trạng thái, 360 px, phân quyền) | Đạt — PR #53 → #55; vùng chạm ≥ 44 px trên màn cảm ứng — PR #61; khoanh vùng, tìm đường báo lỗi / mất mạng — PR #65 (G7). Danh sách trên bản đồ là danh sách xem nhanh (tìm, lọc); bảng đầy đủ có xuất Excel ở Tổng quan → "Bảng tác chiến theo chuyên đề" |
 | Lãnh đạo nắm tình hình trong vài giây (KPI, bản đồ, cảnh báo nổi bật) trên laptop, iPad, điện thoại | Đạt — 6 chỉ số "Tình hình" cùng số Tổng quan, tab Điểm nóng, chế độ xem Tình hình / Tác nghiệp (G3, PR #59 → #62) |
 
 ## 2. Bảng tổng hợp việc còn lại
@@ -73,7 +74,7 @@ Còn lại:
 | G4 | **Dòng diễn biến theo thời gian** trong bảng Cảnh báo khẩn cấp (B.1 feed): SOS mới, trạm vượt báo động, lệnh điều động… mới nhất trên cùng | Không cần dữ liệu; dùng nhật ký sự kiện đã có, API `/dashboard/logs` thêm toạ độ (sửa nhỏ) | — | Cao |
 | G5 | **12 điểm đen sạt lở, đèo dốc trên bản đồ** (B.2): tam giác theo màu mức, popup trạng thái đường | Không cần dữ liệu, không đổi API (số liệu đã tải ở `/dashboard/kpis`) | — | Cao |
 | G6 | **Popup hồ chứa, xuồng – xe** (B.3): hồ có biểu đồ mini + nút thao tác, nhãn lưu lượng xả; xuồng – xe gọi chỉ huy đơn vị | Không cần dữ liệu; API biểu đồ có sẵn, lớp xe thêm số điện thoại đơn vị (sửa nhỏ) | — | Trung bình |
-| G7 | **Khoanh vùng, tìm đường báo lỗi** khi mất mạng / máy chủ lỗi; kết quả khoanh vùng ghi các xã trong vùng | Không cần dữ liệu, không đổi API | — | Cao (đang thiếu trạng thái lỗi) |
+| G7 | **Khoanh vùng, tìm đường báo lỗi** khi mất mạng / máy chủ lỗi; kết quả khoanh vùng ghi các xã trong vùng | Không cần dữ liệu, không đổi API | — | **Đã làm** (PR #65) |
 | BD1 | Dữ liệu nền cho các lớp (trạm, hồ, lực lượng, kho, điểm sơ tán, vùng nguy hiểm) | Dữ liệu | như trang A D1 | **Cao nhất** |
 | BD2 | **Camera CCTV thật**: danh sách camera + máy chủ chuyển luồng | Dữ liệu + hạ tầng + lập trình | Đơn vị quản lý camera (giao thông, thủy điện, công an) | Trung bình |
 | BD3 | **Mạng đường** (tìm đường an toàn, đoạn bị chặn) | Dữ liệu + lập trình | như trang A D3 | Trung bình |
@@ -223,19 +224,36 @@ Thiết kế B.3: bấm đối tượng bất kỳ ("Hồ chứa, Trạm đo, Xe
 - Biểu đồ mini làm như ở trạm (`Hydrograph`, `MiniSeries`): ghi rõ đang tải / lỗi / chưa có lịch sử; hồ chưa có số liệu
   vận hành thì không vẽ, giữ dòng "Chưa có số liệu vận hành…" như hiện nay.
 
-### G7 — Khoanh vùng, tìm đường: báo lỗi và đủ kết quả (chưa làm)
+### G7 — Khoanh vùng, tìm đường: báo lỗi và đủ kết quả (đã làm — PR #65)
 
-Yêu cầu chung "trạng thái tải / trống / lỗi / mất mạng" chưa đạt ở hai công cụ gọi máy chủ trên bản đồ:
+Trước đây hai công cụ gọi máy chủ trên bản đồ không có trạng thái lỗi (yêu cầu chung "tải / trống / lỗi / mất mạng"): khoanh
+vùng mà máy chủ lỗi hoặc mất mạng thì bảng "Phân tích vùng khoanh" **quay mãi** "Đang tính toán không gian địa lý…"; tìm
+đường lỗi thì điểm B đã đặt nhưng không có lộ trình, dòng hướng dẫn vẫn "Chạm chọn điểm A … rồi điểm B". Nay:
 
-- **Khoanh vùng** (`MonitoringMap.jsx` — `onDrawn` gọi `POST /map/area-stats`): máy chủ lỗi hoặc mất mạng thì bảng "Phân tích
-  vùng khoanh" **quay mãi** "Đang tính toán không gian địa lý…" — không báo lỗi, không có nút thử lại.
-- **Tìm đường** (`MapTools.jsx` — `POST /map/route`): lỗi thì điểm B đã đặt nhưng không có lộ trình, dòng hướng dẫn vẫn "Chạm
-  chọn điểm A … rồi điểm B" — người dùng không biết là lỗi.
-- **Kết quả khoanh vùng chưa hiện hết số API đã trả:** các xã trong vùng (`admin_codes` — cần để biết cảnh báo cho xã nào),
-  số lực lượng trong vùng (`forces`), vùng nguy hiểm đang hiệu lực (`hazard_zones`); "Thuê bao di động" là ước tính (82%
-  dân số ước tính) nhưng chưa ghi "ước tính".
-- Có thể thêm: xuất Excel số liệu vùng khoanh và danh sách xã (`utils/exportExcel.js`) để gửi kèm văn bản chỉ đạo.
-- Không đổi API.
+| Tình huống | Khoanh vùng | Tìm đường |
+|---|---|---|
+| Đang gọi máy chủ | "Đang tính toán không gian địa lý…" | "Đang tìm lộ trình an toàn…" (trước: không báo gì) |
+| Mất mạng | "Không tính được số liệu vùng khoanh: mất kết nối mạng — kiểm tra mạng rồi thử lại" + **Thử lại** | "Không tìm được lộ trình: mất kết nối mạng…" + **Thử lại**, hoặc chạm bản đồ chọn lại điểm A |
+| Máy chủ lỗi (5xx) | "… máy chủ đang lỗi (mã 500) — thử lại sau ít phút" + **Thử lại** | như bên trái |
+| Lỗi có lời giải thích (4xx) | Lời của máy chủ; lỗi kiểm tra dữ liệu dạng JSON thì ghi "dữ liệu gửi lên không hợp lệ (mã …)" | như bên trái |
+| Kết quả của lượt cũ về muộn | Bỏ qua khi đã khoanh vùng khác hoặc đã đóng bảng (trước: bảng đã đóng tự mở lại) | Bỏ qua khi đã chọn lại điểm A hoặc tắt công cụ |
+
+- **Kết quả khoanh vùng ghi đủ số API đã trả:** các **xã / phường trong vùng** (6 xã đầu + "+N xã / phường") — vùng nhỏ chiếm
+  dưới 1% diện tích mọi xã thì ghi "Vùng nhỏ, thuộc: xã …" theo ranh giới xã đã tải, ngoài tỉnh thì ghi rõ; **lực lượng đóng
+  trong vùng**, **vùng nguy hiểm đang hiệu lực**. Dân số, số hộ, thuê bao ghi "(ước tính)" kèm một dòng giải thích (tỉ lệ diện
+  tích xã — BD5); diện tích dưới 1 km² ghi "< 1 km²" (trước: "0 km²").
+- **Điện thoại:** chọn khoanh vùng mới thì đóng kết quả cũ (vùng mới thay vùng cũ) — trước đây bảng kết quả và dòng hướng dẫn
+  che gần hết bản đồ, không còn chỗ để vẽ. Bảng kết quả cao tối đa 60% màn hình, phần dưới tiêu đề tự cuộn — danh sách nhiều
+  xã không đẩy nút "Soạn cảnh báo sơ tán" xuống dưới thanh thao tác.
+- **Sửa kèm — thư viện vẽ (leaflet-draw 1.0.4):** chú thích khi vẽ là tiếng Anh ("Click to start drawing shape…") → tiếng Việt
+  ("Chạm lên bản đồ để đặt điểm đầu của vùng", "Chạm điểm đầu để khép vùng", "Bấm giữ rồi kéo để vẽ vùng tròn"); hàm tính
+  diện tích của thư viện gán biến chưa khai báo nên bản chạy thật **ném lỗi JavaScript mỗi lần di chuột** khi vẽ đa giác từ
+  điểm thứ 3, diện tích không hiện → viết lại phần hệ mét (km² / ha / m², số kiểu Việt Nam: 406,95 km²).
+- Nút "Thử lại", nút đóng ≥ 44 px trên màn cảm ứng. **Không đổi API.**
+- **Kiểm thử:** `tests/ui/ui-test.mjs` khối "Công cụ bản đồ" (laptop 1366, điện thoại 360) — giả lập mất mạng, máy chủ 500, trả
+  chậm; đã chạy thêm trên iPad ngang khi làm.
+- Chưa làm (có thể thêm sau): xuất Excel số liệu vùng khoanh và danh sách xã (`utils/exportExcel.js`) để gửi kèm văn bản chỉ
+  đạo.
 
 ## 4. Việc chờ dữ liệu / hệ thống bên ngoài
 
@@ -363,7 +381,7 @@ link nhiệm vụ. Chỉ xem lại nếu có thiết bị định vị gắn tr�
 | Vùng chạm 44 px trên màn cảm ứng (`.touch-hit`, phóng to / thu nhỏ Leaflet) | `frontend/src/index.css` |
 | Các lớp, popup, kéo – thả điều động | `frontend/src/components/map/MapLayers.jsx` |
 | Biểu tượng (thang màu chung), chú giải (gồm thang màu radar `RadarScale`) | `frontend/src/components/map/icons.js`, `MapLegend.jsx` |
-| Nền bản đồ, radar (`useRadarFrames`, `radarFrameAt`, bảng màu `RADAR_BINS`), mưa dự báo theo xã (`ForecastChoropleth`, thang `rainScale`), đo, khoanh vùng, tìm đường | `frontend/src/components/map/MapTools.jsx` |
+| Nền bản đồ, radar (`useRadarFrames`, `radarFrameAt`, bảng màu `RADAR_BINS`), mưa dự báo theo xã (`ForecastChoropleth`, thang `rainScale`), đo, khoanh vùng (chú thích tiếng Việt, sửa `readableArea` của leaflet-draw), tìm đường (`RouteTool`, lời báo lỗi `toolError`) | `frontend/src/components/map/MapTools.jsx` |
 | Chờ dừng tay khi kéo thanh thời gian (lớp mưa dự báo) | `frontend/src/utils/useDebounced.js` |
 | Thanh thao tác điện thoại (dùng chung Dashboard) | `frontend/src/components/common/QuickActionBar.jsx` |
 | Form: sự cố, bản tin bão, số người sơ tán, xuất kho, điều động | `components/map/IncidentModal.jsx`, `StormBulletinModal.jsx`, `components/common/OccupancyModal.jsx`, `IssueModal.jsx`, `DispatchModal.jsx` |
@@ -371,7 +389,7 @@ link nhiệm vụ. Chỉ xem lại nếu có thiết bị định vị gắn tr�
 | API bản đồ | `backend/app/api/v1/map_layers.py` (`/map/layers`, `/map/timeline`, `/map/area-stats`, `/map/storm-track`, `/map/incidents`) |
 | Dự báo mưa theo xã (số liệu từng giờ; khung giờ `hours`, `offset_h`) | `backend/app/api/v1/forecast.py` (`/forecast/areas`) |
 | Trạng thái hồ (dùng chung Dashboard) | `backend/app/services/reservoirs.py` (`classify_reservoir_status`) |
-| Kiểm thử | `tests/ui/ui-test.mjs` (bước "Bản đồ giám sát", "Điều động", khối "Người quản lý" — laptop, iPad ngang / dọc, điện thoại), `tests/e2e/prod-flow.mjs` (trạng thái hồ trên bản đồ), `tests/e2e/iot-test.mjs` (khung giờ mưa dự báo) |
+| Kiểm thử | `tests/ui/ui-test.mjs` (bước "Bản đồ giám sát", "Điều động", khối "Người quản lý" — laptop, iPad ngang / dọc, điện thoại; khối "Công cụ bản đồ" — tìm đường, khoanh vùng khi lỗi), `tests/e2e/prod-flow.mjs` (trạng thái hồ trên bản đồ), `tests/e2e/iot-test.mjs` (khung giờ mưa dự báo) |
 | Dùng lại cho G4 → G6: nhật ký sự kiện, điểm đen sạt lở, vận hành hồ | `components/common/EventLog.jsx`, `backend/app/services/events.py` (`log_event`), `backend/app/services/landslides.py` (`KNOWN_BLACKSPOTS`), `components/charts/ReservoirOpsChart.jsx`, `pages/public/ReservoirMonitor.jsx` (`OperationModal`) |
 
 ## 7. Các thay đổi đã làm cho trang B (để tra cứu)
@@ -389,3 +407,4 @@ link nhiệm vụ. Chỉ xem lại nếu có thiết bị định vị gắn tr�
 | #61 | Người quản lý — bước 3: vùng chạm ≥ 44 px trên màn cảm ứng (trang Bản đồ, đầu trang, menu, dải khẩn cấp); thanh thời gian không đè bảng cảnh báo trên iPad ngang |
 | #62 | Người quản lý — bước 4: khối kiểm thử "Người quản lý" trong ui-test; tài liệu này (G3), README |
 | #64 | Tài liệu này: rà lần 2 theo từng ý của mục B — thêm G4 → G7 (dòng diễn biến, điểm đen sạt lở, popup hồ / xe, báo lỗi khoanh vùng – tìm đường), BD9 → BD11 (số gọi tài xế, tự gửi lệnh điều động, SOS từ Zalo OA / ứng dụng) |
+| #65 | Khoanh vùng, tìm đường báo lỗi khi mất mạng / máy chủ lỗi, có "Thử lại", bỏ kết quả về muộn của lượt cũ; kết quả khoanh vùng ghi xã trong vùng, lực lượng, vùng nguy hiểm, "ước tính"; điện thoại: chọn khoanh mới đóng kết quả cũ, bảng kết quả tự cuộn; leaflet-draw: chú thích tiếng Việt, hết lỗi JavaScript khi tính diện tích (G7) |

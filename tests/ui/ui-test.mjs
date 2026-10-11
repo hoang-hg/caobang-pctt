@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // Kiểm thử giao diện bằng trình duyệt thật (Playwright / Chromium) trên khổ MÁY TÍNH và ĐIỆN THOẠI: bấm thử các màn hình
 // chính như người dùng thật — cổng công khai (gửi phản ánh, tra cứu), màn hình cán bộ (mọi trang, điều động, duyệt phản
-// ánh, nhập dữ liệu bằng form + chọn vị trí trên bản đồ), link nhiệm vụ của trưởng nhóm hiện trường (/nhiem-vu). Mỗi bước
-// bắt: lỗi JavaScript trên trang (màn hình trắng), API
-// trả 5xx, trang tràn ngang trên điện thoại.
+// ánh, nhập dữ liệu bằng form + chọn vị trí trên bản đồ), link nhiệm vụ của trưởng nhóm hiện trường (/nhiem-vu), công cụ
+// bản đồ (tìm đường, khoanh vùng khi mất mạng / máy chủ lỗi). Mỗi bước bắt: lỗi JavaScript trên trang (màn hình trắng),
+// API trả 5xx, trang tràn ngang trên điện thoại.
 //
 //   cd tests/ui && npm ci && npx playwright install chromium
 //   node ui-test.mjs [http://localhost:8080]
@@ -884,6 +884,181 @@ async function dashTouch(ctx) {
   }
 }
 
+// ================================================================ Công cụ bản đồ: tìm đường, khoanh vùng (trang B — G7)
+// Lỗi giả lập bằng route của Playwright (mất mạng, máy chủ 500, trả chậm) — chỉ đọc, không ghi dữ liệu.
+const MAP_TOOL_DEVICES = [
+  ['Laptop 1366×768', { viewport: { width: 1366, height: 768 } }, false],
+  ['Điện thoại 360', devices['Galaxy S8'], true],
+];
+const ROUTE_TOOL = 'Tìm đường an toàn A → B (tránh vùng nguy hiểm)';
+const POLYGON_TOOL = 'Khoanh vùng nguy cơ (đa giác)';
+
+/**
+ * Ba đỉnh tam giác cạnh 2·d px ở chỗ trống của bản đồ — không trúng biểu tượng (kể cả vòng nhấp nháy của SOS lan ra), bảng
+ * nổi, nút; ưu tiên tâm nằm trong ranh giới xã (lớp ranh giới là path SVG), gần giữa bản đồ.
+ */
+const freeTriangle = (page, d) => page.evaluate((half) => {
+  const box = document.querySelector('.leaflet-container').getBoundingClientRect();
+  const free1 = (x, y) => {
+    const e = document.elementFromPoint(x, y);
+    return !!e?.closest('.leaflet-container')
+      && !e.closest('.leaflet-marker-icon, .leaflet-control, .leaflet-popup, .card, button, section, nav, [role="status"], .sos-pulse');
+  };
+  let r = 28; // cả vùng ±r px quanh điểm phải trống; bản đồ quá dày thì nới dần
+  const free = (x, y) => [-r, 0, r].every((dx) => [-r, 0, r].every((dy) => free1(x + dx, y + dy)));
+  const found = [];
+  for (; r >= 0 && !found.length; r -= 14) {
+    for (let y = box.top + half + 10; y < box.bottom - half - 10; y += 12) {
+      for (let x = box.left + half + 10; x < box.right - half - 10; x += 12) {
+        const pts = [[x - half, y - half], [x + half, y - half], [x, y + half], [x, y], [x - half / 2, y], [x + half / 2, y]];
+        if (pts.every(([a, b]) => free(a, b))) found.push([x, y]);
+      }
+    }
+  }
+  if (!found.length) throw new Error('bản đồ không còn chỗ trống để bấm');
+  const cx = (box.left + box.right) / 2;
+  const cy = (box.top + box.bottom) / 2;
+  const inside = ([x, y]) => (document.elementFromPoint(x, y)?.tagName.toLowerCase() === 'path' ? 0 : 1);
+  found.sort((a, b) => inside(a) - inside(b) || Math.hypot(a[0] - cx, a[1] - cy) - Math.hypot(b[0] - cx, b[1] - cy));
+  const [x, y] = found[0];
+  return [[x - half, y - half], [x + half, y - half], [x, y + half]];
+}, d);
+
+async function mapTools(ctx, phone) {
+  const { page } = ctx;
+  const tap = ([x, y]) => (phone ? page.touchscreen.tap(x, y) : page.mouse.click(x, y));
+  const pick = async (label) => {
+    if (phone) await page.getByRole('button', { name: 'Công cụ' }).click();
+    await visible(page.locator(`button[title="${label}"]`)).click();
+    await page.waitForTimeout(300);
+  };
+  const hint = visible(page.locator('div.card[role="status"]').filter({ hasText: 'Đang dùng: Dò đường an toàn' }));
+  const card = visible(page.locator('div.card').filter({ hasText: 'Phân tích vùng khoanh' }));
+  // Lỗi giả lập là chủ ý → bỏ khỏi danh sách "API 5xx" mà bước kiểm thử bắt
+  const forget = () => ctx.problems.splice(0, ctx.problems.length, ...ctx.problems.filter((x) => !/\/map\/(route|area-stats)/.test(x)));
+  const fake = (j) => ({ status: 200, contentType: 'application/json', body: JSON.stringify(j) });
+
+  await step(ctx, 'Đăng nhập, mở Bản đồ', async () => {
+    await page.goto(`${ROOT}/dang-nhap`);
+    await page.getByPlaceholder('Nhập tên đăng nhập hoặc email...').fill(STAFF.user);
+    await page.getByPlaceholder('••••••••').fill(STAFF.pass);
+    await page.locator('button[type="submit"]').click();
+    await page.waitForURL(/\/dashboard/, { timeout: 20_000 });
+    await page.goto(`${ROOT}/ban-do`);
+    await page.locator('.leaflet-marker-pane .leaflet-marker-icon').first().waitFor({ timeout: 20_000 });
+    await page.waitForTimeout(800);
+  });
+
+  await step(ctx, 'Tìm đường: mất mạng / máy chủ lỗi → báo lỗi + Thử lại; có mạng → có lộ trình; chọn lại A khi đang tìm → bỏ kết quả cũ', async () => {
+    let mode = 'abort';
+    await page.route('**/api/v1/map/route', async (route) => {
+      if (mode === 'abort') return route.abort('internetdisconnected');
+      if (mode === '500') return route.fulfill({ status: 500, body: 'Internal Server Error' });
+      if (mode === 'slow') {
+        await new Promise((r) => { setTimeout(r, 1500); });
+        return route.fulfill(fake({ distance_km: 9.9, duration_min: 9, safe: true, roads: ['GIẢ LẬP'], offroad_km: 0, warnings: [], hazards: [], geometry: { type: 'LineString', coordinates: [[106.2, 22.6], [106.3, 22.7]] } }));
+      }
+      return route.continue();
+    });
+    try {
+      await pick(ROUTE_TOOL);
+      const pts = await freeTriangle(page, phone ? 40 : 60);
+      await tap(pts[0]);
+      await page.waitForTimeout(200);
+      await tap(pts[1]);
+      await hint.getByText('Không tìm được lộ trình: mất kết nối mạng').waitFor({ timeout: 8_000 });
+      mode = '500';
+      await hint.getByRole('button', { name: 'Thử lại' }).click();
+      await hint.getByText(/máy chủ đang lỗi \(mã 500\)/).waitFor({ timeout: 8_000 });
+      mode = 'real';
+      await hint.getByRole('button', { name: 'Thử lại' }).click();
+      await hint.getByText(/Lộ trình:/).waitFor({ timeout: 15_000 });
+      mode = 'slow';
+      await tap(pts[2]); // đã đủ A, B → bấm tiếp là chọn lại A
+      await page.waitForTimeout(200);
+      await tap(pts[0]);
+      await hint.getByText('Đang tìm lộ trình an toàn…').waitFor({ timeout: 3_000 });
+      await tap(pts[1]); // chọn lại A khi lượt trước còn đang tìm
+      await page.waitForTimeout(2_000);
+      const txt = (await hint.innerText()).replace(/\s+/g, ' ');
+      if (!/Chạm chọn điểm A/.test(txt) || /9\.9 km/.test(txt)) throw new Error(`kết quả lượt cũ vẫn hiện: ${txt.slice(0, 90)}`);
+      await hint.getByRole('button', { name: 'Tắt công cụ' }).click();
+    } finally {
+      await page.unroute('**/api/v1/map/route');
+      forget();
+    }
+  });
+
+  await step(ctx, 'Khoanh vùng: chú thích tiếng Việt; mất mạng / máy chủ lỗi → báo lỗi + Thử lại; ghi xã trong vùng; 20 xã không tràn; đóng khi đang tính không mở lại', async () => {
+    let mode = 'abort';
+    const codes = await page.evaluate(async () => (await (await fetch('/api/v1/admin-units/geojson')).json()).features.map((f) => f.properties.code));
+    await page.route('**/api/v1/map/area-stats', async (route) => {
+      if (mode === 'abort') return route.abort('internetdisconnected');
+      if (mode === '500') return route.fulfill({ status: 500, body: 'Internal Server Error' });
+      if (mode === 'many') {
+        return route.fulfill(fake({ population: 1234, households: 300, subscribers: 1012, area_km2: 900, sos_open: 0, forces: 2, evac_free: 50, hazard_zones: 1, admin_codes: codes.slice(0, 20) }));
+      }
+      if (mode === 'slow') await new Promise((r) => { setTimeout(r, 1500); });
+      return route.continue();
+    });
+    // Vẽ đa giác 3 đỉnh; trả chú thích leaflet-draw lúc sắp khép vùng và bảng kết quả cũ đã đóng khi chọn công cụ chưa
+    const draw = async () => {
+      const hadCard = (await card.count()) > 0;
+      await pick(POLYGON_TOOL);
+      const oldClosed = !hadCard || (await card.count()) === 0;
+      const pts = await freeTriangle(page, phone ? 40 : 60);
+      for (const pt of pts) {
+        await tap(pt);
+        await page.waitForTimeout(250);
+      }
+      if (!phone) await page.mouse.move(pts[0][0] + 3, pts[0][1] + 3);
+      await page.waitForTimeout(200);
+      const tip = (await page.locator('.leaflet-draw-tooltip').first().innerText().catch(() => '')).replace(/\s+/g, ' ').trim();
+      await tap(pts[0]); // bấm lại điểm đầu → khép vùng
+      return { tip, oldClosed };
+    };
+    try {
+      const { tip } = await draw();
+      if (!/Chạm điểm đầu để khép vùng/.test(tip) || !/(km²|ha|m²)/.test(tip)) throw new Error(`chú thích khi vẽ: "${tip}"`);
+      await card.getByText('Không tính được số liệu vùng khoanh: mất kết nối mạng').waitFor({ timeout: 8_000 });
+      mode = '500';
+      await card.getByRole('button', { name: 'Thử lại' }).click();
+      await card.getByText(/máy chủ đang lỗi \(mã 500\)/).waitFor({ timeout: 8_000 });
+      mode = 'real';
+      await card.getByRole('button', { name: 'Thử lại' }).click();
+      await card.getByText('Dân số (ước tính):').waitFor({ timeout: 15_000 });
+      const units = ((await card.innerText()).replace(/\s+/g, ' ').match(/(Xã \/ phường trong vùng \(\d+\)|Vùng nhỏ, thuộc|Vùng khoanh nằm ngoài)[^S]*/) || [])[0];
+      if (!units) throw new Error('bảng kết quả không ghi xã / phường trong vùng');
+      // Khoanh vùng mới → đóng kết quả cũ; 20 xã, mở hết danh sách → bảng không tràn, nút "Soạn cảnh báo" vẫn trong màn
+      mode = 'many';
+      const again = await draw();
+      if (!again.oldClosed) throw new Error('chọn khoanh vùng mới nhưng bảng kết quả cũ vẫn mở');
+      await card.getByText('Xã / phường trong vùng (20)').waitFor({ timeout: 8_000 });
+      await card.getByRole('button', { name: '+14 xã / phường' }).click();
+      const limit = phone ? (await page.getByRole('navigation', { name: 'Thao tác nhanh' }).boundingBox()).y : page.viewportSize().height;
+      const box = await card.boundingBox();
+      if (box.y + box.height > limit + 1) throw new Error(`bảng kết quả tràn: đáy ${Math.round(box.y + box.height)} > ${Math.round(limit)}px`);
+      const alert = card.getByRole('button', { name: 'Soạn cảnh báo sơ tán vùng này' });
+      if (await alert.count()) {
+        await alert.scrollIntoViewIfNeeded();
+        const ab = await alert.boundingBox();
+        if (ab.y + ab.height > limit + 1) throw new Error('nút "Soạn cảnh báo sơ tán" bị che');
+      }
+      // Đóng bảng khi đang tính → kết quả về muộn không mở lại bảng
+      mode = 'slow';
+      await draw();
+      await card.getByRole('button', { name: 'Đóng phân tích vùng' }).click();
+      await page.waitForTimeout(2_200);
+      if (await card.count()) throw new Error('đóng bảng khi đang tính, kết quả về muộn mở lại bảng');
+      if (phone) await expectNoOverflow(ctx, 'Bản đồ (khoanh vùng)');
+      return `${units.trim()} · chú thích "${tip}"`;
+    } finally {
+      await page.unroute('**/api/v1/map/area-stats');
+      forget();
+    }
+  });
+}
+
 // ================================================================
 console.log(`Kiểm thử giao diện: ${ROOT}${READONLY ? ' (chỉ xem)' : ''}`);
 const browser = await chromium.launch();
@@ -925,6 +1100,13 @@ try {
     const dPage = await dctx.newPage();
     await dashTouch({ page: dPage, vp: { name: `Tổng quan cảm ứng · ${label}`, mobile: !!opts.isMobile && opts.viewport.width < 768 }, problems: watch(dPage) });
     await dctx.close();
+  }
+  for (const [label, opts, phone] of MAP_TOOL_DEVICES) {
+    const tctx = await browser.newContext({ ...opts, locale: 'vi-VN' });
+    tctx.setDefaultTimeout(15_000);
+    const tPage = await tctx.newPage();
+    await mapTools({ page: tPage, vp: { name: `Công cụ bản đồ · ${label}`, mobile: phone }, problems: watch(tPage) }, phone);
+    await tctx.close();
   }
 } finally {
   await browser.close();

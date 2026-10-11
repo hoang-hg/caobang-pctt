@@ -3,10 +3,32 @@ import { useQuery } from '@tanstack/react-query';
 import { GeoJSON, Marker, Pane, Polygon, Polyline, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet';
 import L from './leafletGlobal';
 import 'leaflet-draw';
-import { api } from '../../api/client';
+import { api, ApiError } from '../../api/client';
 import { useStore } from '../../app/store';
 import { pinIcon, COLORS } from './icons';
 import { fmtVn } from '../../utils/bulletin';
+
+// leaflet-draw 1.0.4: chú thích khi vẽ là tiếng Anh, số kiểu Anh; `readableArea` gán biến `type` chưa khai báo → bản
+// build (mã strict) ném ReferenceError mỗi lần di chuột khi vẽ đa giác từ điểm thứ 3, diện tích không hiện. Đổi chú
+// thích sang tiếng Việt và viết lại phần hệ mét của `readableArea` (km² / ha / m²).
+L.drawLocal.format = { numeric: { delimiters: { thousands: '.', decimal: ',' } } };
+Object.assign(L.drawLocal.draw.handlers.polygon.tooltip, {
+  start: 'Chạm lên bản đồ để đặt điểm đầu của vùng.',
+  cont: 'Chạm để thêm điểm.',
+  end: 'Chạm điểm đầu để khép vùng.',
+});
+L.drawLocal.draw.handlers.polyline.error = '<strong>Lỗi:</strong> các cạnh của vùng không được cắt nhau.';
+L.drawLocal.draw.handlers.circle.tooltip.start = 'Bấm giữ rồi kéo để vẽ vùng tròn.';
+L.drawLocal.draw.handlers.circle.radius = 'Bán kính';
+L.drawLocal.draw.handlers.simpleshape.tooltip.end = 'Thả tay để hoàn tất.';
+const drawReadableArea = L.GeometryUtil.readableArea;
+L.GeometryUtil.readableArea = function readableArea(area, isMetric, precision) {
+  if (!isMetric) return drawReadableArea.call(this, area, isMetric, precision);
+  const n = L.GeometryUtil.formattedNumber;
+  if (area >= 1e6) return `${n(area / 1e6, 2)} km²`;
+  if (area >= 1e4) return `${n(area / 1e4, 1)} ha`;
+  return `${n(area, 0)} m²`;
+};
 
 // Bản đồ nền tự lưu trữ trên máy chủ tỉnh (deploy/fetch-basemap.sh → data/tiles, nginx phục vụ /tiles/): vector
 // OpenStreetMap vùng Cao Bằng và các tỉnh lân cận, không phụ thuộc Google / CARTO, chạy được khi mất kết nối quốc tế.
@@ -364,22 +386,49 @@ export function MeasureTool({ active }) {
   );
 }
 
-/** Tìm đường an toàn: chọn điểm A (lực lượng) và B (cần cứu hộ). */
+/** Lời báo lỗi khi công cụ bản đồ gọi máy chủ (khoanh vùng, tìm đường): mất mạng / máy chủ lỗi / lời giải thích của máy chủ. */
+export function toolError(e) {
+  if (!(e instanceof ApiError)) return 'mất kết nối mạng — kiểm tra mạng rồi thử lại';
+  if (e.status >= 500) return `máy chủ đang lỗi (mã ${e.status}) — thử lại sau ít phút`;
+  // 422 của FastAPI trả danh sách lỗi dạng JSON — không đưa nguyên văn cho người dùng
+  return e.message && !/^[[{]/.test(e.message) ? e.message : `dữ liệu gửi lên không hợp lệ (mã ${e.status})`;
+}
+
+/**
+ * Tìm đường an toàn: chọn điểm A (lực lượng) và B (cần cứu hộ). `onResult`: null (chưa đủ 2 điểm) | { loading } |
+ * { error, retry } | lộ trình. Chọn lại điểm A hoặc tắt công cụ khi đang tìm → bỏ kết quả của lượt cũ.
+ */
 export function RouteTool({ active, onResult }) {
   const [a, setA] = useState(null);
   const [b, setB] = useState(null);
   const [route, setRoute] = useState(null);
+  const seq = useRef(0); // lượt tìm mới nhất
   useEffect(() => {
     if (!active) {
+      seq.current += 1;
       setA(null);
       setB(null);
       setRoute(null);
     }
   }, [active]);
+  const find = async (from, to) => {
+    const n = ++seq.current;
+    setRoute(null);
+    onResult({ loading: true });
+    try {
+      const r = await api('/map/route', { method: 'POST', body: { from_lat: from.lat, from_lon: from.lng, to_lat: to.lat, to_lon: to.lng } });
+      if (n !== seq.current) return;
+      setRoute(r);
+      onResult(r);
+    } catch (e) {
+      if (n === seq.current) onResult({ error: toolError(e), retry: () => find(from, to) });
+    }
+  };
   useMapEvents({
-    async click(e) {
+    click(e) {
       if (!active) return;
       if (!a || (a && b)) {
+        seq.current += 1;
         setA(e.latlng);
         setB(null);
         setRoute(null);
@@ -387,9 +436,7 @@ export function RouteTool({ active, onResult }) {
         return;
       }
       setB(e.latlng);
-      const r = await api('/map/route', { method: 'POST', body: { from_lat: a.lat, from_lon: a.lng, to_lat: e.latlng.lat, to_lon: e.latlng.lng } });
-      setRoute(r);
-      onResult(r);
+      find(a, e.latlng);
     },
   });
   return (

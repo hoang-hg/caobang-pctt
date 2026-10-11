@@ -2,7 +2,7 @@ import { Fragment, useMemo, useState } from 'react';
 import clsx from 'clsx';
 import {
   Activity, AlertTriangle, Circle as CircleIcon, Clock, CloudRain, Compass, Droplets, MapPin, Megaphone, Mountain, PenTool, Route, Ruler, Search,
-  Send, Siren, Waves, X,
+  RotateCcw, Send, Siren, Waves, X,
 } from 'lucide-react';
 import { ShowMore, TrendTag, useEscapeToClose } from '../common/ui';
 import { Can } from '../../rbac/usePermission';
@@ -462,18 +462,34 @@ export const toolList = (canIncident) => [
 
 const TOOL_NAME = { measure: 'Thước đo', route: 'Dò đường an toàn', incident: 'Đánh dấu sự cố' };
 
-/** Hướng dẫn công cụ đang dùng (và kết quả dò đường). */
+/** Hướng dẫn công cụ đang dùng (và kết quả dò đường: đang tìm / lỗi + thử lại / lộ trình — RouteTool). */
 export function ToolHint({ tool, routeInfo, onClose, className }) {
   return (
     <div className={clsx('card border border-accent/40 bg-panel/95 px-3.5 py-2 text-xs shadow-xl backdrop-blur-md', className)} role="status">
       <div className="mb-1 flex items-center justify-between gap-2 font-semibold text-accent">
         <span>Đang dùng: {TOOL_NAME[tool] || 'Khoanh vùng'}</span>
-        <button type="button" onClick={onClose} className="-m-1 flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-panel2 hover:text-ink" aria-label="Tắt công cụ">
+        <button type="button" onClick={onClose} className="tap-sq -m-1 flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-panel2 hover:text-ink" aria-label="Tắt công cụ">
           <X size={14} />
         </button>
       </div>
       {tool === 'measure' && 'Chạm lên bản đồ để thêm các điểm đo khoảng cách. Bấm lại nút thước để xoá.'}
-      {tool === 'route' && (routeInfo ? (
+      {tool === 'route' && (routeInfo?.loading ? (
+        <span className="flex items-center gap-1.5 text-muted">
+          <Compass size={13} className="animate-spin text-accent" aria-hidden="true" /> Đang tìm lộ trình an toàn…
+        </span>
+      ) : routeInfo?.error ? (
+        <span className="block" role="alert">
+          <span className="flex items-start gap-1.5 font-semibold text-danger">
+            <AlertTriangle size={13} className="mt-0.5 shrink-0" aria-hidden="true" /> Không tìm được lộ trình: {routeInfo.error}
+          </span>
+          <span className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+            <button type="button" className="btn-ghost tap px-2.5 py-1 text-xs" onClick={routeInfo.retry}>
+              <RotateCcw size={12} aria-hidden="true" /> Thử lại
+            </button>
+            <span className="text-muted">hoặc chạm bản đồ chọn lại điểm A</span>
+          </span>
+        </span>
+      ) : routeInfo ? (
         <span>
           Lộ trình: <b>{routeInfo.distance_km} km</b> (~{routeInfo.duration_min}′) ·{' '}
           {routeInfo.safe
@@ -492,42 +508,84 @@ export function ToolHint({ tool, routeInfo, onClose, className }) {
   );
 }
 
-/** Kết quả khoanh vùng: diện tích, dân số, số hộ… → soạn cảnh báo sơ tán (quyền alert.create, vẫn qua phê duyệt). */
-export function DrawnStats({ drawn, onClose, onAlert, touch, className }) {
+const UNITS_STEP = 6; // số xã / phường hiện trước khi bấm "xem thêm"
+
+/**
+ * Kết quả khoanh vùng: diện tích, dân số, số hộ… → soạn cảnh báo sơ tán (quyền alert.create, vẫn qua phê duyệt).
+ * `drawn`: { polygon, stats, error } — error: không tính được (mất mạng / máy chủ lỗi) → báo + `onRetry`.
+ * `units`: { names, small, unknown } — xã / phường trong vùng (MonitoringMap tính từ `admin_codes`; vùng nhỏ → xã chứa tâm
+ * vùng; `unknown`: chưa tải được ranh giới xã).
+ */
+export function DrawnStats({ drawn, units, onClose, onRetry, onAlert, touch, className }) {
+  const [allUnits, setAllUnits] = useState(false);
+  const s = drawn.stats;
+  const names = units?.names || [];
+  const shownNames = allUnits ? names : names.slice(0, UNITS_STEP);
   return (
-    <div className={clsx('card border border-line bg-panel/95 p-3.5 shadow-2xl backdrop-blur-md', className)}>
-      <div className="mb-2 flex items-center justify-between border-b border-line pb-1.5 text-sm font-bold text-ink">
+    // Cao tối đa 60% màn hình, phần dưới tiêu đề tự cuộn — danh sách nhiều xã không đẩy nút "Soạn cảnh báo" ra khỏi màn
+    <div className={clsx('card flex max-h-[min(60vh,34rem)] flex-col border border-line bg-panel/95 p-3.5 shadow-2xl backdrop-blur-md', className)}>
+      <div className="mb-2 flex shrink-0 items-center justify-between border-b border-line pb-1.5 text-sm font-bold text-ink">
         <span>Phân tích vùng khoanh</span>
-        <button type="button" onClick={onClose} className="-m-1 flex h-8 w-8 items-center justify-center rounded-lg hover:bg-panel2" aria-label="Đóng phân tích vùng">
+        <button type="button" onClick={onClose} className="tap-sq -m-1 flex h-8 w-8 items-center justify-center rounded-lg hover:bg-panel2" aria-label="Đóng phân tích vùng">
           <X size={14} />
         </button>
       </div>
-      {!drawn.stats ? (
-        <div className="flex items-center gap-2 py-3 text-xs text-muted">
-          <Compass size={14} className="animate-spin text-accent" aria-hidden="true" />
-          <span>Đang tính toán không gian địa lý…</span>
-        </div>
-      ) : (
-        <>
-          <div className="my-1 grid grid-cols-2 gap-1 text-xs">
-            <div className="text-muted">Diện tích:</div><b className="text-right font-mono">{int(drawn.stats.area_km2)} km²</b>
-            <div className="text-muted">Dân số ước tính:</div><b className="text-right font-mono">{int(drawn.stats.population)} người</b>
-            <div className="text-muted">Hộ gia đình:</div><b className="text-right font-mono">{int(drawn.stats.households)} hộ</b>
-            <div className="text-muted">Thuê bao di động:</div><b className="text-right font-mono">{int(drawn.stats.subscribers)} TB</b>
-            <div className="text-muted">SOS đang mở:</div><b className="text-right font-mono text-danger">{drawn.stats.sos_open}</b>
-            <div className="text-muted">Chỗ trống sơ tán:</div><b className="text-right font-mono text-good">{int(drawn.stats.evac_free)}</b>
-          </div>
-          <Can I="alert" a="create">
-            <button
-              type="button"
-              className={clsx('btn-danger mt-2 w-full justify-center text-xs font-semibold shadow-sm', touch ? 'min-h-[44px]' : 'py-2')}
-              onClick={onAlert}
-            >
-              <Megaphone size={14} aria-hidden="true" /> Soạn cảnh báo sơ tán vùng này
+      <div className="scroll-thin -mr-1.5 min-h-0 overflow-y-auto pr-1.5">
+        {drawn.error ? (
+          <div className="space-y-2 py-1 text-xs" role="alert">
+            <p className="flex items-start gap-1.5 font-semibold text-danger">
+              <AlertTriangle size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
+              <span>Không tính được số liệu vùng khoanh: {drawn.error}</span>
+            </p>
+            <button type="button" className={clsx('btn-ghost w-full justify-center text-xs', touch ? 'min-h-[44px]' : 'py-1.5')} onClick={onRetry}>
+              <RotateCcw size={13} aria-hidden="true" /> Thử lại
             </button>
-          </Can>
-        </>
-      )}
+          </div>
+        ) : !s ? (
+          <div className="flex items-center gap-2 py-3 text-xs text-muted" role="status">
+            <Compass size={14} className="animate-spin text-accent" aria-hidden="true" />
+            <span>Đang tính toán không gian địa lý…</span>
+          </div>
+        ) : (
+          <>
+            <div className="my-1 grid grid-cols-[1fr_auto] gap-x-2 gap-y-1 text-xs">
+              <div className="text-muted">Diện tích:</div><b className="text-right font-mono">{s.area_km2 ? `${int(s.area_km2)} km²` : '< 1 km²'}</b>
+              <div className="text-muted">Dân số (ước tính):</div><b className="text-right font-mono">{int(s.population)} người</b>
+              <div className="text-muted">Số hộ (ước tính):</div><b className="text-right font-mono">{int(s.households)} hộ</b>
+              <div className="text-muted">Thuê bao di động (ước tính):</div><b className="text-right font-mono">{int(s.subscribers)} TB</b>
+              <div className="text-muted">SOS đang mở:</div><b className={clsx('text-right font-mono', s.sos_open ? 'text-danger' : 'text-ink')}>{int(s.sos_open)}</b>
+              <div className="text-muted">Lực lượng đóng trong vùng:</div><b className="text-right font-mono">{int(s.forces)} đơn vị</b>
+              <div className="text-muted">Chỗ trống sơ tán:</div><b className={clsx('text-right font-mono', s.evac_free ? 'text-good' : 'text-ink')}>{int(s.evac_free)}</b>
+              <div className="text-muted">Vùng nguy hiểm đang hiệu lực:</div><b className={clsx('text-right font-mono', s.hazard_zones ? 'text-warn' : 'text-ink')}>{int(s.hazard_zones)}</b>
+            </div>
+            <p className="text-[10px] leading-snug text-muted">Dân số, số hộ, thuê bao ước tính theo tỉ lệ diện tích từng xã (chưa có dân cư theo xóm).</p>
+            <div className="mt-2 border-t border-line pt-1.5 text-xs">
+              {!names.length ? (
+                <span className="text-muted">{units?.unknown ? 'Chưa xác định được xã / phường (chưa tải được ranh giới xã).' : 'Vùng khoanh nằm ngoài các xã / phường của tỉnh.'}</span>
+              ) : (
+                <>
+                  <b className="text-ink">{units.small ? 'Vùng nhỏ, thuộc' : `Xã / phường trong vùng (${names.length})`}:</b>{' '}
+                  <span className="text-ink-2">{shownNames.join(', ')}</span>
+                  {names.length > UNITS_STEP && (
+                    <button type="button" className="tap ml-1 font-semibold text-accent hover:underline" onClick={() => setAllUnits((v) => !v)} aria-expanded={allUnits}>
+                      {allUnits ? 'thu gọn' : `+${names.length - UNITS_STEP} xã / phường`}
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+            <Can I="alert" a="create">
+              <button
+                type="button"
+                className={clsx('btn-danger mt-2 w-full justify-center text-xs font-semibold shadow-sm', touch ? 'min-h-[44px]' : 'py-2')}
+                onClick={onAlert}
+              >
+                <Megaphone size={14} aria-hidden="true" /> Soạn cảnh báo sơ tán vùng này
+              </button>
+            </Can>
+          </>
+        )}
+      </div>
     </div>
   );
 }
