@@ -1640,7 +1640,9 @@ và **điện thoại** (Pixel 7, GPS giả lập ở TP Cao Bằng):
   thấy); điện thoại cảm ứng 360×740 vẫn thấy trọn 6 ô KPI dù nút cao hơn;
 - **Công cụ bản đồ** (laptop 1366×768, điện thoại 360): tìm đường và khoanh vùng khi mất mạng / máy chủ lỗi 500 (giả lập)
   báo lỗi kèm "Thử lại", có mạng thì có kết quả; kết quả về muộn của lượt cũ (đã chọn lại điểm A, đã đóng bảng) bị bỏ qua;
-  chú thích khi vẽ bằng tiếng Việt, có diện tích; bảng kết quả ghi xã trong vùng, 20 xã không tràn màn hình.
+  chú thích khi vẽ bằng tiếng Việt, có diện tích; bảng kết quả ghi xã trong vùng, 20 xã không tràn màn hình;
+- **Lớp & popup bản đồ** (laptop 1366×768, điện thoại 360): đủ điểm đen sạt lở như Tổng quan, vẽ hình tam giác, không ô
+  vuông điểm nguy hiểm nào vẽ chồng (đã gộp), popup có trạng thái giám sát.
 
 Mỗi bước **lỗi** khi trang có lỗi JavaScript (màn hình trắng), API trả 5xx, hoặc **tràn ngang trên điện thoại** (phải kéo
 ngang mới đọc hết). Ảnh chụp bước lỗi: artifact `ui-shots` của CI.

@@ -41,7 +41,8 @@ export const LAYER_GROUPS = [
       { key: 'flood', label: 'Vùng ngập lụt' },
       { key: 'floodScenario', label: 'Vùng ngập theo kịch bản (BĐ I–III)' },
       { key: 'landslide', label: 'Vùng sạt lở / lũ quét' },
-      { key: 'hazardPoints', label: 'Điểm nóng sạt lở, sự cố giao thông – hạ tầng' },
+      { key: 'blackspots', label: 'Điểm đen sạt lở, đèo dốc' }, // danh mục + trạng thái giám sát — /dashboard/kpis
+      { key: 'hazardPoints', label: 'Điểm nguy hiểm, sự cố giao thông – hạ tầng' },
       { key: 'reports', label: 'Phản ánh của người dân (72 giờ)', perm: 'report' },
       { key: 'roads', label: 'Mạng đường & đoạn bị chặn' },
     ],
@@ -63,7 +64,7 @@ export const LAYER_GROUPS = [
 export const LAYER_ORDER = LAYER_GROUPS.flatMap((g) => g.items.map((it) => it.key));
 
 export const DEFAULT_LAYERS = {
-  stations: true, reservoirs: true, forecast: false, radar: false, storm: false, flood: true, floodScenario: true, landslide: true, hazardPoints: true,
+  stations: true, reservoirs: true, forecast: false, radar: false, storm: false, flood: true, floodScenario: true, landslide: true, blackspots: true, hazardPoints: true,
   reports: true, roads: false,
   forces: true, vehicles: false, routes: true, warehouses: true, evac: false, cameras: true, sos: true, admin: true,
 };
@@ -77,6 +78,7 @@ const EMPTY_NOTE = {
   warehouses: 'Chưa có kho (nhập loại "Kho vật tư")',
   evac: 'Chưa có điểm sơ tán (nhập loại "Điểm sơ tán")',
   cameras: 'Chưa có camera nào được khai báo',
+  blackspots: 'Không có điểm đen sạt lở trong vùng đang xem',
 };
 // Ghi chú cố định: lực lượng chưa gắn thiết bị định vị — vị trí là nơi đóng quân đã nhập, không phải GPS trực tiếp
 const FIXED_NOTE = { forces: 'Vị trí đơn vị đã nhập — chưa gắn thiết bị định vị' };
@@ -249,7 +251,7 @@ export function AlertsList({
                   key={h.id}
                   type="button"
                   className={clsx(item, 'flex items-start gap-2 border-l-4 p-2.5 hover:bg-panel2/80', sc.edge)}
-                  onClick={() => onFocus(h.bounds ? { bounds: h.bounds, label: h.name } : { lat: h.lat, lon: h.lon, zoom: 13, label: h.name })}
+                  onClick={() => onFocus(h.bounds ? { bounds: h.bounds, label: h.name } : { lat: h.lat, lon: h.lon, zoom: 13, label: h.name }, h)}
                   aria-label={`${sc.name}: ${h.name} — ${h.detail}. Xem trên bản đồ`}
                 >
                   <Icon size={15} className={clsx('mt-0.5 shrink-0', sc.text)} aria-hidden="true" />

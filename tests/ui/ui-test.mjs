@@ -1099,6 +1099,56 @@ async function mapTools(ctx, phone) {
   });
 }
 
+// ================================================================ Lớp & popup của bản đồ (trang B — G5)
+const MAP_LAYER_DEVICES = [
+  ['Laptop 1366×768', { viewport: { width: 1366, height: 768 } }, false],
+  ['Điện thoại 360', devices['Galaxy S8'], true],
+];
+const TRIANGLE_PATH = 'svg path[d^="M15 2.5"]'; // tam giác điểm đen (icons.js blackspotIcon)
+const TRIANGLE = `.leaflet-marker-icon ${TRIANGLE_PATH}`;
+const HAZARD_GLYPH = 'm21.73 18-8-14'; // hình cảnh báo trong ô vuông điểm nguy hiểm (icons.js hazardIcon)
+
+async function mapLayers(ctx, phone) {
+  const { page } = ctx;
+  let k = null;
+  await step(ctx, 'Đăng nhập, mở Bản đồ', async () => {
+    await page.goto(`${ROOT}/dang-nhap`);
+    await page.getByPlaceholder('Nhập tên đăng nhập hoặc email...').fill(STAFF.user);
+    await page.getByPlaceholder('••••••••').fill(STAFF.pass);
+    await page.locator('button[type="submit"]').click();
+    await page.waitForURL(/\/dashboard/, { timeout: 20_000 });
+    const kpis = page.waitForResponse((r) => r.url().includes('/api/v1/dashboard/kpis') && r.ok(), { timeout: 20_000 });
+    await page.goto(`${ROOT}/ban-do`);
+    k = await (await kpis).json();
+    await page.locator('.leaflet-marker-pane .leaflet-marker-icon').first().waitFor({ timeout: 20_000 });
+    await page.waitForTimeout(1000);
+  });
+
+  // Thiết kế B.2 "Điểm nóng sạt lở: icon tam giác cảnh báo… Đỏ = nguy cơ rất cao" — danh mục điểm đen cùng số với Tổng quan
+  await step(ctx, 'Điểm đen sạt lở, đèo dốc: đủ điểm như Tổng quan, tam giác theo màu, popup có trạng thái giám sát; điểm đã nhập trùng chỗ không vẽ chồng', async () => {
+    const want = k?.landslides?.points?.length ?? 0;
+    const n = await page.locator(TRIANGLE).count();
+    if (n !== want) throw new Error(`${n} tam giác, Tổng quan có ${want} điểm đen`);
+    if (!want) return 'vùng đang xem không có điểm đen';
+    // Điểm nguy hiểm đã nhập trùng chỗ đã gộp vào tam giác — không còn ô vuông cảnh báo ngay dưới tam giác
+    const stacked = await page.locator(TRIANGLE).evaluateAll((paths, glyph) => paths.filter((pth) => {
+      const icon = pth.closest('.leaflet-marker-icon');
+      const r = icon.getBoundingClientRect();
+      return document.elementsFromPoint(r.x + r.width / 2, r.y + r.height / 2)
+        .some((e) => e.classList.contains('leaflet-marker-icon') && e !== icon && e.innerHTML.includes(glyph));
+    }).length, HAZARD_GLYPH);
+    if (stacked) throw new Error(`${stacked} tam giác bị ô vuông điểm nguy hiểm vẽ chồng`);
+    const icon = page.locator('.leaflet-marker-icon', { has: page.locator(TRIANGLE_PATH) }).first();
+    await icon.dispatchEvent('click'); // biểu tượng SOS có thể nằm đè — mở popup trực tiếp
+    const pop = visible(page.locator('.leaflet-popup-content'));
+    await pop.getByText('Giám sát:').waitFor({ timeout: 5_000 });
+    const text = (await pop.innerText()).replace(/\s+/g, ' ');
+    if (phone) await expectNoOverflow(ctx, 'Bản đồ (popup điểm đen)');
+    await page.keyboard.press('Escape');
+    return `${n} điểm · ${text.slice(0, 80)}`;
+  });
+}
+
 // ================================================================
 console.log(`Kiểm thử giao diện: ${ROOT}${READONLY ? ' (chỉ xem)' : ''}`);
 const browser = await chromium.launch();
@@ -1147,6 +1197,13 @@ try {
     const tPage = await tctx.newPage();
     await mapTools({ page: tPage, vp: { name: `Công cụ bản đồ · ${label}`, mobile: phone }, problems: watch(tPage) }, phone);
     await tctx.close();
+  }
+  for (const [label, opts, phone] of MAP_LAYER_DEVICES) {
+    const lctx = await browser.newContext({ ...opts, locale: 'vi-VN' });
+    lctx.setDefaultTimeout(15_000);
+    const lPage = await lctx.newPage();
+    await mapLayers({ page: lPage, vp: { name: `Lớp & popup bản đồ · ${label}`, mobile: phone }, problems: watch(lPage) }, phone);
+    await lctx.close();
   }
 } finally {
   await browser.close();

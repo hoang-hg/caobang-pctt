@@ -7,7 +7,7 @@ import { BellRing, ChevronLeft, ChevronRight, Clock, Info, Layers, Map as MapIco
 import { api } from '../api/client';
 import { useAreaQuery, useUnitsGeo } from '../api/hooks';
 import { useStore } from '../app/store';
-import MapLayers, { floodScenarioStates, StormLayer, stormQuery } from '../components/map/MapLayers';
+import MapLayers, { blackspotStates, floodScenarioStates, StormLayer, stormQuery } from '../components/map/MapLayers';
 import MapLegend, { RadarScale } from '../components/map/MapLegend';
 import MapKpis from '../components/map/MapKpis';
 import { riverSummary } from '../components/dashboard/RiverKpi';
@@ -72,7 +72,9 @@ function radarNoteOf(offset, q, frame) {
 const MODE_KEY = 'pctt.banDo.cheDo';
 const readMode = () => { try { return localStorage.getItem(MODE_KEY) === 'tinh_hinh' ? 'tinh_hinh' : 'tac_nghiep'; } catch { return 'tac_nghiep'; } };
 const OPS_LAYERS = ['forces', 'vehicles', 'warehouses', 'routes', 'evac', 'reports', 'cameras'];
-const RISK_LAYERS = ['sos', 'stations', 'reservoirs', 'flood', 'floodScenario', 'landslide', 'hazardPoints'];
+const RISK_LAYERS = ['sos', 'stations', 'reservoirs', 'flood', 'floodScenario', 'landslide', 'blackspots', 'hazardPoints'];
+// Chạm một điểm nóng → bật lớp chứa điểm đó (đang tắt thì bay tới chỗ trống)
+const HOT_LAYER = { sos: 'sos', river: 'stations', rain: 'stations', sensor: 'stations', reservoir: 'reservoirs', landslide: 'blackspots', hazard: 'hazardPoints' };
 const situationLayers = (l) => ({
   ...l, ...Object.fromEntries(OPS_LAYERS.map((x) => [x, false])), ...Object.fromEntries(RISK_LAYERS.map((x) => [x, true])),
 });
@@ -169,6 +171,9 @@ export default function MonitoringMap() {
     roads: data && !data.roads?.features?.length ? 'Chưa có dữ liệu mạng đường' : null, // chạy thật chưa nhập mạng đường
     floodScenario: data && !scenarioStates.length ? 'Chưa nhập bản đồ ngập theo kịch bản' : null,
   };
+  // Điểm đen sạt lở, đèo dốc: danh mục kèm trạng thái giám sát đã tải ở /dashboard/kpis, gộp điểm nguy hiểm đã nhập cùng chỗ
+  const blackspots = useMemo(() => blackspotStates(kQ.data?.landslides?.points, data?.hazard_points?.features), [kQ.data, data]);
+  const merged = layers.blackspots ? blackspots.merged.size : 0;
   // Ghi chú dưới tên lớp (không khoá lớp): vùng kịch bản nào đang hiện theo mực nước tại thời điểm đang xem
   const unknownLevels = scenarioStates.filter((x) => x.level == null).length;
   const notes = {
@@ -177,8 +182,13 @@ export default function MonitoringMap() {
     floodScenario: scenarioStates.length
       ? `${scenarioStates.filter((x) => x.active).length}/${scenarioStates.length} vùng đang ngập theo mực nước ${offset ? `lúc ${fmtVn(Date.now() + offset * 3600_000)}` : 'hiện tại'}${unknownLevels ? ` · ${unknownLevels} vùng chưa có số đo trạm` : ''}`
       : null,
+    blackspots: kQ.data ? null : kQ.isError ? 'Không tải được danh sách điểm đen sạt lở' : 'Đang tải danh sách điểm đen sạt lở…',
+    hazardPoints: merged ? `${merged} điểm trùng chỗ điểm đen — hiện chung tam giác điểm đen` : null,
   };
-  const counts = useMemo(() => layerCounts(data), [data]);
+  const counts = useMemo(
+    () => ({ ...layerCounts(data), ...(kQ.data ? { blackspots: blackspots.list.length } : {}) }),
+    [data, kQ.data, blackspots],
+  );
   const permOk = { sos: canSos, resource: canResource, report: canReports };
   const groups = LAYER_GROUPS.map((g) => ({ ...g, items: g.items.filter((it) => !it.perm || permOk[it.perm]) })).filter((g) => g.items.length);
 
@@ -297,7 +307,7 @@ export default function MonitoringMap() {
       show('forces');
       fly(pts(data?.forces), 'Lực lượng');
     } else if (key === 'topic') {
-      show('reservoirs', 'landslide', 'hazardPoints');
+      show('reservoirs', 'landslide', 'blackspots', 'hazardPoints');
       // Hồ đang xả + điểm sạt lở cấm đường / cảnh báo; không có thì mọi hồ chứa
       const hot = [
         ...pts(data?.reservoirs, (p) => p.status_code === 'xa_dieu_tiet' || p.status_code === 'xa_khan_cap'),
@@ -364,7 +374,11 @@ export default function MonitoringMap() {
       canSos={canSos}
       canDispatch={canDispatch}
       // Điện thoại: chạm một mục → đóng bảng để thấy chỗ bản đồ bay tới
-      onFocus={(f) => { setFocus(f); if (!wide) setSheet(null); }}
+      onFocus={(f, hot) => {
+        if (hot && HOT_LAYER[hot.kind]) setLayers((l) => ({ ...l, [HOT_LAYER[hot.kind]]: true }));
+        setFocus(f);
+        if (!wide) setSheet(null);
+      }}
       onDispatch={(s) => setDispatch({ ticket: s })}
       touch={touch}
     />
@@ -446,6 +460,7 @@ export default function MonitoringMap() {
             data={data}
             layers={layers}
             timeline={offset !== 0 ? timeline : null}
+            blackspots={blackspots}
             onDispatch={(ticket, forceId) => setDispatch({ ticket, forceId })}
             onCamera={setCamera}
             onIssue={setIssue}

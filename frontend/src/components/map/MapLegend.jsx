@@ -2,7 +2,7 @@ import { Fragment } from 'react';
 import { RiskLegend } from '../common/ui';
 import { RADAR_BINS } from './MapTools';
 import {
-  cameraIcon, COLORS, evacIcon, forceIcon, hazardIcon, reportIcon, reservoirIcon, sosIcon, stationIcon, stormIcon, vehicleIcon,
+  blackspotIcon, cameraIcon, COLORS, evacIcon, forceIcon, hazardIcon, reportIcon, reservoirIcon, sosIcon, stationIcon, stormIcon, vehicleIcon,
   warehouseIcon,
 } from './icons';
 
@@ -85,6 +85,14 @@ const ROWS = {
     <Row sym={<Swatch style={{ background: `${COLORS.do}40`, borderColor: COLORS.do }} />}>
       <b>Vùng sạt lở / lũ quét</b> — màu theo mức nguy cơ
     </Row>
+  ),
+  blackspots: () => (
+    <>
+      <Row sym={<Ico icon={blackspotIcon(3)} />}>
+        <b>Điểm đen sạt lở, đèo dốc</b> — Đỏ: cấm đường / nguy cơ rất cao, Cam: cảnh báo, Xanh: chưa ghi nhận nguy cơ
+      </Row>
+      <Row sym={<Ico icon={blackspotIcon(null)} />}>Xám, nét đứt: chưa có số liệu giám sát (không phải an toàn)</Row>
+    </>
   ),
   hazardPoints: () => (
     <>
