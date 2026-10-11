@@ -21,7 +21,7 @@ import StormBulletinModal from '../components/map/StormBulletinModal';
 import OccupancyModal from '../components/common/OccupancyModal';
 import {
   AdminBoundaries, AreaFocus, BASEMAPS, BaseLayer, DrawTool, FocusHandler, ForecastChoropleth, MeasureTool, RadarLayer, radarFrameAt, rainScale,
-  RouteTool, useRadarFrames,
+  RouteTool, toolError, useRadarFrames,
 } from '../components/map/MapTools';
 import DispatchModal from '../components/common/DispatchModal';
 import CameraModal from '../components/common/CameraModal';
@@ -38,6 +38,7 @@ import { fmtVn } from '../utils/bulletin';
 import { useDebounced } from '../utils/useDebounced';
 import { useMediaQuery } from '../utils/useMediaQuery';
 import { useOnline } from '../utils/useOnline';
+import { communeAt } from '../utils/geo';
 
 /** Chạm một điểm trên bản đồ khi công cụ "Đánh dấu sự cố" đang bật. */
 function PickPoint({ active, onPick }) {
@@ -181,17 +182,51 @@ export default function MonitoringMap() {
   const permOk = { sos: canSos, resource: canResource, report: canReports };
   const groups = LAYER_GROUPS.map((g) => ({ ...g, items: g.items.filter((it) => !it.perm || permOk[it.perm]) })).filter((g) => g.items.length);
 
-  const onDrawn = useCallback(async (polygon) => {
-    setTool(null);
-    setDrawn({ polygon, stats: null });
-    const stats = await api('/map/area-stats', { method: 'POST', body: { polygon } });
-    setDrawn({ polygon, stats });
+  // Phân tích vùng khoanh: lỗi (mất mạng / máy chủ lỗi) → báo + thử lại, không quay mãi "Đang tính toán…". `drawSeq`: lượt
+  // mới nhất — khoanh lại hoặc đóng bảng khi đang tính thì kết quả lượt cũ bỏ qua (không mở lại bảng đã đóng)
+  const drawSeq = useRef(0);
+  const analyze = useCallback(async (polygon) => {
+    const n = ++drawSeq.current;
+    setDrawn({ polygon, stats: null, error: null, seq: n });
+    try {
+      const stats = await api('/map/area-stats', { method: 'POST', body: { polygon } });
+      if (n === drawSeq.current) setDrawn({ polygon, stats, error: null, seq: n });
+    } catch (e) {
+      if (n === drawSeq.current) setDrawn({ polygon, stats: null, error: toolError(e), seq: n });
+    }
   }, []);
+  const onDrawn = useCallback((polygon) => {
+    setTool(null);
+    analyze(polygon);
+  }, [analyze]);
+  const closeDrawn = () => {
+    drawSeq.current += 1;
+    setDrawn(null);
+  };
+  // Xã / phường trong vùng: máy chủ trả mã xã có > 1% diện tích nằm trong vùng; vùng nhỏ (quanh một xóm) không đạt ngưỡng
+  // đó → lấy xã chứa tâm vùng theo ranh giới xã đã tải (useUnitsGeo)
+  const drawnUnits = useMemo(() => {
+    if (!drawn?.stats) return null;
+    const byCode = new Map((unitsGeo?.features || []).map((f) => [f.properties.code, f.properties]));
+    const label = (code) => {
+      const u = byCode.get(code);
+      return u ? `${u.unit_type === 'phuong' ? 'phường' : 'xã'} ${u.name}` : code;
+    };
+    const codes = drawn.stats.admin_codes || [];
+    if (codes.length) return { names: codes.map(label).sort((x, y) => x.localeCompare(y, 'vi')), small: false };
+    if (!unitsGeo) return { names: [], unknown: true }; // chưa tải được ranh giới xã — không khẳng định "ngoài tỉnh"
+    const ring = drawn.polygon.coordinates[0];
+    const [lon, lat] = ring.reduce(([x, y], [a, b]) => [x + a / ring.length, y + b / ring.length], [0, 0]);
+    const code = communeAt(unitsGeo, lat, lon);
+    return { names: code ? [label(code)] : [], small: !!code };
+  }, [drawn, unitsGeo]);
 
   const toggleTool = (t) => {
     setTool((cur) => (cur === t ? null : t));
     setRouteInfo(null);
     setSheet(null);
+    // Khoanh vùng mới thay vùng cũ → đóng kết quả cũ (điện thoại: bảng kết quả + hướng dẫn che gần hết chỗ để vẽ)
+    if (t === 'polygon' || t === 'circle') closeDrawn();
   };
   const toggleSheet = (s) => setSheet((cur) => (cur === s ? null : s));
 
@@ -343,9 +378,12 @@ export default function MonitoringMap() {
   );
   const drawnCard = drawn && (
     <DrawnStats
+      key={drawn.seq} // vùng khoanh mới → danh sách xã thu gọn lại
       drawn={drawn}
-      onClose={() => setDrawn(null)}
-      onAlert={() => { setAlertDraft(drawn); navigate('/canh-bao'); }}
+      units={drawnUnits}
+      onClose={closeDrawn}
+      onRetry={() => analyze(drawn.polygon)}
+      onAlert={() => { setAlertDraft({ polygon: drawn.polygon, stats: drawn.stats }); navigate('/canh-bao'); }}
       touch={touch}
       className={wide ? 'w-[19rem]' : 'pointer-events-auto w-full'}
     />
