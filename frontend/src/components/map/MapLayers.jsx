@@ -10,11 +10,14 @@ import { useStore } from '../../app/store';
 import Hydrograph from '../charts/Hydrograph';
 import { useChartTheme } from '../charts/chartTheme';
 import { Can, usePermission } from '../../rbac/usePermission';
-import { cameraIcon, evacIcon, forceIcon, hazardIcon, reportIcon, reservoirIcon, sosIcon, stationIcon, stormIcon, vehicleIcon, warehouseIcon } from './icons';
+import {
+  blackspotIcon, cameraIcon, evacIcon, forceIcon, hazardIcon, reportIcon, reservoirIcon, sosIcon, stationIcon, stormIcon, vehicleIcon, warehouseIcon,
+} from './icons';
 import { ALARM, alarmLevel, CATEGORY, FORCE_TYPE, INCIDENT, LEVEL, PRIORITY, REPORT_STATUS, RES_STATUS, SKILL, SOS_STATUS, SOURCE, STATION_TYPE, VEHICLE } from '../../utils/labels';
 import { ago, num } from '../../utils/format';
 import { fmtVn } from '../../utils/bulletin';
-import { levelOf, RESERVOIR_LEVEL, risk } from '../../utils/risk';
+import { HAZARD_LEVEL, LANDSLIDE_LEVEL, levelOf, RESERVOIR_LEVEL, risk } from '../../utils/risk';
+import { distanceKm } from '../../utils/geo';
 
 const ll = (f) => [f.geometry.coordinates[1], f.geometry.coordinates[0]];
 const Tel = ({ phone, label = 'Gọi' }) =>
@@ -167,6 +170,67 @@ function HazardPopup({ p }) {
   );
 }
 
+const SAME_SPOT_M = 300; // điểm nguy hiểm đã nhập cách điểm đen ≤ 300 m = cùng một chỗ
+
+/**
+ * Điểm đen sạt lở, đèo dốc (danh mục — /dashboard/kpis → landslides.points, trạng thái tính từ vùng nguy hiểm, đường bị
+ * chia cắt, cảm biến) gộp với điểm nguy hiểm đã nhập từ tệp (`hazard_points` nguồn import) nằm cùng chỗ (≤ 300 m): một tam
+ * giác, màu = mức cao hơn của trạng thái giám sát và mức đã nhập — "chưa có số liệu giám sát" không che mất mức Đỏ đã nhập.
+ * → { list: [{ p, near, level }], merged: Set id điểm đã nhập được gộp (không vẽ riêng khi lớp điểm đen đang bật) }.
+ * Sự cố do cán bộ / phản ánh đánh dấu không gộp — vẫn là điểm riêng, kết thúc được.
+ */
+export function blackspotStates(points, hazardFeatures) {
+  const imported = (hazardFeatures || []).filter((f) => f.properties.source === 'import');
+  const merged = new Set();
+  const list = (points || []).filter((p) => p.lat != null && p.lon != null).map((p) => {
+    const near = imported
+      .filter((f) => distanceKm(p.lat, p.lon, f.geometry.coordinates[1], f.geometry.coordinates[0]) * 1000 <= SAME_SPOT_M)
+      .map((f) => f.properties);
+    near.forEach((h) => merged.add(h.id));
+    const levels = [levelOf(LANDSLIDE_LEVEL, p.traffic_status), ...near.map((h) => levelOf(HAZARD_LEVEL, h.level))].filter((x) => x != null);
+    return { p, near, level: levels.length ? Math.max(...levels) : null };
+  });
+  return { list, merged };
+}
+
+function BlackspotPopup({ p, near, level }) {
+  const sc = risk(level);
+  return (
+    <div className="w-72">
+      <div className="flex items-start justify-between gap-2">
+        <b className="leading-snug">{p.name}</b>
+        <span className={clsx('chip shrink-0 text-[10px] font-bold', sc.chip)}>{sc.name}</span>
+      </div>
+      <div className="text-xs text-muted">
+        {p.category_label}{p.road_name ? ` · ${p.road_name}` : ''}{p.admin_name ? ` · ${p.admin_name}` : ''}
+      </div>
+      <div className="mt-1.5 text-xs">
+        Giám sát: <b className={risk(levelOf(LANDSLIDE_LEVEL, p.traffic_status)).text}>{p.traffic_label}</b>
+      </div>
+      <ul className="mt-1 space-y-0.5 text-[11px] text-ink-2">
+        {p.tilt_info && (
+          <li>
+            Nghiêng taluy <b className="font-mono">+{p.tilt_info.current_tilt_deg}°</b>
+            {p.tilt_info.alarm_threshold != null && ` (ngưỡng BĐ III ${p.tilt_info.alarm_threshold}°)`} · {p.tilt_info.sensor_name}
+          </li>
+        )}
+        {p.soil_info && <li>{p.soil_info.status_text} · {p.soil_info.sensor_name}</li>}
+        {p.rain_info && <li>Mưa 24 giờ <b className="font-mono">{num(p.rain_info.rain_24h_mm, 1)} mm</b> · {p.rain_info.station_name}</li>}
+        {!p.monitored && <li className="text-muted">Chưa có cảm biến nghiêng / độ ẩm đất báo số đo trong 6 giờ qua</li>}
+      </ul>
+      {near.length > 0 && (
+        <div className="mt-1.5 border-t border-line pt-1 text-[11px]">
+          <div className="font-semibold text-ink">Bản đồ điểm nguy hiểm (đã nhập) tại đây:</div>
+          {near.map((h) => (
+            <div key={h.id}>{h.name} — {INCIDENT_TYPE[h.type] || h.type}, nguy cơ <b>{LEVEL[h.level]?.label || h.level}</b></div>
+          ))}
+        </div>
+      )}
+      {p.response_action && <p className="mt-1.5 text-[11px] text-muted">{p.response_action}</p>}
+    </div>
+  );
+}
+
 function ReportPopup({ p, onIncident }) {
   const navigate = useNavigate();
   const canIncident = usePermission('incident', 'update', p.admin_code);
@@ -223,7 +287,7 @@ export function floodScenarioStates(data, timeline) {
 
 const ROMAN = { 1: 'I', 2: 'II', 3: 'III' };
 
-export default function MapLayers({ data, layers, timeline, onDispatch, onCamera, onIssue, onIncident, onOccupancy }) {
+export default function MapLayers({ data, layers, timeline, blackspots, onDispatch, onCamera, onIssue, onIncident, onOccupancy }) {
   const map = useMap();
   const gps = useStore((s) => s.gps);
   const theme = useStore((s) => s.theme);
@@ -306,9 +370,18 @@ export default function MapLayers({ data, layers, timeline, onDispatch, onCamera
           ))}
 
       {layers.hazardPoints &&
-        data.hazard_points.features.map((f) => (
-          <Marker key={f.properties.id} position={ll(f)} icon={hazardIcon(f.properties.type, f.properties.level)}>
-            <Popup><HazardPopup p={f.properties} /></Popup>
+        data.hazard_points.features
+          .filter((f) => !(layers.blackspots && blackspots?.merged.has(f.properties.id))) // đã gộp vào tam giác điểm đen
+          .map((f) => (
+            <Marker key={f.properties.id} position={ll(f)} icon={hazardIcon(f.properties.type, f.properties.level)}>
+              <Popup><HazardPopup p={f.properties} /></Popup>
+            </Marker>
+          ))}
+
+      {layers.blackspots &&
+        (blackspots?.list || []).map(({ p, near, level }) => (
+          <Marker key={`bs-${p.code}`} position={[p.lat, p.lon]} icon={blackspotIcon(level)} title={`${p.name} — ${p.traffic_label}`} zIndexOffset={300}>
+            <Popup minWidth={280}><BlackspotPopup p={p} near={near} level={level} /></Popup>
           </Marker>
         ))}
 

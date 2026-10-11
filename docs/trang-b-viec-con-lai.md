@@ -6,7 +6,7 @@ tải / trống / lỗi / mất mạng, 360 px, theo phân quyền).
 
 - Cập nhật: 11/10/2026 — mã nguồn `main` gồm PR #53 → #62 (bố cục, màu hồ, lọc SOS, form, tài liệu này; mưa dự báo theo
   thanh thời gian — G1 ở PR #57; radar theo thanh thời gian — G2 ở PR #58; bố cục cho người quản lý — G3 ở PR #59 → #62);
-  khoanh vùng, tìm đường báo lỗi — G7 ở PR #65.
+  khoanh vùng, tìm đường báo lỗi — G7 ở PR #65; điểm đen sạt lở trên bản đồ — G5 ở PR #66.
 - Rà lại lần 2 (10/10/2026): đối chiếu **từng ý** của mục B với mã nguồn — thêm 4 việc giao diện (G4 → G7, mục 3) và 3
   việc chờ dữ liệu / tích hợp (BD9 → BD11, mục 4); sửa lại các dòng tương ứng ở mục 1.
 - Máy chủ thử vẫn chạy **v1.0.3**, **chưa có** các thay đổi trên — xem V1 trong `docs/trang-a-viec-con-lai.md` (triển khai
@@ -17,14 +17,13 @@ tải / trống / lỗi / mất mạng, 360 px, theo phân quyền).
 theo thanh thời gian (G1, G2 — PR #57, #58); bố cục cho người quản lý trên laptop, iPad, điện thoại (G3 — PR #59 → #62).
 Rà lần 2 theo từng ý của mục B thấy 4 việc giao diện làm được ngay, không cần dữ liệu mới (mục 3). **Đã làm G7** (PR #65):
 khoanh vùng, tìm đường báo lỗi khi mất mạng / máy chủ lỗi, có "Thử lại"; kết quả khoanh vùng ghi các xã trong vùng; sửa
-kèm lỗi sẵn có của thư viện vẽ (chú thích tiếng Anh, diện tích không hiện). **Còn 3 việc**, thứ tự đề xuất:
+kèm lỗi sẵn có của thư viện vẽ (chú thích tiếng Anh, diện tích không hiện). **Đã làm G5** (PR #66): 12 điểm đen sạt lở, đèo
+dốc lên bản đồ — tam giác theo màu, gộp điểm nguy hiểm đã nhập trùng chỗ. **Còn 2 việc**, thứ tự đề xuất:
 
-1. **G5 — 12 điểm đen sạt lở, đèo dốc lên bản đồ** (tam giác theo màu mức, trạng thái Cấm đường / Cảnh báo) — B.2; nay chỉ
-   có ở Tổng quan và cổng công khai, bấm "xem trên bản đồ" chỉ hiện ghim 8 giây. Không đổi API (số liệu đã tải).
-2. **G4 — dòng diễn biến theo thời gian** trong bảng Cảnh báo khẩn cấp (SOS mới, trạm vượt báo động, lệnh điều động… mới
+1. **G4 — dòng diễn biến theo thời gian** trong bảng Cảnh báo khẩn cấp (SOS mới, trạm vượt báo động, lệnh điều động… mới
    nhất trên cùng) — B.1 "feed cuộn liên tục"; nay các tab chỉ có trạng thái hiện tại. Sửa nhỏ phía máy chủ (trả và ghi
    kèm toạ độ cho nhật ký sự kiện).
-3. **G6 — popup hồ chứa, xuồng – xe đủ như B.3**: hồ có biểu đồ mini, nút thao tác, nhãn lưu lượng xả (m³/s) ngay trên
+2. **G6 — popup hồ chứa, xuồng – xe đủ như B.3**: hồ có biểu đồ mini, nút thao tác, nhãn lưu lượng xả (m³/s) ngay trên
    biểu tượng; xuồng – xe có nút gọi. Sửa nhỏ API (thêm số điện thoại đơn vị vào lớp xe).
 
 Còn lại:
@@ -49,7 +48,7 @@ Còn lại:
 | B.2 Radar thời tiết, mây vệ tinh (ảnh mờ) | Đạt một phần — radar RainViewer: ảnh ~2 giờ qua theo thanh thời gian, ghi giờ ảnh, chú giải màu (G2). **Chưa có mây vệ tinh** (RainViewer đã bỏ từ 01/01/2026); radar KTTV chưa có nguồn; **điều khoản RainViewer chỉ cho dùng cá nhân / giáo dục** (BD6) |
 | B.2 Quỹ đạo bão: tâm, đường đi dự kiến, vùng gió mạnh | Đạt — trực ban dán bản tin; nét liền đã qua, nét đứt dự báo, vòng gió mạnh |
 | B.2 Vùng ngập (xanh trong suốt, càng đậm càng sâu; nội suy DEM + mực nước) | Đạt một phần — vùng ngập nhập tay / cảm biến, tô đậm theo độ sâu; vùng ngập kịch bản BĐ I–III theo mực nước trạm. **Chưa nội suy từ DEM** (BD4) |
-| B.2 Điểm nóng sạt lở (tam giác cảnh báo ở vùng đồi núi, đèo dốc; Đỏ = rất cao); sự cố giao thông / hạ tầng | Đạt một phần — lớp hiện điểm nguy hiểm nhập từ tệp (loại `diem_nguy_hiem`, BD1) và sự cố cán bộ đánh dấu ngay trên bản đồ (tự ẩn khi hết hạn), tam giác theo màu mức. **12 điểm đen sạt lở, đèo dốc** có trạng thái Cấm đường / Cảnh báo (Tổng quan → Sạt lở & đường đèo) **chưa vẽ trên bản đồ** (G5) |
+| B.2 Điểm nóng sạt lở (tam giác cảnh báo ở vùng đồi núi, đèo dốc; Đỏ = rất cao); sự cố giao thông / hạ tầng | Đạt — lớp **"Điểm đen sạt lở, đèo dốc"**: 12 điểm, tam giác theo màu (Đỏ cấm đường / nguy cơ rất cao, Cam cảnh báo, Xanh thông suốt, Xám chưa có số liệu), popup trạng thái giám sát, số đo cảm biến, hướng xử lý (G5, PR #66); lớp điểm nguy hiểm nhập từ tệp (loại `diem_nguy_hiem`, BD1) và sự cố cán bộ đánh dấu ngay trên bản đồ (tự ẩn khi hết hạn) — điểm đã nhập trùng chỗ điểm đen gộp chung một tam giác. Toạ độ 12 điểm cần cán bộ địa phương xác nhận (BD1) |
 | B.2 Lực lượng cứu hộ (GPS trực tiếp) | **Không làm** GPS (BD8) — hiện vị trí đơn vị đã nhập, ghi rõ trên bảng lớp |
 | B.2 Kho vật tư: biểu đồ tròn % hàng còn | Đạt — kèm "Ra lệnh xuất kho" |
 | B.2 Điểm sơ tán: sức chứa "Đang chứa a/b" | Đạt — kèm cập nhật số người (nút ±1 / ±10) |
@@ -72,7 +71,7 @@ Còn lại:
 | G2 | **Radar các khung đã qua** theo thanh thời gian (−2 giờ → hiện tại) | Không cần dữ liệu | — | **Đã làm** (PR #58) |
 | G3 | **Bố cục cho người quản lý** (laptop, iPad, điện thoại): chỉ số Tình hình, Điểm nóng, chế độ xem, vùng chạm 44 px | Không cần dữ liệu (không đổi API) | — | **Đã làm** (PR #59 → #62) |
 | G4 | **Dòng diễn biến theo thời gian** trong bảng Cảnh báo khẩn cấp (B.1 feed): SOS mới, trạm vượt báo động, lệnh điều động… mới nhất trên cùng | Không cần dữ liệu; dùng nhật ký sự kiện đã có, API `/dashboard/logs` thêm toạ độ (sửa nhỏ) | — | Cao |
-| G5 | **12 điểm đen sạt lở, đèo dốc trên bản đồ** (B.2): tam giác theo màu mức, popup trạng thái đường | Không cần dữ liệu, không đổi API (số liệu đã tải ở `/dashboard/kpis`) | — | Cao |
+| G5 | **12 điểm đen sạt lở, đèo dốc trên bản đồ** (B.2): tam giác theo màu mức, popup trạng thái đường | Không cần dữ liệu, không đổi API (số liệu đã tải ở `/dashboard/kpis`) | — | **Đã làm** (PR #66) |
 | G6 | **Popup hồ chứa, xuồng – xe** (B.3): hồ có biểu đồ mini + nút thao tác, nhãn lưu lượng xả; xuồng – xe gọi chỉ huy đơn vị | Không cần dữ liệu; API biểu đồ có sẵn, lớp xe thêm số điện thoại đơn vị (sửa nhỏ) | — | Trung bình |
 | G7 | **Khoanh vùng, tìm đường báo lỗi** khi mất mạng / máy chủ lỗi; kết quả khoanh vùng ghi các xã trong vùng | Không cần dữ liệu, không đổi API | — | **Đã làm** (PR #65) |
 | BD1 | Dữ liệu nền cho các lớp (trạm, hồ, lực lượng, kho, điểm sơ tán, vùng nguy hiểm) | Dữ liệu | như trang A D1 | **Cao nhất** |
@@ -193,23 +192,32 @@ cũ trước; Cảm biến chỉ có trạm đang vượt báo động / mất t
      `log_event` (hàm này tự gán xã gần nhất).
 - **Không thay** tab Điểm nóng: Điểm nóng trả lời "đang nguy ở đâu", Diễn biến trả lời "vừa xảy ra gì".
 
-### G5 — 12 điểm đen sạt lở, đèo dốc trên bản đồ (chưa làm)
+### G5 — 12 điểm đen sạt lở, đèo dốc trên bản đồ (đã làm — PR #66)
 
 Thiết kế B.2: "icon tam giác cảnh báo tại các khu vực đồi núi đèo dốc; Đỏ = nguy cơ rất cao". Hệ thống có danh mục **12 điểm
 đen sạt lở, đèo dốc** (Đèo Khau Cốc Chà, Đèo Mẻ Pia, Khu vực Ca Thành… — `backend/app/services/landslides.py`) với trạng
-thái tính từ vùng nguy hiểm, đường bị chia cắt, cảm biến nghiêng / độ ẩm đất: **Cấm đường / Cảnh báo / Thông suốt / Chưa có
-số liệu**. Danh mục hiện ở Tổng quan (tab "Sạt lở & đường đèo", Bảng tác chiến) và cổng công khai — **không có trên bản đồ
-giám sát**: bấm "xem trên bản đồ" chỉ hiện ghim 8 giây rồi mất; tab Điểm nóng chỉ liệt kê điểm Cấm đường / Cảnh báo.
+thái tính từ vùng nguy hiểm, đường bị chia cắt, cảm biến nghiêng / độ ẩm đất. Trước đây danh mục chỉ ở Tổng quan (tab "Sạt
+lở & đường đèo", Bảng tác chiến) và cổng công khai — bấm "xem trên bản đồ" chỉ hiện ghim 8 giây rồi mất. Nay:
 
-- **Số liệu đã tải:** trang bản đồ đã gọi `/dashboard/kpis` (6 chỉ số, Điểm nóng) — trong đó có `landslides.points` (toạ độ,
-  tuyến đường, xã, trạng thái, số đo nghiêng / độ ẩm / mưa 24 giờ, hướng xử lý), lọc theo vùng. Không thêm API, không thêm
-  lượt gọi.
-- **Đề xuất giao diện:** lớp "Điểm đen sạt lở, đèo dốc" trong nhóm Cảnh báo & Vùng nguy hiểm (có trong chế độ Tình hình), số
-  điểm trên bảng lớp; tam giác theo thang màu chung (`LANDSLIDE_LEVEL`): Đỏ — Cấm đường, Cam — Cảnh báo, Xanh — Thông suốt,
-  Xám nét đứt — Chưa có số liệu (không coi là an toàn); popup: tên, tuyến đường, xã, trạng thái, số đo nghiêng / độ ẩm đất
-  (số mới nhất trong 6 giờ qua), mưa 24 giờ, hướng xử lý.
-- **Lưu ý:** toạ độ 12 điểm trong danh mục nên được cán bộ địa phương xác nhận (BD1) — lên bản đồ thì sai lệch dễ thấy. Khi
-  tỉnh nhập điểm sạt lở từ tệp (loại `diem_nguy_hiem`) trùng các điểm này thì tránh vẽ hai biểu tượng chồng nhau.
+- **Lớp "Điểm đen sạt lở, đèo dốc"** (nhóm Cảnh báo & Vùng nguy hiểm, bật sẵn, có trong chế độ Tình hình, số điểm trên bảng
+  lớp): **tam giác** theo thang màu chung — Đỏ: cấm đường / nguy cơ rất cao, Cam: cảnh báo, Xanh: chưa ghi nhận nguy cơ,
+  **Xám nét đứt: chưa có số liệu giám sát** (không coi là an toàn). Rê chuột thấy tên + trạng thái.
+- **Popup:** tên, loại (đường đèo / khu dân cư sườn đồi / ngầm tràn), tuyến đường, xã, trạng thái giám sát, số đo nghiêng taluy
+  (kèm ngưỡng BĐ III), độ ẩm đất, mưa 24 giờ của trạm gắn kèm, hướng xử lý; điểm chưa có cảm biến báo số đo trong 6 giờ qua
+  ghi rõ.
+- **Gộp điểm đã nhập trùng chỗ:** điểm nguy hiểm nhập từ tệp (loại `diem_nguy_hiem`) cách điểm đen ≤ 300 m không vẽ thêm ô
+  vuông chồng lên — gộp vào tam giác, popup ghi "Bản đồ điểm nguy hiểm (đã nhập) tại đây: … nguy cơ Rất cao"; **màu tam giác
+  = mức cao hơn** của trạng thái giám sát và mức đã nhập (chưa có cảm biến thì không để "Xám" che mất mức Đỏ đã nhập). Bảng
+  lớp ghi "N điểm trùng chỗ điểm đen — hiện chung tam giác"; tắt lớp điểm đen thì các điểm đã nhập hiện lại như cũ. Sự cố
+  do cán bộ / phản ánh đánh dấu không gộp (vẫn kết thúc được).
+- **Chạm điểm nóng** (tab Điểm nóng) → tự bật lớp chứa điểm đó (điểm đen, trạm, hồ, SOS, điểm nguy hiểm) rồi bay tới; ô chỉ
+  số "Hồ · Sạt lở" bật cả lớp điểm đen.
+- **Không đổi API, không thêm lượt gọi:** số liệu lấy từ `/dashboard/kpis` (`landslides.points`) trang đã tải, lọc theo vùng.
+- Lớp "Điểm nóng sạt lở, sự cố giao thông – hạ tầng" đổi tên thành **"Điểm nguy hiểm, sự cố giao thông – hạ tầng"** — tránh
+  nhầm với tab "Điểm nóng" và lớp điểm đen.
+- **Kiểm thử:** `tests/ui/ui-test.mjs` khối "Lớp & popup bản đồ" (laptop 1366, điện thoại 360): đủ số điểm như Tổng quan,
+  không ô vuông nào vẽ chồng tam giác, popup có trạng thái giám sát.
+- **Lưu ý:** toạ độ 12 điểm trong danh mục nên được cán bộ địa phương xác nhận (BD1) — lên bản đồ thì sai lệch dễ thấy.
 
 ### G6 — Popup hồ chứa, xuồng – xe đủ như B.3 (chưa làm)
 
@@ -359,6 +367,8 @@ link nhiệm vụ. Chỉ xem lại nếu có thiết bị định vị gắn tr�
 2. Nhập dữ liệu nền (BD1); mở `/ban-do` trên điện thoại và máy tính:
    - mỗi lớp có số đối tượng, không còn "Chưa có …" ở lớp đã nhập;
    - hồ chưa có số liệu vận hành hiện Xám nét đứt, nhập thử một lần "Cập nhật vận hành" → đổi màu;
+   - 12 điểm đen sạt lở nằm đúng chỗ trên nền vệ tinh (sửa toạ độ trong danh mục nếu lệch); màu tam giác khớp tab "Sạt lở &
+     đường đèo" ở Tổng quan (G5);
    - khoanh thử một vùng đã biết dân số → so ước tính với số thật (BD5);
    - tìm đường an toàn khi đã có mạng đường (BD3);
    - bật lớp "Mưa dự báo theo xã", kéo thanh tới +6h / +12h: khung giờ trên chú giải khớp giờ trên thanh; đợt có mưa, so vài
@@ -379,7 +389,7 @@ link nhiệm vụ. Chỉ xem lại nếu có thiết bị định vị gắn tr�
 | Chỉ số "Tình hình" (lưới / hàng / vuốt ngang) — công thức dùng chung dải KPI Tổng quan | `frontend/src/components/map/MapKpis.jsx`, `components/dashboard/kpiFacts.js` |
 | Gom điểm nóng (chỉ sắp xếp lại số liệu đã tải) | `frontend/src/components/map/hotspots.js` |
 | Vùng chạm 44 px trên màn cảm ứng (`.touch-hit`, phóng to / thu nhỏ Leaflet) | `frontend/src/index.css` |
-| Các lớp, popup, kéo – thả điều động | `frontend/src/components/map/MapLayers.jsx` |
+| Các lớp, popup, kéo – thả điều động; điểm đen gộp điểm đã nhập cùng chỗ (`blackspotStates`) | `frontend/src/components/map/MapLayers.jsx` |
 | Biểu tượng (thang màu chung), chú giải (gồm thang màu radar `RadarScale`) | `frontend/src/components/map/icons.js`, `MapLegend.jsx` |
 | Nền bản đồ, radar (`useRadarFrames`, `radarFrameAt`, bảng màu `RADAR_BINS`), mưa dự báo theo xã (`ForecastChoropleth`, thang `rainScale`), đo, khoanh vùng (chú thích tiếng Việt, sửa `readableArea` của leaflet-draw), tìm đường (`RouteTool`, lời báo lỗi `toolError`) | `frontend/src/components/map/MapTools.jsx` |
 | Chờ dừng tay khi kéo thanh thời gian (lớp mưa dự báo) | `frontend/src/utils/useDebounced.js` |
@@ -408,3 +418,4 @@ link nhiệm vụ. Chỉ xem lại nếu có thiết bị định vị gắn tr�
 | #62 | Người quản lý — bước 4: khối kiểm thử "Người quản lý" trong ui-test; tài liệu này (G3), README |
 | #64 | Tài liệu này: rà lần 2 theo từng ý của mục B — thêm G4 → G7 (dòng diễn biến, điểm đen sạt lở, popup hồ / xe, báo lỗi khoanh vùng – tìm đường), BD9 → BD11 (số gọi tài xế, tự gửi lệnh điều động, SOS từ Zalo OA / ứng dụng) |
 | #65 | Khoanh vùng, tìm đường báo lỗi khi mất mạng / máy chủ lỗi, có "Thử lại", bỏ kết quả về muộn của lượt cũ; kết quả khoanh vùng ghi xã trong vùng, lực lượng, vùng nguy hiểm, "ước tính"; điện thoại: chọn khoanh mới đóng kết quả cũ, bảng kết quả tự cuộn; leaflet-draw: chú thích tiếng Việt, hết lỗi JavaScript khi tính diện tích (G7) |
+| #66 | Điểm đen sạt lở, đèo dốc lên bản đồ (G5): lớp mới — tam giác theo màu, popup trạng thái giám sát + số đo cảm biến + hướng xử lý, gộp điểm nguy hiểm đã nhập trùng chỗ; chạm điểm nóng tự bật lớp chứa điểm đó; đổi tên lớp "Điểm nguy hiểm, sự cố giao thông – hạ tầng"; ui-test khối "Lớp & popup bản đồ" |

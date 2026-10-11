@@ -97,6 +97,18 @@ export const hazardIcon = (type, level) =>
     shape: 'square',
   });
 
+/**
+ * Điểm đen sạt lở, đèo dốc (thiết kế B.2 "icon tam giác cảnh báo… Đỏ = nguy cơ rất cao"): tam giác tô theo thang màu chung
+ * — Đỏ cấm đường / nguy cơ rất cao, Cam cảnh báo, Xanh thông suốt; `level` null = chưa có số liệu giám sát → xám, viền nét
+ * đứt (không tô xanh như "an toàn").
+ */
+export const blackspotIcon = (level) => {
+  const fill = level == null ? COLORS.gray : ALARM_COLOR[level];
+  const glyph = level === 1 ? '#111' : '#fff'; // chữ đen trên vàng (tương phản như chip)
+  const html = `<div style="width:30px;height:28px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))"><svg xmlns="http://www.w3.org/2000/svg" width="30" height="28" viewBox="0 0 30 28"><path d="M15 2.5 28.5 25.5h-27z" fill="${fill}" stroke="#fff" stroke-width="2" stroke-linejoin="round"${level == null ? ' stroke-dasharray="4 2.5"' : ''}/><path d="M15 10.5v6.5M15 21.2v.1" stroke="${glyph}" stroke-width="2.8" stroke-linecap="round"/></svg></div>`;
+  return L.divIcon({ html, className: 'map-icon', iconSize: [30, 28], iconAnchor: [15, 16], popupAnchor: [0, -14] });
+};
+
 export const pinIcon = (label, color = COLORS.blue) =>
   L.divIcon({
     html: `<div style="background:${color};color:#fff;font:700 12px/22px sans-serif;width:22px;height:22px;border-radius:50%;text-align:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)">${label}</div>`,
