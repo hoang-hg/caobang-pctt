@@ -97,10 +97,11 @@ export default function ReservoirOpsChart({ river, xDomain, xTicks, syncId, heig
 }
 
 /**
- * Diễn biến vận hành 48 giờ của MỘT hồ (thẻ hồ ở tab Hồ chứa của Tổng quan): mực nước so với MNDBT và Q đến / Q xả — hai
- * biểu đồ nhỏ cùng trục thời gian (không dùng 2 trục Y). Dùng chung truy vấn của cả vùng (một lượt gọi cho mọi thẻ).
+ * Diễn biến vận hành 48 giờ của MỘT hồ (thẻ hồ ở tab Hồ chứa của Tổng quan, popup hồ trên bản đồ giám sát): mực nước so với
+ * MNDBT và Q đến / Q xả — hai biểu đồ nhỏ cùng trục thời gian (không dùng 2 trục Y). Dùng chung truy vấn của cả vùng (một
+ * lượt gọi cho mọi thẻ). `compact`: thấp hơn, vừa popup bản đồ trên điện thoại.
  */
-export function ReservoirHistory({ reservoir: r }) {
+export function ReservoirHistory({ reservoir: r, compact = false }) {
   const c = useChartTheme();
   const q = useAreaQuery('reservoir-operations', PATH, { hours: HOURS }, { refetchInterval: 60_000 });
   const series = useMemo(
@@ -108,7 +109,7 @@ export function ReservoirHistory({ reservoir: r }) {
     [q.data, r.id],
   );
   if (!q.data) {
-    return q.isError ? <ErrorState height={80} onRetry={q.refetch}>Không tải được diễn biến vận hành</ErrorState> : <Skeleton height={190} />;
+    return q.isError ? <ErrorState height={80} onRetry={q.refetch}>Không tải được diễn biến vận hành</ErrorState> : <Skeleton height={compact ? 183 : 190} />;
   }
   if (!series.length) return <EmptyState height={70}>Chưa có số liệu vận hành trong {HOURS} giờ qua</EmptyState>;
   const domain = [series[0].t, Math.max(series[series.length - 1].t, Date.now())];
@@ -120,7 +121,7 @@ export function ReservoirHistory({ reservoir: r }) {
   return (
     <div className="flex flex-col gap-1 text-[11px]">
       <div className="text-muted">Mực nước hồ (m) · MNDBT {num(r.normal_level, 2)} m</div>
-      <ResponsiveContainer width="100%" height={90}>
+      <ResponsiveContainer width="100%" height={compact ? 64 : 90}>
         <LineChart data={series} syncId={syncId} syncMethod="value" margin={{ top: 4, right: 8, bottom: 0, left: -12 }}>
           <CartesianGrid stroke={c.grid} vertical={false} />
           {x(true)}
@@ -134,7 +135,7 @@ export function ReservoirHistory({ reservoir: r }) {
         <span>Lưu lượng (m³/s)</span>
         <Legend items={[{ label: 'Q đến', color: c.s3, line: true }, { label: 'Q xả', color: c.s1, line: true }]} />
       </div>
-      <ResponsiveContainer width="100%" height={100}>
+      <ResponsiveContainer width="100%" height={compact ? 76 : 100}>
         <LineChart data={series} syncId={syncId} syncMethod="value" margin={{ top: 4, right: 8, bottom: 0, left: -12 }}>
           <CartesianGrid stroke={c.grid} vertical={false} />
           {x(false)}

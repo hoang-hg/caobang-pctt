@@ -19,9 +19,10 @@ import { buildHotspots } from '../components/map/hotspots';
 import IncidentModal from '../components/map/IncidentModal';
 import StormBulletinModal from '../components/map/StormBulletinModal';
 import OccupancyModal from '../components/common/OccupancyModal';
+import ReservoirOperationModal from '../components/common/ReservoirOperationModal';
 import {
-  AdminBoundaries, AreaFocus, BASEMAPS, BaseLayer, DrawTool, FocusHandler, ForecastChoropleth, MeasureTool, RadarLayer, radarFrameAt, rainScale,
-  RouteTool, toolError, useRadarFrames,
+  AdminBoundaries, AreaFocus, BASEMAPS, BaseLayer, DrawTool, FocusHandler, ForecastChoropleth, MapResize, MeasureTool, RadarLayer, radarFrameAt,
+  rainScale, RouteTool, toolError, useRadarFrames,
 } from '../components/map/MapTools';
 import DispatchModal from '../components/common/DispatchModal';
 import CameraModal from '../components/common/CameraModal';
@@ -119,6 +120,7 @@ export default function MonitoringMap() {
   const [incident, setIncident] = useState(null); // { lat, lon, report? } → form đánh dấu sự cố
   const [stormForm, setStormForm] = useState(false);
   const [occupancy, setOccupancy] = useState(null); // điểm sơ tán đang cập nhật số người
+  const [reservoirOp, setReservoirOp] = useState(null); // hồ đang nhập số liệu vận hành (popup hồ → form dùng chung Tổng quan)
   const [rightTab, setRightTab] = useState(mode === 'tinh_hinh' ? 'diem_nong' : 'sos'); // diem_nong | sos | sensors
   const [reportOpen, setReportOpen] = useState(false);
 
@@ -330,6 +332,11 @@ export default function MonitoringMap() {
   const mapPad = wide
     ? { topLeft: [leftOpen ? 300 : 60, 30], bottomRight: [rightOpen ? 350 : 60, 100] }
     : { topLeft: [16, 16], bottomRight: [16, 16] };
+  // Popup tự kéo bản đồ cho lọt khung: chừa thanh công cụ / chế độ xem (trên), bảng lớp, bảng cảnh báo (hai bên), thanh thời
+  // gian (dưới); điện thoại chừa cột nút Công cụ / Chú giải bên phải
+  const popupPad = wide
+    ? { autoPanPaddingTopLeft: [leftOpen ? 300 : 16, 76], autoPanPaddingBottomRight: [rightOpen ? 350 : 16, 110] }
+    : { autoPanPaddingTopLeft: [12, 12], autoPanPaddingBottomRight: [76, 12] };
 
   const setAllLayers = (val) => {
     const next = {};
@@ -451,6 +458,7 @@ export default function MonitoringMap() {
       {/* Vùng bản đồ: `isolate` giữ z-index của Leaflet bên trong, không đè thanh thao tác / hộp thoại */}
       <div className="relative isolate min-h-0 w-full flex-1 select-none overflow-hidden">
         <MapContainer center={[22.75, 106.05]} zoom={9} zoomControl={false} zoomSnap={0.25} className="h-full w-full">
+          <MapResize />
           <BaseLayer basemap={basemap} />
           {radarFrame && <RadarLayer host={radarQ.data.host} frame={radarFrame} />}
           <ZoomControl position="bottomright" />
@@ -464,11 +472,13 @@ export default function MonitoringMap() {
             layers={layers}
             timeline={offset !== 0 ? timeline : null}
             blackspots={blackspots}
+            popupPad={popupPad}
             onDispatch={(ticket, forceId) => setDispatch({ ticket, forceId })}
             onCamera={setCamera}
             onIssue={setIssue}
             onIncident={setIncident}
             onOccupancy={setOccupancy}
+            onReservoirOp={setReservoirOp}
           />
           <PickPoint active={tool === 'incident'} onPick={(pt) => { setTool(null); setIncident(pt); }} />
           <FocusHandler padding={mapPad} />
@@ -745,6 +755,7 @@ export default function MonitoringMap() {
       {incident && <IncidentModal at={incident} onClose={() => setIncident(null)} />}
       {stormForm && <StormBulletinModal onClose={() => setStormForm(false)} />}
       {occupancy && <OccupancyModal site={occupancy} onClose={() => setOccupancy(null)} />}
+      {reservoirOp && <ReservoirOperationModal reservoir={reservoirOp} onClose={() => setReservoirOp(null)} />}
       {canReport && <QuickIncidentModal open={reportOpen} onClose={() => setReportOpen(false)} />}
     </div>
   );

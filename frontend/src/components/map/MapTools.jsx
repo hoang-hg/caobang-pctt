@@ -219,6 +219,29 @@ export function RadarLayer({ host, frame }) {
 }
 
 /** Zoom vừa khít vùng đang lọc + phủ lớp mờ ngoài ranh giới. */
+/**
+ * Khung bản đồ đổi cỡ mà cửa sổ không đổi (hàng chỉ số "Tình hình" hiện ra sau khi bản đồ khởi tạo, thu gọn menu trái…) →
+ * báo Leaflet tính lại kích thước, giữ nguyên tâm. Không thì Leaflet dùng cỡ cũ: căn giữa vùng lệch (điện thoại: tỉnh dồn
+ * xuống đáy), popup tự kéo bản đồ theo cỡ sai nên bị khuất.
+ */
+export function MapResize() {
+  const map = useMap();
+  useEffect(() => {
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    let frame = 0;
+    const ro = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => map.invalidateSize());
+    });
+    ro.observe(map.getContainer());
+    return () => {
+      ro.disconnect();
+      cancelAnimationFrame(frame);
+    };
+  }, [map]);
+  return null;
+}
+
 export function AreaFocus({ area, filtered, padding = {} }) {
   const map = useMap();
   useEffect(() => {

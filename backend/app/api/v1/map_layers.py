@@ -133,7 +133,8 @@ async def _layers(codes: list[str], res_codes: list[str], sos_codes: list[str], 
         pr,
     )
     vehicles = await fetch_all(
-        f"""SELECT v.id, v.code, v.name, v.vehicle_type, v.category, v.status, v.fuel_level, f.name AS force_name,
+        f"""SELECT v.id, v.code, v.name, v.vehicle_type, v.category, v.status, v.fuel_level, v.capacity, f.name AS force_name,
+                   f.contact_phone AS force_phone, f.commander AS force_commander,
                    ST_Y(v.current_location) AS lat, ST_X(v.current_location) AS lon
               FROM resources.vehicles v LEFT JOIN resources.forces f ON f.id = v.force_id
              WHERE {area_clause('v.current_location', res_codes)}""",
