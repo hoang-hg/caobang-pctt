@@ -69,7 +69,7 @@ const ROWS = {
   ),
   reservoirs: () => (
     <>
-      <Row sym={<Ico icon={reservoirIcon(3, 3)} />}><b>Hồ chứa</b> xả lũ lớn (Đỏ) — nhãn = số cửa xả đang mở</Row>
+      <Row sym={<Ico icon={reservoirIcon(3, 3)} />}><b>Hồ chứa</b> xả lũ lớn (Đỏ) — nhãn dưới biểu tượng: số cửa đang mở · lưu lượng xả (m³/s)</Row>
       <Row sym={<Ico icon={reservoirIcon(1, 2)} />}>Hồ đang xả điều tiết (Cam)</Row>
       <Row sym={<Ico icon={reservoirIcon(0, 0)} />}>Hồ chưa xả tràn (Xanh)</Row>
       <Row sym={<Ico icon={reservoirIcon(0, null)} />}>Xám, nét đứt: chưa có số liệu vận hành</Row>

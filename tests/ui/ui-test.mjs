@@ -1069,6 +1069,12 @@ async function mapTools(ctx, phone) {
       await card.getByText('Dân số (ước tính):').waitFor({ timeout: 15_000 });
       const units = ((await card.innerText()).replace(/\s+/g, ' ').match(/(Xã \/ phường trong vùng \(\d+\)|Vùng nhỏ, thuộc|Vùng khoanh nằm ngoài)[^S]*/) || [])[0];
       if (!units) throw new Error('bảng kết quả không ghi xã / phường trong vùng');
+      // Xuất Excel số liệu vùng khoanh + danh sách xã (gửi kèm văn bản chỉ đạo)
+      const [xl] = await Promise.all([
+        page.waitForEvent('download', { timeout: 30_000 }),
+        card.getByRole('button', { name: /^Xuất Excel/ }).click(),
+      ]);
+      if (!/^vung-khoanh-.*\.xlsx$/.test(xl.suggestedFilename())) throw new Error(`tệp Excel lạ: ${xl.suggestedFilename()}`);
       // Khoanh vùng mới → đóng kết quả cũ; 20 xã, mở hết danh sách → bảng không tràn, nút "Soạn cảnh báo" vẫn trong màn
       mode = 'many';
       const again = await draw();
@@ -1106,11 +1112,23 @@ const MAP_LAYER_DEVICES = [
 ];
 const TRIANGLE_PATH = 'svg path[d^="M15 2.5"]'; // tam giác điểm đen (icons.js blackspotIcon)
 const TRIANGLE = `.leaflet-marker-icon ${TRIANGLE_PATH}`;
+
+/**
+ * Chờ bản đồ đứng yên: vị trí khung (transform của pane bản đồ, proxy thu phóng) không đổi qua 5 lần dò liên tiếp (~0,5 s).
+ * Ranh giới vùng tải xong sau các điểm → bản đồ còn bay tới vùng đang lọc (0,8 s); bấm lúc đó thì popup bị kéo đi.
+ */
+const mapIdle = (page) => page.waitForFunction(() => {
+  const t = [...document.querySelectorAll('.leaflet-map-pane, .leaflet-proxy')].map((e) => e.style.transform).join('|');
+  if (window.mapIdleT === t) window.mapIdleN = (window.mapIdleN || 0) + 1;
+  else { window.mapIdleT = t; window.mapIdleN = 0; }
+  return window.mapIdleN >= 5;
+}, null, { polling: 100, timeout: 15_000 });
 const HAZARD_GLYPH = 'm21.73 18-8-14'; // hình cảnh báo trong ô vuông điểm nguy hiểm (icons.js hazardIcon)
 
 async function mapLayers(ctx, phone) {
   const { page } = ctx;
   let k = null;
+  let layers0 = null; // /map/layers lúc mở trang (danh mục xe, đơn vị — không đổi theo bộ mô phỏng)
   // WebSocket thật của trang (đi qua máy chủ như thường) — giữ đường để chèn thêm một tin "log.new" giả lập (bước Diễn
   // biến), không phải ghi dữ liệu thật
   let socket = null;
@@ -1125,10 +1143,13 @@ async function mapLayers(ctx, phone) {
     await page.locator('button[type="submit"]').click();
     await page.waitForURL(/\/dashboard/, { timeout: 20_000 });
     const kpis = page.waitForResponse((r) => r.url().includes('/api/v1/dashboard/kpis') && r.ok(), { timeout: 20_000 });
+    const mapData = page.waitForResponse((r) => r.url().includes('/api/v1/map/layers') && r.ok(), { timeout: 20_000 });
     await page.goto(`${ROOT}/ban-do`);
     k = await (await kpis).json();
+    layers0 = await (await mapData).json();
     await page.locator('.leaflet-marker-pane .leaflet-marker-icon').first().waitFor({ timeout: 20_000 });
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(500);
+    await mapIdle(page);
   });
 
   // Thiết kế B.2 "Điểm nóng sạt lở: icon tam giác cảnh báo… Đỏ = nguy cơ rất cao" — danh mục điểm đen cùng số với Tổng quan
@@ -1200,6 +1221,95 @@ async function mapLayers(ctx, phone) {
     await page.locator('.leaflet-tooltip').filter({ hasText: msg.slice(0, 30) }).waitFor({ timeout: 5_000 });
     if (phone) await expectNoOverflow(ctx, 'Bản đồ (Diễn biến)');
     return `${times.length} mục · lọc "Cảnh báo" ${nWarn} · cuộn ${scrolled}px`;
+  });
+
+  // Thiết kế B.3 "popup: chi tiết, biểu đồ mini, nút hành động nhanh (VD gọi điện cho tài xế)"; B.2 "hồ chứa: hiển thị lưu
+  // lượng nước đang xả (m³/s)"
+  await step(ctx, 'Hồ chứa: nhãn lưu lượng xả trên biểu tượng; popup có biểu đồ 48 giờ, nút "Cập nhật vận hành" mở form, lọt khung bản đồ; xuồng – xe: nút gọi chỉ huy đơn vị', async () => {
+    // Bước trước vừa bay tới một điểm (thu phóng 14) — tải lại để bắt đầu từ khung nhìn cả vùng, bản đồ đứng yên
+    await page.reload();
+    await page.locator('.leaflet-marker-pane .leaflet-marker-icon').first().waitFor({ timeout: 20_000 });
+    await page.waitForTimeout(500);
+    await mapIdle(page);
+    // Nhãn dưới biểu tượng hồ đang mở cửa xả: "N cửa · X m³/s" — so với chính popup của hồ đó (cùng một bản số liệu; bộ
+    // mô phỏng đổi cửa xả theo phút nên không so với lượt gọi API khác)
+    const labels = await page.locator('.leaflet-marker-icon span').filter({ hasText: / cửa( · [\d.]+ m³\/s)?$/ }).allInnerTexts();
+    const DAM = 'svg path[d="M5 21V7l7-4 7 4v14"]';
+    const icon = labels.length
+      ? page.locator('.leaflet-marker-icon', { has: page.locator('span', { hasText: / cửa/ }) }).first()
+      : page.locator('.leaflet-marker-icon', { has: page.locator(DAM) }).first();
+    if (!(await icon.count())) return 'vùng đang xem không có hồ chứa';
+    const label = labels.length ? (await icon.locator('span', { hasText: / cửa/ }).innerText()).trim() : null;
+    await icon.dispatchEvent('click');
+    const pop = visible(page.locator('.leaflet-popup-content'));
+    await pop.getByRole('button', { name: 'Mở tab Hồ chứa' }).waitFor({ timeout: 5_000 });
+    if (label) {
+      const t = (await pop.innerText()).replace(/\s+/g, ' ');
+      const gates = t.match(/Cửa xả mở (\d+)\/\d+/)?.[1];
+      const flow = t.match(/Lưu lượng xả ([\d.,]+) m³\/s/)?.[1];
+      const [, lg, lf] = label.match(/^(\d+) cửa(?: · ([\d.]+) m³\/s)?$/) || [];
+      const num = (x) => (x == null ? null : Math.round(Number(String(x).replace(/\./g, '').replace(',', '.'))));
+      if (lg !== gates || (lf != null && num(lf) !== num(flow))) throw new Error(`nhãn "${label}" khác popup (cửa ${gates}, xả ${flow} m³/s)`);
+    }
+    const hasOps = !(await pop.getByText(/^Chưa có số liệu vận hành/).count());
+    if (hasOps) {
+      const more = pop.getByRole('button', { name: /^Xem diễn biến 48 giờ/ });
+      if (await more.count()) await more.click(); // điện thoại: biểu đồ thu gọn sau nút
+      await pop.getByText(/Mực nước hồ \(m\)|Chưa có số liệu vận hành trong 48 giờ qua/).first().waitFor({ timeout: 10_000 });
+    }
+    await mapIdle(page); // bản đồ tự kéo cho popup lọt khung
+    const fit = await pop.evaluate((el) => {
+      const p = el.closest('.leaflet-popup').getBoundingClientRect();
+      const m = el.closest('.leaflet-container').getBoundingClientRect();
+      return { top: Math.round(p.top - m.top), bottom: Math.round(m.bottom - p.bottom), left: Math.round(p.left - m.left), right: Math.round(m.right - p.right) };
+    });
+    if (Object.values(fit).some((v) => v < 0)) throw new Error(`popup hồ tràn ra ngoài bản đồ: ${JSON.stringify(fit)}`);
+    const update = pop.getByRole('button', { name: 'Cập nhật vận hành' });
+    await mapIdle(page);
+    if (await update.count()) {
+      await update.click();
+      const dlg = page.getByRole('dialog').filter({ hasText: 'Cập nhật vận hành –' });
+      await dlg.waitFor({ timeout: 5_000 });
+      await dlg.getByRole('button', { name: 'Huỷ' }).click(); // chỉ mở form, không lưu
+    }
+    await page.locator('.leaflet-popup-close-button').first().dispatchEvent('click');
+    // Xuồng – xe: bật lớp (tắt sẵn) → popup có nút gọi chỉ huy đơn vị quản lý phương tiện
+    const vehicles = (layers0?.vehicles?.features || []).map((f) => f.properties);
+    if (!vehicles.length) return `${labels.length} nhãn xả · popup hồ ${hasOps ? 'có' : 'chưa có'} số liệu · không có phương tiện`;
+    if (phone) await page.getByRole('navigation', { name: 'Thao tác nhanh' }).getByRole('button', { name: /^Lớp/ }).click();
+    else if (!(await page.getByRole('checkbox', { name: /Xuồng, xe, thiết bị/ }).count())) {
+      await visible(page.getByRole('button', { name: /Lớp dữ liệu/ })).click();
+    }
+    const box = page.getByRole('checkbox', { name: /Xuồng, xe, thiết bị/ });
+    if (!(await box.isChecked())) await box.check();
+    if (phone) await page.keyboard.press('Escape');
+    await page.waitForTimeout(400);
+    await mapIdle(page);
+    const target = vehicles.find((v) => v.force_phone) || vehicles[0];
+    const vIcon = page.locator('.leaflet-marker-icon').filter({ has: page.locator('svg') }).filter({
+      has: page.locator('path[d^="M2 21c.6.5 1.2 1 2.5 1"], path[d^="M14 18V6a2 2 0 0 0-2-2H4"], path[d^="M14.7 6.3a1"], circle[r="3"]'),
+    });
+    if (!(await vIcon.count())) throw new Error('bật lớp Xuồng, xe nhưng không thấy biểu tượng phương tiện');
+    // mở popup của đúng phương tiện có số chỉ huy (dò theo mã trong popup)
+    let found = false;
+    for (let i = 0; i < Math.min(await vIcon.count(), 40) && !found; i += 1) {
+      await vIcon.nth(i).dispatchEvent('click');
+      const vp = visible(page.locator('.leaflet-popup-content'));
+      await vp.waitFor({ timeout: 3_000 }).catch(() => {});
+      if (await vp.locator('b', { hasText: new RegExp(`^${target.code}$`) }).count()) { // đúng mã (CB-X01 ≠ CB-X010)
+        found = true;
+        const call = vp.getByRole('link', { name: 'Gọi chỉ huy đơn vị' });
+        if (target.force_phone) {
+          // popup đang hiện dần / canh bố cục (Leaflet ẩn tạm khi cập nhật) — chờ nút, không đếm ngay
+          await call.waitFor({ timeout: 5_000 }).catch(() => { throw new Error(`popup ${target.code} thiếu nút "Gọi chỉ huy đơn vị"`); });
+          const href = await call.getAttribute('href');
+          if (href !== `tel:${target.force_phone.replace(/\s/g, '')}`) throw new Error(`nút gọi sai số: ${href}`);
+        }
+      }
+    }
+    if (!found) throw new Error(`không mở được popup phương tiện ${target.code}`);
+    if (phone) await expectNoOverflow(ctx, 'Bản đồ (popup hồ, xe)');
+    return `${labels.length} nhãn xả (${labels.slice(0, 2).join('; ')}) · popup hồ lọt khung ${JSON.stringify(fit)} · xe ${target.code}`;
   });
 }
 

@@ -28,10 +28,13 @@ const P = {
   storm: '<path d="M21 4H3M18 8H6M19 12H9M16 16h-6M11 20H9"/>',
 };
 
-function badge(path, { bg = '#fff', stroke = COLORS.blue, size = 28, ring = stroke, shape = 'circle', extraClass = '', label, dashed = false, opacity = 1 } = {}) {
+/** `label`: số nhỏ góc trên phải (giá trị trạm, số cửa…); `sub`: nhãn dài dưới biểu tượng (`subInk`: màu chữ của nhãn đó). */
+function badge(path, { bg = '#fff', stroke = COLORS.blue, size = 28, ring = stroke, shape = 'circle', extraClass = '', label, sub, subInk = '#fff', dashed = false, opacity = 1 } = {}) {
   const radius = shape === 'square' ? '7px' : '9999px';
   const html = `<div class="${extraClass}" style="width:${size}px;height:${size}px;border-radius:${radius};background:${bg};border:2px ${dashed ? 'dashed' : 'solid'} ${ring};opacity:${opacity};display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.35);position:relative">${svg(path, stroke, size * 0.58)}${
     label ? `<span style="position:absolute;top:-8px;right:-10px;background:${ring};color:#fff;font:600 10px/14px sans-serif;padding:0 4px;border-radius:7px">${label}</span>` : ''
+  }${
+    sub ? `<span style="position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:3px;white-space:nowrap;background:${ring};color:${subInk};font:600 10px/14px sans-serif;padding:0 5px;border-radius:7px;box-shadow:0 1px 3px rgba(0,0,0,.3)">${sub}</span>` : ''
   }</div>`;
   return L.divIcon({ html, className: 'map-icon', iconSize: [size, size], iconAnchor: [size / 2, size / 2], popupAnchor: [0, -size / 2] });
 }
@@ -71,12 +74,16 @@ export const reportIcon = (status) =>
 export const stormIcon = () => badge(P.storm, { bg: '#a855f7', stroke: '#fff', ring: '#fff', size: 26 });
 
 /** Hồ chứa: viền theo thang màu chung (`level` = RESERVOIR_LEVEL của trạng thái máy chủ) — 3 xả lũ lớn Đỏ, 2 xả điều tiết
- * Cam, 0 chưa xả Xanh; null = chưa có số liệu vận hành → xám nét đứt (không vẽ như hồ bình thường). Nhãn = số cửa đang mở. */
-export const reservoirIcon = (gatesOpen, level) => {
+ * Cam, 0 chưa xả Xanh; null = chưa có số liệu vận hành → xám nét đứt (không vẽ như hồ bình thường). Hồ đang mở cửa xả: nhãn
+ * dưới biểu tượng = số cửa · lưu lượng xả (thiết kế B.2 "hiển thị lưu lượng nước đang xả") — chữ đen trên Cam / Vàng (tương
+ * phản như chip), trắng trên Đỏ. */
+export const reservoirIcon = (gatesOpen, level, outflow) => {
   const ring = level == null ? COLORS.gray : ALARM_COLOR[level];
+  const flow = outflow != null ? ` · ${Math.round(outflow).toLocaleString('vi-VN')} m³/s` : '';
   return badge(P.dam, {
     bg: '#e0f2fe', stroke: '#075985', ring, size: 28, shape: 'square', dashed: level == null,
-    label: level != null && gatesOpen ? `${gatesOpen} cửa` : undefined,
+    sub: level != null && gatesOpen ? `${gatesOpen} cửa${flow}` : undefined,
+    subInk: level === 3 ? '#fff' : '#111',
   });
 };
 

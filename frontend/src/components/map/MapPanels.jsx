@@ -1,13 +1,15 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
 import {
-  Activity, AlertTriangle, ArrowUp, Circle as CircleIcon, Clock, CloudRain, Compass, Droplets, LifeBuoy, MapPin, Megaphone, MessageCircle, Mountain,
-  PenTool, Route, Ruler, Search, RotateCcw, Send, Settings2, Siren, Waves, X,
+  Activity, AlertTriangle, ArrowUp, Circle as CircleIcon, Clock, CloudRain, Compass, Droplets, FileSpreadsheet, LifeBuoy, MapPin, Megaphone,
+  MessageCircle, Mountain, PenTool, Route, Ruler, Search, RotateCcw, Send, Settings2, Siren, Waves, X,
 } from 'lucide-react';
 import { ErrorState, ShowMore, Skeleton, TrendTag, useEscapeToClose } from '../common/ui';
+import { useStore } from '../../app/store';
 import { Can } from '../../rbac/usePermission';
 import { ALARM, alarmLevel, INCIDENT, PRIORITY, STATION_TYPE } from '../../utils/labels';
-import { ago, dateTime, int, time } from '../../utils/format';
+import { ago, dateTime, int, time, vnFileStamp } from '../../utils/format';
+import { exportExcel } from '../../utils/exportExcel';
 import { fmtVn } from '../../utils/bulletin';
 import { risk } from '../../utils/risk';
 import { trendProps } from '../../utils/stations';
@@ -659,9 +661,34 @@ const UNITS_STEP = 6; // số xã / phường hiện trước khi bấm "xem th�
  */
 export function DrawnStats({ drawn, units, onClose, onRetry, onAlert, touch, className }) {
   const [allUnits, setAllUnits] = useState(false);
+  const toast = useStore((st) => st.toast);
   const s = drawn.stats;
   const names = units?.names || [];
   const shownNames = allUnits ? names : names.slice(0, UNITS_STEP);
+  // Xuất Excel số liệu vùng khoanh + danh sách xã — gửi kèm văn bản chỉ đạo / báo cáo cấp trên
+  const exportStats = async () => {
+    const ring = drawn.polygon.coordinates[0];
+    const [lon, lat] = ring.reduce(([x, y], [a, b]) => [x + a / ring.length, y + b / ring.length], [0, 0]);
+    const rows = [
+      ['Thời điểm xuất', dateTime(new Date())],
+      ['Tâm vùng (vĩ độ, kinh độ)', `${lat.toFixed(5)}, ${lon.toFixed(5)}`],
+      ['Diện tích (km²)', s.area_km2 || '< 1'],
+      ['Dân số (ước tính, người)', s.population],
+      ['Số hộ (ước tính)', s.households],
+      ['Thuê bao di động (ước tính)', s.subscribers],
+      ['Phiếu SOS đang mở', s.sos_open],
+      ['Lực lượng đóng trong vùng (đơn vị)', s.forces],
+      ['Chỗ trống sơ tán (người)', s.evac_free],
+      ['Vùng nguy hiểm đang hiệu lực', s.hazard_zones],
+      ['Ghi chú', 'Dân số, số hộ, thuê bao ước tính theo tỉ lệ diện tích từng xã (chưa có dân cư theo xóm)'],
+      ...names.map((n, i) => [i ? '' : units?.small ? 'Vùng nhỏ, thuộc' : `Xã / phường trong vùng (${names.length})`, n]),
+    ].map(([k, v]) => ({ 'Chỉ tiêu': k, 'Giá trị': v }));
+    try {
+      await exportExcel(rows, { sheet: 'Vung khoanh', filename: `vung-khoanh-${vnFileStamp(new Date(), true)}.xlsx` });
+    } catch (e) {
+      toast({ tone: 'danger', title: 'Không xuất được tệp Excel', body: e.message });
+    }
+  };
   return (
     // Cao tối đa 60% màn hình, phần dưới tiêu đề tự cuộn — danh sách nhiều xã không đẩy nút "Soạn cảnh báo" ra khỏi màn
     <div className={clsx('card flex max-h-[min(60vh,34rem)] flex-col border border-line bg-panel/95 p-3.5 shadow-2xl backdrop-blur-md', className)}>
@@ -715,6 +742,13 @@ export function DrawnStats({ drawn, units, onClose, onRetry, onAlert, touch, cla
                 </>
               )}
             </div>
+            <button
+              type="button"
+              className={clsx('btn-ghost mt-2 w-full justify-center text-xs', touch ? 'min-h-[44px]' : 'py-1.5')}
+              onClick={exportStats}
+            >
+              <FileSpreadsheet size={13} aria-hidden="true" /> Xuất Excel (số liệu + danh sách xã)
+            </button>
             <Can I="alert" a="create">
               <button
                 type="button"

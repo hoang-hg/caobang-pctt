@@ -130,6 +130,11 @@ body {
   .tap-sq { min-height: 44px !important; min-width: 44px !important; }
 }
 .leaflet-tooltip { background: rgb(var(--panel)); color: rgb(var(--ink)); border-color: rgb(var(--line)); border-radius: 0.375rem; font-size: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+/* Điện thoại: popup bản đồ không cao quá vùng bản đồ còn trống (đầu trang, dải khẩn cấp, hàng chỉ số, thanh dưới ≈ 340 px) —
+   phần thừa cuộn trong popup, nút thao tác không bị thanh dưới che */
+@media (max-width: 767px) {
+  .leaflet-popup-content { max-height: max(12rem, calc(100vh - 340px)); max-height: max(12rem, calc(100dvh - 340px)); overflow-y: auto; overscroll-behavior: contain; }
+}
 
 .map-icon { background: none; border: none; }
 .custom-cluster-icon { background: none !important; border: none !important; }

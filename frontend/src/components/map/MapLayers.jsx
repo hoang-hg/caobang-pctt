@@ -1,13 +1,15 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Circle, CircleMarker, GeoJSON, Marker, Polyline, Popup, Tooltip, useMap } from 'react-leaflet';
 import { Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, YAxis } from 'recharts';
-import { Phone, Send, Video, PackageMinus, Users } from 'lucide-react';
+import { Phone, Send, Video, PackageMinus, PencilLine, Users } from 'lucide-react';
 import clsx from 'clsx';
+import L from './leafletGlobal';
 import { api } from '../../api/client';
 import { useStore } from '../../app/store';
 import Hydrograph from '../charts/Hydrograph';
+import { ReservoirHistory } from '../charts/ReservoirOpsChart';
 import { useChartTheme } from '../charts/chartTheme';
 import { Can, usePermission } from '../../rbac/usePermission';
 import {
@@ -18,8 +20,12 @@ import { ago, num } from '../../utils/format';
 import { fmtVn } from '../../utils/bulletin';
 import { HAZARD_LEVEL, LANDSLIDE_LEVEL, levelOf, RESERVOIR_LEVEL, risk } from '../../utils/risk';
 import { distanceKm } from '../../utils/geo';
+import { useMediaQuery } from '../../utils/useMediaQuery';
 
 const ll = (f) => [f.geometry.coordinates[1], f.geometry.coordinates[0]];
+// Bề rộng popup: như trước trên máy tính, co theo màn hình điện thoại (chừa cột nút Công cụ / Chú giải bên phải) — 360 px còn 240 px
+const POP_W = 'w-[min(18rem,calc(100vw-7.5rem))]';
+const POP_W_SM = 'w-[min(16rem,calc(100vw-7.5rem))]';
 const Tel = ({ phone, label = 'Gọi' }) =>
   phone ? (
     <a className="btn-ghost px-2 py-1 text-xs" href={`tel:${phone.replace(/\s/g, '')}`}><Phone size={12} /> {label}</a>
@@ -47,7 +53,7 @@ function StationPopup({ p }) {
   const value = p.value == null ? null : `${num(p.value, p.type === 'muc_nuoc' ? 2 : 1)} ${p.unit}`;
   const chip = p.thresholds?.bd1 != null && <span className={clsx('chip', ALARM[lv].cls)}>{ALARM[lv].label}</span>;
   return (
-    <div className="w-72">
+    <div className={POP_W}>
       <div className="font-semibold">{p.name}</div>
       <div className="mb-1 text-xs text-muted">{STATION_TYPE[p.type]} · {p.id}</div>
       {p.at ? (
@@ -82,7 +88,7 @@ function WarehousePopup({ p, onIssue }) {
   const cats = Object.entries(p.categories || {});
   const colors = [c.s1, c.s2, c.s3, '#e87ba4'];
   return (
-    <div className="w-64">
+    <div className={POP_W_SM}>
       <div className="font-semibold">{p.name}</div>
       {p.pct == null ? (
         <div className="text-xs text-muted">Chưa có số liệu tồn kho (nhập bằng loại dữ liệu “Tồn kho”)</div>
@@ -123,7 +129,7 @@ function WarehousePopup({ p, onIssue }) {
 function SosPopup({ p, onDispatch }) {
   const pr = PRIORITY[p.priority] || PRIORITY[2];
   return (
-    <div className="w-72">
+    <div className={POP_W}>
       <div className="flex items-center gap-2">
         <b>{p.code}</b>
         <span className={clsx('chip', pr?.cls)}>{pr?.short}</span>
@@ -196,7 +202,7 @@ export function blackspotStates(points, hazardFeatures) {
 function BlackspotPopup({ p, near, level }) {
   const sc = risk(level);
   return (
-    <div className="w-72">
+    <div className={POP_W}>
       <div className="flex items-start justify-between gap-2">
         <b className="leading-snug">{p.name}</b>
         <span className={clsx('chip shrink-0 text-[10px] font-bold', sc.chip)}>{sc.name}</span>
@@ -236,7 +242,7 @@ function ReportPopup({ p, onIncident }) {
   const canIncident = usePermission('incident', 'update', p.admin_code);
   const st = REPORT_STATUS[p.status];
   return (
-    <div className="w-64">
+    <div className={POP_W_SM}>
       <div className="flex flex-wrap items-center gap-1.5">
         <b>{p.category_label}</b>
         {st && <span className={clsx('chip text-[10px]', st.cls)}>{st.label}</span>}
@@ -255,6 +261,101 @@ function ReportPopup({ p, onIncident }) {
         )}
         <button className="btn-ghost px-2 py-1 text-xs" onClick={() => navigate('/phan-anh')}>Mở trang Phản ánh</button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Popup hồ chứa (thiết kế B.3 "popup: chi tiết, biểu đồ mini, nút hành động nhanh"): trạng thái, số liệu vận hành, diễn biến
+ * 48 giờ (mực nước so MNDBT, Q đến / Q xả — chỉ tải khi mở popup, dùng chung truy vấn với tab Hồ chứa của Tổng quan), nút
+ * "Cập nhật vận hành" (trực ban có quyền monitoring.update, như tab Hồ chứa) và mở tab Hồ chứa.
+ */
+function ReservoirPopup({ p, lv, onOperate }) {
+  const navigate = useNavigate();
+  const canUpdate = usePermission('monitoring', 'update', '*');
+  const noData = p.status_code === 'chua_co_so_lieu';
+  // Điện thoại: biểu đồ thu gọn sau nút (popup cao quá vùng bản đồ còn trống); máy tính, iPad: hiện sẵn
+  const roomy = useMediaQuery('(min-width: 768px)');
+  const [chart, setChart] = useState(roomy);
+  const map = useMap();
+  // Mở biểu đồ bằng nút làm popup cao lên → canh lại cho lọt khung (Leaflet chỉ tự kéo bản đồ lúc mở popup)
+  useEffect(() => {
+    if (!chart || roomy) return undefined;
+    const id = setTimeout(() => map.eachLayer((l) => { if (l instanceof L.Popup && l.isOpen()) l.update(); }), 60);
+    return () => clearTimeout(id);
+  }, [chart, roomy, map]);
+  return (
+    <div className={POP_W}>
+      <b>{p.name}</b>
+      <div className="text-xs text-muted">Sông {p.river}{p.capacity_mw ? ` · ${p.capacity_mw} MW` : ''}</div>
+      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+        {p.status_label && <span className={clsx('chip text-[11px]', risk(lv).chip)}>{p.status_label}</span>}
+        {p.operating_at && (
+          <span className={clsx('text-[11px]', p.stale ? 'font-semibold text-warn' : 'text-muted')}>
+            Số liệu lúc {fmtVn(p.operating_at)}{p.stale ? ' — đã cũ' : ''}
+          </span>
+        )}
+      </div>
+      {noData ? (
+        <p className="mt-1 text-xs text-muted">
+          Chưa có số liệu vận hành (mực nước, cửa xả, lưu lượng){canUpdate ? ' — nhập khi đơn vị quản lý hồ báo về' : ''}. MNDBT {num(p.normal_level, 1)} m.
+        </p>
+      ) : (
+        <>
+          <table className="mt-1 w-full text-xs">
+            <tbody>
+              <tr><td>Mực nước hồ</td><td className="text-right font-mono">{num(p.current_level, 2)} m</td></tr>
+              <tr><td>MNDBT</td><td className="text-right font-mono">{num(p.normal_level, 1)} m</td></tr>
+              <tr><td>Lưu lượng về</td><td className="text-right font-mono">{num(p.inflow_m3s)} m³/s</td></tr>
+              <tr><td>Lưu lượng xả</td><td className="text-right font-mono font-semibold">{num(p.outflow_m3s)} m³/s</td></tr>
+              <tr><td>Cửa xả mở</td><td className="text-right font-mono">{p.spill_gates_open}/{p.spill_gates}</td></tr>
+            </tbody>
+          </table>
+          <div className="mt-1.5 border-t border-line pt-1.5">
+            {/* Nút giữ nguyên trong DOM (chỉ đổi chữ): React gỡ phần tử vừa bấm trước khi sự kiện lan tới bản đồ → Leaflet
+                thấy cú bấm "ngoài popup" và đóng popup */}
+            {!roomy && (
+              <button
+                type="button"
+                className="btn-ghost tap w-full justify-center px-2 py-1 text-xs"
+                aria-expanded={chart}
+                onClick={() => setChart((v) => !v)}
+              >
+                {chart ? 'Thu gọn diễn biến 48 giờ' : 'Xem diễn biến 48 giờ (mực nước, lưu lượng)'}
+              </button>
+            )}
+            {chart && <ReservoirHistory reservoir={p} compact />}
+          </div>
+        </>
+      )}
+      <div className="mt-2 flex flex-wrap gap-1">
+        {canUpdate && (
+          <button type="button" className="btn-primary px-2 py-1 text-xs" onClick={() => onOperate(p)}>
+            <PencilLine size={12} aria-hidden="true" /> Cập nhật vận hành
+          </button>
+        )}
+        <button type="button" className="btn-ghost px-2 py-1 text-xs" onClick={() => navigate('/dashboard?tab=ho_chua')}>Mở tab Hồ chứa</button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Popup xuồng, xe, thiết bị (thiết kế B.3 "nút hành động nhanh — VD gọi điện cho tài xế"): chưa có số người lái (BD9) → gọi
+ * chỉ huy đơn vị quản lý phương tiện (số trên lớp Lực lượng, API /map/layers trả kèm).
+ */
+function VehiclePopup({ p }) {
+  return (
+    <div className="w-60">
+      <b>{p.code}</b> – {VEHICLE[p.vehicle_type]}
+      <div className="text-xs text-muted">{p.force_name || 'Chưa gắn đơn vị'}{p.capacity ? ` · chở ${p.capacity} người` : ''}</div>
+      <div className="text-xs">{RES_STATUS[p.status].label} · Nhiên liệu {p.fuel_level == null ? 'chưa cập nhật' : `${p.fuel_level}%`}</div>
+      <div className="mt-2 flex flex-wrap gap-1"><Tel phone={p.force_phone} label="Gọi chỉ huy đơn vị" /></div>
+      <p className="mt-1 text-[11px] text-muted">
+        {p.force_phone
+          ? `Chưa có số người lái — gọi chỉ huy ${p.force_commander || 'đơn vị'} để liên lạc với phương tiện.`
+          : 'Chưa có số điện thoại người lái hay đơn vị quản lý phương tiện.'}
+      </p>
     </div>
   );
 }
@@ -287,7 +388,14 @@ export function floodScenarioStates(data, timeline) {
 
 const ROMAN = { 1: 'I', 2: 'II', 3: 'III' };
 
-export default function MapLayers({ data, layers, timeline, blackspots, onDispatch, onCamera, onIssue, onIncident, onOccupancy }) {
+/**
+ * Các lớp của bản đồ giám sát. `popupPad`: khoảng đệm khi popup tự kéo bản đồ cho lọt khung — chừa các bảng nổi (thanh công
+ * cụ, bảng cảnh báo, thanh thời gian, nút góc phải), không để đầu popup bị che.
+ */
+export default function MapLayers({
+  data, layers, timeline, blackspots, popupPad, onDispatch, onCamera, onIssue, onIncident, onOccupancy, onReservoirOp,
+}) {
+  const pad = popupPad || {};
   const map = useMap();
   const gps = useStore((s) => s.gps);
   const theme = useStore((s) => s.theme);
@@ -344,7 +452,7 @@ export default function MapLayers({ data, layers, timeline, blackspots, onDispat
                 dashArray: p.source === 'sensor' ? '5 4' : undefined,
               }}
             >
-              <Popup>
+              <Popup {...pad}>
                 <b>{p.name}</b>
                 <div className="text-xs text-muted">{flood ? `Độ sâu ngập ~${p.depth_m} m` : `Nguy cơ ${LEVEL[p.level]?.label || p.level || 'Cảnh báo'}`} · nguồn: {p.source === 'sensor' ? 'cảm biến IoT (tự động)' : p.source === 'model' ? 'mô hình nội suy DEM' : 'thủ công'}</div>
                 <div className="text-xs">Hiệu lực đến {new Date(p.valid_until).toLocaleString('vi-VN')}</div>
@@ -358,7 +466,7 @@ export default function MapLayers({ data, layers, timeline, blackspots, onDispat
           .filter((s) => s.active)
           .map(({ f, p, level }) => (
             <GeoJSON key={`fs-${p.id}-${theme}`} data={f} style={{ color: '#1e40af', weight: 1, fillColor: '#2563eb', fillOpacity: 0.28 }}>
-              <Popup>
+              <Popup {...pad}>
                 <b>{p.name}</b>
                 <div className="text-xs">
                   Kịch bản ngập khi {p.station_name} {p.alarm_level ? `đạt BĐ ${ROMAN[p.alarm_level]}` : 'đạt'} ({p.trigger} m) — mực nước
@@ -374,21 +482,21 @@ export default function MapLayers({ data, layers, timeline, blackspots, onDispat
           .filter((f) => !(layers.blackspots && blackspots?.merged.has(f.properties.id))) // đã gộp vào tam giác điểm đen
           .map((f) => (
             <Marker key={f.properties.id} position={ll(f)} icon={hazardIcon(f.properties.type, f.properties.level)}>
-              <Popup><HazardPopup p={f.properties} /></Popup>
+              <Popup {...pad}><HazardPopup p={f.properties} /></Popup>
             </Marker>
           ))}
 
       {layers.blackspots &&
         (blackspots?.list || []).map(({ p, near, level }) => (
           <Marker key={`bs-${p.code}`} position={[p.lat, p.lon]} icon={blackspotIcon(level)} title={`${p.name} — ${p.traffic_label}`} zIndexOffset={300}>
-            <Popup minWidth={280}><BlackspotPopup p={p} near={near} level={level} /></Popup>
+            <Popup {...pad}><BlackspotPopup p={p} near={near} level={level} /></Popup>
           </Marker>
         ))}
 
       {layers.reports &&
         (data.reports?.features || []).map((f) => (
           <Marker key={f.properties.id} position={ll(f)} icon={reportIcon(f.properties.status)}>
-            <Popup minWidth={260}><ReportPopup p={f.properties} onIncident={onIncident} /></Popup>
+            <Popup {...pad}><ReportPopup p={f.properties} onIncident={onIncident} /></Popup>
           </Marker>
         ))}
 
@@ -404,7 +512,7 @@ export default function MapLayers({ data, layers, timeline, blackspots, onDispat
           const label = value == null || stale ? undefined : p.type === 'muc_nuoc' ? value.toFixed(1) : p.type === 'luong_mua' ? Math.round(value) : value.toFixed(1);
           return (
             <Marker key={p.id} position={ll(f)} icon={stationIcon(p.type, stale && !lv ? null : lv, label, stale)}>
-              <Popup minWidth={290}><StationPopup p={{ ...p, value, stale, at: timeline?.time }} /></Popup>
+              <Popup {...pad}><StationPopup p={{ ...p, value, stale, at: timeline?.time }} /></Popup>
             </Marker>
           );
         })}
@@ -415,36 +523,8 @@ export default function MapLayers({ data, layers, timeline, blackspots, onDispat
           // Trạng thái theo cách tính của Dashboard (map_layers.py → services/reservoirs.py); chưa có số liệu → Xám
           const lv = levelOf(RESERVOIR_LEVEL, p.status_code);
           return (
-            <Marker key={p.id} position={ll(f)} icon={reservoirIcon(p.spill_gates_open, lv)}>
-              <Popup>
-                <div className="w-60">
-                  <b>{p.name}</b>
-                  <div className="text-xs text-muted">Sông {p.river}{p.capacity_mw ? ` · ${p.capacity_mw} MW` : ''}</div>
-                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                    {p.status_label && <span className={clsx('chip text-[11px]', risk(lv).chip)}>{p.status_label}</span>}
-                    {p.operating_at && (
-                      <span className={clsx('text-[11px]', p.stale ? 'font-semibold text-warn' : 'text-muted')}>
-                        Số liệu lúc {fmtVn(p.operating_at)}{p.stale ? ' — đã cũ' : ''}
-                      </span>
-                    )}
-                  </div>
-                  {p.status_code === 'chua_co_so_lieu' ? (
-                    <p className="mt-1 text-xs text-muted">
-                      Chưa có số liệu vận hành (mực nước, cửa xả, lưu lượng) — trực ban nhập ở Tổng quan → Hồ chứa. MNDBT {num(p.normal_level, 1)} m.
-                    </p>
-                  ) : (
-                    <table className="mt-1 w-full text-xs">
-                      <tbody>
-                        <tr><td>Mực nước hồ</td><td className="text-right font-mono">{num(p.current_level, 2)} m</td></tr>
-                        <tr><td>MNDBT</td><td className="text-right font-mono">{num(p.normal_level, 1)} m</td></tr>
-                        <tr><td>Lưu lượng về</td><td className="text-right font-mono">{num(p.inflow_m3s)} m³/s</td></tr>
-                        <tr><td>Lưu lượng xả</td><td className="text-right font-mono font-semibold">{num(p.outflow_m3s)} m³/s</td></tr>
-                        <tr><td>Cửa xả mở</td><td className="text-right font-mono">{p.spill_gates_open}/{p.spill_gates}</td></tr>
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              </Popup>
+            <Marker key={p.id} position={ll(f)} icon={reservoirIcon(p.spill_gates_open, lv, p.outflow_m3s)}>
+              <Popup {...pad}><ReservoirPopup p={p} lv={lv} onOperate={onReservoirOp} /></Popup>
             </Marker>
           );
         })}
@@ -453,7 +533,7 @@ export default function MapLayers({ data, layers, timeline, blackspots, onDispat
       {layers.warehouses &&
         data.warehouses.features.map((f) => (
           <Marker key={f.properties.id} position={ll(f)} icon={warehouseIcon(f.properties.pct)}>
-            <Popup minWidth={260}><WarehousePopup p={f.properties} onIssue={onIssue} /></Popup>
+            <Popup {...pad}><WarehousePopup p={f.properties} onIssue={onIssue} /></Popup>
           </Marker>
         ))}
 
@@ -462,7 +542,7 @@ export default function MapLayers({ data, layers, timeline, blackspots, onDispat
           const p = f.properties;
           return (
             <Marker key={p.id} position={ll(f)} icon={evacIcon(p.current_occupancy / p.capacity)}>
-              <Popup><EvacPopup p={p} onOccupancy={onOccupancy} /></Popup>
+              <Popup {...pad}><EvacPopup p={p} onOccupancy={onOccupancy} /></Popup>
             </Marker>
           );
         })}
@@ -472,11 +552,7 @@ export default function MapLayers({ data, layers, timeline, blackspots, onDispat
           const p = f.properties;
           return (
             <Marker key={p.id} position={pos(f)} icon={vehicleIcon(p)}>
-              <Popup>
-                <b>{p.code}</b> – {VEHICLE[p.vehicle_type]}
-                <div className="text-xs text-muted">{p.force_name}</div>
-                <div className="text-xs">{RES_STATUS[p.status].label} · Nhiên liệu {p.fuel_level == null ? 'chưa cập nhật' : `${p.fuel_level}%`}</div>
-              </Popup>
+              <Popup {...pad}><VehiclePopup p={p} /></Popup>
             </Marker>
           );
         })}
@@ -494,8 +570,8 @@ export default function MapLayers({ data, layers, timeline, blackspots, onDispat
               zIndexOffset={500}
             >
               <Tooltip direction="top" offset={[0, -14]}>{p.name}</Tooltip>
-              <Popup>
-                <div className="w-64">
+              <Popup {...pad}>
+                <div className={POP_W_SM}>
                   <b>{p.name}</b>
                   <div className="text-xs text-muted">{FORCE_TYPE[p.org_type]} · {p.commander}</div>
                   <div className="text-xs">Sẵn sàng {p.personnel_ready} · Nhiệm vụ {p.personnel_on_mission} · 📻 {p.radio_freq}</div>
@@ -522,7 +598,7 @@ export default function MapLayers({ data, layers, timeline, blackspots, onDispat
       {layers.cameras &&
         data.cameras.features.map((f) => (
           <Marker key={f.properties.id} position={ll(f)} icon={cameraIcon()}>
-            <Popup>
+            <Popup {...pad}>
               <b>{f.properties.name}</b>
               <div className="mt-1"><button className="btn-primary px-2 py-1 text-xs" onClick={() => onCamera(f.properties)}><Video size={12} /> Xem trực tiếp</button></div>
             </Popup>
@@ -535,7 +611,7 @@ export default function MapLayers({ data, layers, timeline, blackspots, onDispat
           const p = f.properties;
           return (
             <Marker key={p.id} position={ll(f)} icon={sosIcon(p.priority, p.status)} zIndexOffset={1000}>
-              <Popup minWidth={280}><SosPopup p={p} onDispatch={(t) => onDispatch(t)} /></Popup>
+              <Popup {...pad}><SosPopup p={p} onDispatch={(t) => onDispatch(t)} /></Popup>
             </Marker>
           );
         })}
