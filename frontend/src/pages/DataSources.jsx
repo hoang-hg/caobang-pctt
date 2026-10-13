@@ -150,7 +150,7 @@ function SourcesTab() {
         const [stLabel, stCls] = SRC_STATUS[s.status] || SRC_STATUS.chua_chay;
         const pull = ['open_meteo', 'openweather'].includes(s.type);
         return (
-          <div key={s.id} className={clsx('card p-4', s.status === 'loi' && 'border-danger/60')}>
+          <div key={s.id} className={clsx('card min-w-0 p-4', s.status === 'loi' && 'border-danger/60')}>
             <div className="flex items-start gap-3">
               <T.icon size={22} className="mt-0.5 shrink-0 text-accent" />
               <div className="min-w-0 flex-1">
@@ -166,7 +166,8 @@ function SourcesTab() {
                     {s.stats?.rows != null && <> · {int(s.stats.rows)} dòng{s.stats.units ? ` / ${s.stats.units} xã` : ''}{s.stats.duration_s ? ` · ${s.stats.duration_s}s` : ''}</>}
                   </div>
                 )}
-                {s.last_error && <div className="mt-1 rounded bg-danger/10 px-2 py-1 font-mono text-[11px] text-danger">{s.last_error}</div>}
+                {/* Lỗi thường kèm URL dài không dấu cách (VD Open-Meteo 503) — ngắt dòng ở bất kỳ ký tự nào, không kéo rộng thẻ */}
+                {s.last_error && <div className="mt-1 rounded bg-danger/10 px-2 py-1 font-mono text-[11px] text-danger [overflow-wrap:anywhere]">{s.last_error}</div>}
                 {!pull && s.has_secret && <div className="mt-1 text-xs text-muted">Token nguồn: <span className="font-mono">{s.secret_hint}</span></div>}
                 <PushInfo source={s} />
               </div>
