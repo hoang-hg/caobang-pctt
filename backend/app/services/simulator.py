@@ -26,7 +26,7 @@ from app.infra.redis import get_redis
 from app.services import scenario
 from app.services.alert_watch import in_background, mail_new_draft
 from app.services.broadcast import advance_delivery, estimate_audience, fill_template
-from app.services.events import log_event
+from app.services.events import log_event, station_place
 from app.services.sos import create_ticket
 from app.ws.hub import hub
 
@@ -185,10 +185,13 @@ class Simulator:
                 if prev is None:
                     await self._wl_set(sid, level)
                 elif level > prev:
+                    # Gắn xã + toạ độ trạm: lọc theo vùng, bấm tới trạm trên bản đồ (dòng diễn biến)
+                    place = await station_place(sid)
                     await log_event(
                         f"{name}: mực nước {value:.2f} m, vượt Báo động {LEVEL_NAMES[level]}",
                         "canh_bao",
                         "danger" if level >= 2 else "warning",
+                        **place,
                     )
                     await self._wl_set(sid, level)
                 elif level < prev and value < thr.get(f"bd{prev}", float("inf")) - 0.15:
@@ -424,7 +427,9 @@ class Simulator:
     # 3 ---------------------------------------------------------------
     async def reservoirs(self, readings: list[dict]) -> None:
         rain = {r["station_id"]: r["value"] for r in readings if r["type"] == "luong_mua"}
-        res = await fetch_all("SELECT * FROM iot_telemetry.reservoirs")
+        res = await fetch_all(
+            "SELECT *, ST_Y(location) AS lat, ST_X(location) AS lon FROM iot_telemetry.reservoirs"
+        )
         for r in res:
             if r["normal_level"] is None:
                 continue  # hồ nhập từ tệp chưa có mực nước dâng bình thường → không có gì để mô phỏng
@@ -452,6 +457,8 @@ class Simulator:
                     "van_hanh",
                     "warning" if gates > r["spill_gates_open"] else "info",
                     r["admin_unit_id"],
+                    r["lat"],
+                    r["lon"],
                 )
 
     # 4 ---------------------------------------------------------------

@@ -6,7 +6,7 @@ tải / trống / lỗi / mất mạng, 360 px, theo phân quyền).
 
 - Cập nhật: 11/10/2026 — mã nguồn `main` gồm PR #53 → #62 (bố cục, màu hồ, lọc SOS, form, tài liệu này; mưa dự báo theo
   thanh thời gian — G1 ở PR #57; radar theo thanh thời gian — G2 ở PR #58; bố cục cho người quản lý — G3 ở PR #59 → #62);
-  khoanh vùng, tìm đường báo lỗi — G7 ở PR #65; điểm đen sạt lở trên bản đồ — G5 ở PR #66.
+  khoanh vùng, tìm đường báo lỗi — G7 ở PR #65; điểm đen sạt lở trên bản đồ — G5 ở PR #66; tab Diễn biến — G4 ở PR #67.
 - Rà lại lần 2 (10/10/2026): đối chiếu **từng ý** của mục B với mã nguồn — thêm 4 việc giao diện (G4 → G7, mục 3) và 3
   việc chờ dữ liệu / tích hợp (BD9 → BD11, mục 4); sửa lại các dòng tương ứng ở mục 1.
 - Máy chủ thử vẫn chạy **v1.0.3**, **chưa có** các thay đổi trên — xem V1 trong `docs/trang-a-viec-con-lai.md` (triển khai
@@ -18,12 +18,11 @@ theo thanh thời gian (G1, G2 — PR #57, #58); bố cục cho người quản 
 Rà lần 2 theo từng ý của mục B thấy 4 việc giao diện làm được ngay, không cần dữ liệu mới (mục 3). **Đã làm G7** (PR #65):
 khoanh vùng, tìm đường báo lỗi khi mất mạng / máy chủ lỗi, có "Thử lại"; kết quả khoanh vùng ghi các xã trong vùng; sửa
 kèm lỗi sẵn có của thư viện vẽ (chú thích tiếng Anh, diện tích không hiện). **Đã làm G5** (PR #66): 12 điểm đen sạt lở, đèo
-dốc lên bản đồ — tam giác theo màu, gộp điểm nguy hiểm đã nhập trùng chỗ. **Còn 2 việc**, thứ tự đề xuất:
+dốc lên bản đồ — tam giác theo màu, gộp điểm nguy hiểm đã nhập trùng chỗ. **Đã làm G4** (PR #67): tab **Diễn biến** —
+dòng thời gian mới nhất trên cùng (SOS mới, trạm vượt báo động, lệnh điều động…), tức thì qua WebSocket, chạm để bay tới;
+nhật ký sự kiện kèm toạ độ. **Còn 1 việc:**
 
-1. **G4 — dòng diễn biến theo thời gian** trong bảng Cảnh báo khẩn cấp (SOS mới, trạm vượt báo động, lệnh điều động… mới
-   nhất trên cùng) — B.1 "feed cuộn liên tục"; nay các tab chỉ có trạng thái hiện tại. Sửa nhỏ phía máy chủ (trả và ghi
-   kèm toạ độ cho nhật ký sự kiện).
-2. **G6 — popup hồ chứa, xuồng – xe đủ như B.3**: hồ có biểu đồ mini, nút thao tác, nhãn lưu lượng xả (m³/s) ngay trên
+1. **G6 — popup hồ chứa, xuồng – xe đủ như B.3**: hồ có biểu đồ mini, nút thao tác, nhãn lưu lượng xả (m³/s) ngay trên
    biểu tượng; xuồng – xe có nút gọi. Sửa nhỏ API (thêm số điện thoại đơn vị vào lớp xe).
 
 Còn lại:
@@ -41,7 +40,7 @@ Còn lại:
 | B.1 Bản đồ toàn màn, bảng nổi | Đạt — máy tính: bảng nổi thu gọn được; điện thoại: bản đồ toàn màn (360 px thấy ~93%, trước ~3%), bảng trượt từ đáy |
 | B.1 Bảng lớp dữ liệu (trái) | Đạt — 4 nhóm lớp, số đối tượng từng lớp, lớp trống ghi "chưa có … (nhập loại …)" |
 | B.1 Thanh thời gian & radar (đáy): bão, mưa, ngập 12 giờ qua / 24 giờ tới | Đạt — thanh −12h…+24h đổi trạm (số đo quá khứ / bản tin dự báo), vùng ngập kịch bản, vị trí tâm bão, **mưa dự báo theo xã** (hiện tại: tổng 24 giờ tới; kéo tới +N giờ: mưa trong giờ đó; giờ đã qua: xem trạm mưa — G1), **radar** ảnh ~2 giờ qua (−2h → hiện tại, ghi giờ ảnh — G2) |
-| B.1 Bảng cảnh báo khẩn cấp (phải): **dòng thời gian cuộn liên tục** (feed) SOS + cảnh báo cảm biến | Đạt một phần — cập nhật tức thì (WebSocket); tab Điểm nóng, Phiếu SOS (lọc Đỏ / Cam / Vàng, tìm kiếm), Cảm biến (trạm vượt báo động, mất tín hiệu). Mỗi tab là **trạng thái hiện tại** xếp theo mức — **chưa có dòng diễn biến theo thời gian** (SOS mới, trạm vừa vượt báo động, lệnh điều động… mới nhất trên cùng) (G4) |
+| B.1 Bảng cảnh báo khẩn cấp (phải): **dòng thời gian cuộn liên tục** (feed) SOS + cảnh báo cảm biến | Đạt — tab **Diễn biến**: nhật ký sự kiện mới nhất trên cùng (SOS mới, trạm vượt báo động, cảm biến sạt lở, thiết bị mất tín hiệu, lệnh điều động, vận hành hồ…), đến tức thì qua WebSocket, lọc Cứu hộ / Cảnh báo / Vận hành, chạm để bay tới (G4, PR #67); tab Điểm nóng, Phiếu SOS (lọc Đỏ / Cam / Vàng, tìm kiếm), Cảm biến (trạm vượt báo động, mất tín hiệu) — trạng thái hiện tại xếp theo mức |
 | B.1 Công cụ (phải trên): nền bản đồ, đo khoảng cách, khoanh vùng | Đạt — nền Địa lý / Vệ tinh / Địa hình / Ban đêm, đo, khoanh đa giác / tròn, đánh dấu sự cố |
 | B.2 Trạm mưa, mực nước; bấm xem biểu đồ so với BĐ I–III | Đạt — màu theo báo động, mất tín hiệu xám nét đứt. Cần trạm + ngưỡng thật (BD1) |
 | B.2 Hồ chứa: vị trí, hiển thị lưu lượng đang xả (m³/s) | Đạt — màu theo trạng thái (Đỏ xả lũ lớn, Cam xả điều tiết, Xám chưa có số liệu), popup có lưu lượng; số liệu vận hành nhập tay (trang A D4). Nhãn trên biểu tượng mới ghi số cửa đang mở — thêm lưu lượng xả để thấy không cần bấm (G6) |
@@ -70,7 +69,7 @@ Còn lại:
 | G1 | **Mưa dự báo theo thanh thời gian** (lượng mưa giờ tại thời điểm đang kéo) | Không cần dữ liệu (thêm tham số API) | — | **Đã làm** (PR #57) |
 | G2 | **Radar các khung đã qua** theo thanh thời gian (−2 giờ → hiện tại) | Không cần dữ liệu | — | **Đã làm** (PR #58) |
 | G3 | **Bố cục cho người quản lý** (laptop, iPad, điện thoại): chỉ số Tình hình, Điểm nóng, chế độ xem, vùng chạm 44 px | Không cần dữ liệu (không đổi API) | — | **Đã làm** (PR #59 → #62) |
-| G4 | **Dòng diễn biến theo thời gian** trong bảng Cảnh báo khẩn cấp (B.1 feed): SOS mới, trạm vượt báo động, lệnh điều động… mới nhất trên cùng | Không cần dữ liệu; dùng nhật ký sự kiện đã có, API `/dashboard/logs` thêm toạ độ (sửa nhỏ) | — | Cao |
+| G4 | **Dòng diễn biến theo thời gian** trong bảng Cảnh báo khẩn cấp (B.1 feed): SOS mới, trạm vượt báo động, lệnh điều động… mới nhất trên cùng | Không cần dữ liệu; dùng nhật ký sự kiện đã có, API `/dashboard/logs` thêm toạ độ (sửa nhỏ) | — | **Đã làm** (PR #67) |
 | G5 | **12 điểm đen sạt lở, đèo dốc trên bản đồ** (B.2): tam giác theo màu mức, popup trạng thái đường | Không cần dữ liệu, không đổi API (số liệu đã tải ở `/dashboard/kpis`) | — | **Đã làm** (PR #66) |
 | G6 | **Popup hồ chứa, xuồng – xe** (B.3): hồ có biểu đồ mini + nút thao tác, nhãn lưu lượng xả; xuồng – xe gọi chỉ huy đơn vị | Không cần dữ liệu; API biểu đồ có sẵn, lớp xe thêm số điện thoại đơn vị (sửa nhỏ) | — | Trung bình |
 | G7 | **Khoanh vùng, tìm đường báo lỗi** khi mất mạng / máy chủ lỗi; kết quả khoanh vùng ghi các xã trong vùng | Không cần dữ liệu, không đổi API | — | **Đã làm** (PR #65) |
@@ -168,29 +167,33 @@ lượng phải sang Tổng quan; iPad ngang dùng bố cục cho chuột — 50
 - **Trang Tổng quan:** cũng đã sửa vùng chạm ≥ 44 px trên màn cảm ứng ở cả 5 tab — PR #63, ghi ở
   `docs/trang-a-viec-con-lai.md` (trước 78–86 chỗ nhỏ hơn 44 px, nay 0).
 
-### G4 — Dòng diễn biến theo thời gian trong bảng Cảnh báo khẩn cấp (chưa làm)
+### G4 — Dòng diễn biến theo thời gian trong bảng Cảnh báo khẩn cấp (đã làm — PR #67)
 
 Thiết kế B.1: bảng bên phải là "dòng thời gian cuộn liên tục (feed) các tín hiệu SOS từ người dân hoặc cảnh báo từ cảm biến
-tự động". Nay cả ba tab (Điểm nóng, Phiếu SOS, Cảm biến) là **trạng thái lúc này** xếp theo mức: SOS xếp theo cấp rồi phiếu
-cũ trước; Cảm biến chỉ có trạm đang vượt báo động / mất tín hiệu, không biết trạm vượt lúc nào; không thấy việc vừa xảy ra
-(lệnh điều động, đội đã đến, hồ mở thêm cửa xả…).
+tự động". Trước đây cả ba tab (Điểm nóng, Phiếu SOS, Cảm biến) là trạng thái lúc này xếp theo mức — không biết trạm vượt báo
+động lúc nào, không thấy việc vừa xảy ra (lệnh điều động, đội đã đến, hồ mở thêm cửa xả…). Nay:
 
-- **Nguồn có sẵn:** nhật ký sự kiện (`operations.event_logs`) — đang hiện ở Tổng quan ("Nhật ký sự kiện",
-  `components/common/EventLog.jsx`), API `GET /dashboard/logs` (lọc theo vùng), đẩy tức thì qua WebSocket `log.new`
-  (`useSocket.js` đã chèn mục mới lên đầu). Đã ghi: SOS mới (nguồn, số người, nghi trùng), đổi trạng thái SOS, lệnh điều
-  động / huỷ lệnh / đội đã đến, trạm mực nước vượt báo động, cảm biến sạt lở vượt BĐ II tự khoanh vùng, thiết bị mất / có lại
-  tín hiệu, cập nhật vận hành hồ, xuất kho, tiến độ sơ tán, cảnh báo hết hiệu lực.
-- **Đề xuất giao diện:** thêm tab **Diễn biến** cạnh Điểm nóng · Phiếu SOS · Cảm biến. Mỗi dòng: giờ (VD 08:12), biểu tượng
-  loại, nội dung, viền màu theo mức (Đỏ / Cam / thông tin). Mục mới chèn lên đầu, nháy nhẹ vài giây; người dùng đang cuộn xem
-  dòng cũ thì **không nhảy** — hiện nút "N mục mới". Lọc nhanh Tất cả / Cứu hộ / Cảnh báo / Vận hành; chạm dòng có toạ độ →
-  bản đồ bay tới. Tài khoản không xem được SOS thì ẩn mục cứu hộ (như tab Phiếu SOS).
-- **Sửa nhỏ phía máy chủ** (không đổi luồng dữ liệu):
-  1. `/dashboard/logs` trả thêm `lat`, `lon` — cột `location` đã có, chỉ chưa trả ra;
-  2. ba loại dòng đang ghi **không kèm toạ độ**: trạm mực nước "vượt Báo động" (`simulator.check_triggers` — dùng cho cả số
-     đo thật qua `integrations/ingest.py`), "MẤT TÍN HIỆU thiết bị", "Cập nhật vận hành hồ" → không gắn xã: lọc theo vùng
-     không loại được (tài khoản cấp xã thấy cả trạm, hồ xã khác) và không bay tới được. Truyền toạ độ trạm / hồ vào
-     `log_event` (hàm này tự gán xã gần nhất).
+- **Tab "Diễn biến"** (giữa Điểm nóng và Phiếu SOS): nhật ký sự kiện **mới nhất trên cùng** — cùng nguồn "Nhật ký sự kiện" ở
+  Tổng quan (`GET /dashboard/logs`, 50 mục gần nhất theo vùng đang lọc), mục mới **đến tức thì** qua WebSocket `log.new` (tải
+  lại 1 phút / lần phòng khi mất kết nối). Có: SOS mới (nguồn, số người, nghi trùng), đổi trạng thái SOS, lệnh điều động / huỷ /
+  đội đã đến, trạm mực nước vượt báo động, cảm biến sạt lở vượt BĐ II tự khoanh vùng, thiết bị mất / có lại tín hiệu, vận hành
+  hồ, bản tin dự báo, xuất kho, tiến độ sơ tán, cảnh báo hết hiệu lực.
+- Mỗi dòng: giờ (ngày khác thì kèm ngày), biểu tượng loại, nội dung, **viền màu theo mức** (Đỏ khẩn cấp / Vàng cảnh báo /
+  thông tin). Mục đến sau lúc mở tab có nhãn **"mới"**. Dòng có toạ độ (biểu tượng ghim) → **chạm để bản đồ bay tới**, hiện
+  nhãn sự kiện tại chỗ.
+- **Đang cuộn xem mục cũ thì danh sách không nhảy** — hiện nút **"N mục mới ↑"**, bấm để về đầu. Lọc nhanh: Tất cả · Cứu hộ
+  (SOS, người dân) · Cảnh báo (cảm biến, thiết bị, cảnh báo) · Vận hành; 20 mục + "Xem thêm". Đang tải / không tải được / chưa
+  có sự kiện đều ghi rõ.
+- **Theo quyền:** tài khoản không xem được SOS không thấy mục cứu hộ / người dân và chip "Cứu hộ" (như tab Phiếu SOS).
+- **Sửa nhỏ phía máy chủ** (thêm trường, không đổi luồng dữ liệu): `/dashboard/logs` và sự kiện `log.new` trả thêm `lat`,
+  `lon`; các dòng trước đây ghi **không kèm toạ độ** nay kèm toạ độ (và tự gắn xã — lọc theo vùng, phạm vi tài khoản đúng
+  hơn): trạm mực nước vượt báo động (dùng cho cả số đo thật), thiết bị mất / có lại tín hiệu, cập nhật vận hành hồ, bản tin dự
+  báo mực nước, vùng giữ lại khi cảm biến mất tín hiệu (`services/events.py` `station_place`). Dòng ghi trước khi cập nhật
+  vẫn không có toạ độ (không bấm tới được).
 - **Không thay** tab Điểm nóng: Điểm nóng trả lời "đang nguy ở đâu", Diễn biến trả lời "vừa xảy ra gì".
+- **Kiểm thử:** `tests/ui/ui-test.mjs` khối "Lớp & popup bản đồ" — xếp mới nhất trên cùng, lọc theo loại, chèn một tin
+  `log.new` giả lập vào WebSocket thật khi đang cuộn → nút "N mục mới", danh sách không nhảy, chạm → bay tới;
+  `tests/e2e/prod-flow.mjs` — nhật ký vận hành hồ kèm toạ độ (chạy thật, CSDL trống).
 
 ### G5 — 12 điểm đen sạt lở, đèo dốc trên bản đồ (đã làm — PR #66)
 
@@ -385,7 +388,7 @@ link nhiệm vụ. Chỉ xem lại nếu có thiết bị định vị gắn tr�
 | Phần | Tệp |
 |---|---|
 | Trang bản đồ, bố cục máy tính / điện thoại | `frontend/src/pages/MonitoringMap.jsx` |
-| Bảng lớp, cảnh báo (tab Điểm nóng), thanh thời gian, chế độ xem (`ViewModeSwitch`), công cụ, bảng trượt | `frontend/src/components/map/MapPanels.jsx` |
+| Bảng lớp, cảnh báo (tab Điểm nóng, Diễn biến — `EventFeed`), thanh thời gian, chế độ xem (`ViewModeSwitch`), công cụ, bảng trượt | `frontend/src/components/map/MapPanels.jsx` |
 | Chỉ số "Tình hình" (lưới / hàng / vuốt ngang) — công thức dùng chung dải KPI Tổng quan | `frontend/src/components/map/MapKpis.jsx`, `components/dashboard/kpiFacts.js` |
 | Gom điểm nóng (chỉ sắp xếp lại số liệu đã tải) | `frontend/src/components/map/hotspots.js` |
 | Vùng chạm 44 px trên màn cảm ứng (`.touch-hit`, phóng to / thu nhỏ Leaflet) | `frontend/src/index.css` |
@@ -400,7 +403,9 @@ link nhiệm vụ. Chỉ xem lại nếu có thiết bị định vị gắn tr�
 | Dự báo mưa theo xã (số liệu từng giờ; khung giờ `hours`, `offset_h`) | `backend/app/api/v1/forecast.py` (`/forecast/areas`) |
 | Trạng thái hồ (dùng chung Dashboard) | `backend/app/services/reservoirs.py` (`classify_reservoir_status`) |
 | Kiểm thử | `tests/ui/ui-test.mjs` (bước "Bản đồ giám sát", "Điều động", khối "Người quản lý" — laptop, iPad ngang / dọc, điện thoại; khối "Công cụ bản đồ" — tìm đường, khoanh vùng khi lỗi), `tests/e2e/prod-flow.mjs` (trạng thái hồ trên bản đồ), `tests/e2e/iot-test.mjs` (khung giờ mưa dự báo) |
-| Dùng lại cho G4 → G6: nhật ký sự kiện, điểm đen sạt lở, vận hành hồ | `components/common/EventLog.jsx`, `backend/app/services/events.py` (`log_event`), `backend/app/services/landslides.py` (`KNOWN_BLACKSPOTS`), `components/charts/ReservoirOpsChart.jsx`, `pages/public/ReservoirMonitor.jsx` (`OperationModal`) |
+| Nhật ký sự kiện (nguồn tab Diễn biến; `log_event` trả toạ độ, `station_place` gắn xã + toạ độ trạm) | `backend/app/services/events.py`, `backend/app/api/v1/dashboard.py` (`/dashboard/logs`), `frontend/src/api/useSocket.js` (`log.new`) |
+| Danh mục điểm đen sạt lở (lớp điểm đen) | `backend/app/services/landslides.py` (`KNOWN_BLACKSPOTS`, `get_landslides_overview`) |
+| Dùng lại cho G6: vận hành hồ | `components/charts/ReservoirOpsChart.jsx`, `pages/public/ReservoirMonitor.jsx` (`OperationModal`) |
 
 ## 7. Các thay đổi đã làm cho trang B (để tra cứu)
 
@@ -419,3 +424,4 @@ link nhiệm vụ. Chỉ xem lại nếu có thiết bị định vị gắn tr�
 | #64 | Tài liệu này: rà lần 2 theo từng ý của mục B — thêm G4 → G7 (dòng diễn biến, điểm đen sạt lở, popup hồ / xe, báo lỗi khoanh vùng – tìm đường), BD9 → BD11 (số gọi tài xế, tự gửi lệnh điều động, SOS từ Zalo OA / ứng dụng) |
 | #65 | Khoanh vùng, tìm đường báo lỗi khi mất mạng / máy chủ lỗi, có "Thử lại", bỏ kết quả về muộn của lượt cũ; kết quả khoanh vùng ghi xã trong vùng, lực lượng, vùng nguy hiểm, "ước tính"; điện thoại: chọn khoanh mới đóng kết quả cũ, bảng kết quả tự cuộn; leaflet-draw: chú thích tiếng Việt, hết lỗi JavaScript khi tính diện tích (G7) |
 | #66 | Điểm đen sạt lở, đèo dốc lên bản đồ (G5): lớp mới — tam giác theo màu, popup trạng thái giám sát + số đo cảm biến + hướng xử lý, gộp điểm nguy hiểm đã nhập trùng chỗ; chạm điểm nóng tự bật lớp chứa điểm đó; đổi tên lớp "Điểm nguy hiểm, sự cố giao thông – hạ tầng"; ui-test khối "Lớp & popup bản đồ" |
+| #67 | Tab "Diễn biến" trong bảng Cảnh báo khẩn cấp (G4): nhật ký sự kiện mới nhất trên cùng, tức thì qua WebSocket, nút "N mục mới" khi đang cuộn, lọc theo loại, chạm để bay tới; `/dashboard/logs` và `log.new` trả toạ độ; nhật ký trạm vượt báo động, thiết bị mất / có tín hiệu, vận hành hồ, bản tin dự báo, vùng giữ lại kèm toạ độ + xã |

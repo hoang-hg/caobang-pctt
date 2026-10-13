@@ -1,6 +1,7 @@
 """Ghi nhật ký sự kiện + đẩy realtime (dùng chung cho API và simulator).
 
-Nhật ký có toạ độ mà chưa gắn xã → tự gán xã gần nhất, để lọc theo phạm vi RBAC.
+Nhật ký có toạ độ mà chưa gắn xã → tự gán xã gần nhất, để lọc theo phạm vi RBAC. Toạ độ trả kèm (`lat`, `lon`) để dòng
+diễn biến trên bản đồ giám sát bấm được tới chỗ xảy ra.
 """
 
 from app.db import fetch_one
@@ -27,7 +28,8 @@ async def log_event(
                                                ORDER BY u.geom <-> pt.g LIMIT 1)),
                   pt.g
              FROM pt
-           RETURNING id, time, category, severity, message, admin_unit_id""",
+           RETURNING id, time, category, severity, message, admin_unit_id,
+                     ST_Y(location) AS lat, ST_X(location) AS lon""",
         {
             "c": category,
             "s": severity,
@@ -41,3 +43,17 @@ async def log_event(
     unit_id = row.pop("admin_unit_id")
     await hub.publish("log.new", row, "monitoring", domains.code_of_unit_id(unit_id))
     return row
+
+
+async def station_place(station_id: str | None, conn=None) -> dict:
+    """Xã + toạ độ của trạm → `log_event(..., **place)`: dòng nhật ký về trạm / thiết bị gắn đúng xã (lọc theo vùng, phạm vi
+    tài khoản) và bấm được tới trạm trên bản đồ. Trạm không còn → {} (ghi như cũ, không gắn xã)."""
+    if not station_id:
+        return {}
+    row = await fetch_one(
+        """SELECT admin_unit_id, ST_Y(location) AS lat, ST_X(location) AS lon
+             FROM iot_telemetry.monitoring_stations WHERE id = :s""",
+        {"s": station_id},
+        conn,
+    )
+    return row or {}

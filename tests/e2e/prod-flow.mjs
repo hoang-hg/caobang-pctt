@@ -262,6 +262,9 @@ const opLogs = await call('GET', '/dashboard/logs?limit=20', null, admin);
 const opLog = (Array.isArray(opLogs.data) ? opLogs.data : []).find((l) => l.message?.startsWith('Cập nhật vận hành'));
 check('Nhật ký vận hành ghi lưu lượng xả trực ban nhập', opLogs.status === 200 && !!opLog?.message.includes('lưu lượng xả 150 m³/s'),
   opLog?.message || `HTTP ${opLogs.status}`);
+// Tab "Diễn biến" của bản đồ giám sát (trang B — G4): dòng nhật ký kèm toạ độ để bấm tới chỗ xảy ra
+check('Nhật ký vận hành hồ kèm toạ độ hồ (dòng Diễn biến bấm tới được)', typeof opLog?.lat === 'number' && typeof opLog?.lon === 'number',
+  `lat=${opLog?.lat} lon=${opLog?.lon}`);
 res = await until('/public/reservoirs', (d) => d?.reservoirs?.find((r) => r.id === HO)?.status_code === 'xa_dieu_tiet');
 ho = res?.reservoirs?.find((r) => r.id === HO);
 check('Cổng công khai hiện ngay số liệu mới', ho?.status_code === 'xa_dieu_tiet' && res.spill_count === 1 && res.no_data_count === 0 &&
