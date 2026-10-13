@@ -1,337 +1,335 @@
-import { useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRef, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { MapContainer, Marker, Popup } from 'react-leaflet';
-import {
-  Users, Ship, Package, AlertTriangle, FileSpreadsheet, FileDown, MapPin, Phone, Send, Truck, Wrench, Fuel, Search, PackageMinus,
-  PackagePlus, Pencil,
-} from 'lucide-react';
-import { useAreaQuery } from '../api/hooks';
+import { RefreshCw } from 'lucide-react';
+import { useAreaQuery, useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
-import { Empty, KpiCard, Modal, Progress, Section, StatusDot, Tabs } from '../components/common/ui';
+import { EmptyState, ErrorState, Pager, Section, Skeleton, Tabs } from '../components/common/ui';
 import SuppliesChart from '../components/charts/SuppliesChart';
-import DispatchModal from '../components/common/DispatchModal';
 import IssueModal from '../components/common/IssueModal';
 import { FuelDepotModal, ReceiveModal, VehicleModal } from '../components/common/LogisticsModals';
-import { BaseLayer } from '../components/map/MapTools';
-import { vehicleIcon } from '../components/map/icons';
-import { CATEGORY, FORCE_TYPE, INCIDENT, PRIORITY, RES_STATUS, SKILL, VEHICLE, VEHICLE_CAT } from '../utils/labels';
-import { RISK } from '../utils/risk';
-import { dateTime, int, time, vnFileStamp } from '../utils/format';
+import ConnectionBanner from '../components/dashboard/ConnectionBanner';
+import { unitLabel } from '../components/dashboard/CommuneView';
+import ForceList from '../components/resources/ForceList';
+import QuickDispatch from '../components/resources/QuickDispatch';
+import ResourceAlerts from '../components/resources/ResourceAlerts';
+import ResourceKpis from '../components/resources/ResourceKpis';
+import ResourceToolbar from '../components/resources/ResourceToolbar';
+import VehicleList, { FuelDepots, VehicleMap } from '../components/resources/VehicleList';
+import WarehouseList, { STOCK_NOTE } from '../components/resources/WarehouseList';
+import {
+  FILTERS, SORTS, TABS, TAB_IDS, WAREHOUSE_LEVEL, forceLevelLabel, matchFilters, optionCounts, resourceAlerts, sortRows,
+  warehouseFacts,
+} from '../components/resources/resourceFacts';
+import { CATEGORY, FORCE_TYPE, RES_STATUS, SKILL, VEHICLE, VEHICLE_CAT } from '../utils/labels';
+import { dateTime, vnFileStamp } from '../utils/format';
 import { exportExcel } from '../utils/exportExcel';
 import { exportSnapshotPdf } from '../utils/exportPdf';
-import { Can } from '../rbac/usePermission';
+import { useMediaQuery } from '../utils/useMediaQuery';
+import { useOnline } from '../utils/useOnline';
+import { usePaged } from '../utils/usePaged';
+import { useAllowedCodes, usePermission } from '../rbac/usePermission';
 
-const norm = (s = '') => s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').toLowerCase();
-const Tel = ({ phone }) => <a href={`tel:${phone.replace(/\s/g, '')}`} className="inline-flex items-center gap-1 text-accent hover:underline"><Phone size={12} />{phone}</a>;
+const norm = (s) => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/đ/g, 'd');
+const EMPTY = {
+  luc_luong: 'Chưa có đơn vị lực lượng cứu hộ trong vùng đang xem — nhập bằng loại dữ liệu “Lực lượng”.',
+  vat_tu: 'Chưa có kho vật tư trong vùng đang xem — nhập loại dữ liệu “Kho vật tư”, rồi “Tồn kho vật tư”.',
+  phuong_tien: 'Chưa có phương tiện, trang thiết bị trong vùng đang xem — nhập bằng loại dữ liệu “Phương tiện”.',
+};
+const REFRESH_KEYS = ['resources-summary', 'forces', 'warehouses', 'vehicles', 'fuel', 'supplies', 'kpis'];
 
-function QuickDispatch({ force, onClose }) {
-  const { data: tickets = [] } = useAreaQuery('sos', '/sos');
-  const [ticket, setTicket] = useState(null);
-  if (ticket) return <DispatchModal ticket={ticket} presetForceId={force.id} onClose={onClose} />;
-  const open = tickets.filter((t) => t.status === 'moi' || t.status === 'dieu_phoi');
-  return (
-    <Modal open onClose={onClose} title={`Điều động nhanh – ${force.name}`}>
-      <p className="mb-2 text-sm text-muted">Chọn điểm nóng cần đến:</p>
-      <div className="flex flex-col gap-1.5">
-        {open.map((t) => (
-          <button key={t.id} className="card flex items-center gap-2 p-2 text-left hover:border-accent" onClick={() => setTicket(t)}>
-            <span className={clsx('chip', PRIORITY[t.priority]?.cls || 'bg-panel2')}>{PRIORITY[t.priority]?.short || `Cấp ${t.priority}`}</span>
-            <span className="text-sm"><b>{t.code}</b> · {INCIDENT[t.incident_type] || t.incident_type} · {t.address || t.admin_name}</span>
-          </button>
-        ))}
-        {!open.length && <Empty>Không có điểm nóng đang chờ điều phối</Empty>}
-      </div>
-    </Modal>
-  );
-}
-
+/**
+ * Quản lý Vật tư & Lực lượng cứu hộ (thiết kế C). Trên cùng: dải thông tin khẩn (kho cạn kiệt, hàng sắp hết hạn, phương tiện
+ * thiếu nhiên liệu / hỏng, phiếu SOS chờ) → 4 ô chỉ số → 3 thẻ Lực lượng · Vật tư · Phương tiện, mỗi thẻ có tìm kiếm, bộ lọc
+ * riêng, cách xếp, phân trang, xuất Excel / PDF (mọi dòng đang lọc, không chỉ trang đang xem).
+ * Thẻ và bộ lọc nằm trên địa chỉ trang (?tab=vat_tu&tt=can_kiet): dải khẩn / ô chỉ số dẫn thẳng tới danh sách đã lọc, nút
+ * Quay lại của trình duyệt trả lại. Danh sách tải đủ một lần theo vùng đang xem rồi lọc tại máy — dải khẩn, ô chỉ số, số
+ * đếm của bộ lọc tính từ cùng dữ liệu. Máy tính: bảng; điện thoại, iPad dọc: thẻ, nút ≥ 44 px. Nút ghi (xuất / nhập kho,
+ * báo tình trạng xe, điều động) chỉ hiện với quyền tương ứng ở đúng xã (backend kiểm tra lại); mất mạng → tắt, nói lý do.
+ */
 export default function Resources() {
   const navigate = useNavigate();
+  const qc = useQueryClient();
+  const online = useOnline();
+  const isLg = useMediaQuery('(min-width: 1024px)');
+  const filter = useStore((s) => s.filter);
   const setFocus = useStore((s) => s.setFocus);
-  const filterLabel = useStore((s) => s.filter.label);
-  const [tab, setTab] = useState('forces');
-  const [status, setStatus] = useState('');
-  const [level, setLevel] = useState('');
+  const toast = useStore((s) => s.toast);
+  const [params, setParams] = useSearchParams();
+  const tab = TAB_IDS.includes(params.get('tab')) ? params.get('tab') : TAB_IDS[0];
+  const tabInfo = TABS.find((t) => t.id === tab);
+  // Giá trị lạ trên địa chỉ (gõ tay, liên kết cũ) → bỏ qua, không lọc ra danh sách trống
+  const filters = Object.fromEntries(FILTERS[tab].map((f) => [f.key, f.options.some(([v]) => v === params.get(f.key)) ? params.get(f.key) : '']));
   const [q, setQ] = useState('');
+  const [sorts, setSorts] = useState({});
+  const sort = sorts[tab] || SORTS[tab][0][0];
+  const [pageSize, setPageSize] = useState(() => (window.innerWidth >= 1024 ? 20 : 10));
+  const [chartOpen, setChartOpen] = useState(() => window.innerWidth >= 768);
+  const [pdf, setPdf] = useState(false); // đang chụp PDF: mọi dòng đang lọc, dạng bảng, bỏ nút
+  const [refreshing, setRefreshing] = useState(false);
   const [quick, setQuick] = useState(null);
   const [issue, setIssue] = useState(null);
   const [vehicleEdit, setVehicleEdit] = useState(null);
   const [receive, setReceive] = useState(null);
   const [depotEdit, setDepotEdit] = useState(null);
-  const tableRef = useRef(null);
+  const tabsRef = useRef(null);
+  const contentRef = useRef(null);
 
-  const { data: summary } = useAreaQuery('resources-summary', '/resources/summary', {}, { refetchInterval: 30_000 });
-  const { data: forces = [] } = useAreaQuery('forces', '/resources/forces', { status: status || undefined, level: level || undefined });
-  const { data: warehouses = [] } = useAreaQuery('warehouses', '/resources/warehouses', { level: level || undefined });
-  const { data: vehicles = [] } = useAreaQuery('vehicles', '/resources/vehicles', { status: status || undefined });
-  const { data: depots = [] } = useAreaQuery('fuel', '/resources/fuel-depots');
+  const canDispatch = usePermission('dispatch', 'create');
+  const canSos = usePermission('sos', 'view');
+  const canImport = usePermission('data', 'import');
+  const canSubmit = usePermission('data', 'submit');
 
-  const match = (...fields) => !q || fields.some((f) => norm(f).includes(norm(q)));
-  const fForces = forces.filter((f) => match(f.name, f.commander, f.admin_name, ...(f.skills || []).map((s) => SKILL[s])));
-  const fWarehouses = warehouses.filter((w) => match(w.name, w.admin_name));
-  const fVehicles = vehicles.filter((v) => match(v.code, v.name, v.force_name, VEHICLE[v.vehicle_type]));
-  const critical = useMemo(() => warehouses.filter((w) => w.alerts.critical.length || w.alerts.expiring.length), [warehouses]);
+  // Tài khoản xã chưa lọc: tiêu đề là xã của mình, không ghi "Toàn tỉnh" (như Tổng quan)
+  const scope = useAllowedCodes('resource', 'view');
+  const { data: units = [] } = useUnits();
+  const scopeUnit = scope?.length === 1 ? units.find((u) => u.code === scope[0]) : null;
+  const scopeLabel = filter.codes.length || scope === null ? filter.label : scopeUnit ? unitLabel(scopeUnit) : `${scope.length} xã/phường được giao`;
 
+  const summaryQ = useAreaQuery('resources-summary', '/resources/summary', {}, { refetchInterval: 30_000 });
+  const forcesQ = useAreaQuery('forces', '/resources/forces');
+  const warehousesQ = useAreaQuery('warehouses', '/resources/warehouses');
+  const vehiclesQ = useAreaQuery('vehicles', '/resources/vehicles');
+  const depotsQ = useAreaQuery('fuel', '/resources/fuel-depots');
+  // Phiếu SOS chờ / quá hạn (cùng truy vấn KPI của Tổng quan — máy chủ đã đệm) — nhu cầu đặt cạnh nguồn lực
+  const kpisQ = useAreaQuery('kpis', '/dashboard/kpis', {}, { enabled: canSos, refetchInterval: 30_000 });
+  const queries = { luc_luong: forcesQ, vat_tu: warehousesQ, phuong_tien: vehiclesQ };
+  const query = queries[tab];
+
+  // Tìm không dấu trên mọi thẻ (số đếm của thẻ theo ô tìm); bộ lọc riêng chỉ áp vào thẻ đang mở
+  const nq = norm(q.trim());
+  const has = (...fields) => !nq || fields.some((f) => f != null && norm(f).includes(nq));
+  const searched = {
+    luc_luong: (forcesQ.data || []).filter((f) => has(f.name, f.code, f.commander, f.admin_name, f.base_name, FORCE_TYPE[f.org_type], ...(f.skills || []).map((s) => SKILL[s]))),
+    vat_tu: (warehousesQ.data || []).filter((w) => has(w.name, w.code, w.admin_name, w.manager, ...w.items.map((i) => i.name))),
+    phuong_tien: (vehiclesQ.data || []).filter((v) => has(v.code, v.name, v.force_name, VEHICLE[v.vehicle_type], VEHICLE_CAT[v.category])),
+  };
+  const factsById = new Map((warehousesQ.data || []).map((w) => [w.id, warehouseFacts(w)]));
+  const factsOf = (w) => factsById.get(w.id) || warehouseFacts(w);
+  const tabFacts = tab === 'vat_tu' ? factsOf : undefined;
+  const rows = sortRows(tab, searched[tab].filter((r) => matchFilters(tab, r, filters, tabFacts?.(r))), sort, factsOf);
+  const counts = Object.fromEntries(FILTERS[tab].map((f) => [f.key, optionCounts(tab, searched[tab], filters, f.key, tabFacts)]));
+  const paged = usePaged(rows, pageSize, `${tab}|${nq}|${JSON.stringify(filters)}|${sort}|${pageSize}`, pdf);
+
+  const alerts = resourceAlerts({ summary: summaryQ.data, warehouses: warehousesQ.data, vehicles: vehiclesQ.data, depots: depotsQ.data });
+  const sources = [[summaryQ, 'chỉ số tổng hợp'], [warehousesQ, 'kho'], [vehiclesQ, 'phương tiện'], [depotsQ, 'điểm nhiên liệu']];
+  const failed = sources.filter(([s]) => s.isError && !s.data);
+  const tabAlert = (id) => {
+    const top = alerts.find((a) => a.tab === id); // đã xếp nặng → nhẹ
+    return top ? { level: top.level, text: top.text } : undefined;
+  };
+
+  const scrollToList = (anchor) => requestAnimationFrame(() => requestAnimationFrame(() => {
+    ((anchor && document.getElementById(anchor)) || tabsRef.current)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }));
+  // Dải khẩn / ô chỉ số → thẻ + bộ lọc (một mục lịch sử: Quay lại trả về chỗ cũ); bỏ ô tìm để thấy đủ các dòng của bộ lọc
+  const go = (id, f = {}, anchor) => {
+    const next = new URLSearchParams({ tab: id });
+    Object.entries(f).forEach(([k, v]) => v && next.set(k, v));
+    setParams(next);
+    setQ('');
+    scrollToList(anchor);
+  };
+  const switchTab = (id) => setParams(id === TAB_IDS[0] ? {} : { tab: id }); // bộ lọc mỗi thẻ một nghĩa → đổi thẻ là bỏ
+  const setFilter = (key, value) => setParams((p) => {
+    const next = new URLSearchParams(p);
+    if (value) next.set(key, value);
+    else next.delete(key);
+    return next;
+  }, { replace: true });
+  const clearAll = () => {
+    setParams(tab === TAB_IDS[0] ? {} : { tab }, { replace: true });
+    setQ('');
+  };
+  const setSort = (key) => setSorts((s) => ({ ...s, [tab]: key }));
   const showOnMap = (lat, lon, label) => {
     setFocus({ lat, lon, zoom: 14, label });
     navigate('/ban-do');
   };
-
-  const doExcel = () => {
-    const stamp = vnFileStamp();
-    if (tab === 'forces') {
-      exportExcel(fForces.map((f) => ({
-        'Mã': f.code, 'Đơn vị': f.name, 'Loại': FORCE_TYPE[f.org_type], 'Cấp': f.level === 'tinh' ? 'Tỉnh' : 'Xã', 'Vị trí': f.base_name,
-        'Tổng quân số': f.personnel_total, 'Sẵn sàng': f.personnel_ready, 'Đang nhiệm vụ': f.personnel_on_mission,
-        'Chỉ huy': f.commander, 'SĐT': f.contact_phone, 'Tần số': f.radio_freq, 'Kỹ năng': f.skills.map((s) => SKILL[s]).join(', '),
-      })), { sheet: 'Luc luong', filename: `luc-luong-cuu-ho-${stamp}.xlsx` });
-    } else if (tab === 'supplies') {
-      exportExcel(fWarehouses.flatMap((w) => w.items.map((i) => ({
-        'Kho': w.name, 'Địa bàn': w.admin_name, 'Mặt hàng': i.name, 'Nhóm': CATEGORY[i.category], 'Tồn': i.quantity, 'Đơn vị': i.unit,
-        'Định mức': i.safety_quota, '% định mức': i.pct, 'Hạn dùng': i.expiry_date || '',
-      }))), { sheet: 'Ton kho', filename: `ton-kho-vat-tu-${stamp}.xlsx` });
-    } else {
-      exportExcel(fVehicles.map((v) => ({
-        'Số hiệu': v.code, 'Tên': v.name, 'Loại': VEHICLE[v.vehicle_type], 'Nhóm': VEHICLE_CAT[v.category], 'Đơn vị': v.force_name,
-        'Trạng thái': RES_STATUS[v.status].label, 'Nhiên liệu %': v.fuel_level ?? '', 'Nhiệm vụ': v.mission_code || '',
-      })), { sheet: 'Phuong tien', filename: `phuong-tien-${stamp}.xlsx` });
+  const refresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all(REFRESH_KEYS.map((key) => qc.refetchQueries({ queryKey: [key], type: 'active' })));
+    } finally {
+      setRefreshing(false);
     }
   };
 
-  const doPdf = () =>
-    exportSnapshotPdf(tableRef.current, {
-      title: 'BÁO CÁO NGUỒN LỰC ỨNG PHÓ THIÊN TAI – TỈNH CAO BẰNG',
-      subtitle: `${{ forces: 'Lực lượng cứu hộ', supplies: 'Kho vật tư & nhu yếu phẩm', vehicles: 'Phương tiện & thiết bị' }[tab]} · ${filterLabel} · ${new Date().toLocaleString('vi-VN')}`,
-      filename: `nguon-luc-${tab}-${vnFileStamp()}.pdf`,
-    });
+  const doExcel = async () => {
+    if (!rows.length) return;
+    const stamp = vnFileStamp(new Date(), true);
+    try {
+      if (tab === 'luc_luong') {
+        await exportExcel(rows.map((f) => ({
+          'Mã': f.code, 'Đơn vị': f.name, 'Loại': FORCE_TYPE[f.org_type], 'Cấp': forceLevelLabel(f.level), 'Tình trạng': RES_STATUS[f.status]?.label,
+          'Vị trí đóng quân': f.base_name, 'Xã/phường': f.admin_name, 'Tổng quân số': f.personnel_total, 'Sẵn sàng': f.personnel_ready,
+          'Đang nhiệm vụ': f.personnel_on_mission, 'Chỉ huy': f.commander, 'SĐT': f.contact_phone, 'Tần số': f.radio_freq,
+          'Kỹ năng': (f.skills || []).map((s) => SKILL[s] || s).join(', '), 'Số phương tiện': f.vehicle_count,
+        })), { sheet: 'Luc luong', filename: `luc-luong-cuu-ho-${stamp}.xlsx` });
+      } else if (tab === 'vat_tu') {
+        await exportExcel(rows.flatMap((w) => {
+          const x = factsOf(w);
+          return w.items.filter((i) => !filters.nhom || i.category === filters.nhom).map((i) => ({
+            'Kho': w.name, 'Cấp kho': WAREHOUSE_LEVEL[w.level] || w.level, 'Xã/phường': w.admin_name, 'Thủ kho': w.manager, 'SĐT': w.phone,
+            'Mặt hàng': i.name, 'Nhóm': CATEGORY[i.category], 'Tồn': i.quantity, 'Đơn vị': i.unit, 'Định mức': i.safety_quota,
+            '% định mức': i.pct ?? '', 'Hạn dùng': i.expiry_date || '',
+            'Cảnh báo': [x.low.includes(i) && 'Cạn kiệt', x.expiring.includes(i) && 'Sắp hết hạn'].filter(Boolean).join(', '),
+            'Cập nhật': i.last_updated ? dateTime(i.last_updated) : '',
+          }));
+        }), { sheet: 'Ton kho', filename: `ton-kho-vat-tu-${stamp}.xlsx` });
+      } else {
+        await exportExcel(rows.map((v) => ({
+          'Số hiệu': v.code, 'Tên': v.name, 'Loại': VEHICLE[v.vehicle_type], 'Nhóm': VEHICLE_CAT[v.category], 'Sức chở': v.capacity ?? '',
+          'Đơn vị quản lý': v.force_name, 'SĐT đơn vị': v.contact_phone || '', 'Trạng thái': RES_STATUS[v.status]?.label,
+          'Ghi chú': v.status_note || '', 'Nhiệm vụ': v.mission_code || '', 'Nhiên liệu %': v.fuel_level ?? '',
+          'Báo nhiên liệu lúc': v.fuel_updated_at ? dateTime(v.fuel_updated_at) : '',
+        })), { sheet: 'Phuong tien', filename: `phuong-tien-${stamp}.xlsx` });
+      }
+    } catch (e) {
+      toast({ tone: 'danger', title: 'Không xuất được tệp Excel', body: e.message });
+    }
+  };
 
-  const s = summary || {};
+  // PDF: chụp vùng nội dung của thẻ — vẽ đủ mọi dòng đang lọc dạng bảng (điện thoại tạm dựng trang khổ laptop), chụp xong trả lại
+  const doPdf = async () => {
+    if (!rows.length || pdf) return;
+    setPdf(true);
+    try {
+      await new Promise((resolve) => { requestAnimationFrame(() => requestAnimationFrame(resolve)); });
+      const now = new Date();
+      const active = FILTERS[tab].filter((f) => filters[f.key]).map((f) => f.options.find(([v]) => v === filters[f.key])?.[1]);
+      await exportSnapshotPdf(contentRef.current, {
+        title: 'BÁO CÁO NGUỒN LỰC ỨNG PHÓ THIÊN TAI – TỈNH CAO BẰNG',
+        subtitle: [tabInfo.label, scopeLabel, `${rows.length} ${tabInfo.noun}`, ...active, q.trim() && `tìm "${q.trim()}"`, now.toLocaleString('vi-VN')]
+          .filter(Boolean).join(' · '),
+        filename: `nguon-luc-${tab}-${vnFileStamp(now, true)}.pdf`,
+        layoutWidth: 1280,
+      });
+    } catch (e) {
+      toast({ tone: 'danger', title: 'Không xuất được PDF', body: e.message });
+    } finally {
+      setPdf(false);
+    }
+  };
+
+  const asTable = isLg || pdf;
+  let body;
+  if (query.isLoading) body = <Skeleton height={240} />;
+  else if (query.isError && !query.data) body = <ErrorState height={200} onRetry={query.refetch}>Không tải được danh sách {tabInfo.noun}</ErrorState>;
+  else if (!query.data?.length) {
+    body = (
+      <EmptyState height={160}>
+        {EMPTY[tab]}
+        {(canImport || canSubmit) && <> <Link to="/nhap-du-lieu" className="font-semibold text-accent hover:underline">Mở Nhập dữ liệu →</Link></>}
+      </EmptyState>
+    );
+  } else if (!rows.length) {
+    body = (
+      <EmptyState height={140}>
+        Không có {tabInfo.noun} khớp ô tìm / bộ lọc.{' '}
+        <button type="button" className="tap font-semibold text-accent hover:underline" onClick={clearAll}>Bỏ lọc</button>
+      </EmptyState>
+    );
+  } else if (tab === 'luc_luong') {
+    body = <ForceList rows={paged.visible} asTable={asTable} pdf={pdf} sort={sort} onSort={setSort} canDispatch={canDispatch} online={online} onDispatch={setQuick} onMap={showOnMap} />;
+  } else if (tab === 'vat_tu') {
+    body = <WarehouseList rows={paged.visible} factsOf={factsOf} category={filters.nhom} pdf={pdf} online={online} onReceive={setReceive} onIssue={setIssue} onMap={showOnMap} />;
+  } else {
+    body = <VehicleList rows={paged.visible} asTable={asTable} pdf={pdf} sort={sort} onSort={setSort} online={online} onEdit={setVehicleEdit} onMap={showOnMap} />;
+  }
+  const pager = rows.length > 0 && !pdf && <Pager paged={paged} size={pageSize} onSize={setPageSize} noun={tabInfo.noun} />;
+  const dataTime = summaryQ.dataUpdatedAt ? new Date(summaryQ.dataUpdatedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : null;
+
   return (
-    <div className="flex flex-col gap-3 p-3">
-      <div>
-        <h1 className="text-lg font-bold">Quản lý Vật tư & Lực lượng cứu hộ – {filterLabel}</h1>
-        <p className="text-xs text-muted">Ta đang có gì, ở đâu, tình trạng ra sao — số liệu tự nhảy khi kho xuất hàng hoặc lực lượng nhận lệnh</p>
+    <div className="flex flex-col gap-3 p-3 pb-8">
+      {/* Thông tin khẩn luôn trên cùng (Cam / Đỏ dính khi cuộn) + mất mạng */}
+      <ResourceAlerts
+        items={alerts}
+        sos={canSos ? kpisQ.data?.sos : null}
+        failed={failed.map(([, name]) => name)}
+        onRetry={() => failed.forEach(([s]) => s.refetch())}
+        loading={sources.some(([s]) => s.isLoading)}
+        known={{ warehouses: warehousesQ.data?.length || 0, vehicles: vehiclesQ.data?.length || 0 }}
+        onGo={(it) => go(it.tab, it.filter, it.anchor)}
+      />
+      <ConnectionBanner updatedAt={summaryQ.dataUpdatedAt || null} />
+
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h1 className="text-base font-bold leading-tight sm:text-lg">
+            <span className="hidden sm:inline">Quản lý </span>Vật tư & Lực lượng<span className="hidden sm:inline"> cứu hộ</span>
+          </h1>
+          <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11px] text-muted">
+            <span className="font-semibold text-accent">{scopeLabel}</span>
+            <span aria-hidden="true">·</span>
+            <span>
+              {dataTime ? <>Số liệu lúc <b className="font-mono text-ink-2">{dataTime}</b></> : summaryQ.isError ? 'Chưa tải được số liệu' : 'Đang tải số liệu…'}
+            </span>
+            <span className="hidden lg:inline">· tự cập nhật khi kho xuất / nhập, lực lượng nhận lệnh</span>
+          </p>
+        </div>
+        <button type="button" onClick={refresh} disabled={refreshing} className="btn-ghost tap-sq h-9 min-w-[36px] shrink-0 px-2.5 text-xs" aria-label="Làm mới số liệu" title="Làm mới số liệu">
+          <RefreshCw size={14} className={clsx(refreshing && 'animate-spin')} aria-hidden="true" /> <span className="hidden md:inline">Làm mới</span>
+        </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <KpiCard label="Cán bộ, chiến sĩ sẵn sàng" value={int(s.forces?.ready)} icon={Users} sub={`${int(s.forces?.on_mission)} đang làm nhiệm vụ / tổng ${int(s.forces?.total)}`} />
-        <KpiCard label="Xuồng / xe lội nước đang rảnh" value={`${int(s.vehicles?.boats_free)} / ${int(s.vehicles?.amphibious_free)}`} icon={Ship} sub={`${int(s.vehicles?.excavators_free)} máy xúc, máy ủi sẵn sàng`} />
-        <KpiCard label="Dự trữ lương thực / nước uống" value={`${s.stock?.food_pct ?? '–'}% / ${s.stock?.water_pct ?? '–'}%`} icon={Package} sub="so với định mức an toàn" tone={s.stock?.food_pct < 50 || s.stock?.water_pct < 50 ? 'warn' : undefined} />
-        <KpiCard
-          label="Kho cạn kiệt (<20%) / sắp hết hạn"
-          value={`${int(s.stock?.critical_warehouses)} / ${int(s.stock?.expiring_items)}`}
-          icon={AlertTriangle}
-          tone={s.stock?.critical_warehouses ? 'danger' : undefined}
-          sub={critical.slice(0, 2).map((w) => w.name.replace('Kho cụm ', '')).join(', ')}
+      <ResourceKpis summaryQ={summaryQ} warehouses={warehousesQ.data} onGo={(id, f) => go(id, f)} />
+
+      <div ref={tabsRef} className="scroll-mt-20">
+        <Tabs
+          fit
+          label="Danh mục nguồn lực"
+          value={tab}
+          onChange={switchTab}
+          tabs={TABS.map((t) => ({
+            value: t.id, label: t.label, short: t.short, icon: t.icon, count: queries[t.id].data ? searched[t.id].length : undefined, alert: tabAlert(t.id),
+          }))}
         />
       </div>
 
-      <div className="card flex flex-wrap items-center gap-2 p-2">
-        <div className="relative min-w-[14rem] flex-1">
-          <Search size={14} className="absolute left-3 top-2.5 text-muted" />
-          <input className="input pl-8" placeholder="Tìm nhanh đơn vị, chỉ huy, kỹ năng, số hiệu…" value={q} onChange={(e) => setQ(e.target.value)} />
-        </div>
-        <select className="input w-auto" value={level} onChange={(e) => setLevel(e.target.value)} aria-label="Cấp quản lý">
-          <option value="">Mọi cấp quản lý</option>
-          <option value="tinh">Cấp tỉnh</option>
-          <option value="cum">Kho cụm</option>
-          <option value="xa">Cấp xã</option>
-        </select>
-        <select className="input w-auto" value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Tình trạng">
-          <option value="">Mọi tình trạng</option>
-          {Object.entries(RES_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-        </select>
-        <button className="btn-ghost" onClick={doExcel}><FileSpreadsheet size={15} /> Excel</button>
-        <button className="btn-ghost" onClick={doPdf}><FileDown size={15} /> PDF</button>
-      </div>
-
-      <Tabs
-        value={tab}
-        onChange={setTab}
-        tabs={[
-          { value: 'forces', label: 'Lực lượng', icon: Users, count: fForces.length },
-          { value: 'supplies', label: 'Vật tư – Nhu yếu phẩm', icon: Package, count: fWarehouses.length },
-          { value: 'vehicles', label: 'Phương tiện – Trang thiết bị', icon: Truck, count: fVehicles.length },
-        ]}
+      <ResourceToolbar
+        tab={tab}
+        q={q}
+        onSearch={setQ}
+        filters={filters}
+        counts={query.data ? counts : null}
+        onFilter={setFilter}
+        onClear={clearAll}
+        sort={sort}
+        onSort={setSort}
+        shown={rows.length}
+        total={query.data?.length || 0}
+        noun={tabInfo.noun}
+        onExcel={doExcel}
+        onPdf={doPdf}
+        exporting={pdf}
       />
 
-      <div ref={tableRef} className="bg-bg">
-        {tab === 'forces' && (
-          <div className="card overflow-x-auto">
-            <table className="table-base">
-              <thead>
-                <tr><th>Đơn vị</th><th>Quân số</th><th>Vị trí đóng quân</th><th>Chỉ huy & liên lạc</th><th>Kỹ năng đặc thù</th><th className="no-print" /></tr>
-              </thead>
-              <tbody>
-                {fForces.map((f) => (
-                  <tr key={f.id}>
-                    <td>
-                      <div className="flex items-center gap-2 font-medium"><StatusDot cls={RES_STATUS[f.status].dot} />{f.name}</div>
-                      <div className="text-xs text-muted">{FORCE_TYPE[f.org_type]} · cấp {f.level === 'tinh' ? 'tỉnh' : 'xã'} · {f.vehicle_count} phương tiện</div>
-                    </td>
-                    <td className="whitespace-nowrap">
-                      <div className="font-mono text-sm">{f.personnel_total} / <span className="text-good">{f.personnel_ready}</span> / <span className="text-warn">{f.personnel_on_mission}</span></div>
-                      <div className="text-[11px] text-muted">tổng / sẵn sàng / nhiệm vụ</div>
-                    </td>
-                    <td>
-                      <div className="text-sm">{f.base_name}</div>
-                      <button className="no-print inline-flex items-center gap-1 text-xs text-accent hover:underline" onClick={() => showOnMap(f.lat, f.lon, f.name)}><MapPin size={12} /> Xem trên bản đồ</button>
-                    </td>
-                    <td className="text-sm">
-                      <div>{f.commander}</div>
-                      <Tel phone={f.contact_phone} />
-                      <div className="text-xs text-muted">📻 {f.radio_freq}</div>
-                    </td>
-                    <td><div className="flex max-w-[16rem] flex-wrap gap-1">{f.skills.map((sk) => <span key={sk} className="chip bg-panel2 text-ink-2">{SKILL[sk]}</span>)}</div></td>
-                    <td className="no-print">
-                      <Can I="dispatch" a="create">
-                        <button className="btn-danger px-2 py-1 text-xs" disabled={f.personnel_ready < 1} onClick={() => setQuick(f)}><Send size={12} /> Điều động nhanh</button>
-                      </Can>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {!fForces.length && <Empty />}
-          </div>
+      <div ref={contentRef} className="flex flex-col gap-3 bg-bg">
+        {tab === 'vat_tu' && (
+          <Section
+            title="Phân bổ dự trữ giữa các kho (điều tiết liên vùng)"
+            collapsible
+            open={chartOpen || pdf}
+            onToggle={() => setChartOpen((v) => !v)}
+          >
+            <SuppliesChart height={260} />
+          </Section>
         )}
-
-        {tab === 'supplies' && (
-          <div className="flex flex-col gap-3">
-            <Section title="Biểu đồ phân bổ – kho đầy / kho thiếu (điều tiết liên vùng)"><SuppliesChart height={260} /></Section>
-            <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
-              {fWarehouses.map((w) => (
-                <div key={w.id} className={clsx('card p-3', w.alerts.critical.length && 'border-danger/60')}>
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="font-semibold">{w.name}</div>
-                      <div className="text-xs text-muted">{{ tinh: 'Kho dự trữ tỉnh', cum: 'Kho cụm', da_chien: 'Kho dã chiến', xa: 'Kho xã' }[w.level]} · {w.admin_name} · {w.manager} · <Tel phone={w.phone} /></div>
-                    </div>
-                    <div className="no-print flex gap-1">
-                      <button className="btn-ghost px-2 py-1" title="Xem trên bản đồ" onClick={() => showOnMap(w.lat, w.lon, w.name)}><MapPin size={14} /></button>
-                      <Can I="inventory" a="receive" scope={w.admin_code}>
-                        <button className="btn-ghost px-2 py-1 text-xs" onClick={() => setReceive(w)}><PackagePlus size={12} /> Nhập hàng</button>
-                      </Can>
-                      <Can I="inventory" a="issue" scope={w.admin_code}>
-                        <button className="btn-primary px-2 py-1 text-xs" onClick={() => setIssue(w)}><PackageMinus size={12} /> Xuất kho</button>
-                      </Can>
-                    </div>
-                  </div>
-                  {!w.items.length && <p className="mt-2 text-xs text-muted">Chưa có số liệu tồn kho — nhập bằng loại dữ liệu “Tồn kho”.</p>}
-                  <table className="mt-2 w-full text-xs">
-                    <tbody>
-                      {w.items.map((i) => {
-                        const exp = w.alerts.expiring.includes(i.item_code);
-                        const low = i.pct < 20;
-                        return (
-                          <tr key={i.item_code} className="border-b border-line/50">
-                            <td className="py-1 pr-2">{i.name}</td>
-                            <td className="w-24 py-1"><Progress value={i.pct} tone={low ? 'danger' : i.pct < 50 ? 'warn' : 'good'} /></td>
-                            <td className={clsx('py-1 pl-2 text-right font-mono', low && 'font-semibold text-danger')}>{int(i.quantity)} {i.unit}</td>
-                            <td className="py-1 pl-2 text-right">
-                              {low && <span className="chip bg-danger text-white">Cạn kiệt</span>}
-                              {exp && <span className={`chip ${RISK[2].chip}`} title={`Hạn dùng ${i.expiry_date}`}>Sắp hết hạn</span>}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                  <div className="mt-1 text-[11px] text-muted">Cập nhật: {dateTime(w.items.reduce((m, i) => (i.last_updated > m ? i.last_updated : m), ''))}</div>
-                </div>
-              ))}
-            </div>
-            {!fWarehouses.length && <Empty />}
-          </div>
-        )}
-
-        {tab === 'vehicles' && (
-          <div className="grid gap-3 xl:grid-cols-[1fr_420px]">
-            <div className="card overflow-x-auto">
-              <table className="table-base">
-                <thead><tr><th>Số hiệu</th><th>Loại</th><th>Đơn vị quản lý</th><th>Trạng thái</th><th>Nhiên liệu</th><th className="no-print" /></tr></thead>
-                <tbody>
-                  {Object.keys(VEHICLE_CAT).map((cat) => {
-                    const list = fVehicles.filter((v) => v.category === cat);
-                    if (!list.length) return null;
-                    return [
-                      <tr key={cat}><td colSpan={6} className="bg-panel2/60 text-xs font-semibold uppercase text-muted">{VEHICLE_CAT[cat]} ({list.length})</td></tr>,
-                      ...list.map((v) => (
-                        <tr key={v.id}>
-                          <td className="font-mono font-semibold">{v.code}</td>
-                          <td>{VEHICLE[v.vehicle_type]}{v.capacity ? <span className="text-xs text-muted"> · {v.capacity} chỗ</span> : ''}</td>
-                          <td className="text-sm">{v.force_name}</td>
-                          <td>
-                            <div className="flex items-center gap-1.5 text-sm">
-                              {v.status === 'bao_duong' ? <Wrench size={13} className="text-danger" /> : <StatusDot cls={RES_STATUS[v.status].dot} />}
-                              {RES_STATUS[v.status].label}
-                            </div>
-                            {v.status === 'nhiem_vu' && v.mission_code && (
-                              // Chưa có GPS: không vẽ thanh tiến độ giả — ghi đang đến (ETA) / đã đến (trực ban ghi khi đội báo)
-                              <div className="mt-0.5 text-xs text-muted">
-                                {v.mission_code} · {v.mission_status === 'da_den' ? `đã đến lúc ${time(v.mission_arrived_at)}` : `đang đến, ETA ${time(v.mission_eta)}`}
-                              </div>
-                            )}
-                            {v.status === 'bao_duong' && v.status_note && <div className="mt-0.5 text-xs text-muted">{v.status_note}</div>}
-                          </td>
-                          <td className="w-32">
-                            {v.fuel_level == null ? (
-                              <div className="flex items-center gap-1 text-xs text-muted" title="Chưa ai báo mức nhiên liệu"><Fuel size={12} /> Chưa cập nhật</div>
-                            ) : (
-                              <>
-                                <div className="flex items-center gap-1 text-xs" title={v.fuel_updated_at ? `Báo lúc ${dateTime(v.fuel_updated_at)}` : undefined}><Fuel size={12} /> {v.fuel_level}%</div>
-                                <Progress value={v.fuel_level} tone={v.fuel_level < 30 ? 'danger' : v.fuel_level < 60 ? 'warn' : 'good'} />
-                              </>
-                            )}
-                          </td>
-                          <td className="no-print whitespace-nowrap">
-                            <Can I="vehicle" a="update" scope={v.admin_code}>
-                              <button className="btn-ghost px-2 py-1 text-xs" title="Báo tình trạng, nhiên liệu" onClick={() => setVehicleEdit(v)}><Pencil size={13} /> Cập nhật</button>
-                            </Can>
-                            <button className="btn-ghost px-2 py-1" title="Xem trên bản đồ" onClick={() => showOnMap(v.lat, v.lon, v.code)}><MapPin size={14} /></button>
-                          </td>
-                        </tr>
-                      )),
-                    ];
-                  })}
-                </tbody>
-              </table>
-              {!fVehicles.length && <Empty />}
-            </div>
-            <div className="flex flex-col gap-3">
-              <Section title="Vị trí phương tiện" bodyClass="pb-3">
-                <div className="h-72 overflow-hidden rounded-lg">
-                  <MapContainer center={[22.75, 106.05]} zoom={8} className="h-full w-full" scrollWheelZoom={false}>
-                    <BaseLayer basemap="auto" showNav={false} />
-                    {fVehicles.filter((v) => v.lat).map((v) => (
-                      <Marker key={v.id} position={[v.lat, v.lon]} icon={vehicleIcon(v)}>
-                        <Popup><b>{v.code}</b> {VEHICLE[v.vehicle_type]}<br />{v.force_name}</Popup>
-                      </Marker>
-                    ))}
-                  </MapContainer>
-                </div>
-              </Section>
-              <Section title="Quản lý nhiên liệu dự trữ">
-                <div className="flex flex-col gap-2">
-                  {depots.map((d) => (
-                    <div key={d.id} className="text-sm">
-                      <div className="flex justify-between"><span>{d.name}</span><span className="font-mono text-xs">{int(d.gasoline_l + d.diesel_l)} / {int(d.capacity_l)} L</span></div>
-                      <div className="flex gap-2 text-[11px] text-muted">
-                        <span>Xăng {int(d.gasoline_l)} L</span><span>Dầu {int(d.diesel_l)} L</span>
-                        <span>{d.updated_at ? `· cập nhật ${dateTime(d.updated_at)}` : '· theo tệp nhập'}</span>
-                        <Can I="inventory" a="receive" scope={d.admin_code}>
-                          <button className="no-print ml-auto text-accent hover:underline" onClick={() => setDepotEdit(d)}>Cập nhật</button>
-                        </Can>
-                      </div>
-                      <Progress value={(100 * (d.gasoline_l + d.diesel_l)) / d.capacity_l} tone={(d.gasoline_l + d.diesel_l) / d.capacity_l < 0.3 ? 'danger' : 'accent'} />
-                    </div>
-                  ))}
-                </div>
-              </Section>
+        {tab === 'phuong_tien' ? (
+          // Bảng cần đủ rộng: bản đồ + nhiên liệu chỉ đứng cột phải từ 1536 px; nhỏ hơn thì nằm dưới danh sách (2 cột từ 768 px)
+          <div className="grid gap-3 2xl:grid-cols-[minmax(0,1fr)_400px]">
+            <div className="flex min-w-0 flex-col gap-2">{body}{pager}</div>
+            <div className="grid min-w-0 content-start gap-3 md:grid-cols-2 2xl:grid-cols-1">
+              <VehicleMap rows={rows} />
+              <FuelDepots query={depotsQ} online={online} onEdit={setDepotEdit} />
             </div>
           </div>
+        ) : (
+          <div className="flex flex-col gap-2">{body}{pager}</div>
         )}
+        {tab === 'vat_tu' && <p className="text-[11px] text-muted">{STOCK_NOTE}</p>}
       </div>
 
       {quick && <QuickDispatch force={quick} onClose={() => setQuick(null)} />}

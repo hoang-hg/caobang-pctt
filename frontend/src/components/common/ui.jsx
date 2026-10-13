@@ -1,8 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import clsx from 'clsx';
-import { AlertTriangle, ArrowLeft, ChevronDown, MoveRight, RefreshCw, TrendingDown, TrendingUp, X } from 'lucide-react';
-import { NO_DATA, RISK } from '../../utils/risk';
+import {
+  AlertTriangle, ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, MoveRight, RefreshCw, TrendingDown, TrendingUp, X,
+} from 'lucide-react';
+import { NO_DATA, RISK, risk } from '../../utils/risk';
 
 export function KpiCard({ label, value, unit, sub, tone, icon: Icon, blink, children }) {
   const toneCls = {
@@ -27,8 +29,11 @@ export function KpiCard({ label, value, unit, sub, tone, icon: Icon, blink, chil
   );
 }
 
-export function Progress({ value, tone = 'accent', className }) {
-  const color = { accent: 'bg-accent', danger: 'bg-danger', warn: 'bg-warn', good: 'bg-good', serious: 'bg-serious' }[tone];
+/** Thanh tỉ lệ. `level` (0–3 / null, utils/risk.js) → màu theo thang rủi ro chung, null = Xám; không có `level` → `tone`. */
+export function Progress({ value, tone = 'accent', level, className }) {
+  const color = level !== undefined
+    ? risk(level).fill
+    : { accent: 'bg-accent', danger: 'bg-danger', warn: 'bg-warn', good: 'bg-good', serious: 'bg-serious' }[tone];
   return (
     <div className={clsx('h-1.5 w-full overflow-hidden rounded-full bg-panel2', className)}>
       <div className={clsx('h-full rounded-full', color)} style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
@@ -108,21 +113,42 @@ export function Modal({ open, onClose, title, children, wide, footer }) {
   );
 }
 
-export function Tabs({ tabs, value, onChange }) {
+/**
+ * Hàng thẻ chuyển nội dung. Mỗi thẻ: { value, label, short (nhãn ngắn dưới 640 px — nhãn dài tràn khỏi màn 360 px), icon,
+ * count, alert: { level, text } (chấm màu mức nặng nhất bên trong thẻ, thang rủi ro chung) }. Màn cảm ứng: cao ≥ 44 px.
+ * `fit`: dưới 640 px các thẻ chia đều bề ngang, nhãn trên / số đếm dưới, bỏ biểu tượng — 3 thẻ vừa màn 360 px, không phải
+ * kéo ngang tìm thẻ thứ ba. `label`: tên của hàng thẻ cho trình đọc màn hình.
+ */
+export function Tabs({ tabs, value, onChange, fit = false, label }) {
   return (
-    <div className="scroll-thin flex gap-1 overflow-x-auto border-b border-line">
+    <div className="scroll-thin flex gap-1 overflow-x-auto border-b border-line" role={label ? 'group' : undefined} aria-label={label}>
       {tabs.map((t) => (
         <button
           key={t.value}
+          type="button"
           onClick={() => onChange(t.value)}
+          aria-pressed={value === t.value}
           className={clsx(
-            'flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium',
+            'tap flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium',
+            fit && 'max-sm:min-w-0 max-sm:flex-1 max-sm:flex-col max-sm:gap-0.5 max-sm:px-1 max-sm:py-1.5',
             value === t.value ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-ink',
           )}
         >
-          {t.icon && <t.icon size={16} />}
-          {t.label}
-          {t.count != null && <span className="rounded-full bg-panel2 px-1.5 text-[11px]">{t.count}</span>}
+          {t.icon && <t.icon size={16} className={clsx('shrink-0', fit && 'max-sm:hidden')} aria-hidden="true" />}
+          {t.short ? (
+            <>
+              <span className="sm:hidden">{t.short}</span>
+              <span className="hidden sm:inline">{t.label}</span>
+            </>
+          ) : t.label}
+          {(t.count != null || t.alert) && (
+            <span className="flex items-center gap-1.5">
+              {t.count != null && <span className="rounded-full bg-panel2 px-1.5 text-[11px]">{t.count}</span>}
+              {t.alert && (
+                <span role="img" className={clsx('h-2.5 w-2.5 shrink-0 rounded-full', risk(t.alert.level).fill)} title={t.alert.text} aria-label={t.alert.text} />
+              )}
+            </span>
+          )}
         </button>
       ))}
     </div>
@@ -248,6 +274,38 @@ export function ShowMore({ list, step, noun }) {
       <span className="text-muted">Đang hiện {list.shown}/{list.total} {noun}</span>
       <button type="button" className={btn} onClick={list.more}>Xem thêm {Math.min(step, rest)} {noun}</button>
       {rest > step && <button type="button" className={btn} onClick={list.all}>Xem tất cả {list.total}</button>}
+    </div>
+  );
+}
+
+/**
+ * Thanh phân trang dưới danh sách (utils/usePaged): "a–b / tổng", số dòng mỗi trang, trang trước / sau. Nút ≥ 44 px trên màn
+ * cảm ứng. Danh sách vừa một trang và không đổi cỡ trang được → chỉ hiện số dòng.
+ */
+export function Pager({ paged, size, sizes = [10, 20, 50], onSize, noun, className }) {
+  const nav = 'btn-ghost tap-sq h-9 w-9 p-0';
+  return (
+    <div className={clsx('flex flex-wrap items-center justify-between gap-2 text-xs text-muted no-print', className)}>
+      <span>
+        {paged.total > paged.to - paged.from + 1 ? <><b className="font-mono text-ink">{paged.from}–{paged.to}</b> / </> : null}
+        <b className="font-mono text-ink">{paged.total}</b> {noun}
+      </span>
+      {paged.total > Math.min(...sizes) && (
+        <div className="flex items-center gap-2">
+          {onSize && (
+            <select className="input tap min-h-[36px] w-auto py-0.5 text-xs" value={size} onChange={(e) => onSize(Number(e.target.value))} aria-label="Số dòng mỗi trang">
+              {sizes.map((n) => <option key={n} value={n}>{n} / trang</option>)}
+            </select>
+          )}
+          <button type="button" className={nav} onClick={() => paged.setPage(paged.page - 1)} disabled={paged.page <= 1} aria-label="Trang trước">
+            <ChevronLeft size={15} />
+          </button>
+          <span className="font-mono" aria-live="polite">{paged.page}/{paged.pages}</span>
+          <button type="button" className={nav} onClick={() => paged.setPage(paged.page + 1)} disabled={paged.page >= paged.pages} aria-label="Trang sau">
+            <ChevronRight size={15} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

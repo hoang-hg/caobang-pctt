@@ -83,13 +83,19 @@ export default function SuppliesChart({ height = 250 }) {
         ) : (
           <span />
         )}
+        {/* Cột = cả NHÓM hàng của một kho (gạo + mì tôm + lương khô…) — từng mặt hàng dưới 20 % xem ở danh sách kho */}
         {criticalCount > 0 ? (
-          <span className="inline-flex items-center gap-1 rounded-md border border-danger/25 bg-danger/10 px-2 py-0.5 text-[11px] font-semibold text-danger">
+          <span
+            className="inline-flex items-center gap-1 rounded-md border border-danger/25 bg-danger/10 px-2 py-0.5 text-[11px] font-semibold text-danger"
+            title="Tính gộp cả nhóm hàng của từng kho — từng mặt hàng dưới 20% định mức xem ở danh sách kho"
+          >
             <AlertCircle size={12} />
-            <span>{criticalCount} mặt hàng dưới 20% định mức</span>
+            <span>{criticalCount} nhóm hàng (gộp theo kho) dưới 20% định mức</span>
           </span>
         ) : (
-          <span className="text-[11px] font-medium text-muted">Không mặt hàng nào dưới 20% định mức</span>
+          <span className="text-[11px] font-medium text-muted" title="Tính gộp cả nhóm hàng của từng kho — từng mặt hàng xem ở danh sách kho">
+            Không nhóm hàng nào (gộp theo kho) dưới 20% định mức
+          </span>
         )}
       </div>
 
