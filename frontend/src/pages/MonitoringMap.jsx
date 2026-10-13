@@ -137,6 +137,8 @@ export default function MonitoringMap() {
   // Dải tình huống: cùng truy vấn (cùng bộ nhớ đệm) với Dashboard → cùng số, cùng màu
   const kQ = useAreaQuery('kpis', '/dashboard/kpis', {}, { refetchInterval: 30_000 });
   const stationsQ = useAreaQuery('stations', '/stations');
+  // Dòng diễn biến (tab Diễn biến): cùng truy vấn "Nhật ký sự kiện" của Tổng quan — mục mới đẩy tức thì qua WebSocket log.new
+  const logsQ = useAreaQuery('logs', '/dashboard/logs', { limit: 50 }, { refetchInterval: 60_000 });
   const waterStations = useMemo(() => (stationsQ.data || []).filter((s) => s.type === 'muc_nuoc'), [stationsQ.data]);
   const { data: area } = useAreaQuery('area', '/admin-units/area', {}, { staleTime: Infinity });
   const { data: unitsGeo } = useUnitsGeo();
@@ -371,6 +373,7 @@ export default function MonitoringMap() {
       noDataCount={noDataCount}
       hotspots={hotspots}
       hotNote={hotNote}
+      feed={{ logs: logsQ.data, pending: logsQ.isPending, error: logsQ.isError, refetch: logsQ.refetch }}
       canSos={canSos}
       canDispatch={canDispatch}
       // Điện thoại: chạm một mục → đóng bảng để thấy chỗ bản đồ bay tới

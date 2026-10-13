@@ -13,7 +13,7 @@ import logging
 from datetime import UTC, datetime, timedelta
 
 from app.db import execute, fetch_all, fetch_one
-from app.services.events import log_event
+from app.services.events import log_event, station_place
 from app.services.simulator import alarm_level, simulator
 from app.ws.hub import hub
 
@@ -137,15 +137,19 @@ async def ingest_readings(device: dict, items: list[dict], channel: str) -> dict
                 WHERE id = :id""",
             {"v": latest["value"], "id": device["id"]},
         )
-        if device["status"] == "mat_tin_hieu":
+        # Gắn xã + toạ độ trạm cho dòng nhật ký (lọc theo vùng, bấm tới trạm trên bản đồ)
+        back = device["status"] == "mat_tin_hieu"
+        place = await station_place(device["station_id"]) if back or switched else {}
+        if back:
             await log_event(
-                f"Thiết bị {device['name']} ({device['id']}) có tín hiệu trở lại", "he_thong", "info"
+                f"Thiết bị {device['name']} ({device['id']}) có tín hiệu trở lại", "he_thong", "info", **place
             )
         if switched:
             await log_event(
                 f"{device['station_name']} chuyển sang dữ liệu thật từ thiết bị {device['id']} ({channel.upper()})",
                 "he_thong",
                 "info",
+                **place,
             )
         else:
             await execute(
@@ -203,5 +207,6 @@ async def mark_stale_devices() -> None:
             f"MẤT TÍN HIỆU thiết bị {d['name']} ({d['id']}) — kiểm tra nguồn điện / đường truyền",
             "he_thong",
             "warning",
+            **await station_place(d["station_id"]),
         )
         await ingest_log(f"device:{d['id']}", f"Mất tín hiệu: {d['name']}", level="warning")

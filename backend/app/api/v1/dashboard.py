@@ -12,7 +12,7 @@ from app.auth import audit
 from app.db import execute, fetch_all, fetch_all_no_jit, fetch_one, transaction
 from app.infra.cache import cached_view, invalidate
 from app.rbac.authz import area_scope, require_any, require_permission
-from app.services.events import log_event
+from app.services.events import log_event, station_place
 from app.services.landslides import get_landslides_overview
 from app.services.lite import VN_TZ
 from app.services.reservoirs import get_reservoirs_overview
@@ -446,7 +446,8 @@ async def _supplies(codes: list[str]) -> list[dict]:
 @router.get("/dashboard/logs")
 async def logs(limit: int = 40, codes: list[str] = Depends(MON)):
     return await fetch_all(
-        f"""SELECT id, time, category, severity, message FROM operations.event_logs e
+        f"""SELECT id, time, category, severity, message, ST_Y(location) AS lat, ST_X(location) AS lon
+              FROM operations.event_logs e
              WHERE e.admin_unit_id IS NULL OR {unit_clause('e.admin_unit_id', codes)}
              ORDER BY time DESC LIMIT :l""",
         {"l": limit, "codes": codes},
@@ -476,7 +477,8 @@ async def update_reservoir_operation(
     """Trực ban nhập số liệu vận hành hồ khi đơn vị quản lý hồ báo về (chưa có kết nối tự động) — cổng công khai và
     trang bản nhẹ hiện ngay; hồ chưa có số liệu hiện "Chưa có số liệu vận hành" thay vì "Chưa xả tràn"."""
     res = await fetch_one(
-        "SELECT id, name, spill_gates, normal_level FROM iot_telemetry.reservoirs WHERE id = :id",
+        """SELECT id, name, spill_gates, normal_level, admin_unit_id, ST_Y(location) AS lat, ST_X(location) AS lon
+             FROM iot_telemetry.reservoirs WHERE id = :id""",
         {"id": reservoir_id},
     )
     if not res:
@@ -527,6 +529,9 @@ async def update_reservoir_operation(
         + f" ({user['full_name']})",
         "canh_bao" if body.spill_gates_open else "van_hanh",
         "warning" if body.spill_gates_open else "info",
+        admin_unit_id=res["admin_unit_id"],
+        lat=res["lat"],
+        lon=res["lon"],
     )
     return next(r for r in (await get_reservoirs_overview())["reservoirs"] if r["id"] == reservoir_id)
 
@@ -636,6 +641,7 @@ async def put_forecast_bulletin(
         + f" ({user['full_name']})",
         "canh_bao" if level else "van_hanh",
         "warning" if level else "info",
+        **await station_place(station_id),
     )
     return {"station_id": station_id, "points": len(points), "peak": peak.value, "peak_level": level}
 
@@ -652,4 +658,9 @@ async def delete_forecast_bulletin(
     )
     await audit(user, "forecast.bulletin_delete", "station", station_id, {})
     await hub.publish("forecast.updated", {"station_id": station_id})
-    await log_event(f"Gỡ bản tin dự báo mực nước {station['name']} ({user['full_name']})", "van_hanh", "info")
+    await log_event(
+        f"Gỡ bản tin dự báo mực nước {station['name']} ({user['full_name']})",
+        "van_hanh",
+        "info",
+        **await station_place(station_id),
+    )

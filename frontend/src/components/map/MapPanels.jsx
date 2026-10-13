@@ -1,13 +1,13 @@
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
 import {
-  Activity, AlertTriangle, Circle as CircleIcon, Clock, CloudRain, Compass, Droplets, MapPin, Megaphone, Mountain, PenTool, Route, Ruler, Search,
-  RotateCcw, Send, Siren, Waves, X,
+  Activity, AlertTriangle, ArrowUp, Circle as CircleIcon, Clock, CloudRain, Compass, Droplets, LifeBuoy, MapPin, Megaphone, MessageCircle, Mountain,
+  PenTool, Route, Ruler, Search, RotateCcw, Send, Settings2, Siren, Waves, X,
 } from 'lucide-react';
-import { ShowMore, TrendTag, useEscapeToClose } from '../common/ui';
+import { ErrorState, ShowMore, Skeleton, TrendTag, useEscapeToClose } from '../common/ui';
 import { Can } from '../../rbac/usePermission';
 import { ALARM, alarmLevel, INCIDENT, PRIORITY, STATION_TYPE } from '../../utils/labels';
-import { ago, int } from '../../utils/format';
+import { ago, dateTime, int, time } from '../../utils/format';
 import { fmtVn } from '../../utils/bulletin';
 import { risk } from '../../utils/risk';
 import { trendProps } from '../../utils/stations';
@@ -159,21 +159,157 @@ export function LayerList({ groups, layers, setLayers, unavailable, notes, count
   );
 }
 
+// Dòng diễn biến: nhóm loại nhật ký (operations.event_logs.category) → chip lọc
+const FEED_GROUPS = [
+  ['tat_ca', 'Tất cả', null],
+  ['cuu_ho', 'Cứu hộ', ['cuu_ho', 'nguoi_dan']],
+  ['canh_bao', 'Cảnh báo', ['canh_bao', 'he_thong']],
+  ['van_hanh', 'Vận hành', ['van_hanh']],
+];
+const SOS_CATEGORIES = ['cuu_ho', 'nguoi_dan']; // tài khoản không xem được SOS → ẩn (như tab Phiếu SOS)
+const FEED_ICON = { cuu_ho: LifeBuoy, nguoi_dan: MessageCircle, canh_bao: AlertTriangle, he_thong: Activity, van_hanh: Settings2 };
+const FEED_SEV = {
+  danger: { edge: risk(3).edge, text: risk(3).text },
+  warning: { edge: risk(1).edge, text: risk(1).text },
+  info: { edge: 'border-l-accent/40', text: 'text-muted' },
+};
+const FEED_STEP = 20;
+const feedRows = (all, g) => {
+  const cs = FEED_GROUPS.find(([x]) => x === g)?.[2];
+  return cs ? all.filter((l) => cs.includes(l.category)) : all;
+};
+const isToday = (t) => new Date(t).toDateString() === new Date().toDateString();
+
 /**
- * Bảng Cảnh báo khẩn cấp (thiết kế B.1 — feed bên phải): phiếu SOS đang mở + trạm vượt báo động / mất tín hiệu. Tài khoản
- * không có quyền xem SOS chỉ thấy thẻ Cảm biến. Chạm một mục → bản đồ bay tới (`onFocus`).
+ * Dòng diễn biến (thiết kế B.1 "dòng thời gian cuộn liên tục các tín hiệu SOS… hoặc cảnh báo từ cảm biến tự động"): nhật ký
+ * sự kiện mới nhất trên cùng — cùng nguồn "Nhật ký sự kiện" ở Tổng quan (/dashboard/logs), đẩy tức thì qua WebSocket
+ * `log.new`. Mục đến sau khi mở tab có nhãn "mới"; đang cuộn xem mục cũ thì danh sách không nhảy — hiện nút "N mục mới".
+ * Chạm mục có toạ độ → bản đồ bay tới. `feed`: { logs, pending, error, refetch }.
  */
+function EventFeed({ feed, canSos, onFocus, touch }) {
+  const [group, setGroup] = useState('tat_ca');
+  const [opened] = useState(() => Date.now()); // mục đến sau lúc mở tab = "mới"
+  const [seenAt, setSeenAt] = useState(null); // giờ của mục trên cùng lúc người dùng còn ở đầu danh sách
+  const listRef = useRef(null);
+  const all = useMemo(
+    () => (feed.logs || []).filter((l) => canSos || !SOS_CATEGORIES.includes(l.category)),
+    [feed.logs, canSos],
+  );
+  const rows = useMemo(() => feedRows(all, group), [all, group]);
+  const list = useShowMore(rows, FEED_STEP, group);
+  const topTime = rows[0] ? Date.parse(rows[0].time) : null;
+  // Đang ở đầu danh sách → coi như đã thấy mục mới nhất; cuộn xuống xem mục cũ → mục đến sau đó đếm vào nút "N mục mới"
+  useEffect(() => {
+    const el = listRef.current?.closest('.overflow-y-auto');
+    if (!el) return undefined;
+    // lúc mở tab coi như đã thấy mục trên cùng (vùng cuộn có thể đang ở giữa do tab trước)
+    const sync = () => setSeenAt((cur) => (el.scrollTop < 40 || cur == null ? topTime : cur));
+    sync();
+    el.addEventListener('scroll', sync, { passive: true });
+    return () => el.removeEventListener('scroll', sync);
+  }, [topTime]);
+  const unseen = seenAt == null ? 0 : rows.filter((l) => Date.parse(l.time) > seenAt).length;
+  const toTop = (behavior = 'smooth') => listRef.current?.closest('.overflow-y-auto')?.scrollTo({ top: 0, behavior });
+  // Đổi bộ lọc = xem danh sách mới từ đầu: mục trên cùng của bộ lọc đó coi như đã thấy
+  const pick = (g) => {
+    const first = feedRows(all, g)[0];
+    setGroup(g);
+    setSeenAt(first ? Date.parse(first.time) : null);
+    toTop('auto');
+  };
+
+  if (feed.pending) return <div className="space-y-2" ref={listRef}>{[0, 1, 2, 3].map((i) => <Skeleton key={i} height={52} />)}</div>;
+  if (feed.error && !feed.logs) return <ErrorState onRetry={feed.refetch}>Không tải được diễn biến (nhật ký sự kiện)</ErrorState>;
+  const groups = FEED_GROUPS.filter(([g]) => canSos || g !== 'cuu_ho');
+  return (
+    <div ref={listRef} className="space-y-2">
+      <div className={clsx('grid gap-1', groups.length === 4 ? 'grid-cols-2' : 'grid-cols-3')} role="group" aria-label="Lọc diễn biến theo loại">
+        {groups.map(([g, label, cs]) => (
+          <button
+            key={g}
+            type="button"
+            onClick={() => pick(g)}
+            aria-pressed={group === g}
+            className={clsx(
+              'inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full border px-2 text-[11px] font-semibold',
+              touch ? 'min-h-[44px]' : 'min-h-[26px]',
+              group === g ? 'border-accent bg-accent text-white' : 'border-line text-ink-2 hover:bg-panel2',
+            )}
+          >
+            {label} <span className="font-mono">{cs ? all.filter((l) => cs.includes(l.category)).length : all.length}</span>
+          </button>
+        ))}
+      </div>
+      {unseen > 0 && (
+        <button
+          type="button"
+          onClick={() => toTop()}
+          className={clsx('sticky top-0 z-10 mx-auto flex items-center gap-1 rounded-full bg-accent px-3 text-[11px] font-bold text-white shadow-lg', touch ? 'min-h-[44px]' : 'min-h-[28px]')}
+        >
+          <ArrowUp size={12} aria-hidden="true" /> {unseen} mục mới
+        </button>
+      )}
+      {feed.error && <p className="text-[11px] text-danger" role="status">Không cập nhật được — đang hiện diễn biến đã tải trước đó</p>}
+      <ol className="space-y-2" role="log" aria-label="Diễn biến, mới nhất trên cùng">
+        {list.visible.map((l) => {
+          const Icon = FEED_ICON[l.category] || Activity;
+          const sev = FEED_SEV[l.severity] || FEED_SEV.info;
+          const at = l.lat != null && l.lon != null;
+          const fresh = Date.parse(l.time) > opened;
+          const body = (
+            <>
+              <Icon size={14} className={clsx('mt-0.5 shrink-0', sev.text)} aria-hidden="true" />
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center gap-1.5 text-[11px] text-muted">
+                  <time dateTime={l.time} className="font-mono">{isToday(l.time) ? time(l.time) : dateTime(l.time)}</time>
+                  {fresh && <span className="chip bg-accent px-1.5 py-0 text-[10px] font-bold text-white">mới</span>}
+                </span>
+                <span className="mt-0.5 block text-xs leading-snug text-ink">{l.message}</span>
+              </span>
+              {at && <MapPin size={13} className="mt-0.5 shrink-0 text-muted" aria-hidden="true" />}
+            </>
+          );
+          const cls = clsx('flex w-full items-start gap-2 rounded-xl border border-l-4 border-line p-2.5 text-left shadow-sm', sev.edge, fresh && 'bg-accent/5');
+          return (
+            <li key={l.id}>
+              {at ? (
+                <button
+                  type="button"
+                  className={clsx(cls, 'transition-all hover:border-accent hover:bg-panel2/80')}
+                  onClick={() => onFocus({ lat: l.lat, lon: l.lon, zoom: 14, label: l.message.slice(0, 60) })}
+                  aria-label={`${time(l.time)}: ${l.message}. Xem trên bản đồ`}
+                >
+                  {body}
+                </button>
+              ) : (
+                <div className={cls}>{body}</div>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+      <ShowMore list={list} step={FEED_STEP} noun="mục" />
+      {!rows.length && (
+        <div className="px-2 py-8 text-center text-xs text-muted">
+          {all.length ? 'Không có diễn biến loại này' : 'Chưa có sự kiện nào trong vùng đang xem'}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /**
- * Bảng cảnh báo khẩn cấp: tab Điểm nóng (lãnh đạo — mọi loại rủi ro xếp Đỏ → Vàng, hotspots.js), Phiếu SOS (khi xem được
- * SOS), Cảm biến (vượt báo động, mất tín hiệu). `hotNote`: số liệu điểm nóng chưa đủ (đang tải / không tải được) — nói rõ
- * thay vì để danh sách thiếu trông như "không có gì".
+ * Bảng cảnh báo khẩn cấp (thiết kế B.1 — bên phải): tab Điểm nóng (lãnh đạo — mọi loại rủi ro xếp Đỏ → Vàng, hotspots.js),
+ * Diễn biến (dòng thời gian mới nhất trên cùng — EventFeed), Phiếu SOS (khi xem được SOS), Cảm biến (vượt báo động, mất tín
+ * hiệu). `hotNote`: số liệu điểm nóng chưa đủ (đang tải / không tải được) — nói rõ thay vì để danh sách thiếu trông như
+ * "không có gì". Chạm một mục → `onFocus(vị trí, điểm nóng?)` — bản đồ bay tới, bật lớp chứa điểm nóng.
  */
 export function AlertsList({
-  tab, setTab, sos, sensorAlerts, silentStations, noDataCount, hotspots = [], hotNote, canSos, canDispatch, onFocus, onDispatch, touch,
+  tab, setTab, sos, sensorAlerts, silentStations, noDataCount, hotspots = [], hotNote, feed, canSos, canDispatch, onFocus, onDispatch, touch,
 }) {
   const [search, setSearch] = useState('');
   const [prio, setPrio] = useState(0); // 0 = mọi mức; 1 / 2 / 3 = cấp ưu tiên (Đỏ / Cam / Vàng — cùng màu trên bản đồ)
-  const tabs = canSos ? ['diem_nong', 'sos', 'sensors'] : ['diem_nong', 'sensors'];
+  const tabs = canSos ? ['diem_nong', 'dien_bien', 'sos', 'sensors'] : ['diem_nong', 'dien_bien', 'sensors'];
   const active = tabs.includes(tab) ? tab : 'diem_nong';
   const hot = useShowMore(hotspots, HOT_STEP, 'diem-nong');
   const perPrio = useMemo(() => Object.fromEntries([1, 2, 3].map((n) => [n, sos.filter((s) => s.priority === n).length])), [sos]);
@@ -200,6 +336,7 @@ export function AlertsList({
       <div className="space-y-2 border-b border-line bg-panel2/40 px-3 py-2">
         <div className="flex gap-1">
           {tabBtn('diem_nong', `Điểm nóng (${hotspots.length})`)}
+          {tabBtn('dien_bien', 'Diễn biến')}
           {canSos && tabBtn('sos', `Phiếu SOS (${sos.length})`)}
           {tabBtn('sensors', `Cảm biến (${sensorAlerts.length + silentStations.length})`)}
         </div>
@@ -277,6 +414,8 @@ export function AlertsList({
             )}
           </>
         )}
+
+        {active === 'dien_bien' && <EventFeed feed={feed} canSos={canSos} onFocus={onFocus} touch={touch} />}
 
         {active === 'sos' && (
           <>

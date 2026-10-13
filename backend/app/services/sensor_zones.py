@@ -34,17 +34,19 @@ async def hold_stale_sensor_zones() -> list[str]:
                SET valid_until = now() + interval '1 hour',
                    name = CASE WHEN t.held THEN z.name ELSE z.name || :suffix END
               FROM t WHERE z.id = t.id
-         RETURNING z.name, t.held""",
+         RETURNING z.name, t.held, ST_Y(ST_PointOnSurface(z.geom)) AS lat, ST_X(ST_PointOnSurface(z.geom)) AS lon""",
         {"mark": HELD_MARK, "suffix": HELD_SUFFIX},
     )
-    first = [r["name"] for r in rows if not r["held"]]
+    first = [r for r in rows if not r["held"]]
     if rows:
         await invalidate("public:")  # vùng nguy hiểm hiện trên cổng công khai
-    for name in first:
+    for r in first:
         await log_event(
-            f"Giữ vùng nguy cơ “{name}”: cảm biến mất tín hiệu khi đang báo động — vùng không tự hết hạn cho tới khi "
+            f"Giữ vùng nguy cơ “{r['name']}”: cảm biến mất tín hiệu khi đang báo động — vùng không tự hết hạn cho tới khi "
             "có số đo mới; cử người kiểm tra hiện trường",
             "canh_bao",
             "warning",
+            lat=r["lat"],
+            lon=r["lon"],
         )
-    return first
+    return [r["name"] for r in first]

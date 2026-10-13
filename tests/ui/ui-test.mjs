@@ -1111,6 +1111,13 @@ const HAZARD_GLYPH = 'm21.73 18-8-14'; // hình cảnh báo trong ô vuông đi�
 async function mapLayers(ctx, phone) {
   const { page } = ctx;
   let k = null;
+  // WebSocket thật của trang (đi qua máy chủ như thường) — giữ đường để chèn thêm một tin "log.new" giả lập (bước Diễn
+  // biến), không phải ghi dữ liệu thật
+  let socket = null;
+  await page.routeWebSocket(/\/ws(\?|$)/, (ws) => {
+    ws.connectToServer();
+    socket = ws;
+  });
   await step(ctx, 'Đăng nhập, mở Bản đồ', async () => {
     await page.goto(`${ROOT}/dang-nhap`);
     await page.getByPlaceholder('Nhập tên đăng nhập hoặc email...').fill(STAFF.user);
@@ -1144,8 +1151,55 @@ async function mapLayers(ctx, phone) {
     await pop.getByText('Giám sát:').waitFor({ timeout: 5_000 });
     const text = (await pop.innerText()).replace(/\s+/g, ' ');
     if (phone) await expectNoOverflow(ctx, 'Bản đồ (popup điểm đen)');
-    await page.keyboard.press('Escape');
+    await page.locator('.leaflet-popup-close-button').first().dispatchEvent('click'); // Esc không đóng popup Leaflet
     return `${n} điểm · ${text.slice(0, 80)}`;
+  });
+
+  // Thiết kế B.1 "Bảng cảnh báo khẩn cấp: dòng thời gian cuộn liên tục (feed) các tín hiệu SOS… cảnh báo từ cảm biến"
+  await step(ctx, 'Diễn biến: mới nhất trên cùng, lọc theo loại; sự kiện mới đến khi đang cuộn → "N mục mới", không nhảy; chạm mục → bay tới', async () => {
+    if (phone) await page.getByRole('navigation', { name: 'Thao tác nhanh' }).getByRole('button', { name: /^Cảnh báo/ }).click();
+    await visible(page.getByRole('button', { name: 'Diễn biến', exact: true })).click();
+    const log = visible(page.getByRole('log', { name: 'Diễn biến, mới nhất trên cùng' }));
+    await log.locator('li').first().waitFor({ timeout: 15_000 });
+    const times = await log.locator('time').evaluateAll((els) => els.map((e) => Date.parse(e.getAttribute('datetime'))));
+    if (times.some((t, i) => i > 0 && times[i - 1] < t)) throw new Error('diễn biến chưa xếp mới nhất trên cùng');
+    const chips = visible(page.getByRole('group', { name: 'Lọc diễn biến theo loại' }));
+    const warn = chips.getByRole('button', { name: /^Cảnh báo \d+$/ });
+    const nWarn = Number((await warn.innerText()).match(/\d+/)[0]);
+    await warn.click();
+    const shown = await log.locator('li').count();
+    if (shown !== Math.min(nWarn, 20)) throw new Error(`lọc "Cảnh báo": hiện ${shown} mục, chip ghi ${nWarn}`);
+    await chips.getByRole('button', { name: /^Tất cả \d+$/ }).click();
+    await page.waitForTimeout(300);
+    if (!socket) throw new Error('trang chưa mở kết nối WebSocket');
+    // Đang cuộn xem mục cũ (nếu danh sách đủ dài) thì một sự kiện mới đến
+    const scrolled = await log.evaluate((el) => {
+      const sc = el.closest('.overflow-y-auto');
+      sc.scrollTop = 300;
+      return sc.scrollTop;
+    });
+    await page.waitForTimeout(300);
+    const msg = 'KIỂM THỬ: sự kiện giả lập qua WebSocket';
+    socket.send(JSON.stringify({
+      event: 'log.new',
+      data: { id: 2 ** 31, time: new Date().toISOString(), category: 'canh_bao', severity: 'danger', message: msg, lat: 22.6657, lon: 106.2522 },
+    }));
+    if (scrolled > 40) {
+      // bộ mô phỏng (bản trình diễn) có thể sinh thêm sự kiện thật trong lúc thử → "N mục mới", N ≥ 1
+      const pill = page.getByRole('button', { name: /^\d+ mục mới$/ });
+      await pill.waitFor({ timeout: 5_000 });
+      const kept = await log.evaluate((el) => el.closest('.overflow-y-auto').scrollTop);
+      if (kept < 100) throw new Error(`danh sách nhảy về đầu khi có mục mới (vị trí cuộn ${kept})`);
+      await pill.click();
+      await page.waitForFunction((el) => el.closest('.overflow-y-auto').scrollTop < 5, await log.elementHandle(), { timeout: 5_000 });
+    }
+    const item = log.locator('li', { hasText: msg }); // sự kiện thật đến sau có thể đứng trên — tìm theo nội dung
+    await item.waitFor({ timeout: 5_000 });
+    if (!(await item.getByText('mới', { exact: true }).count())) throw new Error('mục vừa đến chưa có nhãn "mới"');
+    await item.getByRole('button').click();
+    await page.locator('.leaflet-tooltip').filter({ hasText: msg.slice(0, 30) }).waitFor({ timeout: 5_000 });
+    if (phone) await expectNoOverflow(ctx, 'Bản đồ (Diễn biến)');
+    return `${times.length} mục · lọc "Cảnh báo" ${nWarn} · cuộn ${scrolled}px`;
   });
 }
 
