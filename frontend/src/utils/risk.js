@@ -50,5 +50,16 @@ export const levelOf = (table, code) => (code in table ? table[code] : null);
 export const rainLevel = (mm) => (mm == null ? null : mm >= 200 ? 3 : mm >= 100 ? 2 : mm >= 50 ? 1 : 0);
 export const RAIN_LABEL = ['Chưa tới mưa to', 'Mưa to', 'Mưa rất to', 'Mưa ≥ 200 mm']; // nhãn ngắn — vừa góc thẻ KPI
 
+/**
+ * Dự trữ (%) so với định mức an toàn của kho, sức chứa điểm nhiên liệu, bình nhiên liệu phương tiện → mức (thiết kế C.2):
+ * dưới 20 % Đỏ — cạn kiệt (phương tiện báo nhiên liệu dưới 20 % không được gợi ý điều động — FUEL_LOW,
+ * services/logistics.py); dưới 50 % Vàng — theo dõi, lên kế hoạch bổ sung; còn lại Xanh. Chưa có định mức / chưa ai báo →
+ * null (Xám). Cam dành cho hàng sắp hết hạn dùng (EXPIRY_DAYS ngày, như resources.py).
+ */
+export const STOCK_LOW = 20;
+export const STOCK_WATCH = 50;
+export const EXPIRY_DAYS = 30;
+export const stockLevel = (pct) => (pct == null || Number.isNaN(Number(pct)) ? null : pct < STOCK_LOW ? 3 : pct < STOCK_WATCH ? 1 : 0);
+
 /** Phiếu SOS: quá hạn phản hồi hoặc cấp 1 → Đỏ; cấp 2 → Cam; cấp 3 → Vàng (như màu ưu tiên PRIORITY). */
 export const sosLevel = (priority, overdue = false) => (overdue || priority === 1 ? 3 : priority === 2 ? 2 : 1);

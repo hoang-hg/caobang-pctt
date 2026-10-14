@@ -1313,6 +1313,199 @@ async function mapLayers(ctx, phone) {
   });
 }
 
+// ================================================================ Vật tư & Lực lượng (trang C) — laptop, iPad dọc, điện thoại 360
+// Dải khẩn trên cùng (chạm → đúng danh sách đã lọc; Quay lại trả bộ lọc cũ), 4 ô chỉ số, 3 thẻ vừa màn 360 px; tìm không dấu,
+// xếp, phân trang, Excel / PDF mọi dòng đang lọc; lỗi / trống / mất mạng báo rõ, nút ghi tắt khi mất mạng; màn cảm ứng: vùng
+// chạm ≥ 44 px; tài khoản phường chỉ thấy phường mình, không có nút điều động. Chỉ xem — không xuất / nhập kho, không báo xe.
+const RESOURCE_DEVICES = [
+  ['Laptop 1366×768', { viewport: { width: 1366, height: 768 } }, false],
+  ['iPad dọc', devices['iPad Pro 11'], false],
+  ['Điện thoại 360', devices['Galaxy S8'], true],
+];
+const WARD = { user: process.env.UI_WARD_USER || 'admin.thucphan', pass: process.env.UI_WARD_PASS || 'adminthucphan123', name: 'Thục Phán' };
+const norm = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/đ/g, 'd');
+
+async function loginAs(page, who) {
+  await page.goto(`${ROOT}/dang-nhap`);
+  await page.getByPlaceholder('Nhập tên đăng nhập hoặc email...').fill(who.user);
+  await page.getByPlaceholder('••••••••').fill(who.pass);
+  await page.locator('button[type="submit"]').click();
+  await page.waitForURL(/\/dashboard/, { timeout: 20_000 });
+}
+
+async function resourcesPage(ctx) {
+  const { page, vp } = ctx;
+  const strip = page.getByRole('status', { name: 'Thông tin khẩn về nguồn lực' });
+  const kpis = page.getByRole('group', { name: 'Chỉ số nguồn lực' });
+  const tabs = page.getByRole('group', { name: 'Danh mục nguồn lực' });
+  const tab = (name) => tabs.getByRole('button', { name: new RegExp(`^${name}`) });
+  // Dòng đang hiện: bảng (laptop) hoặc thẻ (iPad dọc, điện thoại)
+  const rows = page.locator('main table tbody tr, main ul[aria-label="Lực lượng cứu hộ"] > li, main ul[aria-label="Kho vật tư"] > li, main ul[aria-label="Phương tiện, trang thiết bị"] > li');
+  const touch = await page.evaluate(() => matchMedia('(pointer: coarse)').matches);
+  const wide = await page.evaluate(() => innerWidth >= 1024); // laptop: bảng, 20 dòng / trang; nhỏ hơn: thẻ, 10 dòng
+  const size = wide ? 20 : 10;
+
+  await step(ctx, 'Mở Vật tư & Lực lượng: dải khẩn trên cùng, 4 ô chỉ số, 3 thẻ vừa màn; không tràn ngang', async () => {
+    await loginAs(page, STAFF);
+    await page.goto(`${ROOT}/nguon-luc`);
+    await kpis.getByRole('button').first().waitFor({ timeout: 20_000 });
+    await strip.waitFor({ timeout: 20_000 });
+    await rows.first().waitFor({ timeout: 20_000 });
+    const m = await page.evaluate(() => {
+      const box = (sel) => document.querySelector(sel)?.getBoundingClientRect();
+      const tabBtns = [...document.querySelectorAll('[aria-label="Danh mục nguồn lực"] > button')].map((b) => b.getBoundingClientRect());
+      return {
+        stripAbove: box('[aria-label="Thông tin khẩn về nguồn lực"]').top < box('[aria-label="Chỉ số nguồn lực"]').top,
+        kpi: document.querySelectorAll('[aria-label="Chỉ số nguồn lực"] > button').length,
+        tabs: tabBtns.length,
+        tabsOut: tabBtns.filter((t) => t.right > innerWidth + 1 || t.left < -1).length,
+      };
+    });
+    if (!m.stripAbove) throw new Error('dải thông tin khẩn không nằm trên cùng');
+    if (m.kpi !== 4) throw new Error(`có ${m.kpi} ô chỉ số (cần 4, bấm được)`);
+    if (m.tabs !== 3 || m.tabsOut) throw new Error(`${m.tabs} thẻ, ${m.tabsOut} thẻ tràn khỏi màn hình`);
+    await expectNoOverflow(ctx, '/nguon-luc');
+    return (await strip.innerText()).replace(/\s+/g, ' ').slice(0, 80);
+  });
+
+  await step(ctx, 'Chạm ô chỉ số / dải khẩn → đúng danh sách đã lọc; Quay lại trả bộ lọc cũ', async () => {
+    const tile = kpis.getByRole('button', { name: /Kho cạn kiệt/ });
+    const n = Number((await tile.innerText()).match(/(\d+)\s*kho dưới/)?.[1] ?? 0);
+    await tile.click();
+    await page.waitForURL(/tab=vat_tu/);
+    const cards = page.getByRole('list', { name: 'Kho vật tư' }).locator(':scope > li');
+    await cards.first().waitFor({ timeout: 10_000 });
+    if (n > 0) {
+      if (!/tt=can_kiet/.test(page.url())) throw new Error(`ô "${n} kho dưới 20%" mở ${page.url()}`);
+      const shown = await cards.count();
+      if (shown !== Math.min(n, size)) throw new Error(`ô ghi ${n} kho, danh sách hiện ${shown}`);
+      const texts = await cards.allInnerTexts();
+      if (!texts.every((t) => /Cạn kiệt/.test(t))) throw new Error('có kho không cạn kiệt trong danh sách đã lọc');
+    }
+    const before = page.url();
+    await kpis.getByRole('button', { name: /Xuồng/ }).click();
+    await page.waitForURL(/tab=phuong_tien/);
+    await rows.first().waitFor({ timeout: 10_000 }).catch(() => {});
+    const boats = await rows.allInnerTexts();
+    if (!/nhom=duong_thuy/.test(page.url()) || !boats.every((t) => /Đường thủy/.test(t) && /Sẵn sàng/.test(t))) {
+      throw new Error(`ô Xuồng mở ${page.url()} — ${boats.length} dòng không đúng nhóm / tình trạng`);
+    }
+    await page.goBack();
+    await page.waitForURL((u) => u.toString() === before, { timeout: 5_000 });
+    // Mục đầu của dải khẩn (nếu có): mở đúng thẻ
+    const chip = strip.locator('button[title$="mở danh sách đã lọc"]').first();
+    let chipNote = 'dải khẩn không có mục';
+    if (await chip.count()) {
+      await chip.click();
+      await page.waitForURL(/tab=/);
+      chipNote = `mục khẩn → ${new URL(page.url()).search}`;
+    }
+    return `${n} kho cạn kiệt · ${boats.length} xuồng sẵn sàng · ${chipNote}`;
+  });
+
+  await step(ctx, 'Tìm không dấu, xếp, phân trang; Excel (và PDF trên laptop) xuất mọi dòng đang lọc', async () => {
+    await page.goto(`${ROOT}/nguon-luc`);
+    await rows.first().waitFor({ timeout: 20_000 });
+    // Tìm theo một từ trong tên đơn vị đầu tiên, gõ không dấu
+    const first = (await rows.first().innerText()).split('\n')[0];
+    const word = norm(first).split(/[^a-z0-9]+/).find((w) => w.length >= 4) || norm(first).slice(0, 4);
+    await page.getByLabel('Tìm trong danh sách').fill(word);
+    await page.waitForTimeout(300);
+    const found = await rows.allInnerTexts();
+    if (!found.length || !found.some((t) => t.includes(first))) throw new Error(`tìm "${word}" không ra "${first}"`);
+    await page.getByLabel('Xoá ô tìm').click();
+    await tab('Phương tiện').click();
+    await rows.first().waitFor();
+    const pager = page.getByText(/^\d+–\d+$/).first();
+    const total = await rows.count();
+    let pageNote = `${total} dòng, 1 trang`;
+    if (total === size && await page.getByRole('button', { name: 'Trang sau' }).isEnabled().catch(() => false)) {
+      await page.getByRole('button', { name: 'Trang sau' }).click();
+      await page.getByText(new RegExp(`^${size + 1}–\\d+$`)).first().waitFor({ timeout: 5_000 });
+      pageNote = `trang 2: ${await rows.count()} dòng`;
+    }
+    const sortBox = page.getByLabel('Sắp xếp');
+    if (!(await sortBox.isVisible())) await page.getByRole('button', { name: /^Bộ lọc/ }).click(); // điện thoại: ô xếp nằm trong khung Bộ lọc
+    await sortBox.selectOption('nhien_lieu');
+    await page.waitForTimeout(300);
+    if (await pager.count() && !/^1–/.test(await pager.innerText())) throw new Error('đổi cách xếp không về trang 1');
+    const fuel = (await rows.allInnerTexts()).map((t) => Number(t.match(/(\d+)%/)?.[1])).filter((x) => !Number.isNaN(x));
+    if (fuel.some((x, i) => i && fuel[i - 1] > x)) throw new Error(`"Nhiên liệu thấp trước" xếp sai: ${fuel.slice(0, 6)}`);
+    const [xlsx] = await Promise.all([page.waitForEvent('download', { timeout: 20_000 }), page.getByRole('button', { name: 'Excel', exact: true }).click()]);
+    if (!/^phuong-tien-.*\.xlsx$/.test(xlsx.suggestedFilename())) throw new Error(`tên tệp Excel: ${xlsx.suggestedFilename()}`);
+    let pdfNote = '';
+    if (wide) {
+      const [pdf] = await Promise.all([page.waitForEvent('download', { timeout: 60_000 }), page.getByRole('button', { name: 'PDF', exact: true }).click()]);
+      if (!/^nguon-luc-phuong_tien-.*\.pdf$/.test(pdf.suggestedFilename())) throw new Error(`tên tệp PDF: ${pdf.suggestedFilename()}`);
+      await page.waitForTimeout(300);
+      if ((await rows.count()) > size) throw new Error('chụp PDF xong không trở lại phân trang');
+      pdfNote = ` · ${pdf.suggestedFilename()}`;
+    }
+    await expectNoOverflow(ctx, 'thẻ Phương tiện');
+    return `tìm "${word}" · ${pageNote} · ${xlsx.suggestedFilename()}${pdfNote}`;
+  });
+
+  await step(ctx, 'Lỗi tải / chưa có dữ liệu / mất mạng: báo rõ (Thử lại, chỗ nhập), nút ghi tắt khi mất mạng', async () => {
+    // Mất kết nối tới máy chủ (abort — không phải 5xx thật, watch() không tính là lỗi API)
+    await page.route('**/api/v1/resources/forces*', safeRoute((r) => r.abort('failed')));
+    await page.goto(`${ROOT}/nguon-luc`);
+    await page.getByText('Không tải được danh sách đơn vị').waitFor({ timeout: 20_000 });
+    await page.getByRole('button', { name: 'Thử lại' }).first().waitFor();
+    await page.unroute('**/api/v1/resources/forces*');
+    await page.route('**/api/v1/resources/vehicles*', safeRoute((r) => r.fulfill({ status: 200, contentType: 'application/json', body: '[]' })));
+    await page.goto(`${ROOT}/nguon-luc?tab=phuong_tien`);
+    await page.getByText(/Chưa có phương tiện, trang thiết bị trong vùng đang xem/).waitFor({ timeout: 20_000 });
+    await page.unroute('**/api/v1/resources/vehicles*');
+    await page.goto(`${ROOT}/nguon-luc?tab=vat_tu`);
+    const issue = page.getByRole('button', { name: /Xuất kho/ }).first();
+    await issue.waitFor({ timeout: 20_000 });
+    await page.context().setOffline(true);
+    try {
+      await page.getByText('Mất kết nối mạng').waitFor({ timeout: 5_000 });
+      if (!(await issue.isDisabled())) throw new Error('mất mạng nhưng nút Xuất kho vẫn bấm được');
+    } finally {
+      await page.context().setOffline(false);
+    }
+    await page.waitForTimeout(300);
+    if (await issue.isDisabled()) throw new Error('có mạng lại nhưng nút Xuất kho vẫn tắt');
+  });
+
+  if (touch) {
+    await step(ctx, 'Màn cảm ứng: mọi vùng chạm của 3 thẻ ≥ 44 px', async () => {
+      const bad = [];
+      for (const t of ['luc_luong', 'vat_tu', 'phuong_tien']) {
+        await page.goto(`${ROOT}/nguon-luc?tab=${t}`);
+        await rows.first().waitFor({ timeout: 20_000 });
+        await page.waitForTimeout(800);
+        for (const s of await smallTargets(page)) bad.push(`${t}: ${s.what} ${s.size}px`);
+      }
+      if (bad.length) throw new Error(`${bad.length} vùng chạm < 44 px — ${bad.slice(0, 5).join(', ')}`);
+    });
+  }
+}
+
+/** Tài khoản phường (Cấp 3): tiêu đề là phường mình, chỉ đơn vị trong phường, không có nút điều động (quyền dispatch.create). */
+async function resourcesWard(ctx) {
+  const { page } = ctx;
+  await step(ctx, `Tài khoản phường ${WARD.name}: chỉ thấy phường mình, không có nút Điều động`, async () => {
+    try {
+      await loginAs(page, WARD);
+    } catch (e) {
+      if (READONLY) return `bỏ qua: không đăng nhập được ${WARD.user}`;
+      throw e;
+    }
+    await page.goto(`${ROOT}/nguon-luc`);
+    await page.getByRole('group', { name: 'Chỉ số nguồn lực' }).getByRole('button').first().waitFor({ timeout: 20_000 });
+    await page.waitForTimeout(1500);
+    const head = await page.locator('main').innerText();
+    if (!head.includes(WARD.name) || /Toàn tỉnh Cao Bằng ·/.test(head)) throw new Error('tiêu đề không phải phường của tài khoản');
+    if (await page.getByRole('button', { name: /Điều động/ }).count()) throw new Error('tài khoản phường thấy nút Điều động');
+    await expectNoOverflow(ctx, '/nguon-luc (phường)');
+    const units = await page.locator('main ul[aria-label="Lực lượng cứu hộ"] > li, main table tbody tr').count();
+    return `${units} đơn vị trong phường`;
+  });
+}
+
 // ================================================================
 console.log(`Kiểm thử giao diện: ${ROOT}${READONLY ? ' (chỉ xem)' : ''}`);
 const browser = await chromium.launch();
@@ -1368,6 +1561,21 @@ try {
     const lPage = await lctx.newPage();
     await mapLayers({ page: lPage, vp: { name: `Lớp & popup bản đồ · ${label}`, mobile: phone }, problems: watch(lPage) }, phone);
     await lctx.close();
+  }
+  for (const [label, opts, phone] of RESOURCE_DEVICES) {
+    const rctx = await browser.newContext({ ...opts, locale: 'vi-VN', acceptDownloads: true });
+    rctx.setDefaultTimeout(15_000);
+    const rPage = await rctx.newPage();
+    const vpR = { name: `Vật tư & Lực lượng · ${label}`, mobile: phone };
+    await resourcesPage({ page: rPage, vp: vpR, problems: watch(rPage) });
+    await rctx.close();
+    if (phone) {
+      const wctx = await browser.newContext({ ...opts, locale: 'vi-VN' });
+      wctx.setDefaultTimeout(15_000);
+      const wPage = await wctx.newPage();
+      await resourcesWard({ page: wPage, vp: vpR, problems: watch(wPage) });
+      await wctx.close();
+    }
   }
 } finally {
   await browser.close();

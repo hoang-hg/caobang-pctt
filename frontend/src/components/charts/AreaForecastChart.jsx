@@ -64,7 +64,7 @@ export default function AreaForecastChart({ height = 250 }) {
     return (
       <EmptyState height={height}>
         Chưa có dữ liệu dự báo mưa theo xã — nguồn dự báo Open-Meteo chưa chạy
-        {canSystem ? <> · <Link to="/nguon-du-lieu" className="font-semibold text-accent hover:underline">Kiểm tra nguồn dữ liệu →</Link></> : ' (báo cấp tỉnh kiểm tra)'}
+        {canSystem ? <> · <Link to="/nguon-du-lieu" className="touch-hit font-semibold text-accent hover:underline">Kiểm tra nguồn dữ liệu →</Link></> : ' (báo cấp tỉnh kiểm tra)'}
       </EmptyState>
     );
   }
