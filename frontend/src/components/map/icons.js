@@ -1,5 +1,5 @@
 import L from 'leaflet';
-import { NO_DATA, RISK, stockLevel } from '../../utils/risk';
+import { NO_DATA, occupancyLevel, RISK, stockLevel } from '../../utils/risk';
 
 // Đỏ / cam / vàng / xanh / xám lấy từ thang màu rủi ro chung (utils/risk.js) — biểu tượng trên bản đồ cùng màu với chip
 const COLORS = { do: RISK[3].hex, cam: RISK[2].hex, vang: RISK[1].hex, good: RISK[0].hex, blue: '#2a78d6', gray: NO_DATA.hex, violet: '#6d5dd3' };
@@ -92,8 +92,9 @@ export const reservoirIcon = (gatesOpen, level, outflow) => {
 export const warehouseIcon = (minPct) =>
   badge(P.box, { bg: '#fff', stroke: '#7c3aed', ring: ({ 3: COLORS.do, 1: COLORS.vang })[stockLevel(minPct)] || '#7c3aed', size: 26, shape: 'square' });
 
+/** Điểm sơ tán: viền theo mức chứa (thang chung occupancyLevel — đầy Đỏ, trên 85% Cam, còn chỗ xanh lá nhận diện). */
 export const evacIcon = (ratio) =>
-  badge(P.home, { bg: '#dcfce7', stroke: '#166534', ring: ratio >= 1 ? COLORS.do : ratio > 0.85 ? COLORS.cam : '#166534', size: 24 });
+  badge(P.home, { bg: '#dcfce7', stroke: '#166534', ring: ({ 3: COLORS.do, 2: COLORS.cam })[occupancyLevel(ratio, 1)] || '#166534', size: 24 });
 
 export const cameraIcon = () => badge(P.cam, { bg: '#111827', stroke: '#fff', ring: '#111827', size: 24, shape: 'square' });
 

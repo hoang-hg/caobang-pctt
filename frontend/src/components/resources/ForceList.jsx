@@ -1,6 +1,6 @@
 import clsx from 'clsx';
-import { ArrowUpDown, MapPin, Phone, Radio, Send, UserRound } from 'lucide-react';
-import { StatusDot } from '../common/ui';
+import { MapPin, Phone, Radio, Send, UserRound } from 'lucide-react';
+import { SortTh, StatusDot } from '../common/ui';
 import { FORCE_TYPE, RES_STATUS, SKILL } from '../../utils/labels';
 import { int } from '../../utils/format';
 import { forceLevelLabel } from './resourceFacts';
@@ -24,19 +24,6 @@ function Strength({ f }) {
       <div className="bg-good" style={{ width: `${(100 * f.personnel_ready) / total}%` }} />
       <div className="bg-warn" style={{ width: `${(100 * f.personnel_on_mission) / total}%` }} />
     </div>
-  );
-}
-
-/** Tiêu đề cột bấm được để xếp (bảng máy tính) — chọn cùng cách xếp với ô "Xếp" của thanh lọc. */
-export function SortTh({ k, dir = 'ascending', sort, onSort, pdf, children, className }) {
-  if (!k || pdf) return <th scope="col" className={className}>{children}</th>;
-  return (
-    <th scope="col" className={className} aria-sort={sort === k ? dir : undefined}>
-      <button type="button" className="tap inline-flex items-center gap-1 uppercase hover:text-ink" onClick={() => onSort(k)} title="Xếp theo cột này">
-        {children}
-        <ArrowUpDown size={11} className={sort === k ? 'text-accent' : 'opacity-40'} aria-hidden="true" />
-      </button>
-    </th>
   );
 }
 

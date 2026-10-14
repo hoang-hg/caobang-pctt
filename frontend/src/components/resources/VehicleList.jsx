@@ -1,14 +1,14 @@
 import clsx from 'clsx';
 import { MapContainer, Marker, Popup } from 'react-leaflet';
 import { Fuel, MapPin, Pencil, Phone, Wrench } from 'lucide-react';
-import { EmptyState, ErrorState, Progress, Section, Skeleton, StatusDot } from '../common/ui';
+import { EmptyState, ErrorState, Progress, Section, Skeleton, SortTh, StatusDot } from '../common/ui';
 import { BaseLayer, MapResize } from '../map/MapTools';
 import { vehicleIcon } from '../map/icons';
 import { Can, usePermission } from '../../rbac/usePermission';
 import { RES_STATUS, VEHICLE, VEHICLE_CAT } from '../../utils/labels';
 import { dateTime, int, time } from '../../utils/format';
 import { STOCK_LOW, stockLevel } from '../../utils/risk';
-import { SortTh, StatusChip } from './ForceList';
+import { StatusChip } from './ForceList';
 import { depotPct } from './resourceFacts';
 
 const BTN = 'tap inline-flex min-h-[36px] whitespace-nowrap items-center justify-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold';

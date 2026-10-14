@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import clsx from 'clsx';
 import {
-  AlertTriangle, ArrowLeft, Check, ChevronDown, ChevronLeft, ChevronRight, MoveRight, RefreshCw, TrendingDown, TrendingUp, X,
+  AlertTriangle, ArrowLeft, ArrowUpDown, Check, ChevronDown, ChevronLeft, ChevronRight, MoveRight, RefreshCw, TrendingDown, TrendingUp, X,
 } from 'lucide-react';
 import { NO_DATA, RISK, risk } from '../../utils/risk';
 
@@ -307,6 +307,19 @@ export function Pager({ paged, size, sizes = [10, 20, 50], onSize, noun, classNa
         </div>
       )}
     </div>
+  );
+}
+
+/** Tiêu đề cột bấm được để xếp (bảng máy tính) — chọn cùng cách xếp với ô "Xếp" của thanh lọc; `dir`: chiều của cách xếp đó. */
+export function SortTh({ k, dir = 'ascending', sort, onSort, pdf, children, className }) {
+  if (!k || pdf) return <th scope="col" className={className}>{children}</th>;
+  return (
+    <th scope="col" className={className} aria-sort={sort === k ? dir : undefined}>
+      <button type="button" className="tap inline-flex items-center gap-1 uppercase hover:text-ink" onClick={() => onSort(k)} title="Xếp theo cột này">
+        {children}
+        <ArrowUpDown size={11} className={sort === k ? 'text-accent' : 'opacity-40'} aria-hidden="true" />
+      </button>
+    </th>
   );
 }
 
