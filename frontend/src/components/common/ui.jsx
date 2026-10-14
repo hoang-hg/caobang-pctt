@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import clsx from 'clsx';
 import {
-  AlertTriangle, ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, MoveRight, RefreshCw, TrendingDown, TrendingUp, X,
+  AlertTriangle, ArrowLeft, Check, ChevronDown, ChevronLeft, ChevronRight, MoveRight, RefreshCw, TrendingDown, TrendingUp, X,
 } from 'lucide-react';
 import { NO_DATA, RISK, risk } from '../../utils/risk';
 
@@ -311,6 +311,33 @@ export function Pager({ paged, size, sizes = [10, 20, 50], onSize, noun, classNa
 }
 
 export const StatusDot = ({ cls }) => <span className={clsx('inline-block h-2 w-2 shrink-0 rounded-full', cls)} />;
+
+/**
+ * Các bước của form nhiều bước (đầu hộp thoại): bấm để quay lại bước đã qua, không nhảy cóc tới bước chưa điền. `done[i]`:
+ * bước i đã điền đủ (dấu ✓). Nút ≥ 44 px trên màn cảm ứng.
+ */
+export function StepChips({ steps, step, onStep, done = [], disabled }) {
+  return (
+    <ol className="mb-3 flex flex-wrap gap-1.5 text-[11px]" aria-label="Các bước">
+      {steps.map((s, i) => (
+        <li key={s}>
+          <button
+            type="button"
+            disabled={i > step || disabled}
+            onClick={() => onStep(i)}
+            aria-current={i === step ? 'step' : undefined}
+            className={clsx(
+              'chip tap min-h-[32px] px-2.5 py-0.5',
+              i === step ? 'bg-accent text-white' : i < step ? 'bg-good/15 text-good hover:bg-good/25' : 'bg-panel2 text-muted',
+            )}
+          >
+            {i < step && done[i] && <Check size={11} aria-hidden="true" />} {i + 1}. {s}
+          </button>
+        </li>
+      ))}
+    </ol>
+  );
+}
 
 /** Lỗi của một ô nhập, hiện ngay dưới ô (ô đặt aria-invalid + aria-describedby trỏ tới `id`). Dùng chung mọi form. */
 export const FieldError = ({ id, children }) => (children ? (
