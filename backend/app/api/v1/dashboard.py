@@ -417,7 +417,8 @@ async def _landslide_sensors(codes: list[str], hours: int) -> dict:
 
 @router.get("/dashboard/supplies")
 async def supplies(codes: list[str] = Depends(area_scope("resource", "view"))):
-    """Vật tư theo kho/nhóm: hiện có vs định mức (phần thiếu hụt để vẽ cột chồng)."""
+    """Vật tư theo kho/nhóm (lương thực, nước uống, y tế, đồ dùng cứu sinh — thiết kế C.2): hiện có vs định mức (phần
+    thiếu hụt để vẽ cột chồng)."""
     return await cached_view("supplies", {"codes": codes}, lambda: _supplies(codes))
 
 
@@ -429,7 +430,7 @@ async def _supplies(codes: list[str]) -> list[dict]:
               FROM resources.inventory inv
               JOIN resources.items i ON i.code = inv.item_code
               JOIN resources.warehouses w ON w.id = inv.warehouse_id
-             WHERE i.category IN ('luong_thuc', 'nuoc_uong', 'do_dung') AND {area_clause('w.location', codes)}
+             WHERE i.category IN ('luong_thuc', 'nuoc_uong', 'y_te', 'do_dung') AND {area_clause('w.location', codes)}
              GROUP BY w.code, w.name, w.level, i.category
              ORDER BY array_position(ARRAY['tinh', 'cum', 'xa', 'da_chien'], w.level), w.code""",
         {"codes": codes},

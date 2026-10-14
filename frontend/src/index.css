@@ -39,6 +39,9 @@
   --series-1: #2a78d6;
   --series-2: #eb6834;
   --series-3: #1baf7a;
+  /* Màu 4 (nhóm Y tế): tím, không dùng vàng của bộ palette — vàng là mức "Vàng – theo dõi" của thang rủi ro trên cùng
+     trang. Đã chạy kiểm định với 3 màu trên: CVD ΔE ≥ 9, nền sáng / tối đều đạt */
+  --series-4: #6250d6;
   --chart-grid: #e5e7eb;
   --chart-axis: #6b7280;
   --chart-shortage: #d1d5db;
@@ -64,6 +67,7 @@
     --series-1: #3987e5;
     --series-2: #d95926;
     --series-3: #199e70;
+    --series-4: #9085e9;
     --chart-grid: #273449;
     --chart-axis: #94a3b8;
     --chart-shortage: #334155;

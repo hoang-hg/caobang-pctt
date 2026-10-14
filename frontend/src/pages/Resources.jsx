@@ -14,8 +14,10 @@ import ConnectionBanner from '../components/dashboard/ConnectionBanner';
 import QuickIncidentModal from '../components/dashboard/QuickIncidentModal';
 import { unitLabel } from '../components/dashboard/CommuneView';
 import ForceList from '../components/resources/ForceList';
+import ItemSummary from '../components/resources/ItemSummary';
 import PickSheet from '../components/resources/PickSheet';
 import QuickDispatch from '../components/resources/QuickDispatch';
+import { ForceReadinessChart, VehicleStatusChart } from '../components/resources/ReadinessCharts';
 import ResourceAlerts from '../components/resources/ResourceAlerts';
 import ResourceKpis from '../components/resources/ResourceKpis';
 import ResourceToolbar from '../components/resources/ResourceToolbar';
@@ -69,6 +71,7 @@ export default function Resources() {
   const sort = sorts[tab] || SORTS[tab][0][0];
   const [pageSize, setPageSize] = useState(() => (window.innerWidth >= 1024 ? 20 : 10));
   const [chartOpen, setChartOpen] = useState(() => window.innerWidth >= 768);
+  const [supplyView, setSupplyView] = useState('kho'); // thẻ Vật tư: biểu đồ theo kho | tổng hợp theo mặt hàng
   const [pdf, setPdf] = useState(false); // đang chụp PDF: mọi dòng đang lọc, dạng bảng, bỏ nút
   const [refreshing, setRefreshing] = useState(false);
   const [quick, setQuick] = useState(null);
@@ -354,14 +357,42 @@ export default function Resources() {
       />
 
       <div ref={contentRef} className="flex flex-col gap-3 bg-bg">
+        {/* Biểu đồ cho lãnh đạo, trên danh sách của mỗi thẻ — thu gọn được (điện thoại mặc định thu gọn: danh sách lên trước) */}
         {tab === 'vat_tu' && (
           <Section
-            title="Phân bổ dự trữ giữa các kho (điều tiết liên vùng)"
+            title={supplyView === 'mat_hang' ? 'Dự trữ theo mặt hàng' : 'Phân bổ dự trữ giữa các kho (điều tiết liên vùng)'}
             collapsible
             open={chartOpen || pdf}
             onToggle={() => setChartOpen((v) => !v)}
+            right={(
+              <div className="flex shrink-0 gap-1 no-print" role="group" aria-label="Cách xem dự trữ">
+                {[['kho', 'Theo kho'], ['mat_hang', 'Theo mặt hàng']].map(([v, label]) => (
+                  <button
+                    key={v}
+                    type="button"
+                    aria-pressed={supplyView === v}
+                    onClick={() => { setSupplyView(v); setChartOpen(true); }}
+                    className={clsx('tap whitespace-nowrap rounded-md px-2 py-1 text-[11px] font-semibold', supplyView === v ? 'bg-accent text-white' : 'bg-panel2/60 text-muted hover:text-ink')}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
           >
-            <SuppliesChart height={260} />
+            {supplyView === 'mat_hang'
+              ? <ItemSummary warehouses={rows} category={filters.nhom} expiringOf={(w) => factsOf(w).expiring} />
+              : <SuppliesChart height={260} />}
+          </Section>
+        )}
+        {tab === 'luc_luong' && rows.length > 0 && (
+          <Section title="Quân số theo loại lực lượng" collapsible open={chartOpen || pdf} onToggle={() => setChartOpen((v) => !v)}>
+            <ForceReadinessChart forces={rows} />
+          </Section>
+        )}
+        {tab === 'phuong_tien' && rows.length > 0 && (
+          <Section title="Phương tiện theo nhóm và tình trạng" collapsible open={chartOpen || pdf} onToggle={() => setChartOpen((v) => !v)}>
+            <VehicleStatusChart vehicles={rows} />
           </Section>
         )}
         {tab === 'phuong_tien' ? (

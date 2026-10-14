@@ -1,5 +1,5 @@
 import L from 'leaflet';
-import { NO_DATA, RISK } from '../../utils/risk';
+import { NO_DATA, RISK, stockLevel } from '../../utils/risk';
 
 // Đỏ / cam / vàng / xanh / xám lấy từ thang màu rủi ro chung (utils/risk.js) — biểu tượng trên bản đồ cùng màu với chip
 const COLORS = { do: RISK[3].hex, cam: RISK[2].hex, vang: RISK[1].hex, good: RISK[0].hex, blue: '#2a78d6', gray: NO_DATA.hex, violet: '#6d5dd3' };
@@ -87,8 +87,10 @@ export const reservoirIcon = (gatesOpen, level, outflow) => {
   });
 };
 
-export const warehouseIcon = (pctValue) =>
-  badge(P.box, { bg: '#fff', stroke: '#7c3aed', ring: pctValue == null ? '#7c3aed' : pctValue < 20 ? COLORS.do : pctValue < 50 ? COLORS.cam : '#7c3aed', size: 26, shape: 'square' }); // null = kho chưa có số liệu tồn kho
+/** Kho: viền theo mặt hàng thiếu nhất (thang chung stockLevel — như trang Vật tư & Lực lượng): dưới 20% định mức Đỏ, dưới
+ * 50% Vàng; đủ hoặc chưa có số liệu tồn kho (null) giữ viền tím nhận diện. */
+export const warehouseIcon = (minPct) =>
+  badge(P.box, { bg: '#fff', stroke: '#7c3aed', ring: ({ 3: COLORS.do, 1: COLORS.vang })[stockLevel(minPct)] || '#7c3aed', size: 26, shape: 'square' });
 
 export const evacIcon = (ratio) =>
   badge(P.home, { bg: '#dcfce7', stroke: '#166534', ring: ratio >= 1 ? COLORS.do : ratio > 0.85 ? COLORS.cam : '#166534', size: 24 });

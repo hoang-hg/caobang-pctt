@@ -10,6 +10,7 @@ const CATS = [
   { key: 'luong_thuc', label: 'Lương thực' },
   { key: 'nuoc_uong', label: 'Nước uống' },
   { key: 'do_dung', label: 'Áo phao & đồ cứu sinh' },
+  { key: 'y_te', label: 'Y tế' }, // túi sơ cứu, thuốc, Cloramin B (thiết kế C.2) — màu 4, thêm sau để 3 nhóm cũ giữ màu
 ];
 
 // Cấp kho (resources.warehouses.level)
@@ -42,7 +43,7 @@ export default function SuppliesChart({ height = 250 }) {
   const [levelFilter, setLevelFilter] = useState('all');
   const { data, isError, refetch } = useAreaQuery('supplies', '/dashboard/supplies', {}, { refetchInterval: 60_000 });
 
-  const colors = [c.s1, c.s2, c.s3];
+  const colors = [c.s1, c.s2, c.s3, c.s4]; // màu theo nhóm hàng, cố định (lọc kho không đổi màu)
 
   const { rows, levels, criticalCount } = useMemo(() => {
     if (!data) return { rows: [], levels: [], criticalCount: 0 };

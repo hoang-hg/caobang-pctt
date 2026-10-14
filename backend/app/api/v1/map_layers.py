@@ -146,7 +146,11 @@ async def _layers(codes: list[str], res_codes: list[str], sos_codes: list[str], 
                    COALESCE(json_agg(json_build_object('category', i.category, 'pct',
                             round(100.0 * inv.quantity / NULLIF(inv.safety_quota, 0))))
                             FILTER (WHERE inv.item_code IS NOT NULL), '[]') AS items,
-                   round(100.0 * sum(inv.quantity) / NULLIF(sum(inv.safety_quota), 0))::int AS pct
+                   round(100.0 * sum(inv.quantity) / NULLIF(sum(inv.safety_quota), 0))::int AS pct,
+                   -- Mức của kho theo mặt hàng thiếu nhất (như trang Vật tư & Lực lượng, dải khẩn): có hàng dưới 20%
+                   -- định mức là Đỏ dù cả kho còn nhiều; mặt hàng chưa có định mức không tính
+                   min(round(100.0 * inv.quantity / NULLIF(inv.safety_quota, 0)))::int AS min_pct,
+                   count(*) FILTER (WHERE round(100.0 * inv.quantity / NULLIF(inv.safety_quota, 0)) < 20) AS low_items
               FROM resources.warehouses w
               -- LEFT JOIN: kho chưa có dòng tồn kho vẫn hiện trên bản đồ (pct = null)
               LEFT JOIN resources.inventory inv ON inv.warehouse_id = w.id
