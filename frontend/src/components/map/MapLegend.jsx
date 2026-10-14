@@ -128,7 +128,7 @@ const ROWS = {
       <b>Lộ trình điều động</b> — xanh: tránh vùng nguy hiểm, cam: đi qua
     </Row>
   ),
-  warehouses: () => <Row sym={<Ico icon={warehouseIcon(15)} />}><b>Kho vật tư</b> — viền đỏ: tồn dưới 20% định mức, cam: dưới 50%</Row>,
+  warehouses: () => <Row sym={<Ico icon={warehouseIcon(15)} />}><b>Kho vật tư</b> — viền đỏ: có mặt hàng dưới 20% định mức, vàng: dưới 50%</Row>,
   evac: () => <Row sym={<Ico icon={evacIcon(0.9)} />}><b>Điểm sơ tán</b> — viền cam: trên 85% sức chứa, đỏ: đã đầy</Row>,
   cameras: () => <Row sym={<Ico icon={cameraIcon()} />}><b>Camera</b> — bấm để xem trực tiếp</Row>,
 };

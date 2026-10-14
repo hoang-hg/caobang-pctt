@@ -18,7 +18,7 @@ import {
 import { ALARM, alarmLevel, CATEGORY, FORCE_TYPE, INCIDENT, LEVEL, PRIORITY, REPORT_STATUS, RES_STATUS, SKILL, SOS_STATUS, SOURCE, STATION_TYPE, VEHICLE } from '../../utils/labels';
 import { ago, num } from '../../utils/format';
 import { fmtVn } from '../../utils/bulletin';
-import { HAZARD_LEVEL, LANDSLIDE_LEVEL, levelOf, RESERVOIR_LEVEL, risk } from '../../utils/risk';
+import { HAZARD_LEVEL, LANDSLIDE_LEVEL, levelOf, RESERVOIR_LEVEL, risk, STOCK_LOW, stockLevel } from '../../utils/risk';
 import { distanceKm } from '../../utils/geo';
 import { useMediaQuery } from '../../utils/useMediaQuery';
 
@@ -83,35 +83,41 @@ function StationPopup({ p }) {
   );
 }
 
+// Màu theo NHÓM hàng (như biểu đồ phân bổ kho) — kho thiếu một nhóm thì các nhóm khác không đổi màu
+const CAT_SERIES = { luong_thuc: 's1', nuoc_uong: 's2', do_dung: 's3', y_te: 's4' };
+
 function WarehousePopup({ p, onIssue }) {
   const c = useChartTheme();
   const cats = Object.entries(p.categories || {});
-  const colors = [c.s1, c.s2, c.s3, '#e87ba4'];
+  const lv = stockLevel(p.pct);
   return (
     <div className={POP_W_SM}>
       <div className="font-semibold">{p.name}</div>
       {p.pct == null ? (
         <div className="text-xs text-muted">Chưa có số liệu tồn kho (nhập bằng loại dữ liệu “Tồn kho”)</div>
       ) : (
-        <div className="text-xs text-muted">Tồn kho trung bình {p.pct}% định mức</div>
+        <div className="text-xs text-muted">Tồn kho trung bình {p.pct}% định mức{p.min_pct != null && ` · thấp nhất ${p.min_pct}%`}</div>
+      )}
+      {p.low_items > 0 && (
+        <div className="mt-0.5 text-xs font-semibold text-danger">{p.low_items} mặt hàng dưới {STOCK_LOW}% định mức (cạn kiệt)</div>
       )}
       {p.pct != null && <div className="flex items-center gap-2">
         <div className="h-24 w-24">
           <ResponsiveContainer>
             <PieChart>
               <Pie data={[{ v: Math.min(p.pct, 100) }, { v: Math.max(0, 100 - p.pct) }]} dataKey="v" innerRadius={26} outerRadius={40} startAngle={90} endAngle={-270} stroke="none" isAnimationActive={false}>
-                <Cell fill={p.pct < 20 ? c.danger : p.pct < 50 ? c.serious : c.s1} />
+                <Cell fill={risk(lv).hex} />
                 <Cell fill={c.shortage} />
               </Pie>
             </PieChart>
           </ResponsiveContainer>
         </div>
         <ul className="flex-1 space-y-0.5 text-xs">
-          {cats.map(([k, v], i) => (
+          {cats.map(([k, v]) => (
             <li key={k} className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full" style={{ background: colors[i] }} />
+              <span className="h-2 w-2 rounded-full" style={{ background: c[CAT_SERIES[k]] || c.muted }} />
               {CATEGORY[k]}
-              <b className={clsx('ml-auto font-mono', v < 20 && 'text-danger')}>{v}%</b>
+              <b className={clsx('ml-auto font-mono', v < STOCK_LOW && 'text-danger')}>{v}%</b>
             </li>
           ))}
         </ul>
@@ -532,7 +538,7 @@ export default function MapLayers({
       {/* Nhóm 3: lực lượng & vật tư */}
       {layers.warehouses &&
         data.warehouses.features.map((f) => (
-          <Marker key={f.properties.id} position={ll(f)} icon={warehouseIcon(f.properties.pct)}>
+          <Marker key={f.properties.id} position={ll(f)} icon={warehouseIcon(f.properties.min_pct ?? f.properties.pct)}>
             <Popup {...pad}><WarehousePopup p={f.properties} onIssue={onIssue} /></Popup>
           </Marker>
         ))}

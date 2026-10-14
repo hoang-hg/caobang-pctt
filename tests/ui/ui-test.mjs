@@ -1470,6 +1470,24 @@ async function resourcesPage(ctx) {
     if (await issue.isDisabled()) throw new Error('có mạng lại nhưng nút Xuất kho vẫn tắt');
   });
 
+  if (!vp.mobile) {
+    // Laptop, iPad: khối biểu đồ mở sẵn (điện thoại mặc định thu gọn để danh sách lên trước)
+    await step(ctx, 'Biểu đồ cho lãnh đạo: quân số theo loại lực lượng, phương tiện theo nhóm, phân bổ kho có Y tế, "Theo mặt hàng" thiếu nhất lên đầu', async () => {
+      await page.goto(`${ROOT}/nguon-luc`);
+      await page.getByRole('img', { name: /^Quân số theo loại lực lượng/ }).waitFor({ timeout: 20_000 });
+      await page.goto(`${ROOT}/nguon-luc?tab=phuong_tien`);
+      await page.getByRole('img', { name: /^Phương tiện theo nhóm/ }).waitFor({ timeout: 20_000 });
+      await page.goto(`${ROOT}/nguon-luc?tab=vat_tu`);
+      await page.locator('main').getByText('Y tế', { exact: true }).first().waitFor({ timeout: 20_000 });
+      await page.getByRole('group', { name: 'Cách xem dự trữ' }).getByRole('button', { name: 'Theo mặt hàng' }).click();
+      const list = page.getByRole('list', { name: 'Tồn kho theo mặt hàng' });
+      await list.waitFor();
+      const pcts = (await list.locator(':scope > li').allInnerTexts()).map((t) => Number(t.match(/(\d+)%/)?.[1])).filter((x) => !Number.isNaN(x));
+      if (!pcts.length || pcts.some((x, i) => i && pcts[i - 1] > x)) throw new Error(`"Theo mặt hàng" chưa xếp thiếu nhất lên đầu: ${pcts.slice(0, 6)}`);
+      return `${pcts.length} mặt hàng, thấp nhất ${pcts[0]}%`;
+    });
+  }
+
   if (touch) {
     await step(ctx, 'Màn cảm ứng: mọi vùng chạm của 3 thẻ ≥ 44 px', async () => {
       const bad = [];

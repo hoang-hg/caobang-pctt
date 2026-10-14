@@ -12,7 +12,7 @@ import { exportExcel } from '../../utils/exportExcel';
 import { exportSnapshotPdf } from '../../utils/exportPdf';
 import { INCIDENT, PRIORITY, SOS_STATUS } from '../../utils/labels';
 import { dateTime, int, minutesSince, num, vnFileStamp } from '../../utils/format';
-import { LANDSLIDE_LEVEL, levelOf, RESERVOIR_LEVEL, risk, sosLevel } from '../../utils/risk';
+import { LANDSLIDE_LEVEL, levelOf, RESERVOIR_LEVEL, risk, sosLevel, STOCK_LOW, STOCK_WATCH, stockLevel } from '../../utils/risk';
 import { slaState } from '../../utils/sla';
 import { useMediaQuery } from '../../utils/useMediaQuery';
 import { ErrorState, Skeleton } from '../common/ui';
@@ -30,7 +30,7 @@ const LEVEL_FILTERS = [
   ['all', 'Mọi mức'], ['3', 'Đỏ – khẩn cấp'], ['2', 'Cam – nguy hiểm'], ['1', 'Vàng – theo dõi'], ['0', 'Xanh – dưới ngưỡng'],
   ['none', 'Xám – chưa có dữ liệu'],
 ];
-const CATS = [['luong_thuc', 'Lương thực'], ['nuoc_uong', 'Nước uống'], ['do_dung', 'Áo phao & đồ cứu sinh']];
+const CATS = [['luong_thuc', 'Lương thực'], ['nuoc_uong', 'Nước uống'], ['do_dung', 'Áo phao & đồ cứu sinh'], ['y_te', 'Y tế']];
 const WAREHOUSE_LEVEL = { tinh: 'Kho tỉnh', cum: 'Kho cụm', xa: 'Kho xã', da_chien: 'Kho dã chiến' };
 const ALERT_CHANNELS = ['SMS', 'CELL_BROADCAST', 'ZALO_OA', 'LOA']; // như mặc định khung soạn (pages/Alerts.jsx)
 const EMPTY = {
@@ -86,11 +86,11 @@ function buildRows(tab, { stations, reservoirs, points, tickets, supplies }) {
   return supplies.map((w) => {
     const vals = CATS.map(([key]) => w[key]).filter((v) => v != null);
     const low = vals.length ? Math.min(...vals) : null;
-    // Đỏ: có mặt hàng < 20% định mức (cạn kiệt — thiết kế mục C); Vàng: < 50% (cần bổ sung — như KPI trang Vật tư)
-    const level = low == null ? null : low < 20 ? 3 : low < 50 ? 1 : 0;
+    // Số của API là % theo NHÓM hàng của từng kho (lương thực, nước, đồ dùng, y tế) — nhóm thấp nhất quyết định mức
+    const level = stockLevel(low); // thang chung (utils/risk.js): dưới 20% Đỏ, dưới 50% Vàng
     return {
       id: w.code, name: w.name, sub: WAREHOUSE_LEVEL[w.level] || w.level, area: '', level, pcts: Object.fromEntries(CATS.map(([key]) => [key, w[key]])),
-      levelText: low == null ? 'Chưa có định mức' : low < 20 ? `Có mặt hàng ${low}% (< 20%)` : low < 50 ? `Thấp nhất ${low}% (< 50%)` : `Thấp nhất ${low}%`,
+      levelText: low == null ? 'Chưa có định mức' : level === 3 ? `Có nhóm hàng ${low}% (< ${STOCK_LOW}%)` : level === 1 ? `Thấp nhất ${low}% (< ${STOCK_WATCH}%)` : `Thấp nhất ${low}%`,
     };
   });
 }

@@ -14,6 +14,7 @@ export function useChartTheme() {
       s1: v('--series-1'),
       s2: v('--series-2'),
       s3: v('--series-3'),
+      s4: v('--series-4'),
       grid: v('--chart-grid'),
       axis: v('--chart-axis'),
       shortage: v('--chart-shortage'),
