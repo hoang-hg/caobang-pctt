@@ -24,3 +24,5 @@ export const ago = (t) => {
   const h = Math.floor(m / 60);
   return h < 24 ? `${h} giờ ${m % 60} phút trước` : `${Math.floor(h / 24)} ngày trước`;
 };
+/** Chữ để so khớp khi tìm: bỏ dấu tiếng Việt, đ → d, chữ thường ("Đội Bảo Lạc" ~ "doi bao lac") — người dùng gõ không dấu. */
+export const foldVi = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/đ/g, 'd');

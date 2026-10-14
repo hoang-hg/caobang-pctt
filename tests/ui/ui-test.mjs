@@ -1484,6 +1484,123 @@ async function resourcesPage(ctx) {
   }
 }
 
+/**
+ * Thao tác hiện trường của trang C. Điện thoại: thanh dưới đáy Xuất kho · Nhập kho · Báo SOS · Báo xe · Gọi 112 → chọn kho /
+ * phương tiện (tìm không dấu) → form 2 bước, lỗi hiện ngay khi nhập (vượt tồn, nhiên liệu ngoài 0–100, hạn đã qua, chưa đổi
+ * gì) — không gửi. Laptop (trừ chế độ chỉ xem): xuất 1 đơn vị rồi nhập lại 1 — tồn kho trở về như cũ.
+ */
+async function resourcesField(ctx, phone) {
+  const { page } = ctx;
+  if (phone) {
+    await step(ctx, 'Thanh đáy điện thoại: Xuất kho → chọn kho (tìm không dấu) → form 2 bước, vượt tồn báo ngay, xem trước tồn còn lại', async () => {
+      await loginAs(page, STAFF);
+      await page.goto(`${ROOT}/nguon-luc`);
+      const bar = page.getByRole('navigation', { name: 'Thao tác nhanh' });
+      await bar.getByRole('button', { name: 'Xuất kho' }).waitFor({ timeout: 20_000 });
+      const labels = (await bar.innerText()).replace(/\s+/g, ' ');
+      const missing = ['Xuất kho', 'Nhập kho', 'Báo SOS', 'Báo xe', 'Gọi 112'].filter((x) => !labels.includes(x));
+      if (missing.length) throw new Error(`thanh đáy thiếu: ${missing.join(', ')}`);
+      await bar.getByRole('button', { name: 'Xuất kho' }).click();
+      let dialog = page.getByRole('dialog');
+      await dialog.getByText('Xuất kho — chọn kho').waitFor();
+      const picks = dialog.getByRole('list').locator(':scope > li');
+      const n = await picks.count();
+      if (n > 6) {
+        const first = (await picks.first().locator('b').innerText()).trim();
+        await dialog.getByLabel('Tìm trong danh sách chọn').fill(norm(first));
+        await page.waitForTimeout(200);
+        if (!(await picks.first().innerText()).includes(first)) throw new Error(`tìm không dấu "${norm(first)}" không ra ${first}`);
+      }
+      await picks.first().getByRole('button').click();
+      dialog = page.getByRole('dialog');
+      await dialog.getByRole('radiogroup', { name: 'Mặt hàng cần xuất' }).waitFor();
+      await dialog.getByRole('button', { name: /^Tiếp/ }).click();
+      await dialog.getByText('Chọn mặt hàng cần xuất').waitFor({ timeout: 3_000 });
+      const item = dialog.getByRole('radio').filter({ hasNot: page.locator('[disabled]') }).first();
+      const stock = Number(((await item.innerText()).match(/tồn ([\d.]+)/)?.[1] || '0').replace(/\./g, ''));
+      await item.click();
+      const qty = dialog.getByLabel(/Số lượng xuất/);
+      await qty.fill(String(stock + 5));
+      await dialog.getByText(/Vượt tồn kho — kho chỉ còn/).waitFor({ timeout: 3_000 });
+      await qty.fill('1');
+      await dialog.getByText(/Sau khi xuất, kho còn/).waitFor({ timeout: 3_000 });
+      await expectNoOverflow(ctx, 'form xuất kho', dialog);
+      await dialog.getByRole('button', { name: 'Huỷ' }).click();
+      return `${n} kho · tồn ${stock}`;
+    });
+
+    await step(ctx, 'Thanh đáy: Báo xe — chip nhiên liệu, 150% báo lỗi, Lưu khi chưa đổi gì nói rõ; Nhập kho — hạn đã qua báo ngay', async () => {
+      const bar = page.getByRole('navigation', { name: 'Thao tác nhanh' });
+      await bar.getByRole('button', { name: 'Báo xe' }).click();
+      let dialog = page.getByRole('dialog');
+      await dialog.getByText('Báo tình trạng — chọn phương tiện').waitFor();
+      await dialog.getByRole('list').locator(':scope > li').first().getByRole('button').click();
+      dialog = page.getByRole('dialog');
+      const fuel = dialog.getByLabel('Mức nhiên liệu (%)');
+      await fuel.waitFor();
+      const before = await fuel.inputValue();
+      await dialog.getByRole('button', { name: '10%', exact: true }).click();
+      await dialog.getByText(/không được gợi ý khi điều động/).first().waitFor({ timeout: 3_000 });
+      await fuel.fill('150');
+      await dialog.getByText(/số nguyên từ 0 đến 100/).waitFor({ timeout: 3_000 });
+      await fuel.fill(before);
+      await dialog.getByRole('button', { name: 'Lưu tình trạng' }).click();
+      await dialog.getByText('Chưa thay đổi trạng thái hay mức nhiên liệu').waitFor({ timeout: 3_000 });
+      await expectNoOverflow(ctx, 'form báo tình trạng xe', dialog);
+      await dialog.getByRole('button', { name: 'Huỷ' }).click();
+      await bar.getByRole('button', { name: 'Nhập kho' }).click();
+      dialog = page.getByRole('dialog');
+      await dialog.getByText('Nhập hàng — chọn kho').waitFor();
+      await dialog.getByRole('list').locator(':scope > li').first().getByRole('button').click();
+      dialog = page.getByRole('dialog');
+      await dialog.getByRole('radio').first().click();
+      await dialog.getByRole('button', { name: /^Nhập kho$|^Nhập \d/ }).click();
+      await dialog.getByText('Nhập số lượng nhập thêm').waitFor({ timeout: 3_000 });
+      await dialog.getByLabel('Hạn sử dụng của lô').fill('2020-01-01');
+      await dialog.getByText(/Hạn dùng đã qua/).waitFor({ timeout: 3_000 });
+      await expectNoOverflow(ctx, 'form nhập kho', dialog);
+      await dialog.getByRole('button', { name: 'Huỷ' }).click();
+    });
+    return;
+  }
+  if (READONLY) return;
+  await step(ctx, 'Xuất kho 1 đơn vị rồi nhập lại 1: tồn kho trên máy chủ giảm 1 rồi trở về như cũ', async () => {
+    await loginAs(page, STAFF);
+    await page.goto(`${ROOT}/nguon-luc?tab=vat_tu`);
+    const card = page.getByRole('list', { name: 'Kho vật tư' }).locator(':scope > li').first();
+    await card.waitFor({ timeout: 20_000 });
+    const wname = (await card.innerText()).split('\n')[0];
+    const stockOf = (item) => page.evaluate(async ([w, it]) => {
+      const auth = JSON.parse(localStorage.getItem('pctt_auth') || '{}');
+      const res = await fetch('/api/v1/resources/warehouses', { headers: { Authorization: `Bearer ${auth.token}` } });
+      return (await res.json()).find((x) => x.name === w)?.items.find((i) => i.name === it)?.quantity;
+    }, [wname, item]);
+    await card.getByRole('button', { name: /Xuất kho/ }).click();
+    let dialog = page.getByRole('dialog');
+    const radio = dialog.getByRole('radio').filter({ hasNot: page.locator('[disabled]') }).first();
+    await radio.waitFor();
+    const item = (await radio.locator('b').first().innerText()).trim();
+    const before = await stockOf(item);
+    await radio.click();
+    await dialog.getByLabel(/Số lượng xuất/).fill('1');
+    await dialog.getByLabel('Nơi nhận').fill('Kiểm thử giao diện — nhập trả lại ngay');
+    await dialog.getByRole('button', { name: /^Xuất 1 / }).click();
+    await dialog.waitFor({ state: 'detached', timeout: 15_000 });
+    const mid = await stockOf(item);
+    if (mid !== before - 1) throw new Error(`xuất 1 ${item}: tồn ${before} → ${mid}`);
+    await card.getByRole('button', { name: /Nhập hàng/ }).click();
+    dialog = page.getByRole('dialog');
+    await dialog.getByRole('radio', { name: new RegExp(item) }).first().click();
+    await dialog.getByLabel(/Số lượng nhập thêm/).fill('1');
+    await dialog.getByLabel('Nguồn hàng').fill('Kiểm thử giao diện — trả lại');
+    await dialog.getByRole('button', { name: /^Nhập 1 / }).click();
+    await dialog.waitFor({ state: 'detached', timeout: 15_000 });
+    const after = await stockOf(item);
+    if (after !== before) throw new Error(`nhập lại 1 ${item}: tồn ${mid} → ${after} (trước ${before})`);
+    return `${wname} · ${item}: ${before} → ${mid} → ${after}`;
+  });
+}
+
 /** Tài khoản phường (Cấp 3): tiêu đề là phường mình, chỉ đơn vị trong phường, không có nút điều động (quyền dispatch.create). */
 async function resourcesWard(ctx) {
   const { page } = ctx;
@@ -1569,6 +1686,13 @@ try {
     const vpR = { name: `Vật tư & Lực lượng · ${label}`, mobile: phone };
     await resourcesPage({ page: rPage, vp: vpR, problems: watch(rPage) });
     await rctx.close();
+    if (phone || label.startsWith('Laptop')) {
+      const fctx = await browser.newContext({ ...opts, locale: 'vi-VN' });
+      fctx.setDefaultTimeout(15_000);
+      const fPage = await fctx.newPage();
+      await resourcesField({ page: fPage, vp: { name: `Thao tác hiện trường · ${label}`, mobile: phone }, problems: watch(fPage) }, phone);
+      await fctx.close();
+    }
     if (phone) {
       const wctx = await browser.newContext({ ...opts, locale: 'vi-VN' });
       wctx.setDefaultTimeout(15_000);

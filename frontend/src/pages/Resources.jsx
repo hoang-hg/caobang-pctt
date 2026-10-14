@@ -2,16 +2,19 @@ import { useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { RefreshCw } from 'lucide-react';
+import { PackageMinus, PackagePlus, RefreshCw, Truck } from 'lucide-react';
 import { useAreaQuery, useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
 import { EmptyState, ErrorState, Pager, Section, Skeleton, Tabs } from '../components/common/ui';
 import SuppliesChart from '../components/charts/SuppliesChart';
 import IssueModal from '../components/common/IssueModal';
 import { FuelDepotModal, ReceiveModal, VehicleModal } from '../components/common/LogisticsModals';
+import QuickActionBar from '../components/common/QuickActionBar';
 import ConnectionBanner from '../components/dashboard/ConnectionBanner';
+import QuickIncidentModal from '../components/dashboard/QuickIncidentModal';
 import { unitLabel } from '../components/dashboard/CommuneView';
 import ForceList from '../components/resources/ForceList';
+import PickSheet from '../components/resources/PickSheet';
 import QuickDispatch from '../components/resources/QuickDispatch';
 import ResourceAlerts from '../components/resources/ResourceAlerts';
 import ResourceKpis from '../components/resources/ResourceKpis';
@@ -23,15 +26,15 @@ import {
   warehouseFacts,
 } from '../components/resources/resourceFacts';
 import { CATEGORY, FORCE_TYPE, RES_STATUS, SKILL, VEHICLE, VEHICLE_CAT } from '../utils/labels';
-import { dateTime, vnFileStamp } from '../utils/format';
+import { dateTime, foldVi, vnFileStamp } from '../utils/format';
 import { exportExcel } from '../utils/exportExcel';
 import { exportSnapshotPdf } from '../utils/exportPdf';
 import { useMediaQuery } from '../utils/useMediaQuery';
 import { useOnline } from '../utils/useOnline';
 import { usePaged } from '../utils/usePaged';
+import { stockLevel } from '../utils/risk';
 import { useAllowedCodes, usePermission } from '../rbac/usePermission';
 
-const norm = (s) => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/đ/g, 'd');
 const EMPTY = {
   luc_luong: 'Chưa có đơn vị lực lượng cứu hộ trong vùng đang xem — nhập bằng loại dữ liệu “Lực lượng”.',
   vat_tu: 'Chưa có kho vật tư trong vùng đang xem — nhập loại dữ liệu “Kho vật tư”, rồi “Tồn kho vật tư”.',
@@ -80,6 +83,13 @@ export default function Resources() {
   const canSos = usePermission('sos', 'view');
   const canImport = usePermission('data', 'import');
   const canSubmit = usePermission('data', 'submit');
+  const canReport = usePermission('sos', 'create');
+  // Phạm vi ghi (null = toàn tỉnh, [] = không có quyền) — thanh thao tác nhanh chỉ đưa ra kho / phương tiện làm được
+  const issueCodes = useAllowedCodes('inventory', 'issue');
+  const receiveCodes = useAllowedCodes('inventory', 'receive');
+  const vehicleCodes = useAllowedCodes('vehicle', 'update');
+  const [pick, setPick] = useState(null); // 'issue' | 'receive' | 'vehicle' — đang chọn kho / phương tiện từ thanh đáy
+  const [reportOpen, setReportOpen] = useState(false);
 
   // Tài khoản xã chưa lọc: tiêu đề là xã của mình, không ghi "Toàn tỉnh" (như Tổng quan)
   const scope = useAllowedCodes('resource', 'view');
@@ -98,8 +108,8 @@ export default function Resources() {
   const query = queries[tab];
 
   // Tìm không dấu trên mọi thẻ (số đếm của thẻ theo ô tìm); bộ lọc riêng chỉ áp vào thẻ đang mở
-  const nq = norm(q.trim());
-  const has = (...fields) => !nq || fields.some((f) => f != null && norm(f).includes(nq));
+  const nq = foldVi(q.trim());
+  const has = (...fields) => !nq || fields.some((f) => f != null && foldVi(f).includes(nq));
   const searched = {
     luc_luong: (forcesQ.data || []).filter((f) => has(f.name, f.code, f.commander, f.admin_name, f.base_name, FORCE_TYPE[f.org_type], ...(f.skills || []).map((s) => SKILL[s]))),
     vat_tu: (warehousesQ.data || []).filter((w) => has(w.name, w.code, w.admin_name, w.manager, ...w.items.map((i) => i.name))),
@@ -119,6 +129,42 @@ export default function Resources() {
     const top = alerts.find((a) => a.tab === id); // đã xếp nặng → nhẹ
     return top ? { level: top.level, text: top.text } : undefined;
   };
+
+  // Thao tác hiện trường từ thanh dưới đáy điện thoại: kho / phương tiện tài khoản ghi được trong vùng đang xem — một mục thì
+  // mở thẳng form, nhiều mục thì chọn (kho cảnh báo nặng lên đầu)
+  const inScope = (codes, code) => codes === null || (codes || []).includes(code);
+  const targets = {
+    issue: sortRows('vat_tu', (warehousesQ.data || []).filter((w) => inScope(issueCodes, w.admin_code) && w.items.length), 'canh_bao', factsOf),
+    receive: sortRows('vat_tu', (warehousesQ.data || []).filter((w) => inScope(receiveCodes, w.admin_code)), 'canh_bao', factsOf),
+    vehicle: sortRows('phuong_tien', (vehiclesQ.data || []).filter((v) => inScope(vehicleCodes, v.admin_code)), 'so_hieu'),
+  };
+  const openTarget = (kind, x) => {
+    setPick(null);
+    if (kind === 'issue') setIssue(x);
+    else if (kind === 'receive') setReceive(x);
+    else setVehicleEdit(x);
+  };
+  const startPick = (kind) => (targets[kind].length === 1 ? openTarget(kind, targets[kind][0]) : setPick(kind));
+  const pickItems = pick === 'vehicle'
+    ? targets.vehicle.map((v) => ({
+      id: v.id,
+      value: v,
+      title: `${v.code} · ${VEHICLE[v.vehicle_type] || v.vehicle_type}`,
+      sub: `${RES_STATUS[v.status]?.label || v.status} · ${v.force_name || ''}`,
+      level: stockLevel(v.fuel_level),
+      right: <span className="shrink-0 font-mono text-xs text-muted">{v.fuel_level == null ? 'chưa báo' : `${v.fuel_level}%`}</span>,
+      search: `${v.code} ${VEHICLE[v.vehicle_type]} ${v.force_name}`,
+    }))
+    : (targets[pick] || []).map((w) => ({
+      id: w.id,
+      value: w,
+      title: w.name,
+      sub: `${WAREHOUSE_LEVEL[w.level] || w.level} · ${w.admin_name || ''}`,
+      level: factsOf(w).level,
+      right: <span className="shrink-0 text-xs text-muted">{w.items.length} mặt hàng</span>,
+      search: `${w.name} ${w.admin_name}`,
+    }));
+  const offlineSlot = !online ? { disabled: true, title: 'Mất mạng — chưa ghi được' } : {};
 
   const scrollToList = (anchor) => requestAnimationFrame(() => requestAnimationFrame(() => {
     ((anchor && document.getElementById(anchor)) || tabsRef.current)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -242,7 +288,8 @@ export default function Resources() {
   const dataTime = summaryQ.dataUpdatedAt ? new Date(summaryQ.dataUpdatedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : null;
 
   return (
-    <div className="flex flex-col gap-3 p-3 pb-8">
+    // Điện thoại: chừa chỗ cho thanh thao tác nhanh dưới đáy (không che dòng cuối, nút phân trang)
+    <div className="flex flex-col gap-3 p-3 pb-28 sm:pb-8">
       {/* Thông tin khẩn luôn trên cùng (Cam / Đỏ dính khi cuộn) + mất mạng */}
       <ResourceAlerts
         items={alerts}
@@ -337,6 +384,27 @@ export default function Resources() {
       {vehicleEdit && <VehicleModal vehicle={vehicleEdit} onClose={() => setVehicleEdit(null)} />}
       {receive && <ReceiveModal warehouse={receive} onClose={() => setReceive(null)} />}
       {depotEdit && <FuelDepotModal depot={depotEdit} onClose={() => setDepotEdit(null)} />}
+
+      {pick && (
+        <PickSheet
+          title={{ issue: 'Xuất kho — chọn kho', receive: 'Nhập hàng — chọn kho', vehicle: 'Báo tình trạng — chọn phương tiện' }[pick]}
+          hint={pick === 'vehicle' ? 'Vạch màu theo mức nhiên liệu đã báo (dưới 20% Đỏ)' : 'Kho có cảnh báo nặng lên đầu'}
+          items={pickItems}
+          empty={pick === 'vehicle' ? 'Không có phương tiện bạn được báo tình trạng trong vùng đang xem' : 'Không có kho bạn được ghi trong vùng đang xem'}
+          onPick={(it) => openTarget(pick, it.value)}
+          onClose={() => setPick(null)}
+        />
+      )}
+      {/* Điện thoại: thao tác chính ở vùng ngón cái (khung chung với Tổng quan, Bản đồ) — chỉ nút tài khoản làm được */}
+      <QuickActionBar
+        slots={[
+          targets.issue.length ? { key: 'xuat-kho', label: 'Xuất kho', icon: PackageMinus, onClick: () => startPick('issue'), ...offlineSlot } : null,
+          targets.receive.length ? { key: 'nhap-kho', label: 'Nhập kho', icon: PackagePlus, onClick: () => startPick('receive'), ...offlineSlot } : null,
+          targets.vehicle.length ? { key: 'bao-xe', label: 'Báo xe', icon: Truck, onClick: () => startPick('vehicle'), ...offlineSlot } : null,
+        ]}
+        onSos={canReport ? () => setReportOpen(true) : null}
+      />
+      {canReport && <QuickIncidentModal open={reportOpen} onClose={() => setReportOpen(false)} />}
     </div>
   );
 }

@@ -9,7 +9,8 @@ const BTN = 'relative flex min-h-[56px] flex-col items-center justify-center gap
  * GIỮA, nổi lên; "Gọi 112" ở mép phải, tách xa Báo SOS để không bấm nhầm. Ba ô còn lại tuỳ trang — `slots` = [trái 1, trái 2,
  * phải]: Dashboard "Mực nước · Bản đồ · Cứu hộ", Bản đồ "Lớp · Cảnh báo · Thời gian". Ô `null` (tài khoản không có quyền)
  * để trống, giữ nguyên vị trí các nút khác; `onSos` trống (không có quyền báo SOS) → ô giữa trống.
- * Ô: { key, label, icon, onClick | to, badge (số, đỏ), active (đang mở — nút bật / tắt) }. `className`: z-index + khổ ẩn
+ * Ô: { key, label, icon, onClick | to, badge (số, đỏ), active (đang mở — nút bật / tắt), disabled + title (VD mất mạng: ô
+ * ghi số liệu tắt, nói lý do) }. Trang Vật tư & Lực lượng: "Xuất kho · Nhập kho · Báo xe". `className`: z-index + khổ ẩn
  * thanh (mặc định ẩn từ 640 px như Dashboard; trang Bản đồ tự quyết định khi nào vẽ thanh).
  */
 export default function QuickActionBar({ slots = [], onSos, className = 'z-40 sm:hidden' }) {
@@ -30,7 +31,15 @@ export default function QuickActionBar({ slots = [], onSos, className = 'z-40 sm
     return s.to ? (
       <Link key={s.key} to={s.to} className={cls}>{inner}</Link>
     ) : (
-      <button key={s.key} type="button" onClick={s.onClick} className={cls} aria-pressed={s.active === undefined ? undefined : s.active}>
+      <button
+        key={s.key}
+        type="button"
+        onClick={s.onClick}
+        disabled={s.disabled}
+        title={s.title}
+        className={clsx(cls, 'disabled:opacity-40 disabled:active:scale-100')}
+        aria-pressed={s.active === undefined ? undefined : s.active}
+      >
         {inner}
       </button>
     );
