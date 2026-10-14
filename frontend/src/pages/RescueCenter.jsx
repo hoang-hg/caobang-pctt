@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { Columns3, List, RefreshCw } from 'lucide-react';
+import { Columns3, Home, Inbox, List, Navigation, RefreshCw } from 'lucide-react';
 import { api } from '../api/client';
 import { useAreaQuery, useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
@@ -13,9 +13,11 @@ import DispatchModal from '../components/common/DispatchModal';
 import { MissionLinkModal } from '../components/common/MissionLink';
 import CancelDispatchModal from '../components/common/CancelDispatchModal';
 import EditTicketModal from '../components/common/EditTicketModal';
+import QuickActionBar from '../components/common/QuickActionBar';
 import ConnectionBanner from '../components/dashboard/ConnectionBanner';
+import QuickIncidentModal from '../components/dashboard/QuickIncidentModal';
 import { unitLabel } from '../components/dashboard/CommuneView';
-import Evacuation from '../components/rescue/Evacuation';
+import Evacuation, { EvacuationModal } from '../components/rescue/Evacuation';
 import Intake from '../components/rescue/Intake';
 import RescueBoard from '../components/rescue/RescueBoard';
 import RescueKpis from '../components/rescue/RescueKpis';
@@ -23,7 +25,7 @@ import TicketTable from '../components/rescue/TicketTable';
 import {
   COLUMN_KEYS, FILTERS, SORTS, matchTicket, optionCounts, rescueAlerts, sortTickets, ticketFacts,
 } from '../components/rescue/rescueFacts';
-import { Can, useAllowedCodes } from '../rbac/usePermission';
+import { Can, useAllowedCodes, usePermission } from '../rbac/usePermission';
 import { INCIDENT, PRIORITY, SOS_STATUS, SOURCE, VULNERABLE } from '../utils/labels';
 import { dateTime, foldVi, vnFileStamp } from '../utils/format';
 import { exportExcel } from '../utils/exportExcel';
@@ -75,6 +77,8 @@ export default function RescueCenter() {
   const [linkFor, setLinkFor] = useState(null);
   const [cancelFor, setCancelFor] = useState(null);
   const [editFor, setEditFor] = useState(null);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [evacOpen, setEvacOpen] = useState(false);
   const contentRef = useRef(null);
   const boardRef = useRef(null);
 
@@ -83,6 +87,9 @@ export default function RescueCenter() {
   const { data: units = [] } = useUnits();
   const scopeUnit = scope?.length === 1 ? units.find((u) => u.code === scope[0]) : null;
   const scopeLabel = filter.codes.length || scope === null ? filter.label : scopeUnit ? unitLabel(scopeUnit) : `${scope.length} xã/phường được giao`;
+  const canReport = usePermission('sos', 'create');
+  const canEvac = usePermission('evacuation', 'update');
+  const evacCodes = useAllowedCodes('evacuation', 'update');
 
   const ticketsQ = useAreaQuery('sos', '/sos', {}, { refetchInterval: 20_000 });
   const evacQ = useAreaQuery('evacuation', '/evacuation', {}, { refetchInterval: 30_000 });
@@ -118,6 +125,14 @@ export default function RescueCenter() {
     setParams(next);
     setQ('');
     if (sortKey) setSort(sortKey);
+    scrollTo(boardRef.current);
+  };
+  // Thanh thao tác nhanh → một cột của bảng điều phối, bỏ lọc (một mục lịch sử)
+  const openColumn = (col) => {
+    const next = new URLSearchParams();
+    if (col !== COLUMN_KEYS[0]) next.set('cot', col);
+    setParams(next);
+    setQ('');
     scrollTo(boardRef.current);
   };
   const clearAll = () => {
@@ -220,6 +235,12 @@ export default function RescueCenter() {
   };
   const dataTime = ticketsQ.dataUpdatedAt ? new Date(ticketsQ.dataUpdatedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : null;
   const listView = view === 'danh_sach' || pdf;
+  // Tài khoản một xã: "Sơ tán" mở thẳng số liệu của xã mình (bỏ bước chọn xã)
+  const evacUnit = evacCodes?.length === 1 ? units.find((u) => u.code === evacCodes[0]) : null;
+  const evacRow = evacUnit ? evacQ.data?.progress.find((r) => r.code === evacUnit.code) || { code: evacUnit.code, name: evacUnit.name } : null;
+  const waiting = tickets.filter((t) => t.status === 'moi').length;
+  const fieldAsks = tickets.filter((t) => factsOf(t).needSupport || factsOf(t).rescuedPending).length;
+  const offlineSlot = !online ? { disabled: true, title: 'Mất mạng — chưa ghi được' } : {};
 
   let body;
   if (ticketsQ.isLoading) body = <Skeleton height={360} />;
@@ -253,7 +274,7 @@ export default function RescueCenter() {
   }
 
   return (
-    <div className="flex flex-col gap-3 p-3 pb-8">
+    <div className="flex flex-col gap-3 p-3 pb-28 sm:pb-8">
       {/* Thông tin khẩn luôn trên cùng (Cam / Đỏ dính khi cuộn) + mất mạng */}
       <UrgentStrip
         label="Thông tin khẩn cứu hộ"
@@ -332,7 +353,7 @@ export default function RescueCenter() {
         </div>
         {/* Điện thoại: giám sát sơ tán trước, tiếp nhận tin (việc của trực ban ở bàn) sau; màn rộng: cột phải */}
         <aside className="flex min-w-0 flex-col gap-3">
-          <Can I="sos" a="create"><div className="order-2 2xl:order-1"><Intake /></div></Can>
+          <Can I="sos" a="create"><div className="order-2 2xl:order-1"><Intake online={online} /></div></Can>
           <Evacuation query={evacQ} online={online} className="order-1 2xl:order-2" />
         </aside>
       </div>
@@ -341,6 +362,20 @@ export default function RescueCenter() {
       {linkFor && <MissionLinkModal ticket={linkFor} onClose={() => setLinkFor(null)} />}
       {cancelFor && <CancelDispatchModal ticket={cancelFor} onClose={() => setCancelFor(null)} />}
       {editFor && <EditTicketModal ticket={editFor} onClose={() => setEditFor(null)} />}
+      {evacOpen && <EvacuationModal row={evacRow} progress={evacQ.data?.progress} onClose={() => setEvacOpen(false)} />}
+      {/* Điện thoại: việc hay làm ở vùng ngón cái — phiếu chờ (số = phiếu chưa tiếp nhận), báo sơ tán, phiếu đang thực thi (số =
+          đội xin chi viện / báo đã cứu chờ xác nhận); khung chung với Tổng quan, Bản đồ, Vật tư */}
+      <QuickActionBar
+        slots={[
+          { key: 'cho', label: 'Chờ xử lý', icon: Inbox, onClick: () => openColumn('moi'), badge: waiting },
+          canEvac
+            ? { key: 'so-tan', label: 'Sơ tán', icon: Home, onClick: () => setEvacOpen(true), ...offlineSlot }
+            : { key: 'so-tan', label: 'Sơ tán', icon: Home, onClick: () => scrollTo(document.getElementById('so-tan')) },
+          { key: 'thuc-thi', label: 'Thực thi', icon: Navigation, onClick: () => openColumn('thuc_thi'), badge: fieldAsks },
+        ]}
+        onSos={canReport ? () => setReportOpen(true) : null}
+      />
+      {canReport && <QuickIncidentModal open={reportOpen} onClose={() => setReportOpen(false)} />}
     </div>
   );
 }

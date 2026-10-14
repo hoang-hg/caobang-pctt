@@ -101,7 +101,7 @@ export function Modal({ open, onClose, title, children, wide, footer }) {
       >
         <div className="flex shrink-0 items-center justify-between border-b border-line px-4 py-3">
           <h3 className="font-semibold">{title}</h3>
-          <button className="rounded p-1 text-muted hover:bg-panel2" onClick={onClose} aria-label="Đóng">
+          <button type="button" className="touch-hit rounded p-1 text-muted hover:bg-panel2" onClick={onClose} aria-label="Đóng">
             <X size={18} />
           </button>
         </div>

@@ -1756,9 +1756,152 @@ async function rescuePage(ctx) {
   }
 }
 
+/**
+ * Form của trang D — chỉ mở, kiểm tra lỗi, đóng (không ghi dữ liệu): sơ tán 2 bước, tiếp nhận 2 bước, sửa phiếu, huỷ lệnh;
+ * điện thoại: thanh thao tác nhanh (phiếu chờ, thực thi, sơ tán tắt khi mất mạng; nội dung cuối trang không bị thanh che).
+ */
+async function rescueForms(ctx) {
+  const { page, vp } = ctx;
+  const dlg = page.getByRole('dialog');
+  const bar = page.getByRole('navigation', { name: 'Thao tác nhanh' });
+  const touch = await page.evaluate(() => matchMedia('(pointer: coarse)').matches);
+  const open = async (path = '/cuu-ho') => {
+    await page.goto(`${ROOT}${path}`);
+    await page.getByRole('group', { name: 'Chỉ số cứu hộ' }).getByRole('button').first().waitFor({ timeout: 20_000 });
+  };
+  const noSmall = async (where) => {
+    if (!touch) return;
+    const bad = await smallTargets(page);
+    if (bad.length) throw new Error(`${where}: ${bad.length} vùng chạm < 44 px — ${bad.slice(0, 5).map((s) => `${s.what} ${s.size}px`).join(', ')}`);
+  };
+
+  await step(ctx, 'Form "Cập nhật sơ tán" 2 bước: chạm chọn xã (tìm không dấu) → số liệu; lỗi ngay dưới ô; bấm Lưu khi thiếu → con trỏ về ô lỗi', async () => {
+    await open();
+    if (!(await page.getByRole('button', { name: '+ Cập nhật xã' }).count())) return 'tài khoản không có quyền cập nhật sơ tán';
+    const opener = vp.mobile ? bar.getByRole('button', { name: /Sơ tán/ }) : page.getByRole('button', { name: '+ Cập nhật xã' });
+    await opener.click();
+    await dlg.waitFor();
+    await dlg.getByLabel('Tìm xã / phường').fill(norm(WARD.name));
+    const items = dlg.getByRole('list', { name: 'Chọn xã / phường' }).getByRole('button');
+    await items.first().waitFor({ timeout: 5_000 });
+    const names = await items.allInnerTexts();
+    if (!names.every((t) => norm(t).includes(norm(WARD.name)))) throw new Error(`tìm "${norm(WARD.name)}" ra: ${names.join(' | ')}`);
+    await noSmall('bước chọn xã');
+    await items.first().click();
+    const planned = dlg.getByLabel(/Hộ phải sơ tán/);
+    await planned.fill('9999999');
+    const err1 = (await dlg.locator('#loi-so-tan-planned_households').innerText().catch(() => '')).trim();
+    if (!err1 || (await planned.getAttribute('aria-invalid')) !== 'true') throw new Error('số hộ quá lớn không báo lỗi ngay dưới ô');
+    await planned.fill('10');
+    await dlg.getByLabel(/Nhân khẩu đã sơ tán/).fill('');
+    await dlg.getByRole('button', { name: /Lưu số liệu/ }).click();
+    await dlg.locator('#loi-so-tan-evacuated_persons').waitFor({ timeout: 3_000 });
+    const focus = await page.evaluate(() => ({ id: document.activeElement?.id, bad: document.activeElement?.getAttribute('aria-invalid') }));
+    if (focus.bad !== 'true') throw new Error(`bấm Lưu khi thiếu số: con trỏ ở "${focus.id}", không về ô lỗi`);
+    await expectNoOverflow(ctx, 'form sơ tán', dlg);
+    await noSmall('bước số liệu');
+    await dlg.getByRole('button', { name: 'Huỷ', exact: true }).click();
+    await dlg.waitFor({ state: 'hidden' });
+    return err1;
+  });
+
+  await step(ctx, 'Tiếp nhận 2 bước: SĐT sai báo ngay khi gõ; nội dung ngắn báo khi bấm "Bóc tách"; bước 2: mức ưu tiên kèm SLA, số người −/+', async () => {
+    const box = page.locator('section').filter({ has: page.getByRole('heading', { name: /Tiếp nhận đa kênh/ }) }).first();
+    if (!(await box.count())) return 'tài khoản không có quyền tạo phiếu SOS';
+    await box.scrollIntoViewIfNeeded();
+    const phoneBox = box.getByLabel(/SĐT người báo tin/);
+    await phoneBox.fill('12345');
+    if ((await phoneBox.getAttribute('aria-invalid')) !== 'true') throw new Error('SĐT sai không báo ngay khi gõ');
+    await phoneBox.fill('0912 345 678');
+    const text = box.getByLabel(/Nội dung tin cầu cứu/);
+    await text.fill('ngập');
+    await box.getByRole('button', { name: /Bóc tách & kiểm tra/ }).click();
+    await box.locator('#loi-noi-dung-tiep-nhan').waitFor({ timeout: 3_000 });
+    if (READONLY) return 'chỉ xem: không gọi bóc tách';
+    await text.fill('Nước ngập đến mái nhà ở xóm Pác Bó, 5 người có 1 cụ già');
+    await box.getByRole('button', { name: /Bóc tách & kiểm tra/ }).click();
+    await box.getByRole('button', { name: /Tạo phiếu SOS/ }).waitFor({ timeout: 15_000 });
+    const picked = (await box.getByRole('radio', { checked: true }).allInnerTexts()).map((s) => s.replace(/\s+/g, ' '));
+    if (!(await box.getByRole('button', { name: 'Thêm 1', exact: true }).count())) throw new Error('bước 2 không có nút −/+ số người');
+    await noSmall('tiếp nhận bước 2');
+    await box.getByRole('button', { name: 'Quay lại' }).click();
+    return picked.join(' · ') || 'bóc tách chưa chọn mức';
+  });
+
+  await step(ctx, 'Sửa phiếu: Lưu khi chưa đổi gì → nói rõ; Huỷ lệnh thiếu lý do → báo dưới ô, con trỏ về ô lý do', async () => {
+    await open();
+    const notes = [];
+    const edit = visible(page.getByRole('button', { name: /^Sửa phiếu SOS-/ }));
+    if (await edit.count()) {
+      await edit.click();
+      await dlg.waitFor();
+      await dlg.getByRole('button', { name: 'Lưu', exact: true }).click();
+      await dlg.getByText(/Chưa thay đổi gì/).waitFor({ timeout: 3_000 });
+      await expectNoOverflow(ctx, 'form sửa phiếu', dlg);
+      await noSmall('form sửa phiếu');
+      await dlg.getByRole('button', { name: 'Huỷ', exact: true }).click();
+      await dlg.waitFor({ state: 'hidden' });
+      notes.push('sửa phiếu');
+    }
+    // Lệnh điều động đang chạy ở cột "Đang thực thi" (bảng hẹp: thẻ cột trên địa chỉ trang)
+    await open('/cuu-ho?cot=thuc_thi');
+    const cancel = visible(page.getByRole('button', { name: /Huỷ lệnh/ }));
+    if (await cancel.count()) {
+      await cancel.click();
+      await dlg.waitFor();
+      await dlg.getByRole('button', { name: 'Huỷ lệnh', exact: true }).click();
+      await dlg.locator('#loi-ly-do-huy').waitFor({ timeout: 3_000 });
+      const focused = await page.evaluate(() => document.activeElement?.id);
+      if (focused !== 'ly-do-huy') throw new Error(`con trỏ ở "${focused}", không về ô lý do`);
+      await expectNoOverflow(ctx, 'form huỷ lệnh', dlg);
+      await noSmall('form huỷ lệnh');
+      await dlg.getByRole('button', { name: 'Đóng', exact: true }).last().click();
+      await dlg.waitFor({ state: 'hidden' });
+      notes.push('huỷ lệnh');
+    }
+    return notes.length ? notes.join(', ') : 'không có phiếu để sửa / lệnh để huỷ';
+  });
+
+  if (vp.mobile) {
+    await step(ctx, 'Thanh thao tác nhanh: "Chờ xử lý" (số = phiếu chờ) → cột Chờ; "Thực thi" → cột Thực thi; cuối trang không bị thanh che; mất mạng → "Sơ tán" tắt', async () => {
+      await open('/cuu-ho?cot=hoan_thanh');
+      await bar.waitFor();
+      const waitBtn = bar.getByRole('button', { name: /Chờ xử lý/ });
+      await waitBtn.click();
+      await page.waitForURL((u) => !new URL(u).searchParams.get('cot'));
+      const tab = page.locator('[aria-label="Cột của bảng điều phối"] > [aria-pressed="true"]');
+      const [tabText, badgeText] = [await tab.innerText(), await waitBtn.innerText()];
+      if (!/Chờ/.test(tabText)) throw new Error(`đang mở cột "${tabText}", không phải cột Chờ`);
+      const badge = Number(badgeText.match(/\d+/)?.[0] ?? 0);
+      const inTab = Number(tabText.match(/\d+/)?.[0] ?? 0);
+      if (badge !== inTab) throw new Error(`thanh ghi ${badge} phiếu chờ, cột Chờ có ${inTab}`);
+      await bar.getByRole('button', { name: /Thực thi/ }).click();
+      await page.waitForURL(/cot=thuc_thi/);
+      const covered = await page.evaluate(() => {
+        const m = document.querySelector('main');
+        m.scrollTo(0, m.scrollHeight);
+        const last = [...m.querySelectorAll('section')].pop()?.getBoundingClientRect();
+        const nav = document.querySelector('nav[aria-label="Thao tác nhanh"]').getBoundingClientRect();
+        return last ? Math.round(last.bottom - nav.top) : 0;
+      });
+      if (covered > 1) throw new Error(`thanh thao tác che ${covered}px cuối trang`);
+      const canEvac = await page.getByRole('button', { name: '+ Cập nhật xã' }).count();
+      await page.context().setOffline(true);
+      try {
+        await page.getByText('Mất kết nối mạng').waitFor({ timeout: 5_000 });
+        if (canEvac && !(await bar.getByRole('button', { name: /Sơ tán/ }).isDisabled())) throw new Error('mất mạng nhưng ô "Sơ tán" (ghi số liệu) vẫn bấm được');
+      } finally {
+        await page.context().setOffline(false);
+      }
+      return `${badge} phiếu chờ`;
+    });
+  }
+}
+
 /** Tài khoản phường: chỉ phiếu SOS trong phường, không có nút "Điều phối" (quyền dispatch.create) — có "Tiếp nhận" nếu có phiếu chờ. */
 async function rescueWard(ctx) {
   const { page } = ctx;
+  let signedIn = false;
   await step(ctx, `Điều hành cứu hộ — tài khoản phường ${WARD.name}: chỉ phiếu trong phường, không có nút Điều phối`, async () => {
     try {
       await loginAs(page, WARD);
@@ -1766,6 +1909,7 @@ async function rescueWard(ctx) {
       if (READONLY) return `bỏ qua: không đăng nhập được ${WARD.user}`;
       throw e;
     }
+    signedIn = true;
     await page.goto(`${ROOT}/cuu-ho`);
     await page.getByRole('group', { name: 'Chỉ số cứu hộ' }).getByRole('button').first().waitFor({ timeout: 20_000 });
     await page.waitForTimeout(1200);
@@ -1774,6 +1918,17 @@ async function rescueWard(ctx) {
     if (await page.getByRole('button', { name: 'Điều phối', exact: true }).count()) throw new Error('tài khoản phường thấy nút Điều phối');
     await expectNoOverflow(ctx, '/cuu-ho (phường)');
     return `${await page.locator('main article[aria-label^="SOS-"]').count()} phiếu đang hiện`;
+  });
+  if (!signedIn) return;
+  await step(ctx, `Tài khoản phường ${WARD.name}: "Sơ tán" trên thanh thao tác mở thẳng số liệu của phường (không qua bước chọn xã)`, async () => {
+    if (!(await page.getByRole('button', { name: '+ Cập nhật xã' }).count())) return 'tài khoản không có quyền cập nhật sơ tán';
+    await page.getByRole('navigation', { name: 'Thao tác nhanh' }).getByRole('button', { name: /Sơ tán/ }).click();
+    const dlg = page.getByRole('dialog');
+    await dlg.getByLabel(/Hộ phải sơ tán/).waitFor({ timeout: 5_000 });
+    if (!(await dlg.innerText()).includes(WARD.name)) throw new Error('form không ghi tên phường của tài khoản');
+    if (await dlg.getByRole('list', { name: 'Chọn xã / phường' }).count()) throw new Error('tài khoản một phường vẫn phải chọn xã');
+    await expectNoOverflow(ctx, 'form sơ tán (phường)', dlg);
+    await dlg.getByRole('button', { name: 'Huỷ', exact: true }).click();
   });
 }
 
@@ -1838,7 +1993,9 @@ try {
     dctx.setDefaultTimeout(15_000);
     const dPage = await dctx.newPage();
     const vpD = { name: `Điều hành cứu hộ · ${label}`, mobile: phone };
-    await rescuePage({ page: dPage, vp: vpD, problems: watch(dPage) });
+    const rctxD = { page: dPage, vp: vpD, problems: watch(dPage) };
+    await rescuePage(rctxD);
+    await rescueForms(rctxD);
     await dctx.close();
     if (phone) {
       const wctx = await browser.newContext({ ...opts, locale: 'vi-VN' });

@@ -28,7 +28,7 @@ const QtyStepper = forwardRef(function QtyStepper(
             inputMode="numeric"
             min={min}
             max={max}
-            className={clsx('input min-h-[44px] text-center font-mono text-base sm:min-h-[36px]', unit && 'pr-12', invalid && 'border-danger')}
+            className={clsx('input tap min-h-[44px] text-center font-mono text-base sm:min-h-[36px] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none', unit && 'pr-12', invalid && 'border-danger')}
             value={value}
             onChange={(e) => onChange(e.target.value)}
             aria-invalid={!!invalid}
