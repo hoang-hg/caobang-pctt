@@ -20,7 +20,7 @@ import QuickDispatch from '../components/resources/QuickDispatch';
 import { ForceReadinessChart, VehicleStatusChart } from '../components/resources/ReadinessCharts';
 import ResourceAlerts from '../components/resources/ResourceAlerts';
 import ResourceKpis from '../components/resources/ResourceKpis';
-import ResourceToolbar from '../components/resources/ResourceToolbar';
+import FilterToolbar from '../components/common/FilterToolbar';
 import VehicleList, { FuelDepots, VehicleMap } from '../components/resources/VehicleList';
 import WarehouseList, { STOCK_NOTE } from '../components/resources/WarehouseList';
 import {
@@ -41,6 +41,11 @@ const EMPTY = {
   luc_luong: 'Chưa có đơn vị lực lượng cứu hộ trong vùng đang xem — nhập bằng loại dữ liệu “Lực lượng”.',
   vat_tu: 'Chưa có kho vật tư trong vùng đang xem — nhập loại dữ liệu “Kho vật tư”, rồi “Tồn kho vật tư”.',
   phuong_tien: 'Chưa có phương tiện, trang thiết bị trong vùng đang xem — nhập bằng loại dữ liệu “Phương tiện”.',
+};
+const PLACEHOLDER = {
+  luc_luong: 'Tìm đơn vị, chỉ huy, kỹ năng…',
+  vat_tu: 'Tìm kho, xã/phường, mặt hàng…',
+  phuong_tien: 'Tìm số hiệu, loại, đơn vị…',
 };
 const REFRESH_KEYS = ['resources-summary', 'forces', 'warehouses', 'vehicles', 'fuel', 'supplies', 'kpis'];
 
@@ -338,8 +343,10 @@ export default function Resources() {
         />
       </div>
 
-      <ResourceToolbar
-        tab={tab}
+      <FilterToolbar
+        fields={FILTERS[tab]}
+        sorts={SORTS[tab]}
+        placeholder={PLACEHOLDER[tab]}
         q={q}
         onSearch={setQ}
         filters={filters}

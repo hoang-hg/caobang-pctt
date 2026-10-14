@@ -1,25 +1,21 @@
 import { useState } from 'react';
 import clsx from 'clsx';
 import { FileDown, FileSpreadsheet, Loader2, Search, SlidersHorizontal, X } from 'lucide-react';
-import { FILTERS, SORTS } from './resourceFacts';
 
-const PLACEHOLDER = {
-  luc_luong: 'Tìm đơn vị, chỉ huy, kỹ năng…',
-  vat_tu: 'Tìm kho, xã/phường, mặt hàng…',
-  phuong_tien: 'Tìm số hiệu, loại, đơn vị…',
-};
 const CTRL = 'tap min-h-[40px] text-xs sm:text-sm';
 
 /**
- * Thanh tìm kiếm · lọc · xếp · xuất của thẻ đang mở. Bộ lọc theo từng thẻ (resourceFacts.FILTERS), mỗi lựa chọn kèm số dòng.
+ * Thanh tìm kiếm · lọc · xếp · xuất dùng chung (Vật tư & Lực lượng, Điều hành cứu hộ…). `fields`: [{ key, label, all,
+ * options: [[giá trị, nhãn]] }], `counts[key][giá trị]` = số dòng của từng lựa chọn; `sorts`: [[giá trị, nhãn]]; `children`:
+ * nút riêng của trang (VD đổi cách xem) đặt cạnh Excel / PDF.
  * Điện thoại 360 px: ô tìm cả hàng; "Bộ lọc (n)" · Excel · PDF một hàng nút ≥ 44 px; ô chọn mở trong khung khi bấm "Bộ lọc"
  * (cán bộ hiện trường chủ yếu tìm theo tên). Máy tính: một hàng. Đang lọc → hàng nhãn "Đang lọc" bỏ từng điều kiện được.
  */
-export default function ResourceToolbar({
-  tab, q, onSearch, filters, counts, onFilter, onClear, sort, onSort, shown, total, noun, onExcel, onPdf, exporting,
+export default function FilterToolbar({
+  fields, sorts, placeholder, q, onSearch, filters, counts, onFilter, onClear, sort, onSort, shown, total, noun, onExcel, onPdf, exporting,
+  children,
 }) {
   const [open, setOpen] = useState(false);
-  const fields = FILTERS[tab];
   const active = fields.filter((f) => filters[f.key]);
   return (
     <div className="card flex flex-col gap-2 p-2 no-print">
@@ -29,7 +25,7 @@ export default function ResourceToolbar({
           <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted" aria-hidden="true" />
           <input
             className={clsx('input pl-8 pr-9', CTRL)}
-            placeholder={PLACEHOLDER[tab]}
+            placeholder={placeholder}
             value={q}
             onChange={(e) => onSearch(e.target.value)}
             aria-label="Tìm trong danh sách"
@@ -60,6 +56,7 @@ export default function ResourceToolbar({
         <button type="button" className={clsx('btn-ghost flex-1 px-2.5 sm:flex-none', CTRL)} onClick={onPdf} disabled={!shown || exporting} title={`Xuất PDF ${shown} ${noun} đang lọc`}>
           {exporting ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <FileDown size={14} aria-hidden="true" />} PDF
         </button>
+        {children}
       </div>
       <div className={clsx('grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center', !open && 'max-sm:hidden')}>
         {fields.map((f) => (
@@ -82,7 +79,7 @@ export default function ResourceToolbar({
           onChange={(e) => onSort(e.target.value)}
           aria-label="Sắp xếp"
         >
-          {SORTS[tab].map(([value, label]) => <option key={value} value={value}>Xếp: {label}</option>)}
+          {sorts.map(([value, label]) => <option key={value} value={value}>Xếp: {label}</option>)}
         </select>
       </div>
       {(active.length > 0 || q) && (

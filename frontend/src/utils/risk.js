@@ -61,5 +61,16 @@ export const STOCK_WATCH = 50;
 export const EXPIRY_DAYS = 30;
 export const stockLevel = (pct) => (pct == null || Number.isNaN(Number(pct)) ? null : pct < STOCK_LOW ? 3 : pct < STOCK_WATCH ? 1 : 0);
 
+/**
+ * Điểm sơ tán: số người đang ở / sức chứa → mức (biểu tượng trên bản đồ, cổng công khai, Điều hành cứu hộ): đầy / quá tải
+ * (≥ 100 %) Đỏ, sắp đầy (trên 85 %) Cam, còn chỗ Xanh; chưa có sức chứa → null.
+ */
+export const OCCUPANCY_NEAR = 0.85;
+export const occupancyLevel = (current, capacity) => {
+  if (!capacity) return null;
+  const r = (current || 0) / capacity;
+  return r >= 1 ? 3 : r > OCCUPANCY_NEAR ? 2 : 0;
+};
+
 /** Phiếu SOS: quá hạn phản hồi hoặc cấp 1 → Đỏ; cấp 2 → Cam; cấp 3 → Vàng (như màu ưu tiên PRIORITY). */
 export const sosLevel = (priority, overdue = false) => (overdue || priority === 1 ? 3 : priority === 2 ? 2 : 1);

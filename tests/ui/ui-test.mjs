@@ -492,7 +492,8 @@ async function staff(ctx, trackCode) {
   await step(ctx, READONLY ? 'Mở hộp thoại điều động (không phát lệnh)' : 'Điều động: chọn lực lượng → phát lệnh → báo chưa gửi cho đội', async () => {
     await page.goto(`${ROOT}/cuu-ho`);
     await waitMain(page);
-    const btn = visible(page.getByRole('button', { name: 'Điều phối' }));
+    // exact: nút chuyển cách xem "Bảng điều phối" cũng chứa chữ "điều phối"
+    const btn = visible(page.getByRole('button', { name: 'Điều phối', exact: true }));
     await btn.waitFor({ timeout: READONLY ? 5_000 : 15_000 }).catch((e) => { if (!READONLY) throw e; });
     if (READONLY && !(await btn.count())) return 'bỏ qua: không có phiếu chờ xử lý';
     await btn.click();
@@ -1641,6 +1642,141 @@ async function resourcesWard(ctx) {
   });
 }
 
+// ================================================================ Điều hành cứu hộ (trang D) — laptop, iPad dọc, điện thoại 360
+// Dải khẩn trên cùng, 4 ô chỉ số; ô "Quá hạn SLA" → đúng các phiếu quá hạn, Quay lại trả bộ lọc cũ; bảng điều phối: đủ 4 cột
+// trên laptop, thẻ chọn cột vừa màn trên điện thoại / iPad; "Danh sách": phân trang, xếp, Excel (laptop thêm PDF); không tải
+// được phiếu → nói rõ, không ghi "không có phiếu"; mất mạng → nút ghi tắt; cảm ứng: vùng chạm ≥ 44 px; tài khoản phường: chỉ
+// phiếu trong phường, không có nút Điều phối. Chỉ xem — không chuyển trạng thái, không điều động.
+const RESCUE_DEVICES = RESOURCE_DEVICES;
+
+async function rescuePage(ctx) {
+  const { page, vp } = ctx;
+  const strip = page.getByRole('status', { name: 'Thông tin khẩn cứu hộ' });
+  const kpis = page.getByRole('group', { name: 'Chỉ số cứu hộ' });
+  const cards = page.locator('main article[aria-label^="SOS-"]');
+  const touch = await page.evaluate(() => matchMedia('(pointer: coarse)').matches);
+  const wide = await page.evaluate(() => innerWidth >= 1280);
+
+  await step(ctx, 'Mở Điều hành cứu hộ: dải khẩn trên cùng, 4 ô chỉ số, bảng điều phối (laptop 4 cột / thẻ chọn cột vừa màn)', async () => {
+    await loginAs(page, STAFF);
+    await page.goto(`${ROOT}/cuu-ho`);
+    await kpis.getByRole('button').first().waitFor({ timeout: 20_000 });
+    await strip.waitFor({ timeout: 20_000 });
+    const m = await page.evaluate(() => {
+      const box = (sel) => document.querySelector(sel)?.getBoundingClientRect();
+      const tabs = [...document.querySelectorAll('[aria-label="Cột của bảng điều phối"] > button')].map((b) => b.getBoundingClientRect());
+      return {
+        stripAbove: box('[aria-label="Thông tin khẩn cứu hộ"]').top < box('[aria-label="Chỉ số cứu hộ"]').top,
+        kpi: document.querySelectorAll('[aria-label="Chỉ số cứu hộ"] > button').length,
+        columns: document.querySelectorAll('main section[aria-label*=" phiếu"]').length,
+        tabs: tabs.length,
+        tabsOut: tabs.filter((t) => t.right > innerWidth + 1 || t.left < -1).length,
+      };
+    });
+    if (!m.stripAbove) throw new Error('dải thông tin khẩn không nằm trên cùng');
+    if (m.kpi !== 4) throw new Error(`có ${m.kpi} ô chỉ số (cần 4, bấm được)`);
+    if (wide ? m.columns !== 4 : m.tabs !== 4 || m.tabsOut) throw new Error(`laptop ${m.columns} cột / ${m.tabs} thẻ cột, ${m.tabsOut} thẻ tràn màn`);
+    await expectNoOverflow(ctx, '/cuu-ho');
+    return wide ? '4 cột' : '4 thẻ cột';
+  });
+
+  await step(ctx, 'Chạm ô "Quá hạn SLA" → chỉ phiếu quá hạn; Quay lại trả bộ lọc cũ', async () => {
+    const tile = kpis.getByRole('button', { name: /Quá hạn SLA/ });
+    const n = Number((await tile.innerText()).match(/(\d+)\s*phiếu/)?.[1] ?? 0);
+    const before = page.url();
+    await tile.click();
+    await page.waitForURL(/th=qua_han/);
+    if (n > 0) {
+      await cards.first().waitFor({ timeout: 10_000 });
+      const labels = await cards.evaluateAll((els) => els.map((el) => el.getAttribute('aria-label')));
+      if (!labels.every((l) => /quá hạn SLA/.test(l))) throw new Error('có phiếu không quá hạn trong danh sách đã lọc');
+      if (wide && labels.length !== n) throw new Error(`ô ghi ${n} phiếu quá hạn, bảng hiện ${labels.length}`);
+    } else {
+      await page.getByText(/Không có phiếu khớp bộ lọc/).first().waitFor({ timeout: 5_000 });
+    }
+    await page.goBack();
+    await page.waitForURL((u) => u.toString() === before, { timeout: 5_000 });
+    return `${n} phiếu quá hạn`;
+  });
+
+  await step(ctx, 'Danh sách: phân trang, xếp "chờ lâu nhất", Excel (và PDF trên laptop) mọi phiếu đang lọc', async () => {
+    await page.getByRole('group', { name: 'Cách xem phiếu' }).getByRole('button', { name: 'Danh sách' }).click();
+    await page.waitForURL(/xem=danh_sach/);
+    await cards.first().or(page.locator('main table tbody tr').first()).waitFor({ timeout: 10_000 });
+    const sortBox = page.getByLabel('Sắp xếp');
+    if (!(await sortBox.isVisible())) await page.getByRole('button', { name: /^Bộ lọc/ }).click();
+    await sortBox.selectOption('cho_lau');
+    const [xlsx] = await Promise.all([page.waitForEvent('download', { timeout: 20_000 }), page.getByRole('button', { name: 'Excel', exact: true }).click()]);
+    if (!/^phieu-sos-.*\.xlsx$/.test(xlsx.suggestedFilename())) throw new Error(`tên tệp Excel: ${xlsx.suggestedFilename()}`);
+    let note = xlsx.suggestedFilename();
+    if (wide) {
+      const [pdfFile] = await Promise.all([page.waitForEvent('download', { timeout: 60_000 }), page.getByRole('button', { name: 'PDF', exact: true }).click()]);
+      if (!/^phieu-sos-.*\.pdf$/.test(pdfFile.suggestedFilename())) throw new Error(`tên tệp PDF: ${pdfFile.suggestedFilename()}`);
+      note += ` · ${pdfFile.suggestedFilename()}`;
+    }
+    await expectNoOverflow(ctx, '/cuu-ho?xem=danh_sach');
+    return note;
+  });
+
+  await step(ctx, 'Không tải được phiếu → báo rõ (không ghi "không có phiếu"); mất mạng → dải báo, nút Điều phối tắt', async () => {
+    await page.route('**/api/v1/sos', safeRoute((r) => (r.request().method() === 'GET' ? r.abort('failed') : r.continue())));
+    await page.route('**/api/v1/sos?**', safeRoute((r) => r.abort('failed')));
+    try {
+      await page.goto(`${ROOT}/cuu-ho`);
+      await page.getByText(/Không tải được danh sách phiếu SOS/).first().waitFor({ timeout: 20_000 });
+      if (await page.getByText(/Không có phiếu chờ xử lý/).count()) throw new Error('lỗi tải nhưng vẫn ghi "không có phiếu"');
+    } finally {
+      await page.unroute('**/api/v1/sos');
+      await page.unroute('**/api/v1/sos?**');
+    }
+    await page.goto(`${ROOT}/cuu-ho`);
+    const btn = page.getByRole('button', { name: 'Điều phối', exact: true }).first();
+    const hasDispatch = await btn.waitFor({ timeout: 15_000 }).then(() => true, () => false);
+    await page.context().setOffline(true);
+    try {
+      await page.getByText('Mất kết nối mạng').waitFor({ timeout: 5_000 });
+      if (hasDispatch && !(await btn.isDisabled())) throw new Error('mất mạng nhưng nút Điều phối vẫn bấm được');
+    } finally {
+      await page.context().setOffline(false);
+    }
+    return hasDispatch ? 'nút Điều phối tắt khi mất mạng' : 'không có phiếu chờ điều phối';
+  });
+
+  if (touch) {
+    await step(ctx, 'Màn cảm ứng: mọi vùng chạm của bảng điều phối và danh sách ≥ 44 px', async () => {
+      const bad = [];
+      for (const path of ['/cuu-ho', '/cuu-ho?xem=danh_sach']) {
+        await page.goto(`${ROOT}${path}`);
+        await kpis.getByRole('button').first().waitFor({ timeout: 20_000 });
+        await page.waitForTimeout(800);
+        for (const s of await smallTargets(page)) bad.push(`${path}: ${s.what} ${s.size}px`);
+      }
+      if (bad.length) throw new Error(`${bad.length} vùng chạm < 44 px — ${bad.slice(0, 5).join(', ')}`);
+    });
+  }
+}
+
+/** Tài khoản phường: chỉ phiếu SOS trong phường, không có nút "Điều phối" (quyền dispatch.create) — có "Tiếp nhận" nếu có phiếu chờ. */
+async function rescueWard(ctx) {
+  const { page } = ctx;
+  await step(ctx, `Điều hành cứu hộ — tài khoản phường ${WARD.name}: chỉ phiếu trong phường, không có nút Điều phối`, async () => {
+    try {
+      await loginAs(page, WARD);
+    } catch (e) {
+      if (READONLY) return `bỏ qua: không đăng nhập được ${WARD.user}`;
+      throw e;
+    }
+    await page.goto(`${ROOT}/cuu-ho`);
+    await page.getByRole('group', { name: 'Chỉ số cứu hộ' }).getByRole('button').first().waitFor({ timeout: 20_000 });
+    await page.waitForTimeout(1200);
+    const head = await page.locator('main').innerText();
+    if (!head.includes(WARD.name) || /Toàn tỉnh Cao Bằng ·/.test(head)) throw new Error('tiêu đề không phải phường của tài khoản');
+    if (await page.getByRole('button', { name: 'Điều phối', exact: true }).count()) throw new Error('tài khoản phường thấy nút Điều phối');
+    await expectNoOverflow(ctx, '/cuu-ho (phường)');
+    return `${await page.locator('main article[aria-label^="SOS-"]').count()} phiếu đang hiện`;
+  });
+}
+
 // ================================================================
 console.log(`Kiểm thử giao diện: ${ROOT}${READONLY ? ' (chỉ xem)' : ''}`);
 const browser = await chromium.launch();
@@ -1696,6 +1832,21 @@ try {
     const lPage = await lctx.newPage();
     await mapLayers({ page: lPage, vp: { name: `Lớp & popup bản đồ · ${label}`, mobile: phone }, problems: watch(lPage) }, phone);
     await lctx.close();
+  }
+  for (const [label, opts, phone] of RESCUE_DEVICES) {
+    const dctx = await browser.newContext({ ...opts, locale: 'vi-VN', acceptDownloads: true });
+    dctx.setDefaultTimeout(15_000);
+    const dPage = await dctx.newPage();
+    const vpD = { name: `Điều hành cứu hộ · ${label}`, mobile: phone };
+    await rescuePage({ page: dPage, vp: vpD, problems: watch(dPage) });
+    await dctx.close();
+    if (phone) {
+      const wctx = await browser.newContext({ ...opts, locale: 'vi-VN' });
+      wctx.setDefaultTimeout(15_000);
+      const wPage = await wctx.newPage();
+      await rescueWard({ page: wPage, vp: vpD, problems: watch(wPage) });
+      await wctx.close();
+    }
   }
   for (const [label, opts, phone] of RESOURCE_DEVICES) {
     const rctx = await browser.newContext({ ...opts, locale: 'vi-VN', acceptDownloads: true });
