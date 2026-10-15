@@ -23,7 +23,7 @@ from app import preflight
 from app import seed_data as D
 from app.auth import hash_secret
 from app.config import settings
-from app.db import engine, execute, fetch_all, fetch_one
+from app.db import APPEND_ONLY_LOGS, engine, execute, fetch_all, fetch_one
 from app.infra.cache import invalidate
 from app.infra.redis import close_redis
 from app.services import scenario
@@ -1114,8 +1114,14 @@ async def main(reset: bool = False):
     now = datetime.now(UTC).replace(second=0, microsecond=0)
     async with engine.begin() as conn:
         if reset:
+            # Nhật ký pháp lý chỉ ghi thêm (trigger, migration 0022): lệnh reset — chỉ máy dev / trình diễn / CI, đã chặn ở
+            # production phía trên — tạm tắt trigger để làm rỗng, bật lại ngay trong cùng giao dịch
+            for table in APPEND_ONLY_LOGS:
+                await ex(conn, f"ALTER TABLE {table} DISABLE TRIGGER USER")
             for stmt in RESET_SQL.split(";"):
                 await ex(conn, stmt)
+            for table in APPEND_ONLY_LOGS:
+                await ex(conn, f"ALTER TABLE {table} ENABLE TRIGGER USER")
         await ex(
             conn,
             "INSERT INTO operations.system_settings (key, value) VALUES ('scenario_anchor', to_jsonb(CAST(:t AS text)))",

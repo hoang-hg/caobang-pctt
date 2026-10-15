@@ -60,7 +60,27 @@ async def check_config() -> list[Item]:
     out += [Item(FAIL, f"[cảnh báo khởi động] {w}") for w in warnings]
     if settings.demo_mode or settings.simulator:
         out.append(Item(FAIL, "DEMO_MODE / SIMULATOR đang bật — số liệu trên cổng là giả"))
-    return out or [Item(OK, "Kiểm tra cấu hình khi khởi động: không lỗi, không cảnh báo")]
+    out += await check_audit_logs()
+    if all(i.status == OK for i in out):
+        return [Item(OK, "Kiểm tra cấu hình khi khởi động: không lỗi, không cảnh báo"), *out]
+    return out
+
+
+async def check_audit_logs() -> list[Item]:
+    """Nhật ký pháp lý chỉ ghi thêm (DB1, migration 0022): đủ 4 trigger chặn sửa / xoá / làm rỗng, không cái nào đang tắt."""
+    row = await fetch_one(
+        """SELECT count(*) AS n FROM pg_trigger
+            WHERE tgname IN ('audit_logs_append_only', 'audit_logs_no_truncate',
+                             'rbac_audit_log_append_only', 'rbac_audit_log_no_truncate') AND tgenabled <> 'D'"""
+    )
+    if row["n"] < 4:
+        return [
+            Item(
+                FAIL,
+                f"Nhật ký pháp lý sửa / xoá được: chỉ {row['n']}/4 trigger chỉ-ghi-thêm đang bật (migration 0022)",
+            )
+        ]
+    return [Item(OK, "Nhật ký pháp lý chỉ ghi thêm: đủ 4 trigger chặn sửa / xoá / làm rỗng")]
 
 
 async def check_data() -> list[Item]:

@@ -1402,7 +1402,7 @@ lỗi (chỉ tên kiểm tra + đạt / lỗi; chi tiết trong email). `/health
 - **Giữ nhật ký có thời hạn** (`backend/app/services/retention.py`, worker chạy mỗi giờ, xoá từng lô): nhật ký tiếp nhận
   IoT / đồng bộ `INGEST_LOG_RETENTION_DAYS` (30 ngày — mỗi lần thiết bị gửi là 1 dòng), dòng sự kiện vận hành
   `EVENT_LOG_RETENTION_DAYS` (730 ngày), link đặt lại mật khẩu 30 ngày; `0` = giữ mãi. **Không** xoá nhật ký thao tác
-  (audit), phiếu SOS, phản ánh, lệnh cảnh báo, số đo cảm biến.
+  (audit — chỉ ghi thêm, trigger chặn xoá), phiếu SOS, phản ánh, lệnh cảnh báo, số đo cảm biến.
 - **Không chạy pytest trong container production** (kiểm thử ghi vào Redis / CSDL thật).
 
 | Hiện tượng | Kiểm tra |
@@ -1545,7 +1545,7 @@ chọn giờ vắng người, báo trước người dùng các ứng dụng kh�
 ## 11. Bảo mật & tuân thủ
 
 **Đã có**: HTTPS + HSTS; kiểm tra cấu hình khi khởi động; mật khẩu và PIN băm PBKDF2, khoá đăng nhập sai theo tài khoản + IP (không khoá được người duyệt cảnh báo từ xa);
-xác thực 2 lớp TOTP, bắt buộc theo vai trò ([11.1](#xac-thuc-2-lop)); PIN ký duyệt cảnh báo; RBAC theo địa bàn, chống leo thang; nhật ký thao tác & phân quyền; giới hạn tần suất chống giả mạo IP;
+xác thực 2 lớp TOTP, bắt buộc theo vai trò ([11.1](#xac-thuc-2-lop)); PIN ký duyệt cảnh báo; RBAC theo địa bàn, chống leo thang; nhật ký thao tác & phân quyền **chỉ ghi thêm** (trigger chặn sửa / xoá / làm rỗng — migration 0022; Go / No-Go báo LỖI khi thiếu / tắt trigger); giới hạn tần suất chống giả mạo IP;
 ảnh xoá EXIF/GPS, link ảnh có chữ ký; IP người phản ánh chỉ lưu băm; CSDL / Redis / MinIO không mở cổng, không ra
 Internet; container backend không chạy root; Swagger tắt ở production; log không chứa token, toạ độ; API key đối tác mã
 hoá Fernet (`SECRET_KEY`), khoá thiết bị băm SHA-256, log `httpx` hạ xuống WARNING để không lộ key trong URL; cổng webhook

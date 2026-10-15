@@ -13,6 +13,9 @@ from sqlalchemy.ext.asyncio import AsyncConnection, create_async_engine
 
 from app.config import settings
 
+# Nhật ký pháp lý CHỈ GHI THÊM (migration 0022: trigger chặn sửa / xoá / làm rỗng — docs/csdl-viec-con-lai.md, DB1)
+APPEND_ONLY_LOGS = ("communications.audit_logs", "communications.rbac_audit_log")
+
 # Tiến trình API: câu lệnh chạy quá DB_STATEMENT_TIMEOUT_MS bị Postgres huỷ (lỗi 500) thay vì giữ kết nối trong pool
 # — một truy vấn chậm không kéo chậm cả hệ thống. Worker / migrate / seed (tác vụ dài) không giới hạn. Việc dài có chủ
 # đích trong API (nhập dữ liệu) tự nới bằng SET LOCAL statement_timeout trong transaction.
