@@ -1336,6 +1336,42 @@ async function loginAs(page, who) {
   await page.waitForURL(/\/dashboard/, { timeout: 20_000 });
 }
 
+/**
+ * Sổ xuất – nhập kho (DB7) ở thẻ Kho vật tư — chỉ xem: "Sổ xuất – nhập" trên thẻ kho mở khối sổ đã lọc sẵn đúng kho; mọi dòng
+ * đang hiện thuộc kho đó; Excel tải được; không tràn ngang; cảm ứng: vùng chạm của khối ≥ 44 px.
+ */
+async function inventoryLedger(ctx) {
+  const { page } = ctx;
+  await step(ctx, 'Sổ xuất – nhập kho: mở từ thẻ kho (lọc sẵn đúng kho), dòng đúng kho, Excel, không tràn, vùng chạm ≥ 44 px', async () => {
+    await page.goto(`${ROOT}/nguon-luc?tab=vat_tu`);
+    const link = page.getByRole('button', { name: /^Sổ xuất – nhập của / }).first();
+    await link.waitFor({ timeout: 20_000 });
+    const wh = (await link.getAttribute('aria-label')).replace('Sổ xuất – nhập của ', '');
+    if (await page.locator('#so-kho [aria-label="Khoảng thời gian của sổ kho"]').count()) throw new Error('khối sổ kho mở sẵn — phải thu gọn, chưa tải');
+    await link.click();
+    const sec = page.locator('#so-kho');
+    await sec.getByText(/dòng sổ/).first().waitFor({ timeout: 15_000 });
+    await sec.getByRole('button', { name: new RegExp(`Bỏ lọc Kho: ${wh.replace(/[.*+?^${}()|[\]\\]/g, '\\async function resourcesPage(ctx) {')}`) }).waitFor({ timeout: 5_000 });
+    const items = sec.locator('tbody tr, ul[aria-label="Sổ xuất – nhập kho"] > li');
+    const n = await items.count();
+    const wrong = (await items.allInnerTexts()).filter((t) => !t.includes(wh));
+    if (wrong.length) throw new Error(`${wrong.length}/${n} dòng không thuộc ${wh}`);
+    if (n) {
+      const [download] = await Promise.all([page.waitForEvent('download', { timeout: 15_000 }), sec.getByRole('button', { name: /Excel/ }).click()]);
+      if (!/^so-xuat-nhap-kho-.*\.xlsx$/.test(download.suggestedFilename())) throw new Error(`tên tệp Excel: ${download.suggestedFilename()}`);
+    }
+    await expectNoOverflow(ctx, 'sổ xuất – nhập kho');
+    if (await page.evaluate(() => matchMedia('(pointer: coarse)').matches)) {
+      const bad = await sec.evaluate((el) => [...el.querySelectorAll('button, input, select')]
+        .filter((e) => e.getBoundingClientRect().width > 0)
+        .map((e) => ({ s: Math.round(Math.min(e.getBoundingClientRect().width, e.getBoundingClientRect().height)), t: (e.getAttribute('aria-label') || e.innerText || '').slice(0, 24) }))
+        .filter((x) => x.s < 44));
+      if (bad.length) throw new Error(`${bad.length} vùng chạm < 44 px — ${bad.slice(0, 4).map((x) => `${x.t} ${x.s}px`).join(', ')}`);
+    }
+    return `${wh}: ${n} dòng`;
+  });
+}
+
 async function resourcesPage(ctx) {
   const { page, vp } = ctx;
   const strip = page.getByRole('status', { name: 'Thông tin khẩn về nguồn lực' });
@@ -2803,6 +2839,7 @@ try {
     const rPage = await rctx.newPage();
     const vpR = { name: `Vật tư & Lực lượng · ${label}`, mobile: phone };
     await resourcesPage({ page: rPage, vp: vpR, problems: watch(rPage) });
+    await inventoryLedger({ page: rPage, vp: vpR, problems: watch(rPage) });
     await rctx.close();
     if (phone || label.startsWith('Laptop')) {
       const fctx = await browser.newContext({ ...opts, locale: 'vi-VN' });

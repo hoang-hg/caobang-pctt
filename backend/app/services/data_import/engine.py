@@ -31,6 +31,7 @@ from app.services.data_import.parsing import (
     to_enum,
 )
 from app.services.data_import.specs import DATASETS, SCOPED_REPLACE_EXTRA, SUBMITTABLE, Dataset, Field
+from app.services.ledger import ledger_context
 
 log = logging.getLogger(__name__)
 
@@ -808,6 +809,8 @@ async def _apply_rows(
     created = updated = deleted = 0
     # Hai lần nhập cùng loại dữ liệu cùng lúc → lần sau chờ lần trước xong
     await conn.execute(text("SELECT pg_advisory_xact_lock(hashtext(:k))"), {"k": f"data_import:{ds.name}"})
+    # Sổ xuất – nhập kho / lịch sử sơ tán (trigger, migration 0024): thay đổi do nhập tệp ghi lý do "nhập dữ liệu"
+    await ledger_context(conn, reason="nhap_du_lieu")
     # Tệp lớn (20.000 dòng, ranh giới xã + gán lại xã cho mọi đối tượng) có thể quá giới hạn 30 s của tiến trình API
     await conn.execute(text("SET LOCAL statement_timeout = '10min'"))
     for row in rows:

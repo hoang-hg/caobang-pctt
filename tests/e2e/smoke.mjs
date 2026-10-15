@@ -114,6 +114,63 @@ check('Xác nhận đã cứu an toàn', resolved.data?.status === 'hoan_thanh')
 const audit = (await call('GET', '/alerts/audit', null, checker)).data;
 check('Nhật ký pháp lý ghi nhận', audit.some((a) => a.action === 'broadcast.approve'), `${audit.length} bản ghi`);
 
+// Sổ xuất – nhập kho, lịch sử sơ tán (DB7, DB8 — trigger migration 0024): mọi lần tồn kho đổi số lượng đều có dòng sổ đúng
+// lý do, người thao tác, lệnh điều động; sổ theo phạm vi được giao. Ghi tồn kho thật của dữ liệu mẫu (xuất 2, nhập 3, điều
+// động kèm 1 rồi huỷ trả lại) — tồn kho chung cuộc tăng 1.
+{
+  // Bộ mô phỏng tự trừ 5 mặt hàng này theo thời gian (services/simulator.py: consume_inventory) → chọn mặt hàng khác, số tồn
+  // không đổi ngoài các bước của bài thử
+  const SIMULATED = ['MI_TOM', 'NUOC_CHAI', 'LUONG_KHO', 'AO_PHAO', 'TUI_SO_CUU'];
+  const usable = (i) => i.quantity >= 10 && !SIMULATED.includes(i.item_code);
+  const whs = (await call('GET', '/resources/warehouses', null, maker)).data;
+  const wh = whs.find((w) => w.items.some(usable));
+  const it = wh.items.find(usable);
+  const iss = await call('POST', `/resources/warehouses/${wh.id}/issue`, { item_code: it.item_code, quantity: 2, destination: 'Thử sổ kho' }, maker);
+  const rec = await call('POST', `/resources/warehouses/${wh.id}/receive`, { item_code: it.item_code, quantity: 3, source: 'Cứu trợ thử sổ kho' }, maker);
+  check('Xuất kho / nhập kho', iss.status === 200 && rec.status === 200, `${iss.status} / ${rec.status}`);
+  const t2 = (await call('POST', '/sos', { raw_message: 'Ngập sâu, cần lương thực (thử sổ kho)', lat: wh.lat, lon: wh.lon, incident_type: 'ngap_lut', source: 'CAN_BO' }, maker)).data;
+  const m2 = (await call('GET', `/sos/${t2.id}/match`, null, maker)).data;
+  const d2 = await call('POST', '/dispatch', {
+    ticket_id: t2.id, force_id: m2.forces[0].id, personnel: 1, warehouse_id: wh.id, supplies: { [it.item_code]: 1 },
+  }, maker);
+  const orderId = d2.data?.order?.id;
+  const c2 = await call('POST', `/dispatch/${orderId}/cancel`, { reason: 'Thử sổ kho: hoàn trả vật tư', return_supplies: true }, maker);
+  check('Điều động kèm vật tư, huỷ lệnh trả lại kho', d2.status === 200 && c2.status === 200, `${d2.status} / ${c2.status}`);
+  const moves = (await call('GET', `/resources/inventory-moves?warehouse_id=${wh.id}&item_code=${it.item_code}&limit=10`, null, maker)).data;
+  const by = (reason) => moves.find((m) => m.reason === reason);
+  const issued = by('xuat');
+  const received = by('nhap');
+  const withOrder = by('xuat_dieu_dong');
+  const returned = by('hoan_tra');
+  check('Sổ kho: xuất −2 (người xuất, nơi nhận), nhập +3 (nguồn hàng)',
+    issued?.delta === -2 && issued.actor_name && issued.note === 'Thử sổ kho' && received?.delta === 3 && received.note === 'Cứu trợ thử sổ kho',
+    JSON.stringify(moves.slice(0, 4).map((m) => [m.reason, m.delta, m.actor_name, m.note])));
+  check('Sổ kho: vật tư kèm lệnh điều động −1 và hoàn trả +1, cùng ghi mã phiếu SOS',
+    withOrder?.delta === -1 && withOrder.ticket_code === t2.code && returned?.delta === 1 && returned.ticket_code === t2.code,
+    `${withOrder?.ticket_code} / ${returned?.ticket_code}`);
+  check('Sổ kho: số tồn sau mỗi dòng khớp tồn kho hiện tại', moves[0]?.quantity_after === it.quantity + 1,
+    `${moves[0]?.quantity_after} vs ${it.quantity + 1}`);
+  const ward = await login('admin.thucphan', 'adminthucphan123');
+  const wardMoves = (await call('GET', '/resources/inventory-moves?limit=500', null, ward)).data;
+  check('Sổ kho theo phạm vi: tài khoản phường chỉ thấy kho trong phường', Array.isArray(wardMoves)
+    && wardMoves.every((m) => m.admin_code === 'CB-THUCPHAN'), `${wardMoves.length} dòng`);
+  check('Sổ kho: quá 5.000 dòng một lần → 422', (await call('GET', '/resources/inventory-moves?limit=100000', null, maker)).status === 422);
+
+  const evac = (await call('GET', '/evacuation', null, maker)).data.progress;
+  const ev = evac.find((e) => e.planned_households > e.evacuated_households) || evac[0];
+  const put = await call('PUT', `/evacuation/${ev.code}`, {
+    planned_households: ev.planned_households, evacuated_households: Math.min(ev.planned_households, ev.evacuated_households + 1),
+    planned_persons: ev.planned_persons, evacuated_persons: Math.min(ev.planned_persons, ev.evacuated_persons + 1),
+  }, maker);
+  const hist = (await call('GET', `/evacuation/${ev.code}/history?hours=1`, null, maker)).data;
+  const last = hist.at(-1);
+  check('Lịch sử sơ tán: lần cập nhật vừa rồi có dòng mới, ghi người cập nhật', put.status === 200
+    && last?.evacuated_households === put.data.evacuated_households && last.actor_name, JSON.stringify(last));
+  const other = evac.find((e) => e.code !== 'CB-THUCPHAN');
+  check('Lịch sử sơ tán theo phạm vi: tài khoản phường hỏi xã khác → 404',
+    (await call('GET', `/evacuation/${other.code}/history`, null, ward)).status === 404);
+}
+
 // Mưa bình quân lưu vực (Phân hệ A): theo diện tích đa giác Thiessen — KPI 24h, biểu đồ mưa giờ, cổng công khai cùng một số
 const kp = (await call('GET', '/dashboard/kpis', null, checker)).data;
 const rf = (await call('GET', '/dashboard/rainfall', null, checker)).data;

@@ -2,6 +2,7 @@
 
 import hmac
 import json
+import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Literal
 
@@ -17,6 +18,7 @@ from app.rbac import domains, scope_loaders
 from app.rbac.authz import area_scope, can, forbidden, require_any, require_permission
 from app.services import dispatch_matching, logistics, mission
 from app.services.events import log_event
+from app.services.ledger import ledger_context
 from app.services.reports import REPORT_SOS_DONE, REPORT_SOS_NOTES
 from app.services.safe_routing import VEHICLE_SPEED, plan_route
 from app.services.sos import SLA_MINUTES, TICKET_SELECT, create_ticket, get_ticket
@@ -340,6 +342,7 @@ async def dispatch(body: DispatchIn, user: dict = Depends(require_any("dispatch"
     personnel = min(body.personnel, force["personnel_ready"])
     eta = datetime.now(UTC) + timedelta(minutes=route["duration_min"])
     token, token_hash = mission.new_token()  # link nhiệm vụ cho trưởng nhóm (app/services/mission.py)
+    order_id = str(uuid.uuid4())  # tạo sẵn: sổ xuất – nhập kho ghi vật tư kèm lệnh (trừ trước khi ghi lệnh)
 
     async with transaction() as conn:
         # Khoá phiếu tới hết transaction, kiểm tra lại trạng thái TRONG khoá (bước tính lộ trình ở trên mất vài trăm
@@ -388,6 +391,9 @@ async def dispatch(body: DispatchIn, user: dict = Depends(require_any("dispatch"
                 409, "Có phương tiện không còn sẵn sàng (đang làm nhiệm vụ / bảo dưỡng) — chọn lại"
             )
         if warehouse:
+            await ledger_context(
+                conn, reason="xuat_dieu_dong", actor_id=user["id"], order_id=order_id, note=ticket["code"]
+            )
             # Trừ có điều kiện từng mặt hàng: kho thiếu bất kỳ mặt hàng nào → huỷ cả lệnh (rollback), báo mặt hàng thiếu
             stock = await fetch_all(
                 """SELECT item_code, quantity FROM resources.inventory
@@ -410,14 +416,16 @@ async def dispatch(body: DispatchIn, user: dict = Depends(require_any("dispatch"
                 conn,
             )
         order = await fetch_one(
-            """INSERT INTO operations.dispatch_orders (ticket_id, force_id, vehicle_ids, personnel, supplies, dispatched_by, eta,
-                                                       route_geom, distance_km, route_safe, supplies_warehouse_id,
-                                                       mission_token_hash, mission_expires_at)
-               VALUES (CAST(:t AS uuid), CAST(:f AS uuid), CAST(:v AS uuid[]), :p, CAST(:s AS jsonb), :by, :eta,
+            """INSERT INTO operations.dispatch_orders (id, ticket_id, force_id, vehicle_ids, personnel, supplies, dispatched_by,
+                                                       dispatched_by_id, eta, route_geom, distance_km, route_safe,
+                                                       supplies_warehouse_id, mission_token_hash, mission_expires_at)
+               VALUES (CAST(:id AS uuid), CAST(:t AS uuid), CAST(:f AS uuid), CAST(:v AS uuid[]), :p, CAST(:s AS jsonb), :by,
+                       CAST(:by_id AS uuid), :eta,
                        ST_SetSRID(ST_GeomFromGeoJSON(:g), 4326), :km, :safe, CAST(:wh AS uuid),
                        :mh, now() + make_interval(hours => :ttl))
                RETURNING id, eta, distance_km, route_safe, mission_expires_at""",
             {
+                "id": order_id,
                 "t": body.ticket_id,
                 "f": body.force_id,
                 "v": vehicle_ids,
@@ -425,6 +433,7 @@ async def dispatch(body: DispatchIn, user: dict = Depends(require_any("dispatch"
                 "s": json.dumps(supplies),
                 "wh": body.warehouse_id if warehouse else None,
                 "by": user["full_name"],
+                "by_id": user["id"],
                 "eta": eta,
                 "g": json.dumps(route["geometry"]),
                 "km": route["distance_km"],
@@ -564,10 +573,11 @@ async def cancel_dispatch(
     async with transaction() as conn:
         order = await fetch_one(
             """UPDATE operations.dispatch_orders
-                  SET status = 'huy', cancelled_at = now(), cancelled_by = :by, cancel_reason = :r
+                  SET status = 'huy', cancelled_at = now(), cancelled_by = :by, cancelled_by_id = CAST(:by_id AS uuid),
+                      cancel_reason = :r
                 WHERE id = CAST(:id AS uuid) AND status IN ('dang_di', 'da_den')
             RETURNING id, ticket_id, force_id, vehicle_ids, personnel, supplies, supplies_warehouse_id""",
-            {"id": order_id, "by": user["full_name"], "r": reason},
+            {"id": order_id, "by": user["full_name"], "by_id": user["id"], "r": reason},
             conn,
         )
         if not order:
@@ -576,6 +586,7 @@ async def cancel_dispatch(
         supplies = order["supplies"] or {}
         returned = bool(body.return_supplies and order["supplies_warehouse_id"] and supplies)
         if returned:
+            await ledger_context(conn, reason="hoan_tra", actor_id=user["id"], order_id=order_id, note=reason)
             await execute(
                 """UPDATE resources.inventory i SET quantity = i.quantity + s.n, last_updated = now()
                      FROM unnest(CAST(:c AS text[]), CAST(:n AS int[])) AS s(code, n)
@@ -648,6 +659,28 @@ async def evacuation(codes: list[str] = Depends(area_scope("monitoring", "view")
     return {"progress": progress, "sites": sites}
 
 
+@router.get("/evacuation/{code}/history")
+async def evacuation_history(
+    code: str,
+    hours: int = Query(72, ge=1, le=SOS_LIST_MAX_HOURS),
+    codes: list[str] = Depends(area_scope("monitoring", "view")),
+):
+    """Diễn biến sơ tán của một xã (DB8, trigger migration 0024): mỗi lần số kế hoạch / đã sơ tán đổi là một dòng, kèm người
+    cập nhật. Xã ngoài phạm vi được giao → 404 (không lộ có hay không)."""
+    if codes and code not in codes:
+        raise HTTPException(404, "Không tìm thấy xã/phường")
+    return await fetch_all(
+        """SELECT h.time, h.planned_households, h.evacuated_households, h.planned_persons, h.evacuated_persons,
+                  us.full_name AS actor_name
+             FROM operations.evacuation_history h
+             JOIN spatial_admin.administrative_units u ON u.id = h.admin_unit_id
+             LEFT JOIN communications.users us ON us.id = h.actor_id
+            WHERE u.code = :c AND h.time > now() - make_interval(hours => :h)
+            ORDER BY h.time""",
+        {"c": code, "h": hours},
+    )
+
+
 class EvacuationIn(BaseModel):
     planned_households: int = Field(ge=0, le=200_000, description="Số hộ phải sơ tán theo kế hoạch")
     evacuated_households: int = Field(ge=0, le=200_000, description="Số hộ đã sơ tán an toàn")
@@ -696,8 +729,12 @@ async def update_evacuation(
         raise HTTPException(404, "Không tìm thấy xã/phường")
     if problem := evacuation_problem(body, unit["households"], unit["population"]):
         raise HTTPException(422, problem)
-    row = await fetch_one(
-        """INSERT INTO operations.evacuation_progress
+    async with transaction() as conn:
+        await ledger_context(
+            conn, actor_id=user["id"]
+        )  # lịch sử sơ tán ghi người cập nhật (trigger, migration 0024)
+        row = await fetch_one(
+            """INSERT INTO operations.evacuation_progress
                   (admin_unit_id, planned_households, evacuated_households, planned_persons, evacuated_persons)
            VALUES (:u, :ph, :eh, :pp, :ep)
            ON CONFLICT (admin_unit_id) DO UPDATE SET
@@ -705,14 +742,15 @@ async def update_evacuation(
                   planned_persons = EXCLUDED.planned_persons, evacuated_persons = EXCLUDED.evacuated_persons,
                   updated_at = now()
            RETURNING planned_households, evacuated_households, planned_persons, evacuated_persons, updated_at""",
-        {
-            "u": unit["id"],
-            "ph": body.planned_households,
-            "eh": body.evacuated_households,
-            "pp": body.planned_persons,
-            "ep": body.evacuated_persons,
-        },
-    )
+            {
+                "u": unit["id"],
+                "ph": body.planned_households,
+                "eh": body.evacuated_households,
+                "pp": body.planned_persons,
+                "ep": body.evacuated_persons,
+            },
+            conn,
+        )
     await audit(user, "evacuation.update", "admin_unit", code, body.model_dump())
     await hub.publish("evacuation.updated", {"code": code})
     await log_event(
