@@ -50,6 +50,7 @@ Sửa chức năng, cấu hình hay quy trình thì cập nhật đúng mục tr
 | G | Nguồn dữ liệu & IoT | `/nguon-du-lieu` | Dự báo tổ hợp ECMWF + GFS theo xã; OpenWeather; cổng IoT HTTP / MQTT / LoRaWAN; kiểm tra số đo; cảnh báo mất tín hiệu; giám sát kết nối |
 | H | Phản ánh của người dân | `/phan-anh` | Cán bộ đúng địa bàn duyệt / từ chối / chuyển SOS phản ánh có ảnh của người dân |
 | I | Phân quyền | `/phan-quyen` | 3 cấp, mỗi cấp 1 vai trò (Quản trị hệ thống · Quản trị tỉnh · Quản trị xã/phường), mỗi tài khoản 1 vai trò; chỉ cấp trên quản lý cấp dưới; nhật ký phân quyền |
+| — | Đợt thiên tai & báo cáo | `/dot-thien-tai` | Thiết kế E.4 "rút kinh nghiệm sau thiên tai". Cấp tỉnh **mở đợt** (tên, loại thiên tai, giờ bắt đầu — "Bây giờ" hoặc lùi tối đa 30 ngày, vùng ảnh hưởng: toàn tỉnh / chọn xã, thêm cả nhóm lọc nhanh) → phiếu SOS, lệnh điều động, lệnh cảnh báo, vùng nguy hiểm, dòng sổ kho trong vùng **tự gắn vào đợt** bằng trigger (mọi nơi tạo: API, Zalo / ứng dụng, cảm biến, nhập tệp); mở lùi giờ / thêm xã → gắn bù, bỏ xã / kết thúc lùi giờ → gỡ ra (báo cáo luôn đúng vùng × thời gian của đợt). **Báo cáo của đợt**: 6 ô chỉ số (phiếu SOS · tiếp nhận trung vị, người được cứu / mắc kẹt, lệnh điều động, cảnh báo đã phát theo mức, sơ tán cao nhất, vật tư đã cấp), phiếu SOS theo ngày (cột chồng theo cấp, thang màu chung), **diễn biến sơ tán** (tổng số hộ đã sơ tán theo mốc giờ so với kế hoạch, từ lịch sử sơ tán), bảng SOS theo xã, vật tư (đã xuất · hoàn trả · thực cấp — theo sổ xuất – nhập kho), sơ tán cao nhất, lệnh cảnh báo, vùng nguy hiểm; **Excel nhiều trang tính, PDF**. Máy tính: danh sách đợt bên trái (đang diễn ra lên đầu), báo cáo bên phải; dưới 1024 px: danh sách (iPad dọc 2 cột) → chạm mở báo cáo, "Tất cả đợt" quay lại (`?dot=DT-2026-001`). Form mở đợt 2 bước, lỗi ngay dưới ô; kết thúc đợt bằng chip lý do. Xem: mọi tài khoản, số liệu theo phạm vi được giao + bộ lọc địa bàn (đợt ở xã khác → không thấy); mở / sửa / kết thúc: `event.manage` (`GET/POST /api/v1/events`, `PATCH /events/{mã}`, `POST /events/{mã}/end`, `GET /events/{mã}/summary`) |
 | — | **Cổng công khai** | `/`, `/cong-khai` | Người dân không cần đăng nhập: cảnh báo đã duyệt, bản đồ vùng nguy hiểm – điểm sơ tán, "Tôi đang ở đâu?", dự báo mưa theo xã, mực nước, hồ chứa, điểm đen sạt lở, đường dây nóng, **gửi phản ánh kèm ảnh**, tra cứu tiến độ phiếu |
 
 Tự động hoá: cảm biến nghiêng / độ ẩm đất vượt BĐ II → tự khoanh vùng nguy cơ 1 km, tạo phiếu SOS nguồn `SENSOR` và
@@ -96,6 +97,7 @@ Ký hiệu: ✅ chạy thật · 🟡 chạy thật nhưng dựa trên dữ li�
 | Công khai | Bản nhẹ `/ban-nhe` (< 50 KB, không JavaScript), mở lại khi mất mạng (PWA) | ✅ | [9.4](#ban-nhe) |
 | Nền tảng | Bản đồ nền tự lưu trữ (OpenStreetMap) | ✅ | Cần chạy `deploy/fetch-basemap.sh` ([6.9](#ban-do-nen)) |
 | Nền tảng | Đăng nhập, xác thực 2 lớp (TOTP), RBAC, đổi/quên mật khẩu, nhật ký thao tác, xuất PDF/Excel | ✅ | [11.1](#xac-thuc-2-lop) |
+| Báo cáo | Đợt thiên tai: phiếu SOS, lệnh điều động, cảnh báo, vùng nguy hiểm, sổ kho tự gắn theo đợt; báo cáo cuối đợt (Excel / PDF) | ✅ | Số liệu đúng bằng dữ liệu nhập vào hệ thống — thiệt hại (người, nhà, đường, hoa màu) **chưa có** tới khi BCH chốt mẫu thống kê (DB6, [docs/csdl-viec-con-lai.md](docs/csdl-viec-con-lai.md)) |
 
 ### 2.2. Dữ liệu
 
@@ -1026,6 +1028,7 @@ hành). Yêu cầu ở phạm vi toàn tỉnh không khớp quyền cấp xã.
 | `integration.view` / `integration.manage` | toàn tỉnh | Xem / cấu hình nguồn dữ liệu, thiết bị IoT, cấp khoá |
 | `data.import` | toàn tỉnh | Nhập dữ liệu chính thức từ tệp; phê duyệt / từ chối hồ sơ xã gửi ([2.4](#nhap-du-lieu)) |
 | `data.submit` | ✓ | Gửi dữ liệu của xã mình chờ cấp tỉnh phê duyệt ([2.4](#nhap-du-lieu)) |
+| `event.manage` | toàn tỉnh | Mở / sửa / kết thúc đợt thiên tai (vùng ảnh hưởng là các xã bất kỳ). Xem đợt và báo cáo chỉ cần `monitoring.view`, số liệu theo phạm vi được giao |
 
 ### 8.2. Cảnh báo: 4 mắt + PIN
 
@@ -1619,7 +1622,7 @@ Kiểm thử API (cần stack dev đang chạy với `DEMO_MODE=true`; tham số
 
 | Nghiệp vụ | Lệnh |
 |---|---|
-| Luồng nghiệp vụ SOS, cảnh báo, nhật ký, sổ xuất – nhập kho, lịch sử sơ tán | `node tests/e2e/smoke.mjs` |
+| Luồng nghiệp vụ SOS, cảnh báo, nhật ký, sổ xuất – nhập kho, lịch sử sơ tán, đợt thiên tai (gắn tự động / gắn bù, đổi vùng gỡ – gắn, vật tư kèm lệnh và hoàn trả theo đợt, diễn biến sơ tán, phạm vi, kết thúc lùi giờ gỡ bản ghi sau giờ kết thúc) | `node tests/e2e/smoke.mjs` |
 | Phân quyền 3 cấp: đúng 3 vai trò, phạm vi xã, cấp trên quản lý cấp dưới (chống mạo danh cùng cấp), đổi cấp / phạm vi, 4 mắt + PIN | `node tests/e2e/rbac-test.mjs` · `node tests/e2e/login-hierarchy-test.mjs` |
 | IoT HTTP / batch / LoRaWAN / MQTT, dự báo, xu hướng & giờ chạm báo động của `/stations` | `node tests/e2e/iot-test.mjs` |
 | Cổng & API công khai, phản ánh, tài khoản, giới hạn tần suất | `node tests/e2e/public-test.mjs [backend] [mailpit]` |
@@ -1720,6 +1723,13 @@ và **điện thoại** (Pixel 7, GPS giả lập ở TP Cao Bằng):
   máy chủ không trả lời → báo + Thử lại tìm được; mất mạng → báo, có mạng lại tự tìm; cảm ứng: vùng chạm ≥ 44 px; chọn phường
   → Bản đồ, nút địa bàn đổi tên; "Tìm gần đây" có phường vừa chọn; mã SOS → Cứu hộ, ô tìm điền mã, thấy phiếu, địa chỉ không
   còn `?phieu=` (Quay lại không mở lại phiếu).
+- **Đợt thiên tai & báo cáo** (laptop 1366×768, iPad dọc, điện thoại 360): đợt đang diễn ra lên đầu danh sách; máy tính mở sẵn
+  báo cáo của đợt đầu, dưới 1024 px danh sách trước → chạm mở báo cáo (địa chỉ có `?dot=`), "Tất cả đợt" quay lại; báo cáo đủ
+  6 ô chỉ số, 2 biểu đồ (phiếu SOS theo ngày, diễn biến sơ tán) và 5 bảng, tải được Excel; không tràn, cảm ứng: vùng chạm ≥ 44 px. Form mở đợt: Tiếp khi trống → báo thiếu tên +
+  loại thiên tai, con trỏ về ô Tên đợt; chưa chọn xã → báo; tìm "thuc phan" ra đúng 1 phường, chọn xong hết lỗi. Máy thử
+  (laptop, điện thoại): mở đợt ở phường Thục Phán → báo cáo đợt mới "Đang diễn ra" → kết thúc bằng chip lý do → "Đã kết thúc",
+  hết nút Kết thúc (iPad và `UI_READONLY=1`: chỉ mở form, Huỷ). Tài khoản phường: không có nút mở / sửa / kết thúc đợt, chỉ
+  thấy đợt toàn tỉnh hoặc có phường mình.
 
 Mỗi bước **lỗi** khi trang có lỗi JavaScript (màn hình trắng), API trả 5xx, hoặc **tràn ngang trên điện thoại** (phải kéo
 ngang mới đọc hết). Ảnh chụp bước lỗi: artifact `ui-shots` của CI.

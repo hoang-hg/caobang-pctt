@@ -1351,7 +1351,7 @@ async function inventoryLedger(ctx) {
     await link.click();
     const sec = page.locator('#so-kho');
     await sec.getByText(/dòng sổ/).first().waitFor({ timeout: 15_000 });
-    await sec.getByRole('button', { name: new RegExp(`Bỏ lọc Kho: ${wh.replace(/[.*+?^${}()|[\]\\]/g, '\\async function resourcesPage(ctx) {')}`) }).waitFor({ timeout: 5_000 });
+    await sec.getByRole('button', { name: new RegExp(`Bỏ lọc Kho: ${wh.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) }).waitFor({ timeout: 5_000 });
     const items = sec.locator('tbody tr, ul[aria-label="Sổ xuất – nhập kho"] > li');
     const n = await items.count();
     const wrong = (await items.allInnerTexts()).filter((t) => !t.includes(wh));
@@ -2721,6 +2721,151 @@ async function omniSearch(ctx) {
   });
 }
 
+// ================================================================ Đợt thiên tai & báo cáo (DB5) — laptop, iPad dọc, điện thoại 360
+// Danh sách đợt (đang diễn ra lên đầu) → báo cáo: 6 ô chỉ số, 2 biểu đồ (SOS theo ngày, diễn biến sơ tán), 5 bảng (SOS theo
+// xã, vật tư, sơ tán, cảnh báo, vùng nguy hiểm), Excel; dưới 1024 px (điện thoại, iPad dọc): danh sách trước, chạm mở báo cáo,
+// "Tất cả đợt" quay lại. Form mở đợt 2 bước: Tiếp khi trống → lỗi dưới ô, con trỏ về ô Tên đợt; chưa chọn xã → báo; tìm xã
+// không dấu. Máy thử (không UI_READONLY; laptop + điện thoại): mở đợt ở phường Thục Phán → báo cáo của đợt mới, kết thúc ngay →
+// "Đã kết thúc" (đợt chỉ mở vài giây, ở 1 phường). Cảm ứng: vùng chạm ≥ 44 px; không tràn ngang. Tài khoản phường: không có
+// nút mở đợt, chỉ thấy đợt toàn tỉnh / có phường mình.
+const EVENT_DEVICES = RESOURCE_DEVICES;
+const REPORT_TABLES = ['Phiếu SOS theo xã/phường', 'Vật tư đã cấp (sổ xuất – nhập kho)', 'Sơ tán — số cao nhất trong đợt',
+  'Lệnh cảnh báo trong đợt', 'Vùng nguy hiểm khoanh trong đợt'];
+const formErrors = (dialog) => dialog.locator('[id^="loi-dot-"]').allInnerTexts().then((a) => a.map((t) => t.trim()).filter(Boolean));
+
+async function expectTouchTargets(page, where) {
+  if (!(await page.evaluate(() => matchMedia('(pointer: coarse)').matches))) return;
+  const bad = await smallTargets(page);
+  if (bad.length) throw new Error(`${where}: ${bad.length} vùng chạm < 44 px — ${bad.slice(0, 4).map((s) => `${s.what} ${s.size}px`).join(', ')}`);
+}
+
+async function eventsPage(ctx, { create }) {
+  const { page } = ctx;
+  await step(ctx, 'Đợt thiên tai: danh sách → báo cáo (6 ô chỉ số, 2 biểu đồ, 5 bảng), Excel, không tràn, vùng chạm ≥ 44 px', async () => {
+    await loginAs(page, STAFF);
+    await page.goto(`${ROOT}/dot-thien-tai`);
+    const list = page.getByRole('list', { name: 'Các đợt thiên tai' });
+    const empty = page.getByText('Chưa có đợt thiên tai nào');
+    await list.or(empty).first().waitFor({ timeout: 20_000 });
+    if (!(await list.count())) {
+      await expectNoOverflow(ctx, 'trang đợt thiên tai (chưa có đợt)');
+      return 'chưa có đợt nào — báo "Chưa có đợt thiên tai nào"';
+    }
+    const live = await list.getByRole('button').evaluateAll((bs) => bs.map((b) => b.getAttribute('aria-label').endsWith('đang diễn ra')));
+    if (live.indexOf(false) !== -1 && live.lastIndexOf(true) > live.indexOf(false)) throw new Error('đợt đang diễn ra không nằm trên đầu danh sách');
+    const kpis = page.getByRole('group', { name: 'Chỉ số của đợt' });
+    // Dưới 1024 px (điện thoại, iPad dọc): danh sách trước, chạm mở báo cáo; máy tính: danh sách bên trái, báo cáo bên phải
+    const narrow = await page.evaluate(() => innerWidth < 1024);
+    if (narrow) {
+      if (await kpis.count()) throw new Error('màn hẹp: chưa chạm đợt nào đã hiện báo cáo (phải là danh sách trước)');
+      await expectTouchTargets(page, 'danh sách đợt');
+      await list.getByRole('button').first().click();
+    }
+    await kpis.waitFor({ timeout: 20_000 });
+    const k = await kpis.locator(':scope > *').count();
+    if (k !== 6) throw new Error(`${k} ô chỉ số (cần 6)`);
+    for (const t of REPORT_TABLES) await page.getByRole('region', { name: t }).waitFor({ timeout: 5_000 });
+    for (const h of ['Phiếu SOS theo ngày', 'Diễn biến sơ tán']) await page.getByRole('heading', { name: h, exact: true }).waitFor({ timeout: 5_000 });
+    const code = (await page.locator('main h2').first().locator('xpath=..').innerText()).match(/DT-\d{4}-\d{3}/)?.[0];
+    const first = (await list.count()) ? await list.getByRole('button').first().getAttribute('aria-label') : null;
+    if (first && !first.startsWith(code)) throw new Error(`báo cáo ${code} nhưng đợt đầu danh sách là ${first}`);
+    const [download] = await Promise.all([page.waitForEvent('download', { timeout: 15_000 }), page.getByRole('button', { name: /^Excel$/ }).click()]);
+    if (!/^bao-cao-DT-\d{4}-\d{3}-.*\.xlsx$/.test(download.suggestedFilename())) throw new Error(`tên tệp Excel: ${download.suggestedFilename()}`);
+    await expectNoOverflow(ctx, `báo cáo ${code}`);
+    await expectTouchTargets(page, `báo cáo ${code}`);
+    if (narrow) {
+      if (!/[?&]dot=DT-/.test(page.url())) throw new Error('màn hẹp: mở báo cáo nhưng địa chỉ không có ?dot= (Quay lại không về danh sách)');
+      await page.getByRole('button', { name: 'Tất cả đợt' }).click();
+      await list.waitFor({ timeout: 5_000 });
+      if (await kpis.count()) throw new Error('"Tất cả đợt" không trả về danh sách');
+    }
+    return `${(await page.locator('main [aria-label="Các đợt thiên tai"] > li').count())} đợt · báo cáo ${code} · ${download.suggestedFilename()}`;
+  });
+
+  await step(ctx, READONLY || !create ? 'Mở đợt thiên tai: form 2 bước, lỗi ngay dưới ô (không ghi)' : 'Mở đợt thiên tai ở 1 phường → báo cáo đợt mới → kết thúc đợt', async () => {
+    if (!(await page.getByRole('list', { name: 'Các đợt thiên tai' }).or(page.getByText('Chưa có đợt thiên tai nào')).count())) await page.goto(`${ROOT}/dot-thien-tai`);
+    const btn = page.getByRole('button', { name: /^Mở đợt/ }).first();
+    await btn.waitFor({ timeout: READONLY ? 5_000 : 15_000 }).catch((e) => { if (!READONLY) throw e; });
+    if (READONLY && !(await btn.count())) return 'bỏ qua: tài khoản không có quyền mở đợt (event.manage)';
+    await btn.click();
+    const dlg = page.getByRole('dialog', { name: 'Mở đợt thiên tai' });
+    await dlg.waitFor();
+    await dlg.getByRole('button', { name: /^Tiếp/ }).click();
+    const e1 = await formErrors(dlg);
+    if (e1.length < 2) throw new Error(`Tiếp khi trống: ${e1.length} lỗi — cần báo thiếu tên và loại thiên tai`);
+    const focus = await page.evaluate(() => document.activeElement?.id);
+    if (focus !== 'dot-ten') throw new Error(`con trỏ ở "${focus || '?'}", không về ô Tên đợt`);
+    await dlg.getByLabel('Tên đợt *').fill('Thử giao diện: mưa lớn (kiểm thử tự động)');
+    await dlg.getByRole('radio', { name: /Mưa lớn/ }).click();
+    await expectNoOverflow(ctx, 'form mở đợt bước 1', dlg);
+    await expectTouchTargets(page, 'form mở đợt bước 1');
+    await dlg.getByRole('button', { name: /^Tiếp/ }).click();
+    await dlg.getByRole('radio', { name: 'Chọn xã/phường' }).click();
+    await dlg.getByRole('button', { name: /Mở đợt$/ }).click();
+    const e2 = await formErrors(dlg);
+    if (!e2.length) throw new Error('chưa chọn xã/phường mà bấm Mở đợt không báo lỗi');
+    await dlg.getByPlaceholder('Tìm xã / phường…').fill('thuc phan');
+    const found = dlg.getByRole('group', { name: 'Xã/phường trong vùng ảnh hưởng' }).getByRole('checkbox');
+    if ((await found.count()) !== 1) throw new Error(`tìm "thuc phan" ra ${await found.count()} xã/phường (cần đúng 1)`);
+    await found.first().click();
+    if ((await found.first().getAttribute('aria-checked')) !== 'true') throw new Error('chạm Phường Thục Phán không chọn được');
+    if (await formErrors(dlg).then((a) => a.length)) throw new Error('đã chọn xã mà lỗi "chưa chọn vùng" vẫn còn');
+    await expectNoOverflow(ctx, 'form mở đợt bước 2', dlg);
+    await expectTouchTargets(page, 'form mở đợt bước 2');
+    if (READONLY || !create) {
+      await dlg.getByRole('button', { name: 'Huỷ', exact: true }).click();
+      await dlg.waitFor({ state: 'hidden', timeout: 5_000 });
+      return `lỗi bước 1: ${e1.join(' / ')} · bước 2: ${e2.join(' / ')}`;
+    }
+    await dlg.getByRole('button', { name: /Mở đợt$/ }).click();
+    await dlg.waitFor({ state: 'hidden', timeout: 15_000 });
+    await page.waitForURL(/[?&]dot=DT-\d{4}-\d{3}/, { timeout: 10_000 });
+    const code = new URL(page.url()).searchParams.get('dot');
+    await page.getByRole('group', { name: 'Chỉ số của đợt' }).waitFor({ timeout: 20_000 });
+    const head = page.locator('main h2').first().locator('xpath=..');
+    if (!(await head.innerText()).includes('Đang diễn ra')) throw new Error(`báo cáo ${code} không ghi "Đang diễn ra"`);
+    await page.getByRole('button', { name: 'Kết thúc đợt', exact: true }).click();
+    const end = page.getByRole('dialog', { name: `Kết thúc đợt ${code}` });
+    await end.waitFor();
+    await end.getByRole('button', { name: 'Mưa đã ngớt, nước rút dưới báo động I' }).click();
+    if (!(await end.locator('#dot-ket-thuc-ghi-chu').inputValue()).includes('nước rút')) throw new Error('chip lý do không điền vào ô ghi chú');
+    await expectTouchTargets(page, 'hộp thoại kết thúc đợt');
+    await end.getByRole('button', { name: 'Kết thúc đợt', exact: true }).click();
+    await end.waitFor({ state: 'hidden', timeout: 15_000 });
+    await head.getByText('Đã kết thúc').waitFor({ timeout: 10_000 });
+    if (await page.getByRole('button', { name: 'Kết thúc đợt', exact: true }).count()) throw new Error('đợt đã kết thúc vẫn còn nút "Kết thúc đợt"');
+    return `${code}: mở → báo cáo → đã kết thúc`;
+  });
+}
+
+async function eventsWard(ctx) {
+  const { page } = ctx;
+  await step(ctx, `Đợt thiên tai — tài khoản phường (${WARD.name}): không có nút mở đợt, chỉ thấy đợt toàn tỉnh / có phường mình`, async () => {
+    try {
+      await loginAs(page, WARD);
+    } catch (e) {
+      if (READONLY) return `bỏ qua: không đăng nhập được ${WARD.user}`;
+      throw e;
+    }
+    await page.goto(`${ROOT}/dot-thien-tai`);
+    const list = page.getByRole('list', { name: 'Các đợt thiên tai' });
+    await list.or(page.getByText('Chưa có đợt thiên tai nào')).first().waitFor({ timeout: 20_000 });
+    if (await page.getByRole('button', { name: /^Mở đợt/ }).count()) throw new Error('tài khoản phường thấy nút "Mở đợt"');
+    const areas = await list.getByRole('button').evaluateAll((bs) => bs.map((b) => b.innerText));
+    const wrong = areas.filter((t) => !/Toàn tỉnh|\d+ xã\/phường/.test(t) && !t.includes(WARD.name));
+    if (wrong.length) throw new Error(`${wrong.length} đợt ngoài phạm vi: ${wrong[0].replace(/\s+/g, ' ').slice(0, 80)}`);
+    if (areas.length) {
+      await list.getByRole('button').first().click();
+      await page.getByRole('group', { name: 'Chỉ số của đợt' }).waitFor({ timeout: 20_000 });
+      if (await page.getByRole('button', { name: 'Kết thúc đợt', exact: true }).or(page.getByRole('button', { name: 'Sửa', exact: true })).count()) {
+        throw new Error('tài khoản phường thấy nút Sửa / Kết thúc đợt');
+      }
+    }
+    await expectNoOverflow(ctx, 'đợt thiên tai (tài khoản phường)');
+    return `${areas.length} đợt trong phạm vi`;
+  });
+}
+
 // ================================================================
 console.log(`Kiểm thử giao diện: ${ROOT}${READONLY ? ' (chỉ xem)' : ''}`);
 const browser = await chromium.launch();
@@ -2853,6 +2998,23 @@ try {
       wctx.setDefaultTimeout(15_000);
       const wPage = await wctx.newPage();
       await resourcesWard({ page: wPage, vp: vpR, problems: watch(wPage) });
+      await wctx.close();
+    }
+  }
+  // Đợt thiên tai — chạy cuối: đợt mở thử (laptop, điện thoại) chỉ ở 1 phường và kết thúc ngay; đặt cuối để bước lỗi giữa
+  // chừng (đợt còn mở) không gắn phiếu / dòng sổ kho của các bước khác vào đợt
+  for (const [label, opts, phone] of EVENT_DEVICES) {
+    const ectx = await browser.newContext({ ...opts, locale: 'vi-VN', acceptDownloads: true });
+    ectx.setDefaultTimeout(15_000);
+    const ePage = await ectx.newPage();
+    const vpE = { name: `Đợt thiên tai · ${label}`, mobile: phone };
+    await eventsPage({ page: ePage, vp: vpE, problems: watch(ePage) }, { create: phone || label.startsWith('Laptop') });
+    await ectx.close();
+    if (phone) {
+      const wctx = await browser.newContext({ ...opts, locale: 'vi-VN' });
+      wctx.setDefaultTimeout(15_000);
+      const wPage = await wctx.newPage();
+      await eventsWard({ page: wPage, vp: vpE, problems: watch(wPage) });
       await wctx.close();
     }
   }

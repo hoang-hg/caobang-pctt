@@ -129,6 +129,9 @@ export function useSocket() {
         case 'hazard.updated': // cán bộ đánh dấu / kết thúc điểm sự cố trên bản đồ
           inv('map-layers');
           break;
+        case 'events.changed': // mở / sửa / kết thúc đợt thiên tai
+          inv('events', 'event-summary');
+          break;
         case 'storm.updated': // trực ban nhập / kết thúc bản tin bão
           inv('storm');
           break;

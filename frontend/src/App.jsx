@@ -22,6 +22,7 @@ const AccessControl = lazy(() => import('./pages/AccessControl'));
 const DataSources = lazy(() => import('./pages/DataSources'));
 const CitizenReports = lazy(() => import('./pages/CitizenReports'));
 const DataImport = lazy(() => import('./pages/DataImport'));
+const DisasterEvents = lazy(() => import('./pages/DisasterEvents'));
 const PublicPortal = lazy(() => import('./pages/public/PublicPortal'));
 const MissionPage = lazy(() => import('./pages/public/MissionPage'));
 
@@ -77,6 +78,7 @@ function Shell() {
               <Route path="/nguon-luc" element={<Guard obj="resource" act="view"><Resources /></Guard>} />
               <Route path="/cuu-ho" element={<Guard obj="sos" act="view"><RescueCenter /></Guard>} />
               <Route path="/canh-bao" element={<Guard obj="alert" act="view"><Alerts /></Guard>} />
+              <Route path="/dot-thien-tai" element={<Guard obj="monitoring" act="view"><DisasterEvents /></Guard>} />
               <Route path="/phan-anh" element={<Guard obj="report" act="view"><CitizenReports /></Guard>} />
               <Route path="/nguon-du-lieu" element={<Guard obj="integration" act="view"><DataSources /></Guard>} />
               <Route path="/nhap-du-lieu" element={<Guard obj="data" act="import" or={['data', 'submit']}><DataImport /></Guard>} />
