@@ -74,9 +74,11 @@ async def search(q: str, limit: int = 12, user: dict = Depends(require_any("moni
             FROM resources.warehouses w
            WHERE CAST(:res_all AS boolean) OR w.admin_unit_id IN (SELECT id FROM spatial_admin.administrative_units WHERE code = ANY(:res_codes))
           UNION ALL
-          SELECT 'sos', t.code, left(COALESCE(t.address, ''), 60), ST_Y(t.location), ST_X(t.location), NULL, t.id::text,
+          -- admin_code = xã của phiếu: giao diện bỏ lọc địa bàn khi phiếu ở xã ngoài vùng đang lọc (mở đúng phiếu ở Cứu hộ)
+          SELECT 'sos', t.code, left(COALESCE(t.address, ''), 60), ST_Y(t.location), ST_X(t.location), su.code, t.id::text,
                  CASE WHEN lower(t.code) = lower(:q) THEN 1 ELSE similarity(lower(t.code), lower(:q)) END
             FROM operations.sos_tickets t
+            LEFT JOIN spatial_admin.administrative_units su ON su.id = t.admin_unit_id
            WHERE CAST(:sos_all AS boolean) OR t.admin_unit_id IN (SELECT id FROM spatial_admin.administrative_units WHERE code = ANY(:sos_codes))
         ) s
         WHERE score > 0.15 OR spatial_admin.norm(label) LIKE '%' || (SELECT n FROM q) || '%'

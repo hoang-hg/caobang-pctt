@@ -158,6 +158,21 @@ export default function RescueCenter() {
     setQ(t.code);
     scrollTo(boardRef.current);
   };
+  // Tìm kiếm toàn năng → /cuu-ho?phieu=SOS-1001: mở đúng phiếu (đúng cột của bảng, ô tìm điền sẵn mã). Không có trong danh
+  // sách 48 giờ (phiếu đã xong lâu hơn) → tra cứu hồ sơ 30 ngày. Thay địa chỉ (replace): nút Quay lại không mở lại phiếu
+  const wanted = params.get('phieu');
+  useEffect(() => {
+    if (!wanted || !ticketsQ.data) return;
+    const t = ticketsQ.data.find((x) => x.code === wanted);
+    const next = new URLSearchParams();
+    if (!t) {
+      next.set('xem', 'danh_sach');
+      next.set('ky', '30n');
+    } else if (t.status !== COLUMN_KEYS[0]) next.set('cot', t.status);
+    setParams(next, { replace: true });
+    setQ(wanted);
+    scrollTo(boardRef.current);
+  }, [wanted, ticketsQ.data]); // eslint-disable-line react-hooks/exhaustive-deps -- chỉ chạy khi có mã cần mở / danh sách vừa tải
   const clearAll = () => {
     setParams(() => {
       const next = new URLSearchParams();

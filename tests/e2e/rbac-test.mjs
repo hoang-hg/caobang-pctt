@@ -83,6 +83,9 @@ const auditDay = await call('GET', `/alerts/audit?limit=5000&since=${since}`, nu
 check('Nhật ký pháp lý 24 giờ qua → 200, chỉ thao tác trong khoảng', auditDay.status === 200 && auditDay.data.every((a) => Date.parse(a.time) >= Date.now() - 86400e3 - 60e3), `${auditDay.data?.length} thao tác`);
 check('Nhật ký pháp lý quá 5.000 dòng một lần → 422', (await call('GET', '/alerts/audit?limit=100000', null, T.chihuy)).status === 422);
 check('Nhật ký pháp lý ngày sai định dạng → 422', (await call('GET', '/alerts/audit?since=hom-qua', null, T.chihuy)).status === 422);
+// Tìm kiếm toàn năng: mã SOS kèm mã xã của phiếu (giao diện bỏ lọc địa bàn khi phiếu ở xã ngoài vùng đang lọc rồi mở phiếu)
+const sosHit = (await call('GET', `/search?q=${encodeURIComponent(inCoba.data.code)}`, null, T.chihuy)).data || [];
+check('Tìm mã SOS → kèm mã xã của phiếu', sosHit.some((h) => h.kind === 'sos' && h.label === inCoba.data.code && h.admin_code === 'CB-COBA'), JSON.stringify(sosHit[0] || null));
 const lay = (await call('GET', '/map/layers', null, T.coba)).data;
 check('Bản đồ của Cấp 3 chỉ có SOS trong xã', lay.sos.features.every((f) => f.properties.admin_code === 'CB-COBA'));
 

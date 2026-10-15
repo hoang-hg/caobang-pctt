@@ -105,7 +105,8 @@ export default function AdminFilter() {
         <MapPin size={15} className="shrink-0" aria-hidden="true" />
         <span className="truncate lg:hidden">{short}</span>
         <span className="hidden truncate lg:inline">{label}</span>
-        <ChevronDown size={14} className="shrink-0" aria-hidden="true" />
+        {/* Điện thoại: bỏ mũi tên — nhường chỗ cho tên xã (nút vẫn báo là mở hộp chọn qua aria-haspopup) */}
+        <ChevronDown size={14} className="shrink-0 max-sm:hidden" aria-hidden="true" />
       </button>
       {filtered && wide && (
         <>
