@@ -12,6 +12,7 @@ from app.auth import audit
 from app.db import execute, fetch_all, fetch_all_no_jit, fetch_one, transaction
 from app.infra.cache import cached_view, invalidate
 from app.rbac.authz import area_scope, require_any, require_permission
+from app.services.broadcast import active_alert_sql
 from app.services.events import log_event, station_place
 from app.services.landslides import get_landslides_overview
 from app.services.lite import VN_TZ
@@ -127,6 +128,70 @@ async def _kpis(codes: list[str]) -> dict:
             "points": ls["points"],
         },
     }
+
+
+@router.get("/dashboard/communes")
+async def communes_status(codes: list[str] = Depends(MON)):
+    """Tình hình từng xã/phường trong phạm vi được giao (hộp chọn địa bàn — thiết kế F): cảnh báo đang hiệu lực, vùng nguy
+    hiểm còn hiệu lực, SOS chưa xong / cấp 1 / quá hạn (cùng công thức ô KPI Tổng quan), trạm vượt ngưỡng báo động, mưa dự báo
+    24 giờ tới. Chỉ trả số liệu — mức màu tính ở giao diện bằng đúng ngưỡng của thang rủi ro chung (không phải cấp độ rủi ro
+    thiên tai chính thức). Không gửi admin_codes = mọi xã trong phạm vi."""
+    return await cached_view("communes", {"codes": codes}, lambda: _communes(codes))
+
+
+async def _communes(codes: list[str]) -> list[dict]:
+    p = {"codes": codes, "all": not codes}
+    rows = await fetch_all(
+        f"""
+        WITH u AS (
+          SELECT id, code, geom FROM spatial_admin.administrative_units
+           WHERE level = 'xa' AND (CAST(:all AS boolean) OR code = ANY(:codes))),
+        s AS (
+          SELECT u.code, count(*) AS sos_open, count(*) FILTER (WHERE t.priority = 1) AS sos_critical,
+                 count(*) FILTER (WHERE {OVERDUE_SQL}) AS sos_overdue
+            FROM operations.sos_tickets t JOIN u ON ST_Intersects(u.geom, t.location)
+           WHERE t.status <> 'hoan_thanh' GROUP BY u.code),
+        a AS (
+          SELECT c AS code, count(*) AS alerts,
+                 max(CASE b.severity WHEN 'do' THEN 3 WHEN 'cam' THEN 2 WHEN 'vang' THEN 1 ELSE 0 END) AS alert_level
+            FROM communications.alert_broadcasts b, unnest(b.target_admin_codes) AS c
+           WHERE {active_alert_sql("b")} GROUP BY c),
+        h AS (
+          SELECT u.code, count(*) AS hazards,
+                 max(CASE z.level WHEN 'do' THEN 3 WHEN 'cam' THEN 2 WHEN 'vang' THEN 1 ELSE 0 END) AS hazard_level
+            FROM iot_telemetry.hazard_zones z JOIN u ON ST_Intersects(z.geom, u.geom)
+           WHERE z.valid_until > now() GROUP BY u.code),
+        f AS (
+          SELECT admin_unit_id, round(sum(precip_p50)::numeric, 1)::float AS rain_24h
+            FROM iot_telemetry.area_forecasts
+           WHERE model = 'BLEND' AND time > now() AND time <= now() + interval '24 hours'
+           GROUP BY admin_unit_id)
+        SELECT u.code, COALESCE(s.sos_open, 0) AS sos_open, COALESCE(s.sos_critical, 0) AS sos_critical,
+               COALESCE(s.sos_overdue, 0) AS sos_overdue, COALESCE(a.alerts, 0) AS alerts, a.alert_level,
+               COALESCE(h.hazards, 0) AS hazards, h.hazard_level, f.rain_24h
+          FROM u LEFT JOIN s USING (code) LEFT JOIN a USING (code) LEFT JOIN h USING (code)
+          LEFT JOIN f ON f.admin_unit_id = u.id
+         ORDER BY u.code""",
+        p,
+    )
+    # Trạm vượt ngưỡng báo động (mực nước, độ nghiêng, độ ẩm đất…) theo số đo trong 2 giờ qua — cùng alarm_level với Tổng quan
+    stations = await fetch_all(
+        f"""SELECT u.code, s.alarm_thresholds AS thr, l.value
+              FROM iot_telemetry.monitoring_stations s JOIN ({LATEST_READINGS}) l ON l.station_id = s.id
+              JOIN spatial_admin.administrative_units u ON u.level = 'xa' AND ST_Contains(u.geom, s.location)
+             WHERE s.alarm_thresholds IS NOT NULL AND (CAST(:all AS boolean) OR u.code = ANY(:codes))""",
+        p,
+    )
+    alarms: dict[str, list[int]] = {}
+    for st in stations:
+        level = alarm_level(st["value"], st["thr"] or {})
+        if level:
+            alarms.setdefault(st["code"], []).append(level)
+    for r in rows:
+        levels = alarms.get(r["code"], [])
+        r["stations_alarm"] = len(levels)
+        r["station_level"] = max(levels, default=None)
+    return rows
 
 
 @router.get("/dashboard/reservoirs")

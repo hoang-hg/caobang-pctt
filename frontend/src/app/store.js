@@ -4,11 +4,14 @@ import { audioAllowed } from '../utils/audio';
 const safeGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
 const safeSet = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch { /* bỏ qua */ } };
 
-const initialTheme = () => {
-  const saved = safeGet('pctt_theme');
-  if (saved) return saved;
-  return window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+// Chế độ Sáng / Tối (thiết kế F.2–F.3): "Theo máy" (theo hệ điều hành, tự đổi khi máy đổi) cho tới khi người dùng chọn Sáng /
+// Tối — lựa chọn lưu ở pctt_theme (index.html đọc trước khi nạp trang để không nháy màn hình); chọn lại "Theo máy" thì xoá
+const THEME_KEY = 'pctt_theme';
+const savedTheme = () => {
+  const t = safeGet(THEME_KEY);
+  return t === 'light' || t === 'dark' ? t : null;
 };
+const systemTheme = () => (window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
 
 const savedAuth = (() => { try { return JSON.parse(safeGet('pctt_auth') || 'null'); } catch { return null; } })();
 
@@ -32,7 +35,7 @@ const savedFilterOf = (username) => {
 function followSystemTheme() {
   try {
     window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', (e) => {
-      if (safeGet('pctt_theme')) return;
+      if (savedTheme()) return;
       const theme = e.matches ? 'light' : 'dark';
       document.documentElement.classList.toggle('dark', theme === 'dark');
       useStore.setState({ theme });
@@ -44,13 +47,15 @@ function followSystemTheme() {
 
 export const useStore = create((set, get) => ({
   // ---- Chế độ Sáng/Tối ----
-  theme: initialTheme(),
-  toggleTheme: () => {
-    const theme = get().theme === 'dark' ? 'light' : 'dark';
-    safeSet('pctt_theme', theme);
+  theme: savedTheme() || systemTheme(),
+  themePref: savedTheme() || 'system', // 'system' | 'light' | 'dark' — chọn trong menu tài khoản
+  setThemePref: (pref) => {
+    const theme = pref === 'system' ? systemTheme() : pref;
+    safeSet(THEME_KEY, pref === 'system' ? null : pref);
     document.documentElement.classList.toggle('dark', theme === 'dark');
-    set({ theme });
+    set({ theme, themePref: pref });
   },
+  toggleTheme: () => get().setThemePref(get().theme === 'dark' ? 'light' : 'dark'),
 
   // ---- Bộ lọc địa phương (Global State) ----
   filter: savedFilterOf(savedAuth?.user?.username),
