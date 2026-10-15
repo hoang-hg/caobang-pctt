@@ -46,7 +46,7 @@ export const CHANNEL = {
 export const BROADCAST_STATUS = {
   pending_approval: { label: 'Chờ phê duyệt', cls: 'bg-warn text-black' },
   sending: { label: 'Đang phát', cls: 'bg-accent text-white' },
-  sent: { label: 'Đã phát', cls: 'bg-good text-white' },
+  sent: { label: 'Đã phát', cls: 'bg-good text-black' },
   // Đã duyệt nhưng kênh SMS / Zalo / Cell Broadcast chưa tích hợp → chỉ công bố trên cổng công khai & bản nhẹ
   published: { label: 'Đã công bố trên cổng', cls: 'bg-accent/15 text-accent' },
   rejected: { label: 'Từ chối', cls: 'bg-panel2 text-muted' },

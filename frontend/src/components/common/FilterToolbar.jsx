@@ -10,6 +10,7 @@ const CTRL = 'tap min-h-[40px] text-xs sm:text-sm';
  * nút riêng của trang (VD đổi cách xem) đặt cạnh Excel / PDF.
  * Điện thoại 360 px: ô tìm cả hàng; "Bộ lọc (n)" · Excel · PDF một hàng nút ≥ 44 px; ô chọn mở trong khung khi bấm "Bộ lọc"
  * (cán bộ hiện trường chủ yếu tìm theo tên). Máy tính: một hàng. Đang lọc → hàng nhãn "Đang lọc" bỏ từng điều kiện được.
+ * `sorts` rỗng (VD danh bạ): không có ô "Sắp xếp".
  */
 export default function FilterToolbar({
   fields, sorts, placeholder, q, onSearch, filters, counts, onFilter, onClear, sort, onSort, shown, total, noun, onExcel, onPdf, exporting,
@@ -73,14 +74,16 @@ export default function FilterToolbar({
             ))}
           </select>
         ))}
-        <select
-          className={clsx('input w-full min-w-0 px-2 sm:ml-auto sm:w-auto sm:max-w-[15rem]', CTRL)}
-          value={sort}
-          onChange={(e) => onSort(e.target.value)}
-          aria-label="Sắp xếp"
-        >
-          {sorts.map(([value, label]) => <option key={value} value={value}>Xếp: {label}</option>)}
-        </select>
+        {sorts?.length > 0 && (
+          <select
+            className={clsx('input w-full min-w-0 px-2 sm:ml-auto sm:w-auto sm:max-w-[15rem]', CTRL)}
+            value={sort}
+            onChange={(e) => onSort(e.target.value)}
+            aria-label="Sắp xếp"
+          >
+            {sorts.map(([value, label]) => <option key={value} value={value}>Xếp: {label}</option>)}
+          </select>
+        )}
       </div>
       {(active.length > 0 || q) && (
         <div className="flex flex-wrap items-center gap-1.5 text-xs" aria-live="polite">

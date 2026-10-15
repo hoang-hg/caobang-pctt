@@ -77,6 +77,12 @@ check('Cấp 3 không điều động → 403', (await call('GET', `/sos/${inCob
 check('Cấp 3 không xem / quản lý tài khoản → 403', (await call('GET', '/rbac/users', null, T.coba)).status === 403);
 check('Cấp 3 không vào được tổng đài → 403', (await call('GET', '/alerts/hotline', null, T.coba)).status === 403);
 check('Cấp 3 không xem nhật ký pháp lý → 403', (await call('GET', '/alerts/audit', null, T.coba)).status === 403);
+// Nhật ký pháp lý theo khoảng ngày (trang Cảnh báo → Nhật ký pháp lý), trần 5.000 dòng một lần
+const since = encodeURIComponent(new Date(Date.now() - 86400e3).toISOString());
+const auditDay = await call('GET', `/alerts/audit?limit=5000&since=${since}`, null, T.chihuy);
+check('Nhật ký pháp lý 24 giờ qua → 200, chỉ thao tác trong khoảng', auditDay.status === 200 && auditDay.data.every((a) => Date.parse(a.time) >= Date.now() - 86400e3 - 60e3), `${auditDay.data?.length} thao tác`);
+check('Nhật ký pháp lý quá 5.000 dòng một lần → 422', (await call('GET', '/alerts/audit?limit=100000', null, T.chihuy)).status === 422);
+check('Nhật ký pháp lý ngày sai định dạng → 422', (await call('GET', '/alerts/audit?since=hom-qua', null, T.chihuy)).status === 422);
 const lay = (await call('GET', '/map/layers', null, T.coba)).data;
 check('Bản đồ của Cấp 3 chỉ có SOS trong xã', lay.sos.features.every((f) => f.properties.admin_code === 'CB-COBA'));
 
