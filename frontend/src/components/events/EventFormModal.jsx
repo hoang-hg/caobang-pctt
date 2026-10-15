@@ -351,9 +351,11 @@ export function EndEventModal({ event, onClose }) {
   const [endAt, setEndAt] = useState(() => toLocalInput(new Date()));
   const [busy, setBusy] = useState(false);
   const endMs = mode === 'now' ? Date.now() : Date.parse(endAt);
+  // Ô giờ chỉ chọn tới phút: cùng phút với giờ bắt đầu vẫn hợp lệ (gửi đi không sớm hơn giờ bắt đầu)
+  const startMs = Date.parse(event.started_at);
   const error = mode === 'now' ? null
     : !endAt || Number.isNaN(endMs) ? 'Chọn giờ kết thúc'
-      : endMs < Date.parse(event.started_at) ? `Phải sau giờ bắt đầu (${when(event.started_at)})`
+      : endMs < startMs - (startMs % 60_000) ? `Phải sau giờ bắt đầu (${when(event.started_at)})`
         : endMs > Date.now() + 60_000 ? 'Không được ở tương lai' : null;
   const submit = async () => {
     if (error) return;
@@ -361,7 +363,7 @@ export function EndEventModal({ event, onClose }) {
     try {
       const ended = await api(`/events/${encodeURIComponent(event.code)}/end`, {
         method: 'POST',
-        body: { end_note: note.trim() || null, ...(mode === 'past' && { ended_at: fromLocalInput(endAt) }) },
+        body: { end_note: note.trim() || null, ...(mode === 'past' && { ended_at: new Date(Math.max(endMs, startMs)).toISOString() }) },
       });
       toast({
         tone: 'good',
