@@ -22,8 +22,7 @@ báo, biểu đồ chuyển giao theo kênh (PR #78).
 Cell Broadcast, Zalo OA / ZNS, thông báo đẩy, loa thông minh; hiện lệnh đã duyệt chỉ công bố trên cổng công khai và bản
 nhẹ — giao diện nói thẳng điều này); danh bạ thật (CE2); tổng đài SIP / WebRTC, ghi âm, IVR thật (CE3); số thuê bao / người
 theo dõi Zalo / loa thật theo vùng (CE4); mô hình dự báo lũ quét – sạt lở 3 giờ tới (CE5). Ký duyệt bằng sinh trắc học (CE6)
-chờ quyết định. Riêng **CE7** (bản nháp tự động từ số đo thật của trạm IoT) là việc lập trình phía máy chủ, làm được
-ngay — cần làm trước khi dựa vào trạm thật.
+chờ quyết định.
 
 ## 1. Đối chiếu với thiết kế mục E (rà ngày 15/10/2026, theo từng ý)
 
@@ -35,7 +34,7 @@ ngay — cần làm trước khi dựa vào trạm thật.
 | E.1 Mẫu tin dựng sẵn có tham số, thao tác dưới 10 giây | Đạt — chạm chọn mẫu (chấm màu theo mức), tham số có nhãn (số phải là số), nội dung tự điền, mức theo mẫu; xem lại trước khi gửi |
 | E.2 Khoanh vùng: vẽ đa giác trên bản đồ hoặc chọn các xã ven sông | Đạt — "Vẽ vùng trên bản đồ" mở sẵn công cụ khoanh của Bản đồ giám sát (`?cong-cu=khoanh`) → "Soạn cảnh báo"; lưu vực chọn nhanh; chạm chọn xã (tìm không dấu) |
 | E.2 Lọc danh sách thuê bao, tài khoản Zalo, loa trong vùng | **Một phần** — ước tính hộ / thuê bao / người theo dõi Zalo / người dùng ứng dụng / loa theo diện tích giao cắt từng xã; danh sách thật cần nhà mạng, Zalo, hệ thống loa (CE4) |
-| E.2 Kích hoạt từ cảm biến (độ nghiêng, mưa vượt ngưỡng) → bản nháp sơ tán chờ Trưởng ban duyệt | **Một phần** — giao diện đủ (thẻ "Tự động", lọc nguồn "tự động" trong lịch sử, thư báo người duyệt). Luồng độ nghiêng / độ ẩm đất vượt BĐ II → vùng nguy cơ 1 km, phiếu SOS, bản nháp "Di dời khẩn cấp" **mới chạy ở chế độ mô phỏng** (máy thử); số đo thật từ thiết bị (MQTT, API nhận số liệu) chỉ được lưu, chưa sinh bản nháp (CE7) |
+| E.2 Kích hoạt từ cảm biến (độ nghiêng, mưa vượt ngưỡng) → bản nháp sơ tán chờ Trưởng ban duyệt | Đạt — độ nghiêng / độ ẩm đất vượt BĐ II → vùng nguy cơ 1 km, phiếu SOS, bản nháp "Di dời khẩn cấp" (thẻ "Tự động", lọc nguồn "tự động" trong lịch sử), thư báo người duyệt. Chạy với **số đo thật** gửi qua MQTT / API nhận số liệu (theo ngưỡng khai báo của từng thiết bị) lẫn trạm mô phỏng ở máy thử; thiết bị gửi lặp không tạo trùng. Mưa vượt ngưỡng: xem dòng dưới |
 | E.2 Kích hoạt từ mô hình dự báo (3 giờ tới nguy cơ cao → "Chuẩn bị sơ tán") | **Một phần** — mưa dự báo 24 giờ (Open-Meteo, kết hợp mô hình) vượt ngưỡng → bản nháp "Chuẩn bị sơ tán" (12 giờ / lần); dự báo mực nước 3 giờ tới (HEC-HMS) mới chạy ở bộ mô phỏng (CE5) |
 | E.3 Danh bạ phân cấp Tỉnh → Xã → Thôn: tên, chức vụ, SĐT, bộ đàm, trạng thái | Đạt — trạng thái trực bằng chữ, tìm không dấu, lọc cấp / trạng thái, Excel / PDF làm bản dự phòng; số liệu mẫu (CE2) |
 | E.3 Tổng đài web (WebRTC / SIP): bấm số trên màn hình để gọi, ghi âm | **Chưa** — nút "Gọi" mở cuộc gọi của điện thoại / phần mềm gọi (`tel:`), chưa ghi âm (CE3, = BC3 trang C) |
@@ -65,7 +64,6 @@ ngay — cần làm trước khi dựa vào trạm thật.
 | CE4 | **Người nhận thật theo vùng**: số thuê bao, người theo dõi Zalo, loa | Dữ liệu từ nhà mạng / Zalo / hệ thống loa | như CE1 | Trung bình |
 | CE5 | **Dự báo lũ quét – sạt lở 3 giờ tới** cho kích hoạt tự động | Mô hình / bản tin | Đài KTTV, cơ quan địa chất (cùng CD6 trang D, BD6 trang B) | Trung bình |
 | CE6 | Ký duyệt bằng sinh trắc học (vân tay / khuôn mặt trên điện thoại) | Quyết định + WebAuthn | Chủ dự án | Thấp |
-| CE7 | **Bản nháp tự động từ trạm IoT thật**: độ nghiêng / độ ẩm đất vượt ngưỡng → vùng nguy cơ, SOS, bản nháp sơ tán | Lập trình máy chủ (không phụ thuộc bên ngoài) | — (cần chủ dự án đồng ý vì đổi hành vi bản chính thức) | **Cao** (trước khi lắp trạm thật) |
 
 ## 3. Việc giao diện đã làm
 
@@ -133,18 +131,12 @@ mô phỏng; cần bản tin / mô hình chính thức (Đài KTTV) và ngưỡn
 PIN 4–8 số + xác thực 2 lớp khi đăng nhập đang dùng. Sinh trắc học (WebAuthn: vân tay / khuôn mặt trên điện thoại của lãnh đạo)
 làm được về kỹ thuật — chờ chủ dự án quyết định (thiết bị, quy trình khi mất máy).
 
-### CE7 — Bản nháp tự động từ trạm IoT thật
-
-- **Hiện trạng:** kiểm tra ngưỡng độ nghiêng / độ ẩm đất (`simulator.check_triggers` → `sensor_hotspot`) chỉ chạy trong bộ mô
-  phỏng, với trạm còn ở chế độ mô phỏng. Bản chính thức (`SIMULATOR=false`) nhận số đo thật qua MQTT (`mqtt_bridge`) hoặc API
-  nhận số liệu (`api/v1/ingest.py`) và lưu lại, nhưng **không** sinh vùng nguy cơ, phiếu SOS hay bản nháp cảnh báo.
-- **Việc lập trình:** chuyển phần kiểm tra ngưỡng ra khỏi bộ mô phỏng, chạy sau mỗi lần ghi số đo (cả trạm thật), giữ chống
-  báo lặp như hiện nay. Bản nháp vẫn **bắt buộc lãnh đạo ký PIN** mới phát — không có lệnh nào tự gửi tới người dân.
-- **Cần:** chủ dự án đồng ý (đổi hành vi bản chính thức); ngưỡng BĐ của từng trạm thật.
-
 ## 5. Kiểm tra khi có dữ liệu thật
 
 1. Triển khai bản mới (V1 của trang A).
+   - Khi lắp trạm thật: khai báo ngưỡng BĐ cho từng thiết bị. Gửi thử một số đo độ nghiêng / độ ẩm đất vượt BĐ II, kiểm tra
+     đủ ba thứ: vùng nguy cơ trên Bản đồ, phiếu SOS ở trang Cứu hộ, bản nháp "Di dời khẩn cấp" chờ ký trên trang này
+     (luồng có sẵn; `tests/e2e/iot-test.mjs` kiểm tra bước vùng nguy cơ). Bản nháp luôn phải được lãnh đạo ký PIN mới phát.
 2. Nhập danh bạ thật (CE2); mở `/canh-bao` trên máy tính, iPad, điện thoại:
    - dải khẩn / ô chỉ số khớp danh sách lệnh; chạm ô "Chờ phê duyệt" ra đúng các lệnh;
    - danh bạ: tìm vài cán bộ theo tên không dấu, gọi thử; xuất Excel làm bản dự phòng.
@@ -164,8 +156,8 @@ làm được về kỹ thuật — chờ chủ dự án quyết định (thiế
 | Bản đồ vùng cảnh báo, chuyển giao theo kênh | `components/alerts/AlertMap.jsx`, `DeliveryChart.jsx` |
 | API cảnh báo, danh bạ, tổng đài, nhật ký | `backend/app/api/v1/alerts.py` |
 | Ước tính người nhận, mô phỏng giao nhận, điều kiện "đang hiệu lực" | `backend/app/services/broadcast.py` |
-| Kích hoạt tự động (cảm biến, dự báo), thư báo người duyệt | `backend/app/services/simulator.py` (`sensor_hotspot`, `auto_draft`), `integrations/runner.py` (`forecast_alerts`), `services/alert_watch.py` |
-| Kiểm thử | `tests/ui/ui-test.mjs` (khối "Cảnh báo khẩn cấp"), `tests/e2e/rbac-test.mjs` (nhật ký theo khoảng ngày), `tests/e2e/prod-flow.mjs` (Maker – Checker) |
+| Kích hoạt tự động (cảm biến, dự báo), thư báo người duyệt | `backend/app/integrations/ingest.py` (`ingest_readings` → `check_triggers`: số đo thật), `services/simulator.py` (`check_triggers`, `sensor_hotspot`, `auto_draft`), `integrations/runner.py` (`forecast_alerts`), `services/alert_watch.py` |
+| Kiểm thử | `tests/ui/ui-test.mjs` (khối "Cảnh báo khẩn cấp"), `tests/e2e/rbac-test.mjs` (nhật ký theo khoảng ngày), `tests/e2e/prod-flow.mjs` (Maker – Checker), `tests/e2e/iot-test.mjs` (số đo thật vượt BĐ II → vùng nguy cơ tự động) |
 
 ## 7. Các thay đổi đã làm cho trang E (để tra cứu)
 
