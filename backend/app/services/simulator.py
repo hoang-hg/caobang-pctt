@@ -166,7 +166,8 @@ class Simulator:
             return out
         async with transaction() as conn:
             await conn.exec_driver_sql(
-                "INSERT INTO iot_telemetry.sensor_readings (time, station_id, value) VALUES (%(time)s, %(station_id)s, %(value)s)",
+                "INSERT INTO iot_telemetry.sensor_readings (time, station_id, value) VALUES (%(time)s, %(station_id)s, %(value)s)"
+                " ON CONFLICT (station_id, time) DO NOTHING",
                 [{"time": r["time"], "station_id": r["station_id"], "value": r["value"]} for r in out],
             )
         await hub.publish("reading.new", out)

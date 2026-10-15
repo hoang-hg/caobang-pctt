@@ -116,18 +116,17 @@ async def ingest_readings(device: dict, items: list[dict], channel: str) -> dict
     good, errors = normalize(items, device, station, now)
 
     accepted = []
-    for r in good:  # bỏ số đo trùng (cùng trạm, cùng thời điểm) — thiết bị gửi lại khi mất mạng
-        dup = await fetch_one(
-            "SELECT 1 FROM iot_telemetry.sensor_readings WHERE station_id = :s AND time = :t",
-            {"s": device["station_id"], "t": r["time"]},
-        )
-        if dup:
-            errors.append(f"trùng số đo lúc {r['time'].isoformat()}")
-            continue
-        await execute(
-            "INSERT INTO iot_telemetry.sensor_readings (time, station_id, value) VALUES (:t, :s, :v)",
+    for r in good:
+        # Bỏ số đo trùng (cùng trạm, cùng thời điểm — thiết bị gửi lại khi mất mạng, MQTT giao lại tin) bằng chỉ mục duy nhất
+        # (migration 0021): một câu ghi, hai bản tin đến cùng lúc cũng không ghi đôi (trước đây hỏi trước rồi mới ghi)
+        row = await fetch_one(
+            """INSERT INTO iot_telemetry.sensor_readings (time, station_id, value) VALUES (:t, :s, :v)
+               ON CONFLICT (station_id, time) DO NOTHING RETURNING time""",
             {"t": r["time"], "s": device["station_id"], "v": r["value"]},
         )
+        if not row:
+            errors.append(f"trùng số đo lúc {r['time'].isoformat()}")
+            continue
         accepted.append(r)
 
     if accepted:
