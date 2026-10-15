@@ -10,7 +10,7 @@
    Tối (mặc định Trung tâm điều hành): nền #111827.
    Màu trạng thái (đỏ/cam/vàng/xanh) của nền, huy hiệu, bản đồ cố định, không đổi theo theme — thang màu rủi ro dùng
    chung ở src/utils/risk.js. CHỮ màu trạng thái (text-danger / -warn / -serious / -good — tailwind.config.js) dùng
-   --*-text: ở nền sáng là sắc đậm hơn, vì vàng / cam / xanh lá của nền chỉ đạt tương phản 1,8 / 2,6 / 3,4 : 1 trên nền
+   --*-text: ở nền sáng là sắc đậm hơn, vì vàng / cam / xanh lá của nền chỉ đạt tương phản 1,6 / 2,6 / 3,4 : 1 trên nền
    trắng; ở nền tối đỏ là sắc sáng hơn (cần ≥ 4,5 : 1 — dưới nắng không đọc được). Chữ đỏ trên nền TRẮNG cố định (nút
    trong dải báo động) dùng text-[rgb(var(--danger))] — không theo theme.
    Bảng màu tối chỉ áp cho màn hình (@media screen): in ra giấy luôn dùng bảng màu sáng.
@@ -28,7 +28,7 @@
   --info: 42 120 214;
   --danger: 208 59 59;
   --serious: 236 131 90;
-  --warn: 250 178 25;
+  --warn: 247 200 0; /* #F7C800 vàng chanh — xem src/utils/risk.js */
   --good: 12 163 12;
   --danger-text: 208 59 59; /* #D03B3B — 4,8 : 1 trên nền trắng */
   --serious-text: 194 65 12; /* #C2410C — 5,2 : 1 trên nền trắng */
@@ -61,7 +61,7 @@
     --info: 57 135 229;
     --danger-text: 248 113 113; /* #F87171 — đỏ gốc chỉ 3,4 : 1 trên nền tối, sắc sáng hơn đạt 5,9 : 1 */
     --serious-text: 236 131 90; /* nền tối: chính màu trạng thái đã đủ tương phản */
-    --warn-text: 250 178 25;
+    --warn-text: 247 200 0;
     --good-text: 12 163 12;
 
     --series-1: #3987e5;

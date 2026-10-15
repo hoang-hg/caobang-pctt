@@ -153,9 +153,9 @@ export default function Hydrograph({ stationId, height = 260, hours = 48, compac
               <CartesianGrid stroke={c.grid} vertical={false} />
               <XAxis dataKey="t" type="number" domain={['dataMin', 'dataMax']} scale="time" tickFormatter={hourLabel} {...axisProps(c)} />
               <YAxis domain={[Math.floor(lo), Math.ceil(hi)]} tickFormatter={(v) => num(v, 1)} {...axisProps(c)} unit=" m" width={44} />
-              {thr.bd1 != null && <ReferenceLine y={thr.bd1} stroke={c.warn} strokeWidth={1.5} label={compact ? undefined : { value: `BĐ I ${num(thr.bd1, 2)} m`, fill: c.warn, position: 'right', fontSize: 10 }} />}
-              {thr.bd2 != null && <ReferenceLine y={thr.bd2} stroke={c.serious} strokeWidth={1.5} label={compact ? undefined : { value: `BĐ II ${num(thr.bd2, 2)} m`, fill: c.serious, position: 'right', fontSize: 10 }} />}
-              {thr.bd3 != null && <ReferenceLine y={thr.bd3} stroke={c.danger} strokeWidth={1.5} label={compact ? undefined : { value: `BĐ III ${num(thr.bd3, 2)} m`, fill: c.danger, position: 'right', fontSize: 10 }} />}
+              {thr.bd1 != null && <ReferenceLine y={thr.bd1} stroke={c.warn} strokeWidth={1.5} label={compact ? undefined : { value: `BĐ I ${num(thr.bd1, 2)} m`, fill: c.warnText, position: 'right', fontSize: 10 }} />}
+              {thr.bd2 != null && <ReferenceLine y={thr.bd2} stroke={c.serious} strokeWidth={1.5} label={compact ? undefined : { value: `BĐ II ${num(thr.bd2, 2)} m`, fill: c.seriousText, position: 'right', fontSize: 10 }} />}
+              {thr.bd3 != null && <ReferenceLine y={thr.bd3} stroke={c.danger} strokeWidth={1.5} label={compact ? undefined : { value: `BĐ III ${num(thr.bd3, 2)} m`, fill: c.dangerText, position: 'right', fontSize: 10 }} />}
             </ComposedChart>
           </ResponsiveContainer>
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-4">
@@ -251,9 +251,9 @@ export default function Hydrograph({ stationId, height = 260, hours = 48, compac
             cursor={{ stroke: c.axis, strokeDasharray: '3 3' }}
           />
           <ReferenceLine x={now} stroke={c.muted} strokeDasharray="2 4" label={compact ? undefined : { value: 'Hiện tại', fill: c.muted, fontSize: 10, position: 'insideTopLeft' }} />
-          {thr.bd1 != null && <ReferenceLine y={thr.bd1} stroke={c.warn} strokeWidth={1.5} label={compact ? undefined : { value: `BĐ I ${thr.bd1}`, fill: c.warn, fontSize: 10, position: 'right' }} />}
-          {thr.bd2 != null && <ReferenceLine y={thr.bd2} stroke={c.serious} strokeWidth={1.5} label={compact ? undefined : { value: `BĐ II ${thr.bd2}`, fill: c.serious, fontSize: 10, position: 'right' }} />}
-          {thr.bd3 != null && <ReferenceLine y={thr.bd3} stroke={c.danger} strokeWidth={1.8} label={compact ? undefined : { value: `BĐ III ${thr.bd3}`, fill: c.danger, fontSize: 10, position: 'right' }} />}
+          {thr.bd1 != null && <ReferenceLine y={thr.bd1} stroke={c.warn} strokeWidth={1.5} label={compact ? undefined : { value: `BĐ I ${thr.bd1}`, fill: c.warnText, fontSize: 10, position: 'right' }} />}
+          {thr.bd2 != null && <ReferenceLine y={thr.bd2} stroke={c.serious} strokeWidth={1.5} label={compact ? undefined : { value: `BĐ II ${thr.bd2}`, fill: c.seriousText, fontSize: 10, position: 'right' }} />}
+          {thr.bd3 != null && <ReferenceLine y={thr.bd3} stroke={c.danger} strokeWidth={1.8} label={compact ? undefined : { value: `BĐ III ${thr.bd3}`, fill: c.dangerText, fontSize: 10, position: 'right' }} />}
           <Line dataKey="obs" name="Thực đo" stroke={c.s1} strokeWidth={2.5} dot={false} connectNulls isAnimationActive={false} />
           <Line dataKey="fc" name="Dự báo" stroke={c.s2} strokeWidth={2.2} strokeDasharray="6 4" dot={false} connectNulls isAnimationActive={false} />
         </ComposedChart>

@@ -174,7 +174,7 @@ export default function SensorHeatmap() {
               <Tooltip content={<ChartTooltip unit={unitOf(sel.s)} labelFormatter={(l) => dateTime(l)} />} cursor={{ stroke: c.axis, strokeDasharray: '3 3' }} />
               {[1, 2, 3].map((lv) => sel.s.thresholds?.[`bd${lv}`] != null && (
                 <ReferenceLine key={lv} y={sel.s.thresholds[`bd${lv}`]} stroke={[null, c.warn, c.serious, c.danger][lv]} strokeWidth={1.5} ifOverflow="extendDomain"
-                  label={{ value: `BĐ ${ROMAN[lv]}`, fill: [null, c.warn, c.serious, c.danger][lv], fontSize: 10, position: 'right' }} />
+                  label={{ value: `BĐ ${ROMAN[lv]}`, fill: [null, c.warnText, c.seriousText, c.dangerText][lv], fontSize: 10, position: 'right' }} />
               ))}
               <Line dataKey="v" name="Lớn nhất trong giờ" stroke={c.s1} strokeWidth={2} dot={false} isAnimationActive={false} />
             </LineChart>
