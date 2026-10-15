@@ -2475,7 +2475,7 @@ async function areaFilter(ctx) {
 
   await step(ctx, 'Bộ lọc địa phương: chọn phường → nút đổi tên, nhớ qua tải lại; Bản đồ phủ mờ ngoài vùng, viền màu nhấn (không đỏ); bỏ lọc về Toàn tỉnh', async () => {
     await trig.click();
-    await dlg.getByRole('button', { name: `Phường ${WARD.name}` }).click();
+    await dlg.getByRole('button', { name: new RegExp(`^Phường ${WARD.name}`) }).click(); // không khớp dòng "Cần chú ý: Phường …"
     await dlg.waitFor({ state: 'hidden', timeout: 3_000 });
     if (!(await trig.innerText()).includes(WARD.name)) throw new Error(`chọn xong nút ghi "${await trig.innerText()}"`);
     await page.goto(`${ROOT}/ban-do`);
@@ -2506,6 +2506,71 @@ async function areaFilter(ctx) {
     if (!/Toàn tỉnh/.test(await trig.innerText())) throw new Error(`tải lại vẫn lọc "${(await trig.innerText()).trim()}" do thẻ Cấp xã tự chọn`);
     return `tự chọn ${auto} → tải lại: Toàn tỉnh`;
   });
+  // Lãnh đạo: tình hình từng xã ngay trong hộp chọn (thang rủi ro chung) — "Cần chú ý" (Đỏ / Cam) đầu hộp, xếp nặng → nhẹ, có
+  // lý do; mỗi ô xã có chấm màu; chạm một xã cần chú ý → lọc theo xã đó
+  await step(ctx, 'Bộ lọc địa phương — tình hình từng xã: chấm màu mọi xã, "Cần chú ý" xếp Đỏ → Cam kèm lý do, chạm → lọc theo xã đó; vùng chạm ≥ 44 px', async () => {
+    await trig.click();
+    await dlg.getByText(/Cần chú ý ·|Không xã\/phường nào ở mức Đỏ \/ Cam/).first().waitFor({ timeout: 15_000 });
+    const chips = await dlg.evaluate((el) => [...el.querySelectorAll('button[aria-label]')]
+      .filter((b) => /^(Phường|Xã) /.test(b.getAttribute('aria-label')))
+      .map((b) => ({ dot: !!b.querySelector('span.rounded-full'), label: b.getAttribute('aria-label') })));
+    const noDot = chips.filter((c) => !c.dot);
+    if (noDot.length) throw new Error(`${noDot.length}/${chips.length} xã thiếu chấm màu (VD ${noDot[0].label})`);
+    const rows = await dlg.evaluate((el) => [...el.querySelectorAll('button[aria-label^="Cần chú ý:"]')].map((b) => b.getAttribute('aria-label')));
+    const rank = { Đỏ: 3, Cam: 2 };
+    const levels = rows.map((r) => rank[r.match(/ — (Đỏ|Cam): /)?.[1]] || 0);
+    if (levels.some((lv) => !lv)) throw new Error(`dòng "Cần chú ý" không phải Đỏ / Cam hoặc thiếu lý do: ${rows.find((r, i) => !levels[i])}`);
+    if (levels.some((lv, i) => i && lv > levels[i - 1])) throw new Error(`"Cần chú ý" không xếp nặng → nhẹ: ${levels.join(',')}`);
+    if (await page.evaluate(() => matchMedia('(pointer: coarse)').matches)) {
+      const bad = await dlg.evaluate((el) => [...el.querySelectorAll('button, input')].map((b) => {
+        const r = b.getBoundingClientRect();
+        let w = r.width;
+        let h = r.height;
+        const a = b.classList.contains('touch-hit') && getComputedStyle(b, '::after');
+        if (a && a.content !== 'none') { w = Math.max(w, parseFloat(a.width) || 0); h = Math.max(h, parseFloat(a.height) || 0); }
+        return { s: Math.round(Math.min(w, h)), t: (b.getAttribute('aria-label') || b.innerText || '').slice(0, 24) };
+      }).filter((x) => x.s > 0 && x.s < 44));
+      if (bad.length) throw new Error(`${bad.length} vùng chạm < 44 px — ${bad.slice(0, 4).map((x) => `${x.t} ${x.s}px`).join(', ')}`);
+    }
+    if (!rows.length) {
+      await page.keyboard.press('Escape');
+      return `${chips.length} xã có chấm màu · không xã nào Đỏ / Cam`;
+    }
+    const name = rows[0].match(/^Cần chú ý: (?:Phường|Xã) (.+?) — /)[1];
+    await dlg.locator('button[aria-label^="Cần chú ý:"]').first().click();
+    await dlg.waitFor({ state: 'hidden', timeout: 3_000 });
+    if (!(await trig.innerText()).includes(name)) throw new Error(`chạm "${name}" nhưng nút địa bàn ghi "${await trig.innerText()}"`);
+    await trig.click();
+    await dlg.getByRole('button', { name: /Toàn tỉnh Cao Bằng/ }).click();
+    return `${chips.length} xã có chấm màu · ${rows.length} dòng cần chú ý đang hiện · chạm "${name}" → lọc`;
+  });
+
+  // Sáng / Tối (thiết kế F.2–F.3): Theo máy · Sáng · Tối trong menu tài khoản; đổi tức thì, nhớ qua tải lại (áp trước khi nạp
+  // trang — không nháy), chọn lại "Theo máy" thì theo hệ điều hành; nút nhanh trên thanh báo trạng thái (aria-pressed)
+  await step(ctx, 'Giao diện Theo máy / Sáng / Tối (menu tài khoản): đổi tức thì, nhớ qua tải lại, "Theo máy" theo hệ điều hành; nút nhanh có aria-pressed', async () => {
+    const menu = page.getByRole('button', { name: /^Tài khoản:/ });
+    const group = page.getByRole('group', { name: 'Giao diện' });
+    const isDark = () => page.evaluate(() => document.documentElement.classList.contains('dark'));
+    await menu.click();
+    await group.waitFor({ timeout: 5_000 });
+    if (await group.getByRole('button', { name: /Theo máy/ }).getAttribute('aria-pressed') !== 'true') throw new Error('máy mới chưa chọn gì nhưng "Theo máy" không được chọn');
+    await group.getByRole('button', { name: /Tối/ }).click();
+    if (!(await isDark())) throw new Error('chọn Tối nhưng giao diện chưa tối');
+    if (await page.locator('header button[aria-label="Nền tối"]').getAttribute('aria-pressed') !== 'true') throw new Error('nút nhanh trên thanh không báo đang nền tối');
+    await page.reload();
+    if (!(await isDark())) throw new Error('tải lại mất lựa chọn Tối');
+    await menu.click();
+    await group.getByRole('button', { name: /Theo máy/ }).click();
+    const system = await page.evaluate(() => (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+    if ((await isDark()) !== (system === 'dark')) throw new Error(`chọn Theo máy nhưng giao diện không theo máy (${system})`);
+    if (await page.evaluate(() => localStorage.getItem('pctt_theme'))) throw new Error('chọn Theo máy nhưng vẫn nhớ lựa chọn cũ');
+    if (await page.evaluate(() => matchMedia('(pointer: coarse)').matches)) {
+      const bad = await group.evaluate((el) => [...el.querySelectorAll('button')].filter((b) => b.getBoundingClientRect().height < 44).length);
+      if (bad) throw new Error(`${bad} nút Giao diện < 44 px`);
+    }
+    await menu.click(); // đóng menu tài khoản
+    return `máy: ${system}`;
+  });
 }
 
 /** Tài khoản phường: nút ghi tên phường của mình; hộp chọn chỉ có phường đó (phạm vi được giao). */
@@ -2520,6 +2585,10 @@ async function areaFilterWard(ctx) {
     await dlg.getByRole('button', { name: /^(Phường|Xã) / }).first().waitFor({ timeout: 15_000 });
     const units = await dlg.getByRole('button', { name: /^(Phường|Xã) / }).allInnerTexts();
     if (units.length !== 1 || !units[0].includes(WARD.name)) throw new Error(`hộp chọn có ${JSON.stringify(units)}`);
+    // Tình hình từng xã cũng theo phạm vi: "Cần chú ý" (nếu có) chỉ có phường của mình
+    await dlg.getByText(/Cần chú ý ·|Không xã\/phường nào ở mức Đỏ \/ Cam/).first().waitFor({ timeout: 15_000 });
+    const hot = await dlg.locator('button[aria-label^="Cần chú ý:"]').evaluateAll((bs) => bs.map((b) => b.getAttribute('aria-label')));
+    if (hot.some((h) => !h.includes(WARD.name))) throw new Error(`"Cần chú ý" có xã ngoài phạm vi: ${hot.join(' | ')}`);
     await page.keyboard.press('Escape');
     return (await trig.innerText()).trim();
   });

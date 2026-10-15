@@ -1,6 +1,6 @@
 import { lazy, Suspense, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { LogOut, UserCircle2, ShieldCheck, KeyRound, Globe, Smartphone, Volume2, VolumeX } from 'lucide-react';
+import { LogOut, UserCircle2, ShieldCheck, KeyRound, Globe, Smartphone, Volume2, VolumeX, Monitor, Sun, Moon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import clsx from 'clsx';
 import { ChangePasswordModal } from '../../pages/AccountPages';
@@ -9,10 +9,12 @@ import { useClickOutside } from '../../utils/useClickOutside';
 
 // Tách chunk: menu nằm trong gói tải đầu (cả cổng công khai) — chỉ tải phần xác thực 2 lớp khi mở
 const MfaModal = lazy(() => import('../account/Mfa'));
+// Giao diện (thiết kế F.2–F.3): Theo máy (theo hệ điều hành) · Sáng · Tối
+const THEMES = [['system', 'Theo máy', Monitor], ['light', 'Sáng', Sun], ['dark', 'Tối', Moon]];
 
 /** Thông tin tài khoản đang đăng nhập + vai trò/phạm vi được giao. */
 export default function UserMenu() {
-  const { auth, setAuth, soundOn, toggleSound, wsStatus } = useStore();
+  const { auth, setAuth, soundOn, toggleSound, wsStatus, themePref, setThemePref } = useStore();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [changing, setChanging] = useState(false);
@@ -34,7 +36,7 @@ export default function UserMenu() {
         <span className="hidden max-w-[10rem] truncate xl:inline">{user.full_name}</span>
       </button>
       {open && (
-        <div className="card absolute right-0 top-11 z-[1200] w-80 p-3 shadow-2xl">
+        <div className="card scroll-thin absolute right-0 top-11 z-[1200] max-h-[calc(100vh-4rem)] w-80 overflow-y-auto p-3 shadow-2xl supports-[height:100dvh]:max-h-[calc(100dvh-4rem)]">
           <div className="font-semibold">{user.full_name}</div>
           <div className="text-xs text-muted">{user.position} · <span className="font-mono">{user.username}</span></div>
           <div className="mt-2 text-[11px] font-semibold uppercase text-muted">Vai trò & phạm vi</div>
@@ -64,12 +66,30 @@ export default function UserMenu() {
               Kết nối thời gian thực: {wsStatus === 'online' ? 'đang hoạt động' : wsStatus === 'connecting' ? 'đang nối lại' : 'mất kết nối'}
             </div>
           </div>
-          <div className="mt-3 grid grid-cols-2 gap-1">
-            <button className="btn-ghost justify-center text-xs" onClick={() => { setChanging(true); setOpen(false); }}><KeyRound size={13} /> Đổi mật khẩu</button>
-            <button className="btn-ghost justify-center text-xs" onClick={() => { setMfaOpen(true); setOpen(false); }}><Smartphone size={13} /> Xác thực 2 lớp</button>
-            <Link to="/cong-khai" className="btn-ghost col-span-2 justify-center text-xs" onClick={() => setOpen(false)}><Globe size={13} /> Cổng công khai</Link>
+          {/* Tối: phòng điều hành, màn hình lớn (chống chói khi nhìn lâu); Sáng: hiện trường ngoài trời, in báo cáo */}
+          <div className="mt-3 border-t border-line pt-2">
+            <div className="text-[11px] font-semibold uppercase text-muted">Giao diện</div>
+            <div className="mt-1 grid grid-cols-3 gap-1" role="group" aria-label="Giao diện">
+              {THEMES.map(([value, label, Icon]) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={themePref === value}
+                  className={clsx('btn-ghost tap justify-center gap-1 px-1.5 text-xs', themePref === value && 'border-accent bg-accent/10 text-accent hover:border-accent hover:bg-accent/15 hover:text-accent')}
+                  onClick={() => setThemePref(value)}
+                >
+                  <Icon size={13} aria-hidden="true" /> {label}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 text-[11px] text-muted">Tối: phòng điều hành, màn hình lớn. Sáng: hiện trường ngoài trời, in báo cáo. Theo máy: đổi cùng điện thoại / máy tính.</p>
           </div>
-          <button className="btn-ghost mt-1 w-full justify-center" onClick={logout}>
+          <div className="mt-3 grid grid-cols-2 gap-1">
+            <button className="btn-ghost tap justify-center text-xs" onClick={() => { setChanging(true); setOpen(false); }}><KeyRound size={13} /> Đổi mật khẩu</button>
+            <button className="btn-ghost tap justify-center text-xs" onClick={() => { setMfaOpen(true); setOpen(false); }}><Smartphone size={13} /> Xác thực 2 lớp</button>
+            <Link to="/cong-khai" className="btn-ghost tap col-span-2 justify-center text-xs" onClick={() => setOpen(false)}><Globe size={13} /> Cổng công khai</Link>
+          </div>
+          <button className="btn-ghost tap mt-1 w-full justify-center" onClick={logout}>
             <LogOut size={14} /> Đăng xuất / đổi tài khoản
           </button>
         </div>

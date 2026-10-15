@@ -131,7 +131,8 @@ export default function Header() {
           className="btn-ghost touch-hit p-2 transition-transform active:rotate-45"
           onClick={toggleTheme}
           title={theme === 'dark' ? 'Chuyển sang nền Sáng' : 'Chuyển sang nền Tối'}
-          aria-label="Đổi nền sáng tối"
+          aria-label="Nền tối"
+          aria-pressed={theme === 'dark'}
         >
           {theme === 'dark' ? <Sun size={16} className="text-amber-400" /> : <Moon size={16} className="text-indigo-500" />}
         </button>

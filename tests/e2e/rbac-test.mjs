@@ -86,6 +86,13 @@ check('Nhật ký pháp lý ngày sai định dạng → 422', (await call('GET'
 // Tìm kiếm toàn năng: mã SOS kèm mã xã của phiếu (giao diện bỏ lọc địa bàn khi phiếu ở xã ngoài vùng đang lọc rồi mở phiếu)
 const sosHit = (await call('GET', `/search?q=${encodeURIComponent(inCoba.data.code)}`, null, T.chihuy)).data || [];
 check('Tìm mã SOS → kèm mã xã của phiếu', sosHit.some((h) => h.kind === 'sos' && h.label === inCoba.data.code && h.admin_code === 'CB-COBA'), JSON.stringify(sosHit[0] || null));
+// Tình hình từng xã (hộp chọn địa bàn): theo phạm vi được giao — Cấp 3 chỉ xã mình, hỏi xã khác không lộ số liệu
+const comCoba = (await call('GET', '/dashboard/communes', null, T.coba)).data || [];
+check('Tình hình từng xã — Cấp 3 chỉ thấy xã mình', comCoba.length === 1 && comCoba[0].code === 'CB-COBA', JSON.stringify(comCoba.map((r) => r.code)));
+const comAll = (await call('GET', '/dashboard/communes', null, T.chihuy)).data || [];
+check('Tình hình từng xã — cấp tỉnh thấy cả 56 xã/phường', comAll.length === 56 && comAll.every((r) => 'sos_open' in r && 'alert_level' in r && 'station_level' in r), `${comAll.length} xã`);
+const comOther = await call('GET', '/dashboard/communes?admin_codes=CB-THUCPHAN', null, T.coba);
+check('Tình hình từng xã — Cấp 3 hỏi xã khác không lộ số liệu', comOther.status === 200 && (comOther.data || []).every((r) => r.code === 'CB-COBA'), JSON.stringify(comOther.data));
 const lay = (await call('GET', '/map/layers', null, T.coba)).data;
 check('Bản đồ của Cấp 3 chỉ có SOS trong xã', lay.sos.features.every((f) => f.properties.admin_code === 'CB-COBA'));
 

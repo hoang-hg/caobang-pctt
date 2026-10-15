@@ -142,7 +142,7 @@ if (!admin) {
 }
 
 // Mọi màn hình nội bộ trên CSDL trống: không lỗi 500
-const staffGets = ['/auth/me', '/dashboard/kpis', '/dashboard/logs', '/dashboard/rainfall', '/dashboard/supplies',
+const staffGets = ['/auth/me', '/dashboard/kpis', '/dashboard/communes', '/dashboard/logs', '/dashboard/rainfall', '/dashboard/supplies',
   '/dashboard/landslide-risk', '/stations', '/sos', '/evacuation', '/alerts/broadcasts', '/alerts/templates',
   '/alerts/channels', '/alerts/contacts', '/alerts/hotline', '/alerts/audit', '/reports', '/resources/summary',
   '/resources/forces', '/resources/vehicles', '/resources/warehouses', '/resources/evacuation-sites', '/resources/fuel-depots',
