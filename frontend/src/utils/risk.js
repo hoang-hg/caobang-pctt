@@ -9,6 +9,10 @@
  * ≥ 4,5 : 1, đọc được ngoài nắng (chữ trắng trên cam chỉ 2,6 : 1, trên xanh lá 3,3 : 1).
  * Mức của từng loại đối tượng lấy theo màu backend trả (services/reservoirs.py, services/landslides.py…) — đổi ở đây,
  * không viết màu / ngưỡng riêng trong từng trang.
+ *
+ * Vàng là vàng chanh #F7C800 (từ 15/10/2026): #FAB219 cũ ngả hổ phách, cách Cam chỉ ΔE 13,6 (OKLab ×100, dưới ngưỡng 15)
+ * — khó phân biệt Cấp 3 / Cấp 2 trên biểu đồ cột chồng, bản đồ. Nay Vàng–Cam 19,0 (người mù màu đỏ–lục 15,0), Cam–Đỏ giữ
+ * 15,7. Không đẩy Cam đậm hơn: Cam #EA580C cách Vàng 20,3 nhưng cách Đỏ còn 8,9 — dễ nhầm Cấp 1 với Cấp 2, tệ hơn.
  */
 export const RISK = [
   {
@@ -16,7 +20,7 @@ export const RISK = [
     chip: 'bg-good text-black', soft: 'border-good/50 bg-good/10', text: 'text-good', fill: 'bg-good', edge: 'border-l-good',
   },
   {
-    level: 1, name: 'Vàng', meaning: 'Theo dõi', hex: '#fab219',
+    level: 1, name: 'Vàng', meaning: 'Theo dõi', hex: '#f7c800',
     chip: 'bg-warn text-black', soft: 'border-warn/70 bg-warn/10', text: 'text-warn', fill: 'bg-warn', edge: 'border-l-warn',
   },
   {

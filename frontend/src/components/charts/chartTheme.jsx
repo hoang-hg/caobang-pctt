@@ -27,6 +27,11 @@ export function useChartTheme() {
       warn: RISK[1].hex,
       serious: RISK[2].hex,
       danger: RISK[3].hex,
+      // CHỮ màu trạng thái (nhãn vạch BĐ I–III…): sắc --*-text đủ tương phản trên nền sáng / tối — không dùng màu vạch làm
+      // màu chữ (vàng 1,6 : 1, cam 2,6 : 1 trên nền trắng)
+      warnText: rgb('--warn-text'),
+      seriousText: rgb('--serious-text'),
+      dangerText: rgb('--danger-text'),
     };
   }, [theme]);
 }

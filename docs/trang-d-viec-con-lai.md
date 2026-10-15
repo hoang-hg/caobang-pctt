@@ -7,7 +7,7 @@ phân quyền). Hai nhóm người dùng: **cán bộ hiện trường** (điệ
 lý** (nắm tình hình trong vài giây qua chỉ số, bản đồ, biểu đồ, cảnh báo nổi bật).
 
 - Cập nhật: 15/10/2026 — mã nguồn `main` gồm PR #72 (bố cục, bảng, trạng thái), #73 (form chia bước, thanh thao tác
-  nhanh), #74 (bản đồ tác chiến, diễn biến 48 giờ, tra cứu hồ sơ, tài liệu này).
+  nhanh), #74 (bản đồ tác chiến, diễn biến 48 giờ, tra cứu hồ sơ, tài liệu này), #75 (màu Vàng của thang rủi ro chung — CD8).
 - Máy chủ thử vẫn chạy **v1.0.3**, **chưa có** các thay đổi trên — xem V1 trong `docs/trang-a-viec-con-lai.md` (triển khai
   chung cho mọi trang).
 - Dữ liệu nền dùng chung với trang A: `docs/trang-a-viec-con-lai.md` mục 2 (D1 — lực lượng, điểm sơ tán, xóm…), README 2.4
@@ -22,9 +22,9 @@ biến 48 giờ và thời gian xử lý cho lãnh đạo, tra cứu hồ sơ 7 
 **Không còn việc giao diện nào làm được mà không cần dữ liệu mới hoặc hệ thống bên ngoài.** Còn lại (mục 4): dữ liệu nền
 thật (CD1 — lực lượng, điểm sơ tán, mạng đường cho định tuyến an toàn, danh mục xóm cho bóc tách địa danh); nhận tin tự động
 từ Zalo OA / ứng dụng (CD2 — cổng có sẵn); gửi lệnh tới trưởng nhóm qua SMS / Zalo / thông báo đẩy (CD3); phương án phân bổ
-hộ dân tới điểm sơ tán (CD4); kích hoạt điểm nóng theo mưa cực ngắn (CD6 — cần nguồn radar, ngưỡng mưa gây sạt); hai việc
-chờ quyết định (CD5 — bóc tách bằng mô hình ngôn ngữ, CD8 — sắc Vàng / Cam của thang chung). Theo dõi GPS đội cứu hộ **không
-làm** theo quyết định ngày 29/09/2026 (CD7).
+hộ dân tới điểm sơ tán (CD4); kích hoạt điểm nóng theo mưa cực ngắn (CD6 — cần nguồn radar, ngưỡng mưa gây sạt); một việc
+chờ quyết định (CD5 — bóc tách bằng mô hình ngôn ngữ). Theo dõi GPS đội cứu hộ **không làm** theo quyết định ngày 29/09/2026
+(CD7). CD8 đã xong: chủ dự án đồng ý đổi Vàng của thang chung sang vàng chanh `#F7C800` (PR #75).
 
 ## 1. Đối chiếu với thiết kế mục D (rà ngày 15/10/2026, theo từng ý)
 
@@ -44,7 +44,7 @@ làm** theo quyết định ngày 29/09/2026 (CD7).
 | D.4 Tự kích hoạt từ trạm quan trắc: khoanh vùng đỏ, tạo phiếu "Nguy cơ sạt lở", đề xuất sơ tán | Đạt (theo cảm biến) — độ nghiêng / độ ẩm đất vượt BĐ II (số đo thật hoặc mô phỏng) → vùng nguy cơ bán kính 1 km (12 giờ; trạm mất tín hiệu thì giữ vùng), phiếu SOS nguồn "Cảm biến" cấp 1–2, bản nháp lệnh di dời chờ duyệt (Maker–Checker); vùng hiện trên bản đồ tác chiến. Mưa cực ngắn chưa là điều kiện kích hoạt (CD6) |
 | D.4 Theo dõi tiến độ di dời dân | Đạt — tiến độ theo xã (form 2 bước, số đã sơ tán bằng nút −/+), ô chỉ số "Sơ tán an toàn", dải khẩn |
 | D.4 Sức chứa điểm sơ tán, phân bổ hộ dân tới từng điểm để tránh quá tải | **Một phần** — số người / sức chứa từng điểm (đầy Đỏ, trên 85% Cam — dải khẩn, bản đồ, cổng công khai cùng thang); chưa có phương án phân bổ thôn → điểm (CD4) |
-| Chung: màu theo mức rủi ro, thống nhất | Đạt — Đỏ / Cam / Vàng theo mức ưu tiên ở thẻ, chip, bản đồ (cụm điểm theo phiếu khẩn nhất), biểu đồ; nút đỏ chỉ cho việc khẩn ("Điều phối" đổi sang nút xanh). Lưu ý sắc Vàng / Cam (CD8) |
+| Chung: màu theo mức rủi ro, thống nhất | Đạt — Đỏ / Cam / Vàng theo mức ưu tiên ở thẻ, chip, bản đồ (cụm điểm theo phiếu khẩn nhất), biểu đồ; nút đỏ chỉ cho việc khẩn ("Điều phối" đổi sang nút xanh). Vàng là vàng chanh `#F7C800` để tách rõ khỏi Cam (CD8, PR #75) |
 | Chung: thông tin khẩn trên cùng | Đạt — dải khẩn dính trên cùng khi cuộn (điện thoại 1 hàng); chạm mục → bảng đã lọc hoặc khối sơ tán |
 | Chung: thao tác chính dễ bấm | Đạt — mỗi thẻ phiếu một nút chính theo bước kế tiếp (Điều phối / Tiếp nhận / Đội đã đến / Đã an toàn); thanh dưới đáy điện thoại Chờ xử lý · Sơ tán · Báo SOS · Thực thi · Gọi 112; vùng chạm ≥ 44 px trên màn cảm ứng |
 | Chung: bảng có tìm, lọc, phân trang, Excel / PDF | Đạt — tìm không dấu, lọc mức / tình huống / loại sự cố / kênh kèm số phiếu, xếp, phân trang; Excel / PDF mọi phiếu đang lọc, **không kèm SĐT, nội dung tin của người dân**; bộ lọc, cách xem, kỳ tra cứu trên địa chỉ trang |
@@ -67,7 +67,7 @@ làm** theo quyết định ngày 29/09/2026 (CD7).
 | CD5 | Bóc tách tin bằng mô hình ngôn ngữ (LLM) | Quyết định + đánh giá chuyển dữ liệu | Chủ dự án, bộ phận pháp chế | Thấp |
 | CD6 | Kích hoạt điểm nóng theo **mưa cực ngắn** | Nguồn mưa dự báo cực ngắn + ngưỡng mưa gây sạt theo vùng | Đài KTTV (radar — cùng BD6 trang B), cơ quan địa chất | Trung bình |
 | CD7 | Theo dõi GPS đội cứu hộ | — | — | **Không làm** (quyết định 29/09/2026) |
-| CD8 | Sắc Vàng / Cam của thang rủi ro chung gần nhau trên biểu đồ | Quyết định (đổi màu ảnh hưởng toàn hệ thống) | Chủ dự án | Thấp |
+| CD8 | Sắc Vàng / Cam của thang rủi ro chung gần nhau trên biểu đồ | Quyết định (đổi màu ảnh hưởng toàn hệ thống) | Chủ dự án (đồng ý 15/10/2026) | **Đã làm** (PR #75) |
 
 ## 3. Việc giao diện đã làm
 
@@ -158,10 +158,24 @@ vị. Bản đồ tác chiến vẽ lộ trình đã giao và ETA; trạng thái
 
 ### CD8 — Sắc Vàng / Cam của thang chung
 
-Công cụ kiểm định màu cho thấy Vàng `#fab219` và Cam `#ec835a` cách nhau ΔE 13,6 — dưới ngưỡng 15 nên khó phân biệt kể cả
-với người nhìn màu bình thường; trên nền sáng, Vàng và Cam tương phản dưới 3:1. Trên biểu đồ cột chồng đã bù bằng số từng
-mức ở chú giải, khe hở giữa các phần, hộp chú thích. Muốn tách rõ hơn phải đổi sắc Cam / Vàng của **thang chung** (thẻ, chip,
-bản đồ, cổng công khai cùng đổi) — chờ chủ dự án quyết định, không tự đổi.
+**Đã làm (PR #75, chủ dự án đồng ý 15/10/2026).** Vàng cũ `#fab219` ngả hổ phách, cách Cam `#ec835a` chỉ ΔE 13,6 (OKLab
+×100, ngưỡng 15) — khó phân biệt Cấp 3 / Cấp 2 trên biểu đồ cột chồng, bản đồ. Ba màu Vàng – Cam – Đỏ nằm trong dải màu
+nóng hẹp: đẩy Cam đậm hơn (`#ea580c`) thì Vàng–Cam 20,3 nhưng Cam–Đỏ còn 8,9 (dễ nhầm Cấp 1 với Cấp 2 — tệ hơn). Nên chỉ đổi
+Vàng sang vàng chanh `#F7C800`, giữ Cam, Đỏ:
+
+| | Trước | Sau |
+|---|---|---|
+| Vàng–Cam, nhìn thường | 13,6 | **19,0** |
+| Vàng–Cam, mù màu đỏ–lục | 11,3 | **15,0** |
+| Cam–Đỏ | 15,7 | 15,7 |
+| Chữ đen trên chip Vàng | 11,4 : 1 | 13,2 : 1 |
+| Ô Vàng trên nền trắng | 1,8 : 1 | 1,6 : 1 |
+
+Đổi ở `--warn` (`src/index.css`) và `RISK[1].hex` (`src/utils/risk.js`) → chip, thẻ, bản đồ, biểu đồ, cổng công khai đổi
+theo. Màu Vàng không bao giờ đứng một mình trên nền trắng (chip có chữ đen, biểu tượng có viền trắng + bóng, biểu đồ có nhãn);
+chữ màu Vàng dùng sắc riêng `#A16207`. Kèm theo: nhãn vạch BĐ I–III trên biểu đồ mực nước, cảm biến dùng sắc chữ
+(`--*-text`) thay màu vạch (chữ vàng trên nền trắng trước đây chỉ 1,8 : 1). Trang bản nhẹ (`/ban-nhe`) có bảng màu riêng,
+không đổi.
 
 ## 5. Kiểm tra khi có dữ liệu thật
 
@@ -200,3 +214,4 @@ bản đồ, cổng công khai cùng đổi) — chờ chủ dự án quyết đ
 | #72 | Dải thông tin khẩn (`UrgentStrip`, dùng chung với trang C), 4 ô chỉ số chạm được; bảng điều phối 4 cột / thẻ chọn cột; thẻ phiếu một nút chính, quá hạn viền đỏ + nhãn nhấp nháy; danh sách bảng / thẻ, tìm không dấu, lọc kèm số phiếu, xếp, phân trang, Excel / PDF (không kèm SĐT, nội dung tin); trạng thái tải / lỗi / mất mạng; thang `occupancyLevel` cho điểm sơ tán; ui-test khối "Điều hành cứu hộ" |
 | #73 | Tiếp nhận 2 bước, cập nhật sơ tán 2 bước, sửa phiếu, huỷ lệnh — lỗi hiện ngay dưới ô; thanh dưới đáy điện thoại; nút ✕ hộp thoại, ô số −/+ 44 px trên màn cảm ứng; ui-test các form, thanh thao tác, tài khoản phường |
 | #74 | Bản đồ tác chiến (gom cụm theo phiếu khẩn nhất, lộ trình, vùng nguy cơ, điểm sơ tán, đội đếm ngược ETA), diễn biến 48 giờ, thời gian xử lý; tra cứu hồ sơ 7 / 30 ngày (API giới hạn 90 ngày); tài liệu này |
+| #75 | Thang rủi ro chung: Vàng `#fab219` → `#F7C800` (CD8) — áp cho mọi trang; nhãn vạch BĐ I–III dùng sắc chữ đủ tương phản |
