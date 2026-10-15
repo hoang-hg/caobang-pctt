@@ -5,7 +5,6 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useQuery } from '@tanstack/react-query';
-import AdminFilter from '../common/AdminFilter';
 import { api } from '../../api/client';
 import { useAreaQuery } from '../../api/hooks';
 import { useStore } from '../../app/store';
@@ -177,10 +176,6 @@ export default function Sidebar() {
                 >
                   <X size={18} />
                 </button>
-              </div>
-              {/* Header chỉ hiện bộ lọc từ 1024 px (lg) — dưới mức đó (cũng là lúc có nút ☰) bộ lọc nằm ở đây */}
-              <div className="mb-3 px-3 lg:hidden">
-                <AdminFilter />
               </div>
               {renderNavLinks(true)}
             </div>

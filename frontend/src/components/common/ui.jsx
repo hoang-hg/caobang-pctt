@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import clsx from 'clsx';
 import {
@@ -87,6 +87,7 @@ export function BackButton({ onClick, children = 'Quay lại Bản đồ', class
  * nút (footer) luôn thấy — trước đây thân cao tới 75vh cộng tiêu đề + nút vượt màn 740 px, nút chính nằm dưới mép. */
 export function Modal({ open, onClose, title, children, wide, footer }) {
   useEscapeToClose(open, onClose);
+  const titleId = useId(); // tiêu đề là tên hộp thoại cho trình đọc màn hình
   if (!open) return null;
   return createPortal(
     <div className="fixed inset-0 z-[1500] flex items-start justify-center overflow-y-auto bg-black/50 p-4 pt-12" onMouseDown={onClose}>
@@ -98,9 +99,10 @@ export function Modal({ open, onClose, title, children, wide, footer }) {
         onMouseDown={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
+        aria-labelledby={titleId}
       >
         <div className="flex shrink-0 items-center justify-between border-b border-line px-4 py-3">
-          <h3 className="font-semibold">{title}</h3>
+          <h3 id={titleId} className="font-semibold">{title}</h3>
           <button type="button" className="touch-hit rounded p-1 text-muted hover:bg-panel2" onClick={onClose} aria-label="Đóng">
             <X size={18} />
           </button>

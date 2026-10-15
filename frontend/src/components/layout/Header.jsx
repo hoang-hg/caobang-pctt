@@ -50,7 +50,7 @@ export default function Header() {
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-danger to-red-700 text-white shadow-sm shadow-danger/25">
           <ShieldAlert size={20} />
         </div>
-        <div className="hidden leading-tight md:block">
+        <div className="hidden leading-tight lg:block">
           <div className="text-sm font-bold tracking-tight text-ink flex items-center gap-1.5">
             BCH PCTT & TKCN Cao Bằng
             <span className="hidden xl:inline-block rounded bg-danger/10 px-1.5 py-0.5 text-[10px] font-semibold text-danger">TOC</span>
@@ -59,14 +59,14 @@ export default function Header() {
         </div>
       </Link>
 
-      {/* Bộ lọc địa phương: từ 1024 px (lg). Hẹp hơn — cùng mức có nút ☰ — bộ lọc nằm trong menu ngăn kéo (Sidebar), không
-          chen vào thanh này (trước đây tràn ngang 7–185 px ở 640–1024 px khi có nhãn "Bấm để bật chuông SOS") */}
-      <div className="hidden lg:block">
+      {/* Bộ lọc địa phương: ở MỌI cỡ màn (trước đây dưới 1024 px nằm trong menu ☰ — chạm 2 lần mới đổi được địa bàn). Dưới
+          1024 px nhãn gọn, co lại trước các nút khác; tên cơ quan chỉ hiện từ 1024 px để nhường chỗ */}
+      <div className="min-w-0 max-w-[14rem] flex-1 lg:max-w-none lg:flex-none">
         <AdminFilter />
       </div>
 
       {/* Tìm kiếm toàn diện */}
-      <div className="min-w-0 flex-1 max-w-sm">
+      <div className="hidden min-w-0 max-w-sm flex-1 md:block">
         <OmniSearch />
       </div>
 
@@ -87,10 +87,12 @@ export default function Header() {
           <span className="hidden font-semibold 2xl:inline">Cổng người dân</span>
         </Link>
 
-        {/* Trạng thái kết nối WebSocket Realtime */}
+        {/* Trạng thái kết nối WebSocket Realtime. Điện thoại (dưới 640 px): chỉ hiện khi đang nối lại / mất kết nối — lúc bình
+            thường nhường chỗ cho bộ lọc địa phương (tình trạng vẫn xem được trong menu tài khoản) */}
         <span
           className={clsx(
             'chip text-[11px] font-medium py-1 px-2.5 transition-colors',
+            wsStatus === 'online' && 'max-sm:hidden',
             wsStatus === 'online' ? 'bg-good/15 text-good border-good/30' : wsStatus === 'connecting' ? 'bg-warn/15 text-warn border-warn/30' : 'bg-danger/15 text-danger border-danger/30'
           )}
           title={`Kết nối thời gian thực: ${wsStatus === 'online' ? 'Đang hoạt động' : wsStatus === 'connecting' ? 'Đang kết nối lại' : 'Mất kết nối'}`}
@@ -113,9 +115,9 @@ export default function Header() {
           </button>
         )}
 
-        {/* Nút bật/tắt âm báo SOS */}
+        {/* Nút bật/tắt âm báo SOS — điện thoại: trong menu tài khoản (nhường chỗ cho bộ lọc địa phương) */}
         <button
-          className={clsx('btn-ghost touch-hit p-2 transition-colors', soundOn ? 'text-accent' : 'text-muted')}
+          className={clsx('btn-ghost touch-hit p-2 transition-colors max-sm:hidden', soundOn ? 'text-accent' : 'text-muted')}
           onClick={toggleSound}
           title={soundOn ? 'Âm báo SOS: BẬT (bấm để tắt)' : 'Âm báo SOS: TẮT (bấm để bật)'}
           aria-label="Bật tắt âm báo SOS"

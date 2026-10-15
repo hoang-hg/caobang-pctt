@@ -242,9 +242,18 @@ export function MapResize() {
   return null;
 }
 
+// Viền vùng đang xem: màu nhấn (xanh) của giao diện — KHÔNG dùng đỏ (Đỏ chỉ nghĩa là mức Khẩn cấp của thang rủi ro chung), viền
+// nền tương phản bên dưới để rõ trên nền sáng, tối, vệ tinh. Phủ mờ ngoài vùng theo chế độ: tối → phủ tối, sáng → phủ trắng
+// (phủ xanh đen trên nền sáng làm bản đồ nặng, khó đọc ngoài trời)
+const AREA_STYLE = {
+  dark: { line: '#3987e5', halo: '#0b1220', mask: '#0b1220', maskOn: 0.5, maskOff: 0.25 },
+  light: { line: '#2a78d6', halo: '#ffffff', mask: '#ffffff', maskOn: 0.6, maskOff: 0.3 },
+};
+
 /** `fly` = false: chỉ vẽ ranh giới / phủ mờ ngoài vùng, không bay tới vùng (nơi gọi tự đặt khung nhìn, VD vừa các phiếu SOS). */
 export function AreaFocus({ area, filtered, padding = {}, fly = true }) {
   const map = useMap();
+  const s = AREA_STYLE[useStore((st) => st.theme)] || AREA_STYLE.dark;
   useEffect(() => {
     if (!fly || !area?.bbox) return;
     const [x1, y1, x2, y2] = area.bbox;
@@ -265,8 +274,9 @@ export function AreaFocus({ area, filtered, padding = {}, fly = true }) {
   const world = [[-89, -179], [-89, 179], [89, 179], [89, -179]];
   return (
     <>
-      <Polygon positions={[world, ...rings]} pathOptions={{ stroke: false, fillColor: '#0b1220', fillOpacity: filtered ? 0.45 : 0.25 }} interactive={false} />
-      <Polygon positions={rings} pathOptions={{ color: '#ef4444', weight: 2, fill: false, dashArray: filtered ? undefined : '6 4' }} interactive={false} />
+      <Polygon positions={[world, ...rings]} pathOptions={{ stroke: false, fillColor: s.mask, fillOpacity: filtered ? s.maskOn : s.maskOff }} interactive={false} />
+      <Polygon positions={rings} pathOptions={{ color: s.halo, weight: 5, opacity: 0.7, fill: false }} interactive={false} />
+      <Polygon positions={rings} pathOptions={{ color: s.line, weight: 2.5, fill: false, dashArray: filtered ? undefined : '6 4' }} interactive={false} />
     </>
   );
 }

@@ -637,9 +637,9 @@ async function smallPhone(ctx) {
 }
 
 // ================================================================ Máy tính bảng / laptop nhỏ (640–1280 px)
-// Thanh trên cùng không tràn ngang (trước 10/2026 tràn 7–185 px ở 640–1024 px, ô tìm kiếm bị ép mất) và luôn mở được bộ
-// lọc xã/phường: từ 1024 px nằm trên thanh, hẹp hơn nằm trong menu ☰. Mở thẳng trang, không bấm gì trước → nhãn "Bấm để
-// bật chuông SOS" còn hiện (trường hợp chật nhất). Chỉ xem.
+// Thanh trên cùng không tràn ngang (trước 10/2026 tràn 7–185 px ở 640–1024 px, ô tìm kiếm bị ép mất) và bộ lọc xã/phường
+// luôn nằm trên thanh (trước đây dưới 1024 px nằm trong menu ☰). Mở thẳng trang, không bấm gì trước → nhãn "Bấm để bật
+// chuông SOS" còn hiện (trường hợp chật nhất). Chỉ xem.
 const TABLET = { name: 'Máy tính bảng', opts: { viewport: { width: 820, height: 1180 }, hasTouch: true }, mobile: false };
 async function tablet(ctx) {
   const { page } = ctx;
@@ -660,12 +660,14 @@ async function tablet(ctx) {
         return Math.max(document.documentElement.scrollWidth - window.innerWidth, header.scrollWidth - header.clientWidth);
       });
       if (px > 2) throw new Error(`thanh trên cùng tràn ngang ${px}px`);
-      const filter = page.locator('[title="Lọc dữ liệu theo địa phương"]');
-      if (await visible(filter).count()) return 'bộ lọc trên thanh trên cùng';
-      await page.getByRole('button', { name: /Mở danh mục điều hướng/ }).click();
-      await visible(filter).waitFor({ timeout: 5_000 });
-      await page.getByRole('button', { name: 'Đóng menu' }).first().click();
-      return 'bộ lọc trong menu ☰';
+      const filter = page.locator('header [title="Lọc dữ liệu theo địa phương"]');
+      if (!(await filter.isVisible())) throw new Error('không thấy bộ lọc xã/phường trên thanh trên cùng');
+      await filter.click();
+      const dlg = page.getByRole('dialog', { name: /Chọn địa bàn/ });
+      await dlg.waitFor({ timeout: 5_000 });
+      await page.keyboard.press('Escape');
+      await dlg.waitFor({ state: 'hidden', timeout: 5_000 });
+      return `bộ lọc trên thanh (${(await filter.innerText()).trim()})`;
     });
   }
 }
@@ -2427,6 +2429,102 @@ async function alertsWard(ctx) {
   });
 }
 
+// ================================================================ Bộ lọc địa phương (trang F)
+// Nút chọn địa bàn trên thanh trên cùng ở MỌI cỡ màn (trước đây dưới 1024 px nằm trong menu ☰); hộp chọn: không tràn, vùng
+// chạm ≥ 44 px (cảm ứng), tìm không dấu, báo không khớp, Esc đóng + trả con trỏ về nút; chọn phường → nhớ qua tải lại; Bản đồ
+// phủ mờ ngoài vùng, viền màu nhấn — không đỏ (Đỏ chỉ là mức Khẩn cấp); bỏ lọc về Toàn tỉnh. Chỉ ghi localStorage của trình
+// duyệt thử.
+const AREA_DEVICES = RESOURCE_DEVICES;
+const AREA_LINE = /^#(2a78d6|3987e5)$/i; // màu nhấn sáng / tối (AREA_STYLE trong MapTools.jsx)
+async function areaFilter(ctx) {
+  const { page, vp } = ctx;
+  const trig = page.locator('header button[title="Lọc dữ liệu theo địa phương"]');
+  const dlg = page.getByRole('dialog', { name: /Chọn địa bàn/ });
+  const search = dlg.getByPlaceholder('Tìm xã / phường trong tỉnh...');
+  await step(ctx, 'Bộ lọc địa phương: nút trên thanh trên cùng, hộp chọn không tràn, vùng chạm ≥ 44 px, tìm không dấu, báo không khớp, Esc đóng', async () => {
+    await loginAs(page, STAFF);
+    const touch = await page.evaluate(() => matchMedia('(pointer: coarse)').matches);
+    if (!(await trig.isVisible())) throw new Error('không thấy nút chọn địa bàn trên thanh trên cùng');
+    if (await trig.getAttribute('aria-expanded') !== 'false') throw new Error('nút chọn địa bàn thiếu aria-expanded');
+    await trig.click();
+    await dlg.getByRole('button', { name: /^Phường / }).first().waitFor({ timeout: 15_000 });
+    const n = await dlg.getByRole('button', { name: /^(Phường|Xã) / }).count();
+    if (n < 2) throw new Error(`hộp chọn chỉ có ${n} xã/phường`);
+    await expectNoOverflow(ctx, 'hộp chọn địa bàn', dlg);
+    if (touch) {
+      const bad = await dlg.evaluate((el) => [...el.querySelectorAll('button, input')].map((b) => {
+        const r = b.getBoundingClientRect();
+        let w = r.width;
+        let h = r.height;
+        const a = b.classList.contains('touch-hit') && getComputedStyle(b, '::after');
+        if (a && a.content !== 'none') { w = Math.max(w, parseFloat(a.width) || 0); h = Math.max(h, parseFloat(a.height) || 0); }
+        return { s: Math.round(Math.min(w, h)), t: (b.getAttribute('aria-label') || b.innerText || b.placeholder || '').slice(0, 24) };
+      }).filter((x) => x.s > 0 && x.s < 44));
+      if (bad.length) throw new Error(`${bad.length} vùng chạm < 44 px — ${bad.slice(0, 4).map((x) => `${x.t} ${x.s}px`).join(', ')}`);
+    }
+    await search.fill('thuc phan');
+    const hits = await dlg.getByRole('button', { name: /^(Phường|Xã) / }).allInnerTexts();
+    if (hits.length !== 1 || !/Thục Phán/.test(hits[0])) throw new Error(`tìm "thuc phan" ra ${JSON.stringify(hits)}`);
+    await search.fill('zzqqxx');
+    await dlg.getByText(/Không có xã\/phường nào khớp/).waitFor({ timeout: 3_000 });
+    await page.keyboard.press('Escape');
+    await dlg.waitFor({ state: 'hidden', timeout: 3_000 });
+    if (!(await trig.evaluate((el) => el === document.activeElement))) throw new Error('Esc đóng nhưng con trỏ không về nút chọn địa bàn');
+    return `${n} xã/phường · ${touch ? 'cảm ứng' : 'chuột'}`;
+  });
+
+  await step(ctx, 'Bộ lọc địa phương: chọn phường → nút đổi tên, nhớ qua tải lại; Bản đồ phủ mờ ngoài vùng, viền màu nhấn (không đỏ); bỏ lọc về Toàn tỉnh', async () => {
+    await trig.click();
+    await dlg.getByRole('button', { name: `Phường ${WARD.name}` }).click();
+    await dlg.waitFor({ state: 'hidden', timeout: 3_000 });
+    if (!(await trig.innerText()).includes(WARD.name)) throw new Error(`chọn xong nút ghi "${await trig.innerText()}"`);
+    await page.goto(`${ROOT}/ban-do`);
+    await page.locator('.leaflet-container').first().waitFor({ timeout: 20_000 });
+    if (!(await trig.innerText()).includes(WARD.name)) throw new Error('tải lại trang mất bộ lọc');
+    let strokes = [];
+    for (let i = 0; i < 20 && !strokes.some((c) => AREA_LINE.test(c)); i += 1) {
+      await page.waitForTimeout(500);
+      strokes = await page.evaluate(() => [...document.querySelectorAll('.leaflet-overlay-pane path[fill="none"]')].map((p) => p.getAttribute('stroke')));
+    }
+    if (!strokes.some((c) => AREA_LINE.test(c))) throw new Error(`không thấy viền vùng màu nhấn (${[...new Set(strokes)].slice(0, 4).join(', ')})`);
+    if (strokes.some((c) => /^#ef4444$/i.test(c))) throw new Error('viền vùng đang xem vẫn màu đỏ');
+    await trig.click();
+    await dlg.getByRole('button', { name: /Toàn tỉnh Cao Bằng/ }).click();
+    await dlg.waitFor({ state: 'hidden', timeout: 3_000 });
+    if (!/Toàn tỉnh/.test(await trig.innerText())) throw new Error(`bỏ lọc xong nút ghi "${await trig.innerText()}"`);
+    if (await page.evaluate(() => localStorage.getItem('pctt_filter'))) throw new Error('bỏ lọc nhưng vẫn nhớ bộ lọc cũ');
+  });
+
+  // Thẻ "Cấp xã" của Tổng quan tự chọn sẵn xã đầu tiên: chỉ trong phiên — tải lại sang trang khác phải về Toàn tỉnh, không để
+  // một xã người dùng không chọn bám theo mọi trang
+  await step(ctx, 'Bộ lọc địa phương: xã do thẻ "Cấp xã" tự chọn sẵn không được nhớ qua tải lại', async () => {
+    await page.goto(`${ROOT}/dashboard?tab=cap_xa`);
+    await page.waitForFunction(() => !/Toàn tỉnh/.test(document.querySelector('header button[title="Lọc dữ liệu theo địa phương"]')?.innerText || 'Toàn tỉnh'), null, { timeout: 15_000 });
+    const auto = (await trig.innerText()).trim();
+    await page.goto(`${ROOT}/cuu-ho`);
+    await waitMain(page);
+    if (!/Toàn tỉnh/.test(await trig.innerText())) throw new Error(`tải lại vẫn lọc "${(await trig.innerText()).trim()}" do thẻ Cấp xã tự chọn`);
+    return `tự chọn ${auto} → tải lại: Toàn tỉnh`;
+  });
+}
+
+/** Tài khoản phường: nút ghi tên phường của mình; hộp chọn chỉ có phường đó (phạm vi được giao). */
+async function areaFilterWard(ctx) {
+  const { page } = ctx;
+  await step(ctx, 'Bộ lọc địa phương — tài khoản phường: nút ghi tên phường, hộp chọn chỉ có phường được giao', async () => {
+    await loginAs(page, WARD);
+    const trig = page.locator('header button[title="Lọc dữ liệu theo địa phương"]');
+    await page.waitForFunction((name) => document.querySelector('header button[title="Lọc dữ liệu theo địa phương"]')?.innerText.includes(name), WARD.name, { timeout: 15_000 });
+    await trig.click();
+    const dlg = page.getByRole('dialog', { name: /Chọn địa bàn/ });
+    await dlg.getByRole('button', { name: /^(Phường|Xã) / }).first().waitFor({ timeout: 15_000 });
+    const units = await dlg.getByRole('button', { name: /^(Phường|Xã) / }).allInnerTexts();
+    if (units.length !== 1 || !units[0].includes(WARD.name)) throw new Error(`hộp chọn có ${JSON.stringify(units)}`);
+    await page.keyboard.press('Escape');
+    return (await trig.innerText()).trim();
+  });
+}
+
 // ================================================================
 console.log(`Kiểm thử giao diện: ${ROOT}${READONLY ? ' (chỉ xem)' : ''}`);
 const browser = await chromium.launch();
@@ -2498,6 +2596,21 @@ try {
       wctx.setDefaultTimeout(15_000);
       const wPage = await wctx.newPage();
       await rescueWard({ page: wPage, vp: vpD, problems: watch(wPage) });
+      await wctx.close();
+    }
+  }
+  for (const [label, opts, phone] of AREA_DEVICES) {
+    const fctx = await browser.newContext({ ...opts, locale: 'vi-VN' });
+    fctx.setDefaultTimeout(15_000);
+    const fPage = await fctx.newPage();
+    const vpF = { name: `Bộ lọc địa phương · ${label}`, mobile: phone };
+    await areaFilter({ page: fPage, vp: vpF, problems: watch(fPage) });
+    await fctx.close();
+    if (phone) {
+      const wctx = await browser.newContext({ ...opts, locale: 'vi-VN' });
+      wctx.setDefaultTimeout(15_000);
+      const wPage = await wctx.newPage();
+      await areaFilterWard({ page: wPage, vp: vpF, problems: watch(wPage) });
       await wctx.close();
     }
   }
