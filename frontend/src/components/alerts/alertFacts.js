@@ -207,6 +207,9 @@ const AUDIT_ACTION = {
   'evacuation.site_occupancy': ['cuu_ho', 'Cập nhật số người ở điểm sơ tán'],
   'incident.create': ['cuu_ho', 'Đánh dấu sự cố trên bản đồ'],
   'incident.close': ['cuu_ho', 'Đóng sự cố trên bản đồ'],
+  'event.create': ['canh_bao', 'Mở đợt thiên tai'],
+  'event.update': ['canh_bao', 'Sửa đợt thiên tai'],
+  'event.end': ['canh_bao', 'Kết thúc đợt thiên tai'],
   'report.approve': ['cuu_ho', 'Duyệt phản ánh của người dân'],
   'report.reject': ['cuu_ho', 'Từ chối phản ánh'],
   'report.resolve': ['cuu_ho', 'Đánh dấu phản ánh đã xử lý'],
@@ -247,7 +250,7 @@ export function auditAction(code) {
   const failed = /_failed$|\.failed$/.test(code || '') || code === 'auth.mfa_failed';
   if (hit) return { group: hit[0], label: hit[1], failed };
   const prefix = (code || '').split('.')[0];
-  const group = { broadcast: 'canh_bao', storm: 'canh_bao', forecast: 'canh_bao', sos: 'cuu_ho', dispatch: 'cuu_ho', report: 'cuu_ho', evacuation: 'cuu_ho', incident: 'cuu_ho', mission: 'cuu_ho', inventory: 'nguon_luc', vehicle: 'nguon_luc', fuel_depot: 'nguon_luc', reservoir: 'nguon_luc', data: 'du_lieu', integration: 'du_lieu', auth: 'tai_khoan', user: 'tai_khoan' }[prefix] || 'khac';
+  const group = { broadcast: 'canh_bao', storm: 'canh_bao', forecast: 'canh_bao', event: 'canh_bao', sos: 'cuu_ho', dispatch: 'cuu_ho', report: 'cuu_ho', evacuation: 'cuu_ho', incident: 'cuu_ho', mission: 'cuu_ho', inventory: 'nguon_luc', vehicle: 'nguon_luc', fuel_depot: 'nguon_luc', reservoir: 'nguon_luc', data: 'du_lieu', integration: 'du_lieu', auth: 'tai_khoan', user: 'tai_khoan' }[prefix] || 'khac';
   return { group, label: code, failed };
 }
 /** Chi tiết thao tác → một dòng đọc được ("lý do: sai PIN · kênh: SMS, Zalo"). */

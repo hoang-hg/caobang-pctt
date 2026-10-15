@@ -71,10 +71,10 @@ Kỹ thuật:
 | DB2 | **Khoá duy nhất số đo (trạm, thời điểm)** | Thiết bị gửi lại khi mất mạng, MQTT giao lại tin: 2 bản tin đến cùng lúc vẫn ghi trùng → mưa cộng dồn bị tính đôi | Chỉ mục duy nhất + `ON CONFLICT DO NOTHING` khi ghi | **Đã làm** (PR #85, migration 0021) |
 | DB3 | **Chỉ mục cho truy vấn vận hành** | Đủ nhanh với dữ liệu mẫu; khi phiếu, lệnh, nhật ký lên hàng vạn thì các truy vấn SLA, danh sách phiếu, vùng cảnh báo phải quét cả bảng | 6 chỉ mục (mục 4) | **Đã làm** (PR #85, migration 0021); đo lại bằng EXPLAIN khi thử tải (CF4 trang F, V2 trang A) |
 | DB4 | **Thời hạn lưu dữ liệu cá nhân** | Luật Bảo vệ dữ liệu cá nhân (hiệu lực 01/01/2026): họ tên, SĐT, tin nhắn, ảnh của người dân đang lưu vô thời hạn | Cột đánh dấu đã ẩn danh + việc định kỳ trong `retention.py` | **Đã làm cơ chế** (PR #87, migration 0023) — mặc định tắt, **chờ chủ dự án chốt thời hạn** |
-| DB5 | **Đợt thiên tai** | Báo cáo, rút kinh nghiệm theo từng đợt (thiết kế E.4); so sánh các đợt | Bảng `disaster_events` + cột `event_id` ở phiếu, lệnh, cảnh báo, vùng nguy hiểm | Trung bình |
+| DB5 | **Đợt thiên tai** | Báo cáo, rút kinh nghiệm theo từng đợt (thiết kế E.4); so sánh các đợt | Bảng `disaster_events` + cột `event_id` ở phiếu, lệnh, cảnh báo, vùng nguy hiểm | **Đã làm** (PR #89, migration 0025) — trang **Đợt thiên tai** (`/dot-thien-tai`), báo cáo Excel / PDF |
 | DB6 | **Thống kê thiệt hại** | Báo cáo thiệt hại theo mẫu nhà nước — hiện chưa có chỗ lưu | Bảng chỉ tiêu + bảng số liệu theo đợt × xã × chỉ tiêu | Trung bình — chờ BCH xác nhận mẫu |
-| DB7 | **Sổ xuất – nhập kho** | Chỉ có tồn hiện tại + nhật ký thao tác dạng JSON → không tổng hợp được "đã cấp bao nhiêu cho xã X trong đợt Y" | Bảng `inventory_moves` | **Đã làm** (PR #88, migration 0024) — chưa gắn đợt thiên tai (DB5) |
-| DB8 | **Lịch sử sơ tán** | `evacuation_progress` chỉ giữ số mới nhất → không vẽ được diễn biến sơ tán trong đợt | Bảng lịch sử, ghi bằng trigger (như vận hành hồ) | **Đã làm** (PR #88) — biểu đồ diễn biến làm cùng DB5 |
+| DB7 | **Sổ xuất – nhập kho** | Chỉ có tồn hiện tại + nhật ký thao tác dạng JSON → không tổng hợp được "đã cấp bao nhiêu cho xã X trong đợt Y" | Bảng `inventory_moves` | **Đã làm** (PR #88, migration 0024); gắn đợt thiên tai (PR #89) |
+| DB8 | **Lịch sử sơ tán** | `evacuation_progress` chỉ giữ số mới nhất → không vẽ được diễn biến sơ tán trong đợt | Bảng lịch sử, ghi bằng trigger (như vận hành hồ) | **Đã làm** (PR #88); biểu đồ diễn biến trong báo cáo đợt (PR #89) |
 | DB9 | **Toàn vẹn tham chiếu** | Phương tiện của lệnh điều động lưu dạng mảng (không khoá ngoại); người ra / huỷ lệnh lưu bằng họ tên (trùng tên, đổi tên) | Bảng nối; thêm khoá ngoại, mã người thao tác | **Đã làm** (PR #88) — trigger kiểm tra thay bảng nối |
 | DB10 | **Tổng hợp số đo theo giờ / ngày** | Biểu đồ dài ngày, báo cáo mưa ngày / mực nước cao nhất ngày đang tính lại từ số đo gốc (cả khúc đã nén) | Continuous aggregate giờ + ngày | Trung bình — khi có số liệu thật |
 | DB11 | **Định tuyến với mạng đường thật** | Thuật toán viết bằng Python, tải cả đồ thị mỗi lần — ổn với 74 đoạn mẫu, chậm khi nhập mạng đường cả tỉnh | Bật pgRouting (có sẵn trong ảnh) | Trung bình — khi có mạng đường (D3 trang A) |
@@ -201,7 +201,36 @@ Bảng lớn tạo bằng `CREATE INDEX CONCURRENTLY` (migration chạy ngoài g
   - biến cấu hình `PII_RETENTION_DAYS` (0 = giữ mãi, như các thời hạn khác).
 - **Cần quyết định:** N do chủ dự án / bộ phận pháp chế chốt (cùng hồ sơ đánh giá tác động xử lý dữ liệu cá nhân).
 
-### DB5 — Đợt thiên tai
+### DB5 — Đợt thiên tai — đã làm (PR #89)
+
+- Migration `0025`: bảng `operations.disaster_events` (mã `DT-<năm>-<số thứ tự>`, tên, loại thiên tai, giờ bắt đầu /
+  kết thúc, vùng ảnh hưởng `admin_codes` — rỗng = toàn tỉnh, ghi chú mở / kết thúc, người mở / kết thúc); cột `event_id`
+  (khoá ngoại, chỉ mục riêng phần có giá trị) ở **5 bảng**: phiếu SOS, lệnh điều động, lệnh cảnh báo, vùng nguy hiểm và dòng
+  sổ kho (DB7).
+- **Gắn tự động bằng trigger** (`operations.assign_event`, trước khi ghi): bản ghi tạo trong lúc có đợt đang mở ở xã thuộc
+  vùng ảnh hưởng nhận mã đợt — mọi nơi tạo (API, cổng nhận tin Zalo / ứng dụng, cảm biến tự động, nhập tệp, bộ mô phỏng)
+  không phải tự gắn. Phiếu theo xã của phiếu; lệnh điều động theo đợt của phiếu; lệnh cảnh báo theo các xã nhận tin; vùng
+  nguy hiểm theo xã; dòng sổ kho kèm lệnh điều động / hoàn trả khi huỷ lệnh theo đợt của lệnh (kho ở xã khác vẫn tính; lệnh
+  ngoài đợt → dòng ngoài đợt, xuất và hoàn trả luôn cùng đợt), dòng khác theo xã của kho. Trùng nhiều đợt → đợt bắt đầu muộn
+  nhất.
+- **Gắn bù**: mở đợt "đã bắt đầu từ…" (lùi tối đa 30 ngày) hoặc thêm xã vào vùng → API gắn các bản ghi đã có từ giờ bắt đầu
+  (không lấy bản ghi đã thuộc đợt khác). **Gỡ ra**: bỏ xã khỏi vùng hoặc kết thúc lùi giờ (quên kết thúc đúng lúc) → bản ghi
+  ngoài vùng / sau giờ kết thúc gỡ khỏi đợt (sang đợt khác nếu khớp) — báo cáo luôn đúng "vùng ảnh hưởng × từ lúc bắt đầu tới
+  lúc kết thúc". Kết thúc đợt → bản ghi mới không gắn nữa.
+- API `/api/v1/events`: danh sách (đang diễn ra lên đầu, kèm số phiếu / người được cứu / cảnh báo), mở, sửa tên – vùng –
+  ghi chú, kết thúc, **báo cáo** `GET /events/{mã}/summary`: phiếu SOS (tổng, còn mở, mắc kẹt, đã cứu, tiếp nhận trung vị,
+  theo loại / ngày / xã), lệnh điều động, lệnh cảnh báo, vùng nguy hiểm, vật tư (đã xuất · hoàn trả · nhập thêm — từ sổ kho),
+  sơ tán cao nhất theo xã và **diễn biến sơ tán** theo mốc giờ (từ lịch sử sơ tán, DB8). Số liệu theo phạm vi được giao + bộ
+  lọc địa bàn; đợt chỉ ở xã khác → không thấy (404).
+- Quyền: xem — `monitoring.view` (mọi tài khoản); mở / sửa / kết thúc — quyền mới `event.manage` (cấp tỉnh). Mọi thao tác
+  ghi nhật ký pháp lý (`event.create` / `update` / `end`) và Diễn biến.
+- Giao diện: trang **Đợt thiên tai** (`/dot-thien-tai`, menu trái) — máy tính: danh sách bên trái, báo cáo bên phải; dưới
+  1024 px: danh sách → chạm mở báo cáo. Báo cáo: 6 ô chỉ số, phiếu SOS theo ngày (theo cấp, thang màu chung), diễn biến sơ
+  tán, 5 bảng; Excel nhiều trang tính, PDF. Form mở đợt 2 bước (lỗi ngay dưới ô), kết thúc đợt bằng chip lý do.
+- Khác phác thảo: thêm `inventory_moves.event_id` (DB7), `end_note` / `ended_by`; **chưa** gắn / gỡ tay từng phiếu (chưa
+  cần — giờ bắt đầu + vùng ảnh hưởng đủ dùng; khi cần thì thêm thao tác "chuyển sang đợt khác" trên phiếu). Thiệt hại theo đợt:
+  DB6. Phần dưới giữ lại để tra cứu.
+
 
 ```sql
 CREATE TABLE operations.disaster_events (
@@ -221,7 +250,7 @@ ALTER TABLE operations.sos_tickets ADD COLUMN event_id uuid REFERENCES operation
 
 - Gán tự động: phiếu / lệnh / cảnh báo tạo trong lúc có đợt đang mở (chưa `ended_at`) ở xã thuộc vùng ảnh hưởng → nhận
   `event_id`; trực ban sửa được.
-- Giao diện (sau): mở / đóng đợt, lọc báo cáo, Excel / PDF theo đợt.
+- Giao diện: mở / đóng đợt, lọc báo cáo, Excel / PDF theo đợt.
 
 ### DB6 — Thống kê thiệt hại
 
@@ -258,8 +287,9 @@ CREATE TABLE operations.damage_reports (
 - API `GET /resources/inventory-moves` (theo phạm vi được giao, tối đa 5.000 dòng); giao diện: khối **Sổ xuất – nhập kho**
   ở thẻ Kho vật tư (7 / 30 / 90 ngày, lọc kho / lý do / mặt hàng, tìm không dấu, phân trang, Excel / PDF; nút trên thẻ
   kho mở sẵn đúng kho).
-- Khác phác thảo: `to_admin_unit_id` (xã nhận) chưa có — nơi nhận khi xuất kho đang là chữ tự do (ghi chú); `event_id`
-  thêm cùng DB5. Phần dưới giữ lại để tra cứu.
+- Khác phác thảo: `to_admin_unit_id` (xã nhận) chưa có — nơi nhận khi xuất kho đang là chữ tự do (ghi chú). `event_id` đã
+  thêm (DB5, PR #89): dòng kèm lệnh điều động / hoàn trả theo đợt của lệnh, dòng khác theo xã của kho. Phần dưới giữ lại để
+  tra cứu.
 
 
 ```sql
@@ -287,7 +317,8 @@ CREATE INDEX ON resources.inventory_moves (warehouse_id, time DESC);
 
 - Bảng `operations.evacuation_history` + trigger trên `evacuation_progress` (chỉ ghi khi số liệu đổi, kèm người cập nhật);
   số hiện có làm điểm đầu. API `GET /evacuation/{code}/history?hours=` (theo phạm vi; xã ngoài phạm vi → 404).
-- Biểu đồ diễn biến sơ tán: làm cùng DB5 (theo đợt). Phần dưới giữ lại để tra cứu.
+- Biểu đồ diễn biến sơ tán: trong báo cáo đợt (DB5, PR #89) — tổng số hộ đã sơ tán của các xã theo mốc giờ so với kế hoạch;
+  xã không cập nhật trong đợt tính số đang ghi lúc bắt đầu đợt. Phần dưới giữ lại để tra cứu.
 
 
 ```sql
@@ -373,7 +404,8 @@ SELECT add_continuous_aggregate_policy('iot_telemetry.readings_hourly',
 2. **DB1** — sửa cả cấu hình triển khai (`docker-compose.prod.yml`, `.env.production`, `golive.py`); thử trên stack giống bản
    chạy thật (job Production của CI).
 3. **DB4** — sau khi chủ dự án chốt thời hạn lưu.
-4. **DB5 + DB7 + DB8** — cùng một đợt (cùng dùng `event_id`), kèm giao diện mở / đóng đợt và báo cáo theo đợt.
+4. **DB5 + DB7 + DB8** — cùng một đợt (cùng dùng `event_id`), kèm giao diện mở / đóng đợt và báo cáo theo đợt. **Xong**
+   (PR #88, #89).
 5. **DB6** — khi BCH xác nhận mẫu thống kê thiệt hại.
 6. **DB9** — gộp vào đợt 4 (cùng sửa luồng điều động).
 7. **DB10, DB11** — khi có số liệu / mạng đường thật (cùng đợt thử tải).

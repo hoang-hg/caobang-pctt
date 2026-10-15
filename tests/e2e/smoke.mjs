@@ -152,8 +152,13 @@ check('Nhật ký pháp lý ghi nhận', audit.some((a) => a.action === 'broadca
     `${moves[0]?.quantity_after} vs ${it.quantity + 1}`);
   const ward = await login('admin.thucphan', 'adminthucphan123');
   const wardMoves = (await call('GET', '/resources/inventory-moves?limit=500', null, ward)).data;
+  // Không chỉ "mọi dòng thuộc phường" (đúng hiển nhiên khi phường chưa có dòng nào): các dòng vừa ghi ở kho thử phải hiện với
+  // phường khi và chỉ khi kho thử nằm trong phường
+  const testIds = new Set(moves.map((m) => m.id));
+  const wardSeesTest = wardMoves.some((m) => testIds.has(m.id));
   check('Sổ kho theo phạm vi: tài khoản phường chỉ thấy kho trong phường', Array.isArray(wardMoves)
-    && wardMoves.every((m) => m.admin_code === 'CB-THUCPHAN'), `${wardMoves.length} dòng`);
+    && wardMoves.every((m) => m.admin_code === 'CB-THUCPHAN') && wardSeesTest === (wh.admin_code === 'CB-THUCPHAN'),
+    `${wardMoves.length} dòng; kho thử ở ${wh.admin_code} — phường ${wardSeesTest ? 'thấy' : 'không thấy'} dòng vừa ghi`);
   check('Sổ kho: quá 5.000 dòng một lần → 422', (await call('GET', '/resources/inventory-moves?limit=100000', null, maker)).status === 422);
 
   const evac = (await call('GET', '/evacuation', null, maker)).data.progress;
@@ -169,6 +174,110 @@ check('Nhật ký pháp lý ghi nhận', audit.some((a) => a.action === 'broadca
   const other = evac.find((e) => e.code !== 'CB-THUCPHAN');
   check('Lịch sử sơ tán theo phạm vi: tài khoản phường hỏi xã khác → 404',
     (await call('GET', `/evacuation/${other.code}/history`, null, ward)).status === 404);
+}
+
+// Đợt thiên tai (DB5 — migration 0025): mở đợt với giờ bắt đầu trong quá khứ → gắn bù phiếu đã có trong vùng; phiếu mới trong
+// vùng tự gắn, ngoài vùng không; lệnh điều động + vật tư kèm lệnh theo đợt của phiếu; kết thúc → phiếu mới không gắn nữa. Báo
+// cáo theo phạm vi; mở / kết thúc chỉ quyền event.manage. Toạ độ: phường Thục Phán (trong vùng), Bảo Lạc (ngoài vùng).
+{
+  const IN = { lat: 22.668, lon: 106.257 };
+  const OUT = { lat: 22.95, lon: 105.672 };
+  const sosAt = async (pt, text) => (await call('POST', '/sos', { raw_message: text, ...pt, incident_type: 'ngap_lut', source: 'CAN_BO' }, maker)).data;
+  const ticketOf = async (id) => (await call('GET', '/sos?hours=2', null, maker)).data.find((t) => t.id === id);
+  const early = await sosAt(IN, 'Thử đợt thiên tai: ngập trước khi mở đợt');
+  const area = early.admin_code;
+  const ward = await login('admin.thucphan', 'adminthucphan123');
+  check('Mở đợt: tài khoản phường không có quyền → 403',
+    (await call('POST', '/events', { name: 'Đợt thử của phường', hazard: 'lu_lut' }, ward)).status === 403);
+  const future = new Date(Date.now() + 3600e3).toISOString();
+  check('Mở đợt: loại thiên tai sai / giờ bắt đầu ở tương lai / xã không có → 422',
+    (await call('POST', '/events', { name: 'Đợt thử', hazard: 'dong_dat' }, maker)).status === 422
+    && (await call('POST', '/events', { name: 'Đợt thử', hazard: 'lu_lut', started_at: future }, maker)).status === 422
+    && (await call('POST', '/events', { name: 'Đợt thử', hazard: 'lu_lut', admin_codes: ['CB-KHONG-CO'] }, maker)).status === 422);
+  const ev = await call('POST', '/events', {
+    name: 'Thử: mưa lũ (kiểm thử tự động)', hazard: 'lu_lut', started_at: new Date(Date.now() - 10 * 60e3).toISOString(),
+    admin_codes: [area], note: 'smoke',
+  }, maker);
+  const code = ev.data?.code;
+  check('Mở đợt thiên tai bắt đầu 10 phút trước → gắn bù phiếu đã có trong vùng',
+    ev.status === 201 && /^DT-\d{4}-\d{3}$/.test(code) && (await ticketOf(early.id))?.event_code === code,
+    `${code} · ${JSON.stringify(ev.data?.attached)}`);
+  const inside = await sosAt(IN, 'Thử đợt thiên tai: ngập sau khi mở đợt');
+  const outside = await sosAt(OUT, 'Thử đợt thiên tai: ngoài vùng');
+  check('Phiếu mới trong vùng tự gắn đợt; phiếu ngoài vùng không', inside.event_code === code && !outside.event_code,
+    `${inside.event_code} / ${outside.event_code}`);
+
+  // Sửa vùng ảnh hưởng: đổi sang xã khác → phiếu của phường cũ gỡ ra, phiếu của xã mới (trong khung giờ) gắn bù; đổi lại → như cũ
+  const codesOf = async () => (await Promise.all([early, inside, outside].map((t) => ticketOf(t.id)))).map((t) => t?.event_code || null);
+  const sw = await call('PATCH', `/events/${code}`, { admin_codes: [outside.admin_code] }, maker);
+  const swapped = await codesOf();
+  const back = await call('PATCH', `/events/${code}`, { admin_codes: [area] }, maker);
+  const restored = await codesOf();
+  check('Sửa vùng ảnh hưởng: xã bỏ ra → gỡ phiếu, xã thêm vào → gắn bù; đổi lại → như cũ',
+    sw.status === 200 && sw.data.detached?.sos >= 2 && sw.data.attached?.sos >= 1
+    && JSON.stringify(swapped) === JSON.stringify([null, null, code])
+    && back.status === 200 && JSON.stringify(restored) === JSON.stringify([code, code, null]),
+    `gỡ ${JSON.stringify(sw.data?.detached)} · gắn ${JSON.stringify(sw.data?.attached)} · ${JSON.stringify(swapped)} → ${JSON.stringify(restored)}`);
+
+  // Sơ tán trong đợt (lịch sử sơ tán): cập nhật số của phường trong vùng → diễn biến có điểm cuối ≥ số vừa ghi (bộ mô phỏng
+  // có thể cộng thêm ngay sau), bảng "sơ tán cao nhất" có phường
+  const evA = (await call('GET', '/evacuation', null, maker)).data.progress.find((e) => e.code === area);
+  const putA = await call('PUT', `/evacuation/${area}`, {
+    planned_households: evA.planned_households, evacuated_households: Math.min(evA.planned_households, evA.evacuated_households + 1),
+    planned_persons: evA.planned_persons, evacuated_persons: Math.min(evA.planned_persons, evA.evacuated_persons + 1),
+  }, maker);
+  const sumE = (await call('GET', `/events/${code}/summary`, null, maker)).data;
+  const lastPt = sumE.evacuation_timeline?.at(-1);
+  const rowE = sumE.evacuation?.find((r) => r.code === area);
+  check('Sơ tán trong đợt: diễn biến có điểm cuối theo số vừa cập nhật, bảng sơ tán cao nhất có phường',
+    putA.status === 200 && lastPt?.households >= putA.data.evacuated_households
+    && (!putA.data.evacuated_households || rowE?.peak_households >= putA.data.evacuated_households),
+    `${sumE.evacuation_timeline?.length} điểm · cuối ${lastPt?.households} hộ · cao nhất ${rowE?.peak_households} / ${putA.data?.evacuated_households}`);
+
+  // Lệnh điều động kèm vật tư → lệnh và dòng sổ kho theo đợt của phiếu (dù kho ở xã khác); huỷ trả lại
+  const SIMULATED = ['MI_TOM', 'NUOC_CHAI', 'LUONG_KHO', 'AO_PHAO', 'TUI_SO_CUU'];
+  const whs = (await call('GET', '/resources/warehouses', null, maker)).data;
+  const wh = whs.find((w) => w.items.some((i) => i.quantity >= 10 && !SIMULATED.includes(i.item_code)));
+  const it = wh.items.find((i) => i.quantity >= 10 && !SIMULATED.includes(i.item_code));
+  const m3 = (await call('GET', `/sos/${inside.id}/match`, null, maker)).data;
+  const d3 = await call('POST', '/dispatch', {
+    ticket_id: inside.id, force_id: m3.forces[0].id, personnel: 1, warehouse_id: wh.id, supplies: { [it.item_code]: 1 },
+  }, maker);
+  const sum = (await call('GET', `/events/${code}/summary`, null, maker)).data;
+  const sup = sum.supplies?.find((s) => s.item_code === it.item_code);
+  check('Báo cáo theo đợt: phiếu, lệnh điều động, vật tư kèm lệnh đều tính vào đợt',
+    d3.status === 200 && sum.sos.total >= 2 && sum.dispatch.orders >= 1 && sup?.issued >= 1,
+    `${sum.sos.total} phiếu, ${sum.dispatch.orders} lệnh, ${it.item_code} xuất ${sup?.issued}`);
+  await call('POST', `/dispatch/${d3.data.order.id}/cancel`, { reason: 'Thử đợt thiên tai: hoàn trả', return_supplies: true }, maker);
+  const sup2 = (await call('GET', `/events/${code}/summary`, null, maker)).data.supplies?.find((s) => s.item_code === it.item_code);
+  check('Huỷ lệnh, trả vật tư → dòng hoàn trả cũng theo đợt (kho ở xã khác vẫn tính)',
+    sup2?.returned >= 1 && sup2.returned === sup2.issued, `xuất ${sup2?.issued} · hoàn trả ${sup2?.returned}`);
+
+  // Phạm vi: đợt ở Bảo Lạc — tài khoản phường Thục Phán không thấy, hỏi báo cáo → 404; đợt Thục Phán thì thấy
+  const evOut = await call('POST', '/events', { name: 'Thử: sạt lở Bảo Lạc (kiểm thử)', hazard: 'sat_lo', admin_codes: [outside.admin_code] }, maker);
+  const wardList = (await call('GET', '/events', null, ward)).data;
+  check('Đợt theo phạm vi: phường thấy đợt của mình, không thấy đợt xã khác (báo cáo → 404)',
+    wardList.some((e) => e.code === code) && !wardList.some((e) => e.code === evOut.data.code)
+    && (await call('GET', `/events/${evOut.data.code}/summary`, null, ward)).status === 404, `${wardList.length} đợt`);
+
+  // Kết thúc lùi giờ (quên kết thúc đúng lúc) tới trước lúc nhận phiếu "inside" → phiếu đó, lệnh điều động và vật tư kèm lệnh
+  // (xuất + hoàn trả) gỡ khỏi đợt; phiếu nhận trước giờ kết thúc vẫn thuộc đợt. Kiểm từng bản ghi, không so tổng: bộ mô phỏng
+  // (CI) có thể tạo thêm phiếu trong phường lúc đang chạy
+  // Giờ kết thúc: giữa lúc nhận "early" và "inside" (2 phiếu chỉ cách nhau chưa tới 1 giây)
+  const endAt = new Date((Date.parse(early.received_at) + Date.parse(inside.received_at)) / 2).toISOString();
+  const end = await call('POST', `/events/${code}/end`, { end_note: 'Nước rút (kiểm thử)', ended_at: endAt }, maker);
+  const sumEnd = (await call('GET', `/events/${code}/summary`, null, maker)).data;
+  const supEnd = sumEnd.supplies.find((s) => s.item_code === it.item_code) || { issued: 0, returned: 0 };
+  check('Kết thúc lùi giờ → phiếu nhận sau giờ kết thúc, lệnh, vật tư kèm lệnh gỡ khỏi đợt; phiếu trước đó vẫn thuộc đợt',
+    end.status === 200 && end.data.detached?.sos >= 1 && end.data.detached.dispatch >= 1 && end.data.detached.supplies >= 2
+    && !(await ticketOf(inside.id))?.event_code && (await ticketOf(early.id))?.event_code === code
+    && supEnd.issued === sup2.issued - 1 && supEnd.returned === sup2.returned - 1,
+    `gỡ ${JSON.stringify(end.data?.detached)} · ${it.item_code} xuất ${sup2.issued}→${supEnd.issued}, hoàn trả ${sup2.returned}→${supEnd.returned}`);
+  const after = await sosAt(IN, 'Thử đợt thiên tai: sau khi kết thúc đợt');
+  check('Kết thúc đợt → phiếu mới không gắn nữa; kết thúc lần 2 → 409',
+    end.status === 200 && end.data.ended_at && !after.event_code
+    && (await call('POST', `/events/${code}/end`, {}, maker)).status === 409, after.event_code || 'không gắn');
+  await call('POST', `/events/${evOut.data.code}/end`, { end_note: 'Kiểm thử xong' }, maker);
 }
 
 // Mưa bình quân lưu vực (Phân hệ A): theo diện tích đa giác Thiessen — KPI 24h, biểu đồ mưa giờ, cổng công khai cùng một số

@@ -15,6 +15,7 @@ from app.api.v1 import (
     auth,
     dashboard,
     data_import,
+    events,
     forecast,
     ingest,
     integrations,
@@ -116,6 +117,7 @@ for r in (
     reports,
     data_import,
     mission,
+    events,
 ):
     app.include_router(r.router, prefix="/api/v1")
 

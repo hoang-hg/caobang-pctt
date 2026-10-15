@@ -30,6 +30,7 @@ class Resource(StrEnum):
     DATA = "data"  # nhập dữ liệu chính thức từ tệp
     EVACUATION = "evacuation"  # kế hoạch và tiến độ sơ tán nhân dân theo xã
     INCIDENT = "incident"  # điểm sự cố (sạt lở, giao thông, hạ tầng) cán bộ đánh dấu trên bản đồ
+    EVENT = "event"  # đợt thiên tai (gom phiếu SOS, lệnh, cảnh báo, vật tư theo đợt để báo cáo)
 
 
 class Action(StrEnum):
@@ -81,6 +82,12 @@ ALL_PERMISSIONS: Final[tuple[Permission, ...]] = (
         "Đánh dấu / kết thúc điểm sự cố (sạt lở, giao thông, hạ tầng) trên bản đồ — hiện ngay trên cổng công khai",
     ),
     Permission(R.DISPATCH, A.CREATE, True, "Phát lệnh điều động lực lượng"),
+    Permission(
+        R.EVENT,
+        A.MANAGE,
+        False,
+        "Mở / kết thúc đợt thiên tai, sửa vùng ảnh hưởng (phiếu SOS, lệnh, cảnh báo, vật tư tự gắn theo đợt để báo cáo)",
+    ),
     Permission(R.RESOURCE, A.VIEW, True, "Xem lực lượng, kho, phương tiện, điểm sơ tán"),
     Permission(R.INVENTORY, A.ISSUE, True, "Ra lệnh xuất kho"),
     Permission(

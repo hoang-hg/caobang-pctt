@@ -57,7 +57,7 @@ TICKET_SELECT = """
 SELECT t.id, t.code, t.reporter_name, t.reporter_phone, t.source, t.raw_message, t.address,
        t.incident_type, t.priority, t.status, t.trapped_count, t.vulnerable, t.received_at, t.acknowledged_at,
        t.resolved_at, t.status_changed_at, t.notes, ST_Y(t.location) AS lat, ST_X(t.location) AS lon,
-       u.code AS admin_code, u.name AS admin_name,
+       u.code AS admin_code, u.name AS admin_name, ev.code AS event_code, ev.name AS event_name,
        d.id AS dispatch_id, d.status AS dispatch_status, d.eta, d.progress, d.distance_km, d.route_safe,
        d.dispatched_at, d.arrived_at,
        f.name AS force_name, f.contact_phone AS force_phone, f.id AS force_id,
@@ -66,6 +66,7 @@ SELECT t.id, t.code, t.reporter_name, t.reporter_phone, t.source, t.raw_message,
        fr.created_at AS field_at
   FROM operations.sos_tickets t
   LEFT JOIN spatial_admin.administrative_units u ON u.id = t.admin_unit_id
+  LEFT JOIN operations.disaster_events ev ON ev.id = t.event_id  -- đợt thiên tai (DB5, migration 0025)
   LEFT JOIN LATERAL (SELECT * FROM operations.dispatch_orders o WHERE o.ticket_id = t.id AND o.status <> 'huy'
                       ORDER BY o.dispatched_at DESC LIMIT 1) d ON TRUE
   LEFT JOIN resources.forces f ON f.id = d.force_id
