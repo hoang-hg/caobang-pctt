@@ -70,7 +70,7 @@ Kỹ thuật:
 | DB1 | **Tách vai trò CSDL; nhật ký pháp lý chỉ ghi thêm** | Ứng dụng kết nối bằng tài khoản quản trị CSDL (superuser), có quyền sửa / xoá / làm rỗng `audit_logs` → nhật ký pháp lý (thiết kế E.4) sửa được; hồ sơ an toàn thông tin cấp độ 3 cần phân quyền tối thiểu | Vai trò ứng dụng riêng (không superuser); thu hồi UPDATE / DELETE / TRUNCATE trên 2 bảng nhật ký; trigger chặn sửa / xoá | **Một phần** — trigger đã làm (PR #86, migration 0022); tài khoản ứng dụng riêng: **Cao**, trước vận hành |
 | DB2 | **Khoá duy nhất số đo (trạm, thời điểm)** | Thiết bị gửi lại khi mất mạng, MQTT giao lại tin: 2 bản tin đến cùng lúc vẫn ghi trùng → mưa cộng dồn bị tính đôi | Chỉ mục duy nhất + `ON CONFLICT DO NOTHING` khi ghi | **Đã làm** (PR #85, migration 0021) |
 | DB3 | **Chỉ mục cho truy vấn vận hành** | Đủ nhanh với dữ liệu mẫu; khi phiếu, lệnh, nhật ký lên hàng vạn thì các truy vấn SLA, danh sách phiếu, vùng cảnh báo phải quét cả bảng | 6 chỉ mục (mục 4) | **Đã làm** (PR #85, migration 0021); đo lại bằng EXPLAIN khi thử tải (CF4 trang F, V2 trang A) |
-| DB4 | **Thời hạn lưu dữ liệu cá nhân** | Luật Bảo vệ dữ liệu cá nhân (hiệu lực 01/01/2026): họ tên, SĐT, tin nhắn, ảnh của người dân đang lưu vô thời hạn | Cột đánh dấu đã ẩn danh + việc định kỳ trong `retention.py` | **Cao** — chờ chủ dự án chốt thời hạn |
+| DB4 | **Thời hạn lưu dữ liệu cá nhân** | Luật Bảo vệ dữ liệu cá nhân (hiệu lực 01/01/2026): họ tên, SĐT, tin nhắn, ảnh của người dân đang lưu vô thời hạn | Cột đánh dấu đã ẩn danh + việc định kỳ trong `retention.py` | **Đã làm cơ chế** (PR #87, migration 0023) — mặc định tắt, **chờ chủ dự án chốt thời hạn** |
 | DB5 | **Đợt thiên tai** | Báo cáo, rút kinh nghiệm theo từng đợt (thiết kế E.4); so sánh các đợt | Bảng `disaster_events` + cột `event_id` ở phiếu, lệnh, cảnh báo, vùng nguy hiểm | Trung bình |
 | DB6 | **Thống kê thiệt hại** | Báo cáo thiệt hại theo mẫu nhà nước — hiện chưa có chỗ lưu | Bảng chỉ tiêu + bảng số liệu theo đợt × xã × chỉ tiêu | Trung bình — chờ BCH xác nhận mẫu |
 | DB7 | **Sổ xuất – nhập kho** | Chỉ có tồn hiện tại + nhật ký thao tác dạng JSON → không tổng hợp được "đã cấp bao nhiêu cho xã X trong đợt Y" | Bảng `inventory_moves` | Trung bình |
@@ -174,7 +174,21 @@ ON CONFLICT (station_id, time) DO NOTHING RETURNING time;   -- không trả dòn
 Bảng lớn tạo bằng `CREATE INDEX CONCURRENTLY` (migration chạy ngoài giao dịch). Đo trước / sau bằng `EXPLAIN ANALYZE` trong
 đợt thử tải.
 
-### DB4 — Thời hạn lưu dữ liệu cá nhân
+### DB4 — Thời hạn lưu dữ liệu cá nhân — đã làm cơ chế (PR #87), chờ chốt thời hạn
+
+- Migration `0023`: cột `pii_cleared_at` cho `sos_tickets`, `citizen_reports`, `call_logs` + chỉ mục bản ghi đến hạn.
+- `services/retention.py: clear_old_pii` — worker chạy mỗi giờ cùng việc dọn nhật ký, theo `PII_RETENTION_DAYS`
+  (**mặc định 0 = giữ mãi**):
+  - phiếu SOS đã xong: ẩn họ tên, SĐT, tin gốc, địa chỉ;
+  - phản ánh đã qua duyệt (đã duyệt / từ chối / đã xử lý): ẩn họ tên, SĐT, nội dung gốc (thay bằng dòng "đã ẩn"), địa chỉ,
+    mã băm IP; xoá ảnh khỏi kho; giữ nội dung đã duyệt công khai;
+  - cuộc gọi tổng đài: SĐT chỉ còn 3 số cuối;
+  - vị trí làm tròn ~100 m; giữ xã, loại sự cố, mốc thời gian, số người — thống kê, điểm nóng không đổi.
+- Phiếu đang mở, phản ánh chờ duyệt không bị đụng; chạy lại nhiều lần vẫn đúng. Kiểm tra Go / No-Go báo CẢNH BÁO khi chưa
+  đặt thời hạn.
+- **Còn lại:** chủ dự án / bộ phận pháp chế chốt N (cùng hồ sơ đánh giá tác động xử lý dữ liệu cá nhân), đặt
+  `PII_RETENTION_DAYS=N` trong `.env.production`. Phần dưới giữ lại để tra cứu.
+
 
 - **Hiện trạng:**
   - `sos_tickets` (`reporter_name`, `reporter_phone`, `raw_message`, `address`) và `community.citizen_reports` (họ tên, SĐT,

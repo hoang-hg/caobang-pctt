@@ -230,6 +230,7 @@ async def tick() -> None:
     if _last_purge is None or time.monotonic() - _last_purge >= PURGE_EVERY_S:
         _last_purge = time.monotonic()
         await retention.purge_old_logs()
+        await retention.clear_old_pii()  # PII_RETENTION_DAYS = 0 (mặc định) → không làm gì
 
 
 class Runner:
