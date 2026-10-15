@@ -27,6 +27,7 @@ from app.services import scenario
 from app.services.alert_watch import in_background, mail_new_draft
 from app.services.broadcast import advance_delivery, estimate_audience, fill_template
 from app.services.events import log_event, station_place
+from app.services.ledger import ledger_context
 from app.services.sos import create_ticket
 from app.ws.hub import hub
 
@@ -562,20 +563,24 @@ class Simulator:
 
     # 7 ---------------------------------------------------------------
     async def consume_inventory(self) -> None:
-        row = await fetch_one(
-            """UPDATE resources.inventory SET quantity = GREATEST(0, quantity - (1 + floor(random() * 6))::int), last_updated = now()
+        async with transaction() as conn:
+            await ledger_context(conn, reason="mo_phong")  # sổ kho / lịch sử sơ tán ghi "bộ mô phỏng"
+            row = await fetch_one(
+                """UPDATE resources.inventory SET quantity = GREATEST(0, quantity - (1 + floor(random() * 6))::int), last_updated = now()
                 WHERE (warehouse_id, item_code) = (SELECT warehouse_id, item_code FROM resources.inventory
                                                     WHERE item_code IN ('MI_TOM','NUOC_CHAI','LUONG_KHO','AO_PHAO','TUI_SO_CUU')
                                                     ORDER BY random() LIMIT 1)
-            RETURNING warehouse_id, item_code, quantity, safety_quota"""
-        )
-        await execute(
-            """UPDATE operations.evacuation_progress
+            RETURNING warehouse_id, item_code, quantity, safety_quota""",
+                conn=conn,
+            )
+            await execute(
+                """UPDATE operations.evacuation_progress
                   SET evacuated_households = LEAST(planned_households, evacuated_households + 1),
                       evacuated_persons = LEAST(planned_persons, evacuated_persons + 4), updated_at = now()
                 WHERE admin_unit_id = (SELECT admin_unit_id FROM operations.evacuation_progress
-                                        WHERE evacuated_households < planned_households ORDER BY random() LIMIT 1)"""
-        )
+                                        WHERE evacuated_households < planned_households ORDER BY random() LIMIT 1)""",
+                conn=conn,
+            )
         if row:
             await hub.publish("inventory.changed", row)
 

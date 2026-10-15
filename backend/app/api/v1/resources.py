@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.area import area_clause
@@ -13,6 +13,7 @@ from app.rbac import domains, scope_loaders
 from app.rbac.authz import area_scope, require_permission
 from app.services import logistics, map_ops
 from app.services.events import log_event
+from app.services.ledger import ledger_context
 from app.services.readings import VN_TZ, vn_time
 from app.ws.hub import hub
 
@@ -105,6 +106,48 @@ async def warehouses(codes: list[str] = Depends(RES), level: str | None = None):
             ],
         }
     return rows
+
+
+MOVES_MAX_ROWS = 5000
+
+
+@router.get("/inventory-moves")
+async def inventory_moves(
+    codes: list[str] = Depends(RES),
+    warehouse_id: str | None = None,
+    item_code: str | None = None,
+    since: datetime | None = None,
+    until: datetime | None = None,
+    limit: int = Query(500, ge=1, le=MOVES_MAX_ROWS),
+):
+    """Sổ xuất – nhập kho (DB7, trigger migration 0024): mỗi lần tồn kho đổi số lượng — nhập, xuất cấp phát, vật tư kèm lệnh
+    điều động, hoàn trả khi huỷ lệnh, nhập tệp. Theo phạm vi được giao (vị trí kho); kho đã xoá chỉ hiện cho cấp tỉnh."""
+    return await fetch_all(
+        f"""SELECT m.id, m.time, m.warehouse_id, m.warehouse_code, m.warehouse_name, u.code AS admin_code,
+                   m.item_code, i.name AS item_name, i.unit, m.delta, m.quantity_after, m.reason, m.note,
+                   us.full_name AS actor_name, t.code AS ticket_code
+              FROM resources.inventory_moves m
+              LEFT JOIN resources.warehouses w ON w.id = m.warehouse_id
+              LEFT JOIN spatial_admin.administrative_units u ON u.id = w.admin_unit_id
+              LEFT JOIN resources.items i ON i.code = m.item_code
+              LEFT JOIN communications.users us ON us.id = m.actor_id
+              LEFT JOIN operations.dispatch_orders o ON o.id = m.dispatch_order_id
+              LEFT JOIN operations.sos_tickets t ON t.id = o.ticket_id
+             WHERE {area_clause('w.location', codes)}
+               AND (CAST(:w AS uuid) IS NULL OR m.warehouse_id = CAST(:w AS uuid))
+               AND (CAST(:i AS text) IS NULL OR m.item_code = :i)
+               AND (CAST(:since AS timestamptz) IS NULL OR m.time >= :since)
+               AND (CAST(:until AS timestamptz) IS NULL OR m.time < :until)
+             ORDER BY m.time DESC, m.id DESC LIMIT :l""",
+        {
+            "codes": codes,
+            "w": warehouse_id,
+            "i": item_code,
+            "since": since,
+            "until": until,
+            "l": limit,
+        },
+    )
 
 
 @router.get("/vehicles")
@@ -216,6 +259,7 @@ async def receive(
         )
         if problem := logistics.receive_problem(body, old is not None, datetime.now(VN_TZ).date()):
             raise HTTPException(422, problem)
+        await ledger_context(conn, reason="nhap", actor_id=user["id"], note=body.source)  # sổ xuất – nhập kho
         row = await fetch_one(
             """INSERT INTO resources.inventory (warehouse_id, item_code, quantity, safety_quota, expiry_date)
                VALUES (CAST(:w AS uuid), :i, :q, :quota, :exp)
@@ -297,6 +341,9 @@ async def issue(
 ):
     """Ra lệnh xuất kho — số liệu trên mọi màn hình tự nhảy qua WebSocket."""
     async with transaction() as conn:
+        await ledger_context(
+            conn, reason="xuat", actor_id=user["id"], note=body.destination
+        )  # sổ xuất – nhập kho
         row = await fetch_one(
             """UPDATE resources.inventory SET quantity = quantity - :q, last_updated = now()
                 WHERE warehouse_id = CAST(:w AS uuid) AND item_code = :i AND quantity >= :q

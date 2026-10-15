@@ -14,6 +14,7 @@ import ConnectionBanner from '../components/dashboard/ConnectionBanner';
 import QuickIncidentModal from '../components/dashboard/QuickIncidentModal';
 import { unitLabel } from '../components/dashboard/CommuneView';
 import ForceList from '../components/resources/ForceList';
+import InventoryLedger from '../components/resources/InventoryLedger';
 import ItemSummary from '../components/resources/ItemSummary';
 import PickSheet from '../components/resources/PickSheet';
 import QuickDispatch from '../components/resources/QuickDispatch';
@@ -81,6 +82,9 @@ export default function Resources() {
   const [refreshing, setRefreshing] = useState(false);
   const [quick, setQuick] = useState(null);
   const [issue, setIssue] = useState(null);
+  // Sổ xuất – nhập kho (DB7): khối thu gọn cuối thẻ Kho vật tư — chưa mở thì chưa tải; nút ở thẻ kho mở sẵn đúng kho
+  const [ledgerOpen, setLedgerOpen] = useState(false);
+  const [ledgerWh, setLedgerWh] = useState('');
   const [vehicleEdit, setVehicleEdit] = useState(null);
   const [receive, setReceive] = useState(null);
   const [depotEdit, setDepotEdit] = useState(null);
@@ -288,7 +292,19 @@ export default function Resources() {
   } else if (tab === 'luc_luong') {
     body = <ForceList rows={paged.visible} asTable={asTable} pdf={pdf} sort={sort} onSort={setSort} canDispatch={canDispatch} online={online} onDispatch={setQuick} onMap={showOnMap} />;
   } else if (tab === 'vat_tu') {
-    body = <WarehouseList rows={paged.visible} factsOf={factsOf} category={filters.nhom} pdf={pdf} online={online} onReceive={setReceive} onIssue={setIssue} onMap={showOnMap} />;
+    body = (
+      <WarehouseList
+        rows={paged.visible}
+        factsOf={factsOf}
+        category={filters.nhom}
+        pdf={pdf}
+        online={online}
+        onReceive={setReceive}
+        onIssue={setIssue}
+        onMap={showOnMap}
+        onLedger={(w) => { setLedgerWh(w.id); setLedgerOpen(true); scrollToList('so-kho'); }}
+      />
+    );
   } else {
     body = <VehicleList rows={paged.visible} asTable={asTable} pdf={pdf} sort={sort} onSort={setSort} online={online} onEdit={setVehicleEdit} onMap={showOnMap} />;
   }
@@ -416,6 +432,18 @@ export default function Resources() {
         )}
         {tab === 'vat_tu' && <p className="text-[11px] text-muted">{STOCK_NOTE}</p>}
       </div>
+      {tab === 'vat_tu' && (
+        <Section
+          id="so-kho"
+          className="scroll-mt-20 no-print"
+          title="Sổ xuất – nhập kho"
+          collapsible
+          open={ledgerOpen}
+          onToggle={() => setLedgerOpen((v) => !v)}
+        >
+          {ledgerOpen && <InventoryLedger warehouse={ledgerWh} onWarehouse={setLedgerWh} known={warehousesQ.data || []} />}
+        </Section>
+      )}
 
       {quick && <QuickDispatch force={quick} onClose={() => setQuick(null)} />}
       <IssueModal warehouse={issue} onClose={() => setIssue(null)} />

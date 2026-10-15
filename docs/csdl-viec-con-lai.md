@@ -73,9 +73,9 @@ Kỹ thuật:
 | DB4 | **Thời hạn lưu dữ liệu cá nhân** | Luật Bảo vệ dữ liệu cá nhân (hiệu lực 01/01/2026): họ tên, SĐT, tin nhắn, ảnh của người dân đang lưu vô thời hạn | Cột đánh dấu đã ẩn danh + việc định kỳ trong `retention.py` | **Đã làm cơ chế** (PR #87, migration 0023) — mặc định tắt, **chờ chủ dự án chốt thời hạn** |
 | DB5 | **Đợt thiên tai** | Báo cáo, rút kinh nghiệm theo từng đợt (thiết kế E.4); so sánh các đợt | Bảng `disaster_events` + cột `event_id` ở phiếu, lệnh, cảnh báo, vùng nguy hiểm | Trung bình |
 | DB6 | **Thống kê thiệt hại** | Báo cáo thiệt hại theo mẫu nhà nước — hiện chưa có chỗ lưu | Bảng chỉ tiêu + bảng số liệu theo đợt × xã × chỉ tiêu | Trung bình — chờ BCH xác nhận mẫu |
-| DB7 | **Sổ xuất – nhập kho** | Chỉ có tồn hiện tại + nhật ký thao tác dạng JSON → không tổng hợp được "đã cấp bao nhiêu cho xã X trong đợt Y" | Bảng `inventory_moves` | Trung bình |
-| DB8 | **Lịch sử sơ tán** | `evacuation_progress` chỉ giữ số mới nhất → không vẽ được diễn biến sơ tán trong đợt | Bảng lịch sử, ghi bằng trigger (như vận hành hồ) | Trung bình |
-| DB9 | **Toàn vẹn tham chiếu** | Phương tiện của lệnh điều động lưu dạng mảng (không khoá ngoại); người ra / huỷ lệnh lưu bằng họ tên (trùng tên, đổi tên) | Bảng nối; thêm khoá ngoại, mã người thao tác | Thấp – trung bình |
+| DB7 | **Sổ xuất – nhập kho** | Chỉ có tồn hiện tại + nhật ký thao tác dạng JSON → không tổng hợp được "đã cấp bao nhiêu cho xã X trong đợt Y" | Bảng `inventory_moves` | **Đã làm** (PR #88, migration 0024) — chưa gắn đợt thiên tai (DB5) |
+| DB8 | **Lịch sử sơ tán** | `evacuation_progress` chỉ giữ số mới nhất → không vẽ được diễn biến sơ tán trong đợt | Bảng lịch sử, ghi bằng trigger (như vận hành hồ) | **Đã làm** (PR #88) — biểu đồ diễn biến làm cùng DB5 |
+| DB9 | **Toàn vẹn tham chiếu** | Phương tiện của lệnh điều động lưu dạng mảng (không khoá ngoại); người ra / huỷ lệnh lưu bằng họ tên (trùng tên, đổi tên) | Bảng nối; thêm khoá ngoại, mã người thao tác | **Đã làm** (PR #88) — trigger kiểm tra thay bảng nối |
 | DB10 | **Tổng hợp số đo theo giờ / ngày** | Biểu đồ dài ngày, báo cáo mưa ngày / mực nước cao nhất ngày đang tính lại từ số đo gốc (cả khúc đã nén) | Continuous aggregate giờ + ngày | Trung bình — khi có số liệu thật |
 | DB11 | **Định tuyến với mạng đường thật** | Thuật toán viết bằng Python, tải cả đồ thị mỗi lần — ổn với 74 đoạn mẫu, chậm khi nhập mạng đường cả tỉnh | Bật pgRouting (có sẵn trong ảnh) | Trung bình — khi có mạng đường (D3 trang A) |
 | DB12 | Tuỳ chọn | Theo dõi khi dữ liệu lớn dần | Mục 4 | Thấp |
@@ -247,7 +247,20 @@ CREATE TABLE operations.damage_reports (
   43/2015/TTLT-BNNPTNT-BKHĐT hoặc văn bản thay thế).
 - Xã nhập qua luồng "Gửi dữ liệu chờ duyệt" đã có, tỉnh duyệt (`reported_by` / `verified_by`).
 
-### DB7 — Sổ xuất – nhập kho
+### DB7 — Sổ xuất – nhập kho — đã làm (PR #88)
+
+- Migration `0024`: bảng `resources.inventory_moves`, ghi bằng **trigger trên `resources.inventory`** — mọi nơi đổi tồn kho
+  (xuất / nhập kho, vật tư kèm lệnh điều động, hoàn trả khi huỷ lệnh, nhập tệp, bộ mô phỏng, nơi viết sau này) đều có dòng
+  sổ, không phụ thuộc từng nơi gọi nhớ ghi. Lý do / người thao tác / lệnh điều động / ghi chú do ứng dụng báo qua biến
+  phiên của giao dịch (`services/ledger.py`); không báo → "khác".
+- Lưu kèm mã / tên kho (kho bị xoá khi nhập lại danh sách thì sổ vẫn còn); mã mặt hàng không khoá ngoại (danh mục sửa
+  được). Khoá ngoại tới lệnh điều động kiểm tra cuối giao dịch (vật tư trừ trước khi ghi lệnh — mã lệnh tạo sẵn).
+- API `GET /resources/inventory-moves` (theo phạm vi được giao, tối đa 5.000 dòng); giao diện: khối **Sổ xuất – nhập kho**
+  ở thẻ Kho vật tư (7 / 30 / 90 ngày, lọc kho / lý do / mặt hàng, tìm không dấu, phân trang, Excel / PDF; nút trên thẻ
+  kho mở sẵn đúng kho).
+- Khác phác thảo: `to_admin_unit_id` (xã nhận) chưa có — nơi nhận khi xuất kho đang là chữ tự do (ghi chú); `event_id`
+  thêm cùng DB5. Phần dưới giữ lại để tra cứu.
+
 
 ```sql
 CREATE TABLE resources.inventory_moves (
@@ -270,7 +283,12 @@ CREATE INDEX ON resources.inventory_moves (warehouse_id, time DESC);
   (`api/v1/resources.py`), vật tư kèm lệnh điều động và hoàn trả khi huỷ lệnh (`api/v1/sos.py`).
 - Dữ liệu cũ: dựng lại từ nhật ký thao tác `inventory.issue` / `inventory.receive` nếu cần.
 
-### DB8 — Lịch sử sơ tán
+### DB8 — Lịch sử sơ tán — đã làm (PR #88)
+
+- Bảng `operations.evacuation_history` + trigger trên `evacuation_progress` (chỉ ghi khi số liệu đổi, kèm người cập nhật);
+  số hiện có làm điểm đầu. API `GET /evacuation/{code}/history?hours=` (theo phạm vi; xã ngoài phạm vi → 404).
+- Biểu đồ diễn biến sơ tán: làm cùng DB5 (theo đợt). Phần dưới giữ lại để tra cứu.
+
 
 ```sql
 CREATE TABLE operations.evacuation_history (
@@ -285,7 +303,16 @@ CREATE TABLE operations.evacuation_history (
 
 Dùng cho biểu đồ "diễn biến sơ tán" trong đợt (DB5) và báo cáo.
 
-### DB9 — Toàn vẹn tham chiếu
+### DB9 — Toàn vẹn tham chiếu — đã làm (PR #88)
+
+- `vehicles.mission_ticket_id` → khoá ngoại tới phiếu SOS (xoá phiếu → về trống); bản ghi mồ côi được dọn trước.
+- `dispatch_orders.dispatched_by_id`, `cancelled_by_id` (khoá ngoại tới tài khoản), giữ họ tên để hiển thị; lệnh cũ gán
+  theo họ tên khi họ tên đó chỉ thuộc đúng 1 tài khoản.
+- Phương tiện của lệnh (`vehicle_ids`): **trigger kiểm tra** mọi mã có thật khi tạo / sửa lệnh, thay cho bảng nối — đổi
+  sang bảng nối phải sửa ~10 truy vấn (điều động, nhiệm vụ, mô phỏng, giải phóng phương tiện) mà lợi ích như nhau khi ghi.
+  Xoá phương tiện (nhập lại danh sách) vẫn để lại mã cũ trong lệnh đã xong — danh sách lệnh bỏ qua mã không còn.
+  Phần dưới giữ lại để tra cứu.
+
 
 - `dispatch_orders.vehicle_ids uuid[]` → bảng nối `operations.dispatch_order_vehicles (order_id, vehicle_id)` có khoá ngoại.
 - `vehicles.mission_ticket_id` → thêm khoá ngoại tới `sos_tickets`.

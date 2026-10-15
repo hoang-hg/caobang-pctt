@@ -17,7 +17,7 @@ const itemLevel = (i, expiring) => {
   return expiring ? Math.max(2, lv ?? 0) : lv;
 };
 
-function WarehouseCard({ w, x, category, pdf, online, onReceive, onIssue, onMap }) {
+function WarehouseCard({ w, x, category, pdf, online, onReceive, onIssue, onMap, onLedger }) {
   const [open, setOpen] = useState(false);
   const canIssue = usePermission('inventory', 'issue', w.admin_code);
   const canReceive = usePermission('inventory', 'receive', w.admin_code);
@@ -78,7 +78,14 @@ function WarehouseCard({ w, x, category, pdf, online, onReceive, onIssue, onMap 
           <ChevronDown size={13} className={clsx('transition-transform', open && 'rotate-180')} aria-hidden="true" />
         </button>
       )}
-      {updated && <div className="text-[11px] text-muted">Cập nhật tồn kho: {dateTime(updated)}</div>}
+      <div className="flex flex-wrap items-center gap-x-1.5 text-[11px] text-muted">
+        {updated && <span>Cập nhật tồn kho: {dateTime(updated)}</span>}
+        {onLedger && !pdf && (
+          <button type="button" className="tap rounded px-1 font-semibold text-accent hover:underline no-print" onClick={() => onLedger(w)} aria-label={`Sổ xuất – nhập của ${w.name}`}>
+            Sổ xuất – nhập
+          </button>
+        )}
+      </div>
 
       {/* Điện thoại: có nút Xuất / Nhập thì Gọi, Bản đồ chỉ còn biểu tượng (44 × 44) — 4 nút chữ không vừa 360 px */}
       <div className="mt-auto flex gap-2 pt-1 no-print">
@@ -123,11 +130,11 @@ function WarehouseCard({ w, x, category, pdf, online, onReceive, onIssue, onMap 
  * Cam: sắp hết hạn, Vàng: dưới 50 %). Trong thẻ, mặt hàng thiếu / sắp hết hạn lên đầu, phần còn lại thu gọn. Nút Xuất kho /
  * Nhập hàng chỉ hiện với tài khoản có quyền ở đúng xã của kho (backend kiểm tra lại); mất mạng → nút tắt, ghi lý do.
  */
-export default function WarehouseList({ rows, factsOf, category, pdf, online, onReceive, onIssue, onMap }) {
+export default function WarehouseList({ rows, factsOf, category, pdf, online, onReceive, onIssue, onMap, onLedger }) {
   return (
     <ul className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3" aria-label="Kho vật tư">
       {rows.map((w) => (
-        <WarehouseCard key={w.id} w={w} x={factsOf(w)} category={category} pdf={pdf} online={online} onReceive={onReceive} onIssue={onIssue} onMap={onMap} />
+        <WarehouseCard key={w.id} w={w} x={factsOf(w)} category={category} pdf={pdf} online={online} onReceive={onReceive} onIssue={onIssue} onMap={onMap} onLedger={onLedger} />
       ))}
     </ul>
   );
