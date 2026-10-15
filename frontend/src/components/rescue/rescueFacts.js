@@ -126,3 +126,74 @@ export function rescueAlerts({ tickets, sites, factsOf }) {
   if (pending) items.push({ key: 'cho-xac-nhan', level: 1, text: `${pending} phiếu đội báo đã cứu — chờ xác nhận`, short: `${pending} chờ xác nhận`, filter: { th: 'cho_xac_nhan' } });
   return items.sort((a, b) => b.level - a.level);
 }
+
+/** Phút → "12′" / "1h05" (thời gian xử lý trung vị). */
+export const dur = (m) => {
+  if (m == null) return '—';
+  const total = Math.max(0, Math.round(m));
+  return total < 60 ? `${total}′` : `${Math.floor(total / 60)}h${String(total % 60).padStart(2, '0')}`;
+};
+
+export const TREND_HOURS = 48;
+export const TREND_STEP = 3; // giờ mỗi cột
+
+/**
+ * Phiếu nhận trong 48 giờ theo khung 3 giờ (mốc 0h, 3h… giờ máy) × mức ưu tiên — cột cuối là khung đang chạy. Danh sách
+ * /sos có đủ phiếu nhận trong 48 giờ (phiếu đã xong bị bỏ sau 48 giờ kể từ lúc xong, muộn hơn lúc nhận).
+ */
+export function sosTrend(tickets, now) {
+  const step = TREND_STEP * 3600_000;
+  const n = TREND_HOURS / TREND_STEP;
+  const d = new Date(now);
+  d.setMinutes(0, 0, 0);
+  d.setHours(d.getHours() - (d.getHours() % TREND_STEP));
+  const first = d.getTime() - (n - 1) * step;
+  const buckets = Array.from({ length: n }, (_, i) => ({ start: first + i * step, p1: 0, p2: 0, p3: 0, total: 0 }));
+  for (const t of tickets) {
+    const at = new Date(t.received_at).getTime();
+    if (!(at >= first && at <= now)) continue;
+    const b = buckets[Math.min(n - 1, Math.floor((at - first) / step))];
+    if (t.priority >= 1 && t.priority <= 3) b[`p${t.priority}`] += 1;
+    b.total += 1;
+  }
+  return buckets;
+}
+
+const median = (xs) => {
+  if (!xs.length) return null;
+  const s = [...xs].sort((a, b) => a - b);
+  const m = s.length >> 1;
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+};
+const minutesBetween = (a, b) => (a && b ? (new Date(b) - new Date(a)) / 60000 : null);
+
+/**
+ * Thời gian xử lý các phiếu nhận trong 48 giờ (trung vị — một nửa số phiếu nhanh hơn): nhận tin → tiếp nhận, nhận tin → có
+ * đội đi, đội đi → đến hiện trường. Tiếp nhận trong SLA (cấp 1 3′, cấp 2 15′, cấp 3 60′ — đồng hồ "Chờ xử lý"): phiếu đã
+ * tiếp nhận kịp / (đã tiếp nhận + còn chờ quá SLA); phiếu đang chờ chưa quá SLA chưa tính.
+ */
+export function responseStats(tickets, now) {
+  const since = now - TREND_HOURS * 3600_000;
+  const recent = tickets.filter((t) => new Date(t.received_at).getTime() >= since);
+  const pick = (from, to) => recent.map((t) => minutesBetween(t[from], t[to])).filter((x) => x != null && x >= 0);
+  const ack = pick('received_at', 'acknowledged_at');
+  const disp = pick('received_at', 'dispatched_at');
+  const reach = pick('dispatched_at', 'arrived_at');
+  let inSla = 0;
+  let late = 0;
+  for (const t of recent) {
+    const sla = t.sla_minutes;
+    if (!sla) continue;
+    if (t.acknowledged_at) {
+      if (minutesBetween(t.received_at, t.acknowledged_at) <= sla) inSla += 1;
+      else late += 1;
+    } else if (t.status === 'moi' && (now - new Date(t.received_at)) / 60000 > sla) late += 1;
+  }
+  return {
+    n: recent.length,
+    ack: median(ack), ackN: ack.length,
+    disp: median(disp), dispN: disp.length,
+    reach: median(reach), reachN: reach.length,
+    inSla, late, slaPct: inSla + late ? Math.round((100 * inSla) / (inSla + late)) : null,
+  };
+}

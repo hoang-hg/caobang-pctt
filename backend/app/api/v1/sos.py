@@ -5,7 +5,7 @@ import json
 from datetime import UTC, datetime, timedelta
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field, model_validator
 
 from app.area import area_clause, unit_clause
@@ -33,9 +33,16 @@ STATUS_LABEL = {
 }
 
 
+# Phiếu đang mở + phiếu xong trong `hours` giờ qua. Bảng điều phối dùng 48 giờ; Danh sách tra cứu hồ sơ 7 / 30 ngày (báo cáo
+# tuần, tháng) — tối đa 90 ngày để một lần tải không kéo cả kho lưu trữ
+SOS_LIST_MAX_HOURS = 24 * 90
+
+
 @router.get("/sos")
 async def list_sos(
-    codes: list[str] = Depends(area_scope("sos", "view")), status: str | None = None, hours: int = 48
+    codes: list[str] = Depends(area_scope("sos", "view")),
+    status: str | None = None,
+    hours: int = Query(48, ge=1, le=SOS_LIST_MAX_HOURS),
 ):
     rows = await fetch_all(
         TICKET_SELECT
