@@ -1,8 +1,9 @@
 """Cảnh báo khẩn cấp đa kênh & Hotline (Phân hệ E): Maker–Checker, Delivery Dashboard, Audit, Danh bạ, IVR."""
 
 import json
+from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.auth import audit, verify_secret
@@ -354,11 +355,25 @@ async def reject(broadcast_id: str, body: RejectIn, user: dict = Depends(require
     return row
 
 
+# Một lần tải tối đa — trang Nhật ký pháp lý lọc / phân trang / xuất trên khoảng ngày đã chọn
+AUDIT_MAX_ROWS = 5000
+
+
 @router.get("/audit")
-async def audit_log(limit: int = 100, _: dict = Depends(require_permission("audit", "view"))):
+async def audit_log(
+    limit: int = Query(100, ge=1, le=AUDIT_MAX_ROWS),
+    since: datetime | None = None,
+    until: datetime | None = None,
+    _: dict = Depends(require_permission("audit", "view")),
+):
+    """Nhật ký pháp lý, mới nhất trước. `since` / `until` (ISO 8601 có múi giờ, until không tính) — truy xuất theo khoảng
+    ngày sau thiên tai (ai soạn, ai duyệt, lúc nào)."""
     return await fetch_all(
-        "SELECT id, time, actor_name, action, entity, entity_id, details FROM communications.audit_logs ORDER BY time DESC LIMIT :l",
-        {"l": limit},
+        """SELECT id, time, actor_name, action, entity, entity_id, details FROM communications.audit_logs
+            WHERE (CAST(:since AS timestamptz) IS NULL OR time >= :since)
+              AND (CAST(:until AS timestamptz) IS NULL OR time < :until)
+            ORDER BY time DESC LIMIT :l""",
+        {"l": limit, "since": since, "until": until},
     )
 
 

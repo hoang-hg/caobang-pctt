@@ -2068,6 +2068,175 @@ async function rescueWard(ctx) {
   });
 }
 
+// ================================================================ Cảnh báo khẩn cấp & Hotline (trang E) — laptop, iPad dọc, điện thoại
+// Dải thông tin khẩn nằm trên 4 ô chỉ số, 4 thẻ vừa màn (điện thoại nhãn ngắn); ô "Chờ phê duyệt" → đúng khối, đúng số lệnh;
+// Lịch sử lệnh: lọc trạng thái trên địa chỉ trang, Excel (laptop thêm PDF); Danh bạ: tìm không dấu, nút gọi, Excel; Nhật
+// ký pháp lý: khoảng ngày, lọc nhóm, khoảng tuỳ chọn sai báo dưới ô; không tải được danh sách lệnh → nói rõ, không ghi
+// "không có lệnh chờ duyệt"; mất mạng → nút Phê duyệt tắt; cảm ứng: vùng chạm ≥ 44 px; tài khoản phường: tiêu đề phường,
+// không có form soạn, không có nhật ký pháp lý. Chỉ xem — không soạn, không duyệt, không gọi tổng đài.
+const ALERT_DEVICES = RESOURCE_DEVICES;
+
+async function alertsPage(ctx) {
+  const { page, vp } = ctx;
+  const kpis = page.getByRole('group', { name: 'Chỉ số cảnh báo' });
+  const touch = await page.evaluate(() => matchMedia('(pointer: coarse)').matches);
+  const wide = await page.evaluate(() => innerWidth >= 1024);
+  const open = async (path = '/canh-bao') => {
+    await page.goto(`${ROOT}${path}`);
+    await kpis.getByRole('button').first().waitFor({ timeout: 20_000 });
+  };
+
+  await step(ctx, 'Mở Cảnh báo khẩn cấp: dải thông tin khẩn trên cùng, 4 ô chỉ số, các thẻ vừa màn; không tràn ngang', async () => {
+    await loginAs(page, STAFF);
+    await open();
+    const m = await page.evaluate(() => {
+      const box = (sel) => document.querySelector(sel)?.getBoundingClientRect();
+      const tabs = [...document.querySelectorAll('[aria-label="Phần của trang Cảnh báo"] > button')].map((b) => b.getBoundingClientRect());
+      return {
+        stripAbove: (box('[aria-label="Thông tin khẩn cảnh báo"]')?.top ?? Infinity) < box('[aria-label="Chỉ số cảnh báo"]').top,
+        kpi: document.querySelectorAll('[aria-label="Chỉ số cảnh báo"] > button').length,
+        tabs: tabs.length,
+        tabsOut: tabs.filter((t) => t.right > innerWidth + 1 || t.left < -1).length,
+      };
+    });
+    if (!m.stripAbove) throw new Error('dải thông tin khẩn không nằm trên ô chỉ số');
+    if (m.kpi !== 4) throw new Error(`có ${m.kpi} ô chỉ số (cần 4, bấm được)`);
+    if (m.tabs < 3 || m.tabsOut) throw new Error(`${m.tabs} thẻ, ${m.tabsOut} thẻ tràn màn`);
+    await expectNoOverflow(ctx, '/canh-bao');
+    return `${m.tabs} thẻ`;
+  });
+
+  await step(ctx, 'Chạm ô "Chờ phê duyệt" → khối chờ duyệt, đúng số lệnh ghi trên ô', async () => {
+    const tile = kpis.getByRole('button', { name: /Chờ phê duyệt/ });
+    const n = Number((await tile.innerText()).match(/(\d+)\s*lệnh/)?.[1] ?? -1);
+    await tile.click();
+    const sec = page.locator('#cho-duyet');
+    await sec.waitFor({ timeout: 5_000 });
+    await page.waitForTimeout(900);
+    const inView = await sec.evaluate((el) => { const r = el.getBoundingClientRect(); return r.top < innerHeight && r.bottom > 0; });
+    if (!inView) throw new Error('không cuộn tới khối "Chờ phê duyệt"');
+    const cards = await sec.locator('article').count();
+    if (cards !== n) throw new Error(`ô ghi ${n} lệnh, khối có ${cards} thẻ`);
+    return `${n} lệnh chờ duyệt`;
+  });
+
+  await step(ctx, 'Lịch sử lệnh: lọc "Đang hiệu lực" (trên địa chỉ trang), Excel (và PDF trên laptop) mọi lệnh đang lọc', async () => {
+    const live = Number((await kpis.getByRole('button', { name: /Đang hiệu lực/ }).innerText()).match(/(\d+)\s*cảnh báo/)?.[1] ?? -1);
+    await page.goto(`${ROOT}/canh-bao?tab=lich_su`);
+    const rows = page.locator('main table tbody tr').or(page.locator('main article[aria-label^="CB-"]'));
+    await rows.first().or(page.getByText(/Chưa có lệnh cảnh báo nào/)).waitFor({ timeout: 20_000 });
+    const box = page.getByLabel('Trạng thái');
+    if (!(await box.isVisible())) await page.getByRole('button', { name: /^Bộ lọc/ }).click();
+    await box.selectOption('hieu_luc');
+    await page.waitForURL(/tt=hieu_luc/);
+    await page.waitForTimeout(400);
+    const shown = await rows.count();
+    if (shown !== Math.min(live, wide ? 20 : 10)) throw new Error(`lọc "Đang hiệu lực" ra ${shown} lệnh, ô chỉ số ghi ${live}`);
+    let note = `${shown} đang hiệu lực`;
+    if (shown) {
+      const [xlsx] = await Promise.all([page.waitForEvent('download', { timeout: 20_000 }), page.getByRole('button', { name: 'Excel', exact: true }).click()]);
+      if (!/^lenh-canh-bao-.*\.xlsx$/.test(xlsx.suggestedFilename())) throw new Error(`tên tệp Excel: ${xlsx.suggestedFilename()}`);
+      note += ` · ${xlsx.suggestedFilename()}`;
+      if (wide) {
+        const [pdfFile] = await Promise.all([page.waitForEvent('download', { timeout: 60_000 }), page.getByRole('button', { name: 'PDF', exact: true }).click()]);
+        if (!/^lenh-canh-bao-.*\.pdf$/.test(pdfFile.suggestedFilename())) throw new Error(`tên tệp PDF: ${pdfFile.suggestedFilename()}`);
+      }
+    }
+    await expectNoOverflow(ctx, '/canh-bao?tab=lich_su');
+    return note;
+  });
+
+  await step(ctx, 'Danh bạ: tìm không dấu ra đúng cán bộ, có nút gọi; Excel danh bạ đang lọc', async () => {
+    await page.goto(`${ROOT}/canh-bao?tab=danh_ba`);
+    const search = page.getByLabel('Tìm trong danh sách');
+    await search.waitFor({ timeout: 20_000 });
+    await page.getByText(/cán bộ · \d+ đang trực/).waitFor({ timeout: 20_000 });
+    await search.fill('truong ban');
+    const call = page.locator('main a[href^="tel:"][aria-label^="Gọi "]');
+    await call.first().waitFor({ timeout: 5_000 });
+    const names = await page.locator('main a[aria-label^="Gọi "]').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')).filter((l) => !/^Gọi \d+ —/.test(l)));
+    if (!names.length) throw new Error('tìm "truong ban" không ra cán bộ nào');
+    const [xlsx] = await Promise.all([page.waitForEvent('download', { timeout: 20_000 }), page.getByRole('button', { name: 'Excel', exact: true }).click()]);
+    if (!/^danh-ba-khan-cap-.*\.xlsx$/.test(xlsx.suggestedFilename())) throw new Error(`tên tệp Excel: ${xlsx.suggestedFilename()}`);
+    await expectNoOverflow(ctx, '/canh-bao?tab=danh_ba');
+    return `${names.length} cán bộ khớp · ${xlsx.suggestedFilename()}`;
+  });
+
+  await step(ctx, 'Nhật ký pháp lý: khoảng 24 giờ, lọc nhóm "Tài khoản & bảo mật"; khoảng tuỳ chọn ngược → báo dưới ô', async () => {
+    await page.goto(`${ROOT}/canh-bao?tab=nhat_ky&ky=1n`);
+    await page.getByText(/thao tác 24 giờ qua/).waitFor({ timeout: 20_000 });
+    const group = page.getByLabel('Nhóm thao tác');
+    if (!(await group.isVisible())) await page.getByRole('button', { name: /^Bộ lọc/ }).click();
+    await group.selectOption('tai_khoan');
+    await page.waitForTimeout(300);
+    const texts = await page.locator('main table tbody tr td:nth-child(3), main li.card b').allInnerTexts();
+    if (!texts.length || !texts.every((t) => /Đăng nhập|mật khẩu|2 lớp|tài khoản/i.test(t))) throw new Error(`nhóm "Tài khoản & bảo mật" ra: ${texts.slice(0, 3).join(' | ')}`);
+    await page.getByRole('button', { name: 'Tuỳ chọn' }).click();
+    await page.getByLabel('Từ ngày').fill('2026-10-10');
+    await page.getByLabel('Đến ngày').fill('2026-10-01');
+    await page.getByText('Chọn ngày bắt đầu không sau ngày kết thúc').waitFor({ timeout: 3_000 });
+    await expectNoOverflow(ctx, '/canh-bao?tab=nhat_ky');
+    return `${texts.length} thao tác tài khoản`;
+  });
+
+  await step(ctx, 'Không tải được danh sách lệnh → báo rõ (không ghi "không có lệnh chờ duyệt"); mất mạng → dải báo, nút Phê duyệt tắt', async () => {
+    await page.route('**/api/v1/alerts/broadcasts**', safeRoute((r) => r.abort('failed')));
+    try {
+      await page.goto(`${ROOT}/canh-bao`);
+      await page.getByText(/Không tải được danh sách lệnh cảnh báo — không có nghĩa là không có lệnh chờ duyệt/).waitFor({ timeout: 30_000 });
+      if (await page.getByText('Không có lệnh chờ phê duyệt').count()) throw new Error('lỗi tải nhưng vẫn ghi "không có lệnh chờ phê duyệt"');
+    } finally {
+      await page.unroute('**/api/v1/alerts/broadcasts**');
+    }
+    await open();
+    const btn = page.getByRole('button', { name: 'Phê duyệt', exact: true }).first();
+    const has = await btn.waitFor({ timeout: 10_000 }).then(() => true, () => false);
+    await page.context().setOffline(true);
+    try {
+      await page.getByText('Mất kết nối mạng').waitFor({ timeout: 5_000 });
+      if (has && !(await btn.isDisabled())) throw new Error('mất mạng nhưng nút Phê duyệt vẫn bấm được');
+    } finally {
+      await page.context().setOffline(false);
+    }
+    return has ? 'nút Phê duyệt tắt khi mất mạng' : 'không có lệnh tài khoản này được duyệt';
+  });
+
+  if (touch) {
+    await step(ctx, 'Màn cảm ứng: mọi vùng chạm của các thẻ trang Cảnh báo ≥ 44 px', async () => {
+      const bad = [];
+      for (const path of ['/canh-bao', '/canh-bao?tab=lich_su', '/canh-bao?tab=danh_ba', '/canh-bao?tab=nhat_ky']) {
+        await open(path);
+        await page.waitForTimeout(1500);
+        for (const s of await smallTargets(page)) bad.push(`${path}: ${s.what} ${s.size}px`);
+      }
+      if (bad.length) throw new Error(`${bad.length} vùng chạm < 44 px — ${bad.slice(0, 5).join(', ')}`);
+    });
+  }
+}
+
+/** Tài khoản phường: tiêu đề phường, không soạn lệnh, không có nhật ký pháp lý (quyền audit.view); danh bạ có cấp tỉnh. */
+async function alertsWard(ctx) {
+  const { page } = ctx;
+  await step(ctx, `Cảnh báo — tài khoản phường ${WARD.name}: tiêu đề phường, không có form soạn lệnh, không có nhật ký pháp lý`, async () => {
+    try {
+      await loginAs(page, WARD);
+    } catch (e) {
+      if (READONLY) return `bỏ qua: không đăng nhập được ${WARD.user}`;
+      throw e;
+    }
+    await page.goto(`${ROOT}/canh-bao`);
+    await page.getByRole('group', { name: 'Chỉ số cảnh báo' }).getByRole('button').first().waitFor({ timeout: 20_000 });
+    const head = await page.locator('main h1 + p').innerText();
+    if (!head.includes(WARD.name)) throw new Error(`tiêu đề không phải phường của tài khoản: ${head}`);
+    if (await page.getByText(/Soạn lệnh cảnh báo/i).count()) throw new Error('tài khoản phường thấy form soạn lệnh');
+    if (await page.locator('[aria-label="Phần của trang Cảnh báo"] > button', { hasText: /Nhật ký/ }).count()) throw new Error('tài khoản phường thấy thẻ Nhật ký pháp lý');
+    await page.goto(`${ROOT}/canh-bao?tab=nhat_ky`);
+    await page.waitForTimeout(1500);
+    if (await page.getByRole('group', { name: 'Khoảng thời gian' }).count()) throw new Error('mở được nhật ký pháp lý bằng địa chỉ trang');
+    await expectNoOverflow(ctx, '/canh-bao (phường)');
+  });
+}
+
 // ================================================================
 console.log(`Kiểm thử giao diện: ${ROOT}${READONLY ? ' (chỉ xem)' : ''}`);
 const browser = await chromium.launch();
@@ -2139,6 +2308,21 @@ try {
       wctx.setDefaultTimeout(15_000);
       const wPage = await wctx.newPage();
       await rescueWard({ page: wPage, vp: vpD, problems: watch(wPage) });
+      await wctx.close();
+    }
+  }
+  for (const [label, opts, phone] of ALERT_DEVICES) {
+    const actx = await browser.newContext({ ...opts, locale: 'vi-VN', acceptDownloads: true });
+    actx.setDefaultTimeout(15_000);
+    const aPage = await actx.newPage();
+    const vpA = { name: `Cảnh báo khẩn cấp · ${label}`, mobile: phone };
+    await alertsPage({ page: aPage, vp: vpA, problems: watch(aPage) });
+    await actx.close();
+    if (phone) {
+      const wctx = await browser.newContext({ ...opts, locale: 'vi-VN' });
+      wctx.setDefaultTimeout(15_000);
+      const wPage = await wctx.newPage();
+      await alertsWard({ page: wPage, vp: vpA, problems: watch(wPage) });
       await wctx.close();
     }
   }
