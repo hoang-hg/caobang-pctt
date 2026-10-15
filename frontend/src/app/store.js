@@ -12,6 +12,21 @@ const initialTheme = () => {
 
 const savedAuth = (() => { try { return JSON.parse(safeGet('pctt_auth') || 'null'); } catch { return null; } })();
 
+// Bộ lọc địa phương nhớ THEO TÀI KHOẢN (pctt_filter = { user, filter }): tải lại trang, mở lại máy trực, phiên hết hạn rồi
+// đăng nhập lại vẫn đúng vùng đang xem; tài khoản khác đăng nhập trên cùng máy thì về Toàn tỉnh. Mã ngoài phạm vi / không còn
+// (đổi vai trò, nhập lại danh sách xã) do AdminFilter bỏ khi đã tải danh sách xã.
+export const DEFAULT_FILTER = { codes: [], label: 'Toàn tỉnh Cao Bằng', presetCode: null };
+const FILTER_KEY = 'pctt_filter';
+const savedFilterOf = (username) => {
+  try {
+    const s = JSON.parse(safeGet(FILTER_KEY) || 'null');
+    if (username && s?.user === username && Array.isArray(s.filter?.codes) && s.filter.codes.length) return { ...DEFAULT_FILTER, ...s.filter };
+  } catch {
+    /* bỏ qua giá trị hỏng */
+  }
+  return DEFAULT_FILTER;
+};
+
 /** Chưa bấm chọn Sáng / Tối → theo hệ điều hành, kể cả khi máy tự đổi (điện thoại chuyển nền tối lúc chiều tối, máy
  * tính theo lịch). Đã bấm chọn (pctt_theme) thì giữ lựa chọn đó. */
 function followSystemTheme() {
@@ -38,9 +53,15 @@ export const useStore = create((set, get) => ({
   },
 
   // ---- Bộ lọc địa phương (Global State) ----
-  filter: { codes: [], label: 'Toàn tỉnh Cao Bằng', presetCode: null },
-  setFilter: (filter) => set({ filter }),
-  clearFilter: () => set({ filter: { codes: [], label: 'Toàn tỉnh Cao Bằng', presetCode: null } }),
+  filter: savedFilterOf(savedAuth?.user?.username),
+  // `remember: false` — bộ lọc hệ thống tự đặt (VD thẻ "Cấp xã" chọn sẵn xã đầu tiên): chỉ trong phiên, tải lại trang về Toàn
+  // tỉnh; không thì xã người dùng không hề chọn cứ bám theo mọi trang sau mỗi lần tải lại
+  setFilter: (filter, { remember = true } = {}) => {
+    const user = get().auth?.user?.username;
+    safeSet(FILTER_KEY, remember && user && filter.codes.length ? JSON.stringify({ user, filter }) : null);
+    set({ filter });
+  },
+  clearFilter: () => get().setFilter(DEFAULT_FILTER),
 
   // ---- Điểm cần bay tới trên bản đồ (từ Omni-search / nút "Xem trên bản đồ") ----
   focus: null, // { lat, lon, zoom, label }
@@ -63,7 +84,14 @@ export const useStore = create((set, get) => ({
 
   // ---- Đăng nhập ----
   auth: savedAuth, // { token, user }
-  setAuth: (auth) => { safeSet('pctt_auth', auth ? JSON.stringify(auth) : null); set({ auth }); },
+  // Đăng xuất: về Toàn tỉnh (vẫn nhớ bộ lọc của tài khoản đó); đăng nhập: lấy lại bộ lọc đã nhớ nếu đúng tài khoản. Làm mới
+  // phiên cùng tài khoản: giữ nguyên
+  setAuth: (auth) => {
+    safeSet('pctt_auth', auth ? JSON.stringify(auth) : null);
+    const user = auth?.user?.username;
+    if (user === get().auth?.user?.username) return set({ auth });
+    return set({ auth, filter: savedFilterOf(user) });
+  },
 
   // ---- Trạng thái kết nối realtime & âm báo ----
   wsStatus: 'connecting',

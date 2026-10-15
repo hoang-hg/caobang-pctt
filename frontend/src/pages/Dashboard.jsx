@@ -149,12 +149,13 @@ export default function Dashboard() {
 
   // Thẻ "Cấp xã" = bộ lọc chung đúng 1 xã (KPI, biểu đồ, nhật ký, bảng đều lọc theo xã đó)
   const communeCode = filter.codes.length === 1 ? filter.codes[0] : '';
-  const enterCommune = (code) => {
+  // `remember` = false: thẻ tự chọn sẵn xã đầu tiên — không nhớ qua lần tải lại (chỉ xã người dùng tự chọn mới được nhớ)
+  const enterCommune = (code, remember = true) => {
     const u = units.find((x) => x.code === code);
-    if (u) setFilter({ codes: [u.code], label: unitLabel(u), presetCode: null });
+    if (u) setFilter({ codes: [u.code], label: unitLabel(u), presetCode: null }, { remember });
   };
   const setTab = (id) => {
-    if (id === 'cap_xa' && !communeCode && scopeUnits.length) enterCommune(scopeUnits[0].code);
+    if (id === 'cap_xa' && !communeCode && scopeUnits.length) enterCommune(scopeUnits[0].code, false);
     if (tab === 'cap_xa' && id !== 'cap_xa') clearFilter();
     setParams((prev) => {
       const next = new URLSearchParams(prev);
@@ -169,7 +170,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (tab !== 'cap_xa' || communeInit.current || !scopeUnits.length) return;
     communeInit.current = true;
-    if (!communeCode) enterCommune(scopeUnits[0].code);
+    if (!communeCode) enterCommune(scopeUnits[0].code, false);
   }, [tab, scopeUnits.length]); // eslint-disable-line react-hooks/exhaustive-deps -- chỉ chọn sẵn 1 lần khi mở thẻ xã
 
   // Chọn trạm (ô KPI mực nước, bảng tác chiến) → mở & cuộn tới biểu đồ thủy văn của trạm đó
@@ -557,7 +558,7 @@ export default function Dashboard() {
 
       {tab === 'cap_xa' && (
         <div ref={ref} className="flex flex-col gap-3.5">
-          <CommuneView code={communeCode} units={scopeUnits} onChange={enterCommune}>
+          <CommuneView code={communeCode} units={scopeUnits} onChange={(code) => enterCommune(code)}>
             <KpiStrip {...kpiProps} large={presentation} />
             <div className="grid gap-3.5 xl:grid-cols-[1fr_360px] [&>*]:min-w-0">
               <div className="grid gap-3.5 lg:grid-cols-2 [&>*]:min-w-0">

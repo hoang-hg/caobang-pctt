@@ -1,7 +1,8 @@
 import { lazy, Suspense, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { LogOut, UserCircle2, ShieldCheck, KeyRound, Globe, Smartphone } from 'lucide-react';
+import { LogOut, UserCircle2, ShieldCheck, KeyRound, Globe, Smartphone, Volume2, VolumeX } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import clsx from 'clsx';
 import { ChangePasswordModal } from '../../pages/AccountPages';
 import { useStore } from '../../app/store';
 import { useClickOutside } from '../../utils/useClickOutside';
@@ -11,7 +12,7 @@ const MfaModal = lazy(() => import('../account/Mfa'));
 
 /** Thông tin tài khoản đang đăng nhập + vai trò/phạm vi được giao. */
 export default function UserMenu() {
-  const { auth, setAuth } = useStore();
+  const { auth, setAuth, soundOn, toggleSound, wsStatus } = useStore();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [changing, setChanging] = useState(false);
@@ -52,6 +53,17 @@ export default function UserMenu() {
             {user.mfa?.enabled ? <span className="font-semibold text-good">đang bật</span> : <span className="text-warn">chưa bật</span>}
           </div>
           {user.email && <div className="mt-1 text-[11px] text-muted">Email khôi phục: {user.email}</div>}
+          {/* Điện thoại: âm báo SOS và tình trạng kết nối nằm ở đây (thanh trên cùng nhường chỗ cho bộ lọc địa phương) */}
+          <div className="mt-3 flex flex-col gap-1 border-t border-line pt-2 sm:hidden">
+            <button type="button" className="btn-ghost tap justify-between text-xs" onClick={toggleSound} aria-pressed={soundOn}>
+              <span className="flex items-center gap-1.5">{soundOn ? <Volume2 size={14} className="text-accent" /> : <VolumeX size={14} />} Âm báo SOS</span>
+              <span className={soundOn ? 'font-semibold text-accent' : 'text-muted'}>{soundOn ? 'Đang bật' : 'Đang tắt'}</span>
+            </button>
+            <div className="flex items-center gap-1.5 px-1 text-[11px] text-muted">
+              <span className={clsx('h-2 w-2 shrink-0 rounded-full', wsStatus === 'online' ? 'bg-good' : wsStatus === 'connecting' ? 'bg-warn' : 'bg-danger')} aria-hidden="true" />
+              Kết nối thời gian thực: {wsStatus === 'online' ? 'đang hoạt động' : wsStatus === 'connecting' ? 'đang nối lại' : 'mất kết nối'}
+            </div>
+          </div>
           <div className="mt-3 grid grid-cols-2 gap-1">
             <button className="btn-ghost justify-center text-xs" onClick={() => { setChanging(true); setOpen(false); }}><KeyRound size={13} /> Đổi mật khẩu</button>
             <button className="btn-ghost justify-center text-xs" onClick={() => { setMfaOpen(true); setOpen(false); }}><Smartphone size={13} /> Xác thực 2 lớp</button>
