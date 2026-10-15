@@ -2214,6 +2214,151 @@ async function alertsPage(ctx) {
   }
 }
 
+/**
+ * Form của trang Cảnh báo (chỉ mở, kiểm tra lỗi, đóng — KHÔNG gửi lệnh, không duyệt): soạn lệnh 3 bước, ký duyệt / từ chối,
+ * gia hạn / kết thúc; điện thoại: thanh thao tác nhanh. Sai PIN thật chỉ thử trên máy thử (UI_READONLY tắt) — máy thật
+ * ghi nhật ký và khoá PIN sau 5 lần sai.
+ */
+async function alertsForms(ctx) {
+  const { page, vp } = ctx;
+  const dlg = page.getByRole('dialog');
+  const touch = await page.evaluate(() => matchMedia('(pointer: coarse)').matches);
+  const composer = page.locator('#soan-canh-bao');
+  const open = async (path = '/canh-bao') => {
+    await page.goto(`${ROOT}${path}`);
+    await page.getByRole('group', { name: 'Chỉ số cảnh báo' }).getByRole('button').first().waitFor({ timeout: 20_000 });
+  };
+  const noSmall = async (where) => {
+    if (!touch) return;
+    const bad = await smallTargets(page);
+    if (bad.length) throw new Error(`${where}: ${bad.length} vùng chạm < 44 px — ${bad.slice(0, 5).map((s) => `${s.what} ${s.size}px`).join(', ')}`);
+  };
+
+  await step(ctx, 'Soạn lệnh 3 bước: Tiếp khi trống → lỗi dưới ô + con trỏ; mẫu tin: tham số số sai → báo; chưa chọn vùng → báo; chọn xã → ước tính người nhận; bước 3 xem lại (không gửi)', async () => {
+    await open();
+    if (!(await composer.count())) return 'tài khoản không có quyền soạn lệnh';
+    await composer.scrollIntoViewIfNeeded();
+    await composer.getByRole('button', { name: /^Tiếp/ }).click();
+    await composer.getByText(/Ghi tiêu đề lệnh/).waitFor({ timeout: 3_000 });
+    const focus = await page.evaluate(() => document.activeElement?.getAttribute('aria-invalid'));
+    if (focus !== 'true') throw new Error('bấm Tiếp khi thiếu nội dung: con trỏ không về ô lỗi');
+    // Mẫu tin có tham số số (lưu lượng / lượng mưa…): nhập chữ → báo ngay
+    const numeric = composer.getByRole('radio', { name: /xả lũ|lũ quét|mưa/i }).first();
+    let note = 'tự soạn';
+    if (await numeric.count()) {
+      await numeric.click();
+      const num = composer.getByLabel(/Lưu lượng|Lượng mưa|Mực nước|Số giờ/).first();
+      if (await num.count()) {
+        await num.fill('nhiều');
+        await composer.getByText('Chỉ nhập số (VD 1200 hoặc 12,5)').first().waitFor({ timeout: 3_000 });
+        note = 'tham số số báo lỗi';
+      }
+      await composer.getByRole('radio', { name: 'Tự soạn' }).click();
+    }
+    await composer.getByLabel('Tiêu đề lệnh *').fill('Kiểm thử giao diện — không gửi');
+    await composer.getByLabel('Nội dung tin *').fill('Kiểm thử giao diện: nội dung cảnh báo mẫu, không gửi đi.');
+    await composer.getByRole('button', { name: /^Tiếp/ }).click();
+    await composer.getByRole('button', { name: /^Tiếp/ }).click();
+    await composer.getByText(/Chọn ít nhất 1 xã\/phường/).waitFor({ timeout: 3_000 });
+    await composer.getByLabel('Tìm xã / phường nhận tin').fill(norm(WARD.name));
+    await composer.getByRole('checkbox', { name: new RegExp(WARD.name) }).first().click();
+    await composer.getByText(/hộ dân/).waitFor({ timeout: 10_000 });
+    await expectNoOverflow(ctx, 'form soạn lệnh (bước 2)');
+    await noSmall('form soạn lệnh (bước 2)');
+    await composer.getByRole('button', { name: /^Tiếp/ }).click();
+    await composer.getByText('Xem lại trước khi gửi').waitFor({ timeout: 3_000 });
+    if (!(await composer.getByText(new RegExp(`1 xã/phường — ${WARD.name}`)).count())) throw new Error('bước xem lại không ghi vùng đã chọn');
+    await noSmall('form soạn lệnh (bước 3)');
+    return note;
+  });
+
+  await step(ctx, 'Ký duyệt: PIN sai định dạng → báo dưới ô; sai PIN (máy chủ) → báo dưới ô, hộp thoại vẫn mở; Từ chối thiếu lý do → báo', async () => {
+    await open();
+    const btn = visible(page.getByRole('button', { name: 'Phê duyệt', exact: true }));
+    if (!(await btn.count())) return 'không có lệnh tài khoản này được duyệt';
+    await btn.click();
+    await dlg.waitFor();
+    await dlg.getByRole('button', { name: /Ký duyệt & phát/ }).click();
+    await dlg.getByText('Nhập mã PIN 4–8 chữ số').waitFor({ timeout: 3_000 });
+    let note = 'PIN trống báo dưới ô';
+    if (!READONLY) {
+      await dlg.getByLabel(/Mã PIN ký duyệt/).fill('9999');
+      await dlg.getByRole('button', { name: /Ký duyệt & phát/ }).click();
+      await dlg.locator('#loi-pin').getByText(/PIN/).waitFor({ timeout: 10_000 });
+      if (!(await dlg.isVisible())) throw new Error('sai PIN nhưng hộp thoại đã đóng');
+      note += ' · sai PIN báo dưới ô';
+    }
+    await dlg.getByRole('radio', { name: /Từ chối/ }).click();
+    await dlg.getByRole('button', { name: /Từ chối lệnh/ }).click();
+    await dlg.getByText(/Ghi lý do từ chối/).waitFor({ timeout: 3_000 });
+    await expectNoOverflow(ctx, 'hộp thoại ký duyệt', dlg);
+    await noSmall('hộp thoại ký duyệt');
+    await dlg.getByRole('button', { name: 'Đóng', exact: true }).last().click();
+    await dlg.waitFor({ state: 'hidden' });
+    return note;
+  });
+
+  await step(ctx, 'Kết thúc cảnh báo: thiếu lý do / PIN → báo dưới ô, chọn nhanh lý do điền được; Gia hạn: chọn thời gian bằng chip', async () => {
+    await open();
+    const end = visible(page.getByRole('button', { name: /^Kết thúc$/ }));
+    if (!(await end.count())) return 'không có cảnh báo tài khoản này quản lý';
+    await end.click();
+    await dlg.waitFor();
+    await dlg.getByRole('button', { name: /Kết thúc cảnh báo/ }).click();
+    await dlg.getByText(/Ghi lý do \/ thông báo kết thúc/).waitFor({ timeout: 3_000 });
+    await dlg.getByRole('button', { name: 'Hết nguy cơ sạt lở' }).click();
+    if ((await dlg.getByLabel(/Lý do \/ thông báo kết thúc/).inputValue()) !== 'Hết nguy cơ sạt lở') throw new Error('chip lý do không điền vào ô');
+    await dlg.getByRole('button', { name: /Kết thúc cảnh báo/ }).click();
+    await dlg.getByText('Nhập mã PIN 4–8 chữ số').waitFor({ timeout: 3_000 });
+    await noSmall('hộp thoại kết thúc');
+    await dlg.getByRole('button', { name: 'Huỷ', exact: true }).click();
+    await dlg.waitFor({ state: 'hidden' });
+    await visible(page.getByRole('button', { name: /^Gia hạn$/ })).click();
+    await dlg.waitFor();
+    await dlg.getByRole('radio', { name: '12 giờ' }).click();
+    await dlg.getByRole('button', { name: 'Gia hạn 12 giờ' }).waitFor({ timeout: 3_000 });
+    await dlg.getByRole('button', { name: 'Huỷ', exact: true }).click();
+    await dlg.waitFor({ state: 'hidden' });
+    return 'lý do / PIN báo dưới ô';
+  });
+
+  if (vp.mobile) {
+    await step(ctx, 'Thanh thao tác nhanh: "Chờ duyệt" (số = lệnh chờ) → khối chờ duyệt; "Soạn lệnh" → form; "Danh bạ" → thẻ danh bạ; cuối trang không bị che', async () => {
+      await open();
+      const bar = page.getByRole('navigation', { name: 'Thao tác nhanh' });
+      await bar.waitFor();
+      const kpi = Number((await page.getByRole('group', { name: 'Chỉ số cảnh báo' }).getByRole('button', { name: /Chờ phê duyệt/ }).innerText()).match(/(\d+)\s*lệnh/)?.[1] ?? 0);
+      const wait = bar.getByRole('button', { name: /Chờ duyệt/ });
+      if (await wait.count()) {
+        const badge = Number((await wait.innerText()).match(/\d+/)?.[0] ?? 0);
+        if (badge !== kpi) throw new Error(`thanh ghi ${badge} lệnh chờ, ô chỉ số ghi ${kpi}`);
+        await wait.click();
+        await page.waitForTimeout(900);
+        const inView = await page.locator('#cho-duyet').evaluate((el) => { const r = el.getBoundingClientRect(); return r.top < innerHeight && r.bottom > 0; });
+        if (!inView) throw new Error('"Chờ duyệt" không cuộn tới khối chờ duyệt');
+      }
+      const compose = bar.getByRole('button', { name: /Soạn lệnh/ });
+      if (await compose.count()) {
+        await compose.click();
+        await page.waitForTimeout(900);
+        const inView = await page.locator('#soan-canh-bao').evaluate((el) => { const r = el.getBoundingClientRect(); return r.top < innerHeight && r.bottom > 0; });
+        if (!inView) throw new Error('"Soạn lệnh" không cuộn tới form soạn');
+      }
+      await bar.getByRole('button', { name: /Danh bạ/ }).click();
+      await page.waitForURL(/tab=danh_ba/);
+      const covered = await page.evaluate(() => {
+        const m = document.querySelector('main');
+        m.scrollTo(0, m.scrollHeight);
+        const last = [...m.querySelectorAll('section')].pop()?.getBoundingClientRect();
+        const nav = document.querySelector('nav[aria-label="Thao tác nhanh"]').getBoundingClientRect();
+        return last ? Math.round(last.bottom - nav.top) : 0;
+      });
+      if (covered > 1) throw new Error(`thanh thao tác che ${covered}px cuối trang`);
+      return `${kpi} lệnh chờ`;
+    });
+  }
+}
+
 /** Tài khoản phường: tiêu đề phường, không soạn lệnh, không có nhật ký pháp lý (quyền audit.view); danh bạ có cấp tỉnh. */
 async function alertsWard(ctx) {
   const { page } = ctx;
@@ -2316,7 +2461,9 @@ try {
     actx.setDefaultTimeout(15_000);
     const aPage = await actx.newPage();
     const vpA = { name: `Cảnh báo khẩn cấp · ${label}`, mobile: phone };
-    await alertsPage({ page: aPage, vp: vpA, problems: watch(aPage) });
+    const actxA = { page: aPage, vp: vpA, problems: watch(aPage) };
+    await alertsPage(actxA);
+    await alertsForms(actxA);
     await actx.close();
     if (phone) {
       const wctx = await browser.newContext({ ...opts, locale: 'vi-VN' });

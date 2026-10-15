@@ -106,7 +106,8 @@ export default function MonitoringMap() {
   const [layers, setLayers] = useState(() => (mode === 'tinh_hinh' ? situationLayers(DEFAULT_LAYERS) : DEFAULT_LAYERS));
   const opsLayers = useRef(null); // lớp đang bật trước khi sang "Tình hình" — quay về "Tác nghiệp" thì trả lại đúng như cũ
   const [basemap, setBasemap] = useState('auto');
-  const [tool, setTool] = useState(null); // measure | route | polygon | circle | incident
+  // ?cong-cu=khoanh (từ "Vẽ vùng trên bản đồ" của form soạn cảnh báo): mở sẵn công cụ khoanh đa giác
+  const [tool, setTool] = useState(() => (new URLSearchParams(window.location.search).get('cong-cu') === 'khoanh' ? 'polygon' : null)); // measure | route | polygon | circle | incident
   const [offset, setOffset] = useState(0);
   const [leftOpen, setLeftOpen] = useState(roomy); // laptop 1366 px: bảng lớp thu gọn sẵn để bản đồ đủ rộng
   const [rightOpen, setRightOpen] = useState(true);
