@@ -13,6 +13,9 @@ cùng, chế độ Sáng / Tối, lớp phủ vùng đang xem trên các bản �
   hình từng xã trong hộp chọn địa bàn, tài liệu này).
 - Máy chủ thử vẫn chạy **v1.0.3**, **chưa có** các thay đổi trên — xem V1 trong `docs/trang-a-viec-con-lai.md` (triển khai
   chung cho mọi trang).
+- **56 xã/phường sau sắp xếp (01/07/2025) đã có đủ**: tên, ranh giới, dân số — dữ liệu công khai
+  (`backend/seed/caobang_communes.geojson`). Nếu Sở Nông nghiệp và Môi trường có tệp ranh giới chính thức thì nhập đè (loại
+  `ranh_gioi_xa`, README 2.2): phân quyền theo xã và việc gán phiếu SOS vào xã dựa trên ranh giới này.
 - Dữ liệu nền dùng chung: README 2.4 (mẫu nhập "Xóm / tổ dân phố", "Nhóm lọc nhanh theo thiên tai"), README 2.2
   (hiện trạng xóm, địa danh).
 
@@ -22,8 +25,8 @@ cùng, chế độ Sáng / Tối, lớp phủ vùng đang xem trên các bản �
 biểu đồ, bản đồ; hộp chọn địa bàn cho lãnh đạo thấy ngay xã nào cần chú ý (PR #82).
 
 **Không còn việc giao diện nào làm được mà không cần dữ liệu mới.** Còn lại (mục 4): ranh giới xóm để lọc tới cấp thôn (CF1),
-danh sách xã chính thức của từng nhóm lọc nhanh (CF2), danh mục địa danh chính thức cho tìm kiếm (CF3), thử tải lọc không
-gian với số liệu thật (CF4 — cùng V2 trang A).
+BCH xác nhận xã nào thuộc nhóm lọc nhanh nào (CF2 — danh sách 56 xã/phường đã có, chỉ còn việc xếp nhóm), danh mục địa danh
+chính thức cho tìm kiếm (CF3), thử tải lọc không gian với số liệu thật (CF4 — cùng V2 trang A).
 
 ## 1. Đối chiếu với thiết kế mục F (rà ngày 15/10/2026, theo từng ý)
 
@@ -32,7 +35,7 @@ gian với số liệu thật (CF4 — cùng V2 trang A).
 | F.1 Bộ lọc là "Global State": chọn khu vực → Bản đồ, Dashboard, danh sách SOS, Nguồn lực tính lại theo khu vực | Đạt — mọi truy vấn gửi kèm mã xã đang lọc (`useAreaQuery`); nút chọn địa bàn trên thanh trên cùng ở mọi trang, mọi cỡ màn; nhớ theo tài khoản qua tải lại / đăng nhập lại (PR #80). Trang Cảnh báo: danh sách lệnh theo phạm vi được giao (lệnh nhắm nhiều xã), bản đồ vùng cảnh báo có phủ vùng đang lọc |
 | F.1 Cây hành chính động Toàn tỉnh → Phường/Xã → Thôn | **Một phần** — Toàn tỉnh → nhóm lọc nhanh → 56 xã/phường (sau 01/07/2025 không còn cấp huyện). Cấp thôn: chưa có ranh giới xóm (8 xóm mẫu, không toạ độ) → tìm xóm bằng ô tìm kiếm, bản đồ bay tới xã chứa xóm (CF1) |
 | F.1 Chọn khu vực → bản đồ zoom vừa khít ranh giới, phủ mờ ngoài ranh giới | Đạt — mọi bản đồ (Tổng quan, Bản đồ giám sát, Cứu hộ, Cảnh báo); phủ tối trên nền tối, phủ trắng trên nền sáng; viền vùng màu nhấn — không dùng đỏ của mức Khẩn cấp (PR #80) |
-| F.1 Nút lọc nhanh theo đặc thù thiên tai (vùng trũng – hạ lưu; đồi núi – đèo dốc) | Đạt — 3 nhóm cho Cao Bằng: Dải biên giới Việt – Trung, Vùng trũng & hạ lưu sông Bằng Giang – Hiến, Vùng núi cao & đèo dốc phía Tây; mỗi nhóm ghi số xã, mức nặng nhất của các xã trong nhóm. Thiết kế mẫu ghi địa danh Thừa Thiên Huế (sông Hương, Tam Giang, A Lưới…) — đã thay bằng địa danh Cao Bằng; danh sách xã từng nhóm chờ BCH xác nhận (CF2) |
+| F.1 Nút lọc nhanh theo đặc thù thiên tai (vùng trũng – hạ lưu; đồi núi – đèo dốc) | Đạt — 3 nhóm cho Cao Bằng: Dải biên giới Việt – Trung, Vùng trũng & hạ lưu sông Bằng Giang – Hiến, Vùng núi cao & đèo dốc phía Tây; mỗi nhóm ghi số xã, mức nặng nhất của các xã trong nhóm. Thiết kế mẫu ghi địa danh Thừa Thiên Huế (sông Hương, Tam Giang, A Lưới…) — đã thay bằng địa danh Cao Bằng; việc xếp xã vào từng nhóm do nhóm phát triển đề xuất, chờ BCH xác nhận (CF2) |
 | F.1 Thanh tìm kiếm toàn năng: địa danh, toạ độ GPS, mã SOS; gợi ý từ CSDL địa danh | Đạt — có cả trên điện thoại (trước đây không); địa danh, xã, xóm, trạm, hồ, lực lượng, kho, mã SOS, toạ độ thập phân / độ-phút-giây / link Google Maps; chọn xã → lọc cả hệ thống, mã SOS → mở đúng phiếu (PR #81). Địa danh hiện là dữ liệu mẫu (CF3) |
 | F.2 Chế độ Tối mặc định cho Trung tâm điều hành, nền xanh đen `#111827` | Đạt — nền `#111827`; mặc định theo hệ điều hành, máy không đặt thì Tối; màn hình lớn: chế độ trình chiếu luôn Tối; máy trực ban chọn "Tối" trong menu tài khoản (PR #82) hoặc mở `?theme=dark` một lần |
 | F.2 Màu cảnh báo Đỏ / Cam / Vàng nổi bật trên nền tối | Đạt — thang chung đã kiểm định độ chênh màu (CD8 trang D); chữ màu dùng sắc chữ riêng cho từng nền, đủ tương phản |
@@ -58,7 +61,7 @@ gian với số liệu thật (CF4 — cùng V2 trang A).
 | GF2 | **Tìm kiếm toàn năng**: điện thoại, trạng thái, chọn xã → lọc, mã SOS → mở phiếu, tìm gần đây | API tìm kiếm thêm mã xã cho kết quả SOS (sửa nhỏ) | — | **Đã làm** (PR #81) |
 | GF3 | **Sáng / Tối + cho lãnh đạo**: chọn Theo máy / Sáng / Tối; tình hình từng xã, "Cần chú ý" trong hộp chọn địa bàn | API mới `/dashboard/communes` (chỉ đọc) | — | **Đã làm** (PR #82) |
 | CF1 | **Ranh giới xóm / tổ dân phố** → lọc tới cấp thôn | Dữ liệu | UBND xã / Sở Nội vụ (mẫu nhập "Xóm / tổ dân phố") | Trung bình |
-| CF2 | **Nhóm lọc nhanh chính thức**: danh sách xã của từng nhóm theo đặc thù thiên tai | Dữ liệu | Văn phòng BCH tỉnh (mẫu "Nhóm lọc nhanh theo thiên tai") | Trung bình |
+| CF2 | **Xếp xã vào nhóm lọc nhanh**: BCH xác nhận xã nào thuộc nhóm nào (danh sách 56 xã/phường đã có — không phải việc này) | Xác nhận nghiệp vụ | Văn phòng BCH tỉnh (sửa qua mẫu nhập "Nhóm lọc nhanh theo thiên tai") | Trung bình (trước vận hành — bản chạy thật hiện đúng 3 nhóm đề xuất) |
 | CF3 | **Danh mục địa danh chính thức** (chợ, cầu, đập, đèo, công trình) cho tìm kiếm | Dữ liệu | UBND xã, Sở Xây dựng | Trung bình |
 | CF4 | **Thử tải lọc không gian** với số liệu thật (hàng vạn điểm) | Dữ liệu thật | — (cùng V2 trang A) | Cao (trước vận hành) |
 
@@ -98,11 +101,22 @@ gian với số liệu thật (CF4 — cùng V2 trang A).
 - **Việc lập trình khi có ranh giới:** thêm cấp thôn vào hộp chọn địa bàn (chạm xã → danh sách xóm của xã); `app/area.py` đã lọc
   theo ranh giới bất kỳ đơn vị nào có mã, không phải sửa API.
 
-### CF2 — Nhóm lọc nhanh chính thức
+### CF2 — Xếp xã vào nhóm lọc nhanh
 
-3 nhóm hiện có do nhóm phát triển đề xuất theo địa hình Cao Bằng. BCH xác nhận / sửa danh sách xã của từng nhóm, thêm nhóm
-mới (VD lưu vực sông Gâm, sông Quây Sơn) bằng mẫu nhập "Nhóm lọc nhanh theo thiên tai" (`nhom_loc_nhanh`, README 2.4) — không
-phải sửa mã.
+- **Không thiếu danh sách xã:** 56 xã/phường sau sắp xếp đã có đủ (tên, ranh giới, dân số). Việc còn lại là **xác nhận xã nào
+  thuộc nhóm lọc nhanh nào**.
+- **Hiện trạng:** 3 nhóm do nhóm phát triển đề xuất theo địa hình Cao Bằng, chưa qua BCH. Đây là dữ liệu nền: **bản chạy thật
+  (CSDL trống) cũng hiện đúng 3 nhóm này**, nên cần xác nhận trước khi vận hành.
+
+| Nhóm | Số xã | Xã / phường đang xếp vào | Cách chọn hiện nay | BCH cần |
+|---|---|---|---|---|
+| Vùng trũng & hạ lưu sông Bằng Giang – Hiến | 9 | Thục Phán, Nùng Trí Cao, Tân Giang, Hòa An, Bạch Đằng, Nam Tuấn, Nguyễn Huệ, Canh Tân, Phục Hòa | Chọn tay: 3 phường nội thị và xã ven sông Bằng Giang, sông Hiến | Đối chiếu bản đồ ngập lụt, thực tế các trận lũ |
+| Vùng núi cao & đèo dốc phía Tây | 20 | Nguyên Bình, Tĩnh Túc, Minh Tâm, Phan Thanh, Thành Công, Tam Kim, Ca Thành, Bảo Lạc, Hưng Đạo, Cốc Pàng, Cô Ba, Khánh Xuân, Xuân Trường, Huy Giáp, Bảo Lâm, Lý Bôn, Nam Quang, Quảng Lâm, Yên Thổ, Sơn Lộ | Toàn bộ xã thuộc 3 huyện cũ Bảo Lâm, Bảo Lạc, Nguyên Bình (chỉ dùng để dựng nhóm — giao diện không hiện huyện cũ) | Đối chiếu bản đồ phân vùng nguy cơ sạt lở, lũ quét; bổ sung xã vùng cao nơi khác nếu cần |
+| Dải biên giới Việt – Trung | 13 | Cốc Pàng, Xuân Trường, Sơn Lộ, Lũng Nặm, Hà Quảng, Tổng Cọt, Trà Lĩnh, Quang Trung, Đình Phong, Đàm Thủy, Lý Quốc, Phục Hòa, Đức Long | Chọn tay theo mô tả nhóm "xã biên giới có đồn Biên phòng" | Đối chiếu danh sách xã biên giới chính thức của tỉnh |
+
+- **Cách sửa (không phải sửa mã):** Nhập dữ liệu → mẫu "Nhóm lọc nhanh theo thiên tai" (`nhom_loc_nhanh`, README 2.4) — sửa
+  danh sách xã của nhóm, thêm nhóm mới (VD lưu vực sông Gâm, sông Quây Sơn). Hoặc gửi danh sách cho nhóm phát triển để cập
+  nhật luôn dữ liệu nền (`backend/app/seed_data.py`, `PRESETS`) — cài mới cũng đúng ngay.
 
 ### CF3 — Danh mục địa danh chính thức
 
