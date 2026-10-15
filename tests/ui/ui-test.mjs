@@ -2359,6 +2359,51 @@ async function alertsForms(ctx) {
   }
 }
 
+/**
+ * Bản đồ vùng cảnh báo & chuyển giao (cho lãnh đạo) — chỉ xem: laptop / iPad mở sẵn, điện thoại thu gọn (không dựng bản đồ khi
+ * chưa mở); số xã tô màu trên bản đồ bằng số xã ghi ở tiêu đề; biểu đồ chuyển giao theo kênh (hoặc nói rõ kênh chưa tích hợp).
+ */
+async function alertsOverview(ctx) {
+  const { page, vp } = ctx;
+  const touch = await page.evaluate(() => matchMedia('(pointer: coarse)').matches);
+  const toggle = page.getByRole('button', { name: /Bản đồ vùng cảnh báo & chuyển giao/ });
+  const section = page.locator('main section').filter({ has: toggle });
+  await step(ctx, 'Bản đồ vùng cảnh báo & chuyển giao: laptop / iPad mở sẵn, điện thoại thu gọn; số xã tô màu = số xã ghi ở tiêu đề; biểu đồ chuyển giao theo kênh', async () => {
+    await page.goto(`${ROOT}/canh-bao`);
+    await toggle.waitFor({ timeout: 20_000 });
+    const expanded = await toggle.getAttribute('aria-expanded');
+    if (vp.mobile) {
+      if (expanded !== 'false') throw new Error('điện thoại: khối bản đồ & chuyển giao không thu gọn sẵn');
+      if (await section.locator('.leaflet-container').count()) throw new Error('điện thoại: thu gọn nhưng vẫn dựng bản đồ');
+      await toggle.click();
+    } else if (expanded !== 'true') throw new Error('laptop / iPad: khối bản đồ & chuyển giao không mở sẵn');
+    await section.locator('.leaflet-container').waitFor({ timeout: 15_000 });
+    const head = await section.getByRole('heading', { name: /Vùng đang có cảnh báo/ }).innerText();
+    const n = Number(head.match(/(\d+) xã\/phường/)?.[1] ?? -1);
+    let filled = -1;
+    for (let i = 0; i < 30; i += 1) {
+      filled = await section.evaluate((el) => [...el.querySelectorAll('.leaflet-overlay-pane path')].filter((p) => Number(p.getAttribute('fill-opacity')) > 0.3).length);
+      if (filled === n) break;
+      await page.waitForTimeout(500);
+    }
+    if (filled !== n) throw new Error(`tiêu đề ghi ${n} xã, bản đồ tô ${filled} xã`);
+    const chart = section.locator('[role="img"][aria-label^="Tỉ lệ đã nhận theo kênh"]');
+    const note = section.getByText(/chưa có số liệu chuyển giao|Không có cảnh báo đang hiệu lực|Chưa có số liệu giao nhận/).first();
+    await chart.or(note).first().waitFor({ timeout: 5_000 });
+    await expectNoOverflow(ctx, '/canh-bao (bản đồ & chuyển giao)');
+    if (touch) {
+      const bad = await smallTargets(page);
+      if (bad.length) throw new Error(`${bad.length} vùng chạm < 44 px — ${bad.slice(0, 5).map((s) => `${s.what} ${s.size}px`).join(', ')}`);
+    }
+    const summary = `${n} xã tô màu · ${(await chart.count()) ? (await chart.getAttribute('aria-label')).replace('Tỉ lệ đã nhận theo kênh: ', '') : 'kênh chưa tích hợp'}`;
+    // Chỉ ở thẻ Phát cảnh báo — thẻ tra cứu (Danh bạ…) không bị đẩy xuống dưới khối bản đồ
+    await page.goto(`${ROOT}/canh-bao?tab=danh_ba`);
+    await page.getByPlaceholder('Tìm tên, chức vụ, đơn vị, SĐT, tần số…').waitFor({ timeout: 20_000 });
+    if (await toggle.count()) throw new Error('thẻ Danh bạ vẫn hiện khối bản đồ & chuyển giao');
+    return summary;
+  });
+}
+
 /** Tài khoản phường: tiêu đề phường, không soạn lệnh, không có nhật ký pháp lý (quyền audit.view); danh bạ có cấp tỉnh. */
 async function alertsWard(ctx) {
   const { page } = ctx;
@@ -2464,6 +2509,7 @@ try {
     const actxA = { page: aPage, vp: vpA, problems: watch(aPage) };
     await alertsPage(actxA);
     await alertsForms(actxA);
+    await alertsOverview(actxA);
     await actx.close();
     if (phone) {
       const wctx = await browser.newContext({ ...opts, locale: 'vi-VN' });
