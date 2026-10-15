@@ -68,8 +68,8 @@ Kỹ thuật:
 | # | Việc | Vì sao | Thay đổi CSDL | Ưu tiên |
 |---|---|---|---|---|
 | DB1 | **Tách vai trò CSDL; nhật ký pháp lý chỉ ghi thêm** | Ứng dụng kết nối bằng tài khoản quản trị CSDL (superuser), có quyền sửa / xoá / làm rỗng `audit_logs` → nhật ký pháp lý (thiết kế E.4) sửa được; hồ sơ an toàn thông tin cấp độ 3 cần phân quyền tối thiểu | Vai trò ứng dụng riêng (không superuser); thu hồi UPDATE / DELETE / TRUNCATE trên 2 bảng nhật ký; trigger chặn sửa / xoá | **Cao** — trước vận hành |
-| DB2 | **Khoá duy nhất số đo (trạm, thời điểm)** | Thiết bị gửi lại khi mất mạng, MQTT giao lại tin: 2 bản tin đến cùng lúc vẫn ghi trùng → mưa cộng dồn bị tính đôi | Chỉ mục duy nhất + `ON CONFLICT DO NOTHING` khi ghi | **Cao** |
-| DB3 | **Chỉ mục cho truy vấn vận hành** | Đủ nhanh với dữ liệu mẫu; khi phiếu, lệnh, nhật ký lên hàng vạn thì các truy vấn SLA, danh sách phiếu, vùng cảnh báo phải quét cả bảng | 6 chỉ mục (mục 4) | **Cao** — đo bằng EXPLAIN khi thử tải (CF4 trang F, V2 trang A) |
+| DB2 | **Khoá duy nhất số đo (trạm, thời điểm)** | Thiết bị gửi lại khi mất mạng, MQTT giao lại tin: 2 bản tin đến cùng lúc vẫn ghi trùng → mưa cộng dồn bị tính đôi | Chỉ mục duy nhất + `ON CONFLICT DO NOTHING` khi ghi | **Đã làm** (PR #85, migration 0021) |
+| DB3 | **Chỉ mục cho truy vấn vận hành** | Đủ nhanh với dữ liệu mẫu; khi phiếu, lệnh, nhật ký lên hàng vạn thì các truy vấn SLA, danh sách phiếu, vùng cảnh báo phải quét cả bảng | 6 chỉ mục (mục 4) | **Đã làm** (PR #85, migration 0021); đo lại bằng EXPLAIN khi thử tải (CF4 trang F, V2 trang A) |
 | DB4 | **Thời hạn lưu dữ liệu cá nhân** | Luật Bảo vệ dữ liệu cá nhân (hiệu lực 01/01/2026): họ tên, SĐT, tin nhắn, ảnh của người dân đang lưu vô thời hạn | Cột đánh dấu đã ẩn danh + việc định kỳ trong `retention.py` | **Cao** — chờ chủ dự án chốt thời hạn |
 | DB5 | **Đợt thiên tai** | Báo cáo, rút kinh nghiệm theo từng đợt (thiết kế E.4); so sánh các đợt | Bảng `disaster_events` + cột `event_id` ở phiếu, lệnh, cảnh báo, vùng nguy hiểm | Trung bình |
 | DB6 | **Thống kê thiệt hại** | Báo cáo thiệt hại theo mẫu nhà nước — hiện chưa có chỗ lưu | Bảng chỉ tiêu + bảng số liệu theo đợt × xã × chỉ tiêu | Trung bình — chờ BCH xác nhận mẫu |
@@ -124,7 +124,12 @@ CREATE TRIGGER audit_logs_no_truncate BEFORE TRUNCATE ON communications.audit_lo
   - pytest: ghi nhật ký được, sửa / xoá báo lỗi;
   - chạy `prod-flow.mjs` với vai trò mới (job Production của CI).
 
-### DB2 — Khoá duy nhất số đo (trạm, thời điểm)
+### DB2 — Khoá duy nhất số đo (trạm, thời điểm) — đã làm (PR #85)
+
+Migration `0021`; `integrations/ingest.py`, bộ mô phỏng, dữ liệu mẫu ghi bằng `ON CONFLICT DO NOTHING`. Đã thử trên
+TimescaleDB 2.30 (cùng phiên bản ảnh bản chạy thật): xoá bản trùng, tạo chỉ mục duy nhất, `ON CONFLICT` đều chạy được cả trên
+đoạn đã nén. Phần dưới giữ lại để tra cứu.
+
 
 - **Hiện trạng:**
   - `integrations/ingest.py` hỏi "đã có số đo này chưa" rồi mới ghi — 2 yêu cầu đến cùng lúc (HTTP + MQTT, gửi lại sau mất
@@ -149,7 +154,7 @@ ON CONFLICT (station_id, time) DO NOTHING RETURNING time;   -- không trả dòn
     khi có nhiều dữ liệu thật);
   - bộ mô phỏng cũng đổi sang `ON CONFLICT DO NOTHING`.
 
-### DB3 — Chỉ mục cho truy vấn vận hành
+### DB3 — Chỉ mục cho truy vấn vận hành — đã làm (PR #85, migration 0021)
 
 | Chỉ mục | Truy vấn dùng |
 |---|---|

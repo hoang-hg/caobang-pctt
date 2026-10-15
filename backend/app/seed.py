@@ -274,7 +274,8 @@ async def seed_telemetry(conn: AsyncConnection, units: dict[str, dict], now: dat
                 }
             )
         await conn.exec_driver_sql(
-            "INSERT INTO iot_telemetry.sensor_readings (time, station_id, value) VALUES (%(t)s, %(s)s, %(v)s)",
+            "INSERT INTO iot_telemetry.sensor_readings (time, station_id, value) VALUES (%(t)s, %(s)s, %(v)s)"
+            " ON CONFLICT (station_id, time) DO NOTHING",
             rows,
         )
         # Dự báo: mực nước 24h (HEC-HMS mô phỏng), mưa 3h (QPF nowcast)
