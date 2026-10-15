@@ -7,8 +7,10 @@ import { api } from '../api/client';
 import { useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
 import { EmptyState, ErrorState, Section, ShowMore, Skeleton, Tabs } from '../components/common/ui';
+import QuickActionBar from '../components/common/QuickActionBar';
 import UrgentStrip from '../components/common/UrgentStrip';
 import ConnectionBanner from '../components/dashboard/ConnectionBanner';
+import QuickIncidentModal from '../components/dashboard/QuickIncidentModal';
 import { unitLabel } from '../components/dashboard/CommuneView';
 import AlertKpis from '../components/alerts/AlertKpis';
 import { ApproveModal, ManageModal } from '../components/alerts/AlertModals';
@@ -54,6 +56,9 @@ export default function Alerts() {
   const [params, setParams] = useSearchParams();
   const canAudit = usePermission('audit', 'view', '*');
   const canCreate = usePermission('alert', 'create');
+  const canApprove = usePermission('alert', 'approve');
+  const canReport = usePermission('sos', 'create');
+  const [reportOpen, setReportOpen] = useState(false);
   const tab = TAB_IDS.includes(params.get('tab')) && (params.get('tab') !== 'nhat_ky' || canAudit) ? params.get('tab') : 'phat';
   const [approve, setApprove] = useState(null);
   const [manage, setManage] = useState(null); // { b, mode: 'extend' | 'end' }
@@ -169,7 +174,7 @@ export default function Alerts() {
   }
 
   return (
-    <div className="flex flex-col gap-3 p-3 pb-8">
+    <div className="flex flex-col gap-3 p-3 pb-28 sm:pb-8">
       {/* Thông tin khẩn luôn trên cùng (Cam / Đỏ dính khi cuộn) + mất mạng */}
       <UrgentStrip
         label="Thông tin khẩn cảnh báo"
@@ -230,6 +235,21 @@ export default function Alerts() {
       {tab === 'nhat_ky' && canAudit && <AuditLog />}
 
       {approve && <ApproveModal b={approve} onClose={() => setApprove(null)} />}
+      {/* Điện thoại: việc hay làm ở vùng ngón cái (khung chung với Tổng quan, Bản đồ, Vật tư, Cứu hộ). Cấp tỉnh: Chờ duyệt (số =
+          lệnh chờ) · Soạn lệnh; tài khoản chỉ xem: Đang phát (số = sắp hết hạn) · Lịch sử. Danh bạ cho mọi tài khoản */}
+      <QuickActionBar
+        slots={[
+          canApprove
+            ? { key: 'cho-duyet', label: 'Chờ duyệt', icon: ShieldCheck, badge: pending.length, onClick: () => go({ anchor: 'cho-duyet' }) }
+            : { key: 'dang-phat', label: 'Đang phát', icon: Radio, badge: live.filter((b) => factsOf(b).soon).length, onClick: () => go({ anchor: 'dang-hieu-luc' }) },
+          canCreate
+            ? { key: 'soan', label: 'Soạn lệnh', icon: Megaphone, onClick: () => go({ anchor: 'soan-canh-bao' }) }
+            : { key: 'lich-su', label: 'Lịch sử', icon: History, onClick: () => setTab('lich_su') },
+          { key: 'danh-ba', label: 'Danh bạ', icon: BookUser, onClick: () => setTab('danh_ba'), active: tab === 'danh_ba' },
+        ]}
+        onSos={canReport ? () => setReportOpen(true) : null}
+      />
+      {canReport && <QuickIncidentModal open={reportOpen} onClose={() => setReportOpen(false)} />}
       {manage && <ManageModal b={manage.b} mode={manage.mode} onClose={() => setManage(null)} />}
     </div>
   );
