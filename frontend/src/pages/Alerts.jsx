@@ -13,6 +13,8 @@ import ConnectionBanner from '../components/dashboard/ConnectionBanner';
 import QuickIncidentModal from '../components/dashboard/QuickIncidentModal';
 import { unitLabel } from '../components/dashboard/CommuneView';
 import AlertKpis from '../components/alerts/AlertKpis';
+import AlertMap from '../components/alerts/AlertMap';
+import DeliveryChart from '../components/alerts/DeliveryChart';
 import { ApproveModal, ManageModal } from '../components/alerts/AlertModals';
 import { LiveCard, PendingCard, RejectedCard } from '../components/alerts/BroadcastCards';
 import BroadcastHistory from '../components/alerts/BroadcastHistory';
@@ -63,6 +65,8 @@ export default function Alerts() {
   const [approve, setApprove] = useState(null);
   const [manage, setManage] = useState(null); // { b, mode: 'extend' | 'end' }
   const [refreshing, setRefreshing] = useState(false);
+  // Bản đồ + chuyển giao: điện thoại mặc định thu gọn (không tải ranh giới xã khi chưa mở) — như trang C, D
+  const [overviewOpen, setOverviewOpen] = useState(() => window.innerWidth >= 768);
 
   // Tài khoản xã: tiêu đề là xã của mình (như Tổng quan), không ghi "Toàn tỉnh"
   const scope = useAllowedCodes('alert', 'view');
@@ -216,14 +220,26 @@ export default function Alerts() {
       />
 
       {tab === 'phat' && (
-        <div className={clsx('flex flex-col gap-3', canCreate && 'xl:grid xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)] xl:items-start')}>
-          {/* Điện thoại: chờ phê duyệt → soạn lệnh → đang hiệu lực → bị từ chối (lãnh đạo duyệt bằng điện thoại không phải cuộn
-              qua form soạn); máy tính: form cột trái, danh sách cột phải */}
-          {canCreate && <div id="soan-canh-bao" className="order-2 min-w-0 scroll-mt-20 xl:order-1"><Composer online={online} /></div>}
-          <div className={clsx('contents', canCreate && 'xl:order-2 xl:flex xl:min-w-0 xl:flex-col xl:gap-3')}>
-            {lists}
+        <>
+          {/* Lãnh đạo: vùng đang có cảnh báo (xã tô theo mức nặng nhất) + chuyển giao theo kênh — cùng danh sách lệnh của ô chỉ
+              số. Chỉ ở thẻ này: Lịch sử / Danh bạ / Nhật ký là việc tra cứu, không đẩy xuống dưới khối bản đồ (iPad dọc ~600 px) */}
+          <Section title="Bản đồ vùng cảnh báo & chuyển giao" collapsible open={overviewOpen} onToggle={() => setOverviewOpen((v) => !v)} className="no-print">
+            {overviewOpen && (bq.data ? (
+              <div className="grid gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+                <AlertMap broadcasts={list} factsOf={factsOf} />
+                <DeliveryChart broadcasts={list} factsOf={factsOf} />
+              </div>
+            ) : bq.isError ? <ErrorState height={120} onRetry={bq.refetch}>Không tải được danh sách lệnh cảnh báo</ErrorState> : <Skeleton height={240} />)}
+          </Section>
+          <div className={clsx('flex flex-col gap-3', canCreate && 'xl:grid xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)] xl:items-start')}>
+            {/* Điện thoại: chờ phê duyệt → soạn lệnh → đang hiệu lực → bị từ chối (lãnh đạo duyệt bằng điện thoại không phải cuộn
+                qua form soạn); máy tính: form cột trái, danh sách cột phải */}
+            {canCreate && <div id="soan-canh-bao" className="order-2 min-w-0 scroll-mt-20 xl:order-1"><Composer online={online} /></div>}
+            <div className={clsx('contents', canCreate && 'xl:order-2 xl:flex xl:min-w-0 xl:flex-col xl:gap-3')}>
+              {lists}
+            </div>
           </div>
-        </div>
+        </>
       )}
       {tab === 'lich_su' && <BroadcastHistory now={now} scopeLabel={scopeLabel} />}
       {tab === 'danh_ba' && (
