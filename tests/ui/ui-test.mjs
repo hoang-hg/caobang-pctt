@@ -2525,6 +2525,97 @@ async function areaFilterWard(ctx) {
   });
 }
 
+// ================================================================ Tìm kiếm toàn năng (trang F)
+// Từ 768 px: ô tìm trên thanh trên cùng (phím "/"); điện thoại: nút kính lúp → hộp tìm (trước đây điện thoại không tìm được).
+// Gợi ý cách gõ, tìm không dấu, không thấy → gợi ý, máy chủ lỗi → báo + Thử lại, mất mạng → báo rồi tự tìm khi có mạng; chọn
+// phường → lọc cả hệ thống + Bản đồ; "Tìm gần đây"; mã SOS → mở đúng phiếu ở Cứu hộ (bỏ lọc địa bàn nếu phiếu ở xã khác).
+// Chỉ xem (bộ lọc, tìm gần đây ghi ở bộ nhớ trình duyệt thử).
+async function omniSearch(ctx) {
+  const { page, vp } = ctx;
+  const input = page.getByRole('combobox', { name: 'Tìm kiếm toàn năng' });
+  const wide = () => page.evaluate(() => innerWidth >= 768);
+  const openSearch = async () => {
+    if (await wide()) await page.keyboard.press('/');
+    else {
+      await page.getByRole('button', { name: 'Tìm kiếm toàn năng' }).click();
+      await page.getByRole('dialog', { name: 'Tìm kiếm' }).waitFor({ timeout: 5_000 });
+    }
+    await input.waitFor({ timeout: 5_000 });
+  };
+  const panel = () => (vp.mobile ? page.getByRole('dialog', { name: 'Tìm kiếm' }) : page.locator('header'));
+  const options = page.getByRole('listbox', { name: 'Kết quả tìm kiếm' }).getByRole('option');
+
+  await step(ctx, 'Tìm kiếm toàn năng: ô tìm (phím "/") / nút kính lúp trên điện thoại — gợi ý cách gõ, tìm không dấu, không thấy, máy chủ lỗi (Thử lại), mất mạng báo rõ; vùng chạm ≥ 44 px', async () => {
+    await loginAs(page, STAFF);
+    await openSearch();
+    if (!(await input.evaluate((el) => el === document.activeElement))) throw new Error('mở tìm kiếm nhưng con trỏ không ở ô tìm');
+    await panel().getByText(/Gõ ít nhất 2 ký tự/).waitFor({ timeout: 3_000 });
+    await input.fill('thuc phan');
+    await page.getByRole('option', { name: new RegExp(`Phường ${WARD.name}.*Lọc theo phường`) }).waitFor({ timeout: 10_000 });
+    if (await input.getAttribute('aria-expanded') !== 'true') throw new Error('ô tìm thiếu aria-expanded khi có kết quả');
+    await input.fill('qqzzxxkk');
+    await panel().getByText(/Không thấy “qqzzxxkk”/).waitFor({ timeout: 10_000 });
+    // Máy chủ không trả lời (cắt kết nối — trả 5xx thì bước kiểm thử tự coi là lỗi API) → nói rõ, Thử lại tìm lại được
+    await page.route('**/api/v1/search**', (r) => r.abort('connectionrefused'));
+    await input.fill('bao lac');
+    await panel().getByText('Không tìm được — máy chủ không trả lời').waitFor({ timeout: 10_000 });
+    await page.unroute('**/api/v1/search**');
+    await panel().getByRole('button', { name: 'Thử lại' }).click();
+    await page.getByRole('option', { name: /Bảo Lạc/ }).first().waitFor({ timeout: 10_000 });
+    // Mất mạng → báo, có mạng lại tự tìm
+    await page.context().setOffline(true);
+    await page.evaluate(() => window.dispatchEvent(new Event('offline')));
+    await input.fill('bao lam');
+    await panel().getByText(/Mất mạng — chưa tìm được/).waitFor({ timeout: 5_000 });
+    await page.context().setOffline(false);
+    await page.evaluate(() => window.dispatchEvent(new Event('online')));
+    await page.getByRole('option', { name: /Bảo Lâm/ }).first().waitFor({ timeout: 10_000 });
+    if (vp.mobile) await expectNoOverflow(ctx, 'hộp tìm kiếm', page.getByRole('dialog', { name: 'Tìm kiếm' }));
+    if (await page.evaluate(() => matchMedia('(pointer: coarse)').matches)) {
+      const bad = await page.evaluate(() => [...document.querySelectorAll('[role="option"], [role="dialog"] button, [role="dialog"] input, header button')]
+        .filter((el) => el.getBoundingClientRect().width > 0)
+        .map((el) => {
+          const r = el.getBoundingClientRect();
+          let w = r.width;
+          let h = r.height;
+          const a = el.classList.contains('touch-hit') && getComputedStyle(el, '::after');
+          if (a && a.content !== 'none') { w = Math.max(w, parseFloat(a.width) || 0); h = Math.max(h, parseFloat(a.height) || 0); }
+          return { s: Math.round(Math.min(w, h)), t: (el.getAttribute('aria-label') || el.innerText || '').slice(0, 24) };
+        })
+        .filter((x) => x.s < 44));
+      if (bad.length) throw new Error(`${bad.length} vùng chạm < 44 px — ${bad.slice(0, 4).map((x) => `${x.t} ${x.s}px`).join(', ')}`);
+    }
+    return `${await options.count()} kết quả "bao lam"`;
+  });
+
+  await step(ctx, 'Tìm kiếm toàn năng: chọn phường → lọc cả hệ thống + Bản đồ; "Tìm gần đây"; mã SOS → mở đúng phiếu ở Cứu hộ, bỏ lọc nếu phiếu ở xã khác', async () => {
+    // Mỗi bước bắt đầu bằng đóng hộp thoại còn mở — điện thoại: mở lại hộp tìm
+    if (!(await input.isVisible())) await openSearch();
+    await input.fill('thuc phan');
+    await page.getByRole('option', { name: new RegExp(`Phường ${WARD.name}`) }).click();
+    await page.waitForURL(/\/ban-do/, { timeout: 10_000 });
+    const trig = page.locator('header button[title="Lọc dữ liệu theo địa phương"]');
+    if (!(await trig.innerText()).includes(WARD.name)) throw new Error(`chọn phường xong, nút địa bàn ghi "${await trig.innerText()}"`);
+    await openSearch();
+    await page.getByRole('listbox', { name: 'Tìm gần đây' }).getByRole('option', { name: new RegExp(WARD.name) }).waitFor({ timeout: 3_000 });
+    await input.fill('SOS-');
+    const sos = page.getByRole('option', { name: /Mở phiếu/ }).first();
+    if (!(await sos.waitFor({ timeout: 10_000 }).then(() => true, () => false))) {
+      await page.keyboard.press('Escape');
+      return 'bỏ qua mã SOS: chưa có phiếu nào';
+    }
+    const code = (await sos.innerText()).match(/SOS-\d+/)?.[0];
+    await sos.click();
+    await page.waitForURL(/\/cuu-ho/, { timeout: 10_000 });
+    const box = page.getByRole('textbox', { name: 'Tìm trong danh sách' });
+    await page.waitForFunction((c) => [...document.querySelectorAll('input[aria-label="Tìm trong danh sách"]')].some((el) => el.value === c), code, { timeout: 15_000 });
+    if (/phieu=/.test(page.url())) throw new Error('địa chỉ còn ?phieu= — nút Quay lại sẽ mở lại phiếu');
+    const shown = await page.locator('main').getByText(code, { exact: false }).count();
+    if (!shown) throw new Error(`mở Cứu hộ nhưng không thấy phiếu ${code}`);
+    return `${code} → ${new URL(page.url()).search || '(cột Chờ xử lý)'} · ô tìm "${await box.first().inputValue()}" · địa bàn "${(await trig.innerText()).trim()}"`;
+  });
+}
+
 // ================================================================
 console.log(`Kiểm thử giao diện: ${ROOT}${READONLY ? ' (chỉ xem)' : ''}`);
 const browser = await chromium.launch();
@@ -2606,6 +2697,11 @@ try {
     const vpF = { name: `Bộ lọc địa phương · ${label}`, mobile: phone };
     await areaFilter({ page: fPage, vp: vpF, problems: watch(fPage) });
     await fctx.close();
+    const sctx = await browser.newContext({ ...opts, locale: 'vi-VN' });
+    sctx.setDefaultTimeout(15_000);
+    const sPage = await sctx.newPage();
+    await omniSearch({ page: sPage, vp: { name: `Tìm kiếm toàn năng · ${label}`, mobile: phone }, problems: watch(sPage) });
+    await sctx.close();
     if (phone) {
       const wctx = await browser.newContext({ ...opts, locale: 'vi-VN' });
       wctx.setDefaultTimeout(15_000);

@@ -15,15 +15,25 @@ export const audioAllowed = () => {
   }
 };
 
-/** Lần bấm / gõ phím đầu tiên trên trang → mở khoá âm thanh, gọi `onReady`. Trả hàm huỷ theo dõi. */
+/** Lần bấm / gõ phím đầu tiên trên trang → mở khoá âm thanh, gọi `onReady`. Trả hàm huỷ theo dõi.
+ * Âm thanh mở khoá NGAY lúc chạm xuống (trình duyệt chỉ cho phép trong sự kiện của người dùng), nhưng `onReady` — làm nhãn
+ * "Bấm để bật chuông SOS" biến mất, thanh trên dồn lại — chờ cú bấm KẾT THÚC: báo ngay lúc chạm xuống thì nút người dùng định
+ * bấm (VD kính lúp trên điện thoại) đã dịch chỗ khi nhấc tay, cú bấm trượt. Không có cú bấm (vuốt cuộn, gõ phím) → sau 0,8 giây. */
 export function watchAudioUnlock(onReady) {
+  let done = false;
+  const ready = () => {
+    if (done) return;
+    done = true;
+    onReady();
+  };
   const unlock = () => {
     try {
       const c = audioContext();
       if (c.state === 'suspended') c.resume();
     } catch { /* trình duyệt không hỗ trợ Web Audio */ }
-    onReady();
     stop();
+    window.addEventListener('click', () => setTimeout(ready, 0), { capture: true, once: true });
+    setTimeout(ready, 800);
   };
   const stop = () => {
     window.removeEventListener('pointerdown', unlock, true);

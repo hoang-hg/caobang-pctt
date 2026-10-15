@@ -65,8 +65,9 @@ export default function Header() {
         <AdminFilter />
       </div>
 
-      {/* Tìm kiếm toàn diện */}
-      <div className="hidden min-w-0 max-w-sm flex-1 md:block">
+      {/* Tìm kiếm toàn năng: từ 768 px là ô tìm; điện thoại là nút kính lúp (mở hộp tìm toàn màn) đứng cạnh cụm nút bên phải —
+          trước đây điện thoại không tìm được gì */}
+      <div className="ml-auto min-w-0 flex-none md:ml-0 md:max-w-sm md:flex-1">
         <OmniSearch />
       </div>
 
