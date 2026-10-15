@@ -67,7 +67,7 @@ Kỹ thuật:
 
 | # | Việc | Vì sao | Thay đổi CSDL | Ưu tiên |
 |---|---|---|---|---|
-| DB1 | **Tách vai trò CSDL; nhật ký pháp lý chỉ ghi thêm** | Ứng dụng kết nối bằng tài khoản quản trị CSDL (superuser), có quyền sửa / xoá / làm rỗng `audit_logs` → nhật ký pháp lý (thiết kế E.4) sửa được; hồ sơ an toàn thông tin cấp độ 3 cần phân quyền tối thiểu | Vai trò ứng dụng riêng (không superuser); thu hồi UPDATE / DELETE / TRUNCATE trên 2 bảng nhật ký; trigger chặn sửa / xoá | **Cao** — trước vận hành |
+| DB1 | **Tách vai trò CSDL; nhật ký pháp lý chỉ ghi thêm** | Ứng dụng kết nối bằng tài khoản quản trị CSDL (superuser), có quyền sửa / xoá / làm rỗng `audit_logs` → nhật ký pháp lý (thiết kế E.4) sửa được; hồ sơ an toàn thông tin cấp độ 3 cần phân quyền tối thiểu | Vai trò ứng dụng riêng (không superuser); thu hồi UPDATE / DELETE / TRUNCATE trên 2 bảng nhật ký; trigger chặn sửa / xoá | **Một phần** — trigger đã làm (PR #86, migration 0022); tài khoản ứng dụng riêng: **Cao**, trước vận hành |
 | DB2 | **Khoá duy nhất số đo (trạm, thời điểm)** | Thiết bị gửi lại khi mất mạng, MQTT giao lại tin: 2 bản tin đến cùng lúc vẫn ghi trùng → mưa cộng dồn bị tính đôi | Chỉ mục duy nhất + `ON CONFLICT DO NOTHING` khi ghi | **Đã làm** (PR #85, migration 0021) |
 | DB3 | **Chỉ mục cho truy vấn vận hành** | Đủ nhanh với dữ liệu mẫu; khi phiếu, lệnh, nhật ký lên hàng vạn thì các truy vấn SLA, danh sách phiếu, vùng cảnh báo phải quét cả bảng | 6 chỉ mục (mục 4) | **Đã làm** (PR #85, migration 0021); đo lại bằng EXPLAIN khi thử tải (CF4 trang F, V2 trang A) |
 | DB4 | **Thời hạn lưu dữ liệu cá nhân** | Luật Bảo vệ dữ liệu cá nhân (hiệu lực 01/01/2026): họ tên, SĐT, tin nhắn, ảnh của người dân đang lưu vô thời hạn | Cột đánh dấu đã ẩn danh + việc định kỳ trong `retention.py` | **Cao** — chờ chủ dự án chốt thời hạn |
@@ -86,6 +86,12 @@ Các đoạn SQL dưới đây là **phác thảo** để thống nhất hướn
 trước khi áp dụng.
 
 ### DB1 — Tách vai trò CSDL, nhật ký pháp lý chỉ ghi thêm
+
+- **Đã làm (PR #86):** migration `0022` — trigger chặn sửa / xoá / làm rỗng `audit_logs`, `rbac_audit_log`, chặn cả tài
+  khoản chủ sở hữu (chỉ chủ sở hữu bảng tắt được trigger). `seed --reset` (chỉ máy dev / trình diễn / CI) tạm tắt trigger
+  trong giao dịch. Kiểm tra Go / No-Go báo LỖI khi thiếu / tắt trigger.
+- **Còn lại:** tài khoản CSDL riêng cho ứng dụng (phần dưới).
+
 
 - **Hiện trạng:**
   - backend, worker kết nối bằng `POSTGRES_USER`. Trên ảnh `timescaledb-ha` đây là **superuser** (đo trên stack thử: `rolsuper
