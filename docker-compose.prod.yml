@@ -73,6 +73,7 @@ x-backend-env: &backend-env
   # Thời hạn giữ nhật ký (ngày, 0 = giữ mãi) — README 10.6
   INGEST_LOG_RETENTION_DAYS: ${INGEST_LOG_RETENTION_DAYS:-30}
   EVENT_LOG_RETENTION_DAYS: ${EVENT_LOG_RETENTION_DAYS:-730}
+  PII_RETENTION_DAYS: ${PII_RETENTION_DAYS:-0}  # 0 = giữ mãi dữ liệu cá nhân — đơn vị chủ quản quyết (README 10.6)
   TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-}
   TURNSTILE_SECRET: ${TURNSTILE_SECRET:-}
   LLM_API_URL: ${LLM_API_URL:-}

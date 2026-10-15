@@ -1403,6 +1403,15 @@ lỗi (chỉ tên kiểm tra + đạt / lỗi; chi tiết trong email). `/health
   IoT / đồng bộ `INGEST_LOG_RETENTION_DAYS` (30 ngày — mỗi lần thiết bị gửi là 1 dòng), dòng sự kiện vận hành
   `EVENT_LOG_RETENTION_DAYS` (730 ngày), link đặt lại mật khẩu 30 ngày; `0` = giữ mãi. **Không** xoá nhật ký thao tác
   (audit — chỉ ghi thêm, trigger chặn xoá), phiếu SOS, phản ánh, lệnh cảnh báo, số đo cảm biến.
+- **Thời hạn lưu dữ liệu cá nhân** `PII_RETENTION_DAYS` (mặc định `0` = giữ mãi — đơn vị chủ quản quyết): cùng lượt chạy
+  mỗi giờ, quá N ngày thì **ẩn**, không xoá bản ghi:
+  - phiếu SOS đã xong: họ tên, SĐT, tin gốc, địa chỉ;
+  - phản ánh đã xử lý / từ chối / đã duyệt: họ tên, SĐT, nội dung gốc, địa chỉ, mã băm IP, ảnh (xoá khỏi kho);
+  - cuộc gọi tổng đài: SĐT người gọi (giữ 3 số cuối);
+  - vị trí làm tròn ~100 m.
+
+  Giữ xã, loại sự cố, mốc thời gian, số người, ghi chú của cán bộ, nội dung đã duyệt công khai — thống kê không đổi. Bản ghi
+  đã ẩn có `pii_cleared_at` (migration 0023). Kiểm tra Go / No-Go báo CẢNH BÁO khi chưa đặt.
 - **Không chạy pytest trong container production** (kiểm thử ghi vào Redis / CSDL thật).
 
 | Hiện tượng | Kiểm tra |
@@ -1565,7 +1574,8 @@ script thì `npm run build` dừng và in mã băm mới cần thay.
 - **Cấp độ an toàn hệ thống thông tin** (Nghị định 85/2016/NĐ-CP và văn bản hướng dẫn): hồ sơ đề xuất cấp độ (hệ thống
   phục vụ người dân, xử lý dữ liệu cá nhân — dự kiến cấp độ 3 trở lên), kiểm thử xâm nhập độc lập trước khi vận hành.
 - **Luật Bảo vệ dữ liệu cá nhân** (hiệu lực 01/01/2026): hệ thống xử lý họ tên, SĐT, vị trí, ảnh, tình trạng sức khoẻ.
-  Cần thông báo xử lý dữ liệu trên form phản ánh, đánh giá tác động, thời hạn lưu trữ. **Không bật `LLM_API_URL` tới dịch
+  Cần thông báo xử lý dữ liệu trên form phản ánh, đánh giá tác động, thời hạn lưu trữ (đặt bằng `PII_RETENTION_DAYS`,
+  [10.6](#giam-sat)). **Không bật `LLM_API_URL` tới dịch
   vụ ở nước ngoài** khi chưa đánh giá chuyển dữ liệu ra nước ngoài.
 - **Bí mật**: `.env.production` quyền 600, chỉ người vận hành đọc; đổi toàn bộ bí mật khi nhân sự vận hành thay đổi.
 - **Bản đồ nền** có giấy phép, thể hiện đúng chủ quyền ([6.9](#ban-do-nen)).

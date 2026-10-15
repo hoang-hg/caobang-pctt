@@ -74,6 +74,10 @@ class Settings(BaseSettings):
     # Nhật ký thao tác (audit), phiếu SOS, phản ánh, lệnh cảnh báo, số đo cảm biến không bị xoá.
     ingest_log_retention_days: int = 30  # nhật ký tiếp nhận IoT / đồng bộ (mỗi lần thiết bị gửi = 1 dòng)
     event_log_retention_days: int = 730  # dòng sự kiện vận hành trên bảng điều hành
+    # Thời hạn lưu dữ liệu cá nhân của người dân (Luật Bảo vệ dữ liệu cá nhân — đơn vị chủ quản quyết, DB4): phiếu SOS đã
+    # xong / phản ánh đã xử lý / cuộc gọi tổng đài quá ngần này ngày → ẩn họ tên, SĐT, tin gốc, địa chỉ, ảnh; vị trí làm tròn
+    # ~100 m (services/retention.py). 0 = giữ mãi (mặc định — chưa có quyết định)
+    pii_retention_days: int = 0
 
     # Hạ tầng chạy thật
     redis_url: str = ""  # VD redis://redis:6379/0 — trống = chạy 1 tiến trình, dùng bộ nhớ trong

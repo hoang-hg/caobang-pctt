@@ -61,6 +61,14 @@ async def check_config() -> list[Item]:
     if settings.demo_mode or settings.simulator:
         out.append(Item(FAIL, "DEMO_MODE / SIMULATOR đang bật — số liệu trên cổng là giả"))
     out += await check_audit_logs()
+    if settings.pii_retention_days <= 0:
+        out.append(
+            Item(
+                WARN,
+                "Chưa đặt PII_RETENTION_DAYS — họ tên, SĐT, tin nhắn, ảnh của người dân lưu vô thời hạn; đơn vị chủ quản "
+                "quyết thời hạn lưu (Luật Bảo vệ dữ liệu cá nhân)",
+            )
+        )
     if all(i.status == OK for i in out):
         return [Item(OK, "Kiểm tra cấu hình khi khởi động: không lỗi, không cảnh báo"), *out]
     return out
