@@ -88,7 +88,7 @@ function TeamRow({ t, now, onPick }) {
         </span>
         <span className="shrink-0 text-right">
           <span className={clsx('block font-mono font-semibold', arrived ? 'text-good' : late ? 'text-danger' : 'text-ink')}>
-            {arrived ? `Đã đến ${time(t.arrived_at)}` : etaSec == null ? 'Chưa có ETA' : late ? 'Quá ETA' : `còn ${mmss(etaSec)}`}
+            {arrived ? (t.arrived_at ? `Đã đến ${time(t.arrived_at)}` : 'Đã đến') : etaSec == null ? 'Chưa có ETA' : late ? 'Quá ETA' : `còn ${mmss(etaSec)}`}
           </span>
           {t.route_safe === false && !arrived && <span className="block text-[10px] font-semibold text-serious">qua vùng nguy hiểm</span>}
         </span>
@@ -122,6 +122,8 @@ export default function RescueMap({ tickets, factsOf, now, onOpen }) {
   const sites = (layers?.evacuation_sites?.features || []).filter((f) => f.geometry?.coordinates?.[1] != null);
   const pick = (t) => setTarget({ lat: t.lat, lon: t.lon, at: Date.now() });
   const points = open.map((t) => [t.lat, t.lon]);
+  // Đã lỗi rồi đang tự tải lại: vẫn báo lỗi — React Query v5 đưa truy vấn chưa có dữ liệu về "đang tải" mỗi lần tải lại
+  const layersFailed = !layers && (layersQ.isError || (layersQ.errorUpdateCount > 0 && layersQ.isFetching));
 
   return (
     <div className="flex min-w-0 flex-col gap-2">
@@ -206,13 +208,13 @@ export default function RescueMap({ tickets, factsOf, now, onOpen }) {
           </MarkerClusterGroup>
         </MapContainer>
         {/* Lớp lộ trình / vùng nguy cơ / điểm sơ tán chưa tải được: nói rõ (điểm SOS vẫn hiện — từ danh sách phiếu) */}
-        {!layers && layersQ.isError && (
+        {layersFailed && (
           <div role="alert" className="absolute inset-x-2 top-2 z-[500] flex flex-wrap items-center justify-center gap-2 rounded-lg border border-danger/40 bg-panel/95 px-3 py-2 text-center text-xs text-danger shadow">
-            Không tải được lộ trình đội, vùng nguy cơ, điểm sơ tán
-            <button type="button" className="btn-ghost tap min-h-[32px] px-2 py-0.5 text-xs" onClick={() => layersQ.refetch()}>Thử lại</button>
+            Không tải được lộ trình đội, vùng nguy cơ, điểm sơ tán{layersQ.isFetching ? ' — đang thử lại…' : ''}
+            <button type="button" className="btn-ghost tap min-h-[32px] px-2 py-0.5 text-xs" onClick={() => layersQ.refetch()} disabled={layersQ.isFetching}>Thử lại</button>
           </div>
         )}
-        {!layers && !layersQ.isError && (
+        {!layers && !layersFailed && (
           <div className="pointer-events-none absolute inset-x-2 top-2 z-[500] rounded-lg bg-panel/90 px-3 py-2 text-center text-xs text-muted shadow">Đang tải lộ trình đội, vùng nguy cơ…</div>
         )}
         {layers && !open.length && (

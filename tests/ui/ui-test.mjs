@@ -1956,18 +1956,33 @@ async function rescueOverview(ctx) {
     if (!(await section.locator('.leaflet-container').count())) await open();
     if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
     await section.locator('.leaflet-container').waitFor({ timeout: 10_000 });
-    await section.scrollIntoViewIfNeeded();
-    const marker = section.locator('.leaflet-marker-icon[title^="SOS-"]').first();
-    for (let i = 0; i < 6 && !(await marker.count()); i += 1) {
-      const cluster = section.locator('.sos-cluster').first();
-      if (!(await cluster.count())) break;
-      await cluster.click({ force: true });
+    // Chỉ cụm / điểm nằm trọn trong khung (Leaflet giữ cả điểm sát mép ngoài khung); kích hoạt bằng sự kiện click — không
+    // phụ thuộc toạ độ màn hình (bấm theo toạ độ trúng điểm ngoài khung thì rơi ra phần khác của trang)
+    // Chọn và bấm trong CÙNG một lần chạy JS: cụm vừa tách / gom lại làm danh sách điểm đổi giữa hai lệnh riêng
+    const tapInside = (sel) => section.evaluate((sec, s) => {
+      const box = sec.querySelector('.leaflet-container').getBoundingClientRect();
+      const el = [...sec.querySelectorAll(s)].find((m) => {
+        const r = m.getBoundingClientRect();
+        const x = r.left + r.width / 2;
+        const y = r.top + r.height / 2;
+        return x > box.left + 4 && x < box.right - 4 && y > box.top + 4 && y < box.bottom - 4;
+      });
+      if (!el) return null;
+      el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+      return el.getAttribute('title') || 'cụm';
+    }, sel);
+    const SOS = '.leaflet-marker-icon[title^="SOS-"]';
+    let code = await tapInside(SOS);
+    for (let i = 0; i < 6 && !code; i += 1) {
+      if (!(await tapInside('.sos-cluster'))) break;
       await page.waitForTimeout(900);
+      code = await tapInside(SOS);
     }
-    if (!(await marker.count())) return 'không có phiếu đang mở trên bản đồ';
-    const code = await marker.getAttribute('title');
-    await marker.click({ force: true });
-    await page.getByRole('button', { name: 'Xem phiếu trên bảng' }).click();
+    if (!code) throw new Error('không chạm được điểm SOS nào trong khung bản đồ (cụm không tách ra)');
+    const btn = page.locator('.leaflet-popup', { hasText: code }).getByRole('button', { name: 'Xem phiếu trên bảng' });
+    await btn.waitFor({ timeout: 5_000 });
+    await btn.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    await btn.click();
     await page.waitForFunction((c) => document.querySelector('input[aria-label="Tìm trong danh sách"]')?.value === c, code, { timeout: 5_000 });
     await visible(page.locator(`main article[aria-label^="${code} "]`).or(page.locator('main table tbody tr', { hasText: code }))).waitFor({ timeout: 5_000 });
     return code;
@@ -2004,13 +2019,13 @@ async function rescueOverview(ctx) {
       await page.route('**/api/v1/map/layers**', safeRoute((r) => r.abort('failed')));
       try {
         await page.goto(`${ROOT}/cuu-ho`);
-        await section.getByText('Không tải được lộ trình đội, vùng nguy cơ, điểm sơ tán').waitFor({ timeout: 30_000 });
+        await section.getByText(/Không tải được lộ trình đội, vùng nguy cơ, điểm sơ tán/).waitFor({ timeout: 30_000 });
+        if (!(await section.getByRole('button', { name: 'Thử lại' }).count())) throw new Error('thiếu nút Thử lại');
         await page.waitForTimeout(1000);
         const m = await mapCount();
         const head = await section.getByRole('heading', { name: /phiếu đang mở/ }).innerText();
         const openCount = Number(head.match(/(\d+) phiếu đang mở/)?.[1] ?? -1);
         if (m.single + m.inClusters !== openCount) throw new Error(`lớp bản đồ lỗi: còn ${m.single + m.inClusters}/${openCount} điểm SOS`);
-        if (!(await section.getByRole('button', { name: 'Thử lại' }).count())) throw new Error('thiếu nút Thử lại');
         return `${openCount} điểm SOS vẫn hiện`;
       } finally {
         await page.unroute('**/api/v1/map/layers**');
