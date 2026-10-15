@@ -6,7 +6,7 @@ import { Columns3, Home, Inbox, List, Navigation, RefreshCw } from 'lucide-react
 import { api } from '../api/client';
 import { useAreaQuery, useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
-import { ErrorState, Pager, Skeleton } from '../components/common/ui';
+import { ErrorState, Pager, Section, Skeleton } from '../components/common/ui';
 import FilterToolbar from '../components/common/FilterToolbar';
 import UrgentStrip from '../components/common/UrgentStrip';
 import DispatchModal from '../components/common/DispatchModal';
@@ -21,6 +21,8 @@ import Evacuation, { EvacuationModal } from '../components/rescue/Evacuation';
 import Intake from '../components/rescue/Intake';
 import RescueBoard from '../components/rescue/RescueBoard';
 import RescueKpis from '../components/rescue/RescueKpis';
+import RescueMap from '../components/rescue/RescueMap';
+import SosTrend from '../components/rescue/SosTrend';
 import TicketTable from '../components/rescue/TicketTable';
 import {
   COLUMN_KEYS, FILTERS, SORTS, matchTicket, optionCounts, rescueAlerts, sortTickets, ticketFacts,
@@ -44,6 +46,8 @@ function useNow(ms = 1000) {
 }
 
 const VIEWS = [['bang', 'Bảng điều phối', Columns3], ['danh_sach', 'Danh sách', List]];
+// Kỳ tra cứu của Danh sách (?ky=): phiếu đang mở + phiếu xong trong kỳ — báo cáo tuần / tháng. Bảng điều phối luôn 48 giờ
+const PERIODS = [['', '48 giờ', 48], ['7n', '7 ngày', 24 * 7], ['30n', '30 ngày', 24 * 30]];
 const minutes = (from, to) => (from && to ? Math.round((new Date(to) - new Date(from)) / 60000) : '');
 
 /**
@@ -68,6 +72,8 @@ export default function RescueCenter() {
   const view = params.get('xem') === 'danh_sach' ? 'danh_sach' : 'bang';
   const column = COLUMN_KEYS.includes(params.get('cot')) ? params.get('cot') : COLUMN_KEYS[0];
   const filters = Object.fromEntries(FILTERS.map((f) => [f.key, f.options.some(([v]) => v === params.get(f.key)) ? params.get(f.key) : '']));
+  const period = PERIODS.find(([k]) => k && k === params.get('ky')) || PERIODS[0];
+  const archive = view === 'danh_sach' && period[0] !== '';
   const [q, setQ] = useState('');
   const [sort, setSort] = useState(SORTS[0][0]);
   const [pageSize, setPageSize] = useState(() => (window.innerWidth >= 1024 ? 20 : 10));
@@ -79,6 +85,8 @@ export default function RescueCenter() {
   const [editFor, setEditFor] = useState(null);
   const [reportOpen, setReportOpen] = useState(false);
   const [evacOpen, setEvacOpen] = useState(false);
+  // Bản đồ + diễn biến: điện thoại mặc định thu gọn (bảng phiếu lên trước, không tải lớp bản đồ khi chưa mở) — như biểu đồ trang C
+  const [overviewOpen, setOverviewOpen] = useState(() => window.innerWidth >= 768);
   const contentRef = useRef(null);
   const boardRef = useRef(null);
 
@@ -94,18 +102,22 @@ export default function RescueCenter() {
   const ticketsQ = useAreaQuery('sos', '/sos', {}, { refetchInterval: 20_000 });
   const evacQ = useAreaQuery('evacuation', '/evacuation', {}, { refetchInterval: 30_000 });
   const tickets = ticketsQ.data || [];
+  // Danh sách kỳ 7 / 30 ngày: tải riêng; dải khẩn, ô chỉ số, bản đồ, diễn biến vẫn theo 48 giờ
+  const archiveQ = useAreaQuery('sos', '/sos', { hours: period[2] }, { enabled: archive, refetchInterval: 60_000 });
+  const listQ = archive ? archiveQ : ticketsQ;
+  const listTickets = listQ.data || [];
 
-  const factsById = new Map(tickets.map((t) => [t.id, ticketFacts(t, now)]));
+  const factsById = new Map((archive && archiveQ.data ? listTickets : tickets).map((t) => [t.id, ticketFacts(t, now)]));
   const factsOf = (t) => factsById.get(t.id) || ticketFacts(t, now);
   const nq = foldVi(q.trim());
   const searched = nq
-    ? tickets.filter((t) => [t.code, t.address, t.admin_name, t.raw_message, t.reporter_phone, t.force_name, INCIDENT[t.incident_type]]
+    ? listTickets.filter((t) => [t.code, t.address, t.admin_name, t.raw_message, t.reporter_phone, t.force_name, INCIDENT[t.incident_type]]
       .some((f) => f && foldVi(f).includes(nq)))
-    : tickets;
+    : listTickets;
   const rows = sortTickets(searched.filter((t) => matchTicket(t, filters, factsOf(t))), sort, factsOf);
   const counts = Object.fromEntries(FILTERS.map((f) => [f.key, optionCounts(searched, filters, f.key, factsOf)]));
   const activeFilters = FILTERS.some((f) => filters[f.key]) || !!nq;
-  const paged = usePaged(rows, pageSize, `${nq}|${JSON.stringify(filters)}|${sort}|${pageSize}`, pdf);
+  const paged = usePaged(rows, pageSize, `${nq}|${JSON.stringify(filters)}|${sort}|${pageSize}|${period[0]}`, pdf);
   const alerts = rescueAlerts({ tickets, sites: evacQ.data?.sites, factsOf });
 
   const setParam = (patch, replace = true) => setParams((p) => {
@@ -119,6 +131,7 @@ export default function RescueCenter() {
     const matches = tickets.filter((t) => matchTicket(t, f, factsOf(t)));
     const next = new URLSearchParams();
     if (view !== 'bang') next.set('xem', view);
+    if (period[0]) next.set('ky', period[0]);
     Object.entries(f).forEach(([k, v]) => v && next.set(k, v));
     const col = COLUMN_KEYS.find((k) => matches.some((t) => t.status === k));
     if (col && col !== COLUMN_KEYS[0]) next.set('cot', col);
@@ -135,10 +148,21 @@ export default function RescueCenter() {
     setQ('');
     scrollTo(boardRef.current);
   };
+  // Bản đồ → phiếu trên bảng: tìm theo mã, mở đúng cột (một mục lịch sử)
+  const openTicket = (t) => {
+    const next = new URLSearchParams();
+    if (view !== 'bang') next.set('xem', view);
+    if (period[0]) next.set('ky', period[0]);
+    if (t.status !== COLUMN_KEYS[0]) next.set('cot', t.status);
+    setParams(next);
+    setQ(t.code);
+    scrollTo(boardRef.current);
+  };
   const clearAll = () => {
     setParams(() => {
       const next = new URLSearchParams();
       if (view !== 'bang') next.set('xem', view);
+      if (period[0]) next.set('ky', period[0]);
       if (column !== COLUMN_KEYS[0]) next.set('cot', column);
       return next;
     }, { replace: true });
@@ -146,7 +170,7 @@ export default function RescueCenter() {
   };
 
   const move = async (id, status) => {
-    const t = tickets.find((x) => x.id === id);
+    const t = tickets.find((x) => x.id === id) || listTickets.find((x) => x.id === id);
     if (!t || t.status === status) return;
     try {
       if (status === 'hoan_thanh') await api(`/sos/${id}/resolve`, { method: 'POST' });
@@ -211,7 +235,7 @@ export default function RescueCenter() {
       const active = FILTERS.filter((f) => filters[f.key]).map((f) => f.options.find(([v]) => v === filters[f.key])?.[1]);
       await exportSnapshotPdf(contentRef.current, {
         title: 'BÁO CÁO PHIẾU CỨU HỘ (SOS) – TỈNH CAO BẰNG',
-        subtitle: [scopeLabel, `${rows.length} phiếu`, ...active, q.trim() && `tìm "${q.trim()}"`, at.toLocaleString('vi-VN')].filter(Boolean).join(' · '),
+        subtitle: [scopeLabel, `${rows.length} phiếu`, archive && `đang mở + đã xong trong ${period[1]}`, ...active, q.trim() && `tìm "${q.trim()}"`, at.toLocaleString('vi-VN')].filter(Boolean).join(' · '),
         filename: `phieu-sos-${vnFileStamp(at, true)}.pdf`,
         layoutWidth: 1280,
       });
@@ -243,10 +267,10 @@ export default function RescueCenter() {
   const offlineSlot = !online ? { disabled: true, title: 'Mất mạng — chưa ghi được' } : {};
 
   let body;
-  if (ticketsQ.isLoading) body = <Skeleton height={360} />;
-  else if (ticketsQ.isError && !ticketsQ.data) {
+  if (listQ.isLoading) body = <Skeleton height={360} />;
+  else if (listQ.isError && !listQ.data) {
     // Không tải được: nói rõ, KHÔNG hiện "không có phiếu" (dễ hiểu nhầm là không ai cần cứu)
-    body = <ErrorState height={220} onRetry={ticketsQ.refetch}>Không tải được danh sách phiếu SOS — không có nghĩa là không có ai cần cứu</ErrorState>;
+    body = <ErrorState height={220} onRetry={listQ.refetch}>Không tải được danh sách phiếu SOS — không có nghĩa là không có ai cần cứu</ErrorState>;
   } else if (listView) {
     body = rows.length ? (
       <div className="flex flex-col gap-2">
@@ -255,7 +279,7 @@ export default function RescueCenter() {
       </div>
     ) : (
       <p className="card p-6 text-center text-xs text-muted">
-        {activeFilters ? 'Không có phiếu khớp ô tìm / bộ lọc.' : 'Không có phiếu SOS nào trong 48 giờ qua trong vùng đang xem.'}
+        {activeFilters ? 'Không có phiếu khớp ô tìm / bộ lọc.' : `Không có phiếu SOS nào trong ${period[1]} qua trong vùng đang xem.`}
       </p>
     );
   } else {
@@ -311,6 +335,23 @@ export default function RescueCenter() {
 
       <RescueKpis ticketsQ={ticketsQ} tickets={tickets} factsOf={factsOf} evacQ={evacQ} onGo={go} onEvac={() => scrollTo(document.getElementById('so-tan'))} />
 
+      {/* Lãnh đạo nắm tình hình: bản đồ tác chiến (phiếu đang mở, lộ trình + ETA của đội, vùng nguy cơ, điểm sơ tán) và diễn biến
+          48 giờ (phiếu theo mức, thời gian xử lý) — cùng danh sách phiếu với bảng điều phối; thu gọn được */}
+      <Section
+        title="Bản đồ tác chiến & diễn biến 48 giờ"
+        collapsible
+        open={overviewOpen}
+        onToggle={() => setOverviewOpen((v) => !v)}
+        className="no-print"
+      >
+        {overviewOpen && (
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+            <RescueMap tickets={tickets} factsOf={factsOf} now={now} onOpen={openTicket} />
+            <SosTrend query={ticketsQ} tickets={tickets} now={now} />
+          </div>
+        )}
+      </Section>
+
       <FilterToolbar
         fields={FILTERS}
         sorts={SORTS}
@@ -318,13 +359,13 @@ export default function RescueCenter() {
         q={q}
         onSearch={setQ}
         filters={filters}
-        counts={ticketsQ.data ? counts : null}
+        counts={listQ.data ? counts : null}
         onFilter={(key, value) => setParam({ [key]: value })}
         onClear={clearAll}
         sort={sort}
         onSort={setSort}
         shown={rows.length}
-        total={tickets.length}
+        total={listTickets.length}
         noun="phiếu"
         onExcel={doExcel}
         onPdf={doPdf}
@@ -348,6 +389,22 @@ export default function RescueCenter() {
               ))}
             </div>
             {view === 'bang' && wide && <span className="text-[11px] text-muted">Kéo thả phiếu giữa các cột hoặc dùng “Chuyển trạng thái” trên thẻ</span>}
+            {view === 'danh_sach' && (
+              <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Kỳ tra cứu: phiếu đang mở và phiếu đã xong trong">
+                <span className="mr-0.5 text-[11px] text-muted">Phiếu đã xong trong</span>
+                {PERIODS.map(([k, label]) => (
+                  <button
+                    key={k || '48h'}
+                    type="button"
+                    aria-pressed={period[0] === k}
+                    onClick={() => setParam({ ky: k })}
+                    className={clsx('tap inline-flex min-h-[32px] items-center rounded-lg px-2.5 text-xs font-semibold', period[0] === k ? 'bg-accent text-white' : 'bg-panel2/70 text-muted hover:text-ink')}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <div ref={contentRef} className="bg-bg">{body}</div>
         </div>

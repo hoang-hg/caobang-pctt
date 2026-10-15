@@ -64,6 +64,9 @@ check('/auth/me: Cấp 3 có đúng 1 vai trò, quyền chỉ trong xã', me.ass
 const cobaSos = (await call('GET', '/sos', null, T.coba)).data;
 check('Cấp 3 chỉ thấy SOS trong xã Cô Ba', cobaSos.every((t) => t.admin_code === 'CB-COBA'), `${cobaSos.length} phiếu`);
 const allSos = (await call('GET', '/sos', null, T.chihuy)).data;
+// Danh sách tra cứu hồ sơ (Điều hành cứu hộ → Danh sách: 48 giờ / 7 ngày / 30 ngày) — tối đa 90 ngày
+check('Danh sách SOS 30 ngày (tra cứu hồ sơ) → 200', (await call('GET', '/sos?hours=720', null, T.chihuy)).status === 200);
+check('Danh sách SOS kỳ quá 90 ngày → 422', (await call('GET', '/sos?hours=100000', null, T.chihuy)).status === 422);
 const tpTicket = allSos.find((t) => t.admin_code === 'CB-THUCPHAN' || t.admin_code === 'CB-NUNGTRICAO');
 check('Cấp 3 không sửa được phiếu xã khác → 403', (await call('PATCH', `/sos/${tpTicket.id}`, { status: 'dieu_phoi' }, T.coba)).status === 403);
 const inCoba = await call('POST', '/sos', { raw_message: 'Nhà sập do sạt lở ở xã Cô Ba, 3 người mắc kẹt', source: 'CAN_BO' }, T.coba);

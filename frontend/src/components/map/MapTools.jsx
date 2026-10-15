@@ -242,17 +242,18 @@ export function MapResize() {
   return null;
 }
 
-export function AreaFocus({ area, filtered, padding = {} }) {
+/** `fly` = false: chỉ vẽ ranh giới / phủ mờ ngoài vùng, không bay tới vùng (nơi gọi tự đặt khung nhìn, VD vừa các phiếu SOS). */
+export function AreaFocus({ area, filtered, padding = {}, fly = true }) {
   const map = useMap();
   useEffect(() => {
-    if (!area?.bbox) return;
+    if (!fly || !area?.bbox) return;
     const [x1, y1, x2, y2] = area.bbox;
     map.flyToBounds([[y1, x1], [y2, x2]], {
       paddingTopLeft: padding.topLeft || [30, 30],
       paddingBottomRight: padding.bottomRight || [30, 30],
       duration: 0.8,
     });
-  }, [area?.bbox?.join(','), map]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [area?.bbox?.join(','), map, fly]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const rings = useMemo(() => {
     if (!area?.geometry) return null;

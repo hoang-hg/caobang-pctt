@@ -1646,7 +1646,9 @@ async function resourcesWard(ctx) {
 // Dải khẩn trên cùng, 4 ô chỉ số; ô "Quá hạn SLA" → đúng các phiếu quá hạn, Quay lại trả bộ lọc cũ; bảng điều phối: đủ 4 cột
 // trên laptop, thẻ chọn cột vừa màn trên điện thoại / iPad; "Danh sách": phân trang, xếp, Excel (laptop thêm PDF); không tải
 // được phiếu → nói rõ, không ghi "không có phiếu"; mất mạng → nút ghi tắt; cảm ứng: vùng chạm ≥ 44 px; tài khoản phường: chỉ
-// phiếu trong phường, không có nút Điều phối. Chỉ xem — không chuyển trạng thái, không điều động.
+// phiếu trong phường, không có nút Điều phối. Form (sơ tán, tiếp nhận, sửa phiếu, huỷ lệnh) chỉ mở, kiểm tra lỗi, đóng; thanh
+// thao tác nhanh (điện thoại); bản đồ tác chiến & diễn biến 48 giờ, kỳ tra cứu 7 / 30 ngày. Chỉ xem — không chuyển trạng
+// thái, không điều động, không ghi số liệu.
 const RESCUE_DEVICES = RESOURCE_DEVICES;
 
 async function rescuePage(ctx) {
@@ -1898,6 +1900,125 @@ async function rescueForms(ctx) {
   }
 }
 
+/**
+ * Bản đồ tác chiến & diễn biến 48 giờ (cho lãnh đạo) — chỉ xem: laptop / iPad mở sẵn, điện thoại thu gọn (bảng phiếu lên
+ * trước); mọi phiếu đang mở có toạ độ đều lên bản đồ (điểm lẻ + số trong các cụm); biểu đồ + thời gian xử lý; chạm điểm →
+ * "Xem phiếu trên bảng" mở đúng phiếu; laptop: lớp lộ trình / vùng nguy cơ không tải được → nói rõ, điểm SOS vẫn hiện.
+ */
+async function rescueOverview(ctx) {
+  const { page, vp } = ctx;
+  const touch = await page.evaluate(() => matchMedia('(pointer: coarse)').matches);
+  const toggle = page.getByRole('button', { name: /Bản đồ tác chiến & diễn biến 48 giờ/ });
+  const section = page.locator('main section').filter({ has: toggle });
+  const open = async () => {
+    await page.goto(`${ROOT}/cuu-ho`);
+    await page.getByRole('group', { name: 'Chỉ số cứu hộ' }).getByRole('button').first().waitFor({ timeout: 20_000 });
+    await toggle.waitFor();
+  };
+  // Điểm SOS trên bản đồ: điểm lẻ + số ghi trên các cụm (đợi gom cụm xong)
+  const mapCount = () => section.evaluate((sec) => ({
+    single: sec.querySelectorAll('.leaflet-marker-icon[title^="SOS-"]').length,
+    clusters: sec.querySelectorAll('.sos-cluster').length,
+    inClusters: [...sec.querySelectorAll('.sos-cluster')].reduce((m, el) => m + Number(el.textContent.trim() || 0), 0),
+  }));
+
+  await step(ctx, 'Bản đồ tác chiến & diễn biến 48 giờ: laptop / iPad mở sẵn, điện thoại thu gọn; mọi phiếu đang mở lên bản đồ; biểu đồ + thời gian xử lý', async () => {
+    await open();
+    const expanded = await toggle.getAttribute('aria-expanded');
+    if (vp.mobile) {
+      if (expanded !== 'false') throw new Error('điện thoại: khối bản đồ & biểu đồ không thu gọn sẵn (bảng phiếu phải lên trước)');
+      if (await section.locator('.leaflet-container').count()) throw new Error('điện thoại: thu gọn nhưng vẫn dựng bản đồ (tải lớp bản đồ thừa)');
+      await toggle.click();
+    } else if (expanded !== 'true') throw new Error('laptop / iPad: khối bản đồ & biểu đồ không mở sẵn');
+    await section.locator('.leaflet-container').waitFor({ timeout: 10_000 });
+    await page.waitForTimeout(1500);
+    const head = await section.getByRole('heading', { name: /phiếu đang mở/ }).innerText();
+    const openCount = Number(head.match(/(\d+) phiếu đang mở/)?.[1] ?? -1);
+    const m = await mapCount();
+    if (m.single + m.inClusters !== openCount) throw new Error(`bản đồ có ${m.single} điểm + ${m.inClusters} trong ${m.clusters} cụm, tiêu đề ghi ${openCount} phiếu đang mở`);
+    const chart = section.locator('[role="img"][aria-label^="Phiếu SOS nhận trong 48 giờ"]');
+    const empty = section.getByText('Chưa có phiếu SOS nào nhận trong 48 giờ qua');
+    await chart.or(empty).first().waitFor({ timeout: 5_000 });
+    let note = `${openCount} phiếu trên bản đồ (${m.clusters} cụm)`;
+    if (await chart.count()) {
+      if ((await section.locator('dl > div').count()) !== 3) throw new Error('thiếu 3 ô thời gian xử lý (tiếp nhận, có đội đi, đội đến nơi)');
+      note += ` · ${(await chart.getAttribute('aria-label')).match(/(\d+) phiếu/)?.[1]} phiếu 48 giờ`;
+    }
+    await expectNoOverflow(ctx, '/cuu-ho (bản đồ & diễn biến)');
+    if (touch) {
+      const bad = await smallTargets(page);
+      if (bad.length) throw new Error(`${bad.length} vùng chạm < 44 px — ${bad.slice(0, 5).map((s) => `${s.what} ${s.size}px`).join(', ')}`);
+    }
+    return note;
+  });
+
+  await step(ctx, 'Chạm điểm SOS trên bản đồ → "Xem phiếu trên bảng" mở đúng phiếu (ô tìm ghi mã phiếu)', async () => {
+    if (!(await section.locator('.leaflet-container').count())) await open();
+    if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
+    await section.locator('.leaflet-container').waitFor({ timeout: 10_000 });
+    await section.scrollIntoViewIfNeeded();
+    const marker = section.locator('.leaflet-marker-icon[title^="SOS-"]').first();
+    for (let i = 0; i < 6 && !(await marker.count()); i += 1) {
+      const cluster = section.locator('.sos-cluster').first();
+      if (!(await cluster.count())) break;
+      await cluster.click({ force: true });
+      await page.waitForTimeout(900);
+    }
+    if (!(await marker.count())) return 'không có phiếu đang mở trên bản đồ';
+    const code = await marker.getAttribute('title');
+    await marker.click({ force: true });
+    await page.getByRole('button', { name: 'Xem phiếu trên bảng' }).click();
+    await page.waitForFunction((c) => document.querySelector('input[aria-label="Tìm trong danh sách"]')?.value === c, code, { timeout: 5_000 });
+    await visible(page.locator(`main article[aria-label^="${code} "]`).or(page.locator('main table tbody tr', { hasText: code }))).waitFor({ timeout: 5_000 });
+    return code;
+  });
+
+  await step(ctx, 'Danh sách: kỳ tra cứu 7 / 30 ngày (phiếu đang mở + đã xong trong kỳ) cho báo cáo tuần, tháng; kỳ nằm trên địa chỉ trang', async () => {
+    await page.goto(`${ROOT}/cuu-ho?xem=danh_sach`);
+    const group = page.getByRole('group', { name: /Kỳ tra cứu/ });
+    await group.waitFor({ timeout: 20_000 });
+    const excel = page.getByRole('button', { name: 'Excel', exact: true });
+    // Số phiếu của Danh sách (không lọc): ghi trên nút Excel "Xuất Excel N phiếu đang lọc"
+    const shown = async () => Number((await excel.getAttribute('title'))?.match(/(\d+)/)?.[1] ?? -1);
+    const rowsOrEmpty = page.locator('main article[aria-label^="SOS-"], main table tbody tr').or(page.getByText(/Không có phiếu SOS nào trong/));
+    await visible(rowsOrEmpty).waitFor({ timeout: 15_000 });
+    const h48 = await shown();
+    await group.getByRole('button', { name: '30 ngày' }).click();
+    await page.waitForURL(/ky=30n/);
+    let h30 = -1;
+    for (let i = 0; i < 30; i += 1) {
+      await page.waitForTimeout(500);
+      h30 = await shown();
+      if (h30 >= h48 && (await page.locator('main [aria-label="Đang tải"]').count()) === 0) break;
+    }
+    if (h30 < h48) throw new Error(`30 ngày (${h30} phiếu) ít hơn 48 giờ (${h48})`);
+    await page.reload();
+    await group.getByRole('button', { name: '30 ngày', pressed: true }).waitFor({ timeout: 20_000 });
+    await page.getByRole('group', { name: 'Cách xem phiếu' }).getByRole('button', { name: 'Bảng điều phối' }).click();
+    if (await group.count()) throw new Error('Bảng điều phối vẫn hiện chọn kỳ (bảng luôn theo 48 giờ)');
+    return `48 giờ ${h48} → 30 ngày ${h30} phiếu`;
+  });
+
+  if (!vp.mobile && !touch) {
+    await step(ctx, 'Lớp lộ trình / vùng nguy cơ không tải được → báo rõ, Thử lại; điểm SOS vẫn hiện', async () => {
+      await page.route('**/api/v1/map/layers**', safeRoute((r) => r.abort('failed')));
+      try {
+        await page.goto(`${ROOT}/cuu-ho`);
+        await section.getByText('Không tải được lộ trình đội, vùng nguy cơ, điểm sơ tán').waitFor({ timeout: 30_000 });
+        await page.waitForTimeout(1000);
+        const m = await mapCount();
+        const head = await section.getByRole('heading', { name: /phiếu đang mở/ }).innerText();
+        const openCount = Number(head.match(/(\d+) phiếu đang mở/)?.[1] ?? -1);
+        if (m.single + m.inClusters !== openCount) throw new Error(`lớp bản đồ lỗi: còn ${m.single + m.inClusters}/${openCount} điểm SOS`);
+        if (!(await section.getByRole('button', { name: 'Thử lại' }).count())) throw new Error('thiếu nút Thử lại');
+        return `${openCount} điểm SOS vẫn hiện`;
+      } finally {
+        await page.unroute('**/api/v1/map/layers**');
+      }
+    });
+  }
+}
+
 /** Tài khoản phường: chỉ phiếu SOS trong phường, không có nút "Điều phối" (quyền dispatch.create) — có "Tiếp nhận" nếu có phiếu chờ. */
 async function rescueWard(ctx) {
   const { page } = ctx;
@@ -1996,6 +2117,7 @@ try {
     const rctxD = { page: dPage, vp: vpD, problems: watch(dPage) };
     await rescuePage(rctxD);
     await rescueForms(rctxD);
+    await rescueOverview(rctxD);
     await dctx.close();
     if (phone) {
       const wctx = await browser.newContext({ ...opts, locale: 'vi-VN' });
