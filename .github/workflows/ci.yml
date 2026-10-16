@@ -101,6 +101,7 @@ jobs:
           SUPERADMIN_PASSWORD=Ci-Pass-$(openssl rand -hex 8)
           SUPERADMIN_PIN=480193
           POSTGRES_PASSWORD=$(openssl rand -hex 16)
+          APP_DB_PASSWORD=$(openssl rand -hex 16)
           MINIO_ROOT_PASSWORD=$(openssl rand -hex 16)
           SMTP_HOST=smtp.ci.local
           BACKUP_REMOTE=offsite:pctt/ci
@@ -197,6 +198,7 @@ jobs:
           SUPERADMIN_PASSWORD=${SUPERADMIN_PASSWORD}
           SUPERADMIN_PIN=${SUPERADMIN_PIN}
           POSTGRES_PASSWORD=$(openssl rand -hex 16)
+          APP_DB_PASSWORD=$(openssl rand -hex 16)
           MINIO_ROOT_PASSWORD=$(openssl rand -hex 16)
           SMTP_HOST=mailpit
           SMTP_PORT=1025
@@ -242,6 +244,19 @@ jobs:
           echo "Stack không sẵn sàng sau 15 phút"; $DC ps; exit 1
       - name: Kiểm thử luồng vận hành thật
         run: node tests/e2e/prod-flow.mjs http://127.0.0.1:8080 http://127.0.0.1:8025
+      # DB1 (docs/csdl-viec-con-lai.md): backend / worker chạy bằng pctt_app (migrate tạo), không superuser; nhật ký pháp lý
+      # không sửa / xoá được — cả bằng tài khoản ứng dụng (thiếu quyền) lẫn chủ sở hữu (trigger)
+      - name: Tài khoản CSDL của ứng dụng — không superuser, nhật ký pháp lý chỉ ghi thêm
+        run: |
+          q() { $DC exec -T db psql -U pctt -d caobang_pctt -v ON_ERROR_STOP=1 -Atc "$1"; }
+          test "$(q "SELECT count(*) > 0 FROM pg_stat_activity WHERE usename = 'pctt_app'")" = t
+          test "$(q "SELECT rolsuper FROM pg_roles WHERE rolname = 'pctt_app'")" = f
+          test "$(q "SELECT has_table_privilege('pctt_app', 'communications.audit_logs', 'UPDATE,DELETE,TRUNCATE')")" = f
+          test "$(q "SELECT count(*) > 0 FROM communications.audit_logs")" = t
+          if q "DELETE FROM communications.audit_logs WHERE id = (SELECT min(id) FROM communications.audit_logs)"; then
+            echo "Xoá nhật ký pháp lý phải bị trigger chặn"; exit 1
+          fi
+          echo "pctt_app không superuser; nhật ký pháp lý chỉ ghi thêm"
       # prod-flow vừa nhập tệp mẫu (CB-LL-001…) → golive phải NO-GO và chỉ ra bản ghi mẫu; không phần nào lỗi giữa chừng
       - name: Kiểm tra Go / No-Go (deploy/golive-check.sh)
         run: |
@@ -252,6 +267,7 @@ jobs:
           cat golive.log
           [ "$code" -eq 1 ] || { echo "Phải NO-GO: còn dữ liệu mẫu của prod-flow"; exit 1; }
           grep -q "Còn bản ghi mẫu CB-LL-001" golive.log || { echo "Không phát hiện bản ghi mẫu"; exit 1; }
+          grep -q "^ĐẠT *Tài khoản CSDL của ứng dụng (pctt_app)" golive.log || { echo "golive: tài khoản CSDL của ứng dụng chưa đạt"; exit 1; }
           ! grep -q "Không kiểm tra được" golive.log || { echo "Có phần kiểm tra bị lỗi giữa chừng"; exit 1; }
           for t in T1 T2 T3 T5; do
             grep -q "^ĐẠT *$t " golive.log || { echo "Kịch bản đối kháng $t không đạt"; exit 1; }

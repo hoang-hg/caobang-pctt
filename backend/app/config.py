@@ -22,6 +22,11 @@ class Settings(BaseSettings):
     db_max_overflow: int = 5
     # Thời gian tối đa của 1 câu lệnh SQL ở tiến trình API (ms); 0 = không giới hạn. Worker / migrate không áp dụng
     db_statement_timeout_ms: int = 30_000
+    # Tài khoản CSDL riêng của ứng dụng (DB1, app/db_roles.py): service migrate tạo / cập nhật mỗi lần triển khai, backend /
+    # worker kết nối bằng tài khoản này (docker-compose.prod.yml) — không superuser, nhật ký pháp lý chỉ ghi thêm. Mật khẩu
+    # trống = không tạo (máy dev dùng tài khoản chủ sở hữu)
+    app_db_user: str = "pctt_app"
+    app_db_password: str = ""
     # Nơi chép bản sao lưu ra ngoài máy chủ (service backup-offsite, README 10.5) — backend chỉ dùng để cảnh báo
     backup_remote: str = ""
     jwt_secret: str = DEV_JWT_SECRET

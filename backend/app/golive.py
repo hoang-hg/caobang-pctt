@@ -61,6 +61,7 @@ async def check_config() -> list[Item]:
     if settings.demo_mode or settings.simulator:
         out.append(Item(FAIL, "DEMO_MODE / SIMULATOR đang bật — số liệu trên cổng là giả"))
     out += await check_audit_logs()
+    out += await check_db_role()
     if settings.pii_retention_days <= 0:
         out.append(
             Item(
@@ -89,6 +90,40 @@ async def check_audit_logs() -> list[Item]:
             )
         ]
     return [Item(OK, "Nhật ký pháp lý chỉ ghi thêm: đủ 4 trigger chặn sửa / xoá / làm rỗng")]
+
+
+async def check_db_role() -> list[Item]:
+    """DB1 (docs/csdl-viec-con-lai.md): ứng dụng kết nối CSDL bằng tài khoản riêng (app/db_roles.py), không superuser, không
+    quyền sửa / xoá nhật ký pháp lý. golive chạy trong worker → current_user là tài khoản worker đang dùng."""
+    me = await fetch_one(
+        """SELECT current_user AS name, r.rolsuper AS superuser,
+                  has_table_privilege('communications.audit_logs', 'UPDATE')
+                    OR has_table_privilege('communications.audit_logs', 'DELETE')
+                    OR has_table_privilege('communications.rbac_audit_log', 'UPDATE')
+                    OR has_table_privilege('communications.rbac_audit_log', 'DELETE') AS can_edit_logs
+             FROM pg_roles r WHERE r.rolname = current_user"""
+    )
+    out: list[Item] = []
+    if me["superuser"]:
+        out.append(
+            Item(
+                FAIL,
+                f"Ứng dụng kết nối CSDL bằng superuser ({me['name']}) — đặt APP_DB_PASSWORD, dùng docker-compose.prod.yml",
+            )
+        )
+    elif me["can_edit_logs"]:
+        out.append(
+            Item(
+                FAIL,
+                f"Tài khoản {me['name']} sửa / xoá được nhật ký pháp lý — chạy lại service migrate (app/db_roles.py)",
+            )
+        )
+    return out or [
+        Item(
+            OK,
+            f"Tài khoản CSDL của ứng dụng ({me['name']}): không superuser, nhật ký pháp lý chỉ đọc + ghi thêm",
+        )
+    ]
 
 
 async def check_data() -> list[Item]:

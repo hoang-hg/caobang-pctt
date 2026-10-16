@@ -27,6 +27,8 @@ Script chỉ đọc dữ liệu. Ngoại lệ duy nhất là 2 lần tra cứu s
 - Không có lỗi hay **cảnh báo** khởi động: Turnstile, SMTP thật, `BACKUP_REMOTE`, TOTP bắt buộc cho vai trò lãnh đạo.
 - `APP_ENV=production`, không bật `DEMO_MODE` / `SIMULATOR`.
 - Nhật ký pháp lý chỉ ghi thêm: đủ 4 trigger chặn sửa / xoá / làm rỗng, không cái nào đang tắt.
+- Ứng dụng kết nối CSDL bằng tài khoản riêng (`APP_DB_USER`, mặc định `pctt_app`) — **không superuser**, không có quyền sửa /
+  xoá nhật ký pháp lý.
 
 ## 3. Dữ liệu (tự động: phần "3. Dữ liệu")
 

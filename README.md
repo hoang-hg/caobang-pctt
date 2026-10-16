@@ -446,7 +446,8 @@ Mọi biến của backend khai báo ở `backend/app/config.py`. Tệp mẫu: `
 | `TOTP_REQUIRED_ROLES` | trống | `super_admin,admin_tinh` | Vai trò bắt buộc xác thực 2 lớp ([11.1](#xac-thuc-2-lop)); trống → cảnh báo khi khởi động; còn tên vai trò cũ → cảnh báo |
 | `TOTP_ISSUER` | `BCH PCTT Cao Bằng` | tuỳ chọn | Tên hiện trong ứng dụng xác thực |
 | `POSTGRES_USER` / `_DB` | `pctt` / `caobang_pctt` | tuỳ chọn | |
-| `POSTGRES_PASSWORD` | `pctt_dev_password` | **bắt buộc** (dùng hex, ghép vào URL) | |
+| `POSTGRES_PASSWORD` | `pctt_dev_password` | **bắt buộc** (dùng hex, ghép vào URL) | Chủ sở hữu CSDL (superuser) — chỉ service migrate và sao lưu dùng |
+| `APP_DB_USER` / `APP_DB_PASSWORD` | `pctt_app` / trống | **bắt buộc** mật khẩu (`openssl rand -hex 24`, khác `POSTGRES_PASSWORD`) | Tài khoản CSDL của backend / worker: không superuser, không đổi cấu trúc bảng, nhật ký pháp lý chỉ ghi thêm. Service migrate tạo / cấp quyền / đặt lại mật khẩu mỗi lần triển khai (`app/db_roles.py`); `deploy/update.sh` tự tạo mật khẩu nếu máy cài từ trước chưa có. Trống (máy dev) = dùng tài khoản chủ sở hữu |
 | `POSTGRES_PORT` | `5433` | — | Cổng mở ra máy (chỉ dev) |
 | `POSTGRES_MAX_CONNECTIONS` | — | `200` | |
 | `POSTGRES_SHARED_BUFFERS` / `_EFFECTIVE_CACHE_SIZE` / `_WORK_MEM` / `_MAINTENANCE_WORK_MEM` | — | `4GB` / `12GB` / `16MB` / `512MB` | Bộ nhớ Postgres cho máy 16 GB (≈ 25% / 75% RAM) |
@@ -1245,7 +1246,8 @@ Tổng kết nối CSDL ≈ (`API_WORKERS` × số bản backend + 1) × (`DB_PO
 git clone <kho mã> /opt/caobang-pctt && cd /opt/caobang-pctt
 cp .env.production.example .env.production && chmod 600 .env.production
 # Điền: DOMAIN, ACME_EMAIL, JWT_SECRET + SECRET_KEY (openssl rand -hex 32, khác nhau), POSTGRES_PASSWORD +
-# MINIO_ROOT_PASSWORD (openssl rand -hex 24), SUPERADMIN_*, SMTP_*, TURNSTILE_*, OPEN_METEO_API_KEY…
+# APP_DB_PASSWORD + MINIO_ROOT_PASSWORD (openssl rand -hex 24, mỗi cái một chuỗi), SUPERADMIN_*, SMTP_*, TURNSTILE_*,
+# OPEN_METEO_API_KEY…
 mkdir -p backups
 sh deploy/fetch-basemap.sh              # bản đồ nền tự lưu trữ → data/tiles (mục 6.9)
 alias dcp='docker compose -f docker-compose.prod.yml --env-file .env.production'
@@ -1357,10 +1359,14 @@ Khôi phục CSDL (đã thử nghiệm với TimescaleDB):
 dcp stop backend worker
 dcp exec -T db psql -U pctt -d postgres -c "DROP DATABASE IF EXISTS caobang_pctt WITH (FORCE)" -c "CREATE DATABASE caobang_pctt"
 dcp exec -T db psql -U pctt -d caobang_pctt -c "CREATE EXTENSION IF NOT EXISTS timescaledb" -c "SELECT timescaledb_pre_restore()"
-dcp exec -T db pg_restore -U pctt -d caobang_pctt --no-owner < backups/db/pctt_<ngày_giờ>.dump
+dcp exec -T db pg_restore -U pctt -d caobang_pctt --no-owner --no-privileges < backups/db/pctt_<ngày_giờ>.dump
 dcp exec -T db psql -U pctt -d caobang_pctt -c "SELECT timescaledb_post_restore()"
 dcp up -d
 ```
+
+`--no-privileges`: không khôi phục lệnh cấp quyền trong bản sao lưu (khôi phục sang máy mới thì tài khoản ứng dụng
+`pctt_app` chưa có, `pg_restore` sẽ báo lỗi). `dcp up -d` chạy lại service migrate: tạo tài khoản ứng dụng và cấp lại
+quyền (`app/db_roles.py`).
 
 Khôi phục ảnh: `dcp stop minio`, rồi
 `docker run --rm -v caobang-pctt-prod_minio_data:/data -v "$PWD/backups/photos:/b" alpine tar -xzf /b/photos_<…>.tar.gz -C /data`,
@@ -1557,7 +1563,7 @@ chọn giờ vắng người, báo trước người dùng các ứng dụng kh�
 ## 11. Bảo mật & tuân thủ
 
 **Đã có**: HTTPS + HSTS; kiểm tra cấu hình khi khởi động; mật khẩu và PIN băm PBKDF2, khoá đăng nhập sai theo tài khoản + IP (không khoá được người duyệt cảnh báo từ xa);
-xác thực 2 lớp TOTP, bắt buộc theo vai trò ([11.1](#xac-thuc-2-lop)); PIN ký duyệt cảnh báo; RBAC theo địa bàn, chống leo thang; nhật ký thao tác & phân quyền **chỉ ghi thêm** (trigger chặn sửa / xoá / làm rỗng — migration 0022; Go / No-Go báo LỖI khi thiếu / tắt trigger); giới hạn tần suất chống giả mạo IP;
+xác thực 2 lớp TOTP, bắt buộc theo vai trò ([11.1](#xac-thuc-2-lop)); PIN ký duyệt cảnh báo; RBAC theo địa bàn, chống leo thang; nhật ký thao tác & phân quyền **chỉ ghi thêm** (trigger chặn sửa / xoá / làm rỗng — migration 0022; Go / No-Go báo LỖI khi thiếu / tắt trigger); backend / worker kết nối CSDL bằng tài khoản riêng `pctt_app`, không superuser, không đổi được cấu trúc bảng, không có quyền sửa / xoá nhật ký (`app/db_roles.py`; Go / No-Go báo LỖI nếu ứng dụng còn chạy bằng superuser); giới hạn tần suất chống giả mạo IP;
 ảnh xoá EXIF/GPS, link ảnh có chữ ký; IP người phản ánh chỉ lưu băm; CSDL / Redis / MinIO không mở cổng, không ra
 Internet; container backend không chạy root; Swagger tắt ở production; log không chứa token, toạ độ; API key đối tác mã
 hoá Fernet (`SECRET_KEY`), khoá thiết bị băm SHA-256, log `httpx` hạ xuống WARNING để không lộ key trong URL; cổng webhook
