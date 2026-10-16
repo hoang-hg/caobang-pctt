@@ -1496,6 +1496,13 @@ chat / email / kho mã.
 
 2. Cập nhật: `sh deploy/update.sh X.Y.Z` → chờ dòng `XONG: đang chạy vX.Y.Z` (2–5 phút, trang ngắt 10–30 giây). Ghi lại
    tên bản sao lưu `backups/db/pctt_…_truoc-X.Y.Z.dump` script in ra.
+
+   Máy đang chạy bản **trước 1.1.0** lên 1.1.0 trở đi: `update.sh` trên máy là bản cũ (chạy logic của chính nó), chưa biết
+   tự tạo mật khẩu tài khoản CSDL của ứng dụng → thêm trước, một lần (không in mật khẩu ra màn hình):
+
+   ```bash
+   grep -q '^APP_DB_PASSWORD=.' .env.production || echo "APP_DB_PASSWORD=$(openssl rand -hex 24)" >> .env.production
+   ```
 3. Kiểm tra sau:
 
    ```bash
