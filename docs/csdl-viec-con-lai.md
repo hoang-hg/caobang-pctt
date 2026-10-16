@@ -67,7 +67,7 @@ Kỹ thuật:
 
 | # | Việc | Vì sao | Thay đổi CSDL | Ưu tiên |
 |---|---|---|---|---|
-| DB1 | **Tách vai trò CSDL; nhật ký pháp lý chỉ ghi thêm** | Ứng dụng kết nối bằng tài khoản quản trị CSDL (superuser), có quyền sửa / xoá / làm rỗng `audit_logs` → nhật ký pháp lý (thiết kế E.4) sửa được; hồ sơ an toàn thông tin cấp độ 3 cần phân quyền tối thiểu | Vai trò ứng dụng riêng (không superuser); thu hồi UPDATE / DELETE / TRUNCATE trên 2 bảng nhật ký; trigger chặn sửa / xoá | **Một phần** — trigger đã làm (PR #86, migration 0022); tài khoản ứng dụng riêng: **Cao**, trước vận hành |
+| DB1 | **Tách vai trò CSDL; nhật ký pháp lý chỉ ghi thêm** | Ứng dụng kết nối bằng tài khoản quản trị CSDL (superuser), có quyền sửa / xoá / làm rỗng `audit_logs` → nhật ký pháp lý (thiết kế E.4) sửa được; hồ sơ an toàn thông tin cấp độ 3 cần phân quyền tối thiểu | Vai trò ứng dụng riêng (không superuser); thu hồi UPDATE / DELETE / TRUNCATE trên 2 bảng nhật ký; trigger chặn sửa / xoá | **Đã làm** — trigger (PR #86, migration 0022); tài khoản ứng dụng riêng `pctt_app` (PR #90, `app/db_roles.py`) |
 | DB2 | **Khoá duy nhất số đo (trạm, thời điểm)** | Thiết bị gửi lại khi mất mạng, MQTT giao lại tin: 2 bản tin đến cùng lúc vẫn ghi trùng → mưa cộng dồn bị tính đôi | Chỉ mục duy nhất + `ON CONFLICT DO NOTHING` khi ghi | **Đã làm** (PR #85, migration 0021) |
 | DB3 | **Chỉ mục cho truy vấn vận hành** | Đủ nhanh với dữ liệu mẫu; khi phiếu, lệnh, nhật ký lên hàng vạn thì các truy vấn SLA, danh sách phiếu, vùng cảnh báo phải quét cả bảng | 6 chỉ mục (mục 4) | **Đã làm** (PR #85, migration 0021); đo lại bằng EXPLAIN khi thử tải (CF4 trang F, V2 trang A) |
 | DB4 | **Thời hạn lưu dữ liệu cá nhân** | Luật Bảo vệ dữ liệu cá nhân (hiệu lực 01/01/2026): họ tên, SĐT, tin nhắn, ảnh của người dân đang lưu vô thời hạn | Cột đánh dấu đã ẩn danh + việc định kỳ trong `retention.py` | **Đã làm cơ chế** (PR #87, migration 0023) — mặc định tắt, **chờ chủ dự án chốt thời hạn** |
@@ -85,12 +85,25 @@ Kỹ thuật:
 Các đoạn SQL dưới đây là **phác thảo** để thống nhất hướng làm — viết thành migration Alembic, chạy thử trên bản sao CSDL thật
 trước khi áp dụng.
 
-### DB1 — Tách vai trò CSDL, nhật ký pháp lý chỉ ghi thêm
+### DB1 — Tách vai trò CSDL, nhật ký pháp lý chỉ ghi thêm — đã làm (PR #86, #90)
 
-- **Đã làm (PR #86):** migration `0022` — trigger chặn sửa / xoá / làm rỗng `audit_logs`, `rbac_audit_log`, chặn cả tài
-  khoản chủ sở hữu (chỉ chủ sở hữu bảng tắt được trigger). `seed --reset` (chỉ máy dev / trình diễn / CI) tạm tắt trigger
-  trong giao dịch. Kiểm tra Go / No-Go báo LỖI khi thiếu / tắt trigger.
-- **Còn lại:** tài khoản CSDL riêng cho ứng dụng (phần dưới).
+- **PR #86:** migration `0022` — trigger chặn sửa / xoá / làm rỗng `audit_logs`, `rbac_audit_log`, chặn cả tài khoản chủ
+  sở hữu (chỉ chủ sở hữu bảng tắt được trigger). `seed --reset` (chỉ máy dev / trình diễn / CI) tạm tắt trigger trong giao
+  dịch. Kiểm tra Go / No-Go báo LỖI khi thiếu / tắt trigger.
+- **PR #90 — tài khoản CSDL riêng cho ứng dụng:**
+  - `app/db_roles.py` (service migrate, sau alembic + seed, **mỗi lần triển khai**): tạo / cập nhật `pctt_app` — không
+    superuser, không tạo CSDL / tài khoản; mật khẩu gửi dạng băm SCRAM-SHA-256 (không nằm trong câu lệnh, nhật ký, thông
+    báo lỗi). Cấp đọc / ghi 7 schema nghiệp vụ + bảng phân quyền casbin (bảng, chuỗi số mới của migration được cấp ngay lần
+    triển khai đó); thu hồi sửa / xoá / làm rỗng 2 bảng nhật ký pháp lý. Không cấp `alembic_version`.
+  - `docker-compose.prod.yml`: backend / worker kết nối bằng `APP_DB_USER` / `APP_DB_PASSWORD` (bắt buộc); migrate, sao
+    lưu giữ tài khoản chủ sở hữu. `deploy/update.sh` tự tạo `APP_DB_PASSWORD` cho máy cài từ trước.
+  - Khôi phục sao lưu: `pg_restore --no-privileges` (máy mới chưa có `pctt_app`; quyền do migrate cấp lại) — README 10.5,
+    `deploy/restore-drill.sh`.
+  - Kiểm tra Go / No-Go báo LỖI nếu ứng dụng chạy bằng superuser / sửa được nhật ký; CI job Production kiểm tra trực tiếp
+    trên CSDL (`pctt_app` đang kết nối, không superuser, không quyền sửa / xoá nhật ký, xoá nhật ký bị trigger chặn).
+  - Máy dev / CI E2E: `APP_DB_PASSWORD` trống → bỏ qua, ứng dụng dùng tài khoản chủ sở hữu như trước.
+
+Phần dưới giữ lại để tra cứu.
 
 
 - **Hiện trạng:**
@@ -402,7 +415,7 @@ SELECT add_continuous_aggregate_policy('iot_telemetry.readings_hourly',
 
 1. **DB2 + DB3** — một migration nhỏ, không đổi hành vi; đo lại bằng `EXPLAIN ANALYZE`.
 2. **DB1** — sửa cả cấu hình triển khai (`docker-compose.prod.yml`, `.env.production`, `golive.py`); thử trên stack giống bản
-   chạy thật (job Production của CI).
+   chạy thật (job Production của CI). **Xong** (PR #86, #90).
 3. **DB4** — sau khi chủ dự án chốt thời hạn lưu.
 4. **DB5 + DB7 + DB8** — cùng một đợt (cùng dùng `event_id`), kèm giao diện mở / đóng đợt và báo cáo theo đợt. **Xong**
    (PR #88, #89).

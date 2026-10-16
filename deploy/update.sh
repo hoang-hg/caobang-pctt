@@ -147,6 +147,12 @@ if [ -d "$TMP/src" ]; then
 fi
 setenv BACKEND_IMAGE "$NEW_BACKEND"
 setenv FRONTEND_IMAGE "$NEW_FRONTEND"
+# Từ bản có tài khoản CSDL riêng cho ứng dụng (docs/csdl-viec-con-lai.md, DB1): máy cài từ trước chưa có APP_DB_PASSWORD
+# → tạo mật khẩu ngẫu nhiên (service migrate tạo tài khoản pctt_app bằng mật khẩu này). Quay lại bản cũ thì bỏ theo env.before
+if [ -z "$(envval APP_DB_PASSWORD)" ]; then
+	setenv APP_DB_PASSWORD "$(openssl rand -hex 24 2>/dev/null || head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+	echo "Đã tạo APP_DB_PASSWORD (tài khoản CSDL của ứng dụng) trong $ENV_FILE"
+fi
 
 # ---- 5. Kiểm tra
 health_ok() {

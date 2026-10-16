@@ -8,7 +8,8 @@
 #   frontend  nginx: giao diện, cache API công khai, ghi đè X-Forwarded-For
 #   backend   API (gunicorn × API_WORKERS), nhân bản được: --scale backend=N
 #   worker    tác vụ nền — CHỈ 1 bản
-#   migrate   chạy 1 lần mỗi lần triển khai: alembic upgrade + seed dữ liệu nền (bỏ qua nếu đã có)
+#   migrate   chạy 1 lần mỗi lần triển khai: alembic upgrade + seed dữ liệu nền (bỏ qua nếu đã có) + tài khoản CSDL của
+#             ứng dụng (app/db_roles.py) — backend / worker kết nối bằng APP_DB_USER, KHÔNG phải superuser POSTGRES_USER
 #   db, redis, minio  chỉ trong mạng "data" (không mở cổng, không ra Internet)
 #   backup    pg_dump hằng ngày + lưu trữ ảnh vào BACKUP_DIR — PHẢI chép ra máy/nơi khác (README.md mục 10.5)
 #   mqtt      (profile "mqtt") broker IoT có tài khoản + ACL + TLS 8883
@@ -162,8 +163,10 @@ services:
     image: ${BACKEND_IMAGE:-caobang-pctt-backend:local}
     build: ./backend
     environment:
-      <<: *backend-env
-    command: ["sh", "-c", "alembic upgrade head && python -m app.seed"]
+      <<: *backend-env  # DATABASE_URL = chủ sở hữu CSDL: đổi cấu trúc bảng, tạo / cấp quyền tài khoản ứng dụng
+      APP_DB_USER: ${APP_DB_USER:-pctt_app}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Đặt APP_DB_PASSWORD (openssl rand -hex 24) — mật khẩu tài khoản CSDL của ứng dụng}
+    command: ["sh", "-c", "alembic upgrade head && python -m app.seed && python -m app.db_roles"]
     restart: "no"
     networks: [data, default]
     depends_on:
@@ -181,6 +184,8 @@ services:
     restart: unless-stopped
     environment:
       <<: *backend-env
+      # Tài khoản ứng dụng (không superuser; nhật ký pháp lý chỉ ghi thêm) — do service migrate tạo / cấp quyền
+      DATABASE_URL: postgresql+psycopg://${APP_DB_USER:-pctt_app}:${APP_DB_PASSWORD:?Đặt APP_DB_PASSWORD}@db:5432/${POSTGRES_DB:-caobang_pctt}
       RUN_MODE: api
       API_WORKERS: ${API_WORKERS:-4}
     networks: [data, default]
@@ -209,6 +214,7 @@ services:
     restart: unless-stopped
     environment:
       <<: *backend-env
+      DATABASE_URL: postgresql+psycopg://${APP_DB_USER:-pctt_app}:${APP_DB_PASSWORD:?Đặt APP_DB_PASSWORD}@db:5432/${POSTGRES_DB:-caobang_pctt}
       RUN_MODE: worker
       OPS_API_URL: http://backend:8000/health  # tự giám sát: API còn trả lời không
     command: ["python", "-m", "app.worker"]

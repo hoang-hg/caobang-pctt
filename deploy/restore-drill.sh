@@ -34,8 +34,9 @@ sql() { docker exec -i -e PGOPTIONS='-c client_min_messages=warning' "$NAME" psq
 t1=$(now)
 sql -d postgres -c "CREATE DATABASE caobang_pctt"
 sql -d caobang_pctt -c "CREATE EXTENSION IF NOT EXISTS timescaledb" -c "SELECT timescaledb_pre_restore()" >/dev/null
-# Như README 10.5: pg_restore --no-owner. Lỗi (không phải cảnh báo) → diễn tập KHÔNG ĐẠT
-if ! docker exec -i "$NAME" pg_restore -U pctt -d caobang_pctt --no-owner --exit-on-error < "$DUMP"; then
+# Như README 10.5: pg_restore --no-owner --no-privileges (quyền của tài khoản ứng dụng pctt_app do service migrate cấp lại —
+# CSDL tạm không có tài khoản đó). Lỗi (không phải cảnh báo) → diễn tập KHÔNG ĐẠT
+if ! docker exec -i "$NAME" pg_restore -U pctt -d caobang_pctt --no-owner --no-privileges --exit-on-error < "$DUMP"; then
   echo "LỖI: pg_restore thất bại — bản sao lưu không khôi phục được"
   exit 1
 fi
