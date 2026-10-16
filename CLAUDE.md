@@ -34,6 +34,8 @@ db/init/01_extensions.sql  postgis, timescaledb, pg_trgm, unaccent
 tests/e2e/*.mjs            kiểm thử API qua HTTP (Node 20+, cần stack dev chạy với DEMO_MODE=true)
 tests/load/                load.js (k6) + make_photo.py — kiểm thử tải (README §12.2)
 scripts/maintenance/       script bảo trì CSDL máy dev (clean-simulated-data: chặn nếu APP_ENV≠development, cần --yes)
+docs/                      GO-LIVE.md (Go / No-Go + biên bản) · trang-a…f-, csdl-viec-con-lai.md (đối chiếu thiết kế Part 1
+                           mục A–G, việc còn lại — xong việc nào sửa dòng đó). Ngoài README chỉ có các tệp này
 .github/workflows/ci.yml · deploy.yml
 
 backend/                   Python 3.12, FastAPI, SQLAlchemy async (psycopg3), Casbin, gunicorn + UvicornWorker
