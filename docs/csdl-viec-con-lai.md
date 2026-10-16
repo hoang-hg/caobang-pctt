@@ -5,6 +5,8 @@ TimescaleDB, 5 cụm (schema) `spatial_admin`, `resources`, `operations`, `iot_t
 
 - Rà ngày 15/10/2026 trên CSDL dựng từ `main` (20 migration Alembic `0001` → `0020`), ảnh `timescale/timescaledb-ha:pg16`:
   PostGIS 3.6, TimescaleDB 2.30, `pg_trgm`, `unaccent`. Số liệu trong tài liệu đo trên stack thử (dữ liệu mẫu).
+- **Cập nhật 16/10/2026** sau khi làm DB1 – DB5, DB7 – DB9 (PR #85 → #90, migration `0021` → `0025`): mục 1, 2 ghi trạng
+  thái hiện tại; mục 4 giữ phần phác thảo ban đầu để tra cứu.
 - Máy chủ thử vẫn chạy **v1.0.3** — xem V1 trong `docs/trang-a-viec-con-lai.md`.
 - Việc về **dữ liệu** (không phải cấu trúc bảng) đã ghi ở tài liệu từng trang — tóm tắt ở mục 5.
 
@@ -15,21 +17,21 @@ TimescaleDB, 5 cụm (schema) `spatial_admin`, `resources`, `operations`, `iot_t
   - `Polygon` làm bằng `MultiPolygon` (vùng gồm nhiều mảnh);
   - `alert_broadcasts.sent_by` tách thành người soạn (`created_by`) và người ký duyệt (`approved_by`) theo quy trình
     Maker – Checker.
-- Hệ thống có thêm **32 bảng ngoài thiết kế** (43 bảng, 7 schema): hồ chứa, dự báo, kịch bản ngập, phản ánh của người dân,
-  nhập dữ liệu, tích hợp thiết bị, tài khoản – phân quyền – nhật ký…
-- **Nên bổ sung** (mục 3):
-  - 4 việc trước khi vận hành, về toàn vẹn và an toàn dữ liệu (DB1 – DB4);
-  - 5 việc để báo cáo, truy vết theo đợt thiên tai (DB5 – DB9);
-  - 2 việc khi có số liệu / mạng đường thật (DB10, DB11);
-  - vài việc tuỳ chọn (DB12).
+- Hệ thống có thêm **35 bảng ngoài thiết kế** (46 bảng, 7 schema): hồ chứa, dự báo, kịch bản ngập, phản ánh của người dân,
+  nhập dữ liệu, tích hợp thiết bị, tài khoản – phân quyền – nhật ký, sổ xuất – nhập kho, lịch sử sơ tán, đợt thiên tai…
+- **Đề xuất bổ sung** (mục 3):
+  - **đã làm** 8 việc: DB1 – DB5, DB7 – DB9 (PR #85 → #90) — vai trò CSDL + nhật ký chỉ ghi thêm, khoá số đo, chỉ mục, cơ
+    chế ẩn dữ liệu cá nhân, đợt thiên tai, sổ kho, lịch sử sơ tán, khoá ngoại;
+  - **còn**: DB4 chờ chủ dự án chốt thời hạn lưu (cơ chế có sẵn, đang tắt); DB6 chờ BCH xác nhận mẫu thống kê thiệt hại;
+    DB10, DB11 khi có số liệu / mạng đường thật; DB12 tuỳ chọn.
 
 ## 1. Hiện trạng tổng quan
 
 | Schema | Bảng theo thiết kế G | Bảng bổ sung (ngoài G) |
 |---|---|---|
 | `spatial_admin` | `administrative_units` | `place_names` (địa danh cho tìm kiếm), `presets` (nhóm lọc nhanh) |
-| `resources` | `forces`, `warehouses`, `inventory`, `vehicles` | `items` (danh mục vật tư), `evacuation_sites`, `fuel_depots` |
-| `operations` | `sos_tickets`, `dispatch_orders` | `dispatch_field_reports` (trưởng nhóm báo qua link nhiệm vụ), `evacuation_progress`, `event_logs`, `road_nodes`, `road_segments`, `data_submissions` (xã gửi dữ liệu chờ duyệt), `system_settings` |
+| `resources` | `forces`, `warehouses`, `inventory`, `vehicles` | `items` (danh mục vật tư), `evacuation_sites`, `fuel_depots`, `inventory_moves` (sổ xuất – nhập kho, DB7) |
+| `operations` | `sos_tickets`, `dispatch_orders` | `dispatch_field_reports` (trưởng nhóm báo qua link nhiệm vụ), `evacuation_progress`, `event_logs`, `road_nodes`, `road_segments`, `data_submissions` (xã gửi dữ liệu chờ duyệt), `system_settings`, `evacuation_history` (lịch sử sơ tán, DB8), `disaster_events` (đợt thiên tai, DB5) |
 | `iot_telemetry` | `monitoring_stations`, `sensor_readings`, `hazard_zones` | `hazard_points`, `reservoirs`, `reservoir_operations`, `forecasts`, `area_forecasts`, `flood_scenarios`, `storm_bulletins`, `cameras` |
 | `communications` | `alert_broadcasts` | `message_templates`, `contacts`, `call_logs`, `audit_logs`, `users`, `password_reset_tokens`, `rbac_audit_log`, `rbac_role_metadata` |
 | `community` (ngoài 5 cụm) | — | `citizen_reports` |
@@ -43,24 +45,27 @@ Kỹ thuật:
   - `reservoir_operations`: khúc 7 ngày, chưa nén, ghi bằng trigger mỗi lần hồ cập nhật.
 - Chưa có bảng tổng hợp liên tục (continuous aggregate).
 - Giữ nhật ký có thời hạn (`services/retention.py`): nhật ký tiếp nhận IoT 30 ngày, dòng sự kiện vận hành 730 ngày. Không
-  xoá nhật ký thao tác, phiếu SOS, phản ánh, lệnh cảnh báo, số đo.
+  xoá nhật ký thao tác, phiếu SOS, phản ánh, lệnh cảnh báo, số đo. Họ tên, SĐT, tin nhắn, ảnh của người dân ẩn sau
+  `PII_RETENTION_DAYS` ngày (DB4 — mặc định tắt).
+- Nhật ký pháp lý (`audit_logs`, `rbac_audit_log`) chỉ ghi thêm — trigger chặn sửa / xoá / làm rỗng; bản chạy thật kết nối
+  bằng tài khoản `pctt_app` (không superuser, không quyền sửa / xoá nhật ký) — DB1.
 - Có sẵn trong ảnh CSDL nhưng chưa bật: **pgRouting 4.0**, **pgAudit**, `pg_cron`, `postgis_raster`.
 
-## 2. Đối chiếu từng bảng của mục G
+## 2. Đối chiếu từng bảng của mục G (trạng thái 16/10/2026)
 
 | Bảng thiết kế | Cột thiết kế | Hiện trạng |
 |---|---|---|
 | G.1 `administrative_units` | id UUID, name, level (Tỉnh / Xã), parent_id, geom MultiPolygon, population | Đạt — `level` có thêm `thon`; thêm `code`, `unit_type` (xã / phường), `center`, `households` (**ước tính** = dân số / 4), `tags`, `rbac_domain`. Có 56 xã/phường sau sắp xếp + tỉnh + 8 xóm mẫu |
 | G.2 `forces` | id, name, contact_phone, personnel_ready, skills[], location | Đạt — thêm loại / cấp lực lượng, chỉ huy, tần số bộ đàm, quân số tổng / đang nhiệm vụ, trạng thái, vị trí đóng quân. `location` cập nhật khi điều động / đến nơi / cán bộ sửa — **không** theo dõi GPS thời gian thực theo quyết định ngày 29/09/2026 (CD7 trang D) |
 | G.2 `warehouses` | id, name, admin_unit_id, location | Đạt — thêm mã, cấp kho, thủ kho, SĐT |
-| G.2 `inventory` | warehouse_id, item_code, quantity, last_updated | Đạt — thêm định mức an toàn (`safety_quota`), hạn dùng; khoá ngoại tới danh mục `items`. Chỉ lưu **tồn hiện tại** — xem DB7 |
+| G.2 `inventory` | warehouse_id, item_code, quantity, last_updated | Đạt — thêm định mức an toàn (`safety_quota`), hạn dùng; khoá ngoại tới danh mục `items`. Mọi lần tồn kho đổi có dòng sổ `inventory_moves` (ghi bằng trigger — DB7, PR #88) |
 | G.2 `vehicles` | id, vehicle_type, force_id, status, current_location | Đạt — thêm nhiên liệu, sức chở, phiếu đang làm, lý do hỏng. `vehicle_type` chưa có `CHECK` (đã kiểm khi nhập). `current_location`: như `forces.location` |
-| G.3 `sos_tickets` | id, reporter_name / phone, location, incident_type, priority 1–3, status, trapped_count | Đạt — thêm nguồn + mã ngoài (chống trùng tin Zalo / ứng dụng), tin gốc, địa chỉ, nhóm yếu thế, các mốc thời gian tính SLA. Họ tên, SĐT lưu vô thời hạn — xem DB4 |
-| G.3 `dispatch_orders` | id, ticket_id, force_id, dispatched_at, eta, route_geom LineString | Đạt — thêm phương tiện, quân số, vật tư kèm, tuyến có an toàn không, tiến độ, link nhiệm vụ, huỷ lệnh. `route_geom` sinh từ định tuyến né vùng nguy hiểm (`services/safe_routing.py`) |
+| G.3 `sos_tickets` | id, reporter_name / phone, location, incident_type, priority 1–3, status, trapped_count | Đạt — thêm nguồn + mã ngoài (chống trùng tin Zalo / ứng dụng), tin gốc, địa chỉ, nhóm yếu thế, các mốc thời gian tính SLA, đợt thiên tai `event_id` (DB5). Họ tên, SĐT, tin nhắn ẩn sau `PII_RETENTION_DAYS` ngày (DB4 — mặc định tắt, chờ chốt thời hạn) |
+| G.3 `dispatch_orders` | id, ticket_id, force_id, dispatched_at, eta, route_geom LineString | Đạt — thêm phương tiện, quân số, vật tư kèm, tuyến có an toàn không, tiến độ, link nhiệm vụ, huỷ lệnh. `route_geom` sinh từ định tuyến né vùng nguy hiểm (`services/safe_routing.py`). Người ra / huỷ lệnh có khoá ngoại tài khoản, phương tiện kiểm bằng trigger (DB9) |
 | G.4 `monitoring_stations` | id varchar, name, type, location, alarm_thresholds JSONB (BĐ1–3) | Đạt — thêm sông, đơn vị đo, trạng thái, nguồn (mô phỏng / IoT / nhập tệp); `type` thêm độ ẩm đất |
-| G.4 `sensor_readings` | time (khoá phân vùng), station_id, value — hypertable | **Một phần** — hypertable đúng thiết kế, nén sau 7 ngày; **chưa có khoá duy nhất (trạm, thời điểm)**: chống trùng bằng truy vấn kiểm tra trước khi ghi, không an toàn khi 2 bản tin cùng đến (DB2) |
-| G.4 `hazard_zones` | id, type, geom Polygon, valid_until | Đạt — thêm mức Đỏ / Cam / Vàng, nguồn, trạm gây ra, độ sâu ngập |
-| G.5 `alert_broadcasts` | id, message_body, target_polygon, channels[], sent_by, metrics JSONB | Đạt — `sent_by` → `created_by` + `approved_by` (Maker – Checker); `metrics` theo từng kênh; thêm hiệu lực, kết thúc lệnh, mẫu tin, số người nhận |
+| G.4 `sensor_readings` | time (khoá phân vùng), station_id, value — hypertable | Đạt — hypertable đúng thiết kế, nén sau 7 ngày; khoá duy nhất (trạm, thời điểm) + `ON CONFLICT DO NOTHING`: bản tin gửi lại / 2 bản tin cùng đến không ghi trùng (DB2, PR #85) |
+| G.4 `hazard_zones` | id, type, geom Polygon, valid_until | Đạt — thêm mức Đỏ / Cam / Vàng, nguồn, trạm gây ra, độ sâu ngập, đợt thiên tai (DB5) |
+| G.5 `alert_broadcasts` | id, message_body, target_polygon, channels[], sent_by, metrics JSONB | Đạt — `sent_by` → `created_by` + `approved_by` (Maker – Checker); `metrics` theo từng kênh; thêm hiệu lực, kết thúc lệnh, mẫu tin, số người nhận, đợt thiên tai (DB5) |
 | Hệ quản trị | PostgreSQL + PostGIS + TimescaleDB | Đạt |
 
 ## 3. Bảng tổng hợp đề xuất bổ sung
