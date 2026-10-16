@@ -301,6 +301,7 @@ tests/load/         kiểm thử tải (k6)
 scripts/maintenance/  script bảo trì CSDL máy dev (có chặn production)
 deploy/             Caddyfile, backup.sh (chạy thật); golive-check.sh, restore-drill.sh, external-monitor.sh
 docs/GO-LIVE.md     kiểm tra trước khi mở cổng cho người dân (Go / No-Go) + biên bản
+docs/mo-cong-viec-con-lai.md  việc còn lại trên máy chủ thật trước khi mở cổng (tài khoản, cấu hình, dữ liệu, kiểm tra làm tay, quyết định)
 docs/trang-a-viec-con-lai.md  trang Tổng quan: đối chiếu thiết kế mục A, việc còn lại (triển khai, thử tải, dùng thử; dữ liệu thật…)
 docs/trang-b-viec-con-lai.md  trang Bản đồ: đối chiếu thiết kế mục B, việc còn lại (dòng diễn biến, điểm đen sạt lở; radar, camera, DEM…)
 docs/trang-c-viec-con-lai.md  trang Vật tư & Lực lượng: đối chiếu thiết kế mục C, việc còn lại (định mức dự trữ, tổng đài web…)

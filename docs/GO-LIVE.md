@@ -1,7 +1,7 @@
 # Kiểm tra trước khi mở cổng cho người dân (Go / No-Go)
 
 Chỉ công bố địa chỉ cổng khi **cả 7 điều kiện** dưới đây đạt và có người ký xác nhận. Chạy lại toàn bộ trước mỗi lần
-nâng cấp lớn.
+nâng cấp lớn. Việc còn lại của máy chủ thật theo lần kiểm tra gần nhất: [mo-cong-viec-con-lai.md](mo-cong-viec-con-lai.md).
 
 Kiểm tra tự động các điều kiện 2–7 (chạy trên máy chủ thật, trong thư mục cài đặt):
 
