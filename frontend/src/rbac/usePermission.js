@@ -3,6 +3,9 @@ import { useStore } from '../app/store';
 import { useUnits } from '../api/hooks';
 import { allowedCodes, hasPermission } from './permissions';
 
+// Nhãn xã/phường (như components/dashboard/CommuneView unitLabel — chép lại để rbac/ không phụ thuộc component)
+const unitLabel = (u) => `${u.unit_type === 'phuong' ? 'Phường' : 'Xã'} ${u.name}`;
+
 /** Chuyển mã xã (CB-...) → domain RBAC; giữ nguyên nếu đã là domain. */
 function useDomainOf(scope) {
   const { data: units } = useUnits();
@@ -45,6 +48,17 @@ export function useIsCommuneUser() {
     const a = s.auth?.user?.assignments || [];
     return a.length > 0 && a.every((x) => x.role === 'admin_xa');
   });
+}
+
+/** Nhãn địa bàn đang xem: bộ lọc đang chọn → xã duy nhất được giao ("Xã Cô Ba") → "N xã/phường được giao"; tài khoản
+ * toàn tỉnh chưa lọc → "Toàn tỉnh Cao Bằng" (nhãn mặc định của bộ lọc). */
+export function useScopeLabel(obj = 'monitoring', act = 'view') {
+  const filter = useStore((s) => s.filter);
+  const scope = useAllowedCodes(obj, act);
+  const { data: units } = useUnits();
+  if (filter.codes.length || scope === null) return filter.label;
+  const only = scope.length === 1 ? units?.find((u) => u.code === scope[0]) : null;
+  return only ? unitLabel(only) : `${scope.length} xã/phường được giao`;
 }
 
 /** <Can I="sos" a="update" scope={ticket.admin_code}>…</Can> */

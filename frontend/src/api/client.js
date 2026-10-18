@@ -1,4 +1,5 @@
 import { useStore } from '../app/store';
+import { homeCommune } from '../rbac/permissions';
 
 export class ApiError extends Error {
   constructor(status, message) { super(message); this.status = status; }
@@ -54,10 +55,13 @@ export async function api(path, { method = 'GET', body, params } = {}) {
   return res.json();
 }
 
-/** Tham số lọc địa phương dùng chung cho mọi truy vấn. */
+/** Tham số lọc địa phương dùng chung cho mọi truy vấn: bộ lọc đang chọn; chưa lọc mà tài khoản chỉ được giao một xã → xã đó
+ * (bản đồ bay tới ranh giới xã, không mở ra cả tỉnh — /admin-units/area không kèm mã trả ranh giới toàn tỉnh). */
 export const useAreaParams = () => {
   const codes = useStore((s) => s.filter.codes);
-  return { admin_codes: codes.length ? codes.join(',') : undefined };
+  const home = useStore((s) => homeCommune(s.auth?.user?.permissions));
+  const list = codes.length ? codes : home ? [home] : [];
+  return { admin_codes: list.length ? list.join(',') : undefined };
 };
 
 /** Gửi tệp (multipart/form-data). Lỗi → ApiError, kèm `data` là JSON phản hồi (VD báo cáo kiểm tra tệp). */

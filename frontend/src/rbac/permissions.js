@@ -42,6 +42,17 @@ export function canManageAt(perms, domain) {
   return (perms || []).some((p) => grants(p, 'user', 'manage') && covers(p.dom, domain));
 }
 
+/**
+ * Tài khoản chỉ được xem ĐÚNG MỘT xã (mọi quyền monitoring.view cùng miền "<CỤM>/<MÃ XÃ>") → mã xã đó; toàn tỉnh, nhiều xã,
+ * cả cụm → null. Không cần danh sách xã (mã nằm ngay trong miền) — dùng được trước khi tải xong /admin-units.
+ */
+export function homeCommune(perms) {
+  const doms = [...new Set((perms || []).filter((p) => grants(p, 'monitoring', 'view')).map((p) => p.dom))];
+  if (doms.length !== 1 || doms[0] === GLOBAL) return null;
+  const code = doms[0].split('/')[1];
+  return code && code !== '*' ? code : null;
+}
+
 /** Mã xã được phép (obj, act); null = toàn tỉnh; [] = không có quyền. */
 export function allowedCodes(perms, obj, act, units) {
   const doms = (perms || []).filter((p) => grants(p, obj, act)).map((p) => p.dom);

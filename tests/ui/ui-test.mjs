@@ -2109,6 +2109,57 @@ async function rescueWard(ctx) {
   });
 }
 
+// ================================================================ Trang chủ tài khoản cấp xã / phường — laptop, điện thoại
+// Tài khoản một phường (WARD): Tổng quan mở thẳng thẻ phường mình (thẻ đầu mang tên phường), không có ô chọn xã; 4 ô chỉ số
+// của xã (phiếu SOS, sơ tán, cảnh báo, mưa dự báo — không phải 6 ô của tỉnh vốn trống khi xã không có trạm); "Gửi yêu cầu chi
+// viện lên tỉnh" mở hộp thoại chi viện (không gửi); điện thoại: thanh dưới có "Chi viện" thay "Mực nước"; Bản đồ: nhãn
+// "Tình hình · Phường …" — bản đồ bay tới phường, không mở ra cả tỉnh.
+async function communeHome(ctx) {
+  const { page, vp } = ctx;
+  let signedIn = false;
+  await step(ctx, `Trang chủ tài khoản phường ${WARD.name}: thẻ phường mình đứng đầu, 4 ô chỉ số của xã, không có ô chọn xã`, async () => {
+    try {
+      await loginAs(page, WARD);
+    } catch (e) {
+      if (READONLY) return `bỏ qua: không đăng nhập được ${WARD.user}`;
+      throw e;
+    }
+    signedIn = true;
+    await page.goto(`${ROOT}/dashboard`);
+    const kpis = page.getByRole('group', { name: 'Chỉ số của xã' });
+    await kpis.waitFor({ timeout: 20_000 });
+    const first = page.getByRole('tablist', { name: 'Nội dung tổng quan' }).getByRole('tab').first();
+    if (!(await first.innerText()).includes(WARD.name)) throw new Error(`thẻ đầu không phải phường của tài khoản: "${await first.innerText()}"`);
+    if ((await first.getAttribute('aria-selected')) !== 'true') throw new Error('thẻ phường không được chọn sẵn');
+    const tiles = await kpis.locator(':scope > *').count();
+    if (tiles !== 4) throw new Error(`có ${tiles} ô chỉ số của xã (cần 4)`);
+    if (await page.getByLabel('Chọn xã/phường').count()) throw new Error('tài khoản một phường vẫn có ô chọn xã');
+    await expectNoOverflow(ctx, 'trang chủ phường');
+    return `${tiles} ô chỉ số`;
+  });
+  if (!signedIn) return;
+  await step(ctx, `Tài khoản phường ${WARD.name}: "Gửi yêu cầu chi viện lên tỉnh" mở hộp thoại chi viện (không gửi)${vp.mobile ? '; thanh dưới có "Chi viện"' : ''}`, async () => {
+    await page.getByRole('button', { name: 'Gửi yêu cầu chi viện lên tỉnh' }).click();
+    const dlg = page.getByRole('dialog', { name: 'Gửi yêu cầu chi viện lên tỉnh' });
+    await dlg.waitFor({ timeout: 5_000 });
+    await expectNoOverflow(ctx, 'hộp thoại chi viện', dlg);
+    await dlg.getByRole('button', { name: 'Huỷ', exact: true }).click();
+    if (vp.mobile) {
+      const bar = page.getByRole('navigation', { name: 'Thao tác nhanh' });
+      if (!(await bar.getByRole('button', { name: /Chi viện/ }).count())) throw new Error('thanh dưới không có nút "Chi viện"');
+      if (await bar.getByRole('button', { name: /Mực nước/ }).count()) throw new Error('thanh dưới vẫn có "Mực nước"');
+    }
+  });
+  await step(ctx, `Bản đồ — tài khoản phường ${WARD.name}: nhãn "Tình hình · Phường ${WARD.name}", không ghi Toàn tỉnh`, async () => {
+    await page.goto(`${ROOT}/ban-do`);
+    const box = page.locator('[aria-label^="Tình hình · "]').first();
+    await box.waitFor({ state: 'attached', timeout: 20_000 });
+    const label = await box.getAttribute('aria-label');
+    if (!label.includes(WARD.name) || /Toàn tỉnh/.test(label)) throw new Error(`nhãn "${label}"`);
+    return label;
+  });
+}
+
 // ================================================================ Cảnh báo khẩn cấp & Hotline (trang E) — laptop, iPad dọc, điện thoại
 // Dải thông tin khẩn nằm trên 4 ô chỉ số, 4 thẻ vừa màn (điện thoại nhãn ngắn); ô "Chờ phê duyệt" → đúng khối, đúng số lệnh;
 // Lịch sử lệnh: lọc trạng thái trên địa chỉ trang, Excel (laptop thêm PDF); Danh bạ: tìm không dấu, nút gọi, Excel; Nhật
@@ -2939,6 +2990,13 @@ try {
       await rescueWard({ page: wPage, vp: vpD, problems: watch(wPage) });
       await wctx.close();
     }
+  }
+  for (const [label, opts, phone] of RESOURCE_DEVICES.filter(([, , phone], i) => phone || i === 0)) {
+    const cctx = await browser.newContext({ ...opts, locale: 'vi-VN' });
+    cctx.setDefaultTimeout(15_000);
+    const cPage = await cctx.newPage();
+    await communeHome({ page: cPage, vp: { name: `Trang chủ cấp xã · ${label}`, mobile: phone }, problems: watch(cPage) });
+    await cctx.close();
   }
   for (const [label, opts, phone] of AREA_DEVICES) {
     const fctx = await browser.newContext({ ...opts, locale: 'vi-VN' });
