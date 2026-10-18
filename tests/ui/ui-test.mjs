@@ -2454,7 +2454,7 @@ async function alertsWard(ctx) {
     }
     await page.goto(`${ROOT}/canh-bao`);
     await page.getByRole('group', { name: 'Chỉ số cảnh báo' }).getByRole('button').first().waitFor({ timeout: 20_000 });
-    const head = await page.locator('main h1 + p').innerText();
+    const head = await page.locator('main .facts').first().innerText(); // dòng ngữ cảnh dưới tiêu đề (PageHeader)
     if (!head.includes(WARD.name)) throw new Error(`tiêu đề không phải phường của tài khoản: ${head}`);
     if (await page.getByText(/Soạn lệnh cảnh báo/i).count()) throw new Error('tài khoản phường thấy form soạn lệnh');
     if (await page.locator('[aria-label="Phần của trang Cảnh báo"] > button', { hasText: /Nhật ký/ }).count()) throw new Error('tài khoản phường thấy thẻ Nhật ký pháp lý');
