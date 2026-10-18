@@ -1,12 +1,12 @@
 import { useMemo } from 'react';
-import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ReferenceArea, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useAreaQuery } from '../../api/hooks';
 import { hourLabel, num } from '../../utils/format';
 import { EmptyState, ErrorState, Skeleton } from '../common/ui';
 import { axisProps, ChartTooltip, Legend, useChartTheme } from './chartTheme';
 
-/** Mưa theo giờ (cột) + mưa tích lũy (đường) — 2 biểu đồ chung trục thời gian, KHÔNG dùng 2 trục Y.
- *  Phần 3 giờ tới vẽ nhạt / nét đứt: dự báo mô hình số (Open-Meteo) cho trạm mưa, KHÔNG phải nowcast radar. */
+/** Mưa theo giờ (cột) + mưa cộng dồn (đường) — 2 biểu đồ chung trục thời gian, KHÔNG dùng 2 trục Y.
+ *  Phần 3 giờ tới vẽ nhạt / nét đứt, ghi chữ "Dự báo": dự báo mô hình số (Open-Meteo) cho trạm mưa, KHÔNG phải đo radar. */
 export default function RainfallChart({ height = 250 }) {
   const c = useChartTheme();
   const { data, isError, refetch } = useAreaQuery('rainfall', '/dashboard/rainfall', {}, { refetchInterval: 60_000 });
@@ -55,25 +55,24 @@ export default function RainfallChart({ height = 250 }) {
         <Legend
           items={[
             // Bình quân lưu vực: trạm đại diện vùng rộng nặng hơn (đa giác Thiessen, backend /dashboard/rainfall)
-            { label: data.method === 'thiessen' ? 'Mưa giờ – TB lưu vực (Thiessen)' : 'Mưa giờ – thực đo', color: c.s1 },
-            { label: 'Dự báo mô hình 3 giờ tới', color: c.s2 },
-            { label: 'Tích lũy', color: c.s1, line: true },
-            { label: 'Tích lũy dự báo', color: c.s2, dashed: true },
+            { label: data.method === 'thiessen' ? 'Mưa từng giờ (trung bình lưu vực)' : 'Mưa từng giờ (đo được)', color: c.s1 },
+            { label: 'Dự báo 3 giờ tới', color: c.s2 },
+            { label: 'Mưa cộng dồn', color: c.s1, line: true },
+            { label: 'Cộng dồn theo dự báo', color: c.s2, dashed: true },
           ]}
         />
         <div className="flex flex-wrap items-center gap-3 text-xs">
           <span className="text-muted">
-            Tổng 24h: <b className="font-mono font-bold text-ink">{totalObs == null ? 'chưa có số đo' : `${num(totalObs, 1)} mm`}</b>
+            Tổng 24 giờ: <b className="num font-bold text-ink">{totalObs == null ? 'chưa có số đo' : `${num(totalObs, 1)} mm`}</b>
           </span>
           {maxStation > 0 && (
             <span className="hidden text-muted sm:inline">
-              Giờ mưa lớn nhất (trạm): <b className="font-mono font-bold text-ink">{num(maxStation, 1)} mm</b>
+              Giờ mưa to nhất tại một trạm: <b className="num font-bold text-ink">{num(maxStation, 1)} mm</b>
             </span>
           )}
           {totalFc > 0 && (
-            <span className="inline-flex items-center gap-1 rounded border border-line bg-panel2 px-2 py-0.5 font-medium text-ink-2">
-              <span>3 giờ tới (mô hình):</span>
-              <b className="font-mono font-bold">+{num(totalFc, 1)} mm</b>
+            <span className="text-muted">
+              3 giờ tới dự báo: <b className="num font-bold text-ink">+{num(totalFc, 1)} mm</b>
             </span>
           )}
         </div>
@@ -83,13 +82,17 @@ export default function RainfallChart({ height = 250 }) {
         <BarChart data={rows} margin={{ top: 6, right: 8, bottom: 0, left: -12 }} barCategoryGap={2}>
           <CartesianGrid stroke={c.grid} vertical={false} />
           <XAxis dataKey="t" tickFormatter={hourLabel} minTickGap={40} {...axisProps(c)} />
-          <YAxis width={44} {...axisProps(c)} label={{ value: 'mm/h', angle: -90, position: 'insideLeft', fill: c.axis, fontSize: 10, dx: 14 }} />
+          <YAxis width={44} {...axisProps(c)} label={{ value: 'mm/giờ', angle: -90, position: 'insideLeft', fill: c.axis, fontSize: 10, dx: 14 }} />
           <Tooltip
             cursor={{ fill: c.grid, opacity: 0.4 }}
-            content={<ChartTooltip labelFormatter={(l, p) => `${tooltipLabel(l)}${p?.[0]?.payload?.forecast ? ' · dự báo mô hình' : ' · thực đo'}`} unit=" mm" />}
+            content={<ChartTooltip labelFormatter={(l, p) => `${tooltipLabel(l)}${p?.[0]?.payload?.forecast ? ' · dự báo' : ' · đo được'}`} unit=" mm" />}
           />
-          {nowT && <ReferenceLine x={nowT} stroke={c.muted} strokeDasharray="2 4" label={{ value: 'Hiện tại', fill: c.muted, fontSize: 10, position: 'top' }} />}
-          <Bar dataKey="mm" name="Mưa TB các trạm" radius={[4, 4, 0, 0]} isAnimationActive={false}>
+          {nowT && (
+            <ReferenceArea x1={nowT} x2={rows[rows.length - 1].t} fill={c.grid} fillOpacity={0.35} ifOverflow="hidden"
+              label={{ value: 'Dự báo', fill: c.muted, fontSize: 11, fontWeight: 600, position: 'insideTop' }} />
+          )}
+          {nowT && <ReferenceLine x={nowT} stroke={c.muted} strokeDasharray="2 4" />}
+          <Bar dataKey="mm" name="Mưa trung bình" radius={[4, 4, 0, 0]} isAnimationActive={false}>
             {rows.map((r) => (
               <Cell
                 key={r.t}
@@ -109,8 +112,8 @@ export default function RainfallChart({ height = 250 }) {
           <XAxis dataKey="t" tickFormatter={hourLabel} minTickGap={40} {...axisProps(c)} hide />
           <YAxis width={44} {...axisProps(c)} label={{ value: 'mm', angle: -90, position: 'insideLeft', fill: c.axis, fontSize: 10, dx: 14 }} />
           <Tooltip content={<ChartTooltip labelFormatter={tooltipLabel} unit=" mm" />} cursor={{ stroke: c.axis, strokeDasharray: '3 3' }} />
-          <Line dataKey="cum" name="Tích lũy" stroke={c.s1} strokeWidth={2} dot={false} isAnimationActive={false} />
-          <Line dataKey="cumF" name="Tích lũy dự báo" stroke={c.s2} strokeWidth={2} strokeDasharray="6 4" dot={false} isAnimationActive={false} />
+          <Line dataKey="cum" name="Mưa cộng dồn" stroke={c.s1} strokeWidth={2} dot={false} isAnimationActive={false} />
+          <Line dataKey="cumF" name="Cộng dồn theo dự báo" stroke={c.s2} strokeWidth={2} strokeDasharray="6 4" dot={false} isAnimationActive={false} />
         </LineChart>
       </ResponsiveContainer>
     </div>
