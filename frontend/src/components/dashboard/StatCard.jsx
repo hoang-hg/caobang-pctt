@@ -11,10 +11,12 @@ import { risk } from '../../utils/risk';
  * `compact`: ô gọn của hàng KPI (lãnh đạo đọc trong vài giây, vừa 2 cột ở màn 360 px): tiêu đề · số lớn · nhãn mức ·
  * một dòng ngữ cảnh. `onClick` → cả ô là nút; `to` → cả ô là liên kết (khi đó KHÔNG đặt nút / liên kết khác bên trong).
  * `aside`: thông tin phụ cạnh nhãn mức của ô gọn (VD mũi tên xu hướng) — không nhấp nháy theo `alert`.
+ * `trend`: mũi tên xu hướng ở góc phải hàng tiêu đề (TrendTag) — ô gọn không cần thêm một hàng nhãn.
+ * Số đổi (số liệu mới về) → số hiện lên nhẹ một lần (tắt khi hệ điều hành bật "giảm chuyển động").
  * `footerRows`: chân ô gọn là vài dòng ngắn, mỗi dòng tự cắt phần chữ thừa — bỏ giới hạn 1–2 dòng của câu ngữ cảnh thường.
  */
 export default function StatCard({
-  icon: Icon, title, badge, aside, value, unit, footer, footerRows = false, level, alert, className, children, compact = false,
+  icon: Icon, title, badge, aside, trend, value, unit, footer, footerRows = false, level, alert, className, children, compact = false,
   onClick, to, hint,
 }) {
   const scale = level === undefined ? null : risk(level);
@@ -32,20 +34,24 @@ export default function StatCard({
         (to || onClick) && 'transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
         level != null && clsx('border-l-4', scale.edge),
         level === null && 'border-dashed',
-        alert && 'bg-danger/[0.04] ring-2 ring-danger',
+        alert && 'ring-2 ring-danger',
         className,
       )}
     >
       <div className="flex items-center justify-between gap-2 text-xs font-semibold text-ink-2">
-        <span className={clsx('flex min-w-0 items-center gap-1.5', compact && 'text-xs [.kpi-lon_&]:text-sm')}>
+        <span className={clsx('flex min-w-0 items-center gap-1.5', compact && 'text-[13px] [.kpi-lon_&]:text-lg')}>
           {Icon && <Icon size={15} className={clsx('shrink-0', scale ? scale.text : 'text-accent')} aria-hidden="true" />}
           <span className="truncate">{title}</span>
         </span>
         {!compact && badgeEl}
+        {trend && <span className="min-w-0 shrink-0 text-[11px] [.kpi-lon_&]:text-sm">{trend}</span>}
       </div>
       {value !== undefined && (
         <div className="flex min-w-0 items-baseline gap-1.5">
-          <span className={clsx('num font-extrabold leading-none tracking-tight text-ink', compact ? 'text-2xl sm:text-[26px] [.kpi-lon_&]:text-4xl' : 'text-2xl lg:text-3xl')}>
+          <span
+            key={value}
+            className={clsx('num font-extrabold leading-none tracking-tight text-ink motion-safe:animate-tick', compact ? 'text-[26px] sm:text-[28px] [.kpi-lon_&]:text-5xl' : 'text-2xl lg:text-3xl')}
+          >
             {value}
           </span>
           {unit && <span className={clsx('font-medium text-muted', compact ? 'truncate text-xs' : 'text-sm')}>{unit}</span>}
@@ -64,7 +70,7 @@ export default function StatCard({
           className={clsx(
             'text-ink-2',
             compact
-              ? clsx('text-xs leading-snug [.kpi-lon_&]:text-sm', !footerRows && 'line-clamp-1 sm:line-clamp-2')
+              ? clsx('text-[13px] leading-snug [.kpi-lon_&]:text-lg', !footerRows && 'line-clamp-1 sm:line-clamp-2')
               : 'border-t border-line/60 pt-1.5 text-xs',
           )}
         >
