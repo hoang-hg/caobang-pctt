@@ -363,26 +363,26 @@ async function staff(ctx, trackCode) {
     }
   });
 
-  // Bảng tác chiến có thẻ Hồ chứa (tìm / lọc / phân trang / xuất Excel như các thẻ khác); tab Hồ chứa hiện 9 thẻ rồi "Xem
+  // Bảng số liệu chi tiết có thẻ Hồ chứa (tìm / lọc / phân trang / xuất Excel như các thẻ khác); tab Hồ chứa hiện 9 thẻ rồi "Xem
   // thêm", hồ khẩn luôn ở đầu. Nhân bản danh sách hồ ngay trong trình duyệt (không ghi gì lên máy chủ) để luôn có > 9 thẻ
-  await step(ctx, 'Tổng quan: bảng tác chiến có thẻ Hồ chứa; tab Hồ chứa hiện 9 thẻ + "Xem thêm", hồ khẩn lên đầu', async () => {
+  await step(ctx, 'Tổng quan: bảng số liệu chi tiết có thẻ Hồ chứa; tab Hồ chứa hiện 9 thẻ + "Xem thêm", hồ khẩn lên đầu', async () => {
     await page.goto(`${ROOT}/dashboard`);
     await waitMain(page);
-    // Bảng tác chiến thu gọn sẵn dưới Tổng quan — mở ra trước
-    const opener = page.getByRole('button', { name: 'Mở bảng dữ liệu chi tiết' });
+    // Bảng số liệu thu gọn sẵn dưới Tổng quan — mở ra trước
+    const opener = page.getByRole('button', { name: 'Mở bảng số liệu' });
     if (await opener.count()) await opener.click();
-    const table = page.locator('section', { hasText: 'Bảng tác chiến theo chuyên đề' }).first();
+    const table = page.locator('section', { hasText: 'Bảng số liệu chi tiết' }).first();
     await table.getByRole('tablist', { name: 'Chuyên đề của bảng' }).getByRole('tab', { name: /Hồ chứa/ }).click();
     const rows = table.locator(vp.mobile ? 'ul[aria-label="Hồ chứa & xả lũ"] > li' : 'tbody tr');
     await rows.first().or(table.getByText('Chưa có hồ chứa trong vùng đang xem')).waitFor({ timeout: 20_000 });
     const inTable = await rows.count();
     if (!inTable) return 'bỏ qua: chưa có hồ chứa';
-    if (!(await table.getByText(/Mực nước \/ MNDBT/i).count())) throw new Error('thẻ Hồ chứa thiếu cột Mực nước / MNDBT');
+    if (!(await table.getByText(/Mực nước \/ mức bình thường/i).count())) throw new Error('thẻ Hồ chứa thiếu cột Mực nước / mức bình thường');
     const [xl] = await Promise.all([
       page.waitForEvent('download', { timeout: 30_000 }),
       table.getByRole('button', { name: 'Excel', exact: true }).click(),
     ]);
-    if (!/^bang-tac-chien-reservoirs-.*\.xlsx$/.test(xl.suggestedFilename())) throw new Error(`tệp Excel lạ: ${xl.suggestedFilename()}`);
+    if (!/^bang-so-lieu-reservoirs-.*\.xlsx$/.test(xl.suggestedFilename())) throw new Error(`tệp Excel lạ: ${xl.suggestedFilename()}`);
 
     const RANK = { xa_khan_cap: 0, xa_dieu_tiet: 1, chua_co_so_lieu: 2, binh_thuong: 3 };
     const status = {};
@@ -417,9 +417,9 @@ async function staff(ctx, trackCode) {
     }
   });
 
-  // Thiết kế A.2: ô SOS nhấp nháy đỏ khi có phiếu chờ quá 15 phút chưa có lực lượng tiếp nhận — kể cả khi chưa phiếu nào
-  // quá hạn theo cấp (cấp 3 hạn 60 phút). Sửa phản hồi KPI ngay trong trình duyệt để có đúng trường hợp đó
-  await step(ctx, 'Tổng quan: ô SOS nhấp nháy khi có phiếu chờ quá 15 phút chưa có đội (chưa quá hạn theo cấp)', async () => {
+  // Thiết kế A.2: ô SOS báo đỏ (viền đỏ, CHỈ nhãn nhấp nháy) khi có phiếu chờ quá 15 phút chưa có lực lượng tiếp nhận — kể cả
+  // khi chưa phiếu nào quá hạn theo cấp (cấp 3 hạn 60 phút). Sửa phản hồi KPI ngay trong trình duyệt để có đúng trường hợp đó
+  await step(ctx, 'Tổng quan: ô SOS báo đỏ, nhãn nhấp nháy khi có phiếu chờ quá 15 phút chưa có đội (chưa quá hạn theo cấp)', async () => {
     const kpis = '**/api/v1/dashboard/kpis**';
     await page.route(kpis, safeRoute(async (route) => {
       const res = await route.fetch();
@@ -430,12 +430,86 @@ async function staff(ctx, trackCode) {
     try {
       await page.goto(`${ROOT}/dashboard`);
       const tile = page.locator('[aria-label="Chỉ số nhanh"] > *').nth(2);
-      await tile.getByText('2 chờ quá 15′').waitFor({ timeout: 20_000 });
-      const st = await tile.evaluate((el) => ({ ring: el.className.includes('ring-danger'), blink: !!el.querySelector('[class*="animate-blink"]') }));
-      if (!st.ring || !st.blink) throw new Error(`ô SOS chưa nhấp nháy đỏ: ${JSON.stringify(st)}`);
+      // Nhãn đặt ở hàng tiêu đề (ô rộng) hoặc cạnh số (ô hẹp) — chỉ một chỗ hiện tuỳ bề rộng
+      await tile.getByText('2 chờ quá 15 phút').filter({ visible: true }).first().waitFor({ timeout: 20_000 });
+      const st = await tile.evaluate((el) => ({
+        ring: el.className.includes('ring-danger'),
+        blink: !!el.querySelector('[class*="animate-blink"]'),
+        wholeTile: /animate-blink/.test(el.className),
+      }));
+      if (!st.ring || !st.blink || st.wholeTile) throw new Error(`ô SOS chưa báo đỏ đúng cách (viền đỏ, chỉ nhãn nhấp nháy): ${JSON.stringify(st)}`);
     } finally {
       await page.unroute(kpis);
     }
+  });
+
+  // Thiết kế A — trả lời trong 5 giây "chỗ nào nguy hiểm nhất, việc gì chờ tôi": câu tóm tắt bằng lời (không khẳng định "an
+  // toàn"), "Việc chờ quyết định" là khối nội dung đầu tiên (điện thoại: ngay sau 6 ô chỉ số), gợi ý 3 bước lần đầu (tắt
+  // được, nhớ trên máy), nút "?" giải thích thuật ngữ, nhật ký lọc bằng nút chữ, không còn thuật ngữ tiếng Anh / viết tắt
+  // trên màn. Chỉ xem — "Đã hiểu" chỉ ghi localStorage của trình duyệt kiểm thử
+  await step(ctx, 'Tổng quan: câu tóm tắt, "Việc chờ quyết định" lên đầu, gợi ý 3 bước, nút "?", nhật ký lọc bằng chữ, không thuật ngữ tiếng Anh', async () => {
+    await page.goto(`${ROOT}/dashboard`);
+    await waitMain(page);
+    const summary = page.getByRole('status', { name: 'Tóm tắt tình hình' });
+    await summary.waitFor({ timeout: 20_000 });
+    const sentence = (await summary.innerText()).replace(/\s+/g, ' ').trim();
+    if (/an toàn|bình thường/i.test(sentence)) throw new Error(`câu tóm tắt khẳng định "an toàn": ${sentence}`);
+
+    await page.locator('[aria-label="Chỉ số nhanh"] > *').nth(5).waitFor();
+    const dec = page.locator('[aria-label="Việc chờ quyết định"]');
+    if (await dec.count()) {
+      const [d, kpi] = await Promise.all([dec.boundingBox(), page.locator('[aria-label="Chỉ số nhanh"]').boundingBox()]);
+      if (vp.mobile ? d.y < kpi.y : d.y > kpi.y) throw new Error(`"Việc chờ quyết định" ${vp.mobile ? 'phải ngay sau' : 'phải đứng trước'} 6 ô chỉ số`);
+    }
+
+    // Gợi ý 3 bước: hiện lần đầu, "Đã hiểu" → tải lại không hiện nữa
+    const tips = page.getByRole('region', { name: 'Gợi ý cho người mới' });
+    if (await tips.count()) {
+      const n = await tips.locator('li').count();
+      if (n !== 3) throw new Error(`gợi ý có ${n} bước (cần 3)`);
+      await tips.getByRole('button', { name: 'Đã hiểu' }).click();
+      await page.reload();
+      await waitMain(page);
+      await summary.waitFor({ timeout: 20_000 });
+      if (await tips.count()) throw new Error('bấm "Đã hiểu" rồi tải lại vẫn hiện gợi ý');
+    }
+
+    // Nút "?" → một câu giải thích; Esc đóng
+    const help = page.getByRole('button', { name: /^Giải thích: Mức báo động/ }).filter({ visible: true }).first();
+    await help.click();
+    const note = page.getByRole('note');
+    await note.getByText(/Báo động III/).waitFor({ timeout: 5_000 });
+    await expectNoOverflow(ctx, 'giải thích "?"');
+    await page.keyboard.press('Escape');
+    await note.waitFor({ state: 'detached', timeout: 5_000 });
+
+    // Nhật ký: nút chữ "Hồ chứa" → chỉ còn sự kiện hồ chứa (hoặc câu "không có sự kiện")
+    const filters = page.getByRole('group', { name: 'Lọc nhật ký theo loại' });
+    const names = (await filters.getByRole('button').allInnerTexts()).map((t) => t.trim());
+    for (const want of ['Tất cả', 'Cứu hộ', 'Hồ chứa', 'Cảnh báo', 'Người dân']) {
+      if (!names.includes(want)) throw new Error(`nhật ký thiếu nút lọc "${want}" (có: ${names.join(', ')})`);
+    }
+    await filters.getByRole('button', { name: 'Hồ chứa', exact: true }).click();
+    const log = page.locator('ol[aria-label="Các sự kiện, mới nhất trên cùng"]');
+    const kinds = await log.locator('> li').evaluateAll((lis) => lis.map((li) => li.innerText.split('\n').slice(0, 3).join(' ')));
+    const off = kinds.filter((t) => !/Hồ chứa|Không có sự kiện/.test(t));
+    if (off.length) throw new Error(`lọc "Hồ chứa" còn sự kiện loại khác: ${off[0]}`);
+    await filters.getByRole('button', { name: 'Tất cả', exact: true }).click();
+
+    // Mọi biểu đồ (chuyên đề "Tất cả"): tiêu đề là câu kết luận; không còn tiếng Anh / viết tắt trên màn (bỏ nội dung nhật
+    // ký — câu do máy chủ ghi — và bản đồ)
+    await page.getByRole('group', { name: 'Chuyên đề biểu đồ' }).getByRole('button', { name: 'Tất cả' }).click();
+    await page.waitForTimeout(2_000);
+    const jargon = await page.evaluate(() => {
+      const main = document.querySelector('main').cloneNode(true);
+      main.querySelectorAll('ol[aria-label^="Các sự kiện"], .leaflet-container, option').forEach((el) => el.remove());
+      const text = main.textContent.replace(/\s+/g, ' ');
+      const re = /\b(Dashboard|KPI|SLA|ETA|QPF|Nowcast|P10|P50|P90|Maker|Checker|HEC-HMS|ECMWF|GFS|NOAA|TOC|TB|realtime|Realtime)\b|BĐ\s|[Tt]ác chiến|\d+\s?h(?!\p{L})|mm\/h(?!\p{L})/gu;
+      return [...new Set(text.match(re) || [])];
+    });
+    if (jargon.length) throw new Error(`còn thuật ngữ tiếng Anh / viết tắt trên màn: ${jargon.join(', ')}`);
+    await expectNoOverflow(ctx, 'Tổng quan — mọi biểu đồ');
+    return sentence.slice(0, 120);
   });
 
   // Thiết kế A.3 "Hydrograph & Vận hành hồ chứa": dưới biểu đồ thủy văn của trạm có hồ trên cùng sông (bản trình diễn: trạm
@@ -444,7 +518,8 @@ async function staff(ctx, trackCode) {
     await page.goto(`${ROOT}/dashboard`);
     await waitMain(page);
     if (!(await page.locator('[aria-label="Chọn trạm mực nước"]').count())) return 'bỏ qua: chưa có trạm mực nước';
-    const sec = page.locator('section', { hasText: 'Thủy văn – mực nước' }).first();
+    // Tiêu đề khối là câu kết luận (đổi theo trạm) — tìm khối theo bộ chọn trạm bên trong
+    const sec = page.locator('section', { has: page.locator('[aria-label="Chọn trạm mực nước"]') }).first();
     const title = sec.getByText(/Vận hành hồ chứa trên sông/);
     try {
       await title.waitFor({ timeout: 20_000 });
