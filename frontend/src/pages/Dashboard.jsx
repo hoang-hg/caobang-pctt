@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import {
   AlertTriangle, ChevronDown, ChevronUp, Compass, Droplets, FileDown, FileSpreadsheet, FileText, Home, Info, LayoutDashboard, LifeBuoy,
-  MapPin, Minimize2, Monitor, Mountain, Pause, Play, Server, Waves, X,
+  MapPin, Minimize2, Monitor, Mountain, Pause, Play, Send, Server, Waves, X,
 } from 'lucide-react';
 import { useAreaQuery, usePresets, useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
@@ -95,7 +95,7 @@ export default function Dashboard() {
   const canDataSubmit = usePermission('data', 'submit'); // xã gửi hồ sơ chờ duyệt — cũng mở được /nhap-du-lieu
   const canForecast = usePermission('monitoring', 'update', '*');
   const canEvacUpdate = usePermission('evacuation', 'update');
-  const tabs = TABS.filter((t) => t.id !== 'he_thong' || canSystem);
+  const tabs = useMemo(() => TABS.filter((t) => t.id !== 'he_thong' || canSystem), [canSystem]);
 
   // Tài khoản cấp xã mở thẳng thẻ "Cấp xã / phường" của xã mình
   const isCommuneUser = useIsCommuneUser();
@@ -122,6 +122,12 @@ export default function Dashboard() {
   );
   const scopeUnit = scope?.length === 1 ? units.find((u) => u.code === scope[0]) : null;
   const scopeLabel = scopeUnit ? unitLabel(scopeUnit) : `${scope?.length || 0} xã/phường được giao`;
+  // Hàng thẻ hiển thị: tài khoản cấp xã — thẻ của xã mình đứng đầu, mang tên xã (thẻ mặc định của tài khoản này)
+  const tabList = useMemo(() => {
+    if (!isCommuneUser) return tabs;
+    const mine = { ...tabs.find((t) => t.id === 'cap_xa'), label: scopeUnit ? unitLabel(scopeUnit) : 'Xã của tôi' };
+    return [mine, ...tabs.filter((t) => t.id !== 'cap_xa')];
+  }, [tabs, isCommuneUser, scopeUnit]);
   const filterLabel = isFiltered || scope === null ? filter.label : scopeLabel;
   const role = auth?.user?.assignments?.[0]?.role_name;
   // Lọc nhanh theo lưu vực (nhóm do BCH xác nhận — README 2.4) — ô chọn trong thanh lệnh (trước đây 1 hàng chip riêng)
@@ -145,6 +151,7 @@ export default function Dashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [bulletinOpen, setBulletinOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [supportOpen, setSupportOpen] = useState(false); // xã xin chi viện lên tỉnh (nút ở trang xã + thanh dưới điện thoại)
   const [docOpen, setDocOpen] = useState(false); // báo cáo văn bản (PDF định dạng chuẩn)
   const [chartsOpen, setChartsOpen] = useState(CHARTS_OPEN);
   const [chartSegment, setChartSegment] = useState('thuy_van'); // 'thuy_van' | 'mua' | 'sat_lo' | 'vat_tu' | 'tat_ca'
@@ -520,7 +527,7 @@ export default function Dashboard() {
       {/* 2. Một hàng thẻ: tổng hợp · chuyên đề · cấp xã · hệ thống — cùng kiểu gạch chân với thẻ các trang khác (ui.jsx Tabs);
           điện thoại cuộn ngang trong hàng */}
       <div className="scroll-thin -mx-1 flex items-end gap-1 overflow-x-auto border-b border-line px-1 no-print" role="tablist" aria-label="Nội dung tổng quan">
-        {tabs.map((t) => {
+        {tabList.map((t) => {
           const badge = tabBadge[t.id];
           return (
             <button
@@ -549,17 +556,24 @@ export default function Dashboard() {
 
       {tab === 'cap_xa' && (
         <div ref={ref} className="flex flex-col gap-3.5">
-          <CommuneView code={communeCode} units={scopeUnits} onChange={(code) => enterCommune(code)}>
-            <KpiStrip {...kpiProps} large={presentation} />
+          <CommuneView code={communeCode} units={scopeUnits} onChange={(code) => enterCommune(code)} onSupport={() => setSupportOpen(true)}>
             <div className="grid gap-3.5 xl:grid-cols-[1fr_360px] [&>*]:min-w-0">
               <div className="grid gap-3.5 lg:grid-cols-2 [&>*]:min-w-0">
-                <Section id="bieu-do-mua" title="Mưa & dự báo 3 giờ tới tại xã" className="scroll-mt-20">
-                  <RainfallChart height={250} />
-                </Section>
-                <Section title="Ngưỡng kích hoạt sạt lở – trạm mưa trong xã">
-                  <LandslideScatter height={250} />
-                </Section>
+                {/* Biểu đồ số đo trạm chỉ khi xã có trạm đo mưa — không thì 2 khung trống "chưa có số đo" chiếm nửa trang */}
+                {rainStations > 0 && (
+                  <>
+                    <Section id="bieu-do-mua" title="Mưa & dự báo 3 giờ tới tại xã" className="scroll-mt-20">
+                      <RainfallChart height={250} />
+                    </Section>
+                    <Section title="Ngưỡng kích hoạt sạt lở – trạm mưa trong xã">
+                      <LandslideScatter height={250} />
+                    </Section>
+                  </>
+                )}
                 <Section id="du-bao-72h" title="Dự báo mưa 72 giờ – tổ hợp ECMWF + GFS (P10–P90)" className="lg:col-span-2">
+                  {!stationsState.loading && rainStations === 0 && (
+                    <p className="mb-2 text-xs text-muted">Xã chưa có trạm đo mưa — theo dõi mưa bằng dự báo mô hình dưới đây.</p>
+                  )}
                   <AreaForecastChart height={220} />
                 </Section>
               </div>
@@ -806,7 +820,9 @@ export default function Dashboard() {
       {/* Thanh thao tác nhanh trên điện thoại (khung chung: Báo SOS giữa, 112 mép phải); chỉ hiện nút tài khoản có quyền dùng */}
       <QuickActionBar
         slots={[
-          { key: 'muc-nuoc', label: 'Mực nước', icon: Waves, onClick: goRivers },
+          isCommuneUser
+            ? { key: 'chi-vien', label: 'Chi viện', icon: Send, onClick: () => setSupportOpen(true) }
+            : { key: 'muc-nuoc', label: 'Mực nước', icon: Waves, onClick: goRivers },
           { key: 'ban-do', label: 'Bản đồ', icon: Compass, to: '/ban-do' },
           canSos ? { key: 'cuu-ho', label: 'Cứu hộ', icon: LifeBuoy, to: '/cuu-ho' } : null,
         ]}
@@ -814,6 +830,8 @@ export default function Dashboard() {
       />
 
       {canReport && <QuickIncidentModal open={reportOpen} onClose={() => setReportOpen(false)} />}
+      {/* Xã xin chi viện lên tỉnh: cùng hộp thoại báo cáo nhanh, chế độ support (phiếu SOS gắn thẻ — rescueFacts) */}
+      {supportOpen && <QuickIncidentModal open onClose={() => setSupportOpen(false)} support />}
       <ReportDocModal
         open={docOpen}
         onClose={(pages) => {
