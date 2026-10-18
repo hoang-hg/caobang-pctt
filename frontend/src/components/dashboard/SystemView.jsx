@@ -63,7 +63,7 @@ export default function SystemView({ k, stations, supplies, evac, unitsCount, ca
   const v = k?.vehicles || {};
   const vehicles = (v.active || 0) + (v.ready || 0) + (v.maintenance || 0);
   const readiness = [
-    ['Trạm mực nước', water.length, water.length ? `${withThr}/${water.length} trạm đủ ngưỡng BĐ I–III` : 'Loại "Trạm quan trắc"'],
+    ['Trạm mực nước', water.length, water.length ? `${withThr}/${water.length} trạm đủ ngưỡng Báo động I–III` : 'Loại "Trạm quan trắc"'],
     ['Trạm đo mưa', byType.find((t) => t.type === 'luong_mua').total, 'Loại "Trạm quan trắc"'],
     ['Cảm biến sạt lở (nghiêng, độ ẩm đất)', byType.filter((t) => t.type === 'do_nghieng' || t.type === 'do_am_dat').reduce((n, t) => n + t.total, 0), 'Loại "Trạm quan trắc"'],
     ['Hồ chứa', k?.reservoirs?.total, k?.reservoirs?.no_data_count ? `${k.reservoirs.no_data_count} hồ chưa có số liệu vận hành` : 'Loại "Hồ chứa"'],
@@ -103,7 +103,7 @@ export default function SystemView({ k, stations, supplies, evac, unitsCount, ca
             <Row label="Bộ mô phỏng">
               {health.simulator ? <span className="text-serious">BẬT — số đo trạm, GPS, SOS mẫu là mô phỏng</span> : 'Tắt'}
             </Row>
-            <Row label="Kết nối realtime (tiến trình này)">{int(health.ws_clients)}</Row>
+            <Row label="Kết nối nhận tin tức thời (tiến trình này)">{int(health.ws_clients)}</Row>
             <Row label="Lưu trữ ảnh">{health.storage}</Row>
           </div>
         )}
@@ -136,8 +136,8 @@ export default function SystemView({ k, stations, supplies, evac, unitsCount, ca
         </div>
       </Box>
 
-      <Box icon={DatabaseZap} title="Dữ liệu nền cho Dashboard" right={canImport && <Link to="/nhap-du-lieu" className="touch-hit text-xs font-semibold text-accent hover:underline">Nhập dữ liệu →</Link>}>
-        <p className="text-[11px] text-muted">Đếm trong vùng đang xem. Thiếu dữ liệu nào thì ô tương ứng trên Dashboard hiện "chưa có".</p>
+      <Box icon={DatabaseZap} title="Dữ liệu nền cho Tổng quan" right={canImport && <Link to="/nhap-du-lieu" className="touch-hit text-xs font-semibold text-accent hover:underline">Nhập dữ liệu →</Link>}>
+        <p className="text-[11px] text-muted">Đếm trong vùng đang xem. Thiếu dữ liệu nào thì ô tương ứng trên Tổng quan hiện "chưa có".</p>
         <ul className="flex flex-col">
           {readiness.map(([label, n, hint]) => (
             <li key={label} className="flex items-center gap-2 border-b border-line/40 py-1 text-xs last:border-0">
@@ -174,7 +174,7 @@ export default function SystemView({ k, stations, supplies, evac, unitsCount, ca
         </ul>
         {monitor?.log?.length > 0 && (
           <div className="border-t border-line/60 pt-2">
-            <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">Nhật ký nhận số đo gần nhất</div>
+            <div className="mb-1 text-xs font-semibold text-muted">Nhật ký nhận số đo gần nhất</div>
             <ul className="flex flex-col gap-0.5">
               {monitor.log.slice(0, 6).map((l) => (
                 <li key={l.id} className={clsx('truncate text-[11px]', l.level === 'error' ? 'text-danger' : 'text-ink-2')} title={l.message}>
