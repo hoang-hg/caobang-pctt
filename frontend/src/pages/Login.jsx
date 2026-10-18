@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { lazy, Suspense, useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ShieldAlert,
@@ -19,6 +19,9 @@ import {
 import { api } from '../api/client';
 import { useStore } from '../app/store';
 import { CodeInput, MfaSetup } from '../components/account/Mfa';
+
+// Vào nhanh chế độ giả lập: CHỈ máy dev (app/store.js) — bản build chạy thật không có khối này
+const DemoLoginPanel = import.meta.env.DEV ? lazy(() => import('../components/common/DemoLoginPanel')) : null;
 
 const REMEMBER_KEY = 'cb_pctt_saved_login';
 
@@ -306,6 +309,8 @@ export default function Login() {
           </form>
           )}
 
+          {DemoLoginPanel && <Suspense fallback={null}><DemoLoginPanel /></Suspense>}
+
           {/* Điều hướng ra Cổng công khai cho người dân */}
           <div className="mt-6 pt-4 border-t border-line/60 flex items-center justify-between text-xs text-muted">
             <Link
@@ -315,8 +320,6 @@ export default function Login() {
               <ArrowLeft size={14} />
               <span>Cổng thông tin & Cứu hộ người dân</span>
             </Link>
-
-            <span className="text-[11px] font-mono text-muted/70">v2.5 PCTT-CB</span>
           </div>
         </div>
 

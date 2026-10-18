@@ -12,6 +12,7 @@ import { FieldError, Modal } from '../common/ui';
 import { INCIDENT, PRIORITY, VULNERABLE } from '../../utils/labels';
 import { useOnline } from '../../utils/useOnline';
 import { unitLabel } from './CommuneView';
+import { COMMUNE_SUPPORT_TAG } from '../rescue/rescueFacts';
 
 const STEPS = ['Loại sự cố', 'Địa điểm', 'Mức độ & nhu cầu'];
 const STEP_FIELDS = [['type'], ['code'], ['priority', 'trapped', 'phone']];
@@ -24,7 +25,7 @@ const GPS_ROUGH_M = 300; // sai số lớn hơn → nhắc mô tả thêm vị t
 const PHONE_RE = /^(?:\+?84|0)\d{9,10}$/;
 const cleanPhone = (s) => s.replace(/[\s.\-()]/g, '');
 // Mã tin gốc (external_id, tối đa 120 ký tự) cho một lần báo cáo; randomUUID chỉ có ở https / localhost
-const newReportId = () => `bao-cao-nhanh-${globalThis.crypto?.randomUUID?.() || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`}`;
+const newReportId = (kind) => `${kind}-${globalThis.crypto?.randomUUID?.() || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`}`;
 
 /**
  * Báo cáo nhanh của cán bộ → TẠO PHIẾU SOS THẬT (POST /sos, nguồn "Cán bộ"), cùng đường với ô tiếp nhận ở Điều hành
@@ -32,8 +33,10 @@ const newReportId = () => `bao-cao-nhanh-${globalThis.crypto?.randomUUID?.() || 
  * → máy chủ định vị theo tên xóm / xã trong nội dung. Chỉ báo "đã tạo" khi máy chủ trả mã phiếu.
  * Form 3 bước cho điện thoại: chọn bằng nút to, ít gõ (số người có nút −/+); bấm "Tiếp" khi còn thiếu → hiện lỗi ngay
  * dưới ô thiếu và đưa con trỏ tới đó (không khoá nút mà không nói vì sao); số người, số điện thoại kiểm tra ngay khi nhập.
+ * support: XÃ XIN CHI VIỆN LÊN TỈNH (trang Cấp xã) — cùng form, nội dung mở đầu COMMUNE_SUPPORT_TAG để trực ban tỉnh lọc /
+ * nhận biết trên bảng điều phối (rescueFacts.isCommuneSupport); bắt buộc chọn ít nhất một nhu cầu chi viện.
  */
-export default function QuickIncidentModal({ open, onClose }) {
+export default function QuickIncidentModal({ open, onClose, support = false }) {
   const qc = useQueryClient();
   const toast = useStore((s) => s.toast);
   const me = useStore((s) => s.auth?.user);
@@ -48,7 +51,8 @@ export default function QuickIncidentModal({ open, onClose }) {
   const [sending, setSending] = useState(false); // chống bấm đúp → 2 phiếu trùng
   const [failure, setFailure] = useState(null); // { network: true } | { network: false, message }
   const [reportId, setReportId] = useState(null);
-  const refs = { type: useRef(null), code: useRef(null), priority: useRef(null), trapped: useRef(null), phone: useRef(null) };
+  const refs = { type: useRef(null), code: useRef(null), priority: useRef(null), trapped: useRef(null), phone: useRef(null), needs: useRef(null) };
+  const stepFields = support ? [...STEP_FIELDS.slice(0, 2), [...STEP_FIELDS[2], 'needs']] : STEP_FIELDS;
 
   const set = (patch) => setF((x) => ({ ...x, ...patch }));
   const touch = (...keys) => setShown((s) => ({ ...s, ...Object.fromEntries(keys.map((key) => [key, true])) }));
@@ -64,7 +68,7 @@ export default function QuickIncidentModal({ open, onClose }) {
         trapped != null && `${trapped} người cần hỗ trợ`,
         f.note.trim(),
         f.needs.length > 0 && `Cần: ${f.needs.join(', ')}`,
-        `(Báo cáo nhanh của cán bộ${me?.full_name ? ` ${me.full_name}` : ''})`,
+        `(${support ? 'Yêu cầu chi viện của' : 'Báo cáo nhanh của cán bộ'}${me?.full_name ? ` ${me.full_name}` : ''})`,
       ].filter(Boolean).join('. ')
     : '';
 
@@ -75,16 +79,17 @@ export default function QuickIncidentModal({ open, onClose }) {
     trapped: trapped != null && !(Number.isInteger(trapped) && trapped >= 0 && trapped <= MAX_TRAPPED)
       && `Số người là số nguyên từ 0 đến ${MAX_TRAPPED.toLocaleString('vi-VN')}`,
     phone: phone && !PHONE_RE.test(phone) && 'Số điện thoại chưa đúng — VD 0912 345 678',
+    needs: support && !f.needs.length && 'Chọn ít nhất một nhu cầu cần tỉnh chi viện',
   };
   // Số người sai hiện NGAY khi gõ; ô khác hiện lỗi sau khi rời ô hoặc bấm Tiếp / Tạo phiếu
   const err = (key) => (key === 'trapped' || shown[key] ? errors[key] || null : null);
-  const stepValid = (i) => STEP_FIELDS[i].every((key) => !errors[key]);
+  const stepValid = (i) => stepFields[i].every((key) => !errors[key]);
 
   // "Tiếp" / "Tạo phiếu" khi còn thiếu: hiện lỗi các ô của bước + đưa con trỏ tới ô lỗi đầu tiên
   const guard = (i) => {
-    const bad = STEP_FIELDS[i].filter((key) => errors[key]);
+    const bad = stepFields[i].filter((key) => errors[key]);
     if (!bad.length) return true;
-    touch(...STEP_FIELDS[i]);
+    touch(...stepFields[i]);
     refs[bad[0]].current?.focus();
     return false;
   };
@@ -130,14 +135,14 @@ export default function QuickIncidentModal({ open, onClose }) {
     setFailure(null);
     // Mã tin của báo cáo này — giữ nguyên qua các lần gửi lại: lần trước đã tới máy chủ (chỉ mất phản hồi) thì máy chủ
     // trả phiếu đã có (duplicate) thay vì tạo phiếu thứ hai — ràng buộc (source, external_id), services/sos.create_ticket
-    const externalId = reportId || newReportId();
+    const externalId = reportId || newReportId(support ? 'chi-vien-xa' : 'bao-cao-nhanh');
     setReportId(externalId);
     try {
       if (navigator.onLine === false) throw new TypeError('offline');
       const t = await api('/sos', {
         method: 'POST',
         body: {
-          raw_message: message,
+          raw_message: support ? `${COMMUNE_SUPPORT_TAG} ${message}` : message,
           source: 'CAN_BO',
           reporter_name: me?.full_name || null,
           reporter_phone: phone || null,
@@ -154,7 +159,9 @@ export default function QuickIncidentModal({ open, onClose }) {
       if (t.duplicate) {
         toast({ tone: 'info', title: `Phiếu ${t.code} đã có trên hệ thống`, body: 'Lần gửi trước đã tới máy chủ — không tạo phiếu thứ hai. Sửa thông tin (nếu cần) ở Điều hành cứu hộ.' });
       } else {
-        toast({ tone: 'good', title: `Đã tạo phiếu ${t.code}`, body: `${INCIDENT[t.incident_type]} – ${t.address || where}. Trực ban xử lý ở Điều hành cứu hộ.` });
+        toast(support
+          ? { tone: 'good', title: `Đã gửi yêu cầu chi viện (phiếu ${t.code})`, body: 'Trực ban tỉnh nhận trên bảng điều phối, mục "Xã xin chi viện".' }
+          : { tone: 'good', title: `Đã tạo phiếu ${t.code}`, body: `${INCIDENT[t.incident_type]} – ${t.address || where}. Trực ban xử lý ở Điều hành cứu hộ.` });
       }
       if (t.possible_duplicates?.length) {
         toast({ tone: 'warn', title: `${t.code} có thể trùng với ${t.possible_duplicates.join(', ')}`, body: 'Kiểm tra trước khi điều động — tránh điều 2 đội tới cùng một nơi.', duration: 12000 });
@@ -205,7 +212,7 @@ export default function QuickIncidentModal({ open, onClose }) {
     <Modal
       open={open}
       onClose={close}
-      title="Báo cáo nhanh hiện trường → tạo phiếu SOS"
+      title={support ? 'Gửi yêu cầu chi viện lên tỉnh' : 'Báo cáo nhanh hiện trường → tạo phiếu SOS'}
       footer={
         // Điện thoại: nút chính chiếm trọn hàng dưới cùng (gần ngón cái, không gãy chữ); máy tính: một hàng như cũ
         <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:items-center sm:justify-end">
@@ -430,14 +437,15 @@ export default function QuickIncidentModal({ open, onClose }) {
               </button>
             ))}
           </div>
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-muted">Cần hỗ trợ:</span>
+          <div ref={refs.needs} tabIndex={-1} className="flex flex-wrap items-center gap-1.5" aria-describedby="loi-nhu-cau">
+            <span className="text-muted">{support ? 'Cần tỉnh chi viện *:' : 'Cần hỗ trợ:'}</span>
             {NEEDS.map((n) => (
-              <button key={n} type="button" aria-pressed={f.needs.includes(n)} className={toggleChip(f.needs.includes(n))} onClick={() => toggleIn('needs', n)}>
+              <button key={n} type="button" aria-pressed={f.needs.includes(n)} className={toggleChip(f.needs.includes(n))} onClick={() => { toggleIn('needs', n); touch('needs'); }}>
                 {n}
               </button>
             ))}
           </div>
+          {support && <FieldError id="loi-nhu-cau">{err('needs')}</FieldError>}
           <label className="flex flex-col gap-1">
             <span className="flex justify-between text-muted">
               Mô tả thêm <span className="font-mono">{f.note.length}/1000</span>

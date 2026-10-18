@@ -85,8 +85,8 @@ export default function RescueCenter() {
   const [editFor, setEditFor] = useState(null);
   const [reportOpen, setReportOpen] = useState(false);
   const [evacOpen, setEvacOpen] = useState(false);
-  // Bản đồ + diễn biến: điện thoại mặc định thu gọn (bảng phiếu lên trước, không tải lớp bản đồ khi chưa mở) — như biểu đồ trang C
-  const [overviewOpen, setOverviewOpen] = useState(() => window.innerWidth >= 768);
+  // Bản đồ + diễn biến: mặc định thu gọn để bảng điều phối SOS lên ngay tầm mắt người trực ban
+  const [overviewOpen, setOverviewOpen] = useState(false);
   const contentRef = useRef(null);
   const boardRef = useRef(null);
 

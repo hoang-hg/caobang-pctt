@@ -13,7 +13,23 @@ const savedTheme = () => {
 };
 const systemTheme = () => (window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
 
-const savedAuth = (() => { try { return JSON.parse(safeGet('pctt_auth') || 'null'); } catch { return null; } })();
+// CHẾ ĐỘ GIẢ LẬP (dữ liệu giả trên trình duyệt — api/simulationEngine.js): CHỈ máy dev (vite dev server,
+// import.meta.env.DEV) và phải BẬT CHỦ ĐỘNG (nút trên trang đăng nhập / thanh trên) — mặc định tắt. Bản build chạy thật luôn
+// tắt và không chứa mã giả lập. Phiên giả lập dùng token DEMO_TOKEN: tắt giả lập (hoặc mở trên bản thật) thì phiên đó bị bỏ,
+// không bao giờ gửi lên máy chủ thật.
+export const DEMO_TOKEN = 'demo-gia-lap';
+const SIM_KEY = 'pctt_sim_mode';
+const SIM_ALLOWED = import.meta.env.DEV;
+const savedSim = SIM_ALLOWED && safeGet(SIM_KEY) === 'true';
+
+const savedAuth = (() => {
+  try {
+    const auth = JSON.parse(safeGet('pctt_auth') || 'null');
+    return auth?.token === DEMO_TOKEN && !savedSim ? null : auth;
+  } catch {
+    return null;
+  }
+})();
 
 // Bộ lọc địa phương nhớ THEO TÀI KHOẢN (pctt_filter = { user, filter }): tải lại trang, mở lại máy trực, phiên hết hạn rồi
 // đăng nhập lại vẫn đúng vùng đang xem; tài khoản khác đăng nhập trên cùng máy thì về Toàn tỉnh. Mã ngoài phạm vi / không còn
@@ -46,6 +62,17 @@ function followSystemTheme() {
 }
 
 export const useStore = create((set, get) => ({
+  // ---- Chế độ giả lập (chỉ máy dev, bật chủ động — xem DEMO_TOKEN) ----
+  simulationMode: savedSim,
+  setSimulationMode: (on) => {
+    const simulationMode = SIM_ALLOWED && Boolean(on);
+    safeSet(SIM_KEY, simulationMode ? 'true' : null);
+    set({ simulationMode });
+    if (!simulationMode && get().auth?.token === DEMO_TOKEN) get().setAuth(null); // tắt giả lập → thoát phiên giả lập
+  },
+  simulationScenario: 'normal',
+  setSimulationScenario: (scenario) => set({ simulationScenario: scenario }),
+
   // ---- Chế độ Sáng/Tối ----
   theme: savedTheme() || systemTheme(),
   themePref: savedTheme() || 'system', // 'system' | 'light' | 'dark' — chọn trong menu tài khoản

@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import {
-  AlertTriangle, ArrowUpRight, Compass, Droplets, FileDown, FileSpreadsheet, FileText, Home, Info, LayoutDashboard, LifeBuoy,
+  AlertTriangle, ArrowUpRight, ChevronDown, ChevronUp, Compass, Droplets, FileDown, FileSpreadsheet, FileText, Home, Info, LayoutDashboard, LifeBuoy,
   Loader2, MapPin, Minimize2, Monitor, Mountain, Pause, Play, RefreshCw, Server, ShieldAlert, Waves, X,
 } from 'lucide-react';
 import { useAreaQuery, usePresets, useUnits } from '../api/hooks';
@@ -30,7 +30,7 @@ import SystemView from '../components/dashboard/SystemView';
 import QuickIncidentModal from '../components/dashboard/QuickIncidentModal';
 import ReportDocModal from '../components/dashboard/ReportDocModal';
 import QuickActionBar from '../components/common/QuickActionBar';
-import { useAllowedCodes, usePermission } from '../rbac/usePermission';
+import { useAllowedCodes, useIsCommuneUser, usePermission } from '../rbac/usePermission';
 import { vnFileStamp } from '../utils/format';
 import { risk } from '../utils/risk';
 import { captureSnapshot, exportSnapshotPdf } from '../utils/exportPdf';
@@ -95,8 +95,11 @@ export default function Dashboard() {
   const canEvacUpdate = usePermission('evacuation', 'update');
   const tabs = TABS.filter((t) => t.id !== 'he_thong' || canSystem);
 
-  const wanted = params.get('tab') || LEGACY_LEVEL[params.get('level')] || 'tong_hop';
-  const tab = tabs.some((t) => t.id === wanted) ? wanted : 'tong_hop';
+  // Tài khoản cấp xã mở thẳng thẻ "Cấp xã / phường" của xã mình
+  const isCommuneUser = useIsCommuneUser();
+  const defaultTab = isCommuneUser ? 'cap_xa' : 'tong_hop';
+  const wanted = params.get('tab') || LEGACY_LEVEL[params.get('level')] || defaultTab;
+  const tab = tabs.some((t) => t.id === wanted) ? wanted : defaultTab;
 
   const kQ = useAreaQuery('kpis', '/dashboard/kpis', {}, { refetchInterval: 30_000 });
   const k = kQ.data;
@@ -142,6 +145,8 @@ export default function Dashboard() {
   const [reportOpen, setReportOpen] = useState(false);
   const [docOpen, setDocOpen] = useState(false); // báo cáo văn bản (PDF định dạng chuẩn)
   const [chartsOpen, setChartsOpen] = useState(CHARTS_OPEN);
+  const [chartSegment, setChartSegment] = useState('thuy_van'); // 'thuy_van' | 'mua' | 'sat_lo' | 'vat_tu' | 'tat_ca'
+  const [opsTableOpen, setOpsTableOpen] = useState(false);
   const [forceOpen, setForceOpen] = useState(false); // đang chụp PDF: mở mọi biểu đồ đang thu gọn, hiện đủ thẻ tab Hồ chứa / Sạt lở
   const ref = useRef(null); // vùng chụp PDF của thẻ đang mở
   const hydroRef = useRef(null);
@@ -166,6 +171,7 @@ export default function Dashboard() {
     }, { replace: true });
   };
   // Mở thẳng /dashboard?tab=cap_xa (link, tải lại trang) khi bộ lọc chưa là 1 xã → chọn sẵn xã đầu tiên trong phạm vi
+  // (tài khoản cấp xã: phạm vi chính là xã được giao)
   const communeInit = useRef(false);
   useEffect(() => {
     if (tab !== 'cap_xa' || communeInit.current || !scopeUnits.length) return;
@@ -384,7 +390,10 @@ export default function Dashboard() {
   const kpiProps = {
     k, kState, evacQ, stationsState, waterStations, rainStations, canSos, canResource, canEvacUpdate, riverRef,
     onOpenTab: setTab,
-    onRain: () => openChart('mua', 'bieu-do-mua'),
+    onRain: () => {
+      setChartSegment('mua');
+      openChart('mua', 'bieu-do-mua');
+    },
   };
   // Nhật ký: máy lớn — danh sách đầy đủ cuộn trong khung cố định; iPad dọc / điện thoại — 5 sự kiện mới + "Xem tất cả"
   const logSection = ({ title, limit, className, listClass = isLg ? 'h-full' : undefined }) => (
@@ -605,76 +614,209 @@ export default function Dashboard() {
         <>
           {/* Vùng chụp PDF: KPI + bản đồ + biểu đồ + nhật ký ("Việc chờ quyết định" không in — việc riêng của người xem) */}
           <div ref={ref} className="flex flex-col gap-2 bg-bg sm:gap-3.5">
-            <KpiStrip {...kpiProps} onRiver={focusStation} large={presentation} />
-            {/* Thứ tự theo thiết bị (chỉ CSS, không nhân đôi component):
-                điện thoại — Việc chờ → bản đồ → biểu đồ → nhật ký; iPad dọc — bản đồ → (Việc chờ | nhật ký) → biểu đồ;
-                laptop / iPad ngang — bản đồ + biểu đồ bên trái, cột phải (Việc chờ + nhật ký) dính khi cuộn */}
-            {/* grid-cols-1 = minmax(0, 1fr): cột không bị nội dung rộng (hàng nút lọc nhật ký) kéo quá bề rộng màn hình; khối bên
-                trong lớp `contents` không nhận [&>*]:min-w-0 nên tự đặt min-w-0 */}
-            <div className="grid grid-cols-1 gap-2.5 sm:gap-3.5 md:grid-cols-2 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] xl:grid-cols-[minmax(0,1fr)_360px] [&>*]:min-w-0">
-              <TacticalMiniMap k={k} className="order-2 md:order-1 md:col-span-2 lg:order-none lg:col-span-1 lg:col-start-1 lg:row-start-1" />
-              <div className="contents lg:sticky lg:top-16 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:flex lg:h-[calc(100vh-8.5rem)] lg:flex-col lg:gap-3.5 lg:self-start print:static print:h-auto">
-                {!presentation && <DecisionPanel k={k} kState={kState} className="order-1 min-w-0 md:order-2 md:self-start lg:order-none lg:shrink-0 lg:self-auto" />}
-                {logSection({
-                  title: 'Nhật ký sự kiện & luồng cảnh báo',
-                  limit: 60,
-                  className: 'order-4 min-w-0 md:order-3 lg:order-none lg:min-h-0 lg:flex-1 lg:overflow-hidden',
-                })}
-              </div>
-              <div className="order-3 grid grid-cols-1 gap-2.5 sm:gap-3.5 md:order-4 md:col-span-2 md:grid-cols-2 lg:order-none lg:col-span-1 lg:col-start-1 lg:row-start-2 lg:grid-cols-1 xl:grid-cols-2 [&>*]:min-w-0">
-                <div ref={hydroRef} className="min-w-0 scroll-mt-20">
-                  <Section title="Thủy văn – mực nước thực đo & dự báo" {...fold('thuy_van')}>
-                    {/* Danh sách trạm (trước đây nằm trong thẻ KPI cao) — chọn trạm để xem biểu đồ */}
-                    <StationPicker stations={waterStations} selectedId={activeStation} onSelect={setStationId} />
-                    {stationsState.error ? (
-                      <ErrorState height={250} onRetry={stationsState.refetch}>Không tải được danh sách trạm mực nước</ErrorState>
-                    ) : stationsState.loading ? (
-                      <Skeleton height={250} />
-                    ) : activeStation ? (
-                      // Thiết kế A.3 "Hydrograph & Vận hành hồ chứa": lưu lượng xả của hồ trên cùng sông, cùng trục thời gian
-                      <Hydrograph stationId={activeStation} station={activeRow} height={250} syncId="thuy-van">
-                        {(xDomain, xTicks) => <ReservoirOpsChart river={activeRow?.river} xDomain={xDomain} xTicks={xTicks} syncId="thuy-van" />}
-                      </Hydrograph>
-                    ) : (
-                      <EmptyState height={250}>Chưa có trạm mực nước trong vùng đang xem — nhập danh mục trạm và ngưỡng BĐ I–III (loại "Trạm quan trắc")</EmptyState>
-                    )}
-                    {canForecast && !presentation && waterStations.length > 0 && (
-                      <div className="mt-2 flex justify-end no-print">
-                        <button type="button" className="btn-ghost tap min-h-[36px] px-2.5 py-1 text-xs" onClick={() => setBulletinOpen(true)}>
-                          Nhập bản tin dự báo KTTV
+            <KpiStrip
+              {...kpiProps}
+              onRiver={(id) => {
+                setChartSegment('thuy_van');
+                focusStation(id);
+              }}
+              large={presentation}
+            />
+
+            {/* Khung điều hành chính: 2 Cột (Trái: Bản đồ tác chiến & Biểu đồ chuyên đề; Phải: Việc chờ quyết định & Nhật ký realtime) */}
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_420px] [&>*]:min-w-0">
+              {/* CỘT TRÁI: Bản đồ tác chiến & Giám sát Chuyên đề */}
+              <div className="flex flex-col gap-3 min-w-0">
+                {/* 1. Bản đồ tác chiến trực quan */}
+                <TacticalMiniMap k={k} className="min-w-0 shadow-sm" />
+
+                {/* 2. Bộ chuyển đổi chuyên đề giám sát (Giảm tải rối mắt cho lãnh đạo) */}
+                <div className="rounded-2xl border border-line bg-panel p-2 shadow-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-line/60">
+                    <div className="flex items-center gap-1.5 overflow-x-auto scroll-thin py-0.5">
+                      <button
+                        type="button"
+                        onClick={() => setChartSegment('thuy_van')}
+                        className={clsx(
+                          'tap flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all',
+                          chartSegment === 'thuy_van'
+                            ? 'bg-accent text-white shadow-sm'
+                            : 'text-ink-2 hover:bg-panel2 hover:text-ink'
+                        )}
+                      >
+                        <Waves size={14} />
+                        <span>Thủy văn & Hồ chứa</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setChartSegment('mua')}
+                        className={clsx(
+                          'tap flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all',
+                          chartSegment === 'mua'
+                            ? 'bg-accent text-white shadow-sm'
+                            : 'text-ink-2 hover:bg-panel2 hover:text-ink'
+                        )}
+                      >
+                        <Droplets size={14} />
+                        <span>Mưa QPF & Dự báo</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setChartSegment('sat_lo')}
+                        className={clsx(
+                          'tap flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all',
+                          chartSegment === 'sat_lo'
+                            ? 'bg-accent text-white shadow-sm'
+                            : 'text-ink-2 hover:bg-panel2 hover:text-ink'
+                        )}
+                      >
+                        <Mountain size={14} />
+                        <span>Sạt lở & Cảm biến</span>
+                      </button>
+                      {canResource && (
+                        <button
+                          type="button"
+                          onClick={() => setChartSegment('vat_tu')}
+                          className={clsx(
+                            'tap flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all',
+                            chartSegment === 'vat_tu'
+                              ? 'bg-accent text-white shadow-sm'
+                              : 'text-ink-2 hover:bg-panel2 hover:text-ink'
+                          )}
+                        >
+                          <Server size={14} />
+                          <span>Kho & Vật tư</span>
                         </button>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setChartSegment((s) => (s === 'tat_ca' ? 'thuy_van' : 'tat_ca'))}
+                      className="btn-ghost tap text-[11px] font-semibold text-muted hover:text-ink px-2.5 py-1 whitespace-nowrap"
+                    >
+                      {chartSegment === 'tat_ca' ? 'Thu gọn chuyên đề' : 'Xem toàn bộ'}
+                    </button>
+                  </div>
+
+                  {/* VÙNG NỘI DUNG BIỂU ĐỒ THEO CHUYÊN ĐỀ ĐƯỢC CHỌN */}
+                  <div className="mt-3 space-y-3">
+                    {/* CHUYÊN ĐỀ 1: THỦY VĂN & HỒ CHỨA */}
+                    {(chartSegment === 'thuy_van' || chartSegment === 'tat_ca' || forceOpen) && (
+                      <div ref={hydroRef} className="min-w-0 scroll-mt-20">
+                        <Section title="Thủy văn – Mực nước thực đo & Vận hành xả lũ hồ chứa" {...fold('thuy_van')}>
+                          <StationPicker stations={waterStations} selectedId={activeStation} onSelect={setStationId} />
+                          {stationsState.error ? (
+                            <ErrorState height={250} onRetry={stationsState.refetch}>Không tải được danh sách trạm mực nước</ErrorState>
+                          ) : stationsState.loading ? (
+                            <Skeleton height={250} />
+                          ) : activeStation ? (
+                            <Hydrograph stationId={activeStation} station={activeRow} height={250} syncId="thuy-van">
+                              {(xDomain, xTicks) => <ReservoirOpsChart river={activeRow?.river} xDomain={xDomain} xTicks={xTicks} syncId="thuy-van" />}
+                            </Hydrograph>
+                          ) : (
+                            <EmptyState height={250}>Chưa có trạm mực nước trong vùng đang xem</EmptyState>
+                          )}
+                          {canForecast && !presentation && waterStations.length > 0 && (
+                            <div className="mt-2 flex justify-end no-print">
+                              <button type="button" className="btn-ghost tap min-h-[34px] px-2.5 py-1 text-xs" onClick={() => setBulletinOpen(true)}>
+                                Nhập bản tin dự báo KTTV
+                              </button>
+                            </div>
+                          )}
+                          {bulletinOpen && <ForecastBulletinModal stations={waterStations} stationId={activeStation} onClose={() => setBulletinOpen(false)} />}
+                        </Section>
                       </div>
                     )}
-                    {bulletinOpen && <ForecastBulletinModal stations={waterStations} stationId={activeStation} onClose={() => setBulletinOpen(false)} />}
-                  </Section>
+
+                    {/* CHUYÊN ĐỀ 2: MƯA QPF & DỰ BÁO TỔ HỢP 72H */}
+                    {(chartSegment === 'mua' || chartSegment === 'tat_ca' || forceOpen) && (
+                      <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+                        <Section id="bieu-do-mua" title="Cường độ mưa & Dự báo 3 giờ tới (Nowcast)" className="scroll-mt-20" {...fold('mua')}>
+                          <RainfallChart height={260} />
+                        </Section>
+                        <Section id="du-bao-72h" title="Dự báo mưa 72h tổ hợp ECMWF + GFS (P10–P90)" className="scroll-mt-20" {...fold('du_bao')}>
+                          <AreaForecastChart height={260} />
+                        </Section>
+                      </div>
+                    )}
+
+                    {/* CHUYÊN ĐỀ 3: SẠT LỞ & CẢM BIẾN TALUY */}
+                    {(chartSegment === 'sat_lo' || chartSegment === 'tat_ca' || forceOpen) && (
+                      <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+                        <Section title="Ngưỡng kích hoạt sạt lở (Mưa tích lũy 72h – Cường độ)" {...fold('sat_lo')}>
+                          <LandslideScatter height={250} />
+                        </Section>
+                        <Section title="Cảm biến cảnh báo sớm (Độ nghiêng & Độ ẩm đất)" {...fold('sat_lo')}>
+                          <SensorHeatmap height={250} />
+                        </Section>
+                      </div>
+                    )}
+
+                    {/* CHUYÊN ĐỀ 4: KHO & VẬT TƯ */}
+                    {canResource && (chartSegment === 'vat_tu' || chartSegment === 'tat_ca' || forceOpen) && (
+                      <Section title="Vật tư cứu trợ theo kho (% định mức dự trữ an toàn)" {...fold('vat_tu')}>
+                        <SuppliesChart height={250} />
+                      </Section>
+                    )}
+                  </div>
                 </div>
-                <Section id="bieu-do-mua" title="Cường độ mưa & dự báo 3 giờ tới" className="scroll-mt-20" {...fold('mua')}>
-                  <RainfallChart height={270} />
-                </Section>
-                <Section id="du-bao-72h" title="Dự báo mưa 72 giờ theo xã – tổ hợp ECMWF + GFS (P10–P90)" className="scroll-mt-20 md:col-span-2 lg:col-span-1 xl:col-span-2" {...fold('du_bao')}>
-                  <AreaForecastChart height={230} />
-                </Section>
-                <Section title="Ngưỡng kích hoạt sạt lở (mưa tích lũy 72h – cường độ)" className={clsx(!canResource && 'md:col-span-2 lg:col-span-1 xl:col-span-2')} {...fold('sat_lo')}>
-                  <LandslideScatter height={240} />
-                </Section>
-                {canResource && (
-                  <Section title="Vật tư cứu trợ theo kho (% định mức dự trữ)" {...fold('vat_tu')}>
-                    <SuppliesChart height={240} />
-                  </Section>
+              </div>
+
+              {/* CỘT PHẢI: Quyết định khẩn & Nhật ký realtime (Cố định khi cuộn trên màn hình lớn). Điện thoại: cột tan ra
+                  (contents) để "Việc chờ quyết định" lên đầu trang, nhật ký xuống cuối — chỉ CSS, không nhân đôi component */}
+              <div className="contents md:flex md:min-w-0 md:flex-col md:gap-3 lg:sticky lg:top-16 lg:h-[calc(100vh-8.5rem)] lg:self-start print:static print:h-auto">
+                {!presentation && (
+                  <DecisionPanel k={k} kState={kState} className="min-w-0 shrink-0 shadow-sm max-md:order-first" />
                 )}
+                {logSection({
+                  title: 'Nhật ký sự kiện & luồng tác chiến',
+                  limit: 60,
+                  className: 'min-w-0 flex-1 overflow-hidden shadow-sm',
+                })}
               </div>
             </div>
           </div>
 
+          {/* 3. Bảng số liệu tác chiến chi tiết địa bàn (Thu gọn / Mở rộng) */}
           {!presentation && (
-            <OperationsTable
-              k={k}
-              kState={kState}
-              stations={waterStations}
-              stationsState={stationsState}
-              onSelectStation={focusStation}
-              scopeLabel={filterLabel}
-            />
+            <div className="card rounded-2xl border border-line bg-panel p-3.5 sm:p-4 shadow-sm transition-all mt-1">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent/10 text-accent font-bold">
+                    <FileSpreadsheet size={18} />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-bold text-ink">Bảng Tác Chiến Chi Tiết Địa Bàn</h2>
+                    <p className="text-[11px] text-muted">
+                      {waterStations.length} trạm thủy văn · {k?.reservoirs?.total || 0} hồ chứa · {k?.sos?.waiting || 0} phiếu SOS chờ · {k?.forces?.ready || 0} chiến sĩ sẵn sàng
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setOpsTableOpen(!opsTableOpen)}
+                  aria-expanded={opsTableOpen}
+                  aria-controls="bang-tac-chien"
+                  className="btn-secondary tap text-xs font-semibold px-3 py-1.5 flex items-center gap-1.5"
+                >
+                  <span>{opsTableOpen ? 'Thu gọn bảng' : 'Mở bảng dữ liệu chi tiết'}</span>
+                  {opsTableOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                </button>
+              </div>
+
+              {opsTableOpen && (
+                <div id="bang-tac-chien" className="mt-4 pt-4 border-t border-line/60 animate-in fade-in duration-200">
+                  <OperationsTable
+                    k={k}
+                    kState={kState}
+                    stations={waterStations}
+                    stationsState={stationsState}
+                    onSelectStation={focusStation}
+                    scopeLabel={filterLabel}
+                  />
+                </div>
+              )}
+            </div>
           )}
         </>
       )}

@@ -2,6 +2,8 @@ import clsx from 'clsx';
 import { Link } from 'react-router-dom';
 import { ChevronRight, ClipboardCheck } from 'lucide-react';
 import { useNavBadges } from '../layout/Sidebar';
+import { useAreaQuery } from '../../api/hooks';
+import { isCommuneSupport } from '../rescue/rescueFacts';
 import { usePermission } from '../../rbac/usePermission';
 import { int } from '../../utils/format';
 import { RISK } from '../../utils/risk';
@@ -19,8 +21,16 @@ const COUNT = 'chip min-w-[2.25rem] justify-center px-2 py-0.5 font-mono text-xs
 export default function DecisionPanel({ k, kState, className }) {
   const badges = useNavBadges();
   const canSos = usePermission('sos', 'view');
+  const { data: tickets = [] } = useAreaQuery('sos', '/sos', {}, { refetchInterval: 20_000, enabled: canSos });
+  const communeRequests = tickets.filter((t) => isCommuneSupport(t) && t.status !== 'hoan_thanh').length;
   const sos = k?.sos || {};
   const rows = [
+    canSos && communeRequests > 0 && {
+      to: '/cuu-ho?th=xa_chi_vien',
+      n: communeRequests,
+      text: 'yêu cầu chi viện từ xã/phường',
+      cls: 'bg-danger text-white motion-safe:animate-pulse',
+    },
     badges.alerts > 0 && { to: '/canh-bao', n: badges.alerts, text: 'lệnh cảnh báo chờ bạn phê duyệt', cls: 'bg-accent text-white' },
     canSos && sos.overdue > 0 && { to: '/cuu-ho', n: sos.overdue, text: 'phiếu SOS quá hạn phản hồi', cls: RISK[3].chip },
     canSos && !(sos.overdue > 0) && sos.waiting > 0 && { to: '/cuu-ho', n: sos.waiting, text: 'phiếu SOS chờ tiếp nhận', cls: 'bg-accent text-white' },

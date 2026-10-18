@@ -16,6 +16,12 @@ export const COLUMNS = [
 ];
 export const COLUMN_KEYS = COLUMNS.map((c) => c.key);
 
+/** Yêu cầu chi viện của xã gửi lên tỉnh (nút "Gửi yêu cầu chi viện lên tỉnh" ở trang Cấp xã — QuickIncidentModal support):
+ * phiếu SOS nguồn CAN_BO, nội dung tin mở đầu bằng thẻ này — không cần cột / API mới, tỉnh lọc và nhận biết được trên bảng
+ * điều phối. */
+export const COMMUNE_SUPPORT_TAG = '[Xã xin chi viện]';
+export const isCommuneSupport = (t) => t?.source === 'CAN_BO' && String(t.raw_message || '').startsWith(COMMUNE_SUPPORT_TAG);
+
 /** Thời lượng ngắn cho đồng hồ SLA / ETA: "4:05", "2h14". */
 export const mmss = (sec) => {
   const s = Math.max(0, Math.floor(Math.abs(sec)));
@@ -48,6 +54,7 @@ export const FILTERS = [
     label: 'Cần chú ý',
     all: 'Mọi tình huống',
     options: [
+      ['xa_chi_vien', 'Xã xin chi viện'],
       ['qua_han', 'Quá hạn SLA'],
       ['chua_doi', 'Chưa có đội'],
       ['chi_vien', 'Đội cần chi viện'],
@@ -60,7 +67,14 @@ export const FILTERS = [
 ];
 const TESTS = {
   muc: (t, v) => String(t.priority) === v,
-  th: (t, v, x) => ({ qua_han: x.overdue, chua_doi: x.noTeam, chi_vien: x.needSupport, cho_xac_nhan: x.rescuedPending, lo_trinh: x.unsafeRoute })[v],
+  th: (t, v, x) => ({
+    xa_chi_vien: isCommuneSupport(t),
+    qua_han: x.overdue,
+    chua_doi: x.noTeam,
+    chi_vien: x.needSupport,
+    cho_xac_nhan: x.rescuedPending,
+    lo_trinh: x.unsafeRoute,
+  })[v],
   loai: (t, v) => t.incident_type === v,
   nguon: (t, v) => t.source === v,
 };
@@ -92,7 +106,9 @@ export function sortTickets(list, key, factsOf) {
   if (key === 'moi_nhat') return out.sort((a, b) => at(b.received_at) - at(a.received_at));
   if (key === 'nhieu_nguoi') return out.sort((a, b) => (b.trapped_count || 0) - (a.trapped_count || 0) || a.priority - b.priority);
   if (key === 'cho_lau') return out.sort((a, b) => (factsOf(b).sla?.waitedSec ?? -1) - (factsOf(a).sla?.waitedSec ?? -1) || at(a.received_at) - at(b.received_at));
-  return out.sort((a, b) => Number(factsOf(b).overdue) - Number(factsOf(a).overdue) || a.priority - b.priority || at(a.received_at) - at(b.received_at));
+  // Thứ tự cứu nạn giữ nguyên (quá hạn → cấp ưu tiên); cùng mức thì yêu cầu chi viện của xã lên trước
+  return out.sort((a, b) => Number(factsOf(b).overdue) - Number(factsOf(a).overdue) || a.priority - b.priority
+    || Number(isCommuneSupport(b)) - Number(isCommuneSupport(a)) || at(a.received_at) - at(b.received_at));
 }
 
 /**
@@ -103,6 +119,16 @@ export function sortTickets(list, key, factsOf) {
 export function rescueAlerts({ tickets, sites, factsOf }) {
   const items = [];
   const count = (pred) => tickets.filter((t) => pred(factsOf(t), t)).length;
+  const communeRequests = count((_, t) => isCommuneSupport(t) && t.status !== 'hoan_thanh');
+  if (communeRequests) {
+    items.push({
+      key: 'xa-chi-vien',
+      level: 3,
+      text: `${communeRequests} yêu cầu chi viện từ xã/phường`,
+      short: `${communeRequests} xã xin chi viện`,
+      filter: { th: 'xa_chi_vien' },
+    });
+  }
   const overdue = count((x) => x.overdue);
   if (overdue) items.push({ key: 'qua-han', level: 3, text: `${overdue} phiếu quá hạn SLA`, short: `${overdue} quá hạn SLA`, filter: { th: 'qua_han' } });
   const p1 = count((x, t) => x.noTeam && t.priority === 1);

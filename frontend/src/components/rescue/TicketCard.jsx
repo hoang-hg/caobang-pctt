@@ -6,7 +6,7 @@ import { INCIDENT, PRIORITY, SOURCE, VULNERABLE } from '../../utils/labels';
 import { time } from '../../utils/format';
 import { risk, sosLevel } from '../../utils/risk';
 import { hasActiveTeam } from '../../utils/sla';
-import { COLUMNS, mmss } from './rescueFacts';
+import { COLUMNS, isCommuneSupport, mmss } from './rescueFacts';
 
 const BTN = 'tap inline-flex min-h-[32px] items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 text-xs font-semibold';
 
@@ -77,9 +77,11 @@ export default function TicketCard({ t, x, now, online, compact = false, onDispa
         overdue && 'ring-2 ring-danger',
       )}
     >
-      <div className="flex items-center gap-1.5">
+      {/* Nhiều nhãn (mức, xã xin chi viện, quá hạn) trên điện thoại 360 px: xuống dòng, không tràn ngang */}
+      <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
         <b className="whitespace-nowrap text-sm font-bold text-ink" title={compact ? `Kênh: ${SOURCE[t.source] || t.source}` : undefined}>{t.code}</b>
         <span className={clsx('chip py-0.5 text-[10px] font-bold', pr.cls)} title={pr.label}>{pr.short}</span>
+        {isCommuneSupport(t) && <span className="chip whitespace-nowrap bg-danger py-0.5 text-[10px] font-bold text-white" title="Xã gửi yêu cầu chi viện lên tỉnh">Xã xin chi viện</span>}
         {overdue && <span className="chip whitespace-nowrap bg-danger py-0.5 text-[10px] font-black uppercase text-white motion-safe:animate-blink">Quá hạn</span>}
         {/* Cột hẹp của bảng 4 cột: bỏ tên kênh (rê lên mã phiếu để xem) — mã, mức, nhãn quá hạn nằm một dòng */}
         <span className={clsx('ml-auto truncate text-[11px] font-medium text-muted', compact && 'hidden')}>{SOURCE[t.source] || t.source}</span>

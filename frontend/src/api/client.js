@@ -20,7 +20,13 @@ function sessionEnded(detail) {
   toast({ tone: 'warn', title: 'Phiên đăng nhập đã kết thúc', body: detail, duration: 10000 });
 }
 
+/** Chế độ giả lập (app/store.js: chỉ máy dev, bật chủ động) cho API nội bộ. Cổng công khai /public/* luôn gọi máy chủ thật.
+ * Bản build chạy thật: import.meta.env.DEV = false → cả nhánh và mã giả lập bị loại khỏi gói. KHÔNG có cơ chế "máy chủ lỗi
+ * thì trả dữ liệu giả" — lỗi thật phải hiện ra là lỗi. */
+const simulating = (path) => import.meta.env.DEV && useStore.getState().simulationMode && !path.startsWith('/public/');
+
 export async function api(path, { method = 'GET', body, params } = {}) {
+  if (simulating(path)) return (await import('./simulationEngine')).simulateRequest(path, { method, body, params });
   const url = new URL(`/api/v1${path}`, window.location.origin);
   Object.entries(params || {}).forEach(([k, v]) => {
     if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, Array.isArray(v) ? v.join(',') : v);
@@ -56,6 +62,7 @@ export const useAreaParams = () => {
 
 /** Gửi tệp (multipart/form-data). Lỗi → ApiError, kèm `data` là JSON phản hồi (VD báo cáo kiểm tra tệp). */
 export async function apiUpload(path, formData) {
+  if (simulating(path)) return (await import('./simulationEngine')).simulateRequest(path, { method: 'POST', body: formData });
   const token = useStore.getState().auth?.token;
   const res = await fetch(`/api/v1${path}`, {
     method: 'POST',
@@ -75,6 +82,7 @@ export async function apiUpload(path, formData) {
 
 /** Tải tệp từ API (có token) và lưu xuống máy, tên tệp theo Content-Disposition. */
 export async function apiDownload(path, fallbackName) {
+  if (simulating(path)) throw new ApiError(501, 'Chế độ giả lập không tải tệp từ máy chủ — tắt giả lập để tải tệp thật');
   const token = useStore.getState().auth?.token;
   const res = await fetch(`/api/v1${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
   if (!res.ok) throw new ApiError(res.status, res.statusText);
