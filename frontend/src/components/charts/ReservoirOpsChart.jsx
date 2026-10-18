@@ -133,7 +133,7 @@ export function ReservoirHistory({ reservoir: r, compact = false }) {
       </ResponsiveContainer>
       <div className="flex flex-wrap items-center justify-between gap-2 text-muted">
         <span>Lưu lượng (m³/s)</span>
-        <Legend items={[{ label: 'Nước về hồ', color: c.s3, line: true }, { label: 'Lưu lượng xả', color: c.s1, line: true }]} />
+        <Legend items={[{ label: 'Về hồ', color: c.s3, line: true }, { label: 'Xả', color: c.s1, line: true }]} />
       </div>
       <ResponsiveContainer width="100%" height={compact ? 76 : 100}>
         <LineChart data={series} syncId={syncId} syncMethod="value" margin={{ top: 4, right: 8, bottom: 0, left: -12 }}>
@@ -141,8 +141,8 @@ export function ReservoirHistory({ reservoir: r, compact = false }) {
           {x(false)}
           <YAxis width={50} tickFormatter={(v) => num(v, 0)} {...axisProps(c)} />
           <Tooltip content={<ChartTooltip unit=" m³/s" labelFormatter={tooltipTime} />} />
-          <Line dataKey="inflow" name="Nước về hồ" type="stepAfter" stroke={c.s3} strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
-          <Line dataKey="outflow" name="Lưu lượng xả" type="stepAfter" stroke={c.s1} strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
+          <Line dataKey="inflow" name="Về hồ" type="stepAfter" stroke={c.s3} strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
+          <Line dataKey="outflow" name="Xả" type="stepAfter" stroke={c.s1} strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
         </LineChart>
       </ResponsiveContainer>
     </div>

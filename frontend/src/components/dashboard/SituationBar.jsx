@@ -78,7 +78,9 @@ export default function SituationBar({
   if (worst >= 2) {
     const scale = risk(worst);
     const onRed = worst === 3; // đỏ: chữ trắng; cam: chữ đen (tương phản ≥ 4,5 : 1)
-    const chip = clsx('max-w-full items-center gap-1.5 rounded-full border px-2 py-0.5 text-[13px] font-semibold', onRed ? 'border-white/35' : 'border-black/20');
+    // Chữ 13 px ở Tổng quan; dải gọn của Bản đồ giữ 12 px — điện thoại không đủ chỗ, chip xuống dòng làm bản đồ thấp đi
+    const size = compact ? 'text-xs' : 'text-[13px]';
+    const chip = clsx('max-w-full items-center gap-1.5 rounded-full border px-2 py-0.5 font-semibold', size, onRed ? 'border-white/35' : 'border-black/20');
     const ring = onRed ? 'ring-white/80' : 'ring-black/40';
     const toggle = clsx('items-center justify-center gap-1 whitespace-nowrap rounded-lg border px-2.5 font-bold', onRed ? 'border-white/40' : 'border-black/25');
     const extraPhone = items.length - 1;
@@ -100,7 +102,7 @@ export default function SituationBar({
         <div className="flex min-w-0 items-start gap-2 sm:flex-1 sm:items-center">
           <Siren size={16} className="mt-0.5 shrink-0 sm:mt-0" aria-hidden="true" />
           <div className="flex min-w-0 flex-wrap items-center gap-1.5 leading-snug">
-            <b className="whitespace-nowrap text-[13px] font-bold">
+            <b className={clsx('whitespace-nowrap font-bold', size)}>
               {onRed ? 'Khẩn cấp:' : 'Cần chú ý:'}
             </b>
             {items.map((it, i) => (
@@ -139,7 +141,7 @@ export default function SituationBar({
               to="/cuu-ho"
               className={clsx(
                 // Màn cảm ứng: 44 px (! để thắng sm:min-h-[36px] khi cả hai cùng khớp — iPad)
-                'flex min-h-[40px] items-center justify-center gap-1 whitespace-nowrap rounded-lg border px-2.5 text-[13px] font-bold sm:min-h-[36px] [@media(pointer:coarse)]:!min-h-[44px]',
+                'flex min-h-[40px] items-center justify-center gap-1 whitespace-nowrap rounded-lg border px-2.5 font-bold sm:min-h-[36px] [@media(pointer:coarse)]:!min-h-[44px]', size,
                 onRed ? 'border-white/40 bg-white/15 hover:bg-white/25' : 'border-black/25 bg-black/10 hover:bg-black/15',
               )}
               title="Mở Điều hành cứu hộ để điều động cho các phiếu SOS"
