@@ -44,7 +44,7 @@ export function kpiTiles(k, stations) {
       key: 'river', icon: Waves, title: 'Mực nước sông', short: 'Mực nước', level: riverFailed || stations.loading ? null : river.level,
       value: stations.loading && !n ? '…' : n ? `${river.above}/${n}` : '–', unit: n ? 'trạm trên BĐ' : '', unitShort: n ? 'trên BĐ' : '',
       sub: riverFailed ? 'Không tải được trạm' : stations.loading && !n ? 'Đang tải trạm…' : !n ? 'Chưa có trạm'
-        : river.level == null ? 'Chưa đánh giá được' : river.level >= 1 ? `Nặng nhất BĐ ${ROMAN[river.level]}` : ALARM[0].label,
+        : river.level == null ? 'Chưa đánh giá được' : river.level >= 1 ? `Nặng nhất báo động ${ROMAN[river.level]}` : ALARM[0].label,
     },
     {
       key: 'topic', icon: Droplets, title: 'Hồ chứa · Sạt lở', short: 'Hồ · Sạt lở', level: topicFacts(rs, ls).level,

@@ -99,7 +99,7 @@ export const alarmLevel = (value, thr = {}) => {
   ['bd1', 'bd2', 'bd3'].forEach((k, i) => { if (thr[k] != null && value >= thr[k]) lv = i + 1; });
   return lv;
 };
-export const ALARM = ['Dưới BĐ I', 'Trên BĐ I', 'Trên BĐ II', 'Trên BĐ III'].map((label, i) => ({
+export const ALARM = ['Dưới báo động I', 'Báo động I', 'Báo động II', 'Báo động III'].map((label, i) => ({
   label,
   cls: RISK[i].chip,
   color: RISK[i].hex,

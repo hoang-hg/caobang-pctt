@@ -27,7 +27,7 @@ export function stationView(s) {
     status = v >= 100 ? 'Mưa rất to' : v >= 50 ? 'Mưa to' : 'Mưa nhỏ / không mưa';
   } else {
     level = alarmLevel(v, s.thresholds || {});
-    status = ['Dưới BĐ I', 'BĐ I', 'BĐ II', 'BĐ III (Nguy hiểm)'][level];
+    status = ['Dưới báo động I', 'Báo động I', 'Báo động II', 'Báo động III (nguy hiểm)'][level];
   }
   const value = rain ? `${Math.round(v)} mm` : `${v.toFixed(2)} ${s.unit || 'm'}`;
   if (stale) {
@@ -64,7 +64,7 @@ export const trendProps = (t, who = 'Mực nước') => t && {
 };
 
 /** Nguồn đường dự báo mực nước: bản tin KTTV do trực ban nhập, hay đường "HEC-HMS" chỉ bộ mô phỏng sinh. */
-export const forecastSource = (model) => (model === 'KTTV' ? 'bản tin KTTV' : 'dự báo mô phỏng');
+export const forecastSource = (model) => (model === 'KTTV' ? 'bản tin thủy văn' : 'dự báo mô phỏng');
 
 /** Giờ của một mốc dự báo: hôm nay → "21:00", ngày khác → "01:00 ngày 10/10" (đọc liền sau "lúc …"). */
 export function etaWhen(t) {
