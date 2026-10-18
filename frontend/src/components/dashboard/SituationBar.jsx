@@ -23,7 +23,7 @@ export function situationItems(k, waterStations) {
       const where = s.river ? `Sông ${s.river}` : s.name;
       const trend = !st.stale && riverTrend(s); // số đo cũ: không nói lên / xuống
       const note = st.stale ? ', số đo cũ' : trend && trend.dir !== 'on_dinh' ? `, ${trendWords(trend)}` : '';
-      items.push({ level: st.level, text: `${where} trên BĐ ${ROMAN[st.level]} (${num(st.value, 2)} m${note})` });
+      items.push({ level: st.level, text: `${where} Báo động ${ROMAN[st.level]} (${num(st.value, 2)} m${note})` });
     }
   }
   const sos = k?.sos || {};
@@ -36,7 +36,7 @@ export function situationItems(k, waterStations) {
   const rainLv = rainLevel(k?.rain?.max_24h);
   if (rainLv >= 1) {
     const at = k.rain.max_station ? ` tại ${k.rain.max_station.replace(/^Trạm đo mưa\s+/i, '')}` : '';
-    items.push({ level: rainLv, text: `${rainLv >= 2 ? 'Mưa rất to' : 'Mưa to'} ${num(k.rain.max_24h, 1)} mm/24h${at}` });
+    items.push({ level: rainLv, text: `${rainLv >= 2 ? 'Mưa rất to' : 'Mưa to'} ${num(k.rain.max_24h, 1)} mm/24 giờ${at}` });
   }
   if (ls.warning_count > 0) items.push({ level: 2, text: `${ls.warning_count} điểm sạt lở cảnh báo` });
   const spilling = (rs.spill_count || 0) - (rs.emergency_count || 0);
@@ -50,12 +50,13 @@ export function situationItems(k, waterStations) {
  * Không có tình huống: nói "chưa ghi nhận" kèm độ phủ số đo — không nói "an toàn"; chưa có số đo: khung xám chỉ chỗ
  * nhập (chỉ link tới trang tài khoản được mở). Lỗi tải danh sách trạm: nói không tải được, không nói "chưa có trạm".
  * `presentation` (chế độ trình chiếu màn hình lớn): hiện đủ mọi tình huống, ẩn nút thao tác — màn hình chỉ để xem.
+ * `quiet` (Tổng quan): chỉ hiện dải khi có tình huống — "chưa có số liệu" / "chưa ghi nhận" nằm trong câu tóm tắt.
  * `compact` (đầu trang Bản đồ): một dải mỏng sát mép, không dính / không lề âm (trang không cuộn); trạng thái "chưa ghi
  * nhận tình huống" chỉ hiện từ máy tính bảng trở lên — điện thoại dành chỗ cho bản đồ.
  */
 export default function SituationBar({
   k, waterStations, stationsError, rainKnown, canSos, canImportStations, canSystem, presentation = false,
-  compact = false,
+  compact = false, quiet = false,
 }) {
   const [opened, setExpanded] = useState(false);
   const expanded = opened || presentation;
@@ -77,7 +78,7 @@ export default function SituationBar({
   if (worst >= 2) {
     const scale = risk(worst);
     const onRed = worst === 3; // đỏ: chữ trắng; cam: chữ đen (tương phản ≥ 4,5 : 1)
-    const chip = clsx('max-w-full items-center gap-1.5 rounded-full border px-2 py-0.5 font-semibold', onRed ? 'border-white/35 bg-white/10' : 'border-black/20 bg-black/5');
+    const chip = clsx('max-w-full items-center gap-1.5 rounded-full border px-2 py-0.5 text-[13px] font-semibold', onRed ? 'border-white/35' : 'border-black/20');
     const ring = onRed ? 'ring-white/80' : 'ring-black/40';
     const toggle = clsx('items-center justify-center gap-1 whitespace-nowrap rounded-lg border px-2.5 font-bold', onRed ? 'border-white/40' : 'border-black/25');
     const extraPhone = items.length - 1;
@@ -97,10 +98,10 @@ export default function SituationBar({
         title={NOTE}
       >
         <div className="flex min-w-0 items-start gap-2 sm:flex-1 sm:items-center">
-          <Siren size={16} className={clsx('mt-0.5 shrink-0 sm:mt-0', onRed && 'motion-safe:animate-pulse')} aria-hidden="true" />
+          <Siren size={16} className="mt-0.5 shrink-0 sm:mt-0" aria-hidden="true" />
           <div className="flex min-w-0 flex-wrap items-center gap-1.5 leading-snug">
-            <b className={clsx('whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider', onRed ? 'bg-white/20' : 'bg-black/10')}>
-              {onRed ? 'Khẩn cấp' : 'Cần chú ý'}
+            <b className="whitespace-nowrap text-[13px] font-bold">
+              {onRed ? 'Khẩn cấp:' : 'Cần chú ý:'}
             </b>
             {items.map((it, i) => (
               <span key={it.text} className={clsx('inline-flex', chip, chipVis(i))}>
@@ -121,7 +122,9 @@ export default function SituationBar({
         <div
           className={clsx(
             'flex flex-wrap items-center gap-2 no-print sm:ml-auto sm:shrink-0 [&>*]:flex-1 sm:[&>*]:flex-none',
-            extraPhone <= 0 && !sosLink && 'hidden sm:flex',
+            // Tổng quan (`quiet`): điện thoại bỏ hàng nút — câu tóm tắt ngay dưới đã nói đủ các tình huống, "Việc chờ quyết
+            // định" có nút điều động; dành chỗ để 6 ô chỉ số vẫn thấy trọn không cần cuộn
+            ((extraPhone <= 0 && !sosLink) || quiet) && 'hidden sm:flex',
             presentation && '!hidden',
           )}
         >
@@ -136,13 +139,12 @@ export default function SituationBar({
               to="/cuu-ho"
               className={clsx(
                 // Màn cảm ứng: 44 px (! để thắng sm:min-h-[36px] khi cả hai cùng khớp — iPad)
-                'flex min-h-[40px] items-center justify-center gap-1 whitespace-nowrap rounded-lg border px-2.5 font-bold shadow-sm active:scale-95 sm:min-h-[36px] [@media(pointer:coarse)]:!min-h-[44px]',
+                'flex min-h-[40px] items-center justify-center gap-1 whitespace-nowrap rounded-lg border px-2.5 text-[13px] font-bold sm:min-h-[36px] [@media(pointer:coarse)]:!min-h-[44px]',
                 onRed ? 'border-white/40 bg-white/15 hover:bg-white/25' : 'border-black/25 bg-black/10 hover:bg-black/15',
               )}
-              title="Mở Điều hành cứu hộ để xử lý các phiếu SOS"
+              title="Mở Điều hành cứu hộ để điều động cho các phiếu SOS"
             >
-              <Siren size={13} aria-hidden="true" />
-              Xử lý {sos.overdue > 0 ? `${sos.overdue} SOS quá hạn` : `${sos.waiting} SOS chờ`} →
+              Điều động {sos.overdue > 0 ? `${sos.overdue} phiếu quá hạn` : `${sos.waiting} phiếu chờ`} →
             </Link>
           )}
         </div>
@@ -172,6 +174,9 @@ export default function SituationBar({
     );
   }
 
+  // `quiet` (Tổng quan): trạng thái chưa có số liệu / chưa ghi nhận đã nói trong câu tóm tắt (SituationSummary)
+  if (quiet) return null;
+
   if (!hasData || stationsError) {
     // Link chỉ tới trang tài khoản mở được: nhập danh mục trạm (quyền data.import — cấp tỉnh), xem kết nối (integration.view)
     const link = canImportStations
@@ -188,8 +193,8 @@ export default function SituationBar({
         <DatabaseZap size={15} className="shrink-0" aria-hidden="true" />
         <span className="min-w-0 flex-1">
           {stationsError
-            ? `Không tải được danh sách trạm quan trắc — ${compact ? 'chưa' : 'Dashboard chưa'} đánh giá được mực nước.${compact ? '' : ' Bấm "Làm mới" để thử lại.'}`
-            : `Chưa có số đo trạm mực nước / đo mưa trong vùng đang xem — ${compact ? 'chưa' : 'Dashboard chưa'} đánh giá được tình hình mưa, lũ.`}
+            ? `Không tải được danh sách trạm quan trắc — chưa đánh giá được mực nước.${compact ? '' : ' Bấm "Làm mới" để thử lại.'}`
+            : 'Chưa có số đo trạm mực nước / đo mưa trong vùng đang xem — chưa đánh giá được tình hình mưa, lũ.'}
           {!stationsError && !link && ' Báo cấp tỉnh kiểm tra danh mục trạm.'}
         </span>
         {!stationsError && link && (
@@ -207,9 +212,56 @@ export default function SituationBar({
     >
       <Info size={15} className="mt-0.5 shrink-0 text-muted" aria-hidden="true" />
       <span>
-        Chưa ghi nhận trạm vượt báo động, SOS quá hạn, sạt lở cấm đường, hồ xả hay mưa ≥ 50 mm/24h trong vùng đang xem
+        Chưa ghi nhận trạm vượt báo động, SOS quá hạn, sạt lở cấm đường, hồ xả hay mưa ≥ 50 mm/24 giờ trong vùng đang xem
         {waterStations.length > 0 && ` · ${fresh}/${waterStations.length} trạm mực nước có số đo trong 60 phút qua`}.
       </span>
     </div>
   );
+}
+
+const lower = (t) => t.charAt(0).toLowerCase() + t.slice(1);
+
+/**
+ * MỘT câu tóm tắt tình hình bằng lời (thiết kế A — trả lời "đang có chuyện gì" trong 5 giây), ghép từ số liệu thật của
+ * KPI + trạm mực nước: "2 trạm ở Báo động II, 12 phiếu SOS chờ (3 quá hạn), 2 hồ đang xả lũ." Không có tình huống
+ * → "chưa ghi nhận …" kèm độ phủ số đo; chưa có số đo → "chưa có số liệu …, chưa đánh giá được" — KHÔNG BAO GIỜ "an toàn".
+ * → { level (mức nặng nhất, null = chưa có số liệu), text, noData }
+ */
+export function situationSentence(k, waterStations, { stationsError = false } = {}) {
+  const parts = [];
+  const rows = waterStations.map((s) => riverState(s));
+  const fresh = rows.filter((st) => !st.noData && !st.stale).length;
+  const above = rows.filter((st) => st.level >= 1);
+  if (above.length) {
+    const top = Math.max(...above.map((st) => st.level));
+    const same = above.every((st) => st.level === top);
+    parts.push({ level: top, text: same ? `${above.length} trạm ở Báo động ${ROMAN[top]}` : `${above.length} trạm vượt báo động (cao nhất Báo động ${ROMAN[top]})` });
+  }
+  const sos = k?.sos || {};
+  if (sos.waiting > 0) {
+    const late = sos.overdue > 0 ? `${sos.overdue} quá hạn` : sos.no_team_15m > 0 ? `${sos.no_team_15m} chờ quá 15 phút` : '';
+    parts.push({ level: late ? 3 : 1, text: `${sos.waiting} phiếu SOS chờ${late ? ` (${late})` : ''}` });
+  }
+  const rs = k?.reservoirs || {};
+  if (rs.spill_count > 0) {
+    parts.push({ level: rs.emergency_count ? 3 : 2, text: `${rs.spill_count} hồ đang xả lũ${rs.emergency_count ? ` (${rs.emergency_count} xả khẩn cấp)` : ''}` });
+  }
+  const ls = k?.landslides || {};
+  if (ls.blocked_count > 0) parts.push({ level: 3, text: `${ls.blocked_count} điểm sạt lở cấm đường` });
+  else if (ls.warning_count > 0) parts.push({ level: 2, text: `${ls.warning_count} điểm sạt lở cần cảnh báo` });
+  const rainLv = rainLevel(k?.rain?.max_24h);
+  if (rainLv >= 1) parts.push({ level: rainLv, text: `mưa lớn nhất ${num(k.rain.max_24h, 0)} mm/24 giờ` });
+  const rainKnown = k?.rain?.avg_24h != null;
+  const noData = stationsError || (!fresh && !rainKnown);
+  const gap = stationsError ? 'chưa tải được danh sách trạm quan trắc' : 'chưa có số đo mực nước, lượng mưa trong vùng đang xem';
+  if (parts.length) {
+    const text = parts.map((p, i) => (i ? lower(p.text) : p.text.charAt(0).toUpperCase() + p.text.slice(1))).join(', ');
+    return { level: Math.max(...parts.map((p) => p.level)), text: `${text}${noData ? ` (${gap})` : ''}.`, noData };
+  }
+  if (noData) return { level: null, text: `${gap.charAt(0).toUpperCase()}${gap.slice(1)} — chưa đánh giá được tình hình mưa, lũ.`, noData };
+  return {
+    level: 0,
+    text: `Chưa ghi nhận trạm vượt báo động, phiếu SOS chờ, hồ xả lũ hay sạt lở cấm đường trong vùng đang xem${waterStations.length ? ` · ${fresh}/${waterStations.length} trạm mực nước có số đo trong 60 phút qua` : ''}.`,
+    noData,
+  };
 }

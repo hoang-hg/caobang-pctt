@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CircleMarker, MapContainer, Pane, Popup, Tooltip, ZoomControl, useMap } from 'react-leaflet';
 import clsx from 'clsx';
@@ -25,12 +25,17 @@ const coords = (f) => {
   return { ...p, lat: p.lat ?? lat, lon: p.lon ?? lon };
 };
 
+// Cùng mức thì xếp theo loại: chỗ nguy hiểm trên diện rộng (mực nước, hồ xả, đường cấm, sự cố) trước từng phiếu SOS —
+// câu "Nguy hiểm nhất" của Tổng quan chỉ một nơi; phiếu SOS đã có ở "Việc chờ quyết định"
+const KIND_ORDER = { 'Mực nước': 0, 'Hồ chứa': 1, 'Sạt lở': 2, 'Sự cố': 3, SOS: 4 };
+
 /**
  * Điểm nóng lấy từ dữ liệu thật: trạm mực nước vượt báo động (số đo cũ vẫn giữ cấp đã vượt), phiếu SOS đang mở, điểm
  * sạt lở cấm đường / cảnh báo, hồ đang xả, điểm sự cố cán bộ đánh dấu. Mức theo thang màu rủi ro chung (utils/risk.js),
- * khớp màu backend: hồ xả điều tiết = Cam, xả khẩn cấp = Đỏ; sạt lở cảnh báo = Cam, cấm đường = Đỏ.
+ * khớp màu backend: hồ xả điều tiết = Cam, xả khẩn cấp = Đỏ; sạt lở cảnh báo = Cam, cấm đường = Đỏ. Dùng chung cho câu
+ * "Nguy hiểm nhất" đầu Tổng quan (cùng truy vấn 'map-layers' — không gọi thêm).
  */
-function buildHotspots(layers, k) {
+export function buildHotspots(layers, k) {
   const out = [];
   for (const f of layers?.stations?.features || []) {
     const s = coords(f);
@@ -73,21 +78,25 @@ function buildHotspots(layers, k) {
     const h = coords(f);
     out.push({ id: `hz-${h.id}`, kind: 'Sự cố', name: h.name, lat: h.lat, lon: h.lon, level: levelOf(HAZARD_LEVEL, h.level) || 1, detail: h.description || '' });
   }
-  return out.filter((h) => h.lat != null && h.lon != null).sort((a, b) => b.level - a.level);
+  return out.filter((h) => h.lat != null && h.lon != null).sort((a, b) => b.level - a.level || KIND_ORDER[a.kind] - KIND_ORDER[b.kind]);
 }
 
-/** Bay tới điểm được chọn trong danh sách bên cạnh. */
+/** Bay tới điểm được chọn trong danh sách bên cạnh (hệ điều hành bật "giảm chuyển động" → chuyển thẳng, không bay). */
 function FlyTo({ target }) {
   const map = useMap();
   useEffect(() => {
-    if (target) map.flyTo([target.lat, target.lon], Math.max(map.getZoom(), 12), { duration: 0.6 });
+    if (!target) return;
+    const zoom = Math.max(map.getZoom(), 12);
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) map.setView([target.lat, target.lon], zoom);
+    else map.flyTo([target.lat, target.lon], zoom, { duration: 0.6 });
   }, [target, map]);
   return null;
 }
 
 /** Bản đồ điểm nóng thu nhỏ cho lãnh đạo: nền bản đồ chung của hệ thống (BaseLayer — tự lưu trữ / có ghi công), vùng
- * đang lọc (AreaFocus), điểm nóng từ /map/layers + KPI. Không có điểm nóng → nói rõ, không vẽ điểm minh hoạ. */
-export default function TacticalMiniMap({ k, className }) {
+ * đang lọc (AreaFocus), điểm nóng từ /map/layers + KPI. Không có điểm nóng → nói rõ, không vẽ điểm minh hoạ.
+ * `focus` ({ id, at }): yêu cầu từ ngoài (câu "Nguy hiểm nhất") — cuộn tới bản đồ và bay tới điểm đó. */
+export default function TacticalMiniMap({ k, className, focus }) {
   const { data: layers, isError: layersError, refetch } = useAreaQuery('map-layers', '/map/layers', {}, { refetchInterval: 30_000 });
   const { data: area } = useAreaQuery('area', '/admin-units/area', {}, { staleTime: Infinity });
   const filtered = useStore((s) => s.filter.codes.length > 0);
@@ -96,15 +105,24 @@ export default function TacticalMiniMap({ k, className }) {
   const [target, setTarget] = useState(null);
 
   const hotspots = useMemo(() => buildHotspots(layers, k), [layers, k]);
+  const box = useRef(null);
+  useEffect(() => {
+    const h = focus && hotspots.find((x) => x.id === focus.id);
+    if (!h) return;
+    setLevel('all');
+    setTarget({ lat: h.lat, lon: h.lon, at: focus.at });
+    const calm = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    box.current?.scrollIntoView({ behavior: calm ? 'auto' : 'smooth', block: 'center' });
+  }, [focus]); // eslint-disable-line react-hooks/exhaustive-deps -- chỉ chạy khi có yêu cầu mới, không theo mỗi lần tải lại điểm
   const min = FILTERS.find((f) => f.id === level).min;
   const shown = hotspots.filter((h) => h.level >= min);
   const count = (m) => hotspots.filter((h) => h.level >= m).length;
 
   return (
-    <section className={clsx('card flex flex-col gap-2 p-3', className)}>
+    <section ref={box} className={clsx('card flex scroll-mt-20 flex-col gap-2 p-3', className)}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="card-title">
-          <Crosshair size={15} className="text-accent" /> Điểm nóng trên bản đồ
+          <Crosshair size={15} className="text-accent" aria-hidden="true" /> Điểm nóng trên bản đồ
         </h2>
         <div className="flex flex-wrap items-center gap-1.5">
           {FILTERS.map((f) => (
