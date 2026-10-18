@@ -49,7 +49,7 @@ export default function SuppliesChart({ height = 250 }) {
     if (!data) return { rows: [], levels: [], criticalCount: 0 };
     const mapped = data.map((d) => ({
       ...d,
-      short: d.name.replace('Kho cụm ', '').replace('Kho dự trữ PCTT tỉnh Cao Bằng', 'Kho tỉnh').replace('Kho dã chiến ', 'DC '),
+      short: d.name.replace('Kho cụm ', '').replace('Kho dự trữ PCTT tỉnh Cao Bằng', 'Kho tỉnh').replace('Kho dã chiến ', 'Dã chiến '),
     }));
     const filtered = levelFilter === 'all' ? mapped : mapped.filter((r) => r.level === levelFilter);
     const critical = filtered.reduce((n, d) => n + CATS.filter((ct) => d[ct.key] != null && d[ct.key] < 20).length, 0);

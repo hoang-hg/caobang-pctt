@@ -22,7 +22,7 @@ const TABS = [
   { id: 'rivers', label: 'Mực nước & trạm thủy văn', short: 'Mực nước', noun: 'trạm mực nước', icon: Waves },
   { id: 'reservoirs', label: 'Hồ chứa & xả lũ', short: 'Hồ chứa', noun: 'hồ chứa', icon: Droplets },
   { id: 'landslides', label: 'Điểm đen sạt lở', short: 'Sạt lở', noun: 'điểm đen sạt lở', icon: Mountain },
-  { id: 'sos', label: 'Phiếu SOS đang mở', short: 'SOS', noun: 'phiếu SOS', icon: Siren, perm: 'sos' },
+  { id: 'sos', label: 'Phiếu SOS đang mở', short: 'Phiếu SOS', noun: 'phiếu SOS', icon: Siren, perm: 'sos' },
   { id: 'supplies', label: 'Kho vật tư dự trữ', short: 'Kho', noun: 'kho vật tư', icon: Boxes, perm: 'resource' },
 ];
 // Lọc theo thang màu rủi ro chung (utils/risk.js) — cùng tên màu ở mọi màn hình
@@ -100,20 +100,20 @@ const COLUMNS = {
   rivers: [
     { label: 'Xã/phường', sort: 'area', cell: (r) => r.area || '–' },
     { label: 'Mực nước', sort: 'value', num: true, cell: (r) => (r.value == null ? '–' : `${num(r.value, 2)} m`) },
-    { label: 'BĐ I / II / III', num: true, cell: (r) => [r.thr.bd1, r.thr.bd2, r.thr.bd3].map((x) => (x == null ? '–' : num(x, 2))).join(' / ') },
+    { label: 'Báo động I / II / III', num: true, cell: (r) => [r.thr.bd1, r.thr.bd2, r.thr.bd3].map((x) => (x == null ? '–' : num(x, 2))).join(' / ') },
     { label: 'Số đo lúc', sort: 'time', cell: (r) => (r.time ? dateTime(r.time) : 'không có số đo 2 giờ qua') },
   ],
   // Đơn vị nối với số bằng dấu cách không ngắt: thẻ điện thoại hẹp xuống dòng sau "/" chứ không để "m" lẻ một dòng
   reservoirs: [
     { label: 'Xã/phường', sort: 'area', cell: (r) => r.area || '–' },
-    { label: 'Mực nước / MNDBT', sort: 'diff', num: true, cell: (r) => (r.waterLevel == null ? '–' : `${num(r.waterLevel, 2)} / ${num(r.normal, 2)} m`) },
+    { label: 'Mực nước / mức bình thường', sort: 'diff', num: true, cell: (r) => (r.waterLevel == null ? '–' : `${num(r.waterLevel, 2)} / ${num(r.normal, 2)} m`) },
     { label: 'Cửa xả mở', sort: 'gatesOpen', num: true, cell: (r) => (r.gatesOpen == null ? '–' : `${int(r.gatesOpen)}/${int(r.gates)}`) },
-    { label: 'Q đến / Q xả', sort: 'outflow', num: true, cell: (r) => (r.inflow == null ? '–' : `${int(r.inflow)} / ${int(r.outflow)} m³/s`) },
+    { label: 'Nước về / xả', sort: 'outflow', num: true, cell: (r) => (r.inflow == null ? '–' : `${int(r.inflow)} / ${int(r.outflow)} m³/s`) },
     { label: 'Số liệu lúc', sort: 'time', cell: (r) => (r.time ? `${dateTime(r.time)}${r.stale ? ' (cũ)' : ''}` : 'chưa có số liệu vận hành') },
   ],
   landslides: [
     { label: 'Xã/phường', sort: 'area', cell: (r) => r.area || '–' },
-    { label: 'Mưa 24h', sort: 'rain24', num: true, cell: (r) => (r.rain24 == null ? '–' : `${num(r.rain24, 1)} mm`) },
+    { label: 'Mưa 24 giờ', sort: 'rain24', num: true, cell: (r) => (r.rain24 == null ? '–' : `${num(r.rain24, 1)} mm`) },
     { label: 'Nghiêng', sort: 'tilt', num: true, cell: (r) => (r.tilt == null ? '–' : `${num(r.tilt, 2)}°`) },
     { label: 'Nguy cơ', cell: (r) => r.risk || '–' },
   ],
@@ -137,22 +137,22 @@ function excelRows(tab, rows) {
     if (tab === 'rivers') {
       return {
         ...base, 'Mã trạm': r.id, 'Tên trạm': r.name, 'Sông': r.sub, 'Xã/phường': r.area || '',
-        'Mực nước (m)': r.value ?? '', 'BĐ I (m)': r.thr.bd1 ?? '', 'BĐ II (m)': r.thr.bd2 ?? '', 'BĐ III (m)': r.thr.bd3 ?? '',
+        'Mực nước (m)': r.value ?? '', 'Báo động I (m)': r.thr.bd1 ?? '', 'Báo động II (m)': r.thr.bd2 ?? '', 'Báo động III (m)': r.thr.bd3 ?? '',
         'Tình trạng': r.levelText, 'Mức màu': risk(r.level).name, 'Số đo lúc': r.time ? dateTime(r.time) : '',
       };
     }
     if (tab === 'reservoirs') {
       return {
         ...base, 'Mã hồ': r.id, 'Tên hồ': r.name, 'Sông': r.sub, 'Xã/phường': r.area || '',
-        'Mực nước (m)': r.waterLevel ?? '', 'MNDBT (m)': r.normal ?? '', 'Chênh so MNDBT (m)': r.diff ?? '',
-        'Cửa xả đang mở': r.gatesOpen ?? '', 'Tổng số cửa xả': r.gates ?? '', 'Q đến (m³/s)': r.inflow ?? '', 'Q xả (m³/s)': r.outflow ?? '',
+        'Mực nước (m)': r.waterLevel ?? '', 'Mực nước dâng bình thường (m)': r.normal ?? '', 'Chênh so mực nước dâng bình thường (m)': r.diff ?? '',
+        'Cửa xả đang mở': r.gatesOpen ?? '', 'Tổng số cửa xả': r.gates ?? '', 'Lưu lượng về hồ (m³/s)': r.inflow ?? '', 'Lưu lượng xả (m³/s)': r.outflow ?? '',
         'Trạng thái': r.levelText, 'Mức màu': risk(r.level).name, 'Số liệu lúc': r.time ? dateTime(r.time) : '', 'Khuyến cáo hạ du': r.warning || '',
       };
     }
     if (tab === 'landslides') {
       return {
         ...base, 'Mã điểm': r.id, 'Điểm đen': r.name, 'Tuyến đường': r.sub, 'Xã/phường': r.area || '',
-        'Mưa 24h (mm)': r.rain24 ?? '', 'Độ nghiêng (°)': r.tilt ?? '', 'Nguy cơ': r.risk || '', 'Giao thông': r.levelText,
+        'Mưa 24 giờ (mm)': r.rain24 ?? '', 'Độ nghiêng (°)': r.tilt ?? '', 'Nguy cơ': r.risk || '', 'Giao thông': r.levelText,
         'Mức màu': risk(r.level).name, 'Hướng xử lý': r.action || '',
       };
     }
@@ -173,7 +173,7 @@ function excelRows(tab, rows) {
 const Chip = ({ r }) => <span className={clsx('chip whitespace-nowrap px-2 py-0 text-[10px]', risk(r.level).chip)}>{r.levelText}</span>;
 
 /**
- * Bảng tác chiến dưới Dashboard: 5 chuyên đề, mọi dòng từ API thật (trạm; hồ chứa và điểm đen sạt lở trong KPI — cùng vùng
+ * Bảng số liệu chi tiết dưới Tổng quan: 5 chuyên đề, mọi dòng từ API thật (trạm; hồ chứa và điểm đen sạt lở trong KPI — cùng vùng
  * đang xem, không thêm lượt gọi; phiếu SOS; kho).
  * Tìm kiếm, lọc theo mức màu, sắp xếp, phân trang, xuất Excel / PDF (toàn bộ danh sách đã lọc, không chỉ trang đang xem).
  * Điện thoại (< 640 px): mỗi dòng là một thẻ, nút to — không phải kéo ngang bảng 760 px. Thao tác chỉ dẫn tới luồng
@@ -263,7 +263,7 @@ export default function OperationsTable({ k, kState, stations, stationsState, on
   const doExcel = async (list) => {
     if (!list.length) return;
     try {
-      await exportExcel(excelRows(tab, list), { sheet: tabInfo.label, filename: `bang-tac-chien-${tab}-${vnFileStamp(new Date(), true)}.xlsx` });
+      await exportExcel(excelRows(tab, list), { sheet: tabInfo.label, filename: `bang-so-lieu-${tab}-${vnFileStamp(new Date(), true)}.xlsx` });
     } catch (e) {
       toast({ tone: 'danger', title: 'Không xuất được tệp Excel', body: e.message });
     }
@@ -279,10 +279,10 @@ export default function OperationsTable({ k, kState, stations, stationsState, on
       const now = new Date();
       const lv = LEVEL_FILTERS.find(([id]) => id === levelFilter)?.[1];
       await exportSnapshotPdf(tableRef.current, {
-        title: `BẢNG TÁC CHIẾN – ${tabInfo.label.toUpperCase()}`,
+        title: `BẢNG SỐ LIỆU – ${tabInfo.label.toUpperCase()}`,
         subtitle: [scopeLabel, `${filtered.length} mục`, levelFilter !== 'all' && lv, search.trim() && `tìm "${search.trim()}"`, now.toLocaleString('vi-VN')]
           .filter(Boolean).join(' · '),
-        filename: `bang-tac-chien-${tab}-${vnFileStamp(now, true)}.pdf`,
+        filename: `bang-so-lieu-${tab}-${vnFileStamp(now, true)}.pdf`,
       });
     } catch (e) {
       toast({ tone: 'danger', title: 'Không xuất được PDF', body: e.message });
@@ -319,8 +319,8 @@ export default function OperationsTable({ k, kState, stations, stationsState, on
             <ChartLine size={12} /> Biểu đồ
           </button>
         )}
-        {tab === 'sos' && canSos && <Link to="/cuu-ho" className={cls}>Điều phối</Link>}
-        {tab === 'supplies' && canResource && <Link to="/nguon-luc" className={cls}>Kho</Link>}
+        {tab === 'sos' && canSos && <Link to="/cuu-ho" className={cls}>Điều động</Link>}
+        {tab === 'supplies' && canResource && <Link to="/nguon-luc" className={cls}>Mở kho</Link>}
         {tab !== 'supplies' && r.lat != null && (
           <button type="button" className={cls} onClick={() => showOnMap(r)} title="Xem trên bản đồ giám sát">
             <MapPin size={12} /> Bản đồ
@@ -345,7 +345,7 @@ export default function OperationsTable({ k, kState, stations, stationsState, on
   return (
     <section className={clsx('card flex flex-col gap-3 p-3 sm:p-4', className)}>
       <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-        <h2 className="card-title">Bảng tác chiến theo chuyên đề</h2>
+        <h2 className="card-title">Bảng số liệu chi tiết</h2>
         <div className="scroll-thin -mx-1 flex gap-1 overflow-x-auto px-1 pb-0.5" role="tablist" aria-label="Chuyên đề của bảng">
           {tabs.map((t) => (
             <button
@@ -399,7 +399,7 @@ export default function OperationsTable({ k, kState, stations, stationsState, on
           <span className="flex items-center gap-1.5 rounded-lg bg-accent/15 px-2 py-0.5 font-bold text-accent">
             Đã chọn {chosen.length} mục
           </span>
-          <button type="button" className="btn-primary tap min-h-[36px] px-2.5 py-1 text-xs font-semibold" onClick={() => doExcel(chosen)}>
+          <button type="button" className="btn-secondary tap min-h-[36px] px-2.5 py-1 text-xs font-semibold" onClick={() => doExcel(chosen)}>
             <FileSpreadsheet size={13} /> Xuất Excel mục đã chọn
           </button>
           {canAlert && (tab === 'landslides' || tab === 'sos') && (
@@ -425,7 +425,7 @@ export default function OperationsTable({ k, kState, stations, stationsState, on
         <div className="scroll-thin relative overflow-x-auto rounded-lg border border-line">
           <table ref={tableRef} className={clsx('w-full bg-panel text-left text-xs', pdf ? 'min-w-[1100px]' : 'min-w-[760px]')}>
             <caption className="sr-only">{tabInfo.label} — {filtered.length} mục</caption>
-            <thead className="bg-panel2/70 text-[11px] uppercase tracking-wide text-muted">
+            <thead className="bg-panel2/70 text-xs text-muted">
               <tr>
                 {!pdf && (
                   <th scope="col" className="w-8 p-0">
@@ -449,7 +449,7 @@ export default function OperationsTable({ k, kState, stations, stationsState, on
                     aria-sort={col.sort && sort.key === col.sort ? (sort.desc ? 'descending' : 'ascending') : undefined}
                   >
                     {col.sort && !pdf ? (
-                      <button type="button" className="tap-sq inline-flex items-center gap-1 uppercase hover:text-ink" onClick={() => onSort(col.sort)}>
+                      <button type="button" className="tap-sq inline-flex items-center gap-1 hover:text-ink" onClick={() => onSort(col.sort)}>
                         {col.label}
                         <ArrowUpDown size={11} className={sort.key === col.sort ? 'text-accent' : 'opacity-40'} aria-hidden="true" />
                       </button>

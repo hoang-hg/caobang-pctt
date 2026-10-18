@@ -72,7 +72,7 @@ export default function SensorHeatmap() {
     return (
       <EmptyState height={140}>
         Chưa có cảm biến độ nghiêng / độ ẩm đất trong vùng đang xem — nhập danh mục trạm loại "Độ nghiêng đất" / "Độ ẩm đất"
-        kèm ngưỡng BĐ I–III
+        kèm ngưỡng Báo động I–III
       </EmptyState>
     );
   }
@@ -91,7 +91,7 @@ export default function SensorHeatmap() {
               <b>{over[0].short}</b> {fmt(over[0].s.value, over[0].s)} ({risk(over[0].now).name}{over[0].stale ? ', số đo cũ' : ''})
             </>
           ) : (
-            <>Chưa cảm biến nào vượt ngưỡng BĐ I ({rows.filter((r) => !r.stale).length}/{rows.length} cảm biến có số đo trong 60 phút qua)</>
+            <>Chưa cảm biến nào vượt ngưỡng Báo động I ({rows.filter((r) => !r.stale).length}/{rows.length} cảm biến có số đo trong 60 phút qua)</>
           )}
         </p>
         <RiskLegend meaningClass="hidden xl:inline" />
@@ -160,7 +160,7 @@ export default function SensorHeatmap() {
           <span className="text-muted">
             {KIND[sel.s.type]?.label} · {sel.s.admin_name || '–'} · ngưỡng{' '}
             {[1, 2, 3].map((lv) => sel.s.thresholds?.[`bd${lv}`] != null && (
-              <span key={lv} className={clsx('font-mono', risk(lv).text)}> BĐ {ROMAN[lv]} {fmt(sel.s.thresholds[`bd${lv}`], sel.s)}</span>
+              <span key={lv} className={clsx('num', risk(lv).text)}> Báo động {ROMAN[lv]} {fmt(sel.s.thresholds[`bd${lv}`], sel.s)}</span>
             ))}
             {sel.s.thresholds?.bd1 == null && ' chưa khai báo'}
           </span>
@@ -174,7 +174,7 @@ export default function SensorHeatmap() {
               <Tooltip content={<ChartTooltip unit={unitOf(sel.s)} labelFormatter={(l) => dateTime(l)} />} cursor={{ stroke: c.axis, strokeDasharray: '3 3' }} />
               {[1, 2, 3].map((lv) => sel.s.thresholds?.[`bd${lv}`] != null && (
                 <ReferenceLine key={lv} y={sel.s.thresholds[`bd${lv}`]} stroke={[null, c.warn, c.serious, c.danger][lv]} strokeWidth={1.5} ifOverflow="extendDomain"
-                  label={{ value: `BĐ ${ROMAN[lv]}`, fill: [null, c.warnText, c.seriousText, c.dangerText][lv], fontSize: 10, position: 'right' }} />
+                  label={{ value: `Báo động ${ROMAN[lv]}`, fill: [null, c.warnText, c.seriousText, c.dangerText][lv], fontSize: 11, fontWeight: 600, position: 'insideTopLeft' }} />
               ))}
               <Line dataKey="v" name="Lớn nhất trong giờ" stroke={c.s1} strokeWidth={2} dot={false} isAnimationActive={false} />
             </LineChart>
@@ -184,7 +184,7 @@ export default function SensorHeatmap() {
         )}
       </div>
       <p className="text-[11px] text-muted">
-        Mỗi ô = giá trị lớn nhất trong giờ; ô xám = giờ không có số đo (điện thoại: 24 giờ gần nhất). Mức theo ngưỡng BĐ I / II / III
+        Mỗi ô = giá trị lớn nhất trong giờ; ô xám = giờ không có số đo (điện thoại: 24 giờ gần nhất). Mức theo ngưỡng Báo động I / II / III
         khai báo cho từng cảm biến (Danh mục trạm) — chỉ báo kỹ thuật để theo dõi sớm, không phải cấp
         độ rủi ro thiên tai do cơ quan có thẩm quyền công bố.
       </p>

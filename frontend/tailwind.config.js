@@ -38,10 +38,15 @@ export default {
           '100%': { transform: 'scale(2.4)', opacity: '0' },
         },
         blink: { '0%,100%': { opacity: '1' }, '50%': { opacity: '0.35' } },
+        // Chuyển động có ý nghĩa (một lần, không lặp): mục mới trượt vào danh sách; số liệu vừa đổi hiện lên nhẹ
+        enter: { from: { opacity: '0', transform: 'translateY(-6px)' }, to: { opacity: '1', transform: 'none' } },
+        tick: { from: { opacity: '0.35', transform: 'translateY(3px)' }, to: { opacity: '1', transform: 'none' } },
       },
       animation: {
         pulseRing: 'pulseRing 1.6s ease-out infinite',
         blink: 'blink 1s ease-in-out infinite',
+        enter: 'enter 0.35s ease-out both',
+        tick: 'tick 0.45s ease-out both',
       },
     },
   },

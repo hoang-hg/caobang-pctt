@@ -3,12 +3,12 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import {
-  AlertTriangle, ChevronDown, ChevronUp, Compass, Droplets, FileDown, FileSpreadsheet, FileText, Home, Info, LayoutDashboard, LifeBuoy,
+  AlertTriangle, ChevronDown, ChevronUp, Compass, Droplets, FileDown, FileSpreadsheet, FileText, Home, LayoutDashboard, LifeBuoy,
   MapPin, Minimize2, Monitor, Mountain, Pause, Play, Send, Server, Waves, X,
 } from 'lucide-react';
 import { useAreaQuery, usePresets, useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
-import { EmptyState, ErrorState, RiskLegend, Section, Segmented, Skeleton } from '../components/common/ui';
+import { EmptyState, ErrorState, Hint, PageTips, RiskLegend, Section, Segmented, Skeleton } from '../components/common/ui';
 import EventLog from '../components/common/EventLog';
 import Hydrograph from '../components/charts/Hydrograph';
 import RainfallChart from '../components/charts/RainfallChart';
@@ -22,8 +22,10 @@ import KpiStrip from '../components/dashboard/KpiStrip';
 import DecisionPanel from '../components/dashboard/DecisionPanel';
 import { riverState, StationPicker } from '../components/dashboard/RiverKpi';
 import SituationBar from '../components/dashboard/SituationBar';
+import SituationSummary, { LevelHint } from '../components/dashboard/SituationSummary';
+import { forecastTitle, hydroTitle, landslideTitle, rainTitle, suppliesTitle } from '../components/dashboard/chartTitles';
 import ConnectionBanner from '../components/dashboard/ConnectionBanner';
-import TacticalMiniMap from '../components/dashboard/TacticalMiniMap';
+import TacticalMiniMap, { buildHotspots } from '../components/dashboard/TacticalMiniMap';
 import OperationsTable from '../components/dashboard/OperationsTable';
 import CommuneView, { unitLabel } from '../components/dashboard/CommuneView';
 import SystemView from '../components/dashboard/SystemView';
@@ -56,6 +58,39 @@ const LEGACY_LEVEL = { tinh: 'tong_hop', xa: 'cap_xa', he_thong: 'he_thong' }; /
 // cuộn qua 5 biểu đồ mới tới nhật ký / bảng
 const CHARTS_OPEN = { thuy_van: true, mua: false, du_bao: false, sat_lo: false, vat_tu: false };
 
+// Nút "?" cạnh tiêu đề biểu đồ: một câu giải thích thuật ngữ / nguồn số liệu (tên mô hình để ở đây, không lên tiêu đề)
+const HYDRO_HINT = (
+  <Hint label="Biểu đồ mực nước">
+    Đường liền: mực nước đo được; nét đứt (vùng ghi "Dự báo"): bản tin dự báo thủy văn do trực ban nhập — chưa có bản tin
+    thì là đường mô phỏng, luôn ghi rõ. Ba vạch ngang là mức Báo động I, II, III của trạm. Biểu đồ dưới: lượng xả của hồ
+    chứa trên cùng sông.
+  </Hint>
+);
+const RAIN_HINT = (
+  <Hint label="Biểu đồ mưa">
+    Cột: lượng mưa từng giờ (trung bình lưu vực, trạm đại diện vùng rộng tính nặng hơn). Cột nhạt viền đứt ở cuối: dự báo
+    3 giờ tới của mô hình thời tiết số (Open-Meteo), không phải đo radar. Đường dưới: mưa cộng dồn.
+  </Hint>
+);
+const FORECAST_HINT = (
+  <Hint label="Dự báo mưa 3 ngày">
+    Kết hợp hai bộ dự báo tổ hợp quốc tế (ECMWF của châu Âu, GFS của Mỹ) qua Open-Meteo. Đường đậm là lượng mưa có khả năng
+    nhất; vùng tô là khoảng có thể xảy ra (10% thấp nhất đến 10% cao nhất của các phương án dự báo).
+  </Hint>
+);
+const LANDSLIDE_HINT = (
+  <Hint label="Ngưỡng sạt lở theo mưa">
+    Mỗi chấm là một trạm đo mưa: trục ngang là mưa 3 ngày qua, trục dọc là cường độ mưa hiện tại. Vượt đường nét đứt Vàng /
+    Cam / Đỏ là nguy cơ sạt lở tăng theo mức đó. Đường ngưỡng là đường minh hoạ, chưa hiệu chỉnh theo số liệu sạt lở của tỉnh.
+  </Hint>
+);
+const SUPPLIES_HINT = (
+  <Hint label="Định mức dự trữ">
+    Lượng hàng tối thiểu mỗi kho phải có sẵn. Phần màu: số hiện có so với định mức; phần xám: phần còn thiếu. Dưới 20% là
+    cạn kiệt, cần bổ sung ngay.
+  </Hint>
+);
+
 // Chế độ trình chiếu: xoay vòng các chuyên đề lãnh đạo hay xem trên màn hình lớn (mặc định 60 giây, ?xoay=giây, tối thiểu 15)
 const ROTATION = ['tong_hop', 'ho_chua', 'sat_lo'];
 
@@ -70,11 +105,15 @@ function LiveClock() {
 }
 
 /**
- * Dashboard tổng quan (thiết kế mục A). Bố cục theo thiết bị của lãnh đạo — chỉ sắp xếp lại, số liệu / API như cũ:
- * - laptop (≥ 1280 px) / iPad ngang (≥ 1024 px): dải khẩn → thanh lệnh → thẻ → 6 ô KPI (1 hàng / 3×2) → bản đồ + biểu đồ
- *   bên trái, "Việc chờ quyết định" + nhật ký cột phải dính khi cuộn → bảng tác chiến;
- * - iPad dọc: KPI 3×2 → bản đồ cả hàng → (Việc chờ | nhật ký 5 mục) → biểu đồ 2 cột;
- * - điện thoại: KPI 2×3 → Việc chờ → bản đồ thu gọn → biểu đồ thu gọn được → nhật ký 5 mục → bảng dạng thẻ; thanh đáy.
+ * Tổng quan (thiết kế mục A) — trả lời trong 5 giây "Chỗ nào đang nguy hiểm nhất? Việc gì đang chờ tôi quyết định?".
+ * Bố cục theo thiết bị — số liệu / API như cũ:
+ * - đầu trang: dải khẩn (Cam / Đỏ, dính khi cuộn) → MỘT câu tóm tắt tình hình + "Nguy hiểm nhất" (SituationSummary) → thẻ;
+ * - laptop / iPad ngang (≥ 1024 px): "Việc chờ quyết định" (trái) cạnh 6 ô chỉ số 3×2 → bản đồ + biểu đồ bên trái, nhật
+ *   ký cột phải dính khi cuộn → bảng số liệu chi tiết (thu gọn sẵn);
+ * - iPad dọc: Việc chờ → 6 ô 3×2 → bản đồ | nhật ký → biểu đồ;
+ * - điện thoại: 6 ô 2×3 (thấy trọn cùng dải khẩn, không cuộn) → Việc chờ → bản đồ → biểu đồ thu gọn được → nhật ký
+ *   5 mục → bảng dạng thẻ; thanh đáy.
+ * Lần đầu mở: gợi ý 3 bước (PageTips, tắt được, nhớ trên máy). Tiêu đề biểu đồ là câu kết luận (chartTitles.js).
  */
 export default function Dashboard() {
   const qc = useQueryClient();
@@ -110,7 +149,18 @@ export default function Dashboard() {
   const allStations = useMemo(() => stationsQ.data || [], [stationsQ.data]);
   const stationsState = { loading: stationsQ.isLoading, error: stationsQ.isError && !stationsQ.data, refetch: stationsQ.refetch };
   const evacQ = useAreaQuery('evacuation', '/evacuation', {}, { refetchInterval: 30_000 });
-  const { data: supplies } = useAreaQuery('supplies', '/dashboard/supplies', {}, { enabled: tab === 'he_thong' && canResource });
+  const [chartSegment, setChartSegment] = useState('thuy_van'); // 'thuy_van' | 'mua' | 'sat_lo' | 'vat_tu' | 'tat_ca'
+  const [forceOpen, setForceOpen] = useState(false); // đang chụp PDF: mở mọi biểu đồ đang thu gọn, hiện đủ thẻ tab Hồ chứa / Sạt lở
+  const showSeg = (id) => tab === 'tong_hop' && (chartSegment === id || chartSegment === 'tat_ca' || forceOpen);
+  const { data: supplies } = useAreaQuery('supplies', '/dashboard/supplies', {}, { enabled: (tab === 'he_thong' || showSeg('vat_tu')) && canResource });
+  // Tiêu đề kết luận của biểu đồ + "Nguy hiểm nhất": CÙNG khoá / tuỳ chọn truy vấn với biểu đồ, bản đồ điểm nóng (TanStack
+  // gộp — không thêm lượt gọi); chỉ tải khi chuyên đề đang hiện
+  const { data: rainfall } = useAreaQuery('rainfall', '/dashboard/rainfall', {}, { refetchInterval: 60_000, enabled: tab === 'tong_hop' });
+  const { data: fcAreas } = useAreaQuery('forecast-areas', '/forecast/areas', { hours: 72 }, { refetchInterval: 10 * 60_000, enabled: showSeg('mua') });
+  const { data: lsRisk } = useAreaQuery('landslide', '/dashboard/landslide-risk', {}, { refetchInterval: 60_000, enabled: showSeg('sat_lo') });
+  const { data: layers } = useAreaQuery('map-layers', '/map/layers', {}, { refetchInterval: 30_000, enabled: tab !== 'cap_xa' });
+  const hotspots = useMemo(() => buildHotspots(layers, k), [layers, k]);
+  const [mapFocus, setMapFocus] = useState(null); // "Xem trên bản đồ" của câu "Nguy hiểm nhất" → bản đồ điểm nóng bay tới
   const { data: presets = [] } = usePresets();
   const { data: units = [] } = useUnits();
 
@@ -154,9 +204,7 @@ export default function Dashboard() {
   const [supportOpen, setSupportOpen] = useState(false); // xã xin chi viện lên tỉnh (nút ở trang xã + thanh dưới điện thoại)
   const [docOpen, setDocOpen] = useState(false); // báo cáo văn bản (PDF định dạng chuẩn)
   const [chartsOpen, setChartsOpen] = useState(CHARTS_OPEN);
-  const [chartSegment, setChartSegment] = useState('thuy_van'); // 'thuy_van' | 'mua' | 'sat_lo' | 'vat_tu' | 'tat_ca'
   const [opsTableOpen, setOpsTableOpen] = useState(false);
-  const [forceOpen, setForceOpen] = useState(false); // đang chụp PDF: mở mọi biểu đồ đang thu gọn, hiện đủ thẻ tab Hồ chứa / Sạt lở
   const ref = useRef(null); // vùng chụp PDF của thẻ đang mở
   const hydroRef = useRef(null);
   const riverRef = useRef(null);
@@ -398,7 +446,6 @@ export default function Dashboard() {
 
   const kpiProps = {
     k, kState, evacQ, stationsState, waterStations, rainStations, canSos, canResource, canEvacUpdate, riverRef,
-    onOpenTab: setTab,
     onRain: () => {
       setChartSegment('mua');
       openChart('mua', 'bieu-do-mua');
@@ -411,9 +458,10 @@ export default function Dashboard() {
       className={clsx('flex flex-col print:static print:h-auto print:overflow-visible', className)}
       bodyClass="flex min-h-0 flex-1 flex-col"
       right={
+        // Trạng thái nhận tin tức thời — chữ thường, không nhấp nháy
         wsStatus === 'online'
-          ? <span className="badge-live shrink-0 whitespace-nowrap text-[10px]">Trực tuyến</span>
-          : <span className="chip shrink-0 whitespace-nowrap bg-panel2 px-2 py-0 text-[10px] text-muted">Mất kết nối realtime</span>
+          ? <span className="shrink-0 whitespace-nowrap text-xs text-muted">Tự cập nhật</span>
+          : <span className="shrink-0 whitespace-nowrap text-xs font-semibold text-warn">Mất kết nối — đang thử lại</span>
       }
     >
       <EventLog className={listClass} limit={limit} preview={isLg ? undefined : 5} />
@@ -440,6 +488,7 @@ export default function Dashboard() {
           canImportStations={canDataImport}
           canSystem={canSystem}
           presentation={presentation}
+          quiet
         />
       )}
       <ConnectionBanner updatedAt={kQ.dataUpdatedAt || null} />
@@ -448,7 +497,7 @@ export default function Dashboard() {
           nằm cố định trên thanh trên cùng (máy tính) / thanh dưới cùng (điện thoại) */}
       <PageHeader
         className="card px-3 py-2.5 sm:px-4"
-        title="Tổng quan tác chiến"
+        title="Tổng quan"
         short="Tổng quan"
         scope={(
           <>
@@ -464,28 +513,39 @@ export default function Dashboard() {
         timeNote={kState.error ? 'Chưa tải được số liệu' : 'Đang tải số liệu…'}
         meta={[
           role && <span key="role" className="hidden 2xl:inline">{role}</span>,
-          // Điện thoại / iPad dọc: thang màu gọn vào "Thang màu" (chạm để mở) ngay trên dòng ngữ cảnh — không thêm một dòng
-          <details key="thang-mau" className="md:hidden">
-            <summary className="touch-hit flex cursor-pointer list-none items-center gap-1 font-semibold text-accent [&::-webkit-details-marker]:hidden">
-              <Info size={13} aria-hidden="true" /> Thang màu
-            </summary>
-            <RiskLegend className="mt-1" />
-          </details>,
+          // Thang màu: từ md trên dòng ngữ cảnh; nút "?" giải thích mức báo động + màu (mọi cỡ màn hình) — không thêm một dòng
+          <RiskLegend key="thang-mau" className="hidden md:flex" meaningClass="hidden xl:inline" />,
+          !presentation && <LevelHint key="giai-thich" />,
         ]}
         actions={presentation ? (
           <>
             <LiveClock />
             <button type="button" onClick={() => setRotatePaused((v) => !v)} aria-pressed={rotatePaused} className="btn-secondary h-9 px-2.5" title={`Tự chuyển chuyên đề sau mỗi ${rotateSec} giây`}>
-              {rotatePaused ? <Play size={14} aria-hidden="true" /> : <Pause size={14} aria-hidden="true" />} {rotatePaused ? 'Tiếp tục xoay vòng' : 'Tạm dừng xoay vòng'}
+              {rotatePaused ? <Play size={14} aria-hidden="true" /> : <Pause size={14} aria-hidden="true" />} {rotatePaused ? 'Tiếp tục tự chuyển' : 'Dừng tự chuyển'}
             </button>
             <button type="button" onClick={exitPresentation} className="btn-secondary h-9 px-2.5">
               <Minimize2 size={14} aria-hidden="true" /> Thoát trình chiếu
             </button>
           </>
         ) : (
-          <button type="button" onClick={enterPresentation} className="btn-secondary tap-sq hidden h-9 px-2.5 lg:inline-flex" aria-label="Chế độ trình chiếu màn hình lớn" title="Trình chiếu trên màn hình lớn phòng điều hành: nền tối, chữ số to, tự xoay vòng chuyên đề">
-            <Monitor size={15} aria-hidden="true" /> <span className="hidden xl:inline">Trình chiếu</span>
-          </button>
+          <>
+            {/* Lọc nhanh theo lưu vực (nhóm do BCH xác nhận — README 2.4). Tài khoản xã chỉ có xã mình → không có lưu vực;
+                điện thoại: chọn lưu vực ở bộ lọc trong menu ☰ (cùng danh sách nhóm) */}
+            {tab === 'tong_hop' && scope === null && basinPresets.length > 0 && (
+              <label className="hidden items-center gap-1.5 text-xs text-muted sm:flex">
+                <MapPin size={13} aria-hidden="true" />
+                <span className="hidden 2xl:inline">Lưu vực</span>
+                <select className="input tap h-9 w-auto max-w-[12rem] py-0.5 text-xs" value={basinValue} onChange={(e) => pickBasin(e.target.value)} aria-label="Lọc theo lưu vực">
+                  <option value="">Toàn tỉnh</option>
+                  {basinValue === 'khac' && <option value="khac" disabled>{filter.label}</option>}
+                  {basinPresets.map((p) => <option key={p.code} value={p.code}>{p.name} ({p.unit_codes.length} xã)</option>)}
+                </select>
+              </label>
+            )}
+            <button type="button" onClick={enterPresentation} className="btn-secondary tap-sq hidden h-9 px-2.5 lg:inline-flex" aria-label="Chế độ trình chiếu màn hình lớn" title="Trình chiếu trên màn hình lớn phòng điều hành: nền tối, chữ số to, tự chuyển chuyên đề">
+              <Monitor size={15} aria-hidden="true" /> <span className="hidden xl:inline">Trình chiếu</span>
+            </button>
+          </>
         )}
         exports={presentation ? undefined : [
           { key: 'anh', label: 'Ảnh chụp tình hình (PDF)', hint: 'Chỉ số, bản đồ, biểu đồ của thẻ đang xem — gửi nhanh qua Zalo, email', icon: FileDown, onClick: doExport, busy: exporting },
@@ -495,23 +555,23 @@ export default function Dashboard() {
         onRefresh={presentation ? undefined : refresh}
         refreshing={refreshing}
       >
-        <div className="hidden flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted sm:flex">
-          {/* Thang màu: hiện sẵn từ md (dưới md: "Thang màu" trên dòng ngữ cảnh) */}
-          <RiskLegend className="hidden md:flex" meaningClass="hidden xl:inline" />
-          {/* Tài khoản xã chỉ có xã mình → không có lưu vực để chọn. Điện thoại: chọn lưu vực ở bộ lọc trong menu ☰ (cùng
-              danh sách nhóm) — không chiếm thêm một dòng trước hàng KPI */}
-          {tab === 'tong_hop' && !presentation && scope === null && basinPresets.length > 0 && (
-            <label className="hidden items-center gap-1.5 no-print sm:flex">
-              <MapPin size={12} aria-hidden="true" />
-              <span className="hidden xl:inline">Lưu vực</span>
-              <select className="input tap min-h-[32px] w-auto max-w-[13rem] py-0.5 text-[11px]" value={basinValue} onChange={(e) => pickBasin(e.target.value)} aria-label="Lọc theo lưu vực">
-                <option value="">Toàn tỉnh</option>
-                {basinValue === 'khac' && <option value="khac" disabled>{filter.label}</option>}
-                {basinPresets.map((p) => <option key={p.code} value={p.code}>{p.name} ({p.unit_codes.length} xã)</option>)}
-              </select>
-            </label>
-          )}
-        </div>
+        {/* Câu tóm tắt tình hình bằng lời + chỗ nguy hiểm nhất (thẻ Cấp xã có phần riêng của xã) */}
+        {tab !== 'cap_xa' && (
+          <div className="mt-1.5">
+            <SituationSummary
+              k={k}
+              waterStations={waterStations}
+              stationsError={stationsState.error}
+              hotspots={hotspots}
+              large={presentation}
+              onShowWorst={(h) => {
+                if (tab !== 'tong_hop') setTab('tong_hop');
+                setMapFocus({ id: h.id, at: Date.now() });
+              }}
+              link={canDataImport ? { to: '/nhap-du-lieu', text: 'Nhập danh mục trạm →' } : canSystem ? { to: '/nguon-du-lieu', text: 'Xem nguồn dữ liệu →' } : null}
+            />
+          </div>
+        )}
       </PageHeader>
 
       {k && kQ.isError && online && (
@@ -537,12 +597,17 @@ export default function Dashboard() {
               aria-selected={tab === t.id}
               onClick={() => setTab(t.id)}
               className={clsx(
-                'tap -mb-px flex min-h-[42px] shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 text-sm font-medium transition-colors',
+                'tap -mb-px flex min-h-[44px] shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 text-sm font-medium transition-colors',
                 tab === t.id ? 'border-accent font-semibold text-accent' : 'border-transparent text-muted hover:text-ink',
               )}
             >
               <t.icon size={15} aria-hidden="true" /> {t.label}
-              {badge && <span className={clsx('rounded-full px-1.5 py-0.5 text-[10px] font-bold', risk(badge.level).chip)}>{badge.text}</span>}
+              {badge && (
+                <span className="flex items-center gap-1 text-xs font-semibold text-ink-2">
+                  <span className={clsx('h-2 w-2 rounded-full', risk(badge.level).fill)} aria-hidden="true" />
+                  {badge.text}
+                </span>
+              )}
             </button>
           );
         })}
@@ -562,18 +627,18 @@ export default function Dashboard() {
                 {/* Biểu đồ số đo trạm chỉ khi xã có trạm đo mưa — không thì 2 khung trống "chưa có số đo" chiếm nửa trang */}
                 {rainStations > 0 && (
                   <>
-                    <Section id="bieu-do-mua" title="Mưa & dự báo 3 giờ tới tại xã" className="scroll-mt-20">
+                    <Section id="bieu-do-mua" title="Mưa từng giờ & dự báo 3 giờ tới tại xã" className="scroll-mt-20">
                       <RainfallChart height={250} />
                     </Section>
-                    <Section title="Ngưỡng kích hoạt sạt lở – trạm mưa trong xã">
+                    <Section title="Ngưỡng sạt lở theo mưa – trạm mưa trong xã" hint={LANDSLIDE_HINT}>
                       <LandslideScatter height={250} />
                     </Section>
                   </>
                 )}
-                <Section id="du-bao-72h" title="Dự báo mưa 72 giờ tới" className="lg:col-span-2">
-                  <p className="mb-2 text-xs text-muted">
-                    {!stationsState.loading && rainStations === 0 && 'Xã chưa có trạm đo mưa — theo dõi bằng dự báo mô hình. '}
-                    Tổ hợp mô hình quốc tế ECMWF + GFS: đường = khả năng nhất, vùng tô = khoảng có thể xảy ra (P10–P90).
+                <Section id="du-bao-72h" title="Dự báo mưa 3 ngày tới" className="lg:col-span-2" hint={FORECAST_HINT}>
+                  <p className="mb-2 text-[13px] text-muted">
+                    {!stationsState.loading && rainStations === 0 && 'Xã chưa có trạm đo mưa — theo dõi bằng dự báo. '}
+                    Đường đậm: lượng mưa có khả năng nhất; vùng tô: khoảng có thể xảy ra.
                   </p>
                   <AreaForecastChart height={220} />
                 </Section>
@@ -598,7 +663,7 @@ export default function Dashboard() {
       {tab === 'sat_lo' && (
         // Cảm biến cảnh báo sớm lên đầu (thiết kế A: heatmap chuỗi thời gian độ nghiêng / độ ẩm đất), rồi điểm đen & đường đèo
         <div ref={ref} className="flex flex-col gap-2.5 bg-bg sm:gap-3.5">
-          <Section title="Cảm biến cảnh báo sớm sạt lở · 48 giờ qua (độ nghiêng taluy, độ ẩm đất)">
+          <Section title="Cảm biến cảnh báo sớm sạt lở 48 giờ qua (độ nghiêng mái taluy, độ ẩm đất)">
             <SensorHeatmap />
           </Section>
           <div className="card p-3 sm:p-5">
@@ -609,45 +674,58 @@ export default function Dashboard() {
 
       {tab === 'tong_hop' && (
         <>
-          {/* Vùng chụp PDF: KPI + bản đồ + biểu đồ + nhật ký ("Việc chờ quyết định" không in — việc riêng của người xem) */}
-          <div ref={ref} className="flex flex-col gap-2 bg-bg sm:gap-3.5">
-            <KpiStrip
-              {...kpiProps}
-              onRiver={(id) => {
-                setChartSegment('thuy_van');
-                focusStation(id);
-              }}
-              large={presentation}
-            />
+          {/* Vùng chụp PDF: chỉ số + bản đồ + biểu đồ + nhật ký ("Việc chờ quyết định", gợi ý không in — việc riêng của người xem) */}
+          <div ref={ref} className="flex flex-col gap-2.5 bg-bg sm:gap-3.5">
+            {/* 1. Việc chờ quyết định — khối nổi bật đầu tiên (hàng thẻ ngang từ 640 px), rồi 6 ô chỉ số. Điện thoại: 6 ô
+                trước (thấy trọn cùng dải khẩn, không cuộn), Việc chờ ngay sau. Trình chiếu: chỉ 6 ô, chữ to */}
+            <div className="flex flex-col gap-2.5 sm:gap-3.5">
+              {!presentation && <DecisionPanel k={k} kState={kState} className="max-sm:order-last" />}
+              <KpiStrip
+                {...kpiProps}
+                onRiver={(id) => {
+                  setChartSegment('thuy_van');
+                  focusStation(id);
+                }}
+                large={presentation}
+              />
+            </div>
 
-            {/* Khung điều hành chính: 2 Cột (Trái: Bản đồ tác chiến & Biểu đồ chuyên đề; Phải: Việc chờ quyết định & Nhật ký realtime) */}
+            {/* Gợi ý lần đầu: điện thoại ngay trước bản đồ; máy tính bảng / laptop đầu cột phải (trên nhật ký) — không đẩy bản
+                đồ xuống dưới màn hình đầu */}
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_420px] [&>*]:min-w-0">
-              {/* CỘT TRÁI: Bản đồ tác chiến & Giám sát Chuyên đề */}
-              <div className="flex flex-col gap-3 min-w-0">
-                {/* 1. Bản đồ tác chiến trực quan */}
-                <TacticalMiniMap k={k} className="min-w-0 shadow-sm" />
+              {!presentation && (
+                <PageTips
+                  id="tong-quan"
+                  className="md:col-start-2 md:row-start-1 md:!flex-col md:!items-stretch md:self-start [&_ol]:md:!grid-cols-1"
+                  steps={[
+                    'Đọc câu tóm tắt trên cùng: tình hình chung và chỗ nguy hiểm nhất. Dải đỏ là việc khẩn.',
+                    'Xử lý "Việc chờ quyết định": bấm vào từng việc để tới thẳng chỗ duyệt lệnh, điều động.',
+                    'Bấm ô chỉ số hoặc điểm trên bản đồ để xem chi tiết; nút "?" giải thích thuật ngữ.',
+                  ]}
+                />
+              )}
+              <div className="flex min-w-0 flex-col gap-3 md:col-start-1 md:row-span-2 md:row-start-1">
+                <TacticalMiniMap k={k} className="min-w-0" focus={mapFocus} />
 
-                {/* 2. Biểu đồ theo chuyên đề — xem một chuyên đề một lúc (bớt rối cho lãnh đạo) hoặc "Tất cả" */}
+                {/* Biểu đồ theo chuyên đề — xem một chuyên đề một lúc (bớt rối cho lãnh đạo) hoặc "Tất cả" */}
                 <div className="card p-2 sm:p-2.5">
                   <Segmented
                     label="Chuyên đề biểu đồ"
                     value={chartSegment}
                     onChange={setChartSegment}
                     options={[
-                      { value: 'thuy_van', label: 'Thủy văn & hồ chứa', short: 'Thủy văn', icon: Waves },
+                      { value: 'thuy_van', label: 'Mực nước & hồ chứa', short: 'Mực nước', icon: Waves },
                       { value: 'mua', label: 'Mưa & dự báo', short: 'Mưa', icon: Droplets },
-                      { value: 'sat_lo', label: 'Sạt lở & cảm biến', short: 'Sạt lở', icon: Mountain },
-                      canResource && { value: 'vat_tu', label: 'Kho & vật tư', short: 'Kho', icon: Server },
+                      { value: 'sat_lo', label: 'Sạt lở', short: 'Sạt lở', icon: Mountain },
+                      canResource && { value: 'vat_tu', label: 'Kho vật tư', short: 'Kho', icon: Server },
                       { value: 'tat_ca', label: 'Tất cả', hint: 'Xem mọi biểu đồ cùng lúc' },
                     ].filter(Boolean)}
                   />
 
-                  {/* VÙNG NỘI DUNG BIỂU ĐỒ THEO CHUYÊN ĐỀ ĐƯỢC CHỌN */}
                   <div className="mt-3 space-y-3">
-                    {/* CHUYÊN ĐỀ 1: THỦY VĂN & HỒ CHỨA */}
-                    {(chartSegment === 'thuy_van' || chartSegment === 'tat_ca' || forceOpen) && (
+                    {showSeg('thuy_van') && (
                       <div ref={hydroRef} className="min-w-0 scroll-mt-20">
-                        <Section title="Thủy văn – Mực nước thực đo & Vận hành xả lũ hồ chứa" {...fold('thuy_van')}>
+                        <Section title={hydroTitle(activeRow)} hint={HYDRO_HINT} {...fold('thuy_van')}>
                           <StationPicker stations={waterStations} selectedId={activeStation} onSelect={setStationId} />
                           {stationsState.error ? (
                             <ErrorState height={250} onRetry={stationsState.refetch}>Không tải được danh sách trạm mực nước</ErrorState>
@@ -658,12 +736,12 @@ export default function Dashboard() {
                               {(xDomain, xTicks) => <ReservoirOpsChart river={activeRow?.river} xDomain={xDomain} xTicks={xTicks} syncId="thuy-van" />}
                             </Hydrograph>
                           ) : (
-                            <EmptyState height={250}>Chưa có trạm mực nước trong vùng đang xem</EmptyState>
+                            <EmptyState height={250} icon={Waves}>Chưa có trạm mực nước trong vùng đang xem</EmptyState>
                           )}
                           {canForecast && !presentation && waterStations.length > 0 && (
                             <div className="mt-2 flex justify-end no-print">
                               <button type="button" className="btn-ghost tap min-h-[34px] px-2.5 py-1 text-xs" onClick={() => setBulletinOpen(true)}>
-                                Nhập bản tin dự báo KTTV
+                                Nhập bản tin dự báo thủy văn
                               </button>
                             </div>
                           )}
@@ -672,33 +750,30 @@ export default function Dashboard() {
                       </div>
                     )}
 
-                    {/* CHUYÊN ĐỀ 2: MƯA QPF & DỰ BÁO TỔ HỢP 72H */}
-                    {(chartSegment === 'mua' || chartSegment === 'tat_ca' || forceOpen) && (
+                    {showSeg('mua') && (
                       <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-                        <Section id="bieu-do-mua" title="Cường độ mưa & Dự báo 3 giờ tới (Nowcast)" className="scroll-mt-20" {...fold('mua')}>
+                        <Section id="bieu-do-mua" title={rainTitle(k, rainfall)} hint={RAIN_HINT} className="scroll-mt-20" {...fold('mua')}>
                           <RainfallChart height={260} />
                         </Section>
-                        <Section id="du-bao-72h" title="Dự báo mưa 72h tổ hợp ECMWF + GFS (P10–P90)" className="scroll-mt-20" {...fold('du_bao')}>
+                        <Section id="du-bao-72h" title={forecastTitle(fcAreas)} hint={FORECAST_HINT} className="scroll-mt-20" {...fold('du_bao')}>
                           <AreaForecastChart height={260} />
                         </Section>
                       </div>
                     )}
 
-                    {/* CHUYÊN ĐỀ 3: SẠT LỞ & CẢM BIẾN TALUY */}
-                    {(chartSegment === 'sat_lo' || chartSegment === 'tat_ca' || forceOpen) && (
+                    {showSeg('sat_lo') && (
                       <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-                        <Section title="Ngưỡng kích hoạt sạt lở (Mưa tích lũy 72h – Cường độ)" {...fold('sat_lo')}>
+                        <Section title={landslideTitle(lsRisk)} hint={LANDSLIDE_HINT} {...fold('sat_lo')}>
                           <LandslideScatter height={250} />
                         </Section>
-                        <Section title="Cảm biến cảnh báo sớm (Độ nghiêng & Độ ẩm đất)" {...fold('sat_lo')}>
+                        <Section title="Cảm biến sạt lở 48 giờ qua (độ nghiêng mái taluy, độ ẩm đất)" {...fold('sat_lo')}>
                           <SensorHeatmap height={250} />
                         </Section>
                       </div>
                     )}
 
-                    {/* CHUYÊN ĐỀ 4: KHO & VẬT TƯ */}
-                    {canResource && (chartSegment === 'vat_tu' || chartSegment === 'tat_ca' || forceOpen) && (
-                      <Section title="Vật tư cứu trợ theo kho (% định mức dự trữ an toàn)" {...fold('vat_tu')}>
+                    {canResource && showSeg('vat_tu') && (
+                      <Section title={suppliesTitle(supplies)} hint={SUPPLIES_HINT} {...fold('vat_tu')}>
                         <SuppliesChart height={250} />
                       </Section>
                     )}
@@ -706,24 +781,17 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* CỘT PHẢI: Quyết định khẩn & Nhật ký realtime (Cố định khi cuộn trên màn hình lớn). Điện thoại: cột tan ra
-                  (contents) để "Việc chờ quyết định" lên đầu trang, nhật ký xuống cuối — chỉ CSS, không nhân đôi component */}
-              <div className="contents md:flex md:min-w-0 md:flex-col md:gap-3 lg:sticky lg:top-16 lg:h-[calc(100vh-8.5rem)] lg:self-start print:static print:h-auto">
-                {!presentation && (
-                  <DecisionPanel k={k} kState={kState} className="min-w-0 shrink-0 shadow-sm max-md:order-first" />
-                )}
-                {logSection({
-                  title: 'Nhật ký sự kiện & luồng tác chiến',
-                  limit: 60,
-                  className: 'min-w-0 flex-1 overflow-hidden shadow-sm',
-                })}
-              </div>
+              {logSection({
+                title: 'Nhật ký sự kiện',
+                limit: 60,
+                className: 'min-w-0 md:col-start-2 lg:sticky lg:top-16 lg:h-[calc(100vh-8.5rem)] lg:self-start lg:overflow-hidden',
+              })}
             </div>
           </div>
 
-          {/* 3. Bảng tác chiến theo chuyên đề — thu gọn sẵn thành một thanh (tóm tắt + nút mở); mở ra là chính bảng */}
+          {/* 3. Bảng số liệu chi tiết theo chuyên đề — thu gọn sẵn thành một thanh (tóm tắt + nút mở); mở ra là chính bảng */}
           {!presentation && (opsTableOpen ? (
-            <div id="bang-tac-chien" className="flex flex-col gap-1.5">
+            <div id="bang-so-lieu" className="flex flex-col gap-1.5">
               <OperationsTable
                 k={k}
                 kState={kState}
@@ -732,7 +800,7 @@ export default function Dashboard() {
                 onSelectStation={focusStation}
                 scopeLabel={filterLabel}
               />
-              <button type="button" onClick={() => setOpsTableOpen(false)} aria-expanded="true" aria-controls="bang-tac-chien" className="btn-ghost tap self-center px-3">
+              <button type="button" onClick={() => setOpsTableOpen(false)} aria-expanded="true" aria-controls="bang-so-lieu" className="btn-ghost tap self-center px-3">
                 Thu gọn bảng <ChevronUp size={14} aria-hidden="true" />
               </button>
             </div>
@@ -740,14 +808,14 @@ export default function Dashboard() {
             <div className="card flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-2.5">
               <div className="min-w-0">
                 <h2 className="card-title">
-                  <FileSpreadsheet size={15} className="text-accent" aria-hidden="true" /> Bảng tác chiến theo chuyên đề
+                  <FileSpreadsheet size={15} className="text-accent" aria-hidden="true" /> Bảng số liệu chi tiết
                 </h2>
-                <p className="num mt-0.5 text-xs text-muted">
-                  {waterStations.length} trạm mực nước · {k?.reservoirs?.total || 0} hồ chứa · {k?.sos?.waiting || 0} phiếu SOS chờ · {k?.forces?.ready || 0} người sẵn sàng
+                <p className="num mt-0.5 text-[13px] text-muted">
+                  {waterStations.length} trạm mực nước · {k?.reservoirs?.total || 0} hồ chứa · {k?.landslides?.total || 0} điểm sạt lở{canSos ? ` · ${k?.sos?.waiting || 0} phiếu SOS chờ` : ''}
                 </p>
               </div>
-              <button type="button" onClick={() => setOpsTableOpen(true)} aria-expanded="false" aria-controls="bang-tac-chien" className="btn-secondary tap h-9 px-3">
-                Mở bảng dữ liệu chi tiết <ChevronDown size={14} aria-hidden="true" />
+              <button type="button" onClick={() => setOpsTableOpen(true)} aria-expanded="false" aria-controls="bang-so-lieu" className="btn-secondary tap h-9 px-3">
+                Mở bảng số liệu <ChevronDown size={14} aria-hidden="true" />
               </button>
             </div>
           ))}

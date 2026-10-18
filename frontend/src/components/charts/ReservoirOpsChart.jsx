@@ -58,7 +58,7 @@ export default function ReservoirOpsChart({ river, xDomain, xTicks, syncId, heig
       </div>
       {hasData ? (
         <ResponsiveContainer width="100%" height={height}>
-          <LineChart data={rows} syncId={syncId} syncMethod="value" margin={{ top: 6, right: 48, bottom: 0, left: -12 }}>
+          <LineChart data={rows} syncId={syncId} syncMethod="value" margin={{ top: 6, right: 16, bottom: 0, left: -12 }}>
             <CartesianGrid stroke={c.grid} vertical={false} />
             <XAxis
               dataKey="t"
@@ -133,7 +133,7 @@ export function ReservoirHistory({ reservoir: r, compact = false }) {
       </ResponsiveContainer>
       <div className="flex flex-wrap items-center justify-between gap-2 text-muted">
         <span>Lưu lượng (m³/s)</span>
-        <Legend items={[{ label: 'Q đến', color: c.s3, line: true }, { label: 'Q xả', color: c.s1, line: true }]} />
+        <Legend items={[{ label: 'Về hồ', color: c.s3, line: true }, { label: 'Xả', color: c.s1, line: true }]} />
       </div>
       <ResponsiveContainer width="100%" height={compact ? 76 : 100}>
         <LineChart data={series} syncId={syncId} syncMethod="value" margin={{ top: 4, right: 8, bottom: 0, left: -12 }}>
@@ -141,8 +141,8 @@ export function ReservoirHistory({ reservoir: r, compact = false }) {
           {x(false)}
           <YAxis width={50} tickFormatter={(v) => num(v, 0)} {...axisProps(c)} />
           <Tooltip content={<ChartTooltip unit=" m³/s" labelFormatter={tooltipTime} />} />
-          <Line dataKey="inflow" name="Q đến" type="stepAfter" stroke={c.s3} strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
-          <Line dataKey="outflow" name="Q xả" type="stepAfter" stroke={c.s1} strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
+          <Line dataKey="inflow" name="Về hồ" type="stepAfter" stroke={c.s3} strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
+          <Line dataKey="outflow" name="Xả" type="stepAfter" stroke={c.s1} strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
         </LineChart>
       </ResponsiveContainer>
     </div>

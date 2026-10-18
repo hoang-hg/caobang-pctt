@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import clsx from 'clsx';
 import {
@@ -195,22 +195,26 @@ export function Tabs({ tabs, value, onChange, fit = false, label }) {
 
 /**
  * Khung một khối nội dung. `collapsible`: tiêu đề thành nút mở / thu gọn (`open`, `onToggle` do nơi gọi giữ). Khi thu gọn
- * nội dung chỉ bị ẩn, KHÔNG gỡ khỏi trang — truy vấn số liệu bên trong vẫn chạy như cũ.
+ * nội dung chỉ bị ẩn, KHÔNG gỡ khỏi trang — truy vấn số liệu bên trong vẫn chạy như cũ. `hint`: nút "?" (Hint) cạnh tiêu đề
+ * — đặt ngoài nút thu gọn (không lồng nút trong nút).
  */
-export function Section({ title, right, children, className, bodyClass, id, collapsible = false, open = true, onToggle }) {
+export function Section({ title, hint, right, children, className, bodyClass, id, collapsible = false, open = true, onToggle }) {
   return (
     <section id={id} className={clsx('card flex min-h-0 flex-col', className)}>
       <div className="flex items-center justify-between gap-2 px-4 pb-1 pt-3">
-        {collapsible ? (
-          <h2 className="card-title min-w-0 flex-1">
-            <button type="button" className="tap flex min-h-[40px] w-full items-center gap-1.5 text-left" aria-expanded={open} onClick={onToggle}>
-              <ChevronDown size={15} className={clsx('shrink-0 transition-transform', !open && '-rotate-90')} aria-hidden="true" />
-              {title}
-            </button>
-          </h2>
-        ) : (
-          <h2 className="card-title">{title}</h2>
-        )}
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          {collapsible ? (
+            <h2 className="card-title min-w-0 flex-1">
+              <button type="button" className="tap flex min-h-[40px] w-full items-center gap-1.5 text-left" aria-expanded={open} onClick={onToggle}>
+                <ChevronDown size={15} className={clsx('shrink-0 transition-transform', !open && '-rotate-90')} aria-hidden="true" />
+                {title}
+              </button>
+            </h2>
+          ) : (
+            <h2 className="card-title min-w-0">{title}</h2>
+          )}
+          {hint}
+        </div>
         {right}
       </div>
       <div className={clsx('min-h-0 flex-1 px-4 pb-3', bodyClass, collapsible && !open && 'hidden')}>{children}</div>
@@ -249,15 +253,122 @@ export function ErrorState({ height, onRetry, className, children = 'Không tả
   );
 }
 
-/** Trống: hệ thống tải được nhưng chưa có dữ liệu — nói cần nhập gì / ở đâu. */
-export const EmptyState = ({ height, className, children }) => (
+/** Trống: hệ thống tải được nhưng chưa có dữ liệu — nói cần nhập gì / ở đâu. `icon` (lucide): hình minh hoạ nét mảnh phía
+ * trên câu chữ (không đặt trong ô màu) — dùng cho khối lớn; danh sách nhỏ, hộp chọn thì bỏ trống. */
+export const EmptyState = ({ height, className, icon: Icon, children }) => (
   <div
     style={height ? { height } : undefined}
     className={clsx('flex items-center justify-center rounded-lg border border-dashed border-line px-4 py-5 text-center text-xs text-muted', className)}
   >
-    <div>{children}</div>
+    <div className="flex flex-col items-center gap-2">
+      {Icon && <Icon size={30} strokeWidth={1.4} className="text-muted/70" aria-hidden="true" />}
+      <div className="max-w-md text-[13px] leading-snug">{children}</div>
+    </div>
   </div>
 );
+
+/**
+ * Nút "?" nhỏ cạnh thuật ngữ chuyên môn: bấm → một câu giải thích nổi ngay dưới nút (đặt theo vị trí nút, không tràn khỏi
+ * màn hình 360 px); bấm ra ngoài / Esc / cuộn trang thì đóng. Vùng chạm 44 px trên màn cảm ứng (.touch-hit). `label`:
+ * thuật ngữ được giải thích (đọc cho trình đọc màn hình: "Giải thích: …"). Không đặt bên trong nút / liên kết khác.
+ */
+export function Hint({ label, children, className }) {
+  const [pos, setPos] = useState(null);
+  const btn = useRef(null);
+  const pop = useRef(null);
+  const id = useId();
+  useEffect(() => {
+    if (!pos) return undefined;
+    const close = (e) => {
+      if (e.type === 'keydown' && e.key !== 'Escape') return;
+      if (e.type === 'mousedown' && (btn.current?.contains(e.target) || pop.current?.contains(e.target))) return;
+      setPos(null);
+    };
+    const main = document.querySelector('main');
+    window.addEventListener('mousedown', close);
+    window.addEventListener('keydown', close);
+    window.addEventListener('resize', close);
+    main?.addEventListener('scroll', close, { passive: true });
+    return () => {
+      window.removeEventListener('mousedown', close);
+      window.removeEventListener('keydown', close);
+      window.removeEventListener('resize', close);
+      main?.removeEventListener('scroll', close);
+    };
+  }, [pos]);
+  const toggle = (e) => {
+    e.stopPropagation();
+    if (pos) return setPos(null);
+    const r = btn.current.getBoundingClientRect();
+    const width = Math.min(288, window.innerWidth - 16);
+    return setPos({ top: r.bottom + 6, left: Math.max(8, Math.min(r.left - 16, window.innerWidth - width - 8)), width });
+  };
+  return (
+    <>
+      <button
+        ref={btn}
+        type="button"
+        onClick={toggle}
+        aria-expanded={!!pos}
+        aria-controls={pos ? id : undefined}
+        aria-label={`Giải thích: ${label}`}
+        title={`Giải thích: ${label}`}
+        className={clsx(
+          'touch-hit inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-line text-[11px] font-bold leading-none text-muted hover:border-accent hover:text-accent no-print',
+          pos && 'border-accent text-accent',
+          className,
+        )}
+      >
+        ?
+      </button>
+      {pos && createPortal(
+        <div
+          ref={pop}
+          id={id}
+          role="note"
+          style={{ top: pos.top, left: pos.left, width: pos.width }}
+          className="fixed z-[1600] rounded-lg border border-line bg-panel px-3 py-2 text-left text-[13px] font-normal leading-snug text-ink shadow-lg motion-safe:animate-enter"
+        >
+          <b className="mb-0.5 block text-xs font-semibold text-muted">{label}</b>
+          {children}
+        </div>,
+        document.body,
+      )}
+    </>
+  );
+}
+
+const tipsKey = (id) => `pctt_goi_y_${id}`;
+const tipsSeen = (id) => { try { return localStorage.getItem(tipsKey(id)) === '1'; } catch { return false; } };
+
+/**
+ * Gợi ý 3 bước lần đầu mở một màn hình: "Bắt đầu từ đâu" cho người mới, không phải đọc hướng dẫn. Bấm "Đã hiểu" → không
+ * hiện lại trên máy này (localStorage, khoá theo `id` của màn). `steps`: 2–4 câu ngắn, mỗi câu một việc.
+ */
+export function PageTips({ id, title = 'Bắt đầu từ đâu?', steps, className }) {
+  const [open, setOpen] = useState(() => !tipsSeen(id));
+  if (!open) return null;
+  const done = () => {
+    try { localStorage.setItem(tipsKey(id), '1'); } catch { /* chế độ riêng tư: chỉ ẩn lần này */ }
+    setOpen(false);
+  };
+  return (
+    <section aria-label="Gợi ý cho người mới" className={clsx('card flex flex-col gap-2 border-accent/40 px-3 py-2.5 no-print sm:flex-row sm:items-center sm:gap-4', className)}>
+      <b className="shrink-0 text-sm font-semibold text-ink">{title}</b>
+      <ol className="grid min-w-0 flex-1 gap-1.5 text-[13px] leading-snug text-ink-2 md:grid-cols-3 md:gap-3">
+        {steps.map((s, i) => (
+          <li key={s} className="flex min-w-0 gap-2">
+            <span className="num w-4 shrink-0 font-bold text-accent">{i + 1}.</span>
+            <span className="min-w-0">{s}</span>
+          </li>
+        ))}
+      </ol>
+      <button type="button" onClick={done} className="btn-secondary tap shrink-0 self-end px-3 py-1 text-xs sm:self-center">
+        <Check size={14} aria-hidden="true" /> Đã hiểu
+      </button>
+    </section>
+  );
+}
 
 /** Chú giải thang màu rủi ro dùng chung (utils/risk.js): Đỏ → Xanh, cộng Xám = chưa có dữ liệu. `meaningClass`: ẩn / hiện phần
  * nghĩa ("khẩn cấp", "theo dõi"…) theo bề rộng — nghĩa vẫn có ở title của từng mục. */
@@ -279,10 +390,11 @@ export function RiskLegend({ className, meaningClass }) {
 }
 
 /**
- * Mũi tên xu hướng + chữ ngắn (VD "0,12 m/giờ"). dir: 'len' | 'xuong' | 'on_dinh'. Lên = cam (rủi ro tăng); xuống = xanh
+ * Mũi tên xu hướng + chữ ngắn (VD "0,12 m/giờ"); `textClass`: ẩn / hiện phần chữ theo bề rộng (ô hẹp chỉ còn mũi tên).
+ * dir: 'len' | 'xuong' | 'on_dinh'. Lên = cam (rủi ro tăng); xuống = xanh
  * dương (KHÔNG xanh lá — đang xuống chưa chắc đã an toàn); ổn định = xám. `label` đọc cho trình đọc màn hình (role="img").
  */
-export function TrendTag({ dir, text, label, className }) {
+export function TrendTag({ dir, text, label, className, textClass }) {
   if (!dir) return null;
   const Icon = dir === 'len' ? TrendingUp : dir === 'xuong' ? TrendingDown : MoveRight;
   return (
@@ -297,7 +409,7 @@ export function TrendTag({ dir, text, label, className }) {
       )}
     >
       <Icon size={12} className="shrink-0" aria-hidden="true" />
-      {text}
+      {textClass ? <span className={textClass}>{text}</span> : text}
     </span>
   );
 }

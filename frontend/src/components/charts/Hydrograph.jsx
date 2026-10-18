@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Area, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { Area, ComposedChart, Line, ReferenceArea, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { api } from '../../api/client';
 import { axisTimeLabel, dateTime, hourLabel, num } from '../../utils/format';
 import { alarmLevel, ALARM } from '../../utils/labels';
@@ -13,6 +13,8 @@ import { axisProps, ChartTooltip, Legend, useChartTheme } from './chartTheme';
 const STALE_BUCKET_MS = 2 * 3600e3;
 const bdLabel = (name, v) => `${name} (${v != null ? `${num(v, 2)} m` : 'chưa khai báo'})`;
 const ROMAN = ['', 'I', 'II', 'III'];
+// Nhãn vạch báo động ghi NGAY TRÊN đường (trong vùng vẽ, sát trái) — lề phải hẹp không đủ chỗ cho chữ đầy đủ
+const bdTag = (lv, v, fill) => ({ value: `Báo động ${ROMAN[lv]} · ${num(v, 2)} m`, fill, fontSize: 11, fontWeight: 600, position: 'insideTopLeft' });
 
 /**
  * Phần VƯỢT báo động của một đường (thiết kế A.3: "khu vực diện tích giữa đường hiện tại và vạch báo động được tô màu cảnh
@@ -59,7 +61,7 @@ function forecastNext(value, thr, ahead) {
 }
 
 /** Biểu đồ thủy văn: mực nước thực đo (liền) + dự báo (nét đứt) + vạch Báo động I/II/III.
- * Dự báo = bản tin KTTV do trực ban nhập (Dashboard → "Nhập bản tin dự báo"); chưa có bản tin → dự báo mô phỏng
+ * Dự báo = bản tin dự báo thủy văn do trực ban nhập (Tổng quan → "Nhập bản tin dự báo thủy văn"); chưa có bản tin → dự báo mô phỏng
  * (chỉ có khi bật bộ mô phỏng), không có cả hai → chỉ vẽ thực đo và ghi rõ chưa có bản tin.
  * `station` (tuỳ chọn): dòng /stations của trạm — đầu biểu đồ dùng SỐ ĐO MỚI NHẤT thay cho TB giờ, để mức báo động, xu hướng
  * và dự báo khớp với ô KPI / bộ chọn trạm cùng trang (TB giờ trễ hơn: trạm đã qua BĐ II mà TB giờ còn dưới).
@@ -87,7 +89,7 @@ export default function Hydrograph({ stationId, height = 260, hours = 48, compac
     const ahead = fc.filter((d) => d.t > nowT);
     const issued = kttv[0]?.issued_at && new Date(kttv[0].issued_at).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
     // Đường "HEC-HMS" chỉ do bộ mô phỏng sinh (hệ thống không chạy mô hình thuỷ văn) → luôn ghi "mô phỏng"
-    const label = kttv.length ? `Dự báo KTTV (phát hành ${issued})` : source.length ? 'Dự báo mô phỏng' : null;
+    const label = kttv.length ? `Bản tin dự báo thủy văn (phát hành ${issued})` : source.length ? 'Dự báo mô phỏng (không phải bản tin chính thức)' : null;
     if (lastObs && fc.length) fc.unshift({ t: lastObs.t, fc: lastObs.obs }); // nối liền thực đo → dự báo
     const t = data.station.thresholds || {};
     // Vạch đã khai báo, từ thấp lên cao — mỗi khoảng giữa hai vạch tô màu của vạch dưới (BĐ I vàng, II cam, III đỏ)
@@ -119,7 +121,7 @@ export default function Hydrograph({ stationId, height = 260, hours = 48, compac
   }
   if (!rows.length) {
     // Chỉ dùng ngưỡng ĐÃ khai báo — trạm mới nhập có thể mới có 1–2 ngưỡng (README 2.4: được để trống tạm)
-    const declared = [['BĐ I', thr.bd1], ['BĐ II', thr.bd2], ['BĐ III', thr.bd3]].filter(([, v]) => v != null);
+    const declared = [['Báo động I', thr.bd1], ['Báo động II', thr.bd2], ['Báo động III', thr.bd3]].filter(([, v]) => v != null);
     if (!declared.length) {
       return (
         <EmptyState height={height}>
@@ -139,9 +141,9 @@ export default function Hydrograph({ stationId, height = 260, hours = 48, compac
               items={[
                 { label: 'Thực đo (chưa có)', color: c.muted, line: true },
                 { label: 'Dự báo (chưa có)', color: c.muted, dashed: true },
-                { label: bdLabel('BĐ I', thr.bd1), color: c.warn, line: true },
-                { label: bdLabel('BĐ II', thr.bd2), color: c.serious, line: true },
-                { label: bdLabel('BĐ III', thr.bd3), color: c.danger, line: true },
+                { label: bdLabel('Báo động I', thr.bd1), color: c.warn, line: true },
+                { label: bdLabel('Báo động II', thr.bd2), color: c.serious, line: true },
+                { label: bdLabel('Báo động III', thr.bd3), color: c.danger, line: true },
               ]}
             />
             <span className="chip bg-panel2 text-[10px] text-muted">Chờ tín hiệu trạm đo</span>
@@ -149,13 +151,13 @@ export default function Hydrograph({ stationId, height = 260, hours = 48, compac
         )}
         <div className="relative">
           <ResponsiveContainer width="100%" height={height}>
-            <ComposedChart data={emptyRows} margin={{ top: 8, right: compact ? 8 : 48, bottom: 0, left: -12 }}>
+            <ComposedChart data={emptyRows} margin={{ top: 8, right: compact ? 8 : 16, bottom: 0, left: -12 }}>
               <CartesianGrid stroke={c.grid} vertical={false} />
               <XAxis dataKey="t" type="number" domain={['dataMin', 'dataMax']} scale="time" tickFormatter={hourLabel} {...axisProps(c)} />
               <YAxis domain={[Math.floor(lo), Math.ceil(hi)]} tickFormatter={(v) => num(v, 1)} {...axisProps(c)} unit=" m" width={44} />
-              {thr.bd1 != null && <ReferenceLine y={thr.bd1} stroke={c.warn} strokeWidth={1.5} label={compact ? undefined : { value: `BĐ I ${num(thr.bd1, 2)} m`, fill: c.warnText, position: 'right', fontSize: 10 }} />}
-              {thr.bd2 != null && <ReferenceLine y={thr.bd2} stroke={c.serious} strokeWidth={1.5} label={compact ? undefined : { value: `BĐ II ${num(thr.bd2, 2)} m`, fill: c.seriousText, position: 'right', fontSize: 10 }} />}
-              {thr.bd3 != null && <ReferenceLine y={thr.bd3} stroke={c.danger} strokeWidth={1.5} label={compact ? undefined : { value: `BĐ III ${num(thr.bd3, 2)} m`, fill: c.dangerText, position: 'right', fontSize: 10 }} />}
+              {thr.bd1 != null && <ReferenceLine y={thr.bd1} stroke={c.warn} strokeWidth={1.5} label={compact ? undefined : bdTag(1, thr.bd1, c.warnText)} />}
+              {thr.bd2 != null && <ReferenceLine y={thr.bd2} stroke={c.serious} strokeWidth={1.5} label={compact ? undefined : bdTag(2, thr.bd2, c.seriousText)} />}
+              {thr.bd3 != null && <ReferenceLine y={thr.bd3} stroke={c.danger} strokeWidth={1.5} label={compact ? undefined : bdTag(3, thr.bd3, c.dangerText)} />}
             </ComposedChart>
           </ResponsiveContainer>
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-4">
@@ -190,17 +192,17 @@ export default function Hydrograph({ stationId, height = 260, hours = 48, compac
               { label: 'Thực đo', color: c.s1, line: true },
               fcLabel ? { label: fcLabel, color: c.s2, dashed: true } : { label: 'Chưa có bản tin dự báo', color: c.muted, dashed: true },
               ...(exceeded ? [{ label: 'Phần vượt báo động (tô theo mức; dự báo tô nhạt)', color: c.serious }] : []),
-              { label: bdLabel('BĐ I', thr.bd1), color: c.warn, line: true },
-              { label: bdLabel('BĐ II', thr.bd2), color: c.serious, line: true },
-              { label: bdLabel('BĐ III', thr.bd3), color: c.danger, line: true },
+              { label: bdLabel('Báo động I', thr.bd1), color: c.warn, line: true },
+              { label: bdLabel('Báo động II', thr.bd2), color: c.serious, line: true },
+              { label: bdLabel('Báo động III', thr.bd3), color: c.danger, line: true },
             ]}
           />
           {latest && (
             // Số đo cũ vẫn giữ cấp đã vượt (mất tín hiệu không xoá được nguy cơ đã biết) nhưng không gọi là "hiện tại"
             <div className="flex items-center gap-2 text-xs">
               <span className="text-muted">
-                {latest.stale ? `Số đo cuối (${dateTime(latest.t)})` : `${latest.raw ? 'Số đo' : 'TB giờ'} ${hourLabel(latest.t)}`}:{' '}
-                <b className={latest.stale ? 'font-mono text-muted' : 'font-mono text-sm text-ink'}>{num(latest.value, 2)} m</b>
+                {latest.stale ? `Số đo cuối (${dateTime(latest.t)})` : `${latest.raw ? 'Số đo' : 'Trung bình giờ'} ${hourLabel(latest.t)}`}:{' '}
+                <b className={latest.stale ? 'num text-muted' : 'num text-sm text-ink'}>{num(latest.value, 2)} m</b>
               </span>
               <TrendTag {...trendProps(trend)} />
               <span
@@ -215,20 +217,20 @@ export default function Hydrograph({ stationId, height = 260, hours = 48, compac
             <p className="w-full text-xs text-muted">
               {next.hit ? (
                 <b className={risk(next.level).text}>
-                  Dự báo vượt BĐ {ROMAN[next.level]} ({num(thr[`bd${next.level}`], 2)} m) lúc {etaWhen(next.hit.t)}
+                  Dự báo lên Báo động {ROMAN[next.level]} ({num(thr[`bd${next.level}`], 2)} m) lúc {etaWhen(next.hit.t)}
                 </b>
               ) : (
                 <>
-                  Dự báo chưa chạm BĐ {ROMAN[next.level]} — cao nhất <b className="font-mono text-ink">{num(next.peak.fc, 2)} m</b> lúc {etaWhen(next.peak.t)}
+                  Dự báo chưa tới Báo động {ROMAN[next.level]} — cao nhất <b className="num text-ink">{num(next.peak.fc, 2)} m</b> lúc {etaWhen(next.peak.t)}
                 </>
               )}
-              {simulated ? ' · theo dự báo mô phỏng, không phải bản tin KTTV' : ' · theo bản tin KTTV'}
+              {simulated ? ' · theo dự báo mô phỏng, không phải bản tin chính thức' : ' · theo bản tin dự báo thủy văn'}
             </p>
           )}
         </div>
       )}
       <ResponsiveContainer width="100%" height={height}>
-        <ComposedChart data={rows} syncId={syncId} syncMethod="value" margin={{ top: 8, right: compact ? 8 : 48, bottom: 0, left: -12 }}>
+        <ComposedChart data={rows} syncId={syncId} syncMethod="value" margin={{ top: 8, right: compact ? 8 : 16, bottom: 0, left: -12 }}>
           <CartesianGrid stroke={c.grid} vertical={false} />
           {/* Phần vượt báo động: thực đo tô đậm, dự báo tô nhạt — không hiện trong chú thích khi rê chuột */}
           {['o', 'f'].flatMap((sfx) => levels.map(({ lv }) => (
@@ -247,13 +249,24 @@ export default function Hydrograph({ stationId, height = 260, hours = 48, compac
           <XAxis dataKey="t" type="number" scale="time" domain={xDomain} ticks={xTicks} tickFormatter={axisTimeLabel} minTickGap={40} {...axisProps(c)} />
           <YAxis domain={domain} width={52} tickFormatter={(v) => v.toFixed(1)} {...axisProps(c)} />
           <Tooltip
-            content={<ChartTooltip unit=" m" labelFormatter={(l) => new Date(l).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })} />}
+            content={<ChartTooltip unit=" m" rows={(p) => p.filter((x) => (x.dataKey === 'obs' || x.dataKey === 'fc') && x.value != null)} labelFormatter={(l) => new Date(l).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })} />}
             cursor={{ stroke: c.axis, strokeDasharray: '3 3' }}
           />
+          {/* Phần sau "Hiện tại" là dự báo: nền nhạt + chữ "Dự báo" (mô phỏng thì ghi rõ) */}
+          {fcLabel && xDomain[1] > now && (
+            <ReferenceArea
+              x1={now}
+              x2={xDomain[1]}
+              fill={c.grid}
+              fillOpacity={0.35}
+              ifOverflow="hidden"
+              label={compact ? undefined : { value: simulated ? 'Dự báo (mô phỏng)' : 'Dự báo', fill: c.muted, fontSize: 11, fontWeight: 600, position: 'insideTopRight' }}
+            />
+          )}
           <ReferenceLine x={now} stroke={c.muted} strokeDasharray="2 4" label={compact ? undefined : { value: 'Hiện tại', fill: c.muted, fontSize: 10, position: 'insideTopLeft' }} />
-          {thr.bd1 != null && <ReferenceLine y={thr.bd1} stroke={c.warn} strokeWidth={1.5} label={compact ? undefined : { value: `BĐ I ${thr.bd1}`, fill: c.warnText, fontSize: 10, position: 'right' }} />}
-          {thr.bd2 != null && <ReferenceLine y={thr.bd2} stroke={c.serious} strokeWidth={1.5} label={compact ? undefined : { value: `BĐ II ${thr.bd2}`, fill: c.seriousText, fontSize: 10, position: 'right' }} />}
-          {thr.bd3 != null && <ReferenceLine y={thr.bd3} stroke={c.danger} strokeWidth={1.8} label={compact ? undefined : { value: `BĐ III ${thr.bd3}`, fill: c.dangerText, fontSize: 10, position: 'right' }} />}
+          {thr.bd1 != null && <ReferenceLine y={thr.bd1} stroke={c.warn} strokeWidth={1.5} label={compact ? undefined : bdTag(1, thr.bd1, c.warnText)} />}
+          {thr.bd2 != null && <ReferenceLine y={thr.bd2} stroke={c.serious} strokeWidth={1.5} label={compact ? undefined : bdTag(2, thr.bd2, c.seriousText)} />}
+          {thr.bd3 != null && <ReferenceLine y={thr.bd3} stroke={c.danger} strokeWidth={1.8} label={compact ? undefined : bdTag(3, thr.bd3, c.dangerText)} />}
           <Line dataKey="obs" name="Thực đo" stroke={c.s1} strokeWidth={2.5} dot={false} connectNulls isAnimationActive={false} />
           <Line dataKey="fc" name="Dự báo" stroke={c.s2} strokeWidth={2.2} strokeDasharray="6 4" dot={false} connectNulls isAnimationActive={false} />
         </ComposedChart>

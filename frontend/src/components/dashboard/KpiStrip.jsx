@@ -1,19 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
-import { CloudRain, Droplets, Home, Siren, Users, Waves } from 'lucide-react';
+import { CloudRain, Home, Ship, Siren, Users, Waves } from 'lucide-react';
 import { useAreaQuery } from '../../api/hooks';
 import { ALARM } from '../../utils/labels';
 import { int, minutesSince, num } from '../../utils/format';
 import { RAIN_LABEL, risk } from '../../utils/risk';
 import { trendProps } from '../../utils/stations';
-import { ErrorState, Progress, Skeleton, TrendTag } from '../common/ui';
-import StatCard, { Badge } from './StatCard';
-import { evacFacts, rainFacts, resourceFacts, sosFacts, topicFacts } from './kpiFacts';
+import { ErrorState, Skeleton, TrendTag } from '../common/ui';
+import StatCard from './StatCard';
+import { evacFacts, rainFacts, sosFacts } from './kpiFacts';
 import { riverName, riverSummary, ROMAN, shortName } from './RiverKpi';
 
-const GRID = 'grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2.5 xl:grid-cols-6 [&>*]:min-w-0';
-const WIDE = 980; // vùng KPI rộng từ ~980 px (iPad ngang khi menu thu gọn) → 6 ô một hàng như laptop
-const TILE_H = 112; // chiều cao khung tải — gần bằng ô thật để trang không nhảy
+const GRID = 'grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2.5 [&>*]:min-w-0';
+const WIDE = 980; // vùng chỉ số rộng từ ~980 px → 6 ô một hàng
+const TILE_H = 92; // chiều cao khung tải — gần bằng ô thật để trang không nhảy
 const HOUR = 3_600_000;
 
 /**
@@ -31,27 +31,30 @@ function lastHourRain(data) {
   const from = new Date(last.time).getHours();
   return {
     mm: last.mm,
-    span: `${from}–${(from + 1) % 24}h`,
+    span: `${from}–${(from + 1) % 24} giờ`,
     dir: delta == null ? null : delta >= 0.5 ? 'len' : delta <= -0.5 ? 'xuong' : 'on_dinh',
     label: comparable && `${delta >= 0.5 ? 'Tăng' : delta <= -0.5 ? 'Giảm' : 'Tương đương'} so với giờ trước (${num(prev.mm, 1)} mm)`,
   };
 }
 
 /**
- * Hàng chỉ số nhanh (thiết kế mục A.2) cho lãnh đạo đọc trong vài giây: 6 ô gọn — 1 hàng trên laptop (≥ 1280 px), 3×2 trên
- * iPad, 2×3 trên điện thoại. Số liệu như trước (KPI, /stations, /evacuation); màu theo thang rủi ro chung. Chạm ô → chi tiết:
- * mưa → biểu đồ mưa, mực nước → trạm nặng nhất trên biểu đồ thủy văn, SOS / sơ tán → Điều hành cứu hộ, lực lượng → Vật tư &
- * Lực lượng (chỉ khi tài khoản mở được trang đó), hồ chứa / sạt lở → thẻ chuyên đề. Thiếu số liệu → "–" và nói rõ.
- * Xu hướng (thiết kế A.2): ô Mưa so mưa giờ trọn gần nhất với giờ trước (dùng chung truy vấn 'rainfall' của biểu đồ mưa —
- * không thêm lượt gọi); ô Mực nước có mũi tên lên / xuống của trạm nặng nhất và giờ dự báo vượt mức báo động kế tiếp.
+ * Hàng 6 chỉ số nhanh (thiết kế mục A.2) cho lãnh đạo đọc trong vài giây: mỗi ô MỘT con số lớn + MỘT dòng ý nghĩa bằng lời
+ * + mũi tên xu hướng ở góc (khi số liệu cho biết được). 1 hàng khi vùng chỉ số đủ rộng, 3×2 trên iPad / laptop có cột "Việc
+ * chờ quyết định", 2×3 trên điện thoại (360 × 740 thấy đủ 6 ô cùng dải khẩn, không cuộn). Thứ tự: mưa · mực nước · SOS ·
+ * sơ tán · quân số · phương tiện chuyên dụng. Số liệu như trước (KPI, /stations, /evacuation); màu theo thang rủi ro chung.
+ * Chạm ô → chi tiết: mưa → biểu đồ mưa, mực nước → trạm đáng lo nhất trên biểu đồ thủy văn, SOS / sơ tán → Điều hành cứu
+ * hộ, quân số / phương tiện → Vật tư & Lực lượng (chỉ khi tài khoản mở được trang đó). Thiếu số liệu → "–" và nói rõ.
+ * Xu hướng: ô Mưa so mưa giờ trọn gần nhất với giờ trước (dùng chung truy vấn 'rainfall' của biểu đồ mưa — không thêm lượt
+ * gọi); ô Mực nước: lên / xuống của trạm nặng nhất. Ô SOS: viền đỏ + nhãn nhấp nháy (chỉ nhãn) khi có phiếu quá hạn phản
+ * hồi theo cấp hoặc chờ quá 15 phút chưa có lực lượng nhận.
  * `large`: chữ số to cho chế độ trình chiếu (màn hình lớn phòng điều hành, đọc từ xa).
  */
 export default function KpiStrip({
-  k, kState, evacQ, stationsState, waterStations, rainStations, canSos, canResource, canEvacUpdate, onRiver, onRain, onOpenTab, riverRef,
+  k, kState, evacQ, stationsState, waterStations, rainStations, canSos, canResource, canEvacUpdate, onRiver, onRain, riverRef,
   large = false,
 }) {
-  // Xếp 6 ô một hàng theo bề rộng THẬT của vùng KPI (không chỉ theo màn hình): iPad ngang 1180 px thu gọn menu đủ chỗ
-  // như laptop → bản đồ lên màn hình đầu nhiều hơn; mở rộng menu thì trở lại 3×2
+  // Xếp 6 ô một hàng theo bề rộng THẬT của vùng chỉ số (không chỉ theo màn hình): màn rộng / trình chiếu đủ chỗ thì một
+  // hàng; cạnh cột "Việc chờ quyết định" thì 3×2
   const gridRef = useRef(null);
   const [wide, setWide] = useState(false);
   const rainQ = useAreaQuery('rainfall', '/dashboard/rainfall', {}, { refetchInterval: 60_000 });
@@ -73,10 +76,11 @@ export default function KpiStrip({
   const rain = k.rain;
   const { known: rainKnown, level: rainLv } = rainFacts(rain);
   const hourRain = lastHourRain(rainQ.data);
+  const maxAt = rain?.max_station ? ` tại ${rain.max_station.replace(/^Trạm đo mưa\s+/i, '')}` : '';
   const river = riverSummary(waterStations);
-  const lead = river.level >= 1 ? river.worst : null; // trạm nặng nhất (đã trên BĐ I) — mũi tên xu hướng của ô
-  // Dự báo chỉ lên ô khi NẶNG THÊM (mức kế tiếp cao hơn mức nặng nhất hiện tại) — "BĐ II · dự báo BĐ II" của trạm khác dễ
-  // đọc nhầm; dự báo từng trạm vẫn ở biểu đồ thủy văn. Chạm ô → trạm sắp nặng thêm đó, không thì trạm nặng nhất
+  const lead = river.level >= 1 ? river.worst : null; // trạm nặng nhất (đã trên báo động I) — mũi tên xu hướng của ô
+  // Dự báo chỉ lên ô khi NẶNG THÊM (mức kế tiếp cao hơn mức nặng nhất hiện tại); dự báo từng trạm vẫn ở biểu đồ thủy văn.
+  // Chạm ô → trạm sắp nặng thêm đó, không thì trạm nặng nhất
   const next = river.next && river.next.eta.level > (river.level ?? 0) ? river.next : null;
   const riverTarget = next ? next.s : river.worst?.s || river.rows[0]?.s;
   const sos = k.sos || {};
@@ -88,40 +92,37 @@ export default function KpiStrip({
   const sites = evacQ.data?.sites || [];
   const fo = k.forces || {};
   const ve = k.vehicles || {};
-  const hasResources = resourceFacts(fo, ve).has;
-  const rs = k.reservoirs || {};
-  const ls = k.landslides || {};
-  const { rsLv, lsLv, level: topicLv } = topicFacts(rs, ls);
-  // Màn cảm ứng: vùng chạm vô hình 44 px (.touch-hit) — dòng cao thật 44 px đẩy ô KPI cuối xuống dưới thanh đáy điện thoại 360 px
-  const topicRow = 'touch-hit flex min-h-[36px] w-full items-center justify-between gap-2 rounded-md px-1.5 text-left text-xs hover:bg-panel2';
+  const hasVehicles = ve.special_total > 0 || ve.heavy_total > 0;
+  const veActive = (ve.special_active || 0) + (ve.heavy_active || 0);
+  const veTotal = (ve.special_total || 0) + (ve.heavy_total || 0);
+  const line = 'block truncate';
+  const sosChip = (
+    <span className="chip whitespace-nowrap bg-danger px-1.5 py-0 text-[11px] font-bold text-white motion-safe:animate-blink">
+      {sos.overdue > 0 ? `${sos.overdue} quá hạn` : `${sos.no_team_15m} chờ quá 15 phút`}
+    </span>
+  );
 
   return (
     <div ref={gridRef} className={clsx(GRID, wide && 'sm:grid-cols-6', large && 'kpi-lon')} aria-label="Chỉ số nhanh">
       <StatCard
         compact
         icon={CloudRain}
-        title="Mưa 24 giờ"
+        title="Mưa trung bình"
         level={rainLv}
-        badge={rainLv >= 1 && <Badge level={rainLv}>{RAIN_LABEL[rainLv]}</Badge>}
+        // Chỉ mũi tên (chữ ở dòng "Giờ …" bên dưới và trong lời đọc) — tiêu đề không bị cắt ở ô hẹp
+        trend={hourRain && <TrendTag dir={hourRain.dir} label={`Mưa giờ ${hourRain.span}: ${num(hourRain.mm, 1)} mm${hourRain.label ? ` — ${hourRain.label}` : ''}`} />}
         value={num(rain?.avg_24h, 1)}
-        unit={rainKnown ? 'mm TB' : undefined}
+        unit={rainKnown ? 'mm/24 giờ' : undefined}
         onClick={onRain}
-        hint={`${rain?.avg_method === 'thiessen' ? `TB lưu vực theo diện tích (đa giác Thiessen) của ${rain.stations} trạm` : rain?.stations === 1 ? 'Số đo của 1 trạm trong vùng' : 'Trung bình cộng các trạm'} — bấm xem biểu đồ mưa giờ và dự báo 3 giờ tới`}
-        // Thiết kế A.2: mưa cực đại cục bộ ở dòng đầu — điện thoại chỉ đủ chỗ 1 dòng; mưa giờ + xu hướng từ máy tính bảng trở lên
+        hint={`${rain?.avg_method === 'thiessen' ? `Trung bình lưu vực theo diện tích đại diện của ${rain.stations} trạm` : rain?.stations === 1 ? 'Số đo của 1 trạm trong vùng' : 'Trung bình cộng các trạm'} — bấm xem biểu đồ mưa từng giờ và dự báo 3 giờ tới`}
         footerRows={rainKnown}
         footer={
           rainKnown ? (
             <>
-              <span className="block truncate">
-                Lớn nhất <b className="num text-ink">{num(rain.max_24h, 1)} mm</b>
-                {rain.max_station && ` · ${rain.max_station.replace(/^Trạm đo mưa\s+/i, '')}`}
+              <span className={line} title={rainLv >= 1 ? `${RAIN_LABEL[rainLv]}: lớn nhất ${num(rain.max_24h, 1)} mm${maxAt}` : undefined}>
+                Lớn nhất <b className={clsx('num', rainLv >= 1 ? risk(rainLv).text : 'text-ink')}>{num(rain.max_24h, 1)} mm</b>{maxAt}
               </span>
-              {hourRain && (
-                <span className="hidden truncate sm:block">
-                  {hourRain.span} <b className="num text-ink">{num(hourRain.mm, 1)} mm</b>{' '}
-                  <TrendTag dir={hourRain.dir} label={hourRain.label} className="align-middle" />
-                </span>
-              )}
+              {hourRain && <span className={clsx(line, 'hidden 2xl:block')}>Mưa {hourRain.span}: <b className="num text-ink">{num(hourRain.mm, 1)} mm</b></span>}
             </>
           ) : rainStations ? `${rainStations} trạm đo mưa chưa gửi số đo 24 giờ qua` : 'Chưa có trạm đo mưa trong vùng đang xem'
         }
@@ -137,33 +138,35 @@ export default function KpiStrip({
             compact
             className="h-full"
             icon={Waves}
-            title="Mực nước sông"
+            title="Mực nước"
             level={river.level}
             alert={river.level === 3}
-            badge={
-              !river.rows.length ? <Badge level={null}>Chưa có trạm</Badge>
-                : river.level == null ? <Badge level={null}>Chưa đánh giá được</Badge>
-                  : <Badge level={river.level}>{river.level >= 1 ? `BĐ ${ROMAN[river.level]}` : ALARM[0].label}</Badge>
-            }
-            aside={lead && <TrendTag {...trendProps(lead.trend, shortName(lead.s))} className="min-w-0 text-[11px]" />}
+            trend={lead && <TrendTag {...trendProps(lead.trend, shortName(lead.s))} textClass="hidden 2xl:inline" />}
             value={river.rows.length ? `${river.above}/${river.rows.length}` : '–'}
-            unit={river.rows.length ? 'trạm trên BĐ' : undefined}
+            unit={river.rows.length ? 'trạm báo động' : undefined}
             onClick={river.rows.length && onRiver ? () => onRiver(riverTarget.id) : undefined}
-            hint={riverTarget ? `Xem biểu đồ thủy văn trạm ${shortName(riverTarget)}` : undefined}
+            hint={riverTarget ? `Xem biểu đồ mực nước trạm ${shortName(riverTarget)}` : undefined}
+            footerRows={river.rows.length > 0}
             footer={
-              next ? (
-                // Dự báo đáng lo nhất: mức kế tiếp · giờ · trạm · nguồn (KTTV / mô phỏng — luôn ghi rõ)
-                <span title={`${next.s.name}: dự báo vượt BĐ ${ROMAN[next.eta.level]} lúc ${next.eta.when} — ${next.eta.source}`}>
-                  <b className={clsx('font-semibold', risk(next.eta.level).text)}>
-                    Dự báo BĐ {ROMAN[next.eta.level]} lúc {next.eta.when}
-                  </b>
-                  {` · ${shortName(next.s)} (${next.eta.kttv ? 'KTTV' : 'mô phỏng'})`}
-                </span>
-              ) : river.worst && river.level >= 1 ? (
+              !river.rows.length ? 'Chưa có trạm mực nước trong vùng đang xem' : (
                 <>
-                  {riverName(river.worst.s)} <b className="num text-ink">{num(river.worst.st.value, 2)} m</b>
+                  {next && (
+                    // Dự báo đáng lo nhất: mức kế tiếp · giờ · trạm · nguồn (bản tin thủy văn / mô phỏng — luôn ghi rõ)
+                    <span className={line} title={`${next.s.name}: dự báo lên báo động ${ROMAN[next.eta.level]} lúc ${next.eta.when} — ${next.eta.source}`}>
+                      {shortName(next.s)}:{' '}
+                      <b className={clsx('font-semibold', risk(next.eta.level).text)}>có thể lên Báo động {ROMAN[next.eta.level]} lúc {next.eta.when}</b>
+                      {!next.eta.kttv && ' (mô phỏng)'}
+                    </span>
+                  )}
+                  <span className={clsx(line, next && 'hidden 2xl:block')}>
+                    {river.level == null
+                      ? `${river.fresh}/${river.rows.length} trạm có số đo trong 60 phút qua — chưa đánh giá được`
+                      : river.worst && river.level >= 1
+                        ? <>Cao nhất <b className={risk(river.level).text}>Báo động {ROMAN[river.level]}</b><span className="max-sm:hidden">: {riverName(river.worst.s)}</span></>
+                        : `${ALARM[0].label} ở mọi trạm có số đo`}
+                  </span>
                 </>
-              ) : river.rows.length ? `${river.fresh}/${river.rows.length} trạm có số đo trong 60 phút qua` : 'Chưa có trạm mực nước trong vùng đang xem'
+              )
             }
           />
         )}
@@ -172,24 +175,27 @@ export default function KpiStrip({
       <StatCard
         compact
         icon={Siren}
-        title="SOS chờ xử lý"
+        title="SOS chờ"
         level={sosLv}
         alert={sosLate}
-        badge={
-          sos.overdue > 0 ? <Badge level={3}>{sos.overdue} quá hạn</Badge>
-            : sos.no_team_15m > 0 ? <Badge level={3}>{sos.no_team_15m} chờ quá 15′</Badge>
-              : sos.critical > 0 ? <Badge className="bg-danger/15 text-danger">{sos.critical} cấp 1</Badge> : null
-        }
+        // Chỉ NHÃN nhấp nháy (cả ô nhấp nháy thì không đọc được số) — tắt khi hệ điều hành bật "giảm chuyển động"
+        // (ô hẹp — điện thoại, 6 ô một hàng trên laptop: nhãn nằm cạnh số, hàng tiêu đề không đủ chỗ)
+        trend={sosLate && <span className="hidden 2xl:inline">{sosChip}</span>}
         value={int(sos.waiting)}
-        unit="phiếu mới"
+        unit={sosLate ? <span className="flex items-center gap-1.5">phiếu <span className="2xl:hidden">{sosChip}</span></span> : 'phiếu'}
         to={canSos ? '/cuu-ho' : undefined}
-        hint="Nhấp nháy đỏ khi có phiếu quá hạn phản hồi theo cấp (Cấp 1 · 3 phút · Cấp 2 · 15 phút · Cấp 3 · 60 phút, như trang Điều hành cứu hộ) hoặc chờ quá 15 phút mà chưa có đội tiếp nhận"
+        hint="Đỏ khi có phiếu quá hạn phản hồi theo cấp (cấp 1: 3 phút · cấp 2: 15 phút · cấp 3: 60 phút, như trang Điều hành cứu hộ) hoặc chờ quá 15 phút mà chưa có đội nhận"
+        footerRows
         footer={
           <>
-            {oldest != null && (
-              <>Chờ lâu nhất <b className={clsx('num', sos.overdue > 0 || oldest > 15 ? 'text-danger' : 'text-ink')}>{oldest}′</b> · </>
-            )}
-            Đang xử lý <b className="num text-ink">{int(sos.in_progress)}</b> · Xong 24 giờ <b className="num text-ink">{int(sos.resolved_24h)}</b>
+            <span className={line}>
+              {oldest != null && sos.waiting > 0
+                ? <>Chờ lâu nhất <b className={clsx('num', sos.overdue > 0 || oldest > 15 ? 'text-danger' : 'text-ink')}>{oldest} phút</b>{sos.critical > 0 && ` · ${sos.critical} cấp 1`}</>
+                : 'Không có phiếu đang chờ'}
+            </span>
+            <span className={clsx(line, 'hidden 2xl:block')}>
+              Đang cứu <b className="num text-ink">{int(sos.in_progress)}</b> · xong 24 giờ <b className="num text-ink">{int(sos.resolved_24h)}</b>
+            </span>
           </>
         }
       />
@@ -197,76 +203,60 @@ export default function KpiStrip({
       <StatCard
         compact
         icon={Home}
-        title="Sơ tán an toàn"
+        title="Sơ tán"
         level={planned ? undefined : null}
         value={planned ? `${evPct}%` : '–'}
-        unit={planned ? 'kế hoạch' : undefined}
+        unit={planned ? 'hộ đã sơ tán' : undefined}
         to={canSos ? '/cuu-ho' : undefined}
-        hint={canEvacUpdate ? 'Cập nhật tiến độ sơ tán ở Điều hành cứu hộ' : undefined}
-        // Thiết kế A.2: số hộ VÀ nhân khẩu đã sơ tán so với kế hoạch — mỗi số một dòng (điện thoại vẫn thấy cả hai);
-        // số điểm sơ tán từ máy tính bảng trở lên
+        hint={canEvacUpdate ? 'Cập nhật tiến độ sơ tán ở Điều hành cứu hộ' : 'Số hộ, số người đã sơ tán so với kế hoạch'}
         footerRows={planned > 0}
         footer={
           planned ? (
             <>
-              <span className="block truncate"><b className="num text-ink">{int(ev.evacuated_households)}/{int(planned)}</b> hộ</span>
-              {ev.planned_persons > 0 && (
-                <span className="block truncate"><b className="num text-ink">{int(ev.evacuated_persons)}/{int(ev.planned_persons)}</b> người</span>
-              )}
+              <span className={line}>
+                <b className="num text-ink">{int(ev.evacuated_households)}/{int(planned)}</b> hộ
+                {ev.planned_persons > 0 && <> · <b className="num text-ink">{int(ev.evacuated_persons)}/{int(ev.planned_persons)}</b> người</>}
+              </span>
               {(evacQ.data || evacQ.isError) && (
-                <span className="hidden truncate sm:block">{evacQ.data ? `${sites.length} điểm sơ tán` : 'không tải được điểm sơ tán'}</span>
+                <span className={clsx(line, 'hidden 2xl:block')}>{evacQ.data ? `${sites.length} điểm sơ tán` : 'không tải được điểm sơ tán'}</span>
               )}
             </>
           ) : 'Chưa có kế hoạch sơ tán trong vùng đang xem'
         }
-      >
-        {planned > 0 && <Progress value={evPct} tone="accent" />}
-      </StatCard>
+      />
 
       <StatCard
         compact
         icon={Users}
-        title="Lực lượng"
-        level={hasResources ? undefined : null}
+        title="Quân số ứng trực"
+        level={fo.units > 0 ? undefined : null}
         value={fo.units > 0 ? int(fo.ready) : '–'}
-        unit={fo.units > 0 ? `/ ${int(fo.total)} sẵn sàng` : undefined}
+        unit={fo.units > 0 ? `/ ${int(fo.total)} người` : undefined}
         to={canResource ? '/nguon-luc' : undefined}
-        hint="Quân số sẵn sàng / tổng số; phương tiện: đang làm nhiệm vụ / tổng số"
-        // Thiết kế A.2: quân số làm nhiệm vụ + phương tiện chuyên dụng (xuồng, xe lội nước — số đã gồm ca nô, ghe) đang hoạt
-        // động; thêm máy xúc, máy ủi thông tuyến sau sạt lở. Mỗi chỉ số một dòng, số đứng trước: ô hẹp chỉ cắt đuôi chữ
-        footerRows={hasResources}
-        footer={
-          hasResources ? (
-            <>
-              <span className="block truncate">Nhiệm vụ: <b className="num text-ink">{int(fo.on_mission)}</b> người</span>
-              <span className="block truncate"><b className="num text-ink">{int(ve.special_active)}/{int(ve.special_total)}</b> xuồng, xe lội nước</span>
-              <span className="block truncate"><b className="num text-ink">{int(ve.heavy_active)}/{int(ve.heavy_total)}</b> máy xúc, máy ủi</span>
-            </>
-          ) : 'Chưa có dữ liệu lực lượng, phương tiện'
-        }
+        hint="Người sẵn sàng nhận nhiệm vụ / tổng quân số các đội trong vùng đang xem"
+        footerRows
+        footer={<span className={line}>{fo.units > 0 ? <><b className="num text-ink">{int(fo.on_mission)}</b> người đang làm nhiệm vụ</> : 'Chưa có dữ liệu lực lượng'}</span>}
       />
 
-      <StatCard compact icon={Droplets} title="Hồ chứa · Sạt lở" level={topicLv}>
-        <button type="button" className={topicRow} onClick={() => onOpenTab('ho_chua')} title="Mở chuyên đề Hồ chứa & xả lũ">
-          <span className="flex min-w-0 items-center gap-1.5 text-ink-2">
-            <span className={clsx('h-2.5 w-2.5 shrink-0 rounded-full', risk(rsLv).fill)} aria-hidden="true" />
-            <span className="truncate">Hồ đang xả</span>
-          </span>
-          <b className="num text-ink">{rs.total ? `${rs.spill_count}/${rs.total}` : '–'}</b>
-        </button>
-        <button
-          type="button"
-          className={topicRow}
-          onClick={() => onOpenTab('sat_lo')}
-          title={ls.total ? `Mở chuyên đề Sạt lở — ${ls.blocked_count} cấm đường, ${ls.warning_count} cảnh báo` : 'Mở chuyên đề Sạt lở & đường đèo'}
-        >
-          <span className="flex min-w-0 items-center gap-1.5 text-ink-2">
-            <span className={clsx('h-2.5 w-2.5 shrink-0 rounded-full', risk(lsLv).fill)} aria-hidden="true" />
-            <span className="truncate">Cấm đường</span>
-          </span>
-          <b className="num text-ink">{ls.total ? ls.blocked_count : '–'}</b>
-        </button>
-      </StatCard>
+      <StatCard
+        compact
+        icon={Ship}
+        title={<><span className="2xl:hidden">Phương tiện</span><span className="hidden 2xl:inline">Phương tiện chuyên dụng</span></>}
+        level={hasVehicles ? undefined : null}
+        value={hasVehicles ? `${int(veActive)}/${int(veTotal)}` : '–'}
+        unit={hasVehicles ? 'hoạt động' : undefined}
+        to={canResource ? '/nguon-luc' : undefined}
+        hint="Xuồng, xe lội nước (gồm ca nô, ghe) và máy xúc, máy ủi thông tuyến: đang làm nhiệm vụ / tổng số"
+        footerRows={hasVehicles}
+        footer={
+          hasVehicles ? (
+            <>
+              <span className={line}>Xuồng, xe lội nước <b className="num text-ink">{int(ve.special_active)}/{int(ve.special_total)}</b></span>
+              <span className={clsx(line, 'hidden 2xl:block')}>Máy xúc, máy ủi <b className="num text-ink">{int(ve.heavy_active)}/{int(ve.heavy_total)}</b></span>
+            </>
+          ) : 'Chưa có dữ liệu phương tiện'
+        }
+      />
     </div>
   );
 }

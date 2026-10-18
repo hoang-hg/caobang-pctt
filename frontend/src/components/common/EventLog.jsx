@@ -1,171 +1,145 @@
 import { useMemo, useState } from 'react';
 import clsx from 'clsx';
-import { Activity, AlertTriangle, LifeBuoy, MessageCircle, Settings2, Siren, Search, X, ShieldAlert } from 'lucide-react';
+import { Activity, AlertTriangle, Droplets, LifeBuoy, MessageCircle, Search, Settings2, X } from 'lucide-react';
 import { useAreaQuery } from '../../api/hooks';
 import { time } from '../../utils/format';
-import { ErrorState, Skeleton } from './ui';
+import { risk } from '../../utils/risk';
+import { useNewKeys } from '../../utils/useNewKeys';
+import { EmptyState, ErrorState, Skeleton } from './ui';
 
-const CAT = {
-  tat_ca: { label: 'Tất cả' },
-  // van_hanh gồm cả hồ chứa, xuất/nhập kho, phương tiện, kết thúc sự cố, bản tin dự báo — không chỉ hồ chứa
-  van_hanh: { icon: Settings2, label: 'Vận hành' },
+// Sự kiện vận hành hồ chứa: nhóm van_hanh gồm cả xuất / nhập kho, phương tiện, kết thúc sự cố, bản tin dự báo — lọc
+// "Hồ chứa" theo nội dung (hồ, thủy điện, cửa xả, xả lũ)
+const RESERVOIR = /(^|\s)hồ\s|thủy điện|thuỷ điện|cửa xả|xả lũ/i;
+const isReservoir = (l) => l.category === 'van_hanh' && RESERVOIR.test(l.message || '');
+
+// Nút lọc (chữ, không đếm) — thiết kế A: Tất cả / Cứu hộ / Hồ chứa / Cảnh báo / Người dân; "Khẩn" giữ bộ lọc chỉ sự kiện
+// khẩn cấp của bản trước
+const FILTERS = [
+  { id: 'tat_ca', label: 'Tất cả', match: () => true },
+  { id: 'cuu_ho', label: 'Cứu hộ', match: (l) => l.category === 'cuu_ho' },
+  { id: 'ho_chua', label: 'Hồ chứa', match: isReservoir },
+  { id: 'canh_bao', label: 'Cảnh báo', match: (l) => l.category === 'canh_bao' },
+  { id: 'nguoi_dan', label: 'Người dân', match: (l) => l.category === 'nguoi_dan' },
+  { id: 'khan', label: 'Khẩn', match: (l) => l.severity === 'danger' },
+];
+
+// Biểu tượng + tên loại của từng sự kiện (luôn kèm chữ)
+const KIND = {
   cuu_ho: { icon: LifeBuoy, label: 'Cứu hộ' },
   canh_bao: { icon: AlertTriangle, label: 'Cảnh báo' },
   nguoi_dan: { icon: MessageCircle, label: 'Người dân' },
+  van_hanh: { icon: Settings2, label: 'Vận hành' },
   he_thong: { icon: Activity, label: 'Hệ thống' },
 };
-
-const SEV = {
-  danger: 'border-l-danger bg-danger/10 text-ink shadow-sm shadow-danger/10',
-  warning: 'border-l-warn bg-warn/10 text-ink',
-  info: 'border-l-accent/50 bg-panel2/60 text-ink',
-};
+const kindOf = (l) => (isReservoir(l) ? { icon: Droplets, label: 'Hồ chứa' } : KIND[l.category] || KIND.he_thong);
+// Mức của sự kiện theo thang màu chung: khẩn → Đỏ, cảnh báo → Cam; tin thường không tô màu
+const SEV_LEVEL = { danger: 3, warning: 2 };
+// Câu do máy chủ ghi có thể viết tắt "BĐ II" — hiện đủ chữ cho người đọc (không sửa dữ liệu gốc)
+const plain = (m) => (m || '').replace(/\bBĐ\s+(I{1,3})\b/g, 'Báo động $1');
 
 /**
- * Nhật ký sự kiện & luồng cảnh báo nâng cấp cho Trung tâm Điều hành Tác chiến. `preview` (số mục): chỉ HIỆN N sự kiện mới
- * nhất + nút "Xem tất cả" (iPad dọc / điện thoại) — chỉ cắt phần hiển thị, truy vấn (`limit`) giữ nguyên.
+ * Nhật ký sự kiện dạng dòng thời gian: mỗi dòng = giờ · biểu tượng loại (kèm chữ) · một câu. Sự kiện khẩn: chấm Đỏ + chữ
+ * đậm; cảnh báo: chấm Cam — không tô nền, không nhấp nháy. Sự kiện mới tới khi đang xem trượt vào đầu danh sách (một lần).
+ * Lọc bằng nút chữ (Tất cả / Cứu hộ / Hồ chứa / Cảnh báo / Người dân), tìm nhanh theo chữ. `preview` (số mục): chỉ HIỆN N
+ * sự kiện mới nhất + nút "Xem tất cả" (iPad dọc / điện thoại) — chỉ cắt phần hiển thị, truy vấn (`limit`) giữ nguyên.
  */
 export default function EventLog({ limit = 50, className, preview }) {
   const q = useAreaQuery('logs', '/dashboard/logs', { limit });
   const data = useMemo(() => q.data || [], [q.data]);
   const [showAll, setShowAll] = useState(false);
-  const [selectedCat, setSelectedCat] = useState('tat_ca');
+  const [filter, setFilter] = useState('tat_ca');
   const [search, setSearch] = useState('');
-  const [onlyDanger, setOnlyDanger] = useState(false);
-
-  const dangerCount = useMemo(() => data.filter((l) => l.severity === 'danger').length, [data]);
+  const isNew = useNewKeys(data.map((l) => l.id), !!q.data);
 
   const filtered = useMemo(() => {
-    return data.filter((l) => {
-      if (selectedCat !== 'tat_ca' && l.category !== selectedCat) return false;
-      if (onlyDanger && l.severity !== 'danger') return false;
-      if (search.trim()) {
-        const q = search.toLowerCase();
-        return (l.message || '').toLowerCase().includes(q) || (l.category || '').toLowerCase().includes(q);
-      }
-      return true;
-    });
-  }, [data, selectedCat, onlyDanger, search]);
+    const f = FILTERS.find((x) => x.id === filter);
+    const needle = search.trim().toLowerCase();
+    return data.filter((l) => f.match(l) && (!needle || (l.message || '').toLowerCase().includes(needle)));
+  }, [data, filter, search]);
+  const shown = preview && !showAll ? filtered.slice(0, preview) : filtered;
 
   return (
-    <div className={clsx('flex flex-col h-full gap-2.5 print:h-auto', className)}>
-      {/* Thanh tab lọc danh mục sự kiện */}
-      <div className="flex items-center gap-1 overflow-x-auto scroll-thin pb-1 border-b border-line/70">
-        {Object.entries(CAT).map(([key, item]) => {
-          const active = selectedCat === key && !onlyDanger;
-          const count = key === 'tat_ca' ? data.length : data.filter((d) => d.category === key).length;
-          return (
-            <button
-              key={key}
-              onClick={() => { setSelectedCat(key); setOnlyDanger(false); }}
-              className={clsx(
-                'flex min-h-[32px] items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all [@media(pointer:coarse)]:min-h-[44px]',
-                active
-                  ? 'bg-accent text-white shadow-sm shadow-accent/25'
-                  : 'bg-panel2/70 text-muted hover:text-ink hover:bg-panel2'
-              )}
-            >
-              {item.icon && <item.icon size={11} />}
-              <span>{item.label}</span>
-              <span className={clsx('text-[10px] px-1 rounded-full', active ? 'bg-white/20 text-white' : 'bg-line text-muted')}>
-                {count}
-              </span>
-            </button>
-          );
-        })}
-
-        {dangerCount > 0 && (
+    <div className={clsx('flex h-full flex-col gap-2 print:h-auto', className)}>
+      <div className="scroll-thin -mx-1 flex items-center gap-1 overflow-x-auto px-1 pb-0.5 no-print" role="group" aria-label="Lọc nhật ký theo loại">
+        {FILTERS.map((f) => (
           <button
-            onClick={() => setOnlyDanger(!onlyDanger)}
+            key={f.id}
+            type="button"
+            aria-pressed={filter === f.id}
+            onClick={() => setFilter(f.id)}
             className={clsx(
-              'ml-auto flex min-h-[32px] items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold whitespace-nowrap transition-all border [@media(pointer:coarse)]:min-h-[44px]',
-              onlyDanger
-                ? 'bg-danger text-white border-danger shadow-sm shadow-danger/25'
-                : 'bg-danger/10 text-danger border-danger/30 hover:bg-danger/20'
+              'tap min-h-[32px] shrink-0 whitespace-nowrap rounded-lg border px-2.5 text-[13px] font-medium',
+              filter === f.id ? 'border-accent bg-accent/10 font-semibold text-accent' : 'border-transparent text-ink-2 hover:bg-panel2 hover:text-ink',
             )}
-            title="Chỉ hiển thị các cảnh báo mức nguy cấp"
           >
-            <ShieldAlert size={12} className={onlyDanger ? 'motion-safe:animate-bounce' : ''} />
-            <span>{dangerCount} khẩn</span>
+            {f.label}
           </button>
-        )}
+        ))}
       </div>
 
-      {/* Ô tìm kiếm nhanh nhật ký */}
-      <div className="relative">
-        <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted" />
+      <div className="relative no-print">
+        <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted" aria-hidden="true" />
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Lọc nhanh nhật ký (tên xã, sự cố, hồ xả...)"
-          className="tap w-full min-h-[36px] pl-8 pr-7 py-1 text-xs rounded-lg border border-line bg-panel2/60 text-ink placeholder:text-muted focus:border-accent focus:outline-none"
+          placeholder="Tìm trong nhật ký (tên xã, hồ, phiếu…)"
+          aria-label="Tìm trong nhật ký"
+          className="input tap min-h-[36px] py-1 pl-8 pr-8 text-[13px]"
         />
         {search && (
           <button
+            type="button"
             onClick={() => setSearch('')}
-            className="tap-sq absolute right-2 top-1/2 flex -translate-y-1/2 items-center justify-center rounded p-0.5 text-muted hover:text-ink [@media(pointer:coarse)]:right-0"
-            aria-label="Xoá tìm kiếm"
+            className="tap-sq absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded text-muted hover:text-ink"
+            aria-label="Xoá chữ tìm"
           >
-            <X size={12} />
+            <X size={13} aria-hidden="true" />
           </button>
         )}
       </div>
 
-      {/* Danh sách ticker sự kiện */}
-      <ul className="flex-1 overflow-y-auto pr-1 flex flex-col gap-2 scroll-thin print:max-h-none print:overflow-visible" aria-live="polite">
+      <ol className="scroll-thin flex-1 overflow-y-auto pr-1 print:max-h-none print:overflow-visible" aria-live="polite" aria-label="Các sự kiện, mới nhất trên cùng">
         {!q.data ? (
           // Chưa tải xong / lỗi tải: không nói "chưa có sự kiện" khi thực ra chưa biết
           <li>{q.isError ? <ErrorState onRetry={q.refetch}>Không tải được nhật ký sự kiện</ErrorState> : <Skeleton height={160} />}</li>
-        ) : filtered.length === 0 ? (
-          <li className="text-center py-8 text-xs text-muted italic">
-            {data.length ? 'Không có sự kiện khớp bộ lọc' : 'Chưa có sự kiện nào trong vùng đang xem'}
+        ) : !filtered.length ? (
+          <li>
+            <EmptyState icon={Activity}>
+              {data.length ? 'Không có sự kiện nào thuộc loại / chữ đang lọc' : 'Chưa có sự kiện nào trong vùng đang xem. Khi có phiếu cứu hộ, vận hành hồ, phản ánh của dân… sự kiện sẽ hiện ở đây.'}
+            </EmptyState>
           </li>
         ) : (
-          (preview && !showAll ? filtered.slice(0, preview) : filtered).map((l) => {
-            const cat = CAT[l.category] || CAT.he_thong;
-            const Icon = l.severity === 'danger' ? Siren : cat.icon || Activity;
-            const isDanger = l.severity === 'danger';
+          shown.map((l, i) => {
+            const kind = kindOf(l);
+            const lv = SEV_LEVEL[l.severity];
+            const last = i === shown.length - 1;
             return (
-              <li
-                key={l.id}
-                className={clsx(
-                  'rounded-lg border-l-4 px-3 py-2 transition-all hover:translate-x-0.5',
-                  SEV[l.severity] || SEV.info,
-                  isDanger && 'ring-1 ring-danger/20'
-                )}
-              >
-                <div className="flex items-center justify-between gap-1 text-[11px] text-muted mb-1">
-                  <div className="flex items-center gap-1.5 font-medium">
-                    <Icon size={13} className={clsx(isDanger ? 'text-danger motion-safe:animate-pulse' : 'text-accent')} />
-                    <span className="font-mono font-semibold text-ink">{time(l.time)}</span>
-                    <span className="text-muted">· {cat.label}</span>
+              <li key={l.id} className={clsx('relative flex gap-2.5 pb-3', isNew(l.id) && 'motion-safe:animate-enter')}>
+                {/* Trục thời gian: chấm theo mức (tin thường: chấm rỗng), đường nối xuống sự kiện kế */}
+                <span className="relative flex w-3 shrink-0 justify-center pt-1.5" aria-hidden="true">
+                  <span className={clsx('z-[1] h-2.5 w-2.5 rounded-full', lv ? risk(lv).fill : 'border-2 border-line bg-panel')} />
+                  {!last && <span className="absolute bottom-[-0.375rem] top-4 w-px bg-line" />}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 text-xs text-muted">
+                    <time className="num font-semibold text-ink-2" dateTime={l.time}>{time(l.time)}</time>
+                    <kind.icon size={13} className="shrink-0" aria-hidden="true" />
+                    <span>{kind.label}</span>
+                    {lv === 3 && <span className="font-semibold text-danger">· khẩn</span>}
                   </div>
-                  {isDanger && (
-                    <span className="chip py-0 px-1.5 text-[9px] bg-danger text-white font-bold tracking-wider uppercase">
-                      Khẩn cấp
-                    </span>
-                  )}
-                  {l.severity === 'warning' && (
-                    <span className="chip py-0 px-1.5 text-[9px] bg-warn text-black font-semibold">
-                      Cảnh báo
-                    </span>
-                  )}
-                </div>
-                <div className={clsx('text-[12.5px] leading-snug', isDanger && 'font-semibold text-danger')}>
-                  {l.message}
+                  <p className={clsx('mt-0.5 text-sm leading-snug', lv === 3 ? 'font-semibold text-ink' : 'text-ink-2')}>{plain(l.message)}</p>
                 </div>
               </li>
             );
           })
         )}
-      </ul>
+      </ol>
       {preview && !showAll && filtered.length > preview && (
-        <button type="button" className="btn-ghost tap min-h-[40px] w-full justify-center text-xs font-semibold" onClick={() => setShowAll(true)}>
+        <button type="button" className="btn-ghost tap min-h-[40px] w-full justify-center text-xs font-semibold no-print" onClick={() => setShowAll(true)}>
           Xem tất cả {filtered.length} sự kiện
         </button>
       )}
     </div>
   );
 }
-
