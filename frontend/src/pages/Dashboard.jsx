@@ -455,7 +455,16 @@ export default function Dashboard() {
         )}
         time={dataTime}
         timeNote={kState.error ? 'Chưa tải được số liệu' : 'Đang tải số liệu…'}
-        meta={[role && <span key="role" className="hidden 2xl:inline">{role}</span>]}
+        meta={[
+          role && <span key="role" className="hidden 2xl:inline">{role}</span>,
+          // Điện thoại / iPad dọc: thang màu gọn vào "Thang màu" (chạm để mở) ngay trên dòng ngữ cảnh — không thêm một dòng
+          <details key="thang-mau" className="md:hidden">
+            <summary className="touch-hit flex cursor-pointer list-none items-center gap-1 font-semibold text-accent [&::-webkit-details-marker]:hidden">
+              <Info size={13} aria-hidden="true" /> Thang màu
+            </summary>
+            <RiskLegend className="mt-1" />
+          </details>,
+        ]}
         actions={presentation ? (
           <>
             <LiveClock />
@@ -479,15 +488,9 @@ export default function Dashboard() {
         onRefresh={presentation ? undefined : refresh}
         refreshing={refreshing}
       >
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted">
-          {/* Thang màu: hiện sẵn từ md; điện thoại gọn vào "Thang màu" (chạm để mở) */}
+        <div className="hidden flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted sm:flex">
+          {/* Thang màu: hiện sẵn từ md (dưới md: "Thang màu" trên dòng ngữ cảnh) */}
           <RiskLegend className="hidden md:flex" meaningClass="hidden xl:inline" />
-          <details className="md:hidden">
-            <summary className="touch-hit flex min-h-[28px] cursor-pointer list-none items-center gap-1 font-semibold text-accent [&::-webkit-details-marker]:hidden">
-              <Info size={13} aria-hidden="true" /> Thang màu
-            </summary>
-            <RiskLegend className="mt-1" />
-          </details>
           {/* Tài khoản xã chỉ có xã mình → không có lưu vực để chọn. Điện thoại: chọn lưu vực ở bộ lọc trong menu ☰ (cùng
               danh sách nhóm) — không chiếm thêm một dòng trước hàng KPI */}
           {tab === 'tong_hop' && !presentation && scope === null && basinPresets.length > 0 && (

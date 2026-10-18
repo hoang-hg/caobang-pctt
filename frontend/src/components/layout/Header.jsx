@@ -90,7 +90,7 @@ export default function Header() {
           <button
             type="button"
             onClick={() => setReportOpen(true)}
-            className="btn-danger tap hidden h-9 px-2.5 sm:inline-flex"
+            className="btn-danger tap-sq hidden h-9 min-w-[36px] px-2.5 sm:inline-flex"
             aria-label="Báo cáo nhanh"
             title="Báo cáo nhanh hiện trường → tạo phiếu SOS"
           >
