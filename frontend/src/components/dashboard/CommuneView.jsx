@@ -78,7 +78,9 @@ export default function CommuneView({ code, units, onChange, onSupport, children
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="card flex flex-wrap items-center justify-between gap-x-4 gap-y-2 p-3 sm:px-4">
+      {/* Thẻ đầu: xã đang xem + việc chính của tài khoản cấp xã (xin chi viện — nút đỏ duy nhất; báo cáo nhanh tạo SOS đã có
+          trên thanh trên cùng / "Báo SOS" ở thanh dưới điện thoại) */}
+      <div className="card flex flex-wrap items-center justify-between gap-x-4 gap-y-3 p-3 sm:px-4">
         <div className="min-w-0">
           <h2 className="text-lg font-bold leading-tight text-ink">{unitLabel(unit) || 'Chọn xã/phường'}</h2>
           {unit && (
@@ -100,31 +102,29 @@ export default function CommuneView({ code, units, onChange, onSupport, children
             </select>
           </label>
         )}
-      </div>
-
-      {/* Kênh lên tỉnh (tài khoản cấp xã): xin chi viện là việc chính — nút đỏ duy nhất; báo cáo nhanh (tạo SOS) đã có trên thanh
-          trên cùng / "Báo SOS" ở thanh dưới điện thoại */}
-      {unit && isCommuneUser && (
-        <div className="card flex flex-wrap items-center gap-x-4 gap-y-2.5 border-l-4 border-l-danger p-3 sm:px-4">
-          <div className="min-w-0 flex-1 basis-64">
-            <h3 className="text-sm font-semibold text-ink">Báo cáo & xin chi viện lên Ban Chỉ huy tỉnh</h3>
-            <p className="mt-0.5 text-xs text-muted">Yêu cầu tới thẳng bảng điều phối của trực ban tỉnh, mục "Xã xin chi viện".</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={onSupport} className="btn-danger tap h-10 px-4 font-semibold">
+        {unit && isCommuneUser && (
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+            <button
+              type="button"
+              onClick={onSupport}
+              className="btn-danger tap h-10 px-4 font-semibold max-sm:w-full"
+              title="Yêu cầu tới thẳng bảng điều phối của trực ban tỉnh (mục &quot;Xã xin chi viện&quot;)"
+            >
               <Send size={15} aria-hidden="true" /> Gửi yêu cầu chi viện lên tỉnh
             </button>
-            {canEvac && (
-              <button type="button" onClick={() => setEvacOpen(true)} className="btn-secondary tap h-10 px-3">
-                <Home size={15} aria-hidden="true" /> Cập nhật sơ tán
-              </button>
-            )}
-            <Link to="/nhap-du-lieu" className="btn-secondary tap h-10 px-3">
-              <FileUp size={15} aria-hidden="true" /> Gửi dữ liệu địa bàn
-            </Link>
+            <div className="grid flex-1 grid-cols-2 gap-2 sm:flex sm:flex-none">
+              {canEvac && (
+                <button type="button" onClick={() => setEvacOpen(true)} className="btn-secondary tap h-10 px-3">
+                  <Home size={15} aria-hidden="true" /> Cập nhật sơ tán
+                </button>
+              )}
+              <Link to="/nhap-du-lieu" className="btn-secondary tap h-10 px-3">
+                <FileUp size={15} aria-hidden="true" /> Gửi dữ liệu
+              </Link>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {!unit ? (
         <p className="card border-dashed p-4 text-center text-sm text-muted">

@@ -570,10 +570,11 @@ export default function Dashboard() {
                     </Section>
                   </>
                 )}
-                <Section id="du-bao-72h" title="Dự báo mưa 72 giờ – tổ hợp ECMWF + GFS (P10–P90)" className="lg:col-span-2">
-                  {!stationsState.loading && rainStations === 0 && (
-                    <p className="mb-2 text-xs text-muted">Xã chưa có trạm đo mưa — theo dõi mưa bằng dự báo mô hình dưới đây.</p>
-                  )}
+                <Section id="du-bao-72h" title="Dự báo mưa 72 giờ tới" className="lg:col-span-2">
+                  <p className="mb-2 text-xs text-muted">
+                    {!stationsState.loading && rainStations === 0 && 'Xã chưa có trạm đo mưa — theo dõi bằng dự báo mô hình. '}
+                    Tổ hợp mô hình quốc tế ECMWF + GFS: đường = khả năng nhất, vùng tô = khoảng có thể xảy ra (P10–P90).
+                  </p>
                   <AreaForecastChart height={220} />
                 </Section>
               </div>
