@@ -159,7 +159,7 @@ export default function CommuneView({ code, units, onChange, onSupport, children
                     return (
                       <li key={t.id} className={clsx('rounded-md border px-2 py-1.5 text-xs', late ? 'border-danger/60 bg-danger/10' : 'border-line')}>
                         <div className="flex items-center justify-between gap-2">
-                          <span className="font-mono font-semibold text-ink">{t.code}</span>
+                          <span className="num font-semibold text-ink">{t.code}</span>
                           <span className={clsx('chip px-1.5 py-0 text-[10px]', PRIORITY[t.priority]?.cls)}>{PRIORITY[t.priority]?.short}</span>
                         </div>
                         <div className="text-ink-2">
@@ -188,13 +188,13 @@ export default function CommuneView({ code, units, onChange, onSupport, children
                 <div className="flex flex-col gap-2 text-xs">
                   <div className="flex items-baseline justify-between">
                     <span className="text-muted">Hộ đã sơ tán / kế hoạch</span>
-                    <b className="font-mono text-base text-ink">
+                    <b className="num text-base text-ink">
                       {int(progress.evacuated_households)}/{int(progress.planned_households)}
                     </b>
                   </div>
                   <Progress value={pct(progress.evacuated_households, progress.planned_households)} tone="good" />
                   <div className="flex justify-between text-muted">
-                    <span>Nhân khẩu: <b className="font-mono text-ink">{int(progress.evacuated_persons)}/{int(progress.planned_persons)}</b></span>
+                    <span>Nhân khẩu: <b className="num text-ink">{int(progress.evacuated_persons)}/{int(progress.planned_persons)}</b></span>
                     <span>Cập nhật {dateTime(progress.updated_at)}</span>
                   </div>
                 </div>
@@ -214,7 +214,7 @@ export default function CommuneView({ code, units, onChange, onSupport, children
                     <li key={s.id} className="text-xs">
                       <div className="flex justify-between gap-2">
                         <span className="truncate font-medium text-ink">{s.name}</span>
-                        <span className="shrink-0 font-mono text-muted">{int(s.current_occupancy)}/{int(s.capacity)} người</span>
+                        <span className="shrink-0 num text-muted">{int(s.current_occupancy)}/{int(s.capacity)} người</span>
                       </div>
                       <Progress value={p} tone={p >= 100 ? 'danger' : p >= 80 ? 'warn' : 'good'} className="mt-1" />
                     </li>
@@ -230,7 +230,7 @@ export default function CommuneView({ code, units, onChange, onSupport, children
                     <li key={f.id} className="text-xs">
                       <div className="flex justify-between gap-2">
                         <span className="truncate font-medium text-ink">{f.name}</span>
-                        <span className="shrink-0 font-mono text-muted">{int(f.personnel_ready)}/{int(f.personnel_total)} sẵn sàng</span>
+                        <span className="shrink-0 num text-muted">{int(f.personnel_ready)}/{int(f.personnel_total)} sẵn sàng</span>
                       </div>
                       <div className="flex justify-between gap-2 text-muted">
                         <span className="truncate">

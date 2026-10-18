@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { useAreaQuery, usePresets, useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
-import { EmptyState, ErrorState, RiskLegend, Section, Skeleton } from '../components/common/ui';
+import { EmptyState, ErrorState, RiskLegend, Section, Segmented, Skeleton } from '../components/common/ui';
 import EventLog from '../components/common/EventLog';
 import Hydrograph from '../components/charts/Hydrograph';
 import RainfallChart from '../components/charts/RainfallChart';
@@ -627,73 +627,20 @@ export default function Dashboard() {
                 {/* 1. Bản đồ tác chiến trực quan */}
                 <TacticalMiniMap k={k} className="min-w-0 shadow-sm" />
 
-                {/* 2. Bộ chuyển đổi chuyên đề giám sát (Giảm tải rối mắt cho lãnh đạo) */}
-                <div className="rounded-2xl border border-line bg-panel p-2 shadow-sm">
-                  <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-line/60">
-                    <div className="flex items-center gap-1.5 overflow-x-auto scroll-thin py-0.5">
-                      <button
-                        type="button"
-                        onClick={() => setChartSegment('thuy_van')}
-                        className={clsx(
-                          'tap flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all',
-                          chartSegment === 'thuy_van'
-                            ? 'bg-accent text-white shadow-sm'
-                            : 'text-ink-2 hover:bg-panel2 hover:text-ink'
-                        )}
-                      >
-                        <Waves size={14} />
-                        <span>Thủy văn & Hồ chứa</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setChartSegment('mua')}
-                        className={clsx(
-                          'tap flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all',
-                          chartSegment === 'mua'
-                            ? 'bg-accent text-white shadow-sm'
-                            : 'text-ink-2 hover:bg-panel2 hover:text-ink'
-                        )}
-                      >
-                        <Droplets size={14} />
-                        <span>Mưa QPF & Dự báo</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setChartSegment('sat_lo')}
-                        className={clsx(
-                          'tap flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all',
-                          chartSegment === 'sat_lo'
-                            ? 'bg-accent text-white shadow-sm'
-                            : 'text-ink-2 hover:bg-panel2 hover:text-ink'
-                        )}
-                      >
-                        <Mountain size={14} />
-                        <span>Sạt lở & Cảm biến</span>
-                      </button>
-                      {canResource && (
-                        <button
-                          type="button"
-                          onClick={() => setChartSegment('vat_tu')}
-                          className={clsx(
-                            'tap flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all',
-                            chartSegment === 'vat_tu'
-                              ? 'bg-accent text-white shadow-sm'
-                              : 'text-ink-2 hover:bg-panel2 hover:text-ink'
-                          )}
-                        >
-                          <Server size={14} />
-                          <span>Kho & Vật tư</span>
-                        </button>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setChartSegment((s) => (s === 'tat_ca' ? 'thuy_van' : 'tat_ca'))}
-                      className="btn-ghost tap text-[11px] font-semibold text-muted hover:text-ink px-2.5 py-1 whitespace-nowrap"
-                    >
-                      {chartSegment === 'tat_ca' ? 'Thu gọn chuyên đề' : 'Xem toàn bộ'}
-                    </button>
-                  </div>
+                {/* 2. Biểu đồ theo chuyên đề — xem một chuyên đề một lúc (bớt rối cho lãnh đạo) hoặc "Tất cả" */}
+                <div className="card p-2 sm:p-2.5">
+                  <Segmented
+                    label="Chuyên đề biểu đồ"
+                    value={chartSegment}
+                    onChange={setChartSegment}
+                    options={[
+                      { value: 'thuy_van', label: 'Thủy văn & hồ chứa', short: 'Thủy văn', icon: Waves },
+                      { value: 'mua', label: 'Mưa & dự báo', short: 'Mưa', icon: Droplets },
+                      { value: 'sat_lo', label: 'Sạt lở & cảm biến', short: 'Sạt lở', icon: Mountain },
+                      canResource && { value: 'vat_tu', label: 'Kho & vật tư', short: 'Kho', icon: Server },
+                      { value: 'tat_ca', label: 'Tất cả', hint: 'Xem mọi biểu đồ cùng lúc' },
+                    ].filter(Boolean)}
+                  />
 
                   {/* VÙNG NỘI DUNG BIỂU ĐỒ THEO CHUYÊN ĐỀ ĐƯỢC CHỌN */}
                   <div className="mt-3 space-y-3">
@@ -774,47 +721,36 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* 3. Bảng số liệu tác chiến chi tiết địa bàn (Thu gọn / Mở rộng) */}
-          {!presentation && (
-            <div className="card rounded-2xl border border-line bg-panel p-3.5 sm:p-4 shadow-sm transition-all mt-1">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent/10 text-accent font-bold">
-                    <FileSpreadsheet size={18} />
-                  </div>
-                  <div>
-                    <h2 className="text-sm font-bold text-ink">Bảng Tác Chiến Chi Tiết Địa Bàn</h2>
-                    <p className="text-[11px] text-muted">
-                      {waterStations.length} trạm thủy văn · {k?.reservoirs?.total || 0} hồ chứa · {k?.sos?.waiting || 0} phiếu SOS chờ · {k?.forces?.ready || 0} chiến sĩ sẵn sàng
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setOpsTableOpen(!opsTableOpen)}
-                  aria-expanded={opsTableOpen}
-                  aria-controls="bang-tac-chien"
-                  className="btn-secondary tap text-xs font-semibold px-3 py-1.5 flex items-center gap-1.5"
-                >
-                  <span>{opsTableOpen ? 'Thu gọn bảng' : 'Mở bảng dữ liệu chi tiết'}</span>
-                  {opsTableOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                </button>
-              </div>
-
-              {opsTableOpen && (
-                <div id="bang-tac-chien" className="mt-4 pt-4 border-t border-line/60 animate-in fade-in duration-200">
-                  <OperationsTable
-                    k={k}
-                    kState={kState}
-                    stations={waterStations}
-                    stationsState={stationsState}
-                    onSelectStation={focusStation}
-                    scopeLabel={filterLabel}
-                  />
-                </div>
-              )}
+          {/* 3. Bảng tác chiến theo chuyên đề — thu gọn sẵn thành một thanh (tóm tắt + nút mở); mở ra là chính bảng */}
+          {!presentation && (opsTableOpen ? (
+            <div id="bang-tac-chien" className="flex flex-col gap-1.5">
+              <OperationsTable
+                k={k}
+                kState={kState}
+                stations={waterStations}
+                stationsState={stationsState}
+                onSelectStation={focusStation}
+                scopeLabel={filterLabel}
+              />
+              <button type="button" onClick={() => setOpsTableOpen(false)} aria-expanded="true" aria-controls="bang-tac-chien" className="btn-ghost tap self-center px-3">
+                Thu gọn bảng <ChevronUp size={14} aria-hidden="true" />
+              </button>
             </div>
-          )}
+          ) : (
+            <div className="card flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-2.5">
+              <div className="min-w-0">
+                <h2 className="card-title">
+                  <FileSpreadsheet size={15} className="text-accent" aria-hidden="true" /> Bảng tác chiến theo chuyên đề
+                </h2>
+                <p className="num mt-0.5 text-xs text-muted">
+                  {waterStations.length} trạm mực nước · {k?.reservoirs?.total || 0} hồ chứa · {k?.sos?.waiting || 0} phiếu SOS chờ · {k?.forces?.ready || 0} người sẵn sàng
+                </p>
+              </div>
+              <button type="button" onClick={() => setOpsTableOpen(true)} aria-expanded="false" aria-controls="bang-tac-chien" className="btn-secondary tap h-9 px-3">
+                Mở bảng dữ liệu chi tiết <ChevronDown size={14} aria-hidden="true" />
+              </button>
+            </div>
+          ))}
         </>
       )}
 

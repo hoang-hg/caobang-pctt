@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import clsx from 'clsx';
 import { Columns3, Home, Inbox, List, Navigation } from 'lucide-react';
 import { api } from '../api/client';
 import { useAreaQuery, useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
-import { ErrorState, Pager, Section, Skeleton } from '../components/common/ui';
+import { ErrorState, Pager, Section, Segmented, Skeleton } from '../components/common/ui';
 import FilterToolbar from '../components/common/FilterToolbar';
 import UrgentStrip from '../components/common/UrgentStrip';
 import PageHeader from '../components/common/PageHeader';
@@ -386,34 +385,22 @@ export default function RescueCenter() {
       <div className="grid gap-3 2xl:grid-cols-[minmax(0,1fr)_370px]">
         <div ref={boardRef} className="flex min-w-0 scroll-mt-20 flex-col gap-2.5">
           <div className="flex flex-wrap items-center justify-between gap-2 no-print">
-            <div className="flex gap-1" role="group" aria-label="Cách xem phiếu">
-              {VIEWS.map(([v, label, Icon]) => (
-                <button
-                  key={v}
-                  type="button"
-                  aria-pressed={view === v}
-                  onClick={() => setParam({ xem: v === 'bang' ? '' : v })}
-                  className={clsx('tap inline-flex min-h-[32px] items-center gap-1.5 rounded-lg px-3 text-xs font-semibold', view === v ? 'bg-accent text-white' : 'bg-panel2/70 text-muted hover:text-ink')}
-                >
-                  <Icon size={14} aria-hidden="true" /> {label}
-                </button>
-              ))}
-            </div>
+            <Segmented
+              label="Cách xem phiếu"
+              value={view}
+              onChange={(v) => setParam({ xem: v === 'bang' ? '' : v })}
+              options={VIEWS.map(([v, label, icon]) => ({ value: v, label, icon }))}
+            />
             {view === 'bang' && wide && <span className="text-[11px] text-muted">Kéo thả phiếu giữa các cột hoặc dùng “Chuyển trạng thái” trên thẻ</span>}
             {view === 'danh_sach' && (
-              <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Kỳ tra cứu: phiếu đang mở và phiếu đã xong trong">
-                <span className="mr-0.5 text-[11px] text-muted">Phiếu đã xong trong</span>
-                {PERIODS.map(([k, label]) => (
-                  <button
-                    key={k || '48h'}
-                    type="button"
-                    aria-pressed={period[0] === k}
-                    onClick={() => setParam({ ky: k })}
-                    className={clsx('tap inline-flex min-h-[32px] items-center rounded-lg px-2.5 text-xs font-semibold', period[0] === k ? 'bg-accent text-white' : 'bg-panel2/70 text-muted hover:text-ink')}
-                  >
-                    {label}
-                  </button>
-                ))}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-xs text-muted">Phiếu đã xong trong</span>
+                <Segmented
+                  label="Kỳ tra cứu: phiếu đang mở và phiếu đã xong trong"
+                  value={period[0]}
+                  onChange={(k) => setParam({ ky: k })}
+                  options={PERIODS.map(([k, label]) => ({ value: k, label }))}
+                />
               </div>
             )}
           </div>

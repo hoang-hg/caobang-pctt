@@ -4,7 +4,7 @@ import {
   Activity, AlertTriangle, ArrowUp, Circle as CircleIcon, Clock, CloudRain, Compass, Droplets, FileSpreadsheet, LifeBuoy, MapPin, Megaphone,
   MessageCircle, Mountain, PenTool, Route, Ruler, Search, RotateCcw, Send, Settings2, Siren, Waves, X,
 } from 'lucide-react';
-import { ErrorState, ShowMore, Skeleton, TrendTag, useEscapeToClose } from '../common/ui';
+import { ErrorState, Segmented, ShowMore, Skeleton, TrendTag, useEscapeToClose } from '../common/ui';
 import { useStore } from '../../app/store';
 import { Can } from '../../rbac/usePermission';
 import { ALARM, alarmLevel, INCIDENT, PRIORITY, STATION_TYPE } from '../../utils/labels';
@@ -518,24 +518,14 @@ export const VIEW_MODES = [
 ];
 export function ViewModeSwitch({ mode, onChange, touch, className }) {
   return (
-    <div role="group" aria-label="Chế độ xem bản đồ" className={clsx('flex gap-0.5 rounded-xl border border-line bg-panel/95 p-0.5 shadow-lg backdrop-blur-md', className)}>
-      {VIEW_MODES.map(([id, label, hint]) => (
-        <button
-          key={id}
-          type="button"
-          aria-pressed={mode === id}
-          title={hint}
-          onClick={() => onChange(id)}
-          className={clsx(
-            'flex-1 whitespace-nowrap rounded-lg px-3 text-xs font-semibold transition-colors',
-            touch ? 'min-h-[44px]' : 'min-h-[32px] [@media(pointer:coarse)]:min-h-[44px]',
-            mode === id ? 'bg-accent text-white shadow-sm' : 'text-ink-2 hover:bg-panel2',
-          )}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
+    <Segmented
+      label="Chế độ xem bản đồ"
+      value={mode}
+      onChange={onChange}
+      touch={touch}
+      className={clsx('flex bg-panel/95 !shadow-lg backdrop-blur-md', className)}
+      options={VIEW_MODES.map(([id, label, hint]) => ({ value: id, label, hint }))}
+    />
   );
 }
 
