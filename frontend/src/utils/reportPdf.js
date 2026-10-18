@@ -104,7 +104,7 @@ export function reportContent({ k, stations = [], evacSites, assessment }) {
       r.st.value == null ? '–' : num(r.st.value, 2),
       r.st.label,
       r.st.stale ? 'số đo cũ' : r.trend ? trendWords(r.trend) : '–',
-      r.eta ? `BĐ ${ROMAN[r.eta.level]} lúc ${r.eta.when} (${r.eta.kttv ? 'bản tin KTTV' : 'dự báo mô phỏng'})` : '–',
+      r.eta ? `Báo động ${ROMAN[r.eta.level]} lúc ${r.eta.when} (${r.eta.kttv ? 'bản tin thủy văn' : 'dự báo mô phỏng'})` : '–',
     ]),
   } : null;
 
@@ -115,7 +115,7 @@ export function reportContent({ k, stations = [], evacSites, assessment }) {
       rs.no_data_count ? `; ${int(rs.no_data_count)} hồ chưa có số liệu vận hành` : ''}.`
     : 'Chưa có số liệu vận hành hồ chứa trong phạm vi báo cáo.';
   const resTable = resShown.length ? {
-    cols: [['TT', 9, 'center'], ['Hồ chứa', 42], ['Mực nước / MNDBT (m)', 30, 'right'], ['Q đến / Q xả (m³/s)', 30, 'right'], ['Cửa xả mở', 17, 'center'], ['Trạng thái', 37]],
+    cols: [['TT', 9, 'center'], ['Hồ chứa', 42], ['Mực nước / mức dâng bình thường (m)', 30, 'right'], ['Lưu lượng về / xả (m³/s)', 30, 'right'], ['Cửa xả mở', 17, 'center'], ['Trạng thái', 37]],
     rows: resShown.map((r, i) => [
       String(i + 1),
       r.name,
@@ -415,7 +415,7 @@ export async function buildReportPdf({ form, scope, at, k, stations, evacSites, 
     if (block.text) w.para(block.text, { style: block.italic ? 'italic' : 'normal' });
     if (block.table) w.table(block.table);
   }
-  w.para('Ghi chú: Mức báo động theo ngưỡng BĐ I – III khai báo cho từng trạm; đây là số liệu tổng hợp tự động, không phải cấp độ rủi ro thiên tai do cơ quan có thẩm quyền công bố. Dự báo ghi rõ nguồn: bản tin của Đài Khí tượng Thủy văn hoặc dự báo mô phỏng.', { style: 'italic', size: 11.5 });
+  w.para('Ghi chú: Mức báo động theo ngưỡng Báo động I – III khai báo cho từng trạm; đây là số liệu tổng hợp tự động, không phải cấp độ rủi ro thiên tai do cơ quan có thẩm quyền công bố. Dự báo ghi rõ nguồn: bản tin của Đài Khí tượng Thủy văn hoặc dự báo mô phỏng.', { style: 'italic', size: 11.5 });
 
   // ---- Nơi nhận (trái) · chức vụ, chữ ký (phải) — không tách sang hai trang
   const signer = lines(form.signerTitle).map((t) => t.toUpperCase());

@@ -56,7 +56,7 @@ export default function ForecastBulletinModal({ stations, stationId, onClose }) 
       open
       wide
       onClose={onClose}
-      title="Nhập bản tin dự báo mực nước (KTTV)"
+      title="Nhập bản tin dự báo thủy văn (mực nước)"
       footer={
         <>
           {current.length > 0 && (
@@ -93,7 +93,7 @@ export default function ForecastBulletinModal({ stations, stationId, onClose }) 
             </label>
             <label className="flex flex-col gap-1">
               Nguồn
-              <input className="input" maxLength={200} placeholder="VD: Đài KTTV tỉnh, bản tin 15h" value={source} onChange={(e) => setSource(e.target.value)} />
+              <input className="input" maxLength={200} placeholder="VD: Đài Khí tượng Thủy văn tỉnh, bản tin 15 giờ" value={source} onChange={(e) => setSource(e.target.value)} />
             </label>
           </div>
           <label className="flex flex-col gap-1">
@@ -106,13 +106,13 @@ export default function ForecastBulletinModal({ stations, stationId, onClose }) 
               spellCheck={false}
             />
             <span className="text-[11px] text-muted">
-              Chọn 2 cột trong Excel rồi dán. Giờ viết 07:00 04/10, 7h 04/10/2026 hoặc 2026-10-04 07:00; mực nước 180,45 hoặc 180.45.
+              Chọn 2 cột trong Excel rồi dán. Giờ viết 07:00 04/10, 7 giờ 04/10/2026 hoặc 2026-10-04 07:00; mực nước 180,45 hoặc 180.45.
             </span>
           </label>
         </div>
 
         <div className="flex flex-col gap-2">
-          <div className="text-[11px] font-semibold uppercase text-muted">Xem trước</div>
+          <div className="text-xs font-semibold text-muted">Xem trước</div>
           {errors.length > 0 && (
             <ul className="rounded-lg border border-danger/40 bg-danger/10 p-2 text-xs text-danger">
               {errors.slice(0, 8).map((e) => <li key={e}>{e}</li>)}
@@ -148,7 +148,7 @@ export default function ForecastBulletinModal({ stations, stationId, onClose }) 
             </table>
           </div>
           <p className="text-[11px] text-muted">
-            Ngưỡng của trạm: BĐ I {thr.bd1 ?? '–'} · BĐ II {thr.bd2 ?? '–'} · BĐ III {thr.bd3 ?? '–'} m. Máy chủ từ chối mốc lệch ngưỡng
+            Ngưỡng của trạm: Báo động I {thr.bd1 ?? '–'} · Báo động II {thr.bd2 ?? '–'} · Báo động III {thr.bd3 ?? '–'} m. Máy chủ từ chối mốc lệch ngưỡng
             quá 50 m (gõ thừa / thiếu chữ số). Thao tác được ghi nhật ký.
           </p>
         </div>
