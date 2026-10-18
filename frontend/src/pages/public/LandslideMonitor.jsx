@@ -165,8 +165,8 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScope
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-black text-sm uppercase tracking-wider bg-white text-[rgb(var(--danger))] px-2.5 py-0.5 rounded-md">
-                  Cấm Lưu Thông Khẩn Cấp
+                <span className="font-bold text-sm bg-white text-[rgb(var(--danger))] px-2.5 py-0.5 rounded-md">
+                  Cấm lưu thông khẩn cấp
                 </span>
                 <span className="text-xs font-semibold text-white/90">
                   Đang có {blockedCount} vị trí đường đèo / ngầm tràn bị chia cắt hoàn toàn!
@@ -453,7 +453,7 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScope
                   {p.rain_info ? (
                     <div className="p-2 rounded-lg bg-panel2/50 border border-line/40">
                       <div className="text-[10px] text-muted flex items-center gap-1">
-                        <CloudRain size={11} className="text-accent" /> Mưa 24h qua:
+                        <CloudRain size={11} className="text-accent" /> Mưa 24 giờ qua:
                       </div>
                       <div className="font-mono text-xs font-bold text-ink mt-0.5">
                         {p.rain_info.rain_24h_mm} mm
@@ -478,7 +478,7 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScope
                         +{p.tilt_info.current_tilt_deg}°
                       </div>
                       <div className="text-[10px] text-muted">
-                        Ngưỡng BĐ3: {p.tilt_info.alarm_threshold}°
+                        Ngưỡng báo động III: {p.tilt_info.alarm_threshold}°
                       </div>
                     </div>
                   ) : p.soil_info ? (

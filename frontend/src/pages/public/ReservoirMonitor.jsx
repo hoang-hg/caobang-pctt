@@ -183,8 +183,8 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap, areaScope
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-black text-sm uppercase tracking-wider bg-white text-[rgb(var(--danger))] px-2.5 py-0.5 rounded-md">
-                  Cảnh Báo Xả Lũ Mức Cao
+                <span className="font-bold text-sm bg-white text-[rgb(var(--danger))] px-2.5 py-0.5 rounded-md">
+                  Cảnh báo xả lũ mức cao
                 </span>
                 <span className="text-xs font-semibold text-white/90">
                   Phát hiện {emergencyCount} hồ chứa đang mở từ một nửa số cửa xả tràn trở lên (xả lũ lớn).
@@ -481,7 +481,7 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap, areaScope
                 <div>
                   <div className="flex items-baseline justify-between text-xs mb-1">
                     <span className="text-muted flex items-center gap-1">
-                      <Gauge size={13} className="text-accent" /> Mực nước hiện tại / MNDBT:
+                      <Gauge size={13} className="text-accent" /> Mực nước hiện tại / mực nước dâng bình thường:
                     </span>
                     <div className="font-mono">
                       <b className="text-sm text-ink">{r.current_level?.toFixed(2)}</b>
@@ -506,7 +506,7 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap, areaScope
                         {r.level_diff >= 0 ? `+${r.level_diff} m` : `${r.level_diff} m`}
                       </b>
                     </span>
-                    <span className="font-mono" title="Tỉ số cao trình mực nước / MNDBT (không phải % dung tích)">MN/MNDBT: {r.volume_pct}%</span>
+                    <span className="num" title="Tỉ số cao trình mực nước / mực nước dâng bình thường (không phải % dung tích)">Bằng {r.volume_pct}% mức dâng bình thường</span>
                   </div>
                 </div>
 
@@ -672,7 +672,7 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap, areaScope
               🟢 Cấp 1: Vận hành bình thường
             </b>
             <p className="text-muted">
-              Mực nước hồ nằm dưới MNDBT. Thủy điện phát điện qua tổ máy, chưa mở cửa xả tràn. Dòng chảy hạ du sông ổn định trong mùa kiệt hoặc đầu lũ.
+              Mực nước hồ nằm dưới mực nước dâng bình thường. Thủy điện phát điện qua tổ máy, chưa mở cửa xả tràn. Dòng chảy hạ du sông ổn định trong mùa kiệt hoặc đầu lũ.
             </p>
           </div>
           <div className="p-3 rounded-xl bg-panel2/60 border border-line/60">
@@ -680,7 +680,7 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap, areaScope
               🟠 Cấp 2: Mở xả tràn điều tiết đón lũ
             </b>
             <p className="text-muted">
-              Mực nước hồ dâng gần hoặc chạm MNDBT. Mở từ 1 đến 2 cửa xả điều tiết. Đập phát còi hú cảnh báo trước 2 - 4 giờ để chính quyền và người dân hạ du chủ động.
+              Mực nước hồ dâng gần hoặc chạm mực nước dâng bình thường. Mở từ 1 đến 2 cửa xả điều tiết. Đập phát còi hú cảnh báo trước 2 - 4 giờ để chính quyền và người dân hạ du chủ động.
             </p>
           </div>
           <div className="p-3 rounded-xl bg-panel2/60 border border-line/60">
