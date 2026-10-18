@@ -2,8 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { BookUser, Home, MapPinned, PhoneCall, Shield, Siren, Users, Send, FileUp, AlertTriangle, PlusCircle } from 'lucide-react';
-
+import { BookUser, FileUp, Home, MapPinned, PhoneCall, Send, Shield, Siren, Users } from 'lucide-react';
 import { api } from '../../api/client';
 import { useAreaQuery } from '../../api/hooks';
 import { useIsCommuneUser, usePermission } from '../../rbac/usePermission';
@@ -11,17 +10,18 @@ import { ErrorState, Progress, Skeleton } from '../common/ui';
 import { FORCE_TYPE, INCIDENT, PRIORITY, SOS_STATUS } from '../../utils/labels';
 import { dateTime, int, minutesSince, pct } from '../../utils/format';
 import { slaState } from '../../utils/sla';
-import QuickIncidentModal from './QuickIncidentModal';
+import { EvacuationModal } from '../rescue/Evacuation';
+import CommuneKpis from './CommuneKpis';
 
 export const unitLabel = (u) => (u ? `${u.unit_type === 'phuong' ? 'Phường' : 'Xã'} ${u.name}` : '');
 
 /** Khung một mục của góc nhìn xã: tiêu đề + nội dung. Đang tải / lỗi tải (`q` = kết quả useQuery) → khung tải / lỗi kèm
  * "Thử lại" — không nói "chưa có dữ liệu" khi thực ra chưa biết; tải xong mà trống thì ghi rõ cần nhập gì (`empty`). */
-function Panel({ icon: Icon, title, right, empty, q, children, className }) {
+function Panel({ id, icon: Icon, title, right, empty, q, children, className }) {
   let body = empty ? <p className="rounded-lg border border-dashed border-line px-3 py-4 text-center text-xs text-muted">{empty}</p> : children;
   if (q && !q.data) body = q.isError ? <ErrorState onRetry={q.refetch}>Không tải được dữ liệu</ErrorState> : <Skeleton height={72} />;
   return (
-    <section className={clsx('card flex min-w-0 flex-col gap-2 p-3', className)}>
+    <section id={id} className={clsx('card flex min-w-0 scroll-mt-20 flex-col gap-2 p-3', className)}>
       <div className="flex items-center justify-between gap-2">
         <h3 className="card-title">
           <Icon size={15} className="text-accent" aria-hidden="true" /> {title}
@@ -36,12 +36,13 @@ function Panel({ icon: Icon, title, right, empty, q, children, className }) {
 const flatten = (nodes) => nodes.flatMap((n) => [n, ...flatten(n.children || [])]);
 
 /**
- * Góc nhìn cấp xã/phường: chọn 1 xã trong phạm vi được giao (danh sách 56 xã thật, mã CB-…); KPI, biểu đồ, nhật ký phía
- * trên đã lọc theo xã này (bộ lọc chung). Mỗi mục đọc API thật, chưa có dữ liệu thì nói rõ cần nhập gì — không có số mẫu.
- * Thao tác ghi (cập nhật sơ tán, điều động) làm ở trang nghiệp vụ tương ứng, ở đây chỉ dẫn link. `children` (KPI của xã)
- * hiện ngay dưới ô chọn xã, trước các mục chi tiết.
+ * Góc nhìn cấp xã/phường — trang chủ của tài khoản cấp xã: xã đang xem (chọn xã khi phạm vi nhiều xã — cấp tỉnh xem từng
+ * xã); tài khoản cấp xã có khối "Báo cáo & xin chi viện" lên tỉnh; hàng chỉ số riêng của xã (CommuneKpis — không lấy 6 ô
+ * của tỉnh, xã không có trạm thì ô nào cũng "–"); `children` (biểu đồ, nhật ký của xã) rồi các mục chi tiết, phiếu SOS
+ * lên đầu. Mỗi mục đọc API thật, chưa có dữ liệu thì nói rõ cần nhập gì — không có số mẫu. `onSupport`: mở hộp thoại xin
+ * chi viện (Tổng quan giữ — thanh dưới điện thoại cũng mở được).
  */
-export default function CommuneView({ code, units, onChange, children }) {
+export default function CommuneView({ code, units, onChange, onSupport, children }) {
   const unit = units.find((u) => u.code === code);
   const canEvac = usePermission('evacuation', 'update', code);
   const canRes = usePermission('resource', 'view', code);
@@ -70,81 +71,60 @@ export default function CommuneView({ code, units, onChange, children }) {
   const localForces = forcesQ.data || []; // đóng quân trong ranh giới xã (kể cả đơn vị cấp tỉnh — ghi rõ cấp)
   const book = useMemo(() => flatten(contactsQ.data || []).filter((c) => c.admin_code === code && c.level !== 'tinh'), [contactsQ.data, code]);
   const myHamlets = useMemo(() => (hamletsQ.data || []).filter((h) => h.parent_code === code), [hamletsQ.data, code]);
-  const [supportOpen, setSupportOpen] = useState(false);
-  const [reportOpen, setReportOpen] = useState(false);
+  const [evacOpen, setEvacOpen] = useState(false);
   // Kênh báo cáo / xin chi viện lên tỉnh: chỉ tài khoản cấp xã (cấp tỉnh xem trang này không "xin chi viện lên tỉnh")
   const isCommuneUser = useIsCommuneUser();
+  const toSos = () => document.getElementById('sos-xa')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="card flex flex-wrap items-center justify-between gap-3 p-3">
+      {/* Thẻ đầu: xã đang xem + việc chính của tài khoản cấp xã (xin chi viện — nút đỏ duy nhất; báo cáo nhanh tạo SOS đã có
+          trên thanh trên cùng / "Báo SOS" ở thanh dưới điện thoại) */}
+      <div className="card flex flex-wrap items-center justify-between gap-x-4 gap-y-3 p-3 sm:px-4">
         <div className="min-w-0">
-          <div className="text-[10px] font-black uppercase tracking-wider text-muted">Góc nhìn cấp xã / phường</div>
-          <h2 className="text-lg font-black text-ink">{unitLabel(unit) || 'Chọn xã/phường'}</h2>
+          <h2 className="text-lg font-bold leading-tight text-ink">{unitLabel(unit) || 'Chọn xã/phường'}</h2>
           {unit && (
-            <p className="text-xs text-muted">
-              Dân số {int(unit.population)} · {int(unit.households)} hộ (dữ liệu nền)
+            <p className="mt-0.5 text-xs text-muted">
+              Dân số <b className="num font-semibold text-ink-2">{int(unit.population)}</b> · <b className="num font-semibold text-ink-2">{int(unit.households)}</b> hộ
+              {myHamlets.length > 0 && <> · {myHamlets.length} xóm / tổ dân phố</>}
             </p>
           )}
         </div>
-        <label className="flex items-center gap-2 text-xs text-muted">
-          <span>Xã/phường</span>
-          <select className="input tap w-auto min-w-[220px] py-1 text-xs" value={code || ''} onChange={(e) => onChange(e.target.value)} aria-label="Chọn xã/phường">
-            {!code && <option value="">— Chọn —</option>}
-            {units.map((u) => (
-              <option key={u.code} value={u.code}>{unitLabel(u)}</option>
-            ))}
-          </select>
-        </label>
-      </div>
-
-      {unit && isCommuneUser && (
-        <div className="card rounded-2xl border border-red-500/30 bg-gradient-to-r from-red-500/10 via-amber-500/5 to-panel p-3.5 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-red-600 text-white shadow-md shadow-red-600/30">
-                <AlertTriangle size={18} />
-              </span>
-              <div>
-                <h3 className="text-xs sm:text-sm font-extrabold text-ink uppercase tracking-wide">
-                  Trung tâm Điều hành Tác chiến {unitLabel(unit)}
-                </h3>
-                <p className="text-[11px] text-muted">
-                  Kênh báo cáo & đề xuất chi viện trực tiếp lên Ban Chỉ huy PCTT & TKCN tỉnh
-                </p>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setSupportOpen(true)}
-                className="btn-danger tap rounded-xl px-3.5 py-2 text-xs font-bold flex items-center gap-1.5 shadow-md shadow-danger/20 hover:scale-[1.02] transition-transform"
-              >
-                <Send size={14} />
-                <span>GỬI YÊU CẦU CHI VIỆN LÊN TỈNH</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setReportOpen(true)}
-                className="btn-secondary tap rounded-xl px-3 py-2 text-xs font-semibold flex items-center gap-1.5"
-              >
-                <PlusCircle size={14} className="text-accent" />
-                <span>Báo cáo thiệt hại nhanh</span>
-              </button>
-
-              <Link
-                to="/nhap-du-lieu"
-                className="btn-ghost tap rounded-xl border border-line bg-panel2/60 px-3 py-2 text-xs font-semibold text-ink-2 hover:text-ink flex items-center gap-1.5"
-              >
-                <FileUp size={14} className="text-muted" />
-                <span>Gửi dữ liệu địa bàn</span>
+        {/* Tài khoản một xã không có gì để chọn — chỉ phạm vi nhiều xã (cấp tỉnh) mới hiện ô chọn */}
+        {units.length > 1 && (
+          <label className="flex items-center gap-2 text-xs text-muted">
+            <span>Xem xã/phường</span>
+            <select className="input tap w-auto min-w-[200px] py-1.5 text-sm" value={code || ''} onChange={(e) => onChange(e.target.value)} aria-label="Chọn xã/phường">
+              {!code && <option value="">— Chọn —</option>}
+              {units.map((u) => (
+                <option key={u.code} value={u.code}>{unitLabel(u)}</option>
+              ))}
+            </select>
+          </label>
+        )}
+        {unit && isCommuneUser && (
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+            <button
+              type="button"
+              onClick={onSupport}
+              className="btn-danger tap h-10 px-4 font-semibold max-sm:w-full"
+              title="Yêu cầu tới thẳng bảng điều phối của trực ban tỉnh (mục &quot;Xã xin chi viện&quot;)"
+            >
+              <Send size={15} aria-hidden="true" /> Gửi yêu cầu chi viện lên tỉnh
+            </button>
+            <div className="grid flex-1 grid-cols-2 gap-2 sm:flex sm:flex-none">
+              {canEvac && (
+                <button type="button" onClick={() => setEvacOpen(true)} className="btn-secondary tap h-10 px-3">
+                  <Home size={15} aria-hidden="true" /> Cập nhật sơ tán
+                </button>
+              )}
+              <Link to="/nhap-du-lieu" className="btn-secondary tap h-10 px-3">
+                <FileUp size={15} aria-hidden="true" /> Gửi dữ liệu
               </Link>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {!unit ? (
         <p className="card border-dashed p-4 text-center text-sm text-muted">
@@ -152,14 +132,56 @@ export default function CommuneView({ code, units, onChange, children }) {
         </p>
       ) : (
         <>
+          <CommuneKpis
+            code={code}
+            sosQ={sosQ}
+            evacQ={evacQ}
+            canSos={canSos}
+            onSos={toSos}
+            onEvac={canEvac ? () => setEvacOpen(true) : undefined}
+          />
           {children}
 
           <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3 [&>*]:min-w-0">
+            {canSos && (
+              <Panel
+                id="sos-xa"
+                icon={Siren}
+                title={`Phiếu SOS đang mở · ${open.length}`}
+                q={sosQ}
+                right={<Link to="/cuu-ho" className="touch-hit text-xs font-semibold text-accent hover:underline">Điều phối →</Link>}
+                empty={!open.length && 'Không có phiếu SOS đang mở ở xã này'}
+              >
+                <ul className="scroll-thin flex max-h-56 flex-col gap-1.5 overflow-y-auto pr-1 print:max-h-none print:overflow-visible">
+                  {open.map((t) => {
+                    const waited = minutesSince(t.received_at);
+                    const late = !!slaState(t, Date.now())?.breached; // cùng quy tắc với KPI quá hạn (utils/sla)
+                    return (
+                      <li key={t.id} className={clsx('rounded-md border px-2 py-1.5 text-xs', late ? 'border-danger/60 bg-danger/10' : 'border-line')}>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-mono font-semibold text-ink">{t.code}</span>
+                          <span className={clsx('chip px-1.5 py-0 text-[10px]', PRIORITY[t.priority]?.cls)}>{PRIORITY[t.priority]?.short}</span>
+                        </div>
+                        <div className="text-ink-2">
+                          {INCIDENT[t.incident_type]} · {t.trapped_count ?? '?'} người · {SOS_STATUS[t.status]}
+                        </div>
+                        <div className={late ? 'font-semibold text-danger' : 'text-muted'}>
+                          Tiếp nhận {waited} phút trước{late && ' — quá hạn phản hồi'}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </Panel>
+            )}
+
             <Panel
               icon={Home}
               title="Tiến độ sơ tán"
               q={evacQ}
-              right={canEvac && canSos && <Link to="/cuu-ho" className="touch-hit text-xs font-semibold text-accent hover:underline">Cập nhật →</Link>}
+              right={canEvac && (
+                <button type="button" onClick={() => setEvacOpen(true)} className="tap text-xs font-semibold text-accent hover:underline">Cập nhật</button>
+              )}
               empty={!progress && 'Xã chưa cập nhật kế hoạch / tiến độ sơ tán (Điều hành cứu hộ → Giám sát sơ tán nhân dân)'}
             >
               {progress && (
@@ -200,37 +222,6 @@ export default function CommuneView({ code, units, onChange, children }) {
                 })}
               </ul>
             </Panel>
-
-            {canSos && (
-              <Panel
-                icon={Siren}
-                title={`Phiếu SOS đang mở · ${open.length}`}
-                q={sosQ}
-                right={<Link to="/cuu-ho" className="touch-hit text-xs font-semibold text-accent hover:underline">Điều phối →</Link>}
-                empty={!open.length && 'Không có phiếu SOS đang mở ở xã này'}
-              >
-                <ul className="scroll-thin flex max-h-56 flex-col gap-1.5 overflow-y-auto pr-1 print:max-h-none print:overflow-visible">
-                  {open.map((t) => {
-                    const waited = minutesSince(t.received_at);
-                    const late = !!slaState(t, Date.now())?.breached; // cùng quy tắc với KPI quá hạn (utils/sla)
-                    return (
-                      <li key={t.id} className={clsx('rounded-md border px-2 py-1.5 text-xs', late ? 'border-danger/60 bg-danger/10' : 'border-line')}>
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="font-mono font-semibold text-ink">{t.code}</span>
-                          <span className={clsx('chip px-1.5 py-0 text-[10px]', PRIORITY[t.priority]?.cls)}>{PRIORITY[t.priority]?.short}</span>
-                        </div>
-                        <div className="text-ink-2">
-                          {INCIDENT[t.incident_type]} · {t.trapped_count ?? '?'} người · {SOS_STATUS[t.status]}
-                        </div>
-                        <div className={late ? 'font-semibold text-danger' : 'text-muted'}>
-                          Tiếp nhận {waited} phút trước{late && ' — quá hạn phản hồi'}
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </Panel>
-            )}
 
             {canRes && (
               <Panel icon={Shield} title={`Lực lượng tại xã · ${localForces.length}`} q={forcesQ} empty={!localForces.length && 'Chưa có dữ liệu lực lượng của xã (nhập loại "Lực lượng")'}>
@@ -292,14 +283,8 @@ export default function CommuneView({ code, units, onChange, children }) {
         </>
       )}
 
-      {/* Xã xin chi viện lên tỉnh: cùng hộp thoại báo cáo nhanh, chế độ support (phiếu SOS gắn thẻ — rescueFacts) */}
-      {supportOpen && <QuickIncidentModal open onClose={() => setSupportOpen(false)} support />}
-      {reportOpen && (
-        <QuickIncidentModal
-          open={reportOpen}
-          onClose={() => setReportOpen(false)}
-        />
-      )}
+      {/* Cập nhật kế hoạch / số đã sơ tán của xã (cùng hộp thoại ở Điều hành cứu hộ) */}
+      {evacOpen && <EvacuationModal row={progress || { code }} progress={evac?.progress} onClose={() => setEvacOpen(false)} />}
     </div>
   );
 }

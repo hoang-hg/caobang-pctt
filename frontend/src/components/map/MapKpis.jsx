@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import clsx from 'clsx';
 import { ChevronDown, CloudRain, Droplets, Home, RefreshCw, Siren, Users, Waves } from 'lucide-react';
-import { useStore } from '../../app/store';
 import { int, num } from '../../utils/format';
 import { ALARM } from '../../utils/labels';
 import { risk } from '../../utils/risk';
 import { evacFacts, rainFacts, resourceFacts, sosFacts, topicFacts } from '../dashboard/kpiFacts';
 import { riverSummary, ROMAN } from '../dashboard/RiverKpi';
 import { ErrorState, Skeleton } from '../common/ui';
+import { useScopeLabel } from '../../rbac/usePermission';
 
 const HIDE_KEY = 'pctt.banDo.anTinhHinh'; // máy tính: người dùng thu gọn bảng chỉ số — nhớ trên máy này
 const readHidden = () => { try { return localStorage.getItem(HIDE_KEY) === '1'; } catch { return false; } };
@@ -120,7 +120,7 @@ function Tile({ t, layout, onPick }) {
  * (iPad dọc) · `scroll` 1 hàng vuốt ngang ô cao 44 px (điện thoại).
  */
 export default function MapKpis({ k, kState, stations, layout, onPick, pickable = {}, className }) {
-  const area = useStore((s) => s.filter.label);
+  const area = useScopeLabel(); // tài khoản một xã chưa lọc: tên xã, không ghi "Toàn tỉnh"
   const [hidden, setHidden] = useState(() => layout === 'grid' && readHidden());
   const toggle = () => setHidden((h) => { writeHidden(!h); return !h; });
 
