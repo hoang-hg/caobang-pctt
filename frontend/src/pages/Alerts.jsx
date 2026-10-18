@@ -2,13 +2,15 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { BookUser, History, Megaphone, Radio, RefreshCw, ScrollText, ShieldCheck, XCircle } from 'lucide-react';
+import { BookUser, History, Megaphone, Radio, ScrollText, ShieldCheck, XCircle } from 'lucide-react';
 import { api } from '../api/client';
 import { useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
 import { EmptyState, ErrorState, Section, ShowMore, Skeleton, Tabs } from '../components/common/ui';
 import QuickActionBar from '../components/common/QuickActionBar';
 import UrgentStrip from '../components/common/UrgentStrip';
+import PageHeader from '../components/common/PageHeader';
+import { PAGE } from '../components/layout/page';
 import ConnectionBanner from '../components/dashboard/ConnectionBanner';
 import QuickIncidentModal from '../components/dashboard/QuickIncidentModal';
 import { unitLabel } from '../components/dashboard/CommuneView';
@@ -178,7 +180,7 @@ export default function Alerts() {
   }
 
   return (
-    <div className="flex flex-col gap-3 p-3 pb-28 sm:pb-8">
+    <div className={PAGE}>
       {/* Thông tin khẩn luôn trên cùng (Cam / Đỏ dính khi cuộn) + mất mạng */}
       <UrgentStrip
         label="Thông tin khẩn cảnh báo"
@@ -190,19 +192,17 @@ export default function Alerts() {
       />
       <ConnectionBanner updatedAt={bq.dataUpdatedAt || null} />
 
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <h1 className="text-base font-bold leading-tight sm:text-lg">Cảnh báo khẩn cấp & Hotline</h1>
-          <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11px] text-muted">
-            <span className="font-semibold text-accent">{scopeLabel}</span>
-            {role && <><span aria-hidden="true">·</span><span>{auth.user.full_name} — {role}</span></>}
-            <span className="hidden md:inline">· Maker–Checker: người soạn ≠ người duyệt, ký bằng PIN · mọi thao tác ghi nhật ký pháp lý</span>
-          </p>
-        </div>
-        <button type="button" onClick={refresh} disabled={refreshing} className="btn-ghost tap-sq h-9 min-w-[36px] shrink-0 px-2.5 text-xs" aria-label="Làm mới số liệu" title="Làm mới số liệu">
-          <RefreshCw size={14} className={clsx(refreshing && 'animate-spin')} aria-hidden="true" /> <span className="hidden md:inline">Làm mới</span>
-        </button>
-      </div>
+      <PageHeader
+        title="Cảnh báo khẩn cấp & Hotline"
+        short="Cảnh báo & Hotline"
+        scope={scopeLabel}
+        meta={[
+          role && <span key="role">{auth.user.full_name} — {role}</span>,
+          <span key="mc" className="hidden md:inline">Maker–Checker: người soạn ≠ người duyệt, ký bằng PIN · mọi thao tác ghi nhật ký pháp lý</span>,
+        ]}
+        onRefresh={refresh}
+        refreshing={refreshing}
+      />
 
       <AlertKpis query={bq} broadcasts={list} factsOf={factsOf} onGo={go} />
 

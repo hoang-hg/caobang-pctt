@@ -90,7 +90,8 @@ frontend/                  React 18, Vite 6, Tailwind 3, TanStack Query 5, Zusta
   src/pages/               trang điều hành (DataImport = nhập dữ liệu chính thức); pages/public/ = cổng công khai (PublicPortal, ReportForm, TicketTracker,
                            ReservoirMonitor, LandslideMonitor, NetworkBanner = báo mất mạng / gợi ý bản nhẹ,
                            MissionPage = /nhiem-vu link nhiệm vụ của trưởng nhóm, không đăng nhập)
-  src/components/          common/ (ui.jsx: KpiCard Modal Tabs Section Empty…, Turnstile, DispatchModal…) · layout/ ·
+  src/components/          common/ (ui.jsx: KpiCard Modal Tabs Section Empty…, PageHeader + ExportMenu, Turnstile, DispatchModal…) ·
+                           layout/ (Header, Sidebar, page.js: khung trang PAGE / EDGE) ·
                            map/ (MapLayers, MapTools = nền bản đồ + công cụ, icons, leafletGlobal) · charts/ (chartTheme) ·
                            account/Mfa.jsx (cài đặt / quản lý xác thực 2 lớp — Login import tĩnh, UserMenu lazy)
   src/index.css            biến màu CSS sáng/tối; tailwind.config.js ánh xạ token
@@ -313,6 +314,10 @@ chỉ khi `DEMO_MODE`; `DEMO_MODE=false` xoá đoạn `so_do` còn sót mỗi l�
   bản build không có (kiểm tra: build rồi tìm chữ "GIẢ LẬP" trong `dist/`). Không bao giờ "máy chủ lỗi thì trả dữ liệu giả";
   `/public/*` luôn gọi máy chủ thật. Dữ liệu = phản hồi API thật đã ghi (`tests/ui/demo-record.mjs` → `api/demo/fixtures.json`)
   — API đổi định dạng thì ghi lại, không sửa tay tệp ghi.
+- **Khung trang điều hành**: lề / khoảng cách `PAGE` (`components/layout/page.js`; dải khẩn tràn mép theo `EDGE`), đầu trang
+  `PageHeader` (tiêu đề · địa bàn · giờ số liệu · thao tác): nhiều nhất 1 nút chính tô màu, xuất / in gom vào menu "Xuất"
+  (`exports`), "Báo cáo nhanh" (tạo SOS) cố định trên thanh trên cùng (`Header`) — không lặp trong trang. Ô chỉ số dùng
+  `StatCard`: mức rủi ro = vạch màu bên trái + nhãn, nền giữ trắng; số đếm dùng lớp `num` (chữ số đều), không `font-mono`.
 - **Tên tệp xuất** (Excel / PDF): ngày theo giờ Việt Nam `vnFileStamp()` (`utils/format.js`), không dùng `toISOString()`
   (giờ UTC — trước 7 giờ sáng ra ngày hôm trước).
 - **Truy vấn theo vùng lọc**: `useAreaQuery(key, path, extra)`; `key` phải trùng khoá mà `useSocket.js` invalidate khi có sự

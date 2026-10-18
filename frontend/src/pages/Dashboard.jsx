@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import {
-  AlertTriangle, ArrowUpRight, ChevronDown, ChevronUp, Compass, Droplets, FileDown, FileSpreadsheet, FileText, Home, Info, LayoutDashboard, LifeBuoy,
-  Loader2, MapPin, Minimize2, Monitor, Mountain, Pause, Play, RefreshCw, Server, ShieldAlert, Waves, X,
+  AlertTriangle, ChevronDown, ChevronUp, Compass, Droplets, FileDown, FileSpreadsheet, FileText, Home, Info, LayoutDashboard, LifeBuoy,
+  MapPin, Minimize2, Monitor, Mountain, Pause, Play, Server, Waves, X,
 } from 'lucide-react';
 import { useAreaQuery, usePresets, useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
@@ -28,6 +28,8 @@ import OperationsTable from '../components/dashboard/OperationsTable';
 import CommuneView, { unitLabel } from '../components/dashboard/CommuneView';
 import SystemView from '../components/dashboard/SystemView';
 import QuickIncidentModal from '../components/dashboard/QuickIncidentModal';
+import PageHeader from '../components/common/PageHeader';
+import { PAGE } from '../components/layout/page';
 import ReportDocModal from '../components/dashboard/ReportDocModal';
 import QuickActionBar from '../components/common/QuickActionBar';
 import { useAllowedCodes, useIsCommuneUser, usePermission } from '../rbac/usePermission';
@@ -419,7 +421,7 @@ export default function Dashboard() {
   const dataTime = kQ.dataUpdatedAt ? new Date(kQ.dataUpdatedAt).toLocaleTimeString('vi-VN', { ...VN_TIME, hour12: false }) : null;
 
   return (
-    <div className="flex flex-col gap-2 p-3.5 pb-28 sm:gap-3.5 sm:p-5 sm:pb-5">
+    <div className={PAGE}>
       {/* 0. Thông tin khẩn luôn trên cùng: dải tình huống (Cam / Đỏ dính khi cuộn) + mất mạng */}
       {k && (
         <SituationBar
@@ -427,8 +429,6 @@ export default function Dashboard() {
           waterStations={waterStations}
           stationsError={stationsState.error}
           rainKnown={rainKnown}
-          canReport={canReport}
-          onReport={() => setReportOpen(true)}
           canSos={canSos}
           canImportStations={canDataImport}
           canSystem={canSystem}
@@ -437,79 +437,60 @@ export default function Dashboard() {
       )}
       <ConnectionBanner updatedAt={kQ.dataUpdatedAt || null} />
 
-      {/* 1. Thanh lệnh gọn (2 dòng): phạm vi · thao tác / giờ số liệu · thang màu · lưu vực */}
-      <div className="card px-3 py-2 sm:px-4 sm:py-2.5">
-        <div className="flex items-center justify-between gap-3">
-          <h1 className="flex min-w-0 items-center gap-x-2 text-base font-black tracking-tight text-ink sm:text-lg">
-            <span className="hidden shrink-0 md:inline">Tổng quan tác chiến</span>
-            <span className="hidden font-normal text-muted md:inline">/</span>
-            <span className="min-w-0 truncate text-accent" title={filterLabel}>{filterLabel}</span>
+      {/* 1. Đầu trang (dùng chung các trang): phạm vi đang xem · giờ số liệu; Trình chiếu · Xuất · Làm mới. "Báo cáo nhanh"
+          nằm cố định trên thanh trên cùng (máy tính) / thanh dưới cùng (điện thoại) */}
+      <PageHeader
+        className="card px-3 py-2.5 sm:px-4"
+        title="Tổng quan tác chiến"
+        short="Tổng quan"
+        scope={(
+          <>
+            <span className="truncate" title={filterLabel}>{filterLabel}</span>
             {isFiltered && tab !== 'cap_xa' && (
-              <button type="button" onClick={clearFilter} className="tap-sq flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted hover:bg-panel2 hover:text-ink" title="Bỏ lọc" aria-label="Bỏ lọc, xem toàn bộ phạm vi">
-                <X size={15} />
+              <button type="button" onClick={clearFilter} className="tap-sq -my-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-muted hover:bg-panel2 hover:text-ink" title="Bỏ lọc" aria-label="Bỏ lọc, xem toàn bộ phạm vi">
+                <X size={13} aria-hidden="true" />
               </button>
             )}
-          </h1>
-          <div className="flex shrink-0 items-center gap-2 no-print">
-            {presentation ? (
-              <>
-                <LiveClock />
-                <button type="button" onClick={() => setRotatePaused((v) => !v)} aria-pressed={rotatePaused} className="btn-ghost px-2.5 py-1.5 text-xs" title={`Tự chuyển chuyên đề sau mỗi ${rotateSec} giây`}>
-                  {rotatePaused ? <Play size={14} /> : <Pause size={14} />} {rotatePaused ? 'Tiếp tục xoay vòng' : 'Tạm dừng xoay vòng'}
-                </button>
-                <button type="button" onClick={exitPresentation} className="btn-ghost px-2.5 py-1.5 text-xs">
-                  <Minimize2 size={14} /> Thoát trình chiếu
-                </button>
-              </>
-            ) : (
-              <>
-                {canReport && (
-                  // Điện thoại: "Báo SOS" ở thanh dưới cùng (vùng ngón cái) — ở đây chỉ hiện từ máy tính bảng trở lên
-                  <button type="button" onClick={() => setReportOpen(true)} className="btn-danger tap hidden min-h-[40px] px-3 text-xs font-bold sm:inline-flex lg:min-h-0 lg:py-1.5">
-                    <ShieldAlert size={14} /> Báo cáo nhanh
-                  </button>
-                )}
-                <button type="button" onClick={refresh} disabled={refreshing} className="btn-ghost tap-sq h-10 min-w-[40px] px-2.5 text-xs lg:h-auto lg:py-1.5" aria-label="Làm mới số liệu" title="Làm mới số liệu">
-                  <RefreshCw size={14} className={clsx(refreshing && 'animate-spin')} /> <span className="hidden xl:inline">Làm mới</span>
-                </button>
-                <Link to="/ban-do" className="btn-ghost tap hidden h-10 px-2.5 text-xs sm:inline-flex lg:h-auto lg:py-1.5" title="Mở Bản đồ giám sát">
-                  <Compass size={14} /> <span className="hidden md:inline">Bản đồ</span> <ArrowUpRight size={12} />
-                </Link>
-                <button type="button" onClick={doExcel} disabled={!k} className="btn-ghost tap-sq h-10 min-w-[40px] px-2.5 text-xs lg:h-auto lg:py-1.5" aria-label="Xuất Excel tổng quan" title="Xuất Excel tổng quan">
-                  <FileSpreadsheet size={14} /> <span className="hidden md:inline">Excel</span>
-                </button>
-                <button type="button" onClick={() => setDocOpen(true)} disabled={!k} className="btn-ghost tap-sq h-10 min-w-[40px] px-2.5 text-xs lg:h-auto lg:py-1.5" aria-label="Soạn báo cáo văn bản định dạng chuẩn (PDF)" title="Báo cáo văn bản gửi UBND tỉnh / Ban Chỉ đạo: quốc hiệu, số liệu, đánh giá – kiến nghị, chỗ ký (PDF chữ thật)">
-                  <FileText size={14} /> <span className="hidden md:inline">Văn bản</span>
-                </button>
-                <button type="button" onClick={doExport} disabled={exporting} className="btn-primary tap-sq h-10 min-w-[40px] px-3 text-xs lg:h-auto lg:py-1.5" aria-label="Xuất PDF báo cáo nhanh" title="Xuất PDF báo cáo nhanh">
-                  {exporting ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />} <span className="hidden md:inline">Xuất PDF</span>
-                </button>
-                <button type="button" onClick={enterPresentation} className="btn-ghost tap-sq hidden px-2.5 py-1.5 text-xs lg:inline-flex" aria-label="Chế độ trình chiếu màn hình lớn" title="Trình chiếu trên màn hình lớn phòng điều hành: nền tối, chữ số to, tự xoay vòng chuyên đề">
-                  <Monitor size={14} /> <span className="hidden xl:inline">Trình chiếu</span>
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted">
-          <span className="whitespace-nowrap">
-            {dataTime ? (
-              <>
-                <span className="sm:hidden">Lúc </span><span className="hidden sm:inline">Số liệu lúc </span>
-                <b className="font-mono text-ink-2">{dataTime}</b>
-                <span className="hidden 2xl:inline"> · tự cập nhật khi có sự kiện mới</span>
-              </>
-            ) : kState.error ? 'Chưa tải được số liệu' : 'Đang tải số liệu…'}
-          </span>
-          {role && <span className="chip hidden border border-line bg-panel2 py-0 text-[10px] text-ink-2 2xl:inline-flex">{role}</span>}
-          {/* Thang màu: hiện sẵn từ md; điện thoại gọn vào "Thang màu" (chạm để mở) */}
-          <RiskLegend className="hidden md:flex" meaningClass="hidden xl:inline" />
-          <details className="md:hidden">
-            <summary className="touch-hit flex min-h-[28px] cursor-pointer list-none items-center gap-1 font-semibold text-accent [&::-webkit-details-marker]:hidden">
+          </>
+        )}
+        time={dataTime}
+        timeNote={kState.error ? 'Chưa tải được số liệu' : 'Đang tải số liệu…'}
+        meta={[
+          role && <span key="role" className="hidden 2xl:inline">{role}</span>,
+          // Điện thoại / iPad dọc: thang màu gọn vào "Thang màu" (chạm để mở) ngay trên dòng ngữ cảnh — không thêm một dòng
+          <details key="thang-mau" className="md:hidden">
+            <summary className="touch-hit flex cursor-pointer list-none items-center gap-1 font-semibold text-accent [&::-webkit-details-marker]:hidden">
               <Info size={13} aria-hidden="true" /> Thang màu
             </summary>
             <RiskLegend className="mt-1" />
-          </details>
+          </details>,
+        ]}
+        actions={presentation ? (
+          <>
+            <LiveClock />
+            <button type="button" onClick={() => setRotatePaused((v) => !v)} aria-pressed={rotatePaused} className="btn-secondary h-9 px-2.5" title={`Tự chuyển chuyên đề sau mỗi ${rotateSec} giây`}>
+              {rotatePaused ? <Play size={14} aria-hidden="true" /> : <Pause size={14} aria-hidden="true" />} {rotatePaused ? 'Tiếp tục xoay vòng' : 'Tạm dừng xoay vòng'}
+            </button>
+            <button type="button" onClick={exitPresentation} className="btn-secondary h-9 px-2.5">
+              <Minimize2 size={14} aria-hidden="true" /> Thoát trình chiếu
+            </button>
+          </>
+        ) : (
+          <button type="button" onClick={enterPresentation} className="btn-secondary tap-sq hidden h-9 px-2.5 lg:inline-flex" aria-label="Chế độ trình chiếu màn hình lớn" title="Trình chiếu trên màn hình lớn phòng điều hành: nền tối, chữ số to, tự xoay vòng chuyên đề">
+            <Monitor size={15} aria-hidden="true" /> <span className="hidden xl:inline">Trình chiếu</span>
+          </button>
+        )}
+        exports={presentation ? undefined : [
+          { key: 'anh', label: 'Ảnh chụp tình hình (PDF)', hint: 'Chỉ số, bản đồ, biểu đồ của thẻ đang xem — gửi nhanh qua Zalo, email', icon: FileDown, onClick: doExport, busy: exporting },
+          { key: 'van-ban', label: 'Báo cáo văn bản (PDF)', hint: 'Quốc hiệu, số liệu, đánh giá – kiến nghị, chỗ ký — gửi UBND tỉnh / Ban Chỉ đạo', icon: FileText, onClick: () => setDocOpen(true), disabled: !k },
+          { key: 'excel', label: 'Bảng số liệu (Excel)', hint: 'Chỉ số, trạm, hồ chứa, sạt lở trong vùng đang xem', icon: FileSpreadsheet, onClick: doExcel, disabled: !k },
+        ]}
+        onRefresh={presentation ? undefined : refresh}
+        refreshing={refreshing}
+      >
+        <div className="hidden flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted sm:flex">
+          {/* Thang màu: hiện sẵn từ md (dưới md: "Thang màu" trên dòng ngữ cảnh) */}
+          <RiskLegend className="hidden md:flex" meaningClass="hidden xl:inline" />
           {/* Tài khoản xã chỉ có xã mình → không có lưu vực để chọn. Điện thoại: chọn lưu vực ở bộ lọc trong menu ☰ (cùng
               danh sách nhóm) — không chiếm thêm một dòng trước hàng KPI */}
           {tab === 'tong_hop' && !presentation && scope === null && basinPresets.length > 0 && (
@@ -524,7 +505,7 @@ export default function Dashboard() {
             </label>
           )}
         </div>
-      </div>
+      </PageHeader>
 
       {k && kQ.isError && online && (
         <div role="alert" className="card flex flex-wrap items-center justify-between gap-2 border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">
@@ -536,8 +517,9 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* 2. Một hàng thẻ: tổng hợp · chuyên đề · cấp xã · hệ thống (cuộn ngang trong hàng trên điện thoại) */}
-      <div className="scroll-thin -mx-1 flex items-center gap-1.5 overflow-x-auto border-b border-line px-1 pb-2 no-print sm:pb-2.5" role="tablist" aria-label="Nội dung tổng quan">
+      {/* 2. Một hàng thẻ: tổng hợp · chuyên đề · cấp xã · hệ thống — cùng kiểu gạch chân với thẻ các trang khác (ui.jsx Tabs);
+          điện thoại cuộn ngang trong hàng */}
+      <div className="scroll-thin -mx-1 flex items-end gap-1 overflow-x-auto border-b border-line px-1 no-print" role="tablist" aria-label="Nội dung tổng quan">
         {tabs.map((t) => {
           const badge = tabBadge[t.id];
           return (
@@ -548,8 +530,8 @@ export default function Dashboard() {
               aria-selected={tab === t.id}
               onClick={() => setTab(t.id)}
               className={clsx(
-                'tap flex min-h-[40px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border px-3 text-xs font-bold',
-                tab === t.id ? 'border-accent bg-accent text-white' : 'border-line bg-panel text-ink-2 hover:bg-panel2 hover:text-ink',
+                'tap -mb-px flex min-h-[42px] shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 text-sm font-medium transition-colors',
+                tab === t.id ? 'border-accent font-semibold text-accent' : 'border-transparent text-muted hover:text-ink',
               )}
             >
               <t.icon size={15} aria-hidden="true" /> {t.label}

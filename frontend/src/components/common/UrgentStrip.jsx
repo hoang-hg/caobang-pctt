@@ -3,6 +3,7 @@ import clsx from 'clsx';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, ChevronDown, DatabaseZap, RefreshCw, Siren } from 'lucide-react';
 import { risk } from '../../utils/risk';
+import { EDGE, EDGE_PAD } from '../layout/page';
 
 /**
  * Dải thông tin khẩn đầu trang — dùng chung (Vật tư & Lực lượng, Điều hành cứu hộ…), cùng kiểu dải tình huống của Tổng
@@ -14,9 +15,9 @@ import { risk } from '../../utils/risk';
  *   không có mục nào mà `action.level` ≥ Cam thì `note` hiện trên dải.
  * - Không có mục nào: `calm` (chấm xanh — chỉ nói "chưa ghi nhận" về phần CÓ dữ liệu, không nói "an toàn") hoặc `gray`
  *   (chưa đánh giá được — viền nét đứt). `failed` (tên phần chưa tải được) + `onRetry`. `loading`: chưa nói gì.
- * - `bleed`: lề âm để dải tràn sát mép vùng nội dung (theo khoảng đệm của trang).
+ * - `bleed`: lề âm để dải tràn sát mép vùng nội dung — mặc định theo khung trang chung (layout/page.js PAGE).
  */
-export default function UrgentStrip({ label, items, action, calm, gray, failed = [], onRetry, loading, bleed = '-mx-3 -mt-3' }) {
+export default function UrgentStrip({ label, items, action, calm, gray, failed = [], onRetry, loading, bleed = EDGE }) {
   const [opened, setOpened] = useState(false);
   const worst = Math.max(items[0]?.level ?? -1, action?.level ?? -1);
   const failNote = failed.length > 0 && (
@@ -52,8 +53,9 @@ export default function UrgentStrip({ label, items, action, calm, gray, failed =
     return (
       <div
         className={clsx(
-          'sticky top-0 z-30 flex items-center gap-2 px-3 py-1.5 text-xs shadow-lg sm:justify-between sm:py-2 print:static',
+          'sticky top-0 z-30 flex items-center gap-2 py-1.5 text-xs shadow-lg sm:justify-between sm:py-2 print:static',
           bleed,
+          EDGE_PAD,
           risk(worst).chip,
         )}
         role="status"

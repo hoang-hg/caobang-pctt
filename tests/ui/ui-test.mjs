@@ -321,7 +321,9 @@ async function staff(ctx, trackCode) {
   await step(ctx, 'Tổng quan: "Văn bản" — báo cáo PDF định dạng chuẩn qua 3 bước, nhúng font tiếng Việt', async () => {
     await page.goto(`${ROOT}/dashboard`);
     await waitMain(page);
-    await page.getByRole('button', { name: 'Soạn báo cáo văn bản định dạng chuẩn (PDF)' }).click();
+    // Menu "Xuất" của đầu trang (PageHeader) → Báo cáo văn bản
+    await page.getByRole('button', { name: 'Xuất', exact: true }).click();
+    await page.getByRole('menuitem', { name: /Báo cáo văn bản/ }).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByRole('button', { name: 'Tiếp', exact: true }).click();
     await dialog.getByRole('button', { name: 'Tiếp', exact: true }).click();
@@ -2452,7 +2454,7 @@ async function alertsWard(ctx) {
     }
     await page.goto(`${ROOT}/canh-bao`);
     await page.getByRole('group', { name: 'Chỉ số cảnh báo' }).getByRole('button').first().waitFor({ timeout: 20_000 });
-    const head = await page.locator('main h1 + p').innerText();
+    const head = await page.locator('main .facts').first().innerText(); // dòng ngữ cảnh dưới tiêu đề (PageHeader)
     if (!head.includes(WARD.name)) throw new Error(`tiêu đề không phải phường của tài khoản: ${head}`);
     if (await page.getByText(/Soạn lệnh cảnh báo/i).count()) throw new Error('tài khoản phường thấy form soạn lệnh');
     if (await page.locator('[aria-label="Phần của trang Cảnh báo"] > button', { hasText: /Nhật ký/ }).count()) throw new Error('tài khoản phường thấy thẻ Nhật ký pháp lý');

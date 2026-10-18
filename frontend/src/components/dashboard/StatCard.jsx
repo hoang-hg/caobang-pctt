@@ -4,7 +4,7 @@ import { risk } from '../../utils/risk';
 
 /**
  * Thẻ chỉ số của Dashboard. `level` theo thang màu rủi ro chung (utils/risk.js): 0–3 = Xanh / Vàng / Cam / Đỏ (vạch màu
- * bên trái, nền nhạt từ Vàng trở lên); `null` = chưa có dữ liệu (viền nét đứt, biểu tượng xám — không tô xanh như "bình
+ * bên trái + màu biểu tượng; nền giữ trắng — cả hàng thẻ tô hồng thì mắt không còn tìm ra ô thật sự gấp); `null` = chưa có dữ liệu (viền nét đứt, biểu tượng xám — không tô xanh như "bình
  * thường"); bỏ trống = chỉ số không mang mức rủi ro (sơ tán, lực lượng). `alert` = cần xử lý ngay: viền đỏ đậm, chỉ nhãn
  * góc nhấp nháy (cả thẻ nhấp nháy thì không đọc được số) — tắt khi hệ điều hành bật "giảm chuyển động".
  *
@@ -30,14 +30,14 @@ export default function StatCard({
         'card flex w-full min-w-0 flex-col text-left',
         compact ? 'gap-1 p-2 sm:p-2.5' : 'justify-between gap-1 p-3',
         (to || onClick) && 'transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
-        level != null && clsx('border-l-4', scale.edge, level > 0 && scale.soft),
+        level != null && clsx('border-l-4', scale.edge),
         level === null && 'border-dashed',
-        alert && 'ring-2 ring-danger',
+        alert && 'bg-danger/[0.04] ring-2 ring-danger',
         className,
       )}
     >
-      <div className="flex items-center justify-between gap-2 text-xs font-bold text-muted">
-        <span className={clsx('flex min-w-0 items-center gap-1.5 uppercase', compact ? 'text-[11px] tracking-wide [.kpi-lon_&]:text-xs' : 'tracking-wider')}>
+      <div className="flex items-center justify-between gap-2 text-xs font-semibold text-ink-2">
+        <span className={clsx('flex min-w-0 items-center gap-1.5', compact && 'text-xs [.kpi-lon_&]:text-sm')}>
           {Icon && <Icon size={15} className={clsx('shrink-0', scale ? scale.text : 'text-accent')} aria-hidden="true" />}
           <span className="truncate">{title}</span>
         </span>
@@ -45,10 +45,10 @@ export default function StatCard({
       </div>
       {value !== undefined && (
         <div className="flex min-w-0 items-baseline gap-1.5">
-          <span className={clsx('font-mono font-black tabular-nums tracking-tight text-ink', compact ? 'text-xl leading-tight sm:text-2xl [.kpi-lon_&]:text-4xl' : 'text-2xl lg:text-3xl')}>
+          <span className={clsx('num font-extrabold leading-none tracking-tight text-ink', compact ? 'text-2xl sm:text-[26px] [.kpi-lon_&]:text-4xl' : 'text-2xl lg:text-3xl')}>
             {value}
           </span>
-          {unit && <span className={clsx('font-mono font-bold text-muted', compact ? 'truncate text-[11px]' : 'text-xs')}>{unit}</span>}
+          {unit && <span className={clsx('font-medium text-muted', compact ? 'truncate text-xs' : 'text-sm')}>{unit}</span>}
         </div>
       )}
       {/* Ô gọn: nhãn mức nằm hàng riêng dưới số (góc phải của ô 2 cột trên điện thoại không đủ chỗ) */}
@@ -64,7 +64,7 @@ export default function StatCard({
           className={clsx(
             'text-ink-2',
             compact
-              ? clsx('text-[11px] leading-snug [.kpi-lon_&]:text-xs', !footerRows && 'line-clamp-1 sm:line-clamp-2')
+              ? clsx('text-xs leading-snug [.kpi-lon_&]:text-sm', !footerRows && 'line-clamp-1 sm:line-clamp-2')
               : 'border-t border-line/60 pt-1.5 text-xs',
           )}
         >

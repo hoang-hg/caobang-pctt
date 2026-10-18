@@ -6,21 +6,22 @@ import {
 } from 'lucide-react';
 import { NO_DATA, RISK, risk } from '../../utils/risk';
 
+/** Ô số liệu gọn (Nhập dữ liệu, Nguồn dữ liệu): `tone` = vạch màu bên trái theo mức (như StatCard), nền giữ trắng. */
 export function KpiCard({ label, value, unit, sub, tone, icon: Icon, blink, children }) {
   const toneCls = {
-    danger: 'border-danger/70 bg-danger/10',
-    serious: 'border-serious/70 bg-serious/10',
-    warn: 'border-warn/70 bg-warn/10',
-    good: 'border-line',
-  }[tone] || 'border-line';
+    danger: 'border-l-4 border-l-danger',
+    serious: 'border-l-4 border-l-serious',
+    warn: 'border-l-4 border-l-warn',
+    good: 'border-l-4 border-l-good',
+  }[tone];
   return (
     <div className={clsx('card flex flex-col gap-1 p-3', toneCls, blink && 'animate-blink')}>
-      <div className="flex items-center gap-1.5 text-xs font-medium text-muted">
-        {Icon && <Icon size={14} />}
+      <div className="flex items-center gap-1.5 text-xs font-semibold text-ink-2">
+        {Icon && <Icon size={14} className="text-accent" aria-hidden="true" />}
         <span className="truncate">{label}</span>
       </div>
       <div className="flex items-baseline gap-1">
-        <span className="font-mono text-2xl font-semibold tabular-nums text-ink">{value}</span>
+        <span className="num text-2xl font-extrabold leading-tight tracking-tight text-ink">{value}</span>
         {unit && <span className="text-xs text-muted">{unit}</span>}
       </div>
       {sub && <div className="text-xs text-ink-2">{sub}</div>}
@@ -255,7 +256,7 @@ export function TrendTag({ dir, text, label, className }) {
       aria-label={label}
       title={label}
       className={clsx(
-        'inline-flex items-center gap-0.5 whitespace-nowrap font-mono font-semibold',
+        'num inline-flex items-center gap-0.5 whitespace-nowrap font-semibold',
         dir === 'len' ? 'text-serious' : dir === 'xuong' ? 'text-accent' : 'text-muted',
         className,
       )}

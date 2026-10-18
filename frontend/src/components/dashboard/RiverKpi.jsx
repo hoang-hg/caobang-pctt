@@ -90,7 +90,7 @@ export function StationPicker({ stations, selectedId, onSelect }) {
             <span className="flex flex-col leading-tight">
               <span className={clsx('whitespace-nowrap font-semibold', on ? 'text-accent' : 'text-ink')}>{riverName(s)}</span>
               <span className="flex items-center gap-1.5 whitespace-nowrap">
-                <b className={clsx('font-mono', st.level == null ? 'text-muted' : 'text-ink')}>{st.value == null ? '–' : `${num(st.value, 2)} m`}</b>
+                <b className={clsx('num', st.level == null ? 'text-muted' : 'text-ink')}>{st.value == null ? '–' : `${num(st.value, 2)} m`}</b>
                 <TrendTag {...trendProps(riverTrend(s))} className="text-[10px]" />
                 <span className={clsx('chip px-1.5 py-0 text-[9px]', st.cls)}>{st.label}</span>
               </span>

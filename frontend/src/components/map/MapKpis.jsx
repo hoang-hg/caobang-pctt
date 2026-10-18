@@ -100,7 +100,7 @@ function Tile({ t, layout, onPick }) {
         <span className="truncate">{scroll ? t.short : t.title}</span>
       </span>
       <span className="flex min-w-0 items-baseline gap-1">
-        <b className={clsx('font-mono font-black leading-tight text-ink', scroll ? 'text-sm' : 'text-base')}>{t.value}</b>
+        <b className={clsx('num font-black leading-tight text-ink', scroll ? 'text-sm' : 'text-base')}>{t.value}</b>
         {t.unit && <span className="truncate text-[10px] text-muted">{scroll ? t.unitShort ?? t.unit : t.unit}</span>}
       </span>
       {!scroll && (

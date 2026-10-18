@@ -9,7 +9,7 @@ import { int } from '../../utils/format';
 import { RISK } from '../../utils/risk';
 import { ErrorState, Skeleton } from '../common/ui';
 
-const COUNT = 'chip min-w-[2.25rem] justify-center px-2 py-0.5 font-mono text-xs font-black';
+const COUNT = 'chip min-w-[2.25rem] justify-center px-2 py-0.5 num text-xs font-black';
 
 /**
  * "Việc chờ quyết định" của lãnh đạo / trực ban: chỉ những việc tài khoản này làm được, mỗi dòng mở thẳng trang xử lý.

@@ -2,13 +2,15 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { Columns3, Home, Inbox, List, Navigation, RefreshCw } from 'lucide-react';
+import { Columns3, Home, Inbox, List, Navigation } from 'lucide-react';
 import { api } from '../api/client';
 import { useAreaQuery, useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
 import { ErrorState, Pager, Section, Skeleton } from '../components/common/ui';
 import FilterToolbar from '../components/common/FilterToolbar';
 import UrgentStrip from '../components/common/UrgentStrip';
+import PageHeader from '../components/common/PageHeader';
+import { PAGE } from '../components/layout/page';
 import DispatchModal from '../components/common/DispatchModal';
 import { MissionLinkModal } from '../components/common/MissionLink';
 import CancelDispatchModal from '../components/common/CancelDispatchModal';
@@ -313,7 +315,7 @@ export default function RescueCenter() {
   }
 
   return (
-    <div className="flex flex-col gap-3 p-3 pb-28 sm:pb-8">
+    <div className={PAGE}>
       {/* Thông tin khẩn luôn trên cùng (Cam / Đỏ dính khi cuộn) + mất mạng */}
       <UrgentStrip
         label="Thông tin khẩn cứu hộ"
@@ -331,22 +333,16 @@ export default function RescueCenter() {
       />
       <ConnectionBanner updatedAt={ticketsQ.dataUpdatedAt || null} />
 
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <h1 className="text-base font-bold leading-tight sm:text-lg">
-            Điều hành cứu hộ<span className="hidden sm:inline"> &amp; điểm nóng khẩn cấp</span>
-          </h1>
-          <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11px] text-muted">
-            <span className="font-semibold text-accent">{scopeLabel}</span>
-            <span aria-hidden="true">·</span>
-            <span>{dataTime ? <>Số liệu lúc <b className="font-mono text-ink-2">{dataTime}</b></> : ticketsQ.isError ? 'Chưa tải được số liệu' : 'Đang tải số liệu…'}</span>
-            <span className="hidden md:inline">· SLA chờ xử lý / chờ điều động: cấp 1 3′, cấp 2 15′, cấp 3 60′</span>
-          </p>
-        </div>
-        <button type="button" onClick={refresh} disabled={refreshing} className="btn-ghost tap-sq h-9 min-w-[36px] shrink-0 px-2.5 text-xs" aria-label="Làm mới số liệu" title="Làm mới số liệu">
-          <RefreshCw size={14} className={clsx(refreshing && 'animate-spin')} aria-hidden="true" /> <span className="hidden md:inline">Làm mới</span>
-        </button>
-      </div>
+      <PageHeader
+        title="Điều hành cứu hộ & điểm nóng khẩn cấp"
+        short="Điều hành cứu hộ"
+        scope={scopeLabel}
+        time={dataTime}
+        timeNote={ticketsQ.isError ? 'Chưa tải được số liệu' : 'Đang tải số liệu…'}
+        meta={[<span key="sla" className="hidden md:inline">SLA chờ xử lý / chờ điều động: cấp 1 3′, cấp 2 15′, cấp 3 60′</span>]}
+        onRefresh={refresh}
+        refreshing={refreshing}
+      />
 
       <RescueKpis ticketsQ={ticketsQ} tickets={tickets} factsOf={factsOf} evacQ={evacQ} onGo={go} onEvac={() => scrollTo(document.getElementById('so-tan'))} />
 

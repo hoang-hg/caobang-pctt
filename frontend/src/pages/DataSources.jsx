@@ -7,6 +7,8 @@ import {
 import { api } from '../api/client';
 import { useStore } from '../app/store';
 import { Empty, KpiCard, Modal, Tabs } from '../components/common/ui';
+import PageHeader from '../components/common/PageHeader';
+import { PAGE } from '../components/layout/page';
 import { usePermission } from '../rbac/usePermission';
 import { STATION_TYPE } from '../utils/labels';
 import { ago, dateTime, int } from '../utils/format';
@@ -352,11 +354,11 @@ function MonitorTab() {
 export default function DataSources() {
   const [tab, setTab] = useState('sources');
   return (
-    <div className="flex flex-col gap-3 p-3">
-      <div>
-        <h1 className="text-lg font-bold">Nguồn dữ liệu & Thiết bị IoT</h1>
-        <p className="text-xs text-muted">Dự báo quốc tế (ECMWF, GFS, OpenWeather) · Cổng tiếp nhận IoT hiện trường HTTP / MQTT / LoRaWAN · Giám sát kết nối</p>
-      </div>
+    <div className={`${PAGE} pb-8`}>
+      <PageHeader
+        title="Nguồn dữ liệu & Thiết bị IoT"
+        description="Dự báo quốc tế (ECMWF, GFS, OpenWeather) · Cổng tiếp nhận IoT hiện trường HTTP / MQTT / LoRaWAN · Giám sát kết nối"
+      />
       <Tabs value={tab} onChange={setTab} tabs={[
         { value: 'sources', label: 'Nguồn dữ liệu', icon: CloudSun },
         { value: 'devices', label: 'Thiết bị IoT', icon: Cpu },

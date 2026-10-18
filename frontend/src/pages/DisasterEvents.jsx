@@ -2,12 +2,14 @@ import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { ChevronLeft, ChevronRight, Flag, Plus, RefreshCw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Flag, Plus } from 'lucide-react';
 import { api, useAreaParams } from '../api/client';
 import { useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
 import { EmptyState, ErrorState, Skeleton } from '../components/common/ui';
 import ConnectionBanner from '../components/dashboard/ConnectionBanner';
+import PageHeader from '../components/common/PageHeader';
+import { PAGE } from '../components/layout/page';
 import EventFormModal, { EndEventModal } from '../components/events/EventFormModal';
 import EventReport from '../components/events/EventReport';
 import { areaText, HAZARD, period } from '../components/events/eventFacts';
@@ -125,7 +127,7 @@ export default function DisasterEvents() {
 
   const showReport = !!current && (isLg || !!selected);
   return (
-    <div className="flex flex-col gap-3 p-3 pb-8">
+    <div className={clsx(PAGE, 'pb-8')}>
       <ConnectionBanner updatedAt={q.dataUpdatedAt || null} />
       {/* Đợt đang diễn ra luôn trên cùng — chạm mở báo cáo */}
       {live.length > 0 && !(showReport && !isLg) && (
@@ -140,29 +142,25 @@ export default function DisasterEvents() {
         </div>
       )}
 
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          {showReport && !isLg ? (
-            <button type="button" className="btn-ghost tap mb-1 px-2 text-xs" onClick={() => openEvent(null)}>
-              <ChevronLeft size={14} aria-hidden="true" /> Tất cả đợt
-            </button>
-          ) : null}
-          <h1 className="text-base font-bold leading-tight sm:text-lg">Đợt thiên tai & báo cáo</h1>
-          <p className="mt-0.5 text-[11px] text-muted">
-            Gom phiếu SOS, lệnh điều động, cảnh báo, vật tư theo đợt để báo cáo, rút kinh nghiệm{area.admin_codes ? ' · số liệu theo vùng đang lọc' : ''}
-          </p>
-        </div>
-        <div className="flex shrink-0 gap-1.5">
-          {canManage && (
-            <button type="button" className="btn-primary tap px-3 text-xs sm:text-sm" onClick={newEvent} disabled={!online} title={online ? undefined : 'Mất mạng — chưa mở được đợt'}>
-              <Plus size={15} aria-hidden="true" /> <span className="max-sm:hidden">Mở đợt thiên tai</span><span className="sm:hidden">Mở đợt</span>
-            </button>
-          )}
-          <button type="button" onClick={refresh} disabled={refreshing} className="btn-ghost tap-sq h-9 min-w-[36px] px-2.5 text-xs" aria-label="Làm mới số liệu" title="Làm mới số liệu">
-            <RefreshCw size={14} className={clsx(refreshing && 'animate-spin')} aria-hidden="true" />
+      <PageHeader
+        title="Đợt thiên tai & báo cáo"
+        before={showReport && !isLg ? (
+          <button type="button" className="btn-ghost tap mb-1 px-2 text-xs" onClick={() => openEvent(null)}>
+            <ChevronLeft size={14} aria-hidden="true" /> Tất cả đợt
           </button>
-        </div>
-      </div>
+        ) : null}
+        meta={[
+          <span key="what" className="max-sm:hidden">Gom phiếu SOS, lệnh điều động, cảnh báo, vật tư theo đợt để báo cáo, rút kinh nghiệm</span>,
+          area.admin_codes && <span key="area">số liệu theo vùng đang lọc</span>,
+        ]}
+        actions={canManage && (
+          <button type="button" className="btn-primary tap h-9 px-3" onClick={newEvent} disabled={!online} title={online ? undefined : 'Mất mạng — chưa mở được đợt'}>
+            <Plus size={15} aria-hidden="true" /> <span className="max-sm:hidden">Mở đợt thiên tai</span><span className="sm:hidden">Mở đợt</span>
+          </button>
+        )}
+        onRefresh={refresh}
+        refreshing={refreshing}
+      />
 
       {isLg ? (
         <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
