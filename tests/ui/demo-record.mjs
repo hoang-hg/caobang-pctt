@@ -201,6 +201,23 @@ async function crawl(browser, scope) {
       await tabs.nth(i).click().catch(() => {});
       await settle();
     }
+    // Tổng quan: biểu đồ chỉ tải khi chọn chuyên đề (mặc định chỉ "Mực nước") → bấm từng chuyên đề; bảng số liệu chi tiết
+    // thu gọn sẵn → mở ra, bấm từng thẻ (phiếu SOS, kho chỉ tải khi mở)
+    const segs = page.getByRole('group', { name: 'Chuyên đề biểu đồ' }).getByRole('button');
+    for (let i = 0, n = await segs.count(); i < n; i += 1) {
+      await segs.nth(i).click().catch(() => {});
+      await settle();
+    }
+    const table = page.getByRole('button', { name: 'Mở bảng số liệu' });
+    if (await table.count()) {
+      await table.click().catch(() => {});
+      await settle();
+      const tableTabs = page.getByRole('tablist', { name: 'Chuyên đề của bảng' }).getByRole('tab');
+      for (let i = 0, n = await tableTabs.count(); i < n; i += 1) {
+        await tableTabs.nth(i).click().catch(() => {});
+        await settle();
+      }
+    }
   };
   for (const url of PAGES[scope]) await visit(url);
   // Đợt thiên tai, hồ sơ dữ liệu: mở từng mục (báo cáo đợt, chi tiết hồ sơ)
@@ -213,11 +230,14 @@ async function crawl(browser, scope) {
   // components/map/MapPanels.jsx TimeControl), gợi ý lực lượng khi điều động từng phiếu SOS
   const stations = await call(token, 'GET', '/stations');
   const tickets = scope === 'tinh' ? await call(token, 'GET', '/sos') : [];
+  // Dự báo mưa 3 ngày: chuỗi của từng xã (hộp chọn xã của biểu đồ) — rỗng khi máy ghi không tới được Open-Meteo
+  const areas = await call(token, 'GET', '/forecast/areas?hours=72').catch(() => []);
   const offsets = Array.from({ length: 37 }, (_, i) => i - 12).filter((h) => h !== 0);
   const extra = [
     ...stations.map((s) => `/stations/${encodeURIComponent(s.id)}/series?hours=24`),
     ...stations.filter((s) => s.type === 'muc_nuoc').map((s) => `/stations/${encodeURIComponent(s.id)}/series?hours=48`),
     `/forecast/areas/${COMMUNE}`,
+    ...areas.map((a) => `/forecast/areas/${encodeURIComponent(a.code)}`),
     '/dashboard/communes',
     '/resources/items',
     '/resources/inventory-moves?limit=5000',
@@ -263,6 +283,24 @@ const clean = (v, key) => {
   }
   return v;
 };
+
+// Dự báo mưa theo xã cần máy ghi tới được Open-Meteo. Lần ghi này không lấy được (danh sách rỗng / chuỗi trống) mà lần
+// ghi trước có → giữ phản hồi của lần trước cho đúng khoá đó (chỉ dự báo; in ra để người chạy biết)
+const KEEP = /^\/forecast\//;
+const blank = (b) => (Array.isArray(b) ? !b.length : b?.series ? !Object.keys(b.series).length : false);
+let prev = null;
+try {
+  prev = JSON.parse(fs.readFileSync(OUT, 'utf8'));
+} catch { /* chưa có tệp cũ */ }
+for (const scope of ['tinh', 'xa']) {
+  for (const [key, i] of Object.entries(prev?.[scope] || {})) {
+    const old = prev.bodies[i];
+    if (KEEP.test(key) && !blank(old) && (!sets[scope].has(key) || blank(sets[scope].get(key)))) {
+      sets[scope].set(key, old);
+      console.log(`   giữ dự báo của lần ghi trước (${prev.recordedAt}): ${scope} ${key}`);
+    }
+  }
+}
 
 // Phản hồi giống hệt nhau (ranh giới xã, danh mục…) chỉ lưu một lần
 const bodies = [];

@@ -424,7 +424,10 @@ Cô Ba).
   sông Bằng Giang vượt BĐ III, sạt lở Tĩnh Túc, thủy điện Bạch Đằng xả lũ lớn).
 - API đổi định dạng → ghi lại: seed mới (`docker compose down -v && docker compose up -d`), `npm run dev`, rồi
   `cd tests/ui && API=http://localhost:8000 UI=http://localhost:5173 node demo-record.mjs` — dựng sẵn tình huống (đợt mưa
-  lũ, xã Cô Ba xin chi viện, tỉnh điều đội…) trên máy chủ đó rồi mở từng trang, lưu phản hồi.
+  lũ, xã Cô Ba xin chi viện, tỉnh điều đội…) trên máy chủ đó rồi mở từng trang, lưu phản hồi. Tổng quan: bấm qua mọi
+  chuyên đề biểu đồ (mực nước, mưa, dự báo 3 ngày, sạt lở, kho) và mở bảng số liệu chi tiết để ghi đủ số liệu từng biểu
+  đồ. Dự báo mưa theo xã cần máy ghi tới được Open-Meteo; không tới được thì giữ phần dự báo của lần ghi trước (in tên
+  khoá giữ lại) — biểu đồ dự báo toàn tỉnh khi đó hiện "chưa có dữ liệu", không báo lỗi.
 
 ---
 
