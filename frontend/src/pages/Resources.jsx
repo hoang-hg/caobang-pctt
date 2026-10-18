@@ -1,11 +1,10 @@
 import { useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import clsx from 'clsx';
 import { PackageMinus, PackagePlus, Truck } from 'lucide-react';
 import { useAreaQuery, useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
-import { EmptyState, ErrorState, Pager, Section, Skeleton, Tabs } from '../components/common/ui';
+import { EmptyState, ErrorState, Pager, Section, Segmented, Skeleton, Tabs } from '../components/common/ui';
 import SuppliesChart from '../components/charts/SuppliesChart';
 import IssueModal from '../components/common/IssueModal';
 import { FuelDepotModal, ReceiveModal, VehicleModal } from '../components/common/LogisticsModals';
@@ -382,19 +381,13 @@ export default function Resources() {
             open={chartOpen || pdf}
             onToggle={() => setChartOpen((v) => !v)}
             right={(
-              <div className="flex shrink-0 gap-1 no-print" role="group" aria-label="Cách xem dự trữ">
-                {[['kho', 'Theo kho'], ['mat_hang', 'Theo mặt hàng']].map(([v, label]) => (
-                  <button
-                    key={v}
-                    type="button"
-                    aria-pressed={supplyView === v}
-                    onClick={() => { setSupplyView(v); setChartOpen(true); }}
-                    className={clsx('tap whitespace-nowrap rounded-md px-2 py-1 text-[11px] font-semibold', supplyView === v ? 'bg-accent text-white' : 'bg-panel2/60 text-muted hover:text-ink')}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
+              <Segmented
+                className="shrink-0 no-print"
+                label="Cách xem dự trữ"
+                value={supplyView}
+                onChange={(v) => { setSupplyView(v); setChartOpen(true); }}
+                options={[{ value: 'kho', label: 'Theo kho' }, { value: 'mat_hang', label: 'Theo mặt hàng' }]}
+              />
             )}
           >
             {supplyView === 'mat_hang'

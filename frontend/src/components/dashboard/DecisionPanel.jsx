@@ -53,7 +53,7 @@ export default function DecisionPanel({ k, kState, className }) {
             <li key={r.to + r.text}>
               <Link to={r.to} className="flex min-h-[44px] items-center gap-2.5 rounded-lg border border-line px-2.5 py-1.5 transition-colors hover:bg-panel2">
                 <span className={clsx(COUNT, r.cls)}>{int(r.n)}</span>
-                <span className="min-w-0 flex-1 text-xs font-semibold leading-snug text-ink">{r.text}</span>
+                <span className="min-w-0 flex-1 text-sm font-medium leading-snug text-ink">{r.text}</span>
                 <ChevronRight size={15} className="shrink-0 text-muted" aria-hidden="true" />
               </Link>
             </li>

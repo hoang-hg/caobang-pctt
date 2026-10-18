@@ -30,6 +30,41 @@ export function KpiCard({ label, value, unit, sub, tone, icon: Icon, blink, chil
   );
 }
 
+/**
+ * Nút chuyển chế độ xem (segmented control) dùng chung mọi trang: khung viền, mục đang chọn tô màu nhấn — chọn MỘT trong
+ * vài cách xem cùng số liệu (không phải điều hướng giữa các trang con: dùng Tabs). `options`: [{ value, label, icon, hint
+ * (chú thích khi rê chuột), short (nhãn ngắn trên điện thoại) }]; `label`: tên nhóm cho trình đọc màn hình. Nút cao 32 px,
+ * 44 px trên màn cảm ứng (`touch`: luôn 44 px). Nhiều mục hơn bề ngang thì cuộn ngang trong khung.
+ */
+export function Segmented({ options, value, onChange, label, touch = false, className }) {
+  return (
+    <div role="group" aria-label={label} className={clsx('scroll-thin inline-flex max-w-full gap-0.5 overflow-x-auto rounded-xl border border-line bg-panel p-0.5 shadow-sm', className)}>
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          aria-pressed={value === o.value}
+          title={o.hint}
+          onClick={() => onChange(o.value)}
+          className={clsx(
+            'inline-flex shrink-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-xs font-semibold transition-colors',
+            touch ? 'min-h-[44px]' : 'tap min-h-[32px]',
+            value === o.value ? 'bg-accent text-white shadow-sm' : 'text-ink-2 hover:bg-panel2 hover:text-ink',
+          )}
+        >
+          {o.icon && <o.icon size={14} className="shrink-0" aria-hidden="true" />}
+          {o.short ? (
+            <>
+              <span className="sm:hidden">{o.short}</span>
+              <span className="max-sm:hidden">{o.label}</span>
+            </>
+          ) : o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /** Thanh tỉ lệ. `level` (0–3 / null, utils/risk.js) → màu theo thang rủi ro chung, null = Xám; không có `level` → `tone`. */
 export function Progress({ value, tone = 'accent', level, className }) {
   const color = level !== undefined
