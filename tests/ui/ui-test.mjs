@@ -366,6 +366,9 @@ async function staff(ctx, trackCode) {
   await step(ctx, 'Tổng quan: bảng tác chiến có thẻ Hồ chứa; tab Hồ chứa hiện 9 thẻ + "Xem thêm", hồ khẩn lên đầu', async () => {
     await page.goto(`${ROOT}/dashboard`);
     await waitMain(page);
+    // Bảng tác chiến thu gọn sẵn dưới Tổng quan — mở ra trước
+    const opener = page.getByRole('button', { name: 'Mở bảng dữ liệu chi tiết' });
+    if (await opener.count()) await opener.click();
     const table = page.locator('section', { hasText: 'Bảng tác chiến theo chuyên đề' }).first();
     await table.getByRole('tablist', { name: 'Chuyên đề của bảng' }).getByRole('tab', { name: /Hồ chứa/ }).click();
     const rows = table.locator(vp.mobile ? 'ul[aria-label="Hồ chứa & xả lũ"] > li' : 'tbody tr');
@@ -1939,8 +1942,8 @@ async function rescueForms(ctx) {
 }
 
 /**
- * Bản đồ tác chiến & diễn biến 48 giờ (cho lãnh đạo) — chỉ xem: laptop / iPad mở sẵn, điện thoại thu gọn (bảng phiếu lên
- * trước); mọi phiếu đang mở có toạ độ đều lên bản đồ (điểm lẻ + số trong các cụm); biểu đồ + thời gian xử lý; chạm điểm →
+ * Bản đồ tác chiến & diễn biến 48 giờ (cho lãnh đạo) — chỉ xem: thu gọn sẵn trên mọi thiết bị (bảng điều phối lên trước,
+ * chưa dựng bản đồ); mở ra: mọi phiếu đang mở có toạ độ đều lên bản đồ (điểm lẻ + số trong các cụm); biểu đồ + thời gian xử lý; chạm điểm →
  * "Xem phiếu trên bảng" mở đúng phiếu; laptop: lớp lộ trình / vùng nguy cơ không tải được → nói rõ, điểm SOS vẫn hiện.
  */
 async function rescueOverview(ctx) {
@@ -1960,14 +1963,11 @@ async function rescueOverview(ctx) {
     inClusters: [...sec.querySelectorAll('.sos-cluster')].reduce((m, el) => m + Number(el.textContent.trim() || 0), 0),
   }));
 
-  await step(ctx, 'Bản đồ tác chiến & diễn biến 48 giờ: laptop / iPad mở sẵn, điện thoại thu gọn; mọi phiếu đang mở lên bản đồ; biểu đồ + thời gian xử lý', async () => {
+  await step(ctx, 'Bản đồ tác chiến & diễn biến 48 giờ: thu gọn sẵn (bảng điều phối lên trước); mở ra: mọi phiếu đang mở lên bản đồ; biểu đồ + thời gian xử lý', async () => {
     await open();
-    const expanded = await toggle.getAttribute('aria-expanded');
-    if (vp.mobile) {
-      if (expanded !== 'false') throw new Error('điện thoại: khối bản đồ & biểu đồ không thu gọn sẵn (bảng phiếu phải lên trước)');
-      if (await section.locator('.leaflet-container').count()) throw new Error('điện thoại: thu gọn nhưng vẫn dựng bản đồ (tải lớp bản đồ thừa)');
-      await toggle.click();
-    } else if (expanded !== 'true') throw new Error('laptop / iPad: khối bản đồ & biểu đồ không mở sẵn');
+    if ((await toggle.getAttribute('aria-expanded')) !== 'false') throw new Error('khối bản đồ & biểu đồ không thu gọn sẵn (bảng điều phối phải lên trước)');
+    if (await section.locator('.leaflet-container').count()) throw new Error('thu gọn nhưng vẫn dựng bản đồ (tải lớp bản đồ thừa)');
+    await toggle.click();
     await section.locator('.leaflet-container').waitFor({ timeout: 10_000 });
     await page.waitForTimeout(1500);
     const head = await section.getByRole('heading', { name: /phiếu đang mở/ }).innerText();
@@ -2056,7 +2056,8 @@ async function rescueOverview(ctx) {
     await step(ctx, 'Lớp lộ trình / vùng nguy cơ không tải được → báo rõ, Thử lại; điểm SOS vẫn hiện', async () => {
       await page.route('**/api/v1/map/layers**', safeRoute((r) => r.abort('failed')));
       try {
-        await page.goto(`${ROOT}/cuu-ho`);
+        await open();
+        if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
         await section.getByText(/Không tải được lộ trình đội, vùng nguy cơ, điểm sơ tán/).waitFor({ timeout: 30_000 });
         if (!(await section.getByRole('button', { name: 'Thử lại' }).count())) throw new Error('thiếu nút Thử lại');
         await page.waitForTimeout(1000);
@@ -2398,23 +2399,20 @@ async function alertsForms(ctx) {
 }
 
 /**
- * Bản đồ vùng cảnh báo & chuyển giao (cho lãnh đạo) — chỉ xem: laptop / iPad mở sẵn, điện thoại thu gọn (không dựng bản đồ khi
- * chưa mở); số xã tô màu trên bản đồ bằng số xã ghi ở tiêu đề; biểu đồ chuyển giao theo kênh (hoặc nói rõ kênh chưa tích hợp).
+ * Bản đồ vùng cảnh báo & chuyển giao (cho lãnh đạo) — chỉ xem: thu gọn sẵn trên mọi thiết bị (lệnh chờ duyệt, soạn lệnh lên
+ * trước; không dựng bản đồ khi chưa mở); số xã tô màu trên bản đồ bằng số xã ghi ở tiêu đề; biểu đồ chuyển giao theo kênh (hoặc nói rõ kênh chưa tích hợp).
  */
 async function alertsOverview(ctx) {
-  const { page, vp } = ctx;
+  const { page } = ctx;
   const touch = await page.evaluate(() => matchMedia('(pointer: coarse)').matches);
   const toggle = page.getByRole('button', { name: /Bản đồ vùng cảnh báo & chuyển giao/ });
   const section = page.locator('main section').filter({ has: toggle });
-  await step(ctx, 'Bản đồ vùng cảnh báo & chuyển giao: laptop / iPad mở sẵn, điện thoại thu gọn; số xã tô màu = số xã ghi ở tiêu đề; biểu đồ chuyển giao theo kênh', async () => {
+  await step(ctx, 'Bản đồ vùng cảnh báo & chuyển giao: thu gọn sẵn (lệnh chờ duyệt lên trước); mở ra: số xã tô màu = số xã ghi ở tiêu đề; biểu đồ chuyển giao theo kênh', async () => {
     await page.goto(`${ROOT}/canh-bao`);
     await toggle.waitFor({ timeout: 20_000 });
-    const expanded = await toggle.getAttribute('aria-expanded');
-    if (vp.mobile) {
-      if (expanded !== 'false') throw new Error('điện thoại: khối bản đồ & chuyển giao không thu gọn sẵn');
-      if (await section.locator('.leaflet-container').count()) throw new Error('điện thoại: thu gọn nhưng vẫn dựng bản đồ');
-      await toggle.click();
-    } else if (expanded !== 'true') throw new Error('laptop / iPad: khối bản đồ & chuyển giao không mở sẵn');
+    if ((await toggle.getAttribute('aria-expanded')) !== 'false') throw new Error('khối bản đồ & chuyển giao không thu gọn sẵn');
+    if (await section.locator('.leaflet-container').count()) throw new Error('thu gọn nhưng vẫn dựng bản đồ');
+    await toggle.click();
     await section.locator('.leaflet-container').waitFor({ timeout: 15_000 });
     const head = await section.getByRole('heading', { name: /Vùng đang có cảnh báo/ }).innerText();
     const n = Number(head.match(/(\d+) xã\/phường/)?.[1] ?? -1);

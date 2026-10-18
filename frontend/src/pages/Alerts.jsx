@@ -65,8 +65,8 @@ export default function Alerts() {
   const [approve, setApprove] = useState(null);
   const [manage, setManage] = useState(null); // { b, mode: 'extend' | 'end' }
   const [refreshing, setRefreshing] = useState(false);
-  // Bản đồ + chuyển giao: điện thoại mặc định thu gọn (không tải ranh giới xã khi chưa mở) — như trang C, D
-  const [overviewOpen, setOverviewOpen] = useState(() => window.innerWidth >= 768);
+  // Bản đồ + chuyển giao: mặc định thu gọn để danh sách lệnh chờ duyệt & soạn lệnh lên ngay tầm mắt
+  const [overviewOpen, setOverviewOpen] = useState(false);
 
   // Tài khoản xã: tiêu đề là xã của mình (như Tổng quan), không ghi "Toàn tỉnh"
   const scope = useAllowedCodes('alert', 'view');

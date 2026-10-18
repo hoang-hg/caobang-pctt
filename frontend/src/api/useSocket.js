@@ -25,9 +25,21 @@ export function useSocket() {
   const qc = useQueryClient();
   // Chỉ nối lại khi đăng nhập / đăng xuất — token gia hạn định kỳ (App.jsx) không làm đứt kết nối
   const loggedIn = useStore((s) => !!s.auth?.token);
+  // Chế độ giả lập (chỉ máy dev — app/store.js): không nối WebSocket thật, làm mới số liệu giả lập theo nhịp
+  const isSim = useStore((s) => import.meta.env.DEV && s.simulationMode);
 
   useEffect(() => {
     if (!loggedIn) return undefined;
+    if (isSim) {
+      useStore.getState().setWsStatus('online');
+      const simTimer = setInterval(() => {
+        qc.invalidateQueries({ queryKey: ['kpis'] });
+        qc.invalidateQueries({ queryKey: ['stations'] });
+      }, 4000);
+      return () => {
+        clearInterval(simTimer);
+      };
+    }
     let ws;
     let retry;
     let beat;
@@ -305,5 +317,5 @@ export function useSocket() {
         ws.close();
       }
     };
-  }, [qc, loggedIn]);
+  }, [qc, loggedIn, isSim]);
 }

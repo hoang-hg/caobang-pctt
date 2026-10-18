@@ -82,9 +82,11 @@ frontend/                  React 18, Vite 6, Tailwind 3, TanStack Query 5, Zusta
   public/                  favicon, icon-192/512.png, manifest.webmanifest (PWA)
   src/sw.js                service worker cổng công khai (chỉ đăng ký ở bản build — main.jsx), README §9.4
   src/App.jsx              route + Guard(obj, act), mỗi trang `lazy()`; trang công khai /, /cong-khai, /dang-nhap…
-  src/api/                 client.js (api(), useAreaParams) · hooks.js (useAreaQuery, useUnits…) · useSocket.js
+  src/api/                 client.js (api(), useAreaParams) · hooks.js (useAreaQuery, useUnits…) · useSocket.js ·
+                           chế độ giả lập (chỉ máy dev, README §4.7): simulationEngine.js, demoUsers.js, demo/fixtures.json
   src/app/store.js         Zustand: theme, filter, focus, alertDraft, gps, auth, wsStatus, soundOn, sidebar, savedAt, toasts
-  src/rbac/                permissions.js (khớp domain) · usePermission.js (usePermission, useCanAll, useAllowedCodes, Can)
+  src/rbac/                permissions.js (khớp domain) · usePermission.js (usePermission, useCanAll, useAllowedCodes,
+                           useIsCommuneUser, Can)
   src/pages/               trang điều hành (DataImport = nhập dữ liệu chính thức); pages/public/ = cổng công khai (PublicPortal, ReportForm, TicketTracker,
                            ReservoirMonitor, LandslideMonitor, NetworkBanner = báo mất mạng / gợi ý bản nhẹ,
                            MissionPage = /nhiem-vu link nhiệm vụ của trưởng nhóm, không đăng nhập)
@@ -307,6 +309,10 @@ chỉ khi `DEMO_MODE`; `DEMO_MODE=false` xoá đoạn `so_do` còn sót mỗi l�
 - **Gọi API**: `api(path, { method, body, params })` trong `src/api/client.js` — tự thêm tiền tố `/api/v1`, Bearer token từ
   store, lỗi → `ApiError(status, detail)`, 401 → đăng xuất (kèm thông báo lý do), 403 có header `X-Must-Change-Password`
   → màn hình đổi mật khẩu. Upload multipart (phản ánh) dùng `fetch` trực tiếp.
+- **Chế độ giả lập** (README §4.7): mã giả lập chỉ nạp trong nhánh `import.meta.env.DEV` bằng `lazy` / `import()` động →
+  bản build không có (kiểm tra: build rồi tìm chữ "GIẢ LẬP" trong `dist/`). Không bao giờ "máy chủ lỗi thì trả dữ liệu giả";
+  `/public/*` luôn gọi máy chủ thật. Dữ liệu = phản hồi API thật đã ghi (`tests/ui/demo-record.mjs` → `api/demo/fixtures.json`)
+  — API đổi định dạng thì ghi lại, không sửa tay tệp ghi.
 - **Tên tệp xuất** (Excel / PDF): ngày theo giờ Việt Nam `vnFileStamp()` (`utils/format.js`), không dùng `toISOString()`
   (giờ UTC — trước 7 giờ sáng ra ngày hôm trước).
 - **Truy vấn theo vùng lọc**: `useAreaQuery(key, path, extra)`; `key` phải trùng khoá mà `useSocket.js` invalidate khi có sự

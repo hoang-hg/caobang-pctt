@@ -1,15 +1,17 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { BookUser, Home, MapPinned, PhoneCall, Shield, Siren, Users } from 'lucide-react';
+import { BookUser, Home, MapPinned, PhoneCall, Shield, Siren, Users, Send, FileUp, AlertTriangle, PlusCircle } from 'lucide-react';
+
 import { api } from '../../api/client';
 import { useAreaQuery } from '../../api/hooks';
-import { usePermission } from '../../rbac/usePermission';
+import { useIsCommuneUser, usePermission } from '../../rbac/usePermission';
 import { ErrorState, Progress, Skeleton } from '../common/ui';
 import { FORCE_TYPE, INCIDENT, PRIORITY, SOS_STATUS } from '../../utils/labels';
 import { dateTime, int, minutesSince, pct } from '../../utils/format';
 import { slaState } from '../../utils/sla';
+import QuickIncidentModal from './QuickIncidentModal';
 
 export const unitLabel = (u) => (u ? `${u.unit_type === 'phuong' ? 'Phường' : 'Xã'} ${u.name}` : '');
 
@@ -67,7 +69,11 @@ export default function CommuneView({ code, units, onChange, children }) {
   const open = (sosQ.data || []).filter((t) => t.admin_code === code && t.status !== 'hoan_thanh');
   const localForces = forcesQ.data || []; // đóng quân trong ranh giới xã (kể cả đơn vị cấp tỉnh — ghi rõ cấp)
   const book = useMemo(() => flatten(contactsQ.data || []).filter((c) => c.admin_code === code && c.level !== 'tinh'), [contactsQ.data, code]);
-  const myHamlets = (hamletsQ.data || []).filter((h) => h.parent_code === code);
+  const myHamlets = useMemo(() => (hamletsQ.data || []).filter((h) => h.parent_code === code), [hamletsQ.data, code]);
+  const [supportOpen, setSupportOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  // Kênh báo cáo / xin chi viện lên tỉnh: chỉ tài khoản cấp xã (cấp tỉnh xem trang này không "xin chi viện lên tỉnh")
+  const isCommuneUser = useIsCommuneUser();
 
   return (
     <div className="flex flex-col gap-3">
@@ -91,6 +97,54 @@ export default function CommuneView({ code, units, onChange, children }) {
           </select>
         </label>
       </div>
+
+      {unit && isCommuneUser && (
+        <div className="card rounded-2xl border border-red-500/30 bg-gradient-to-r from-red-500/10 via-amber-500/5 to-panel p-3.5 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-red-600 text-white shadow-md shadow-red-600/30">
+                <AlertTriangle size={18} />
+              </span>
+              <div>
+                <h3 className="text-xs sm:text-sm font-extrabold text-ink uppercase tracking-wide">
+                  Trung tâm Điều hành Tác chiến {unitLabel(unit)}
+                </h3>
+                <p className="text-[11px] text-muted">
+                  Kênh báo cáo & đề xuất chi viện trực tiếp lên Ban Chỉ huy PCTT & TKCN tỉnh
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setSupportOpen(true)}
+                className="btn-danger tap rounded-xl px-3.5 py-2 text-xs font-bold flex items-center gap-1.5 shadow-md shadow-danger/20 hover:scale-[1.02] transition-transform"
+              >
+                <Send size={14} />
+                <span>GỬI YÊU CẦU CHI VIỆN LÊN TỈNH</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setReportOpen(true)}
+                className="btn-secondary tap rounded-xl px-3 py-2 text-xs font-semibold flex items-center gap-1.5"
+              >
+                <PlusCircle size={14} className="text-accent" />
+                <span>Báo cáo thiệt hại nhanh</span>
+              </button>
+
+              <Link
+                to="/nhap-du-lieu"
+                className="btn-ghost tap rounded-xl border border-line bg-panel2/60 px-3 py-2 text-xs font-semibold text-ink-2 hover:text-ink flex items-center gap-1.5"
+              >
+                <FileUp size={14} className="text-muted" />
+                <span>Gửi dữ liệu địa bàn</span>
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
 
       {!unit ? (
         <p className="card border-dashed p-4 text-center text-sm text-muted">
@@ -236,6 +290,15 @@ export default function CommuneView({ code, units, onChange, children }) {
             </Panel>
           </div>
         </>
+      )}
+
+      {/* Xã xin chi viện lên tỉnh: cùng hộp thoại báo cáo nhanh, chế độ support (phiếu SOS gắn thẻ — rescueFacts) */}
+      {supportOpen && <QuickIncidentModal open onClose={() => setSupportOpen(false)} support />}
+      {reportOpen && (
+        <QuickIncidentModal
+          open={reportOpen}
+          onClose={() => setReportOpen(false)}
+        />
       )}
     </div>
   );

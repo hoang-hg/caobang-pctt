@@ -96,7 +96,6 @@ export default function MonitoringMap() {
   const navigate = useNavigate();
   const { filter, setAlertDraft, setFocus } = useStore();
   const wide = useMediaQuery('(min-width: 1024px)');
-  const roomy = useMediaQuery('(min-width: 1440px)');
   const mid = useMediaQuery('(min-width: 768px)'); // iPad dọc: chỉ số "Tình hình" đủ chỗ 1 hàng 6 ô
   // Màn cảm ứng: iPad ngang dùng bố cục rộng (bảng nổi) nhưng mọi nút, dòng chọn phải ≥ 44 px như điện thoại
   const coarse = useMediaQuery('(pointer: coarse)');
@@ -109,8 +108,8 @@ export default function MonitoringMap() {
   // ?cong-cu=khoanh (từ "Vẽ vùng trên bản đồ" của form soạn cảnh báo): mở sẵn công cụ khoanh đa giác
   const [tool, setTool] = useState(() => (new URLSearchParams(window.location.search).get('cong-cu') === 'khoanh' ? 'polygon' : null)); // measure | route | polygon | circle | incident
   const [offset, setOffset] = useState(0);
-  const [leftOpen, setLeftOpen] = useState(roomy); // laptop 1366 px: bảng lớp thu gọn sẵn để bản đồ đủ rộng
-  const [rightOpen, setRightOpen] = useState(true);
+  const [leftOpen, setLeftOpen] = useState(false); // bảng lớp thu gọn sẵn để bản đồ thoáng rộng
+  const [rightOpen, setRightOpen] = useState(true); // bảng cảnh báo (Tình hình, Điểm nóng) mở sẵn — chỉ huy thấy ngay
   const [legendOpen, setLegendOpen] = useState(false);
   const [sheet, setSheet] = useState(null); // điện thoại / máy tính bảng: layers | alerts | time | tools | legend
   const [dispatch, setDispatch] = useState(null);

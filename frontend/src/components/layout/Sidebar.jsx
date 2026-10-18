@@ -10,18 +10,33 @@ import { useAreaQuery } from '../../api/hooks';
 import { useStore } from '../../app/store';
 import { hasPermission } from '../../rbac/permissions';
 
-const NAV = [
-  { to: '/dashboard', label: 'Tổng quan', icon: LayoutDashboard, perm: ['monitoring', 'view'] },
-  { to: '/ban-do', label: 'Bản đồ giám sát', icon: Map, perm: ['monitoring', 'view'] },
-  { to: '/cuu-ho', label: 'Điều hành cứu hộ', icon: Siren, badge: true, perm: ['sos', 'view'] },
-  { to: '/phan-anh', label: 'Phản ánh người dân', icon: Camera, perm: ['report', 'view'], badgeKey: 'reports' },
-  { to: '/nguon-luc', label: 'Vật tư & Lực lượng', icon: Boxes, perm: ['resource', 'view'] },
-  { to: '/canh-bao', label: 'Cảnh báo & Hotline', icon: Megaphone, perm: ['alert', 'view'], badgeKey: 'alerts' },
-  { to: '/dot-thien-tai', label: 'Đợt thiên tai', icon: CalendarRange, perm: ['monitoring', 'view'] },
-  { to: '/nguon-du-lieu', label: 'Nguồn dữ liệu & IoT', icon: DatabaseZap, perm: ['integration', 'view'] },
-  // Cấp tỉnh nhập thẳng + duyệt hồ sơ; xã/phường gửi dữ liệu chờ duyệt
-  { to: '/nhap-du-lieu', label: 'Nhập dữ liệu', icon: FileUp, perm: ['data', 'import'], alt: ['data', 'submit'], badgeKey: 'submissions' },
-  { to: '/phan-quyen', label: 'Phân quyền', icon: KeyRound, perm: ['user', 'view'] },
+// Menu theo nhóm việc: Điều hành (tác nghiệp hằng ngày) · Dữ liệu & báo cáo · Quản trị. Nhãn gọn — menu 224 px cắt nhãn dài.
+// Mục nào tài khoản không có quyền thì ẩn; nhóm hết mục thì ẩn cả nhóm.
+const NAV_GROUPS = [
+  {
+    title: 'Điều hành',
+    items: [
+      { to: '/dashboard', label: 'Tổng quan', icon: LayoutDashboard, perm: ['monitoring', 'view'] },
+      { to: '/ban-do', label: 'Bản đồ giám sát', icon: Map, perm: ['monitoring', 'view'] },
+      { to: '/cuu-ho', label: 'Điều hành cứu hộ', icon: Siren, badge: true, perm: ['sos', 'view'] },
+      { to: '/canh-bao', label: 'Cảnh báo & Hotline', icon: Megaphone, perm: ['alert', 'view'], badgeKey: 'alerts' },
+      { to: '/nguon-luc', label: 'Vật tư & Lực lượng', icon: Boxes, perm: ['resource', 'view'] },
+      { to: '/phan-anh', label: 'Phản ánh người dân', icon: Camera, perm: ['report', 'view'], badgeKey: 'reports' },
+    ],
+  },
+  {
+    title: 'Dữ liệu & báo cáo',
+    items: [
+      { to: '/dot-thien-tai', label: 'Đợt thiên tai', icon: CalendarRange, perm: ['monitoring', 'view'] },
+      // Cấp tỉnh nhập thẳng + duyệt hồ sơ; xã/phường gửi dữ liệu chờ duyệt
+      { to: '/nhap-du-lieu', label: 'Nhập dữ liệu', icon: FileUp, perm: ['data', 'import'], alt: ['data', 'submit'], badgeKey: 'submissions' },
+      { to: '/nguon-du-lieu', label: 'Nguồn dữ liệu & IoT', icon: DatabaseZap, perm: ['integration', 'view'] },
+    ],
+  },
+  {
+    title: 'Quản trị',
+    items: [{ to: '/phan-quyen', label: 'Phân quyền', icon: KeyRound, perm: ['user', 'view'] }],
+  },
 ];
 
 /** Số đếm trên menu (dùng chung Sidebar và nút menu trên điện thoại ở Header — cùng khoá truy vấn, không gọi API 2 lần). */
@@ -61,58 +76,77 @@ export default function Sidebar() {
   const { sidebarCollapsed, toggleSidebarCollapse, mobileMenuOpen, setMobileMenuOpen } = useStore();
   const badges = useNavBadges();
 
-  const navItems = NAV.filter((n) => hasPermission(perms, ...n.perm) || (n.alt && hasPermission(perms, ...n.alt)));
+  const renderNavLinks = (isMobile = false) => {
+    const isCollapsed = !isMobile && sidebarCollapsed;
+    return (
+      <div className="flex flex-col gap-2.5 px-2">
+        {NAV_GROUPS.map((group, gIdx) => {
+          const visibleItems = group.items.filter(
+            (n) => hasPermission(perms, ...n.perm) || (n.alt && hasPermission(perms, ...n.alt))
+          );
+          if (!visibleItems.length) return null;
 
-  const renderNavLinks = (isMobile = false) => (
-    <div className="flex flex-col gap-1 px-2">
-      {navItems.map(({ to, label, icon: Icon, badge, badgeKey }) => {
-        const count = badges[badgeKey || 'sos'] || 0;
-        const hasBadge = (badge || badgeKey) && count > 0;
-        const isCollapsed = !isMobile && sidebarCollapsed;
+          return (
+            <div key={group.title} className="flex flex-col gap-0.5">
+              {isCollapsed ? (
+                gIdx > 0 && <div className="my-1 border-t border-line/50 mx-1.5" />
+              ) : (
+                <div className="px-3 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted/70">
+                  {group.title}
+                </div>
+              )}
 
-        return (
-          <NavLink
-            key={to}
-            to={to}
-            title={isCollapsed ? label : undefined}
-            onClick={() => {
-              if (isMobile) setMobileMenuOpen(false);
-            }}
-            className={({ isActive }) =>
-              clsx(
-                'group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150 [@media(pointer:coarse)]:min-h-[44px]',
-                isActive
-                  ? 'bg-accent/15 text-accent shadow-sm font-semibold'
-                  : 'text-ink-2 hover:bg-panel2 hover:text-ink',
-                isCollapsed && 'justify-center px-0'
-              )
-            }
-          >
-            {({ isActive }) => (
-              <>
-                {isActive && (
-                  <span className="absolute left-0 top-2 bottom-2 w-1 rounded-r bg-accent" />
-                )}
-                <Icon size={19} className={clsx('shrink-0 transition-transform group-hover:scale-110', isActive && 'text-accent')} />
-                {!isCollapsed && <span className="truncate flex-1">{label}</span>}
-                {hasBadge && (
-                  <span
-                    className={clsx(
-                      'chip font-bold text-[10px] text-white',
-                      badgeKey === 'reports' || badgeKey === 'submissions' ? 'bg-amber-600' : 'bg-danger animate-pulse',
-                      isCollapsed ? 'absolute right-1.5 top-1 px-1 py-0 min-w-4 text-center' : 'ml-auto'
-                    )}
+              {visibleItems.map(({ to, label, icon: Icon, badge, badgeKey }) => {
+                const count = badges[badgeKey || 'sos'] || 0;
+                const hasBadge = (badge || badgeKey) && count > 0;
+
+                return (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    title={isCollapsed ? label : undefined}
+                    onClick={() => {
+                      if (isMobile) setMobileMenuOpen(false);
+                    }}
+                    className={({ isActive }) =>
+                      clsx(
+                        'group relative flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-medium transition-all duration-150 [@media(pointer:coarse)]:min-h-[44px]',
+                        isActive
+                          ? 'bg-accent/15 text-accent shadow-sm font-semibold'
+                          : 'text-ink-2 hover:bg-panel2 hover:text-ink',
+                        isCollapsed && 'justify-center px-0'
+                      )
+                    }
                   >
-                    {count}
-                  </span>
-                )}
-              </>
-            )}
-          </NavLink>
-        );
-      })}
-    </div>
-  );
+                    {({ isActive }) => (
+                      <>
+                        {isActive && (
+                          <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r bg-accent" />
+                        )}
+                        <Icon size={18} className={clsx('shrink-0 transition-transform group-hover:scale-110', isActive && 'text-accent')} />
+                        {!isCollapsed && <span className="truncate flex-1 text-xs">{label}</span>}
+                        {hasBadge && (
+                          <span
+                            className={clsx(
+                              'chip font-bold text-[10px] text-white',
+                              badgeKey === 'reports' || badgeKey === 'submissions' ? 'bg-amber-600' : 'bg-danger animate-pulse',
+                              isCollapsed ? 'absolute right-1 top-0.5 px-1 py-0 min-w-4 text-center' : 'ml-auto'
+                            )}
+                          >
+                            {count}
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </NavLink>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
     <>

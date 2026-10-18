@@ -38,6 +38,15 @@ export function useAllowedCodes(obj, act) {
   return useMemo(() => allowedCodes(perms, obj, act, units), [perms, units, obj, act]);
 }
 
+/** Tài khoản chỉ có vai trò cấp xã (GET /auth/me: assignments[].role = admin_xa): Tổng quan mở thẳng trang Cấp xã của xã
+ * mình, có kênh xin chi viện lên tỉnh. */
+export function useIsCommuneUser() {
+  return useStore((s) => {
+    const a = s.auth?.user?.assignments || [];
+    return a.length > 0 && a.every((x) => x.role === 'admin_xa');
+  });
+}
+
 /** <Can I="sos" a="update" scope={ticket.admin_code}>…</Can> */
 export function Can({ I, a, scope, fallback = null, children }) {
   return usePermission(I, a, scope) ? children : fallback;

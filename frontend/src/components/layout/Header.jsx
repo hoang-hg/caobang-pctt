@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Moon, Sun, Volume2, VolumeX, ShieldAlert, Globe, Menu, X } from 'lucide-react';
 import clsx from 'clsx';
@@ -7,6 +7,9 @@ import AdminFilter from '../common/AdminFilter';
 import OmniSearch from '../common/OmniSearch';
 import UserMenu from '../common/UserMenu';
 import { useNavBadges } from './Sidebar';
+
+// Điều khiển chế độ giả lập: CHỈ máy dev (bản build chạy thật không có mã giả lập — app/store.js)
+const SimulationBar = import.meta.env.DEV ? lazy(() => import('../common/SimulationBar')) : null;
 
 function Clock() {
   const [now, setNow] = useState(new Date());
@@ -75,6 +78,9 @@ export default function Header() {
           kiếm luôn còn chỗ: tên cơ quan từ md, bộ lọc từ lg, đồng hồ + tên tài khoản từ xl, chữ "Cổng người dân" / "Trực
           tuyến" / "Bấm để bật chuông SOS" từ 2xl; hẹp hơn chỉ còn biểu tượng (có title / aria-label) */}
       <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
+        {/* Điều khiển Giả lập tác chiến */}
+        {SimulationBar && <Suspense fallback={null}><SimulationBar /></Suspense>}
+
         {/* Nút xem Cổng công khai cho người dân */}
         <Link
           to="/cong-khai"

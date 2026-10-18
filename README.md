@@ -409,6 +409,23 @@ docker compose exec redis sh -c "redis-cli --scan --pattern 'rl:*' | xargs -r re
 | Đăng nhập tài khoản demo báo sai | CSDL được tạo với `DEMO_MODE=false` → đặt `true` rồi `python -m app.seed --reset` |
 | Không nghe âm báo SOS | Trình duyệt chặn âm thanh khi chưa tương tác → click vào trang một lần |
 
+### 4.7. Chế độ giả lập giao diện (máy dev, không cần backend)
+
+Xem giao diện khi không chạy được backend (máy chưa cài Docker, trình diễn không có mạng): `cd frontend && npm run dev`,
+trang đăng nhập có khối **Chế độ giả lập — chỉ máy dev** → chọn 1 trong 3 vai trò (cấp tỉnh có PIN, trực ban tỉnh, cấp xã
+Cô Ba).
+
+- Chỉ có trong Vite dev (`import.meta.env.DEV`): bản build chạy thật không chứa mã lẫn dữ liệu giả lập. Phải bấm bật; dải
+  vàng **CHẾ ĐỘ GIẢ LẬP** luôn hiện; cổng công khai `/public/*` luôn gọi máy chủ thật; lỗi của máy chủ thật không bao giờ bị
+  thay bằng số liệu giả.
+- Dữ liệu: phản hồi API ghi từ backend seed demo (`frontend/src/api/demo/fixtures.json` — tên giả định, SĐT đầu số 0999),
+  giờ dời về lúc mở. Tạo phiếu SOS, điều động, cập nhật, hoàn thành chạy trên trình duyệt (còn khi tải lại trang, mất khi
+  tắt giả lập); thao tác khác báo "không thực hiện trong chế độ giả lập". Thanh trên cùng: đổi vai trò, chọn kịch bản (lũ
+  sông Bằng Giang vượt BĐ III, sạt lở Tĩnh Túc, thủy điện Bạch Đằng xả lũ lớn).
+- API đổi định dạng → ghi lại: seed mới (`docker compose down -v && docker compose up -d`), `npm run dev`, rồi
+  `cd tests/ui && API=http://localhost:8000 UI=http://localhost:5173 node demo-record.mjs` — dựng sẵn tình huống (đợt mưa
+  lũ, xã Cô Ba xin chi viện, tỉnh điều đội…) trên máy chủ đó rồi mở từng trang, lưu phản hồi.
+
 ---
 
 <a id="cau-hinh"></a>

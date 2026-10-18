@@ -26,6 +26,9 @@ const DisasterEvents = lazy(() => import('./pages/DisasterEvents'));
 const PublicPortal = lazy(() => import('./pages/public/PublicPortal'));
 const MissionPage = lazy(() => import('./pages/public/MissionPage'));
 
+// Dải CHẾ ĐỘ GIẢ LẬP: chỉ máy dev (app/store.js)
+const DemoBanner = import.meta.env.DEV ? lazy(() => import('./components/common/DemoBanner')) : null;
+
 function PageLoading() {
   return <div className="flex h-full min-h-[40vh] items-center justify-center text-sm text-muted">Đang tải…</div>;
 }
@@ -65,6 +68,7 @@ function Shell() {
 
   return (
     <div className="flex h-full flex-col print:block print:h-auto">
+      {DemoBanner && <Suspense fallback={null}><DemoBanner /></Suspense>}
       {!presentation && <Header />}
       <SessionKeeper />
       <div className="flex min-h-0 flex-1 print:block">

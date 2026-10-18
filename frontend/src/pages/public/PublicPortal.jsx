@@ -118,13 +118,13 @@ function PublicMap({ data, forecast, geo, me, route, target, layers, basemap = '
           }}
         />
       )}
-      {layers.hazard && data?.hazard_zones.map((z, i) => (
+      {layers.hazard && data?.hazard_zones?.map((z, i) => (
         <GeoJSON key={`z${i}-${z.name}`} data={z.geom}
           style={{ color: z.type === 'ngap' ? '#1d4ed8' : (LEVEL[z.level]?.color || LEVEL.do.color), weight: 1.5, fillColor: z.type === 'ngap' ? '#2563eb' : (LEVEL[z.level]?.color || LEVEL.do.color), fillOpacity: 0.3 }}>
           <Tooltip sticky>{z.name}</Tooltip>
         </GeoJSON>
       ))}
-      {layers.hazard && data?.blocked_roads.map((r, i) => (
+      {layers.hazard && data?.blocked_roads?.map((r, i) => (
         <GeoJSON key={`r${i}`} data={r.geom} style={{ color: LEVEL.do.color, weight: 5, dashArray: '6 5' }}>
           <Tooltip sticky>{r.road_name} – đoạn đang nguy hiểm, hạn chế đi lại</Tooltip>
         </GeoJSON>
@@ -138,7 +138,7 @@ function PublicMap({ data, forecast, geo, me, route, target, layers, basemap = '
         spiderfyOnMaxZoom={true}
         showCoverageOnHover={false}
       >
-        {layers.hazard && data?.hazard_points.map((p, i) => (
+        {layers.hazard && data?.hazard_points?.map((p, i) => (
           <Marker
             key={`h${i}`}
             position={[p.lat, p.lon]}
@@ -156,7 +156,7 @@ function PublicMap({ data, forecast, geo, me, route, target, layers, basemap = '
             <Popup><b>{p.name}</b><p className="text-xs">{p.description}</p></Popup>
           </Marker>
         ))}
-        {layers.stations && data?.stations.filter((s) => s.type !== 'do_am_dat').map((s) => {
+        {layers.stations && data?.stations?.filter((s) => s.type !== 'do_am_dat').map((s) => {
           // Chưa có số đo / mất tín hiệu → biểu tượng xám, không bao giờ hiện "An toàn"
           const view = stationView(s);
           return (
