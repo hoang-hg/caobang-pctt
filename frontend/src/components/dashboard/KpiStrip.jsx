@@ -113,12 +113,12 @@ export default function KpiStrip({
           rainKnown ? (
             <>
               <span className="block truncate">
-                Lớn nhất <b className="font-mono text-ink">{num(rain.max_24h, 1)} mm</b>
+                Lớn nhất <b className="num text-ink">{num(rain.max_24h, 1)} mm</b>
                 {rain.max_station && ` · ${rain.max_station.replace(/^Trạm đo mưa\s+/i, '')}`}
               </span>
               {hourRain && (
                 <span className="hidden truncate sm:block">
-                  {hourRain.span} <b className="font-mono text-ink">{num(hourRain.mm, 1)} mm</b>{' '}
+                  {hourRain.span} <b className="num text-ink">{num(hourRain.mm, 1)} mm</b>{' '}
                   <TrendTag dir={hourRain.dir} label={hourRain.label} className="align-middle" />
                 </span>
               )}
@@ -161,7 +161,7 @@ export default function KpiStrip({
                 </span>
               ) : river.worst && river.level >= 1 ? (
                 <>
-                  {riverName(river.worst.s)} <b className="font-mono text-ink">{num(river.worst.st.value, 2)} m</b>
+                  {riverName(river.worst.s)} <b className="num text-ink">{num(river.worst.st.value, 2)} m</b>
                 </>
               ) : river.rows.length ? `${river.fresh}/${river.rows.length} trạm có số đo trong 60 phút qua` : 'Chưa có trạm mực nước trong vùng đang xem'
             }
@@ -187,9 +187,9 @@ export default function KpiStrip({
         footer={
           <>
             {oldest != null && (
-              <>Chờ lâu nhất <b className={clsx('font-mono', sos.overdue > 0 || oldest > 15 ? 'text-danger' : 'text-ink')}>{oldest}′</b> · </>
+              <>Chờ lâu nhất <b className={clsx('num', sos.overdue > 0 || oldest > 15 ? 'text-danger' : 'text-ink')}>{oldest}′</b> · </>
             )}
-            Đang xử lý <b className="font-mono text-ink">{int(sos.in_progress)}</b> · Xong 24 giờ <b className="font-mono text-ink">{int(sos.resolved_24h)}</b>
+            Đang xử lý <b className="num text-ink">{int(sos.in_progress)}</b> · Xong 24 giờ <b className="num text-ink">{int(sos.resolved_24h)}</b>
           </>
         }
       />
@@ -209,9 +209,9 @@ export default function KpiStrip({
         footer={
           planned ? (
             <>
-              <span className="block truncate"><b className="font-mono text-ink">{int(ev.evacuated_households)}/{int(planned)}</b> hộ</span>
+              <span className="block truncate"><b className="num text-ink">{int(ev.evacuated_households)}/{int(planned)}</b> hộ</span>
               {ev.planned_persons > 0 && (
-                <span className="block truncate"><b className="font-mono text-ink">{int(ev.evacuated_persons)}/{int(ev.planned_persons)}</b> người</span>
+                <span className="block truncate"><b className="num text-ink">{int(ev.evacuated_persons)}/{int(ev.planned_persons)}</b> người</span>
               )}
               {(evacQ.data || evacQ.isError) && (
                 <span className="hidden truncate sm:block">{evacQ.data ? `${sites.length} điểm sơ tán` : 'không tải được điểm sơ tán'}</span>
@@ -238,9 +238,9 @@ export default function KpiStrip({
         footer={
           hasResources ? (
             <>
-              <span className="block truncate">Nhiệm vụ: <b className="font-mono text-ink">{int(fo.on_mission)}</b> người</span>
-              <span className="block truncate"><b className="font-mono text-ink">{int(ve.special_active)}/{int(ve.special_total)}</b> xuồng, xe lội nước</span>
-              <span className="block truncate"><b className="font-mono text-ink">{int(ve.heavy_active)}/{int(ve.heavy_total)}</b> máy xúc, máy ủi</span>
+              <span className="block truncate">Nhiệm vụ: <b className="num text-ink">{int(fo.on_mission)}</b> người</span>
+              <span className="block truncate"><b className="num text-ink">{int(ve.special_active)}/{int(ve.special_total)}</b> xuồng, xe lội nước</span>
+              <span className="block truncate"><b className="num text-ink">{int(ve.heavy_active)}/{int(ve.heavy_total)}</b> máy xúc, máy ủi</span>
             </>
           ) : 'Chưa có dữ liệu lực lượng, phương tiện'
         }
@@ -252,7 +252,7 @@ export default function KpiStrip({
             <span className={clsx('h-2.5 w-2.5 shrink-0 rounded-full', risk(rsLv).fill)} aria-hidden="true" />
             <span className="truncate">Hồ đang xả</span>
           </span>
-          <b className="font-mono text-ink">{rs.total ? `${rs.spill_count}/${rs.total}` : '–'}</b>
+          <b className="num text-ink">{rs.total ? `${rs.spill_count}/${rs.total}` : '–'}</b>
         </button>
         <button
           type="button"
@@ -264,7 +264,7 @@ export default function KpiStrip({
             <span className={clsx('h-2.5 w-2.5 shrink-0 rounded-full', risk(lsLv).fill)} aria-hidden="true" />
             <span className="truncate">Cấm đường</span>
           </span>
-          <b className="font-mono text-ink">{ls.total ? ls.blocked_count : '–'}</b>
+          <b className="num text-ink">{ls.total ? ls.blocked_count : '–'}</b>
         </button>
       </StatCard>
     </div>

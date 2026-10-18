@@ -7,6 +7,8 @@ import { api } from '../api/client';
 import { useAreaQuery } from '../api/hooks';
 import { useStore } from '../app/store';
 import { Empty, Modal, Tabs } from '../components/common/ui';
+import PageHeader from '../components/common/PageHeader';
+import { PAGE } from '../components/layout/page';
 import { usePermission } from '../rbac/usePermission';
 import { ago, dateTime } from '../utils/format';
 import { INCIDENT, VULNERABLE } from '../utils/labels';
@@ -357,27 +359,24 @@ export default function CitizenReports() {
   }, [data?.items, search]);
 
   return (
-    <div className="flex flex-col gap-3.5 p-3.5 sm:p-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-ink flex items-center gap-2">
-            <span>Phản ánh hiện trường của người dân</span>
-          </h1>
-          <p className="text-xs text-muted mt-0.5">
-            Dữ liệu tiếp nhận từ cổng công khai. Thông tin chỉ được công khai sau khi cán bộ phê duyệt; số điện thoại người gửi được bảo mật.
-          </p>
-        </div>
-
-        <div className="relative">
-          <Search size={14} className="pointer-events-none absolute left-2.5 top-2 text-muted" />
-          <input
-            className="input pl-8 py-1 text-xs w-48 sm:w-64"
-            placeholder="Tìm phản ánh, địa bàn, SĐT..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-      </div>
+    <div className={`${PAGE} pb-8`}>
+      <PageHeader
+        title="Phản ánh hiện trường của người dân"
+        short="Phản ánh người dân"
+        description="Tiếp nhận từ cổng công khai. Chỉ công khai sau khi cán bộ phê duyệt; số điện thoại người gửi được bảo mật."
+        actions={(
+          <div className="relative">
+            <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted" aria-hidden="true" />
+            <input
+              className="input tap h-9 w-44 py-1 pl-8 text-sm sm:w-64"
+              placeholder="Tìm phản ánh, địa bàn, SĐT..."
+              aria-label="Tìm phản ánh theo mã, nội dung, địa bàn, số điện thoại"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+        )}
+      />
 
       <Tabs
         value={tab}

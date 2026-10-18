@@ -84,16 +84,21 @@ body {
   .card { @apply bg-panel border border-line rounded-xl shadow-sm transition-all; }
   .card-hover { @apply card hover:shadow-md hover:border-line/90; }
   .card-glass { @apply bg-panel/90 backdrop-blur-md border border-line rounded-xl shadow-lg; }
-  .card-title { @apply text-[13px] font-semibold text-ink-2 uppercase tracking-wide flex items-center gap-1.5; }
+  /* Tiêu đề khối: chữ thường có dấu, đậm vừa — chữ IN HOA dàn rộng khó đọc với dấu tiếng Việt */
+  .card-title { @apply text-sm font-semibold text-ink flex items-center gap-1.5; }
   
   .btn { @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-medium transition-all duration-150 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 select-none; }
   .btn-primary { @apply btn bg-accent text-white shadow-sm hover:brightness-110 hover:shadow active:brightness-95; }
   .btn-danger { @apply btn bg-danger text-white shadow-sm hover:brightness-110 hover:shadow active:brightness-95; }
   .btn-good { @apply btn bg-good text-white shadow-sm hover:brightness-110 hover:shadow active:brightness-95; }
   .btn-ghost { @apply btn border border-line text-ink-2 hover:bg-panel2 hover:text-ink hover:border-muted/40; }
+  /* Nút phụ: nền trắng có viền — đứng cạnh nút chính mà không tranh chú ý */
+  .btn-secondary { @apply btn border border-line bg-panel text-ink shadow-sm hover:bg-panel2 hover:border-muted/40; }
   .btn-soft { @apply btn bg-panel2 text-ink hover:bg-line/50; }
   
   .input { @apply w-full rounded-lg border border-line bg-panel2 px-3 py-1.5 text-sm text-ink placeholder:text-muted transition-colors focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25; }
+  /* Số liệu: chữ số đều bề ngang (cột số thẳng hàng, số đổi không làm chữ nhảy) — không dùng font mono cho số đếm */
+  .num { font-variant-numeric: tabular-nums lining-nums; }
   .chip { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-wide border border-transparent; }
   
   .badge-live { @apply relative inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold bg-good/15 text-good border border-good/30; }
@@ -102,6 +107,12 @@ body {
   .table-base th { @apply sticky top-0 bg-panel2 text-left text-xs font-semibold uppercase tracking-wide text-muted px-3 py-2.5 border-b border-line z-10; }
   .table-base td { @apply px-3 py-2 border-b border-line/60 align-top; }
   .table-base tr:hover td { @apply bg-panel2/60; }
+}
+
+/* Dòng ngữ cảnh dưới tiêu đề trang (PageHeader): các mục cách nhau bằng dấu chấm giữa — từ 640 px (điện thoại các mục
+   xuống dòng, dấu chấm sẽ lạc ở đầu dòng) */
+@media (min-width: 640px) {
+  .facts > * + *::before { content: '·'; margin-right: 0.5rem; color: rgb(var(--muted) / 0.7); }
 }
 
 .scroll-thin::-webkit-scrollbar { width: 6px; height: 6px; }

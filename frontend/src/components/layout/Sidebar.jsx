@@ -10,7 +10,8 @@ import { useAreaQuery } from '../../api/hooks';
 import { useStore } from '../../app/store';
 import { hasPermission } from '../../rbac/permissions';
 
-// Menu theo nhóm việc: Điều hành (tác nghiệp hằng ngày) · Dữ liệu & báo cáo · Quản trị. Nhãn gọn — menu 224 px cắt nhãn dài.
+// Menu theo nhóm việc: Điều hành (tác nghiệp hằng ngày) · Dữ liệu & báo cáo · Quản trị. Menu rộng 240 px: nhãn chữ 14 px
+// (người lớn tuổi đọc rõ) kèm số đếm không bị cắt.
 // Mục nào tài khoản không có quyền thì ẩn; nhóm hết mục thì ẩn cả nhóm.
 const NAV_GROUPS = [
   {
@@ -91,7 +92,7 @@ export default function Sidebar() {
               {isCollapsed ? (
                 gIdx > 0 && <div className="my-1 border-t border-line/50 mx-1.5" />
               ) : (
-                <div className="px-3 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted/70">
+                <div className="px-3 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-wide text-muted">
                   {group.title}
                 </div>
               )}
@@ -112,7 +113,7 @@ export default function Sidebar() {
                       clsx(
                         'group relative flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-medium transition-all duration-150 [@media(pointer:coarse)]:min-h-[44px]',
                         isActive
-                          ? 'bg-accent/15 text-accent shadow-sm font-semibold'
+                          ? 'bg-accent/15 text-accent shadow-sm'
                           : 'text-ink-2 hover:bg-panel2 hover:text-ink',
                         isCollapsed && 'justify-center px-0'
                       )
@@ -124,12 +125,12 @@ export default function Sidebar() {
                           <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r bg-accent" />
                         )}
                         <Icon size={18} className={clsx('shrink-0 transition-transform group-hover:scale-110', isActive && 'text-accent')} />
-                        {!isCollapsed && <span className="truncate flex-1 text-xs">{label}</span>}
+                        {!isCollapsed && <span className="flex-1 truncate">{label}</span>}
                         {hasBadge && (
                           <span
                             className={clsx(
                               'chip font-bold text-[10px] text-white',
-                              badgeKey === 'reports' || badgeKey === 'submissions' ? 'bg-amber-600' : 'bg-danger animate-pulse',
+                              badgeKey === 'reports' || badgeKey === 'submissions' ? 'bg-amber-600' : 'bg-danger motion-safe:animate-pulse',
                               isCollapsed ? 'absolute right-1 top-0.5 px-1 py-0 min-w-4 text-center' : 'ml-auto'
                             )}
                           >
@@ -154,7 +155,7 @@ export default function Sidebar() {
       <nav
         className={clsx(
           'no-print hidden lg:flex shrink-0 flex-col justify-between border-r border-line bg-panel py-3 transition-all duration-200 select-none',
-          sidebarCollapsed ? 'w-16' : 'w-56'
+          sidebarCollapsed ? 'w-16' : 'w-60'
         )}
       >
         <div className="flex flex-col gap-2">

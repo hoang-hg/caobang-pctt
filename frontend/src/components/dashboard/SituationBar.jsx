@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import clsx from 'clsx';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, ChevronDown, DatabaseZap, Info, ShieldAlert, Siren } from 'lucide-react';
+import { AlertTriangle, ChevronDown, DatabaseZap, Info, Siren } from 'lucide-react';
 import { num } from '../../utils/format';
 import { rainLevel, risk } from '../../utils/risk';
 import { trendWords } from '../../utils/stations';
 import { riverState, riverTrend, ROMAN } from './RiverKpi';
+import { EDGE, EDGE_PAD } from '../layout/page';
 
 const NOTE = 'Tổng hợp tự động từ số liệu hệ thống — không phải cấp độ rủi ro thiên tai do cơ quan có thẩm quyền công bố';
 
@@ -53,7 +54,7 @@ export function situationItems(k, waterStations) {
  * nhận tình huống" chỉ hiện từ máy tính bảng trở lên — điện thoại dành chỗ cho bản đồ.
  */
 export default function SituationBar({
-  k, waterStations, stationsError, rainKnown, canReport, onReport, canSos, canImportStations, canSystem, presentation = false,
+  k, waterStations, stationsError, rainKnown, canSos, canImportStations, canSystem, presentation = false,
   compact = false,
 }) {
   const [opened, setExpanded] = useState(false);
@@ -88,7 +89,7 @@ export default function SituationBar({
           // Điện thoại: chip một hàng riêng (đủ rộng), nút xuống hàng dưới; máy tính: chip + nút cùng một hàng
           compact
             ? 'flex flex-col gap-1.5 px-3 py-1.5 text-xs shadow-md sm:flex-row sm:items-center sm:justify-between sm:px-4'
-            : 'sticky top-0 z-30 -mx-3.5 -mt-3.5 mb-1 flex flex-col gap-2 px-3.5 py-1.5 text-xs shadow-lg sm:-mx-5 sm:-mt-5 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-2 print:static',
+            : clsx('sticky top-0 z-30 mb-1 flex flex-col gap-2 py-1.5 text-xs shadow-lg sm:flex-row sm:items-center sm:justify-between sm:py-2 print:static', EDGE, EDGE_PAD),
           scale.chip,
         )}
         role="status"
@@ -143,16 +144,6 @@ export default function SituationBar({
               <Siren size={13} aria-hidden="true" />
               Xử lý {sos.overdue > 0 ? `${sos.overdue} SOS quá hạn` : `${sos.waiting} SOS chờ`} →
             </Link>
-          )}
-          {canReport && (
-            // Điện thoại: "Báo SOS" đã ở thanh dưới cùng (ngón cái) — không lặp ở dải này
-            <button
-              type="button"
-              onClick={onReport}
-              className="hidden min-h-[36px] items-center gap-1 rounded-lg bg-white px-2.5 font-black text-[rgb(var(--danger))] shadow-sm active:scale-95 sm:flex [@media(pointer:coarse)]:min-h-[44px]"
-            >
-              <ShieldAlert size={13} aria-hidden="true" /> Báo cáo nhanh
-            </button>
           )}
         </div>
       </div>

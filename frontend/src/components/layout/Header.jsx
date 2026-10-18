@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Moon, Sun, Volume2, VolumeX, ShieldAlert, Globe, Menu, X } from 'lucide-react';
 import clsx from 'clsx';
 import { useStore } from '../../app/store';
+import { usePermission } from '../../rbac/usePermission';
 import AdminFilter from '../common/AdminFilter';
 import OmniSearch from '../common/OmniSearch';
 import UserMenu from '../common/UserMenu';
@@ -10,6 +11,9 @@ import { useNavBadges } from './Sidebar';
 
 // Điều khiển chế độ giả lập: CHỈ máy dev (bản build chạy thật không có mã giả lập — app/store.js)
 const SimulationBar = import.meta.env.DEV ? lazy(() => import('../common/SimulationBar')) : null;
+// Báo cáo nhanh → tạo phiếu SOS: một nút cố định trên thanh trên cùng ở mọi trang (máy tính bảng, máy tính); điện thoại dùng
+// "Báo SOS" ở thanh thao tác dưới cùng. Hộp thoại chỉ tải khi bấm
+const QuickIncidentModal = lazy(() => import('../dashboard/QuickIncidentModal'));
 
 function Clock() {
   const [now, setNow] = useState(new Date());
@@ -30,6 +34,8 @@ export default function Header() {
   // Điện thoại: menu thu vào nút ☰ — SOS chờ xử lý / lệnh cảnh báo chờ bạn duyệt hiện số đỏ ngay trên nút
   const badges = useNavBadges();
   const urgent = badges.sos + badges.alerts;
+  const canReport = usePermission('sos', 'create');
+  const [reportOpen, setReportOpen] = useState(false);
 
   return (
     <header className="no-print sticky top-0 z-[1100] flex h-14 shrink-0 items-center gap-2 border-b border-line bg-panel/95 px-3 backdrop-blur-md">
@@ -56,7 +62,6 @@ export default function Header() {
         <div className="hidden leading-tight lg:block">
           <div className="text-sm font-bold tracking-tight text-ink flex items-center gap-1.5">
             BCH PCTT & TKCN Cao Bằng
-            <span className="hidden xl:inline-block rounded bg-danger/10 px-1.5 py-0.5 text-[10px] font-semibold text-danger">TOC</span>
           </div>
           <div className="text-[11px] text-muted truncate max-w-[280px]">Trung tâm Điều hành Phòng chống thiên tai</div>
         </div>
@@ -80,6 +85,24 @@ export default function Header() {
       <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
         {/* Điều khiển Giả lập tác chiến */}
         {SimulationBar && <Suspense fallback={null}><SimulationBar /></Suspense>}
+
+        {canReport && (
+          <button
+            type="button"
+            onClick={() => setReportOpen(true)}
+            className="btn-danger tap hidden h-9 px-2.5 sm:inline-flex"
+            aria-label="Báo cáo nhanh"
+            title="Báo cáo nhanh hiện trường → tạo phiếu SOS"
+          >
+            <ShieldAlert size={15} aria-hidden="true" />
+            <span className="hidden font-semibold lg:inline">Báo cáo nhanh</span>
+          </button>
+        )}
+        {reportOpen && (
+          <Suspense fallback={null}>
+            <QuickIncidentModal open onClose={() => setReportOpen(false)} />
+          </Suspense>
+        )}
 
         {/* Nút xem Cổng công khai cho người dân */}
         <Link

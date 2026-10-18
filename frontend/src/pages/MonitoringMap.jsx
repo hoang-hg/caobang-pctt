@@ -431,8 +431,6 @@ export default function MonitoringMap() {
             waterStations={waterStations}
             stationsError={stationsQ.isError && !stationsQ.data}
             rainKnown={kQ.data?.rain?.avg_24h != null}
-            canReport={canReport}
-            onReport={() => setReportOpen(true)}
             canSos={canSos}
             canImportStations={canImportStations}
             canSystem={canSystem}

@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { PackageMinus, PackagePlus, RefreshCw, Truck } from 'lucide-react';
+import { PackageMinus, PackagePlus, Truck } from 'lucide-react';
 import { useAreaQuery, useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
 import { EmptyState, ErrorState, Pager, Section, Skeleton, Tabs } from '../components/common/ui';
@@ -10,6 +10,8 @@ import SuppliesChart from '../components/charts/SuppliesChart';
 import IssueModal from '../components/common/IssueModal';
 import { FuelDepotModal, ReceiveModal, VehicleModal } from '../components/common/LogisticsModals';
 import QuickActionBar from '../components/common/QuickActionBar';
+import PageHeader from '../components/common/PageHeader';
+import { PAGE } from '../components/layout/page';
 import ConnectionBanner from '../components/dashboard/ConnectionBanner';
 import QuickIncidentModal from '../components/dashboard/QuickIncidentModal';
 import { unitLabel } from '../components/dashboard/CommuneView';
@@ -313,7 +315,7 @@ export default function Resources() {
 
   return (
     // Điện thoại: chừa chỗ cho thanh thao tác nhanh dưới đáy (không che dòng cuối, nút phân trang)
-    <div className="flex flex-col gap-3 p-3 pb-28 sm:pb-8">
+    <div className={PAGE}>
       {/* Thông tin khẩn luôn trên cùng (Cam / Đỏ dính khi cuộn) + mất mạng */}
       <ResourceAlerts
         items={alerts}
@@ -326,24 +328,16 @@ export default function Resources() {
       />
       <ConnectionBanner updatedAt={summaryQ.dataUpdatedAt || null} />
 
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <h1 className="text-base font-bold leading-tight sm:text-lg">
-            <span className="hidden sm:inline">Quản lý </span>Vật tư & Lực lượng<span className="hidden sm:inline"> cứu hộ</span>
-          </h1>
-          <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11px] text-muted">
-            <span className="font-semibold text-accent">{scopeLabel}</span>
-            <span aria-hidden="true">·</span>
-            <span>
-              {dataTime ? <>Số liệu lúc <b className="font-mono text-ink-2">{dataTime}</b></> : summaryQ.isError ? 'Chưa tải được số liệu' : 'Đang tải số liệu…'}
-            </span>
-            <span className="hidden lg:inline">· tự cập nhật khi kho xuất / nhập, lực lượng nhận lệnh</span>
-          </p>
-        </div>
-        <button type="button" onClick={refresh} disabled={refreshing} className="btn-ghost tap-sq h-9 min-w-[36px] shrink-0 px-2.5 text-xs" aria-label="Làm mới số liệu" title="Làm mới số liệu">
-          <RefreshCw size={14} className={clsx(refreshing && 'animate-spin')} aria-hidden="true" /> <span className="hidden md:inline">Làm mới</span>
-        </button>
-      </div>
+      <PageHeader
+        title="Quản lý Vật tư & Lực lượng cứu hộ"
+        short="Vật tư & Lực lượng"
+        scope={scopeLabel}
+        time={dataTime}
+        timeNote={summaryQ.isError ? 'Chưa tải được số liệu' : 'Đang tải số liệu…'}
+        meta={[<span key="auto" className="hidden lg:inline">tự cập nhật khi kho xuất / nhập, lực lượng nhận lệnh</span>]}
+        onRefresh={refresh}
+        refreshing={refreshing}
+      />
 
       <ResourceKpis summaryQ={summaryQ} warehouses={warehousesQ.data} onGo={(id, f) => go(id, f)} />
 

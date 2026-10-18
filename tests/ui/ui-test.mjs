@@ -321,7 +321,9 @@ async function staff(ctx, trackCode) {
   await step(ctx, 'Tổng quan: "Văn bản" — báo cáo PDF định dạng chuẩn qua 3 bước, nhúng font tiếng Việt', async () => {
     await page.goto(`${ROOT}/dashboard`);
     await waitMain(page);
-    await page.getByRole('button', { name: 'Soạn báo cáo văn bản định dạng chuẩn (PDF)' }).click();
+    // Menu "Xuất" của đầu trang (PageHeader) → Báo cáo văn bản
+    await page.getByRole('button', { name: 'Xuất', exact: true }).click();
+    await page.getByRole('menuitem', { name: /Báo cáo văn bản/ }).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByRole('button', { name: 'Tiếp', exact: true }).click();
     await dialog.getByRole('button', { name: 'Tiếp', exact: true }).click();

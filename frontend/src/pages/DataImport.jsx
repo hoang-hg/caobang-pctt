@@ -7,6 +7,8 @@ import { api, apiDownload, apiUpload } from '../api/client';
 import { useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
 import { Empty, KpiCard, Tabs } from '../components/common/ui';
+import PageHeader from '../components/common/PageHeader';
+import { PAGE } from '../components/layout/page';
 import { useAllowedCodes, usePermission } from '../rbac/usePermission';
 import RecordForm from './DataImportForm';
 import Submissions, { IssueTable, PreviewTable } from './DataSubmissions';
@@ -42,15 +44,13 @@ export default function DataImport() {
   };
 
   return (
-    <div className="flex flex-col gap-3 p-3">
-      <div>
-        <h1 className="text-lg font-bold">{canImport ? 'Nhập dữ liệu chính thức' : 'Gửi dữ liệu của xã/phường'}</h1>
-        <p className="text-xs text-muted">
-          {canImport
-            ? 'Điểm sơ tán, vùng nguy hiểm, danh bạ, trạm quan trắc, kho, lực lượng… từ tệp CSV / Excel (.xlsx) / GeoJSON hoặc điền trực tiếp. Bấm “Kiểm tra” trước — hệ thống chỉ ghi khi dữ liệu không còn lỗi, và ghi toàn bộ hoặc không ghi gì. Hồ sơ xã/phường gửi được duyệt ở tab bên cạnh.'
-            : 'Điểm sơ tán, xóm, danh bạ, kho, lực lượng… của xã/phường bạn phụ trách. Dữ liệu được gửi lên cấp tỉnh phê duyệt; chỉ sau khi được duyệt mới hiển thị trên hệ thống và cổng công khai.'}
-        </p>
-      </div>
+    <div className={clsx(PAGE, 'pb-8')}>
+      <PageHeader
+        title={canImport ? 'Nhập dữ liệu chính thức' : 'Gửi dữ liệu của xã/phường'}
+        description={canImport
+          ? 'Điểm sơ tán, vùng nguy hiểm, danh bạ, trạm quan trắc, kho, lực lượng… từ tệp CSV / Excel (.xlsx) / GeoJSON hoặc điền trực tiếp. Bấm “Kiểm tra” trước — hệ thống chỉ ghi khi dữ liệu không còn lỗi, và ghi toàn bộ hoặc không ghi gì. Hồ sơ xã/phường gửi được duyệt ở tab bên cạnh.'
+          : 'Điểm sơ tán, xóm, danh bạ, kho, lực lượng… của xã/phường bạn phụ trách. Dữ liệu được gửi lên cấp tỉnh phê duyệt; chỉ sau khi được duyệt mới hiển thị trên hệ thống và cổng công khai.'}
+      />
       <Tabs
         value={tab}
         onChange={setTab}

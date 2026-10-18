@@ -19,6 +19,8 @@ import {
 } from 'lucide-react';
 import { api } from '../api/client';
 import { useStore } from '../app/store';
+import PageHeader from '../components/common/PageHeader';
+import { PAGE } from '../components/layout/page';
 import { Empty, Modal, Tabs } from '../components/common/ui';
 import { usePermission } from '../rbac/usePermission';
 import { canManageAt, GLOBAL } from '../rbac/permissions';
@@ -742,20 +744,15 @@ export default function AccessControl() {
   const [tab, setTab] = useState('users');
   const mine = useStore((s) => s.auth?.user?.assignments?.[0]);
   return (
-    <div className="flex flex-col gap-4 p-4 sm:p-6 max-w-7xl mx-auto">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-line/60">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-extrabold text-ink tracking-tight">Phân quyền & Quản lý Tài khoản</h1>
-            <span className="chip py-0.5 px-2 bg-accent/15 text-accent font-bold text-xs">3 cấp</span>
-          </div>
-          <p className="text-xs text-muted mt-1 leading-relaxed">
-            Mỗi cấp 1 vai trò, mỗi tài khoản 1 vai trò (Cấp 1 Quản trị hệ thống · Cấp 2 Quản trị tỉnh · Cấp 3 Quản trị
-            xã/phường). Bạn: <b className="text-ink font-semibold">{getTier(mine?.role).title}</b>
-            {mine && ` · ${mine.domain_label}`}
-          </p>
-        </div>
-      </div>
+    <div className={`${PAGE} pb-8`}>
+      <PageHeader
+        title="Phân quyền & Quản lý tài khoản"
+        short="Phân quyền"
+        meta={[
+          <span key="ban">Bạn: <b className="font-semibold text-ink-2">{getTier(mine?.role).title}</b>{mine && ` · ${mine.domain_label}`}</span>,
+        ]}
+        description="3 cấp, mỗi cấp 1 vai trò, mỗi tài khoản 1 vai trò: Cấp 1 Quản trị hệ thống · Cấp 2 Quản trị tỉnh · Cấp 3 Quản trị xã/phường."
+      />
 
       <Tabs
         value={tab}
