@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { MapContainer, ScaleControl, ZoomControl, useMapEvents } from 'react-leaflet';
 import clsx from 'clsx';
@@ -12,7 +12,7 @@ import MapLegend, { RadarScale } from '../components/map/MapLegend';
 import MapKpis from '../components/map/MapKpis';
 import { riverSummary } from '../components/dashboard/RiverKpi';
 import {
-  AlertsList, DEFAULT_LAYERS, DrawnStats, LAYER_GROUPS, LAYER_ORDER, LayerList, layerCounts, Sheet, TimeControl, ToolHint, toolList,
+  AlertsList, DEFAULT_LAYERS, DrawnStats, hourText, LAYER_GROUPS, LAYER_ORDER, LayerList, layerCounts, Sheet, TimeControl, ToolHint, toolList,
   ViewModeSwitch,
 } from '../components/map/MapPanels';
 import { buildHotspots } from '../components/map/hotspots';
@@ -28,11 +28,12 @@ import DispatchModal from '../components/common/DispatchModal';
 import CameraModal from '../components/common/CameraModal';
 import IssueModal from '../components/common/IssueModal';
 import QuickActionBar from '../components/common/QuickActionBar';
-import { ErrorState } from '../components/common/ui';
+import { ErrorState, Hint } from '../components/common/ui';
 import SituationBar from '../components/dashboard/SituationBar';
 import ConnectionBanner from '../components/dashboard/ConnectionBanner';
 import QuickIncidentModal from '../components/dashboard/QuickIncidentModal';
-import { usePermission } from '../rbac/usePermission';
+import { useGuideRole, usePermission } from '../rbac/usePermission';
+import { tipsFor } from '../utils/guides';
 import { alarmLevel } from '../utils/labels';
 import { time } from '../utils/format';
 import { fmtVn } from '../utils/bulletin';
@@ -68,10 +69,17 @@ function radarNoteOf(offset, q, frame) {
   if (offset < 0 && q.data?.radar?.past?.length) return 'Không có ảnh radar cho thời điểm này (chỉ lưu khoảng 2 giờ qua)';
   return 'Chưa có ảnh radar';
 }
-// Chế độ xem (nhớ trên máy, mặc định Tác nghiệp như trước). "Tình hình": ẩn lớp tác nghiệp, bật lớp rủi ro — các lớp khác
-// (mưa dự báo, radar, ranh giới, bão…) giữ như đang chọn
+// Chế độ xem (nhớ trên máy). Chưa chọn lần nào: lãnh đạo cấp tỉnh (có mã PIN ký duyệt) mở "Xem tình hình", người khác
+// "Điều hành". "Xem tình hình": ẩn lớp điều hành, bật lớp rủi ro — các lớp khác (mưa dự báo, radar, ranh giới, bão…) giữ như
+// đang chọn
 const MODE_KEY = 'pctt.banDo.cheDo';
-const readMode = () => { try { return localStorage.getItem(MODE_KEY) === 'tinh_hinh' ? 'tinh_hinh' : 'tac_nghiep'; } catch { return 'tac_nghiep'; } };
+const readMode = (leader) => {
+  try {
+    const m = localStorage.getItem(MODE_KEY);
+    if (m === 'tinh_hinh' || m === 'tac_nghiep') return m;
+  } catch { /* chế độ riêng tư */ }
+  return leader ? 'tinh_hinh' : 'tac_nghiep';
+};
 const OPS_LAYERS = ['forces', 'vehicles', 'warehouses', 'routes', 'evac', 'reports', 'cameras'];
 const RISK_LAYERS = ['sos', 'stations', 'reservoirs', 'flood', 'floodScenario', 'landslide', 'blackspots', 'hazardPoints'];
 // Chạm một điểm nóng → bật lớp chứa điểm đó (đang tắt thì bay tới chỗ trống)
@@ -101,9 +109,11 @@ export default function MonitoringMap() {
   const coarse = useMediaQuery('(pointer: coarse)');
   const touch = !wide || coarse;
   const online = useOnline();
-  const [mode, setMode] = useState(readMode); // tinh_hinh | tac_nghiep
+  // Lãnh đạo: tài khoản cấp tỉnh có mã PIN ký duyệt cảnh báo (không tính Quản trị hệ thống)
+  const leader = useStore((st) => !!st.auth?.user?.has_pin && (st.auth?.user?.assignments || []).every((a) => a.role === 'admin_tinh'));
+  const [mode, setMode] = useState(() => readMode(leader)); // tinh_hinh (Xem tình hình) | tac_nghiep (Điều hành)
   const [layers, setLayers] = useState(() => (mode === 'tinh_hinh' ? situationLayers(DEFAULT_LAYERS) : DEFAULT_LAYERS));
-  const opsLayers = useRef(null); // lớp đang bật trước khi sang "Tình hình" — quay về "Tác nghiệp" thì trả lại đúng như cũ
+  const opsLayers = useRef(null); // lớp đang bật trước khi sang "Xem tình hình" — quay về "Điều hành" thì trả lại đúng như cũ
   const [basemap, setBasemap] = useState('auto');
   // ?cong-cu=khoanh (từ "Vẽ vùng trên bản đồ" của form soạn cảnh báo): mở sẵn công cụ khoanh đa giác
   const [tool, setTool] = useState(() => (new URLSearchParams(window.location.search).get('cong-cu') === 'khoanh' ? 'polygon' : null)); // measure | route | polygon | circle | incident
@@ -181,7 +191,7 @@ export default function MonitoringMap() {
   // Ghi chú dưới tên lớp (không khoá lớp): vùng kịch bản nào đang hiện theo mực nước tại thời điểm đang xem
   const unknownLevels = scenarioStates.filter((x) => x.level == null).length;
   const notes = {
-    forecast: layers.forecast ? (rain ? `${rain.short} (P50)` : rainNote) : null,
+    forecast: layers.forecast ? (rain ? `${rain.short} — khả năng cao nhất` : rainNote) : null,
     radar: radarNote,
     floodScenario: scenarioStates.length
       ? `${scenarioStates.filter((x) => x.active).length}/${scenarioStates.length} vùng đang ngập theo mực nước ${offset ? `lúc ${fmtVn(Date.now() + offset * 3600_000)}` : 'hiện tại'}${unknownLevels ? ` · ${unknownLevels} vùng chưa có số đo trạm` : ''}`
@@ -263,7 +273,7 @@ export default function MonitoringMap() {
     : stationsQ.isError && !stationsQ.data ? 'Không tải được trạm mực nước — danh sách có thể thiếu trạm trên báo động'
       : !data ? (layersQ.isError ? 'Không tải được các lớp bản đồ — danh sách có thể thiếu SOS, sự cố' : 'Đang tải các lớp bản đồ…') : null;
 
-  // Chế độ xem: sang "Tình hình" nhớ các lớp đang bật để quay về "Tác nghiệp" trả lại đúng như cũ; máy nhớ chế độ
+  // Chế độ xem: sang "Xem tình hình" nhớ các lớp đang bật để quay về "Điều hành" trả lại đúng như cũ; máy nhớ chế độ
   const switchMode = (m) => {
     if (m === mode) return;
     if (m === 'tinh_hinh') {
@@ -351,9 +361,9 @@ export default function MonitoringMap() {
         type="button"
         onClick={() => setLayers(mode === 'tinh_hinh' ? situationLayers(DEFAULT_LAYERS) : DEFAULT_LAYERS)}
         className={clsx('px-1.5 font-medium text-muted hover:text-accent', touch && 'min-h-[44px]')}
-        title={mode === 'tinh_hinh' ? 'Lớp mặc định của chế độ Tình hình' : 'Lớp mặc định'}
+        title={mode === 'tinh_hinh' ? 'Lớp mặc định của chế độ Xem tình hình' : 'Lớp mặc định của chế độ Điều hành'}
       >
-        Mặc định
+        Về mặc định
       </button>
     </div>
   );
@@ -394,6 +404,18 @@ export default function MonitoringMap() {
     />
   );
   const tools = toolList(canIncident);
+  // Cách dùng bản đồ (gợi ý theo vai trò — utils/guides.js): nút "?" cạnh câu giải thích chế độ xem, không đè lên bản đồ
+  const guideRole = useGuideRole();
+  const mapHelp = (
+    <Hint label="Cách dùng bản đồ">
+      <ol className="mt-0.5 list-decimal space-y-1 pl-4">
+        {tipsFor('ban-do', guideRole).map((t) => <li key={t}>{t}</li>)}
+      </ol>
+      <Link to={`/huong-dan?vai=${guideRole}${guideRole === 'xa' ? '' : '#ban-do'}`} className="mt-1.5 inline-block font-semibold text-accent hover:underline">
+        Hướng dẫn đầy đủ
+      </Link>
+    </Hint>
+  );
   const basemapSelect = (cls) => (
     <select className={cls} value={basemap} onChange={(e) => setBasemap(e.target.value)} title="Nền bản đồ" aria-label="Nền bản đồ">
       <option value="auto">Nền: Theo giao diện</option>
@@ -490,7 +512,15 @@ export default function MonitoringMap() {
             {/* Cột trái: bảng lớp dữ liệu (trên; thu gọn: chỉ còn nút có chữ) + thẻ thang màu radar / mưa dự báo, chú giải (dưới).
                 Chung một cột để bảng lớp tự co lại (cuộn) phía trên các thẻ — không để thẻ đè lên cuối danh sách lớp */}
             <div className="pointer-events-none absolute bottom-9 left-3 top-3 z-[1000] flex flex-col items-start gap-2">
-              <ViewModeSwitch mode={mode} onChange={switchMode} className="pointer-events-auto shrink-0" />
+              <ViewModeSwitch
+                mode={mode}
+                onChange={switchMode}
+                caption
+                canDispatch={canDispatch}
+                help={mapHelp}
+                className="pointer-events-auto shrink-0"
+                captionClass={clsx(floatCard, 'pointer-events-auto max-w-[19rem] shrink-0 px-2.5 py-1.5')}
+              />
               <div className="flex min-h-[7rem] flex-1 items-start">
                 {leftOpen && (
                   <div className={clsx(floatCard, 'pointer-events-auto flex max-h-full w-[18rem] flex-col overflow-hidden')}>
@@ -627,15 +657,26 @@ export default function MonitoringMap() {
             {/* Trên cùng bên trái: đang xem thời điểm khác, công cụ đang dùng, kết quả khoanh vùng */}
             <div className="pointer-events-none absolute left-2 right-[4.25rem] top-2 z-[1000] flex flex-col items-start gap-2">
               {/* iPad dọc: chế độ xem ngay trên bản đồ (điện thoại: trong bảng Lớp — để bản đồ rộng) */}
-              {mid && <ViewModeSwitch mode={mode} onChange={switchMode} touch className="pointer-events-auto" />}
+              {mid && (
+                <ViewModeSwitch
+                  mode={mode}
+                  onChange={switchMode}
+                  touch
+                  caption
+                  canDispatch={canDispatch}
+                  help={mapHelp}
+                  className="pointer-events-auto"
+                  captionClass={clsx(floatCard, 'pointer-events-auto max-w-sm px-2.5 py-1.5')}
+                />
+              )}
               {offset !== 0 && (
                 <div className={clsx(floatCard, 'pointer-events-auto flex w-full items-center gap-2 px-3 py-1.5 text-xs')} role="status">
                   <Clock size={14} className="shrink-0 text-accent" aria-hidden="true" />
                   <span className="min-w-0 flex-1">
-                    Đang xem <b className="text-accent">{offset > 0 ? `+${offset}h · dự báo` : `${offset}h · đã qua`}</b>
+                    Đang xem <b className="text-accent">{hourText(offset)}</b> · {offset > 0 ? 'dự báo' : 'số đo đã qua'}
                   </span>
                   <button type="button" className="min-h-[40px] shrink-0 rounded-lg px-2 font-semibold text-accent hover:bg-accent/10" onClick={() => setOffset(0)}>
-                    Về hiện tại
+                    Về bây giờ
                   </button>
                 </div>
               )}
@@ -657,7 +698,7 @@ export default function MonitoringMap() {
                   <div className={clsx(floatCard, 'px-2 py-1.5')}>
                     {rain ? (
                       <>
-                        <div className="mb-0.5 font-bold text-ink">{rain.short} (P50)</div>
+                        <div className="mb-0.5 font-bold text-ink">{rain.short}</div>
                         <div className="flex gap-1">
                           {rain.bins.map((b) => <span key={b.label} className="h-2.5 w-5 rounded-sm" style={{ background: b.color }} title={b.label} />)}
                         </div>
@@ -672,7 +713,7 @@ export default function MonitoringMap() {
 
             {sheet === 'layers' && (
               <Sheet title="Lớp dữ liệu bản đồ" onClose={() => setSheet(null)} actions={layerActions}>
-                <ViewModeSwitch mode={mode} onChange={switchMode} touch className="mb-3 w-full !shadow-none" />
+                <ViewModeSwitch mode={mode} onChange={switchMode} touch caption canDispatch={canDispatch} help={mapHelp} className="w-full !shadow-none" captionClass="mb-3 mt-1.5" />
                 {layerList}
               </Sheet>
             )}
@@ -682,7 +723,7 @@ export default function MonitoringMap() {
               </Sheet>
             )}
             {sheet === 'time' && (
-              <Sheet title="Thời gian: số đo đã qua · dự báo" onClose={() => setSheet(null)}>
+              <Sheet title="Thời gian: 12 giờ trước → 24 giờ tới" onClose={() => setSheet(null)}>
                 <TimeControl offset={offset} setOffset={setOffset} touch />
               </Sheet>
             )}
@@ -737,7 +778,7 @@ export default function MonitoringMap() {
             { key: 'canh-bao', label: 'Cảnh báo', icon: BellRing, onClick: () => toggleSheet('alerts'), active: sheet === 'alerts', badge: alertCount },
             {
               key: 'thoi-gian',
-              label: offset ? `${offset > 0 ? '+' : ''}${offset} giờ` : 'Thời gian',
+              label: offset ? `${offset > 0 ? '+' : '−'}${Math.abs(offset)} giờ` : 'Thời gian',
               icon: Clock,
               onClick: () => toggleSheet('time'),
               active: sheet === 'time' || offset !== 0,
