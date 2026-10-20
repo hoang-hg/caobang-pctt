@@ -86,7 +86,9 @@ frontend/                  React 18, Vite 6, Tailwind 3, TanStack Query 5, Zusta
                            chế độ giả lập (chỉ máy dev, README §4.7): simulationEngine.js, demoUsers.js, demo/fixtures.json
   src/app/store.js         Zustand: theme, filter, focus, alertDraft, gps, auth, wsStatus, soundOn, sidebar, savedAt, toasts
   src/rbac/                permissions.js (khớp domain) · usePermission.js (usePermission, useCanAll, useAllowedCodes,
-                           useIsCommuneUser, Can)
+                           useIsCommuneUser, useGuideRole, Can)
+  src/utils/guides.js      nội dung Hướng dẫn xử lý (pages/Guide.jsx, /huong-dan) + gợi ý 3 bước đầu trang theo vai trò
+                           (components/common/RoleTips.jsx) — đổi chữ trên nút thì sửa câu hướng dẫn ở đây
   src/pages/               trang điều hành (DataImport = nhập dữ liệu chính thức); pages/public/ = cổng công khai (PublicPortal, ReportForm, TicketTracker,
                            ReservoirMonitor, LandslideMonitor, NetworkBanner = báo mất mạng / gợi ý bản nhẹ,
                            MissionPage = /nhiem-vu link nhiệm vụ của trưởng nhóm, không đăng nhập)

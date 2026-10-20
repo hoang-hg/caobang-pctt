@@ -23,6 +23,7 @@ const DataSources = lazy(() => import('./pages/DataSources'));
 const CitizenReports = lazy(() => import('./pages/CitizenReports'));
 const DataImport = lazy(() => import('./pages/DataImport'));
 const DisasterEvents = lazy(() => import('./pages/DisasterEvents'));
+const Guide = lazy(() => import('./pages/Guide'));
 const PublicPortal = lazy(() => import('./pages/public/PublicPortal'));
 const MissionPage = lazy(() => import('./pages/public/MissionPage'));
 
@@ -87,6 +88,8 @@ function Shell() {
               <Route path="/nguon-du-lieu" element={<Guard obj="integration" act="view"><DataSources /></Guard>} />
               <Route path="/nhap-du-lieu" element={<Guard obj="data" act="import" or={['data', 'submit']}><DataImport /></Guard>} />
               <Route path="/phan-quyen" element={<Guard obj="user" act="view"><AccessControl /></Guard>} />
+              {/* Hướng dẫn xử lý theo vai trò: mọi tài khoản cán bộ */}
+              <Route path="/huong-dan" element={<Guide />} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
           </Suspense>

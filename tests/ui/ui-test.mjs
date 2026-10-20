@@ -42,6 +42,7 @@ const STAFF_PAGES = [
   ['/nguon-du-lieu', 'Nguồn dữ liệu & IoT'],
   ['/nhap-du-lieu', 'Nhập dữ liệu'],
   ['/phan-quyen', 'Phân quyền'],
+  ['/huong-dan', 'Hướng dẫn xử lý'],
 ];
 const PUBLIC_TABS = [
   'Bản đồ & Cảnh báo', 'Hồ chứa & Xả lũ', 'Sạt trượt & Đường đèo', 'Tra cứu tiến độ', 'Mực nước sông suối',
@@ -2992,6 +2993,73 @@ async function eventsWard(ctx) {
   });
 }
 
+/**
+ * Hướng dẫn xử lý theo vai trò — chỉ xem: tài khoản Quản trị hệ thống mở ra đúng hướng dẫn của mình, chạm "Bạn đang gặp việc
+ * gì?" → cuộn tới đúng tình huống, nút dưới tình huống mở thẳng màn hình xử lý, đổi sang hướng dẫn cấp xã; tài khoản phường
+ * thấy hướng dẫn cấp xã, gợi ý đầu trang Cứu hộ là câu của cấp xã, có liên kết tới hướng dẫn đầy đủ. Không tràn ngang.
+ */
+const GUIDE_DEVICES = [
+  ['Laptop', { viewport: { width: 1366, height: 800 } }, false],
+  ['Điện thoại 360', devices['Galaxy S8'], true],
+];
+
+async function guidePage(ctx) {
+  const { page } = ctx;
+  await step(ctx, 'Hướng dẫn xử lý (Quản trị hệ thống): đúng vai trò, chạm tình huống → cuộn tới các bước, nút mở thẳng màn hình', async () => {
+    await loginAs(page, STAFF);
+    await page.goto(`${ROOT}/huong-dan`);
+    await waitMain(page);
+    await page.getByRole('heading', { name: 'Bạn đang gặp việc gì?' }).waitFor();
+    const roles = page.getByRole('group', { name: 'Hướng dẫn cho' });
+    const pressed = await roles.locator('[aria-pressed="true"]').innerText();
+    if (!/Quản trị/.test(pressed)) throw new Error(`tài khoản quản trị mở ra hướng dẫn "${pressed}"`);
+    const cards = page.locator('main article');
+    const n = await cards.count();
+    if (n < 4) throw new Error(`chỉ có ${n} tình huống`);
+    for (let i = 0; i < n; i += 1) {
+      const card = cards.nth(i);
+      if (await card.locator('ol > li').count() < 3) throw new Error(`tình huống thứ ${i + 1} ít hơn 3 bước`);
+      if (!(await card.getByRole('link').count())) throw new Error(`tình huống thứ ${i + 1} không có nút mở màn hình xử lý`);
+    }
+    await expectNoOverflow(ctx, 'hướng dẫn xử lý');
+
+    // Chạm một tình huống → thẻ của nó vào tầm nhìn
+    await page.getByRole('button', { name: /Trạm đo, nguồn dự báo không gửi số liệu/ }).click();
+    const target = page.locator('article', { has: page.getByRole('heading', { name: 'Trạm đo, nguồn dự báo không gửi số liệu' }) });
+    await page.waitForFunction((el) => {
+      const r = el.getBoundingClientRect();
+      return r.top >= 0 && r.top < window.innerHeight * 0.6;
+    }, await target.elementHandle(), { timeout: 5_000 });
+    await target.getByRole('link', { name: /Mở Nguồn dữ liệu/ }).click();
+    await page.waitForURL(/\/nguon-du-lieu/, { timeout: 10_000 });
+
+    // Xem hướng dẫn của vai trò khác
+    await page.goto(`${ROOT}/huong-dan`);
+    await waitMain(page);
+    await roles.getByRole('button', { name: /Cấp xã|Cán bộ cấp xã/ }).click();
+    await page.waitForURL(/vai=xa/);
+    await page.getByRole('heading', { name: 'Xã cần tỉnh chi viện' }).waitFor();
+    return `${n} tình huống`;
+  });
+
+  await step(ctx, `Hướng dẫn xử lý (tài khoản phường ${WARD.name}): hướng dẫn cấp xã, gợi ý đầu trang Cứu hộ theo cấp xã`, async () => {
+    await page.context().clearCookies();
+    await page.evaluate(() => localStorage.clear());
+    await loginAs(page, WARD);
+    await page.goto(`${ROOT}/cuu-ho`);
+    await waitMain(page);
+    const tips = page.getByRole('region', { name: 'Gợi ý cho người mới' });
+    await tips.waitFor({ timeout: 15_000 });
+    if (!/phiếu cứu hộ của xã mình/.test(await tips.innerText())) throw new Error('gợi ý ở trang Cứu hộ không phải câu của cấp xã');
+    await tips.getByRole('link', { name: 'Hướng dẫn đầy đủ' }).click();
+    await page.waitForURL(/\/huong-dan\?vai=xa/);
+    await page.getByRole('heading', { name: 'Người dân báo gặp nạn' }).waitFor();
+    const pressed = await page.getByRole('group', { name: 'Hướng dẫn cho' }).locator('[aria-pressed="true"]').innerText();
+    if (!/xã/.test(pressed)) throw new Error(`tài khoản phường mở ra hướng dẫn "${pressed}"`);
+    await expectNoOverflow(ctx, 'hướng dẫn xử lý (tài khoản phường)');
+  });
+}
+
 // ================================================================
 console.log(`Kiểm thử giao diện: ${ROOT}${READONLY ? ' (chỉ xem)' : ''}`);
 const browser = await chromium.launch();
@@ -3065,6 +3133,13 @@ try {
       await rescueWard({ page: wPage, vp: vpD, problems: watch(wPage) });
       await wctx.close();
     }
+  }
+  for (const [label, opts, phone] of GUIDE_DEVICES) {
+    const gctx = await browser.newContext({ ...opts, locale: 'vi-VN' });
+    gctx.setDefaultTimeout(15_000);
+    const gPage = await gctx.newPage();
+    await guidePage({ page: gPage, vp: { name: `Hướng dẫn xử lý · ${label}`, mobile: phone }, problems: watch(gPage) });
+    await gctx.close();
   }
   for (const [label, opts, phone] of RESOURCE_DEVICES.filter(([, , phone], i) => phone || i === 0)) {
     const cctx = await browser.newContext({ ...opts, locale: 'vi-VN' });

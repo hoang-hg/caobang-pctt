@@ -8,6 +8,7 @@ import { api } from '../api/client';
 import { useStore } from '../app/store';
 import { Empty, KpiCard, Modal, Tabs } from '../components/common/ui';
 import PageHeader from '../components/common/PageHeader';
+import RoleTips from '../components/common/RoleTips';
 import { PAGE } from '../components/layout/page';
 import { usePermission } from '../rbac/usePermission';
 import { STATION_TYPE } from '../utils/labels';
@@ -359,6 +360,7 @@ export default function DataSources() {
         title="Nguồn dữ liệu & Thiết bị IoT"
         description="Dự báo quốc tế (ECMWF, GFS, OpenWeather) · Cổng tiếp nhận IoT hiện trường HTTP / MQTT / LoRaWAN · Giám sát kết nối"
       />
+      <RoleTips page="nguon-du-lieu" />
       <Tabs value={tab} onChange={setTab} tabs={[
         { value: 'sources', label: 'Nguồn dữ liệu', icon: CloudSun },
         { value: 'devices', label: 'Thiết bị IoT', icon: Cpu },

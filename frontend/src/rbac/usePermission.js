@@ -50,6 +50,17 @@ export function useIsCommuneUser() {
   });
 }
 
+/** Nhóm người dùng cho phần hướng dẫn (utils/guides.js): có vai trò Quản trị hệ thống → 'quan_tri'; chỉ vai trò cấp xã →
+ * 'xa'; còn lại (Quản trị tỉnh — lãnh đạo BCH, trực ban) → 'tinh'. */
+export function useGuideRole() {
+  return useStore((s) => {
+    const roles = (s.auth?.user?.assignments || []).map((x) => x.role);
+    if (roles.includes('super_admin')) return 'quan_tri';
+    if (roles.length > 0 && roles.every((r) => r === 'admin_xa')) return 'xa';
+    return 'tinh';
+  });
+}
+
 /** Nhãn địa bàn đang xem: bộ lọc đang chọn → xã duy nhất được giao ("Xã Cô Ba") → "N xã/phường được giao"; tài khoản
  * toàn tỉnh chưa lọc → "Toàn tỉnh Cao Bằng" (nhãn mặc định của bộ lọc). */
 export function useScopeLabel(obj = 'monitoring', act = 'view') {

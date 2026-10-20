@@ -10,6 +10,7 @@ import IssueModal from '../components/common/IssueModal';
 import { FuelDepotModal, ReceiveModal, VehicleModal } from '../components/common/LogisticsModals';
 import QuickActionBar from '../components/common/QuickActionBar';
 import PageHeader from '../components/common/PageHeader';
+import RoleTips from '../components/common/RoleTips';
 import { PAGE } from '../components/layout/page';
 import ConnectionBanner from '../components/dashboard/ConnectionBanner';
 import QuickIncidentModal from '../components/dashboard/QuickIncidentModal';
@@ -339,6 +340,8 @@ export default function Resources() {
       />
 
       <ResourceKpis summaryQ={summaryQ} warehouses={warehousesQ.data} onGo={(id, f) => go(id, f)} />
+
+      <RoleTips page="nguon-luc" />
 
       <div ref={tabsRef} className="scroll-mt-20">
         <Tabs

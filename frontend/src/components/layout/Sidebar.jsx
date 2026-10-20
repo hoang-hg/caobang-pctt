@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import {
-  LayoutDashboard, Map, Boxes, Siren, Megaphone, KeyRound, DatabaseZap, Camera, FileUp, CalendarRange,
+  LayoutDashboard, Map, Boxes, Siren, Megaphone, KeyRound, DatabaseZap, Camera, FileUp, CalendarRange, BookOpen,
   ChevronLeft, ChevronRight, Phone, X
 } from 'lucide-react';
 import clsx from 'clsx';
@@ -12,7 +12,7 @@ import { hasPermission } from '../../rbac/permissions';
 
 // Menu theo nhóm việc: Điều hành (tác nghiệp hằng ngày) · Dữ liệu & báo cáo · Quản trị. Menu rộng 240 px: nhãn chữ 14 px
 // (người lớn tuổi đọc rõ) kèm số đếm không bị cắt.
-// Mục nào tài khoản không có quyền thì ẩn; nhóm hết mục thì ẩn cả nhóm.
+// Mục nào tài khoản không có quyền thì ẩn; nhóm hết mục thì ẩn cả nhóm. Mục không ghi `perm` (Hướng dẫn xử lý): mọi tài khoản.
 const NAV_GROUPS = [
   {
     title: 'Điều hành',
@@ -37,6 +37,10 @@ const NAV_GROUPS = [
   {
     title: 'Quản trị',
     items: [{ to: '/phan-quyen', label: 'Phân quyền', icon: KeyRound, perm: ['user', 'view'] }],
+  },
+  {
+    title: 'Trợ giúp',
+    items: [{ to: '/huong-dan', label: 'Hướng dẫn xử lý', icon: BookOpen }],
   },
 ];
 
@@ -83,7 +87,7 @@ export default function Sidebar() {
       <div className="flex flex-col gap-2.5 px-2">
         {NAV_GROUPS.map((group, gIdx) => {
           const visibleItems = group.items.filter(
-            (n) => hasPermission(perms, ...n.perm) || (n.alt && hasPermission(perms, ...n.alt))
+            (n) => !n.perm || hasPermission(perms, ...n.perm) || (n.alt && hasPermission(perms, ...n.alt))
           );
           if (!visibleItems.length) return null;
 
@@ -154,24 +158,22 @@ export default function Sidebar() {
       {/* Desktop Sidebar */}
       <nav
         className={clsx(
-          'no-print hidden lg:flex shrink-0 flex-col justify-between border-r border-line bg-panel py-3 transition-all duration-200 select-none',
+          'no-print hidden lg:flex min-h-0 shrink-0 flex-col justify-between gap-2 border-r border-line bg-panel py-3 transition-all duration-200 select-none',
           sidebarCollapsed ? 'w-16' : 'w-60'
         )}
       >
-        <div className="flex flex-col gap-2">
+        {/* Màn thấp (laptop 768 px): danh sách mục tự cuộn bên trong — menu không bao giờ kéo dài cả trang ra ngoài khung */}
+        <div className="scroll-thin flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
           {renderNavLinks(false)}
         </div>
 
-        <div className="flex flex-col gap-2 px-2 pt-2 border-t border-line/60">
-          {!sidebarCollapsed && (
-            <p className="px-1 text-[11px] leading-snug text-muted">Hệ thống tác chiến PCTT & TKCN tỉnh Cao Bằng.</p>
-          )}
+        <div className="flex shrink-0 flex-col gap-2 px-2 pt-2 border-t border-line/60">
           {!sidebarCollapsed && (
             <div className="rounded-xl bg-panel2/80 p-2.5 text-xs">
               <div className="flex items-center gap-1.5 font-semibold text-danger">
                 <Phone size={13} /> Khẩn cấp cứu nạn: 112
               </div>
-              <div className="text-[11px] text-muted mt-0.5">Trực ban tác chiến 24/7</div>
+              <div className="text-[11px] text-muted mt-0.5">Trực ban 24/7</div>
             </div>
           )}
 

@@ -8,6 +8,7 @@ import { useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
 import { Empty, KpiCard, Tabs } from '../components/common/ui';
 import PageHeader from '../components/common/PageHeader';
+import RoleTips from '../components/common/RoleTips';
 import { PAGE } from '../components/layout/page';
 import { useAllowedCodes, usePermission } from '../rbac/usePermission';
 import RecordForm from './DataImportForm';
@@ -24,7 +25,8 @@ export default function DataImport() {
   const canImport = usePermission('data', 'import', '*');
   const [params, setParams] = useSearchParams();
   const code = params.get('ho-so');
-  const [tab, setTab] = useState(code ? 'ho-so' : 'nhap');
+  // ?ho-so=<mã>: mở một hồ sơ; ?tab=ho-so: mở danh sách hồ sơ (liên kết từ trang Hướng dẫn xử lý)
+  const [tab, setTab] = useState(code || params.get('tab') === 'ho-so' ? 'ho-so' : 'nhap');
   const { data: datasets = [], isLoading } = useQuery({
     queryKey: ['import-datasets'],
     queryFn: () => api('/data-import/datasets'),
@@ -51,6 +53,7 @@ export default function DataImport() {
           ? 'Điểm sơ tán, vùng nguy hiểm, danh bạ, trạm quan trắc, kho, lực lượng… từ tệp CSV / Excel (.xlsx) / GeoJSON hoặc điền trực tiếp. Bấm “Kiểm tra” trước — hệ thống chỉ ghi khi dữ liệu không còn lỗi, và ghi toàn bộ hoặc không ghi gì. Hồ sơ xã/phường gửi được duyệt ở tab bên cạnh.'
           : 'Điểm sơ tán, xóm, danh bạ, kho, lực lượng… của xã/phường bạn phụ trách. Dữ liệu được gửi lên cấp tỉnh phê duyệt; chỉ sau khi được duyệt mới hiển thị trên hệ thống và cổng công khai.'}
       />
+      <RoleTips page="nhap-du-lieu" />
       <Tabs
         value={tab}
         onChange={setTab}

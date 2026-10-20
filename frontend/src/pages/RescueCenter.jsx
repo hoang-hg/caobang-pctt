@@ -9,6 +9,7 @@ import { ErrorState, Pager, Section, Segmented, Skeleton } from '../components/c
 import FilterToolbar from '../components/common/FilterToolbar';
 import UrgentStrip from '../components/common/UrgentStrip';
 import PageHeader from '../components/common/PageHeader';
+import RoleTips from '../components/common/RoleTips';
 import { PAGE } from '../components/layout/page';
 import DispatchModal from '../components/common/DispatchModal';
 import { MissionLinkModal } from '../components/common/MissionLink';
@@ -344,6 +345,8 @@ export default function RescueCenter() {
       />
 
       <RescueKpis ticketsQ={ticketsQ} tickets={tickets} factsOf={factsOf} evacQ={evacQ} onGo={go} onEvac={() => scrollTo(document.getElementById('so-tan'))} />
+
+      <RoleTips page="cuu-ho" />
 
       {/* Lãnh đạo nắm tình hình: bản đồ tác chiến (phiếu đang mở, lộ trình + ETA của đội, vùng nguy cơ, điểm sơ tán) và diễn biến
           48 giờ (phiếu theo mức, thời gian xử lý) — cùng danh sách phiếu với bảng điều phối; thu gọn được */}

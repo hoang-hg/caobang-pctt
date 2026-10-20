@@ -10,6 +10,7 @@ import { EmptyState, ErrorState, Section, ShowMore, Skeleton, Tabs } from '../co
 import QuickActionBar from '../components/common/QuickActionBar';
 import UrgentStrip from '../components/common/UrgentStrip';
 import PageHeader from '../components/common/PageHeader';
+import RoleTips from '../components/common/RoleTips';
 import { PAGE } from '../components/layout/page';
 import ConnectionBanner from '../components/dashboard/ConnectionBanner';
 import QuickIncidentModal from '../components/dashboard/QuickIncidentModal';
@@ -205,6 +206,8 @@ export default function Alerts() {
       />
 
       <AlertKpis query={bq} broadcasts={list} factsOf={factsOf} onGo={go} />
+
+      <RoleTips page="canh-bao" />
 
       <Tabs
         fit
