@@ -63,7 +63,7 @@ def order_message(ticket: dict, url: str, eta_min: int | None = None) -> str:
     return (
         f"[LỆNH KHẨN] {ticket['code']}: {ticket['address'] or ticket['admin_name']} – "
         f"toạ độ {ticket['lat']:.5f},{ticket['lon']:.5f}."
-        + (f" ETA {eta_min} phút." if eta_min is not None else "")
+        + (f" Dự kiến đến sau {eta_min} phút." if eta_min is not None else "")
         + f" Mở nhiệm vụ, báo đến / đã cứu / cần chi viện: {url}"
     )
 

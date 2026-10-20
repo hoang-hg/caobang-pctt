@@ -6,14 +6,15 @@ import { COLUMNS } from './rescueFacts';
 import TicketCard from './TicketCard';
 
 const EMPTY = {
-  moi: 'Không có phiếu chờ xử lý',
-  dieu_phoi: 'Không có phiếu đang điều phối',
-  thuc_thi: 'Không có đội đang thực thi',
-  hoan_thanh: 'Chưa có phiếu hoàn thành trong 48 giờ qua',
+  moi: 'Không có phiếu mới báo',
+  dieu_phoi: 'Không có phiếu đang tìm đội',
+  thuc_thi: 'Không có đội nào đang trên đường',
+  hoan_thanh: 'Chưa có phiếu cứu xong trong 48 giờ qua',
 };
 
 /**
- * Bảng điều phối 4 cột (thiết kế D.2: Chờ xử lý → Đang điều phối → Đang thực thi → Đã cứu an toàn). Từ 1280 px: đủ 4 cột,
+ * Bảng điều phối 4 cột (thiết kế D.2, tên đời thường: Mới báo — chưa ai nhận → Đang tìm đội → Đội đang đến → Đã cứu xong).
+ * Phiếu vừa đến khi đang xem trượt vào (`cardProps.isNew`). Từ 1280 px: đủ 4 cột,
  * kéo thả phiếu giữa các cột, mỗi cột cuộn riêng. Nhỏ hơn (điện thoại, iPad): thẻ chọn cột (số phiếu, chấm Đỏ khi cột có
  * phiếu quá hạn) rồi danh sách phiếu của cột — không cuộn lồng nhau, không phải lướt qua 3 cột mới tới cột cần xem. Cột
  * theo trạng thái, KHÔNG tô màu rủi ro (màu Đỏ / Cam / Vàng dành cho mức ưu tiên của từng phiếu).
@@ -28,7 +29,7 @@ export default function RescueBoard({ tickets, factsOf, wide, column, onColumn, 
       {filtered ? 'Không có phiếu khớp bộ lọc trong cột này' : EMPTY[key]}
     </div>
   );
-  const cards = (key) => byCol[key].map((t) => <TicketCard key={t.id} t={t} x={factsOf(t)} compact={wide} {...cardProps} />);
+  const cards = (key) => byCol[key].map((t) => <TicketCard key={t.id} t={t} x={factsOf(t)} compact={wide} fresh={!!cardProps.isNew?.(t.id)} {...cardProps} />);
 
   if (!wide) {
     const col = COLUMNS.find((c) => c.key === column) || COLUMNS[0];
@@ -41,10 +42,11 @@ export default function RescueBoard({ tickets, factsOf, wide, column, onColumn, 
           onChange={onColumn}
           tabs={COLUMNS.map((c) => {
             const late = overdueIn(c.key);
-            return { value: c.key, label: c.title, short: c.short, icon: c.icon, count: byCol[c.key].length, alert: late ? { level: 3, text: `${late} phiếu quá hạn SLA` } : undefined };
+            // Thẻ cột dùng tên ngắn (iPad dọc, điện thoại: 4 thẻ vừa một hàng); tên đầy đủ ghi ngay dưới
+            return { value: c.key, label: c.short, icon: c.icon, count: byCol[c.key].length, alert: late ? { level: 3, text: `${late} phiếu quá hạn phản hồi` } : undefined };
           })}
         />
-        <p className="-mt-1 text-[11px] text-muted">{col.hint}</p>
+        <p className="-mt-1 text-xs text-muted"><b className="font-semibold text-ink-2">{col.title}</b> — {col.hint}</p>
         {byCol[col.key].length ? <div className="grid gap-2.5 md:grid-cols-2">{cards(col.key)}</div> : empty(col.key)}
       </div>
     );
@@ -69,8 +71,8 @@ export default function RescueBoard({ tickets, factsOf, wide, column, onColumn, 
             <div className="border-b border-line/60 px-3 py-2.5">
               <div className="flex items-center gap-1.5 text-sm font-bold text-ink">
                 <c.icon size={15} className={c.key === 'hoan_thanh' ? 'text-good' : 'text-accent'} aria-hidden="true" />
-                <span className="min-w-0 flex-1 truncate">{c.title}</span>
-                {late > 0 && <span className="chip bg-danger px-1.5 py-0 text-[10px] font-bold text-white" title={`${late} phiếu quá hạn SLA`}>{late} quá hạn</span>}
+                <span className="min-w-0 flex-1 leading-tight">{c.title}</span>
+                {late > 0 && <span className="chip bg-danger px-1.5 py-0 text-[11px] font-bold text-white" title={`${late} phiếu quá hạn phản hồi`}>{late} quá hạn</span>}
                 <span className="chip bg-panel2 px-2 py-0.5 text-xs font-semibold">{byCol[c.key].length}</span>
               </div>
               <div className="mt-0.5 text-[11px] text-muted">{c.hint}</div>

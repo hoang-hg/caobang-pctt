@@ -16,7 +16,7 @@ import { HAZARD_LEVEL, levelOf, occupancyLevel, risk, RISK, sosLevel } from '../
 import { hasActiveTeam } from '../../utils/sla';
 import { int, time } from '../../utils/format';
 import { useShowMore } from '../../utils/useShowMore';
-import { mmss } from './rescueFacts';
+import { durWords } from './rescueFacts';
 
 const CENTER = [22.75, 106.05];
 // Như Bản đồ giám sát: lộ trình an toàn xanh, qua vùng nguy hiểm cam; vùng ngập xanh dương, vùng sạt lở theo mức
@@ -66,7 +66,7 @@ function FlyTo({ target }) {
   return null;
 }
 
-/** Đội có thời hạn tới (ETA) gần nhất lên đầu; quá ETA trước cả; đã đến cuối. */
+/** Đội có giờ dự kiến tới gần nhất lên đầu; quá giờ dự kiến trước cả; đã đến cuối. */
 const teamRank = (t, now) => (t.dispatch_status === 'da_den' ? 2 : t.eta && new Date(t.eta).getTime() <= now ? 0 : 1);
 
 function TeamRow({ t, now, onPick }) {
@@ -79,7 +79,7 @@ function TeamRow({ t, now, onPick }) {
         type="button"
         onClick={() => onPick(t)}
         className="tap flex w-full items-center gap-2 rounded-md border border-line/60 px-2 py-1.5 text-left text-xs hover:bg-panel2"
-        aria-label={`${t.force_name || 'Lực lượng'} đến ${t.code}: ${arrived ? 'đã đến' : late ? 'quá ETA' : etaSec != null ? `còn ${mmss(etaSec)}` : 'chưa có ETA'} — xem trên bản đồ`}
+        aria-label={`${t.force_name || 'Lực lượng'} đến ${t.code}: ${arrived ? 'đã đến' : late ? 'quá giờ dự kiến' : etaSec != null ? `còn ${durWords(etaSec)}` : 'chưa có giờ dự kiến'} — xem trên bản đồ`}
       >
         <span className={clsx('h-2.5 w-2.5 shrink-0 rounded-full', risk(sosLevel(t.priority)).fill)} aria-hidden="true" />
         <span className="min-w-0 flex-1">
@@ -87,8 +87,8 @@ function TeamRow({ t, now, onPick }) {
           <span className="block truncate text-muted">{INCIDENT[t.incident_type] || t.incident_type}{t.admin_name ? ` · ${t.admin_name}` : ''}</span>
         </span>
         <span className="shrink-0 text-right">
-          <span className={clsx('block font-mono font-semibold', arrived ? 'text-good' : late ? 'text-danger' : 'text-ink')}>
-            {arrived ? (t.arrived_at ? `Đã đến ${time(t.arrived_at)}` : 'Đã đến') : etaSec == null ? 'Chưa có ETA' : late ? 'Quá ETA' : `còn ${mmss(etaSec)}`}
+          <span className={clsx('block font-semibold', arrived ? 'text-good' : late ? 'text-danger' : 'text-ink')}>
+            {arrived ? (t.arrived_at ? `Đã đến lúc ${time(t.arrived_at)}` : 'Đã đến') : etaSec == null ? 'Chưa có giờ dự kiến' : late ? 'Quá giờ dự kiến' : `còn ${durWords(etaSec)}`}
           </span>
           {t.route_safe === false && !arrived && <span className="block text-[10px] font-semibold text-serious">qua vùng nguy hiểm</span>}
         </span>
@@ -98,9 +98,9 @@ function TeamRow({ t, now, onPick }) {
 }
 
 /**
- * Bản đồ tác chiến cứu hộ (thiết kế D.2 cột "Đang thực thi" + D.4): phiếu SOS đang mở (biểu tượng như Bản đồ giám sát, màu
+ * Bản đồ cứu hộ (thiết kế D.2 cột "Đội đang đến" + D.4): phiếu SOS đang mở (biểu tượng như Bản đồ giám sát, màu
  * theo mức), lộ trình đội đang đi tới phiếu (xanh; qua vùng nguy hiểm: cam), vùng nguy cơ đang hiệu lực (gồm vùng khoanh tự
- * động từ trạm quan trắc), điểm sơ tán (viền theo mức chứa). Dưới bản đồ: đội đang làm nhiệm vụ, đếm ngược ETA (quá ETA lên
+ * động từ trạm quan trắc), điểm sơ tán (viền theo mức chứa). Dưới bản đồ: đội đang trên đường, còn bao lâu tới nơi (quá giờ dự kiến lên
  * đầu, đã đến cuối) — chạm để bay tới. Vị trí đội là lộ trình đã giao từ nơi đóng quân, KHÔNG theo dõi GPS điện thoại. Màn cảm ứng: một
  * ngón tay cuộn trang, hai ngón kéo / phóng bản đồ (bản đồ không "nuốt" thao tác cuộn).
  */
@@ -129,7 +129,7 @@ export default function RescueMap({ tickets, factsOf, now, onOpen }) {
     <div className="flex min-w-0 flex-col gap-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-semibold text-ink">
-          Bản đồ tác chiến <span className="text-xs font-normal text-muted">· {open.length} phiếu đang mở · {teams.length} đội đang làm nhiệm vụ</span>
+          Bản đồ cứu hộ <span className="text-xs font-normal text-muted">· {open.length} phiếu đang mở · {teams.length} đội đang làm nhiệm vụ</span>
         </h3>
         <Link to="/ban-do" className="btn-ghost tap min-h-[32px] px-2.5 py-0.5 text-xs"><Maximize2 size={12} aria-hidden="true" /> Bản đồ đầy đủ</Link>
       </div>
@@ -163,7 +163,7 @@ export default function RescueMap({ tickets, factsOf, now, onOpen }) {
               >
                 <Tooltip sticky>
                   {p.force_name || 'Lực lượng'} → {p.ticket_code}
-                  {p.status === 'da_den' ? ' · đã đến' : etaSec == null ? '' : etaSec > 0 ? ` · còn ${mmss(etaSec)}` : ' · quá ETA'}
+                  {p.status === 'da_den' ? ' · đã đến' : etaSec == null ? '' : etaSec > 0 ? ` · còn ${durWords(etaSec)}` : ' · quá giờ dự kiến'}
                   {p.route_safe === false ? ' · qua vùng nguy hiểm' : ''}
                 </Tooltip>
               </Polyline>
@@ -196,7 +196,7 @@ export default function RescueMap({ tickets, factsOf, now, onOpen }) {
                       {t.address && <div className="text-muted">{t.address}</div>}
                       <div>
                         {SOS_STATUS[t.status] || t.status}
-                        {x.sla ? ` · chờ ${mmss(x.sla.waitedSec)}` : ''}
+                        {x.sla ? ` · chờ ${durWords(x.sla.waitedSec)}` : ''}
                         {t.force_name && hasActiveTeam(t) ? ` · ${t.force_name}` : ''}
                       </div>
                       <button type="button" className="btn-primary tap mt-1 min-h-[32px] justify-center text-xs" onClick={() => onOpen(t)}>Xem phiếu trên bảng</button>
@@ -235,7 +235,7 @@ export default function RescueMap({ tickets, factsOf, now, onOpen }) {
       />
       {coarse && <p className="text-[11px] text-muted">Chạm biểu tượng để xem phiếu · hai ngón tay để kéo, phóng bản đồ</p>}
       <div>
-        <h4 className="mb-1 text-xs font-semibold uppercase text-muted">Đội đang làm nhiệm vụ — đếm ngược ETA</h4>
+        <h4 className="mb-1 text-xs font-semibold text-muted">Đội đang trên đường — còn bao lâu tới nơi</h4>
         {teams.length ? (
           <>
             <ul className="flex flex-col gap-1">
@@ -244,7 +244,7 @@ export default function RescueMap({ tickets, factsOf, now, onOpen }) {
             <ShowMore list={shownTeams} step={4} noun="đội" />
           </>
         ) : (
-          <p className="text-xs text-muted">Chưa có đội nào đang trên đường tới phiếu SOS</p>
+          <p className="text-xs text-muted">Chưa có đội nào đang trên đường tới điểm cứu hộ</p>
         )}
       </div>
     </div>

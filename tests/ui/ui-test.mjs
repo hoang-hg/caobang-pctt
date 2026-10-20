@@ -573,8 +573,7 @@ async function staff(ctx, trackCode) {
   await step(ctx, READONLY ? 'Mở hộp thoại điều động (không phát lệnh)' : 'Điều động: chọn lực lượng → phát lệnh → báo chưa gửi cho đội', async () => {
     await page.goto(`${ROOT}/cuu-ho`);
     await waitMain(page);
-    // exact: nút chuyển cách xem "Bảng điều phối" cũng chứa chữ "điều phối"
-    const btn = visible(page.getByRole('button', { name: 'Điều phối', exact: true }));
+    const btn = visible(page.getByRole('button', { name: 'Điều đội', exact: true }));
     await btn.waitFor({ timeout: READONLY ? 5_000 : 15_000 }).catch((e) => { if (!READONLY) throw e; });
     if (READONLY && !(await btn.count())) return 'bỏ qua: không có phiếu chờ xử lý';
     await btn.click();
@@ -587,14 +586,17 @@ async function staff(ctx, trackCode) {
       return 'chỉ xem';
     }
     await dialog.getByRole('radio').first().check();
-    // Lệnh điều động 2 bước: Lực lượng → Vật tư & xác nhận (tóm tắt lệnh) → Phát lệnh
-    await dialog.getByRole('button', { name: /^Tiếp/ }).click();
+    // Lệnh điều động 3 bước: Chọn đội → Vật tư mang theo → Xác nhận (tóm tắt lệnh) → Phát lệnh
+    await dialog.getByRole('button', { name: /^Tiếp: vật tư/ }).click();
+    await dialog.getByRole('button', { name: /^Tiếp: xác nhận/ }).click();
     await dialog.getByText('Tóm tắt lệnh — kiểm tra trước khi phát').waitFor({ timeout: 5_000 });
-    await dialog.getByRole('button', { name: 'Phát lệnh khẩn cấp' }).click();
+    await dialog.getByRole('button', { name: 'Phát lệnh điều động' }).click();
     await dialog.getByText(/Đã ghi lệnh điều động SOS-/).waitFor({ timeout: 20_000 });
     // Chưa tích hợp SMS / Push → phải nói rõ hệ thống CHƯA gửi tin cho đội
     const text = await dialog.innerText();
     if (!/chưa gửi tin cho đội|Đã gửi lệnh tới/.test(text)) throw new Error('không nêu trạng thái gửi lệnh cho đội');
+    if (!(await dialog.getByRole('button', { name: 'Sao chép lệnh gửi Zalo' }).count())) throw new Error('thiếu nút "Sao chép lệnh gửi Zalo"');
+    if (/\bETA\b/.test(text)) throw new Error('kết quả điều động còn chữ "ETA"');
     // Link nhiệm vụ cho trưởng nhóm: mã sau dấu # (không vào log máy chủ) — mở thử ở bước sau
     missionUrl = await dialog.getByLabel('Link nhiệm vụ').inputValue();
     if (!/\/nhiem-vu#[\w-]{20,}$/.test(missionUrl)) throw new Error(`link nhiệm vụ sai dạng: ${missionUrl}`);
@@ -1762,10 +1764,10 @@ async function resourcesWard(ctx) {
 }
 
 // ================================================================ Điều hành cứu hộ (trang D) — laptop, iPad dọc, điện thoại 360
-// Dải khẩn trên cùng, 4 ô chỉ số; ô "Quá hạn SLA" → đúng các phiếu quá hạn, Quay lại trả bộ lọc cũ; bảng điều phối: đủ 4 cột
+// Dải khẩn trên cùng, 4 ô chỉ số; ô "Quá hạn phản hồi" → đúng các phiếu quá hạn, Quay lại trả bộ lọc cũ; bảng điều phối: đủ 4 cột
 // trên laptop, thẻ chọn cột vừa màn trên điện thoại / iPad; "Danh sách": phân trang, xếp, Excel (laptop thêm PDF); không tải
 // được phiếu → nói rõ, không ghi "không có phiếu"; mất mạng → nút ghi tắt; cảm ứng: vùng chạm ≥ 44 px; tài khoản phường: chỉ
-// phiếu trong phường, không có nút Điều phối. Form (sơ tán, tiếp nhận, sửa phiếu, huỷ lệnh) chỉ mở, kiểm tra lỗi, đóng; thanh
+// phiếu trong phường, không có nút Điều đội. Form (sơ tán, tiếp nhận, sửa phiếu, huỷ lệnh) chỉ mở, kiểm tra lỗi, đóng; thanh
 // thao tác nhanh (điện thoại); bản đồ tác chiến & diễn biến 48 giờ, kỳ tra cứu 7 / 30 ngày. Chỉ xem — không chuyển trạng
 // thái, không điều động, không ghi số liệu.
 const RESCUE_DEVICES = RESOURCE_DEVICES;
@@ -1797,12 +1799,15 @@ async function rescuePage(ctx) {
     if (!m.stripAbove) throw new Error('dải thông tin khẩn không nằm trên cùng');
     if (m.kpi !== 4) throw new Error(`có ${m.kpi} ô chỉ số (cần 4, bấm được)`);
     if (wide ? m.columns !== 4 : m.tabs !== 4 || m.tabsOut) throw new Error(`laptop ${m.columns} cột / ${m.tabs} thẻ cột, ${m.tabsOut} thẻ tràn màn`);
+    // Lời đời thường: không còn thuật ngữ tiếng Anh / chữ "tác chiến" trên trang (thiết kế D, chỉnh giao diện cho người mới)
+    const jargon = (await page.locator('main').innerText()).match(/\b(SLA|ETA|KPI)\b|[Tt]ác chiến/);
+    if (jargon) throw new Error(`trang còn thuật ngữ "${jargon[0]}"`);
     await expectNoOverflow(ctx, '/cuu-ho');
     return wide ? '4 cột' : '4 thẻ cột';
   });
 
-  await step(ctx, 'Chạm ô "Quá hạn SLA" → chỉ phiếu quá hạn; Quay lại trả bộ lọc cũ', async () => {
-    const tile = kpis.getByRole('button', { name: /Quá hạn SLA/ });
+  await step(ctx, 'Chạm ô "Quá hạn phản hồi" → chỉ phiếu quá hạn; Quay lại trả bộ lọc cũ', async () => {
+    const tile = kpis.getByRole('button', { name: /Quá hạn phản hồi/ });
     const n = Number((await tile.innerText()).match(/(\d+)\s*phiếu/)?.[1] ?? 0);
     const before = page.url();
     await tile.click();
@@ -1810,7 +1815,7 @@ async function rescuePage(ctx) {
     if (n > 0) {
       await cards.first().waitFor({ timeout: 10_000 });
       const labels = await cards.evaluateAll((els) => els.map((el) => el.getAttribute('aria-label')));
-      if (!labels.every((l) => /quá hạn SLA/.test(l))) throw new Error('có phiếu không quá hạn trong danh sách đã lọc');
+      if (!labels.every((l) => /quá hạn phản hồi/.test(l))) throw new Error('có phiếu không quá hạn trong danh sách đã lọc');
       if (wide && labels.length !== n) throw new Error(`ô ghi ${n} phiếu quá hạn, bảng hiện ${labels.length}`);
     } else {
       await page.getByText(/Không có phiếu khớp bộ lọc/).first().waitFor({ timeout: 5_000 });
@@ -1839,28 +1844,28 @@ async function rescuePage(ctx) {
     return note;
   });
 
-  await step(ctx, 'Không tải được phiếu → báo rõ (không ghi "không có phiếu"); mất mạng → dải báo, nút Điều phối tắt', async () => {
+  await step(ctx, 'Không tải được phiếu → báo rõ (không ghi "không có phiếu"); mất mạng → dải báo, nút Điều đội tắt', async () => {
     await page.route('**/api/v1/sos', safeRoute((r) => (r.request().method() === 'GET' ? r.abort('failed') : r.continue())));
     await page.route('**/api/v1/sos?**', safeRoute((r) => r.abort('failed')));
     try {
       await page.goto(`${ROOT}/cuu-ho`);
       await page.getByText(/Không tải được danh sách phiếu SOS/).first().waitFor({ timeout: 20_000 });
-      if (await page.getByText(/Không có phiếu chờ xử lý/).count()) throw new Error('lỗi tải nhưng vẫn ghi "không có phiếu"');
+      if (await page.getByText(/Không có phiếu mới báo/).count()) throw new Error('lỗi tải nhưng vẫn ghi "không có phiếu"');
     } finally {
       await page.unroute('**/api/v1/sos');
       await page.unroute('**/api/v1/sos?**');
     }
     await page.goto(`${ROOT}/cuu-ho`);
-    const btn = page.getByRole('button', { name: 'Điều phối', exact: true }).first();
+    const btn = page.getByRole('button', { name: 'Điều đội', exact: true }).first();
     const hasDispatch = await btn.waitFor({ timeout: 15_000 }).then(() => true, () => false);
     await page.context().setOffline(true);
     try {
       await page.getByText('Mất kết nối mạng').waitFor({ timeout: 5_000 });
-      if (hasDispatch && !(await btn.isDisabled())) throw new Error('mất mạng nhưng nút Điều phối vẫn bấm được');
+      if (hasDispatch && !(await btn.isDisabled())) throw new Error('mất mạng nhưng nút Điều đội vẫn bấm được');
     } finally {
       await page.context().setOffline(false);
     }
-    return hasDispatch ? 'nút Điều phối tắt khi mất mạng' : 'không có phiếu chờ điều phối';
+    return hasDispatch ? 'nút Điều đội tắt khi mất mạng' : 'không có phiếu chờ điều đội';
   });
 
   if (touch) {
@@ -1926,8 +1931,8 @@ async function rescueForms(ctx) {
     return err1;
   });
 
-  await step(ctx, 'Tiếp nhận 2 bước: SĐT sai báo ngay khi gõ; nội dung ngắn báo khi bấm "Bóc tách"; bước 2: mức ưu tiên kèm SLA, số người −/+', async () => {
-    const box = page.locator('section').filter({ has: page.getByRole('heading', { name: /Tiếp nhận đa kênh/ }) }).first();
+  await step(ctx, 'Nhận tin báo 2 bước: SĐT sai báo ngay khi gõ; nội dung ngắn báo khi bấm "Tự điền"; bước 2: mức ưu tiên kèm hạn phản hồi bằng lời, số người −/+', async () => {
+    const box = page.locator('section').filter({ has: page.getByRole('heading', { name: /Nhận tin báo cứu hộ/ }) }).first();
     if (!(await box.count())) return 'tài khoản không có quyền tạo phiếu SOS';
     await box.scrollIntoViewIfNeeded();
     const phoneBox = box.getByLabel(/SĐT người báo tin/);
@@ -1936,12 +1941,15 @@ async function rescueForms(ctx) {
     await phoneBox.fill('0912 345 678');
     const text = box.getByLabel(/Nội dung tin cầu cứu/);
     await text.fill('ngập');
-    await box.getByRole('button', { name: /Bóc tách & kiểm tra/ }).click();
+    await box.getByRole('button', { name: /Tự điền & kiểm tra/ }).click();
     await box.locator('#loi-noi-dung-tiep-nhan').waitFor({ timeout: 3_000 });
     if (READONLY) return 'chỉ xem: không gọi bóc tách';
     await text.fill('Nước ngập đến mái nhà ở xóm Pác Bó, 5 người có 1 cụ già');
-    await box.getByRole('button', { name: /Bóc tách & kiểm tra/ }).click();
-    await box.getByRole('button', { name: /Tạo phiếu SOS/ }).waitFor({ timeout: 15_000 });
+    await box.getByRole('button', { name: /Tự điền & kiểm tra/ }).click();
+    await box.getByRole('button', { name: 'Tạo phiếu', exact: true }).waitFor({ timeout: 15_000 });
+    const step2 = await box.innerText();
+    if (!/phản hồi trong 3 phút/.test(step2)) throw new Error('mức ưu tiên không ghi hạn phản hồi bằng lời');
+    if (/SLA|mô hình AI/.test(step2)) throw new Error('bước 2 còn chữ "SLA" / "mô hình AI"');
     const picked = (await box.getByRole('radio', { checked: true }).allInnerTexts()).map((s) => s.replace(/\s+/g, ' '));
     if (!(await box.getByRole('button', { name: 'Thêm 1', exact: true }).count())) throw new Error('bước 2 không có nút −/+ số người');
     await noSmall('tiếp nhận bước 2');
@@ -1984,19 +1992,19 @@ async function rescueForms(ctx) {
   });
 
   if (vp.mobile) {
-    await step(ctx, 'Thanh thao tác nhanh: "Chờ xử lý" (số = phiếu chờ) → cột Chờ; "Thực thi" → cột Thực thi; cuối trang không bị thanh che; mất mạng → "Sơ tán" tắt', async () => {
+    await step(ctx, 'Thanh thao tác nhanh: "Mới báo" (số = phiếu chưa ai nhận) → cột Mới báo; "Đang đến" → cột Đội đang đến; cuối trang không bị thanh che; mất mạng → "Sơ tán" tắt', async () => {
       await open('/cuu-ho?cot=hoan_thanh');
       await bar.waitFor();
-      const waitBtn = bar.getByRole('button', { name: /Chờ xử lý/ });
+      const waitBtn = bar.getByRole('button', { name: /Mới báo/ });
       await waitBtn.click();
       await page.waitForURL((u) => !new URL(u).searchParams.get('cot'));
       const tab = page.locator('[aria-label="Cột của bảng điều phối"] > [aria-pressed="true"]');
       const [tabText, badgeText] = [await tab.innerText(), await waitBtn.innerText()];
-      if (!/Chờ/.test(tabText)) throw new Error(`đang mở cột "${tabText}", không phải cột Chờ`);
+      if (!/Mới báo/.test(tabText)) throw new Error(`đang mở cột "${tabText}", không phải cột Mới báo`);
       const badge = Number(badgeText.match(/\d+/)?.[0] ?? 0);
       const inTab = Number(tabText.match(/\d+/)?.[0] ?? 0);
-      if (badge !== inTab) throw new Error(`thanh ghi ${badge} phiếu chờ, cột Chờ có ${inTab}`);
-      await bar.getByRole('button', { name: /Thực thi/ }).click();
+      if (badge !== Math.min(inTab, 99)) throw new Error(`thanh ghi ${badge} phiếu chờ, cột Mới báo có ${inTab}`);
+      await bar.getByRole('button', { name: /Đang đến/ }).click();
       await page.waitForURL(/cot=thuc_thi/);
       const covered = await page.evaluate(() => {
         const m = document.querySelector('main');
@@ -2020,14 +2028,14 @@ async function rescueForms(ctx) {
 }
 
 /**
- * Bản đồ tác chiến & diễn biến 48 giờ (cho lãnh đạo) — chỉ xem: thu gọn sẵn trên mọi thiết bị (bảng điều phối lên trước,
+ * Bản đồ cứu hộ & diễn biến 48 giờ (cho lãnh đạo) — chỉ xem: thu gọn sẵn trên mọi thiết bị (bảng điều phối lên trước,
  * chưa dựng bản đồ); mở ra: mọi phiếu đang mở có toạ độ đều lên bản đồ (điểm lẻ + số trong các cụm); biểu đồ + thời gian xử lý; chạm điểm →
  * "Xem phiếu trên bảng" mở đúng phiếu; laptop: lớp lộ trình / vùng nguy cơ không tải được → nói rõ, điểm SOS vẫn hiện.
  */
 async function rescueOverview(ctx) {
   const { page, vp } = ctx;
   const touch = await page.evaluate(() => matchMedia('(pointer: coarse)').matches);
-  const toggle = page.getByRole('button', { name: /Bản đồ tác chiến & diễn biến 48 giờ/ });
+  const toggle = page.getByRole('button', { name: /Bản đồ cứu hộ & diễn biến 48 giờ/ });
   const section = page.locator('main section').filter({ has: toggle });
   const open = async () => {
     await page.goto(`${ROOT}/cuu-ho`);
@@ -2041,7 +2049,7 @@ async function rescueOverview(ctx) {
     inClusters: [...sec.querySelectorAll('.sos-cluster')].reduce((m, el) => m + Number(el.textContent.trim() || 0), 0),
   }));
 
-  await step(ctx, 'Bản đồ tác chiến & diễn biến 48 giờ: thu gọn sẵn (bảng điều phối lên trước); mở ra: mọi phiếu đang mở lên bản đồ; biểu đồ + thời gian xử lý', async () => {
+  await step(ctx, 'Bản đồ cứu hộ & diễn biến 48 giờ: thu gọn sẵn (bảng điều phối lên trước); mở ra: mọi phiếu đang mở lên bản đồ; biểu đồ + thời gian xử lý', async () => {
     await open();
     if ((await toggle.getAttribute('aria-expanded')) !== 'false') throw new Error('khối bản đồ & biểu đồ không thu gọn sẵn (bảng điều phối phải lên trước)');
     if (await section.locator('.leaflet-container').count()) throw new Error('thu gọn nhưng vẫn dựng bản đồ (tải lớp bản đồ thừa)');
@@ -2151,11 +2159,11 @@ async function rescueOverview(ctx) {
   }
 }
 
-/** Tài khoản phường: chỉ phiếu SOS trong phường, không có nút "Điều phối" (quyền dispatch.create) — có "Tiếp nhận" nếu có phiếu chờ. */
+/** Tài khoản phường: chỉ phiếu cứu hộ trong phường, không có nút "Điều đội" (quyền dispatch.create) — có "Nhận phiếu" nếu có phiếu mới. */
 async function rescueWard(ctx) {
   const { page } = ctx;
   let signedIn = false;
-  await step(ctx, `Điều hành cứu hộ — tài khoản phường ${WARD.name}: chỉ phiếu trong phường, không có nút Điều phối`, async () => {
+  await step(ctx, `Điều hành cứu hộ — tài khoản phường ${WARD.name}: chỉ phiếu trong phường, không có nút Điều đội`, async () => {
     try {
       await loginAs(page, WARD);
     } catch (e) {
@@ -2168,7 +2176,7 @@ async function rescueWard(ctx) {
     await page.waitForTimeout(1200);
     const head = await page.locator('main').innerText();
     if (!head.includes(WARD.name) || /Toàn tỉnh Cao Bằng ·/.test(head)) throw new Error('tiêu đề không phải phường của tài khoản');
-    if (await page.getByRole('button', { name: 'Điều phối', exact: true }).count()) throw new Error('tài khoản phường thấy nút Điều phối');
+    if (await page.getByRole('button', { name: 'Điều đội', exact: true }).count()) throw new Error('tài khoản phường thấy nút Điều đội');
     await expectNoOverflow(ctx, '/cuu-ho (phường)');
     return `${await page.locator('main article[aria-label^="SOS-"]').count()} phiếu đang hiện`;
   });

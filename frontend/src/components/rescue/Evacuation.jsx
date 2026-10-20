@@ -10,13 +10,13 @@ import QtyStepper from '../common/QtyStepper';
 import OccupancyModal from '../common/OccupancyModal';
 import { useAllowedCodes, usePermission } from '../../rbac/usePermission';
 import { foldVi, int, pct, time } from '../../utils/format';
-import { occupancyLevel } from '../../utils/risk';
+import { occupancyLevel, risk } from '../../utils/risk';
 import { useShowMore } from '../../utils/useShowMore';
 
 const STEPS = ['Xã / phường', 'Số liệu sơ tán'];
 // Trần như EvacuationIn (backend); máy chủ chặn thêm khi vượt số hộ / dân số của xã (evacuation_problem) — form báo trước
 const LIMIT = { planned_households: 200_000, evacuated_households: 200_000, planned_persons: 1_000_000, evacuated_persons: 1_000_000 };
-const NUM = 'input tap min-h-[44px] font-mono sm:min-h-[36px]';
+const NUM = 'input tap num min-h-[44px] sm:min-h-[36px]';
 
 /**
  * Xã / trực ban cập nhật kế hoạch và tiến độ sơ tán (quyền evacuation.update tại xã đó) → KPI "Sơ tán an toàn" của
@@ -159,7 +159,7 @@ export function EvacuationModal({ row, progress = [], onClose }) {
                 <li key={u.code}>
                   <button type="button" className="card tap flex min-h-[48px] w-full items-center gap-2 px-3 py-2 text-left hover:border-accent" onClick={() => pick(u)}>
                     <span className="min-w-0 flex-1 truncate font-semibold text-ink">{u.name}</span>
-                    <span className="shrink-0 font-mono text-xs text-muted">{r ? `${int(r.evacuated_households)}/${int(r.planned_households)} hộ` : 'chưa báo'}</span>
+                    <span className="num shrink-0 text-xs text-muted">{r ? `${int(r.evacuated_households)}/${int(r.planned_households)} hộ` : 'chưa báo'}</span>
                     <ChevronRight size={16} className="shrink-0 text-muted" aria-hidden="true" />
                   </button>
                 </li>
@@ -177,7 +177,7 @@ export function EvacuationModal({ row, progress = [], onClose }) {
           <div aria-live="polite">
             {p != null && (
               <>
-                <div className="mb-1 flex justify-between text-xs"><span className="text-muted">Tiến độ sơ tán</span><b className="font-mono">{p}%</b></div>
+                <div className="mb-1 flex justify-between text-xs"><span className="text-muted">Tiến độ sơ tán</span><b className="num">{p}%</b></div>
                 <Progress value={p} tone="accent" />
               </>
             )}
@@ -207,7 +207,7 @@ function EvacuationRow({ r, online, onEdit }) {
       <div className="mb-0.5 flex items-center justify-between gap-2">
         <span className="truncate font-medium text-ink">{r.name}</span>
         <span className="flex shrink-0 items-center gap-1.5">
-          <span className="font-mono text-muted" title={`Cập nhật ${time(r.updated_at)}`}>{int(r.evacuated_households)}/{int(r.planned_households)} hộ ({p}%)</span>
+          <span className="num text-muted" title={`Cập nhật ${time(r.updated_at)}`}>{int(r.evacuated_households)}/{int(r.planned_households)} hộ ({p}%)</span>
           {canEdit && <button type="button" className={EDIT} onClick={() => onEdit(r)} disabled={!online} aria-label={`Cập nhật sơ tán ${r.name}`}>Sửa</button>}
         </span>
       </div>
@@ -226,9 +226,10 @@ function SiteRow({ s, online, onEdit }) {
       <div className="mb-0.5 flex items-center justify-between gap-2">
         <span className="flex min-w-0 items-center gap-1 text-ink"><Home size={11} className="shrink-0 text-good" aria-hidden="true" /><span className="truncate">{s.name}</span></span>
         <span className="flex shrink-0 items-center gap-1.5">
-          <span className={clsx('font-mono font-semibold', lv === 3 && 'text-danger', lv === 2 && 'text-serious')}>
-            {int(s.current_occupancy)}/{int(s.capacity)}{lv === 3 ? ' · đầy' : lv === 2 ? ' · sắp đầy' : ''}
+          <span className={clsx('num font-semibold', lv === 3 ? 'text-danger' : lv === 2 ? 'text-serious' : 'text-ink-2')} title="Đang chứa / sức chứa">
+            {int(s.current_occupancy)} / {int(s.capacity)} người
           </span>
+          {lv >= 2 && <span className={clsx('chip py-0 text-[11px] font-bold', risk(lv).chip)}>{lv === 3 ? 'Đã đầy' : 'Sắp đầy'}</span>}
           {canEdit && <button type="button" className={EDIT} onClick={() => onEdit(s)} disabled={!online} aria-label={`Cập nhật số người ở ${s.name}`}>Sửa</button>}
         </span>
       </div>
@@ -257,18 +258,18 @@ export default function Evacuation({ query, online, className }) {
     <Section
       id="so-tan"
       className={clsx('scroll-mt-20', className)}
-      title="Giám sát sơ tán nhân dân"
-      right={data && <span className="font-mono text-xs font-semibold text-ink">{int(totDone)}/{int(totPlanned)} hộ</span>}
+      title="Sơ tán dân và điểm sơ tán"
+      right={data && <span className="num text-xs font-semibold text-ink">{int(totDone)}/{int(totPlanned)} hộ</span>}
     >
       {query.isLoading ? <Skeleton height={200} />
         : query.isError && !data ? <ErrorState height={160} onRetry={query.refetch}>Không tải được số liệu sơ tán</ErrorState>
           : (
             <div className="flex flex-col gap-3">
               <div>
-                <div className="mb-1.5 flex items-center justify-between gap-2 text-[11px] font-semibold uppercase text-muted">
+                <div className="mb-1.5 flex items-center justify-between gap-2 text-xs font-semibold text-muted">
                   Tiến độ di dời theo xã (thấp nhất trước)
                   {canUpdate && (
-                    <button type="button" className={clsx(EDIT, 'normal-case')} onClick={() => setEditing('new')} disabled={!online}>+ Cập nhật xã</button>
+                    <button type="button" className={EDIT} onClick={() => setEditing('new')} disabled={!online}>+ Cập nhật xã</button>
                   )}
                 </div>
                 {data.progress.length
@@ -281,7 +282,7 @@ export default function Evacuation({ query, online, className }) {
                   : <EmptyState>Chưa có xã nào báo tiến độ sơ tán{canUpdate ? ' — bấm "+ Cập nhật xã"' : ''}</EmptyState>}
               </div>
               <div>
-                <div className="mb-1.5 text-[11px] font-semibold uppercase text-muted">Sức chứa các điểm sơ tán (đầy lên đầu)</div>
+                <div className="mb-1.5 text-xs font-semibold text-muted">Điểm sơ tán: đang chứa / sức chứa (đầy lên đầu)</div>
                 {data.sites.length
                   ? (
                     <>

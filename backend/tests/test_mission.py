@@ -30,9 +30,9 @@ def test_token_is_random_hashed_and_sent_after_fragment(monkeypatch):
     # Mã sau dấu # → trình duyệt không gửi lên máy chủ (không vào log nginx / backend)
     assert mission.mission_url(token) == f"https://pctt.example.vn/nhiem-vu#{token}"
     msg = mission.order_message(TICKET, mission.mission_url(token), 18)
-    assert msg.startswith("[LỆNH KHẨN] SOS-1001: Xóm Nà Pồng – toạ độ 22.81234,105.98765. ETA 18 phút.")
+    assert msg.startswith("[LỆNH KHẨN] SOS-1001: Xóm Nà Pồng – toạ độ 22.81234,105.98765. Dự kiến đến sau 18 phút.")
     assert msg.endswith(f"/nhiem-vu#{token}")
-    assert "ETA" not in mission.order_message(TICKET, "u")  # cấp lại link: không còn ETA lúc phát lệnh
+    assert "Dự kiến đến" not in mission.order_message(TICKET, "u")  # cấp lại link: không còn giờ dự kiến lúc phát lệnh
 
 
 def test_token_format_rejects_garbage_before_touching_db():

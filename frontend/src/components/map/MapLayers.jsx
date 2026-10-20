@@ -146,7 +146,7 @@ function SosPopup({ p, onDispatch }) {
       {p.raw_message && <p className="mt-1 text-xs italic">“{p.raw_message}”</p>}
       {p.status !== 'thuc_thi' && (
         <Can I="dispatch" a="create" scope={p.admin_code}>
-          <button className="btn-danger mt-2 px-2 py-1 text-xs" onClick={() => onDispatch(p)}><Send size={12} /> Điều phối lực lượng</button>
+          <button className="btn-danger mt-2 px-2 py-1 text-xs" onClick={() => onDispatch(p)}><Send size={12} /> Điều đội</button>
         </Can>
       )}
       <p className="mt-1 text-[11px] text-muted">Mẹo: kéo biểu tượng đội cứu hộ thả vào điểm SOS để điều động nhanh.</p>

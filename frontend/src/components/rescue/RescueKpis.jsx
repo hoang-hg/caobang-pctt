@@ -3,13 +3,13 @@ import StatCard, { Badge } from '../dashboard/StatCard';
 import { ErrorState, Skeleton } from '../common/ui';
 import { int, pct } from '../../utils/format';
 import { occupancyLevel } from '../../utils/risk';
-import { mmss } from './rescueFacts';
+import { durWords } from './rescueFacts';
 
 const GRID = 'grid grid-cols-2 gap-2 lg:grid-cols-4 [&>*]:min-w-0';
 
 /**
  * 4 ô chỉ số của Điều hành cứu hộ (lãnh đạo đọc trong vài giây), cùng kiểu ô của Tổng quan (StatCard gọn): phiếu đang mở
- * theo mức (Đỏ / Cam / Vàng) · quá hạn SLA (nhấp nháy khi có, kèm phiếu chờ lâu nhất) · số người cần cứu / đã cứu 48 giờ ·
+ * theo mức (Đỏ / Cam / Vàng) · quá hạn phản hồi (nhấp nháy khi có, kèm phiếu chờ lâu nhất) · số người cần cứu / đã cứu 48 giờ ·
  * tiến độ sơ tán và điểm sơ tán đầy. Tính từ cùng danh sách phiếu của bảng điều phối. Chạm ô → lọc bảng (`onGo`).
  */
 export default function RescueKpis({ ticketsQ, tickets, factsOf, evacQ, onGo, onEvac }) {
@@ -46,20 +46,20 @@ export default function RescueKpis({ ticketsQ, tickets, factsOf, evacQ, onGo, on
         unit="phiếu"
         footer={open.length ? `Đỏ ${p1} · Cam ${p2} · Vàng ${p3}` : 'Không có phiếu đang mở'}
         onClick={() => onGo({})}
-        hint="Phiếu SOS chưa hoàn thành, theo mức ưu tiên — chạm để xem bảng điều phối"
+        hint="Phiếu cứu hộ chưa xong, theo mức ưu tiên — chạm để xem bảng điều phối"
       />
       <StatCard
         compact
         icon={Clock}
-        title="Quá hạn SLA"
+        title="Quá hạn phản hồi"
         level={overdue ? 3 : 0}
         alert={overdue > 0}
         badge={overdue > 0 && <Badge level={3}>Quá hạn</Badge>}
         value={int(overdue)}
         unit="phiếu"
-        footer={longest ? `Chờ lâu nhất ${mmss(longest.sec)} (${longest.code})` : 'Không có phiếu đang chờ'}
+        footer={longest ? `Chờ lâu nhất ${durWords(longest.sec)} (${longest.code})` : 'Không có phiếu đang chờ'}
         onClick={() => onGo({ th: 'qua_han' })}
-        hint="Phiếu chờ tiếp nhận / chờ điều động quá thời hạn của cấp (Cấp 1: 3′, Cấp 2: 15′, Cấp 3: 60′) — chạm để lọc"
+        hint="Phiếu chờ nhận / chờ điều đội quá hạn của cấp (cấp 1: 3 phút, cấp 2: 15 phút, cấp 3: 60 phút) — chạm để lọc"
       />
       <StatCard
         compact
@@ -67,7 +67,7 @@ export default function RescueKpis({ ticketsQ, tickets, factsOf, evacQ, onGo, on
         title="Người cần cứu"
         value={int(trapped)}
         unit="người"
-        footer={`Đã cứu an toàn 48 giờ: ${int(saved)} người`}
+        footer={`Đã cứu xong 48 giờ qua: ${int(saved)} người`}
         onClick={() => onGo({}, 'nhieu_nguoi')}
         hint="Số người mắc kẹt / cần hỗ trợ ghi trên các phiếu đang mở; đã cứu = phiếu hoàn thành trong 48 giờ qua"
       />

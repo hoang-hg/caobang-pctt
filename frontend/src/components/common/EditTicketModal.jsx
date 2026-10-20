@@ -128,7 +128,7 @@ export default function EditTicketModal({ ticket, onClose }) {
           </div>
         </div>
         {tried && same && <FieldError id="loi-sua-chua-doi">Chưa thay đổi gì — sửa mức ưu tiên, số người hoặc nhóm yếu thế rồi lưu</FieldError>}
-        <p className="text-xs text-muted">Cấp 1: nguy hiểm tính mạng tức thì (vùi lấp, lũ cuốn, mắc kẹt trên mái) — SLA 3 phút.</p>
+        <p className="text-xs text-muted">Cấp 1: nguy hiểm tính mạng tức thì (vùi lấp, lũ cuốn, mắc kẹt trên mái) — phản hồi trong 3 phút.</p>
       </div>
     </Modal>
   );

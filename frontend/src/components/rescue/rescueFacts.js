@@ -4,15 +4,16 @@
  * CÙNG danh sách phiếu đang tải → chạm "3 phiếu quá hạn" mở đúng 3 phiếu.
  */
 import { CheckCircle2, Inbox, Navigation, Send } from 'lucide-react';
-import { INCIDENT, SOURCE } from '../../utils/labels';
+import { INCIDENT, SOS_STATUS, SOURCE } from '../../utils/labels';
 import { occupancyLevel } from '../../utils/risk';
 import { hasActiveTeam, slaState } from '../../utils/sla';
 
+// 4 bước của phiếu bằng lời đời thường (thiết kế D.2: Chờ xử lý → Đang điều phối → Đang thực thi → Hoàn thành)
 export const COLUMNS = [
-  { key: 'moi', title: 'Chờ xử lý', short: 'Chờ', hint: 'Tín hiệu mới – cần tiếp nhận ngay', icon: Inbox },
-  { key: 'dieu_phoi', title: 'Đang điều phối', short: 'Điều phối', hint: 'Đã xác minh, đang giao lực lượng', icon: Send },
-  { key: 'thuc_thi', title: 'Đang thực thi', short: 'Thực thi', hint: 'Lực lượng đang tiếp cận hiện trường', icon: Navigation },
-  { key: 'hoan_thanh', title: 'Đã cứu an toàn', short: 'Đã xong', hint: 'Đã đưa người tới nơi an toàn (48 giờ qua)', icon: CheckCircle2 },
+  { key: 'moi', title: SOS_STATUS.moi, short: 'Mới báo', hint: 'Tin mới đến — nhận phiếu, điều đội ngay', icon: Inbox },
+  { key: 'dieu_phoi', title: SOS_STATUS.dieu_phoi, short: 'Tìm đội', hint: 'Đã nhận phiếu, đang chọn đội và phương tiện', icon: Send },
+  { key: 'thuc_thi', title: SOS_STATUS.thuc_thi, short: 'Đang đến', hint: 'Đội đã xuất phát, đang tới hiện trường', icon: Navigation },
+  { key: 'hoan_thanh', title: SOS_STATUS.hoan_thanh, short: 'Đã xong', hint: 'Người dân đã tới nơi an toàn (48 giờ qua)', icon: CheckCircle2 },
 ];
 export const COLUMN_KEYS = COLUMNS.map((c) => c.key);
 
@@ -22,12 +23,31 @@ export const COLUMN_KEYS = COLUMNS.map((c) => c.key);
 export const COMMUNE_SUPPORT_TAG = '[Xã xin chi viện]';
 export const isCommuneSupport = (t) => t?.source === 'CAN_BO' && String(t.raw_message || '').startsWith(COMMUNE_SUPPORT_TAG);
 
-/** Thời lượng ngắn cho đồng hồ SLA / ETA: "4:05", "2h14". */
-export const mmss = (sec) => {
-  const s = Math.max(0, Math.floor(Math.abs(sec)));
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  return h ? `${h}h${String(m).padStart(2, '0')}` : `${m}:${String(s % 60).padStart(2, '0')}`;
+/** Thời lượng bằng lời: "chưa tới 1 phút", "5 phút", "2 giờ 14 phút", "1 ngày 3 giờ". */
+export const durWords = (sec) => {
+  const m = Math.floor(Math.max(0, Math.abs(sec)) / 60);
+  if (m < 1) return 'chưa tới 1 phút';
+  if (m < 60) return `${m} phút`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return m % 60 ? `${h} giờ ${m % 60} phút` : `${h} giờ`;
+  return h % 24 ? `${Math.floor(h / 24)} ngày ${h % 24} giờ` : `${Math.floor(h / 24)} ngày`;
+};
+
+/**
+ * Câu chờ của phiếu theo hạn phản hồi (utils/sla.js): "Chờ 5 phút — quá hạn 2 phút", "Chờ 1 phút — còn 2 phút";
+ * "Đang tìm đội" mà chưa đội nào đi: "Chờ điều đội 12 phút — …". null khi đồng hồ không chạy (đã có đội, đã xong).
+ */
+export function waitText(t, sla) {
+  if (!sla) return null;
+  const what = t.status === 'moi' ? 'Chờ' : 'Chờ điều đội';
+  const left = t.sla_minutes * 60 - sla.waitedSec;
+  return `${what} ${durWords(sla.waitedSec)} — ${left < 0 ? `quá hạn ${durWords(-left)}` : `còn ${durWords(left)}`}`;
+}
+
+/** Giờ đội dự kiến tới (từ lúc phát lệnh + thời gian đường đi): "Dự kiến đến sau 12 phút" / "Quá giờ dự kiến 3 phút". */
+export const etaText = (etaSec) => {
+  if (Math.abs(etaSec) < 60) return 'Sắp tới nơi';
+  return etaSec > 0 ? `Dự kiến đến sau ${durWords(etaSec)}` : `Quá giờ dự kiến ${durWords(-etaSec)}`;
 };
 
 /** Tình huống của một phiếu — cùng quy tắc SLA với ô SOS của Tổng quan (utils/sla.js, máy chủ OVERDUE_SQL). */
@@ -55,7 +75,7 @@ export const FILTERS = [
     all: 'Mọi tình huống',
     options: [
       ['xa_chi_vien', 'Xã xin chi viện'],
-      ['qua_han', 'Quá hạn SLA'],
+      ['qua_han', 'Quá hạn phản hồi'],
       ['chua_doi', 'Chưa có đội'],
       ['chi_vien', 'Đội cần chi viện'],
       ['cho_xac_nhan', 'Đội báo đã cứu — chờ xác nhận'],
@@ -112,7 +132,7 @@ export function sortTickets(list, key, factsOf) {
 }
 
 /**
- * Dải thông tin khẩn đầu trang: phiếu quá hạn SLA, cấp 1 chưa có đội, đội cần chi viện (Đỏ); đội đi qua vùng nguy hiểm, điểm
+ * Dải thông tin khẩn đầu trang: phiếu quá hạn phản hồi, cấp 1 chưa có đội, đội cần chi viện (Đỏ); đội đi qua vùng nguy hiểm, điểm
  * sơ tán sắp đầy (Cam); điểm sơ tán quá tải (Đỏ); đội báo đã cứu chờ xác nhận (Vàng). Mỗi mục { key, level, text, short,
  * filter | anchor } — chạm → lọc bảng điều phối (hoặc cuộn tới khối sơ tán).
  */
@@ -130,7 +150,7 @@ export function rescueAlerts({ tickets, sites, factsOf }) {
     });
   }
   const overdue = count((x) => x.overdue);
-  if (overdue) items.push({ key: 'qua-han', level: 3, text: `${overdue} phiếu quá hạn SLA`, short: `${overdue} quá hạn SLA`, filter: { th: 'qua_han' } });
+  if (overdue) items.push({ key: 'qua-han', level: 3, text: `${overdue} phiếu quá hạn phản hồi`, short: `${overdue} phiếu quá hạn`, filter: { th: 'qua_han' } });
   const p1 = count((x, t) => x.noTeam && t.priority === 1);
   if (p1) items.push({ key: 'cap1', level: 3, text: `${p1} phiếu cấp 1 chưa có đội`, short: `${p1} cấp 1 chưa có đội`, filter: { muc: '1', th: 'chua_doi' } });
   const support = count((x) => x.needSupport);
@@ -153,12 +173,8 @@ export function rescueAlerts({ tickets, sites, factsOf }) {
   return items.sort((a, b) => b.level - a.level);
 }
 
-/** Phút → "12′" / "1h05" (thời gian xử lý trung vị). */
-export const dur = (m) => {
-  if (m == null) return '—';
-  const total = Math.max(0, Math.round(m));
-  return total < 60 ? `${total}′` : `${Math.floor(total / 60)}h${String(total % 60).padStart(2, '0')}`;
-};
+/** Phút → "12 phút" / "1 giờ 5 phút" (thời gian xử lý của một nửa số phiếu). */
+export const dur = (m) => (m == null ? '—' : m < 1 ? 'dưới 1 phút' : durWords(Math.round(m) * 60));
 
 export const TREND_HOURS = 48;
 export const TREND_STEP = 3; // giờ mỗi cột

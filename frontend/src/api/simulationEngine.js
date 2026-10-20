@@ -402,7 +402,7 @@ function dispatch(body) {
     force_id: force.id,
     dispatch_supplies: body.supplies || {},
   });
-  log(`LỆNH ĐIỀU ĐỘNG: ${force.name} (${body.personnel || 3} người, ${(body.vehicle_ids || []).length} phương tiện) → ${t.code}, ${distance} km, ETA ${minutes} phút`, 'cuu_ho', 'info', { lat: t.lat, lon: t.lon, code: t.admin_code });
+  log(`LỆNH ĐIỀU ĐỘNG: ${force.name} (${body.personnel || 3} người, ${(body.vehicle_ids || []).length} phương tiện) → ${t.code}, ${distance} km, dự kiến đến sau ${minutes} phút`, 'cuu_ho', 'info', { lat: t.lat, lon: t.lon, code: t.admin_code });
   return {
     order: { id: order, status: 'dang_di', mission_expires_at: null },
     route: {
@@ -414,7 +414,7 @@ function dispatch(body) {
     notification: {
       to: force.contact_phone,
       sent: false,
-      message: `[LỆNH KHẨN — GIẢ LẬP] ${t.code}: ${t.address || t.admin_name} – toạ độ ${t.lat?.toFixed(5)},${t.lon?.toFixed(5)}. ETA ${minutes} phút.`,
+      message: `[LỆNH KHẨN — GIẢ LẬP] ${t.code}: ${t.address || t.admin_name} – toạ độ ${t.lat?.toFixed(5)},${t.lon?.toFixed(5)}. Dự kiến đến sau ${minutes} phút.`,
       mission_url: null,
       mission_expires_at: null,
     },

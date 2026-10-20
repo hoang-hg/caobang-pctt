@@ -37,6 +37,7 @@ import { exportSnapshotPdf } from '../utils/exportPdf';
 import { useMediaQuery } from '../utils/useMediaQuery';
 import { useOnline } from '../utils/useOnline';
 import { usePaged } from '../utils/usePaged';
+import { useNewKeys } from '../utils/useNewKeys';
 
 function useNow(ms = 1000) {
   const [now, setNow] = useState(Date.now());
@@ -53,12 +54,14 @@ const PERIODS = [['', '48 giờ', 48], ['7n', '7 ngày', 24 * 7], ['30n', '30 ng
 const minutes = (from, to) => (from && to ? Math.round((new Date(to) - new Date(from)) / 60000) : '');
 
 /**
- * Trung tâm Điều hành Cứu hộ & Điểm nóng (thiết kế D). Trên cùng: dải thông tin khẩn (quá hạn SLA, cấp 1 chưa có đội, đội
- * cần chi viện, điểm sơ tán đầy…) → 4 ô chỉ số → tìm / lọc → "Bảng điều phối" 4 cột (từ 1280 px; nhỏ hơn: thẻ chọn cột) hoặc
+ * Trung tâm Điều hành Cứu hộ & Điểm nóng (thiết kế D). Trên cùng: dải thông tin khẩn (quá hạn phản hồi, cấp 1 chưa có đội,
+ * đội cần chi viện, điểm sơ tán đầy…) → 4 ô chỉ số → gợi ý theo vai trò → tìm / lọc → "Bảng điều phối" 4 cột tên đời thường
+ * (Mới báo — chưa ai nhận → Đang tìm đội → Đội đang đến → Đã cứu xong; từ 1280 px; nhỏ hơn: thẻ chọn cột; phiếu vừa đến trượt
+ * vào) hoặc
  * "Danh sách" (bảng / thẻ, phân trang, xuất Excel / PDF mọi phiếu đang lọc) → tiếp nhận đa kênh, giám sát sơ tán.
  * Bộ lọc, cách xem, cột đang xem nằm trên địa chỉ trang (?th=qua_han&xem=danh_sach): dải khẩn / ô chỉ số dẫn thẳng tới
  * phiếu cần xử lý; Quay lại trả bộ lọc cũ. Dải khẩn, ô chỉ số, số đếm của bộ lọc và bảng dùng CÙNG danh sách phiếu, cùng
- * đồng hồ SLA. Nút ghi chỉ hiện với quyền ở đúng xã của phiếu (backend kiểm tra lại); mất mạng → tắt, nói lý do.
+ * hạn phản hồi. Nút ghi chỉ hiện với quyền ở đúng xã của phiếu (backend kiểm tra lại); mất mạng → tắt, nói lý do.
  */
 export default function RescueCenter() {
   const qc = useQueryClient();
@@ -121,6 +124,8 @@ export default function RescueCenter() {
   const activeFilters = FILTERS.some((f) => filters[f.key]) || !!nq;
   const paged = usePaged(rows, pageSize, `${nq}|${JSON.stringify(filters)}|${sort}|${pageSize}|${period[0]}`, pdf);
   const alerts = rescueAlerts({ tickets, sites: evacQ.data?.sites, factsOf });
+  // Phiếu vừa đến khi đang xem → trượt vào một lần (âm báo phiếu mới: api/useSocket)
+  const isNew = useNewKeys(tickets.map((t) => t.id), !!ticketsQ.data);
 
   const setParam = (patch, replace = true) => setParams((p) => {
     const next = new URLSearchParams(p);
@@ -233,8 +238,8 @@ export default function RescueCenter() {
           'Địa chỉ': t.address || '', 'Xã/phường': t.admin_name || '', 'Kênh tiếp nhận': SOURCE[t.source] || t.source,
           'Trạng thái': SOS_STATUS[t.status] || t.status, 'Nhận lúc': dateTime(t.received_at),
           'Tiếp nhận sau (phút)': minutes(t.received_at, t.acknowledged_at), 'Đang chờ (phút)': x.sla ? Math.floor(x.sla.waitedSec / 60) : '',
-          'Quá hạn SLA': x.overdue ? 'Có' : '', 'Đội': t.force_name || '', 'Điều động lúc': t.dispatched_at ? dateTime(t.dispatched_at) : '',
-          'Đến hiện trường lúc': t.arrived_at ? dateTime(t.arrived_at) : '', 'Hoàn thành lúc': t.resolved_at ? dateTime(t.resolved_at) : '',
+          'Quá hạn phản hồi': x.overdue ? 'Có' : '', 'Đội': t.force_name || '', 'Điều động lúc': t.dispatched_at ? dateTime(t.dispatched_at) : '',
+          'Đến hiện trường lúc': t.arrived_at ? dateTime(t.arrived_at) : '', 'Cứu xong lúc': t.resolved_at ? dateTime(t.resolved_at) : '',
           'Xử lý xong sau (phút)': minutes(t.received_at, t.resolved_at),
         };
       }), { sheet: 'Phieu SOS', filename: `phieu-sos-${vnFileStamp(new Date(), true)}.xlsx` });
@@ -251,7 +256,7 @@ export default function RescueCenter() {
       const at = new Date();
       const active = FILTERS.filter((f) => filters[f.key]).map((f) => f.options.find(([v]) => v === filters[f.key])?.[1]);
       await exportSnapshotPdf(contentRef.current, {
-        title: 'BÁO CÁO PHIẾU CỨU HỘ (SOS) – TỈNH CAO BẰNG',
+        title: 'BÁO CÁO PHIẾU CỨU HỘ – TỈNH CAO BẰNG',
         subtitle: [scopeLabel, `${rows.length} phiếu`, archive && `đang mở + đã xong trong ${period[1]}`, ...active, q.trim() && `tìm "${q.trim()}"`, at.toLocaleString('vi-VN')].filter(Boolean).join(' · '),
         filename: `phieu-sos-${vnFileStamp(at, true)}.pdf`,
         layoutWidth: 1280,
@@ -264,7 +269,7 @@ export default function RescueCenter() {
   };
 
   const cardProps = {
-    now, online,
+    now, online, isNew,
     onDispatch: setDispatch,
     onResolve: (x) => move(x.id, 'hoan_thanh'),
     onFocus,
@@ -324,7 +329,7 @@ export default function RescueCenter() {
           onClick: it.anchor ? () => scrollTo(document.getElementById(it.anchor)) : () => go(it.filter),
         }))}
         calm={tickets.length || evacQ.data?.sites.length
-          ? 'Chưa ghi nhận tình huống khẩn: không phiếu nào quá hạn SLA, không phiếu cấp 1 chưa có đội, không điểm sơ tán đầy'
+          ? 'Chưa ghi nhận tình huống khẩn: không phiếu nào quá hạn phản hồi, không phiếu cấp 1 chưa có đội, không điểm sơ tán đầy'
           : null}
         gray="Chưa có phiếu SOS, điểm sơ tán trong vùng đang xem"
         failed={[ticketsQ.isError && !ticketsQ.data && 'phiếu SOS', evacQ.isError && !evacQ.data && 'số liệu sơ tán'].filter(Boolean)}
@@ -334,12 +339,11 @@ export default function RescueCenter() {
       <ConnectionBanner updatedAt={ticketsQ.dataUpdatedAt || null} />
 
       <PageHeader
-        title="Điều hành cứu hộ & điểm nóng khẩn cấp"
-        short="Điều hành cứu hộ"
+        title="Điều hành cứu hộ"
         scope={scopeLabel}
         time={dataTime}
         timeNote={ticketsQ.isError ? 'Chưa tải được số liệu' : 'Đang tải số liệu…'}
-        meta={[<span key="sla" className="hidden md:inline">SLA chờ xử lý / chờ điều động: cấp 1 3′, cấp 2 15′, cấp 3 60′</span>]}
+        meta={[<span key="sla" className="hidden md:inline">Hạn phản hồi: cấp 1 Đỏ 3 phút · cấp 2 Cam 15 phút · cấp 3 Vàng 60 phút</span>]}
         onRefresh={refresh}
         refreshing={refreshing}
       />
@@ -348,10 +352,10 @@ export default function RescueCenter() {
 
       <RoleTips page="cuu-ho" />
 
-      {/* Lãnh đạo nắm tình hình: bản đồ tác chiến (phiếu đang mở, lộ trình + ETA của đội, vùng nguy cơ, điểm sơ tán) và diễn biến
+      {/* Lãnh đạo nắm tình hình: bản đồ cứu hộ (phiếu đang mở, lộ trình + giờ dự kiến tới của đội, vùng nguy cơ, điểm sơ tán) và diễn biến
           48 giờ (phiếu theo mức, thời gian xử lý) — cùng danh sách phiếu với bảng điều phối; thu gọn được */}
       <Section
-        title="Bản đồ tác chiến & diễn biến 48 giờ"
+        title="Bản đồ cứu hộ & diễn biến 48 giờ"
         collapsible
         open={overviewOpen}
         onToggle={() => setOverviewOpen((v) => !v)}
@@ -368,7 +372,7 @@ export default function RescueCenter() {
       <FilterToolbar
         fields={FILTERS}
         sorts={SORTS}
-        placeholder="Tìm mã SOS, SĐT, địa chỉ, nội dung tin…"
+        placeholder="Tìm mã phiếu, số điện thoại, địa chỉ, nội dung tin…"
         q={q}
         onSearch={setQ}
         filters={filters}
@@ -394,7 +398,7 @@ export default function RescueCenter() {
               onChange={(v) => setParam({ xem: v === 'bang' ? '' : v })}
               options={VIEWS.map(([v, label, icon]) => ({ value: v, label, icon }))}
             />
-            {view === 'bang' && wide && <span className="text-[11px] text-muted">Kéo thả phiếu giữa các cột hoặc dùng “Chuyển trạng thái” trên thẻ</span>}
+            {view === 'bang' && wide && <span className="text-xs text-muted">Kéo thẻ phiếu sang cột khác, hoặc chọn “Chuyển sang…” trên thẻ</span>}
             {view === 'danh_sach' && (
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="text-xs text-muted">Phiếu đã xong trong</span>
@@ -421,15 +425,15 @@ export default function RescueCenter() {
       {cancelFor && <CancelDispatchModal ticket={cancelFor} onClose={() => setCancelFor(null)} />}
       {editFor && <EditTicketModal ticket={editFor} onClose={() => setEditFor(null)} />}
       {evacOpen && <EvacuationModal row={evacRow} progress={evacQ.data?.progress} onClose={() => setEvacOpen(false)} />}
-      {/* Điện thoại: việc hay làm ở vùng ngón cái — phiếu chờ (số = phiếu chưa tiếp nhận), báo sơ tán, phiếu đang thực thi (số =
+      {/* Điện thoại: việc hay làm ở vùng ngón cái — phiếu mới báo (số = phiếu chưa ai nhận), báo sơ tán, đội đang đến (số =
           đội xin chi viện / báo đã cứu chờ xác nhận); khung chung với Tổng quan, Bản đồ, Vật tư */}
       <QuickActionBar
         slots={[
-          { key: 'cho', label: 'Chờ xử lý', icon: Inbox, onClick: () => openColumn('moi'), badge: waiting },
+          { key: 'cho', label: 'Mới báo', icon: Inbox, onClick: () => openColumn('moi'), badge: waiting },
           canEvac
             ? { key: 'so-tan', label: 'Sơ tán', icon: Home, onClick: () => setEvacOpen(true), ...offlineSlot }
             : { key: 'so-tan', label: 'Sơ tán', icon: Home, onClick: () => scrollTo(document.getElementById('so-tan')) },
-          { key: 'thuc-thi', label: 'Thực thi', icon: Navigation, onClick: () => openColumn('thuc_thi'), badge: fieldAsks },
+          { key: 'thuc-thi', label: 'Đang đến', icon: Navigation, onClick: () => openColumn('thuc_thi'), badge: fieldAsks },
         ]}
         onSos={canReport ? () => setReportOpen(true) : null}
       />
