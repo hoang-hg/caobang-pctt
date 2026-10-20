@@ -158,18 +158,16 @@ export default function Sidebar() {
       {/* Desktop Sidebar */}
       <nav
         className={clsx(
-          'no-print hidden lg:flex shrink-0 flex-col justify-between border-r border-line bg-panel py-3 transition-all duration-200 select-none',
+          'no-print hidden lg:flex min-h-0 shrink-0 flex-col justify-between gap-2 border-r border-line bg-panel py-3 transition-all duration-200 select-none',
           sidebarCollapsed ? 'w-16' : 'w-60'
         )}
       >
-        <div className="flex flex-col gap-2">
+        {/* Màn thấp (laptop 768 px): danh sách mục tự cuộn bên trong — menu không bao giờ kéo dài cả trang ra ngoài khung */}
+        <div className="scroll-thin flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
           {renderNavLinks(false)}
         </div>
 
-        <div className="flex flex-col gap-2 px-2 pt-2 border-t border-line/60">
-          {!sidebarCollapsed && (
-            <p className="px-1 text-[11px] leading-snug text-muted">Hệ thống điều hành PCTT & TKCN tỉnh Cao Bằng.</p>
-          )}
+        <div className="flex shrink-0 flex-col gap-2 px-2 pt-2 border-t border-line/60">
           {!sidebarCollapsed && (
             <div className="rounded-xl bg-panel2/80 p-2.5 text-xs">
               <div className="flex items-center gap-1.5 font-semibold text-danger">
