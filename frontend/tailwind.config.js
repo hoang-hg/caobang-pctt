@@ -21,8 +21,9 @@ export default {
         good: v('good'),
         info: v('info'),
       },
-      // Chữ màu trạng thái: sắc riêng cho nền sáng (src/index.css --*-text); bg-/border-/ring-warn… giữ màu gốc
+      // Chữ màu nhấn / trạng thái: sắc riêng đủ tương phản 4,5 : 1 (src/index.css --*-text); bg-/border-/ring-… giữ màu gốc
       textColor: {
+        accent: v('accent-text'),
         danger: v('danger-text'),
         serious: v('serious-text'),
         warn: v('warn-text'),

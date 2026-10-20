@@ -17,6 +17,10 @@ const PRESET_ICON = { ngap_lut: Waves, sat_lo: Mountain, tong_hop: Flag };
 const byName = new Intl.Collator('vi').compare;
 const GROUPS = [['phuong', 'Phường'], ['xa', 'Xã']];
 const unitLabel = (u) => `${u.unit_type === 'phuong' ? 'Phường' : 'Xã'} ${u.name}`;
+// Xã / phường chọn gần đây (4 mục, theo tài khoản, máy này) — chọn lại một chạm
+const recentKey = (uid) => `pctt_dia_ban_gan_day_${uid || 'may'}`;
+const readRecent = (key) => { try { const v = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } };
+const writeRecent = (key, v) => { try { localStorage.setItem(key, JSON.stringify(v)); } catch { /* chế độ riêng tư */ } };
 
 /**
  * Bộ lọc địa phương toàn cục (thiết kế F.1): Toàn tỉnh → nhóm lọc nhanh theo thiên tai → 56 xã/phường (sau sắp xếp
@@ -28,9 +32,13 @@ const unitLabel = (u) => `${u.unit_type === 'phuong' ? 'Phường' : 'Xã'} ${u.
  * - Chỉ liệt kê địa bàn trong phạm vi được giao; tài khoản một xã thấy tên xã của mình.
  * - Lãnh đạo chọn địa bàn biết ngay xã nào đang nóng: chấm màu thang rủi ro chung cạnh từng xã / nhóm lọc nhanh, mục "Cần chú
  *   ý" (xã Đỏ / Cam kèm lý do) đầu hộp chọn — /dashboard/communes, chỉ tải khi mở hộp chọn (communeStatus.js).
+ * - Người mới luôn biết đang xem vùng nào và về toàn tỉnh thế nào: nút ghi "Đang xem: …"; đang lọc thì có nút "Về toàn tỉnh"
+ *   ngay cạnh (mọi cỡ màn — đổi sang một xã rồi về toàn tỉnh trong 3 chạm); hộp chọn có "Chọn gần đây".
  */
 export default function AdminFilter() {
   const { filter, setFilter, clearFilter } = useStore();
+  const uid = useStore((st) => st.auth?.user?.id);
+  const [recent, setRecent] = useState(() => readRecent(recentKey(uid)));
   const unitsQ = useUnits();
   const presetsQ = usePresets();
   const allowed = useAllowedCodes('monitoring', 'view');
@@ -86,8 +94,14 @@ export default function AdminFilter() {
   const pick = (f) => {
     if (f.codes.length) setFilter(f);
     else clearFilter();
+    if (f.codes.length === 1) {
+      const next = [f.codes[0], ...recent.filter((c) => c !== f.codes[0])].slice(0, 4);
+      setRecent(next);
+      writeRecent(recentKey(uid), next);
+    }
     close();
   };
+  const backLabel = restricted ? 'Về toàn bộ phạm vi' : 'Về toàn tỉnh';
 
   const panel = (
     <AreaPanel
@@ -99,6 +113,7 @@ export default function AdminFilter() {
       status={status}
       filter={filter}
       scopeName={restricted ? 'Toàn bộ phạm vi được giao' : 'Toàn tỉnh Cao Bằng'}
+      recent={recent.map((c) => units.find((u) => u.code === c)).filter(Boolean)}
       onPick={pick}
       autoFocus={wide}
     />
@@ -121,20 +136,22 @@ export default function AdminFilter() {
       >
         <MapPin size={15} className="shrink-0" aria-hidden="true" />
         <span className="truncate lg:hidden">{short}</span>
-        <span className="hidden truncate lg:inline">{label}</span>
+        <span className="hidden truncate lg:inline"><span className="font-normal text-muted">Đang xem: </span>{label}</span>
         {/* Điện thoại: bỏ mũi tên — nhường chỗ cho tên xã (nút vẫn báo là mở hộp chọn qua aria-haspopup) */}
         <ChevronDown size={14} className="shrink-0 max-sm:hidden" aria-hidden="true" />
       </button>
-      {filtered && wide && (
-        <>
-          <button type="button" className="absolute -right-2 -top-2 rounded-full bg-panel2 p-0.5 text-muted hover:text-ink [@media(pointer:coarse)]:hidden" onClick={clearFilter} title="Bỏ lọc" aria-label="Bỏ lọc, xem toàn bộ phạm vi">
-            <X size={12} />
-          </button>
-          {/* Màn cảm ứng (iPad ngang): nút bỏ lọc riêng 44 px cạnh bộ lọc — chấm ✕ ở góc quá nhỏ, nới vùng chạm thì đè lên nút bộ lọc */}
-          <button type="button" className="btn-ghost tap-sq ml-1 hidden p-0 [@media(pointer:coarse)]:inline-flex" onClick={clearFilter} title="Bỏ lọc" aria-label="Bỏ lọc, xem toàn bộ phạm vi">
-            <X size={14} />
-          </button>
-        </>
+      {/* Đang lọc: nút "Về toàn tỉnh" ngay cạnh, mọi cỡ màn (điện thoại chỉ biểu tượng ✕ — vùng chạm 44 px, có nhãn đọc) */}
+      {filtered && (
+        <button
+          type="button"
+          className="btn-secondary tap-sq ml-1 h-9 shrink-0 gap-1 px-2 text-xs xl:px-2.5"
+          onClick={clearFilter}
+          title={backLabel}
+          aria-label={backLabel}
+        >
+          <X size={14} aria-hidden="true" />
+          <span className="hidden xl:inline">{backLabel}</span>
+        </button>
       )}
       {open && wide && (
         <div role="dialog" aria-label="Chọn địa bàn" className="card absolute left-0 top-11 z-[1200] flex max-h-[min(75vh,40rem)] w-[26rem] flex-col border border-line bg-panel/95 p-3 shadow-2xl backdrop-blur-md">
@@ -155,7 +172,7 @@ const Dot = ({ level, className }) => (
 const ATTENTION_SHOWN = 3; // 3 xã nặng nhất đủ cho cái nhìn vài giây; phần còn lại: "Xem thêm" và chấm màu trong danh sách
 
 /** Nội dung bảng chọn địa bàn (dùng chung cho bảng thả xuống và hộp chọn điện thoại). */
-function AreaPanel({ unitsQ, presetsQ, units, presets, statusQ, status, filter, scopeName, onPick, autoFocus }) {
+function AreaPanel({ unitsQ, presetsQ, units, presets, statusQ, status, filter, scopeName, recent = [], onPick, autoFocus }) {
   const [q, setQ] = useState('');
   const [allAttention, setAllAttention] = useState(false);
   const k = foldVi(q.trim());
@@ -205,6 +222,31 @@ function AreaPanel({ unitsQ, presetsQ, units, presets, statusQ, status, filter, 
           </button>
         )}
 
+        {/* Chọn gần đây: một chạm chọn lại xã vừa xem */}
+        {!k && recent.length > 0 && (
+          <section aria-label="Xã/phường chọn gần đây" className="mt-2">
+            <h4 className="px-2 text-xs font-semibold text-muted">Chọn gần đây</h4>
+            <div className="mt-1 flex flex-wrap gap-1.5 px-1">
+              {recent.map((u) => {
+                const st = status?.get(u.code);
+                return (
+                  <button
+                    key={u.code}
+                    type="button"
+                    aria-label={`Chọn lại: ${unitLabel(u)}`}
+                    aria-pressed={one(u.code)}
+                    className={clsx('tap flex min-h-[32px] items-center gap-1.5 rounded-full border px-3 text-xs', one(u.code) ? 'border-accent bg-accent/10 text-accent' : 'border-line hover:border-accent')}
+                    onClick={() => pickUnit(u)}
+                  >
+                    {st && <Dot level={st.level} className="h-2 w-2" />}
+                    {unitLabel(u)}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
         {/* Thông tin khẩn trên cùng: xã Đỏ / Cam kèm lý do — lãnh đạo chạm là lọc cả hệ thống theo xã đó */}
         {!k && (
           <section aria-label="Xã/phường cần chú ý" className="mt-2.5">
@@ -217,7 +259,7 @@ function AreaPanel({ unitsQ, presetsQ, units, presets, statusQ, status, filter, 
               <p role="status" className="px-2 py-1 text-[11px] text-muted">Đang tải tình hình từng xã…</p>
             ) : attention.length ? (
               <>
-                <h4 className="flex items-center gap-1.5 px-2 text-[11px] font-bold uppercase tracking-wide text-ink">
+                <h4 className="flex items-center gap-1.5 px-2 text-xs font-semibold text-ink">
                   <Dot level={attention[0].st.level} /> Cần chú ý · {attention.length} xã/phường
                 </h4>
                 {(allAttention ? attention : attention.slice(0, ATTENTION_SHOWN)).map(({ u, st }) => {
@@ -256,7 +298,7 @@ function AreaPanel({ unitsQ, presetsQ, units, presets, statusQ, status, filter, 
 
         {(shownPresets.length > 0 || (!k && presetsQ.isError)) && (
           <>
-            <h4 className="mt-2.5 px-2 text-[11px] font-bold uppercase tracking-wide text-muted">Lọc nhanh theo đặc thù thiên tai</h4>
+            <h4 className="mt-2.5 px-2 text-xs font-semibold text-muted">Lọc nhanh theo vùng thiên tai</h4>
             {presetsQ.isError && !presetsQ.data && (
               <p className="flex items-center justify-between gap-2 px-2 py-1 text-xs text-danger" role="alert">
                 Không tải được nhóm lọc nhanh
@@ -294,7 +336,7 @@ function AreaPanel({ unitsQ, presetsQ, units, presets, statusQ, status, filter, 
           </>
         )}
 
-        {!k && <h4 className="mt-2.5 px-2 text-[11px] font-bold uppercase tracking-wide text-muted">Xã / phường{unitsQ.data ? ` (${units.length})` : ''}</h4>}
+        {!k && <h4 className="mt-2.5 px-2 text-xs font-semibold text-muted">Xã / phường{unitsQ.data ? ` (${units.length})` : ''}</h4>}
         {!k && status && (
           <p className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 px-2 pt-1 text-[11px] text-muted">
             {[3, 2, 1, 0].map((lv) => <span key={lv} className="inline-flex items-center gap-1"><Dot level={lv} /> {RISK[lv].name}</span>)}

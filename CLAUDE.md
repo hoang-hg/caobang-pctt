@@ -341,8 +341,9 @@ chỉ khi `DEMO_MODE`; `DEMO_MODE=false` xoá đoạn `so_do` còn sót mỗi l�
   `useCanAll`, `useAllowedCodes(obj, act)` (null = toàn tỉnh). UI chỉ ẩn/hiện — backend mới chặn thật.
 - **Giao diện**: màu qua biến CSS (`src/index.css`) + token Tailwind (`bg-panel`, `bg-panel2`, `text-ink-2`, `text-muted`,
   `border-line`, `bg-danger`, `text-good`, `text-accent`…); màu trạng thái cố định; hỗ trợ cả sáng và tối. CHỮ màu
-  trạng thái (`text-warn` / `text-serious` / `text-good` / `text-danger`) lấy biến `--*-text` (`tailwind.config.js`
-  `textColor`): nền sáng là sắc đậm hơn — vàng / cam / xanh lá gốc không đạt 4,5 : 1 trên nền trắng; nền tối thì đỏ sáng hơn;
+  nhấn / trạng thái (`text-accent` / `text-warn` / `text-serious` / `text-good` / `text-danger`) lấy biến `--*-text`
+  (`tailwind.config.js` `textColor` — đủ 4,5 : 1 trên nền; `bg-accent` đậm đủ cho chữ trắng 5 : 1 ở cả hai nền): nền sáng là
+  sắc đậm hơn — vàng / cam / xanh lá gốc không đạt 4,5 : 1 trên nền trắng; nền tối thì đỏ sáng hơn;
   màu trạng thái mới làm chữ thì thêm cặp biến tương tự (chữ đỏ trên nền trắng cố định, vd. nút trắng trên dải đỏ:
   `text-[rgb(var(--danger))]`). Bảng màu tối nằm trong `@media screen` → in luôn nền sáng; vùng cuộn cao cố định (`max-h-…` +
   `overflow-y-auto`) thêm `print:max-h-none print:overflow-visible` để in không bị cắt (mẫu cột Kanban ở RescueCenter). Component

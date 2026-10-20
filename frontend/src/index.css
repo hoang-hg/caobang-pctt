@@ -23,16 +23,17 @@
   --line: 229 231 235;
   --ink: 31 41 55;
   --ink-2: 55 65 81;
-  --muted: 107 114 128;
-  --accent: 42 120 214;
+  --muted: 100 107 121; /* 5,1 : 1 trên nền, 4,9 : 1 trên panel-2 (#6B7280 cũ chỉ 4,4 : 1 trên panel-2) */
+  --accent: 34 104 196; /* #2268C4 — chữ 5,2 : 1 trên nền, chữ trắng trên nút 5,5 : 1 (#2A78D6 cũ: 4,2 / 4,4 : 1) */
+  --accent-text: 34 104 196;
   --info: 42 120 214;
   --danger: 208 59 59;
   --serious: 236 131 90;
   --warn: 247 200 0; /* #F7C800 vàng chanh — xem src/utils/risk.js */
   --good: 12 163 12;
-  --danger-text: 208 59 59; /* #D03B3B — 4,8 : 1 trên nền trắng */
+  --danger-text: 200 52 52; /* #C83434 — 5,0 : 1 trên nền, 4,8 : 1 trên panel-2 */
   --serious-text: 194 65 12; /* #C2410C — 5,2 : 1 trên nền trắng */
-  --warn-text: 161 98 7; /* #A16207 — 4,9 : 1 */
+  --warn-text: 150 90 5; /* #965A05 — 5,1 : 1 trên panel-2 */
   --good-text: 21 128 61; /* #15803D — 5,0 : 1 */
 
   /* Màu biểu đồ (theo bộ palette đã kiểm định CVD) */
@@ -57,12 +58,13 @@
     --ink: 241 245 249;
     --ink-2: 203 213 225;
     --muted: 148 163 184;
-    --accent: 57 135 229;
+    --accent: 37 110 204; /* nền nút: chữ trắng 5,0 : 1 (#3987E5 cũ chỉ 3,6 : 1) */
+    --accent-text: 96 165 250; /* chữ màu nhấn trên nền tối: 6,4 : 1 */
     --info: 57 135 229;
     --danger-text: 248 113 113; /* #F87171 — đỏ gốc chỉ 3,4 : 1 trên nền tối, sắc sáng hơn đạt 5,9 : 1 */
     --serious-text: 236 131 90; /* nền tối: chính màu trạng thái đã đủ tương phản */
     --warn-text: 247 200 0;
-    --good-text: 12 163 12;
+    --good-text: 22 178 22; /* 5,2 : 1 trên panel-2 nền tối (#0CA30C chỉ 4,4 : 1) */
 
     --series-1: #3987e5;
     --series-2: #d95926;
