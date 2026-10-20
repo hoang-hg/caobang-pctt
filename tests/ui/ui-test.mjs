@@ -837,7 +837,8 @@ async function firstScreen(ctx) {
 
 // ================================================================ Bản đồ cho người quản lý (trang B) — laptop, iPad, điện thoại
 // 6 chỉ số "Tình hình" thấy ngay (2 cột trong bảng cảnh báo / 1 hàng / 1 hàng vuốt ngang ô 44 px); tab Điểm nóng đứng đầu,
-// xếp Đỏ → Cam → Vàng; chế độ xem "Tình hình" bớt điểm trên bản đồ, "Tác nghiệp" trả lại như cũ; máy cảm ứng: mọi vùng chạm
+// xếp Đỏ → Cam → Vàng; chế độ xem "Xem tình hình" bớt điểm trên bản đồ, "Điều hành" trả lại như cũ; thanh thời gian: mốc chữ,
+// nút Phát chạy từng giờ (laptop, iPad ngang); máy cảm ứng: mọi vùng chạm
 // của trang ≥ 44 px (tính cả vùng chạm vô hình .touch-hit của đầu trang). Chỉ xem — chế độ xem chỉ lưu trên máy.
 const MANAGER_DEVICES = [
   ['Laptop 1366×768', { viewport: { width: 1366, height: 768 } }, 'grid'],
@@ -886,7 +887,7 @@ async function managerMap(ctx, layout) {
     if (vp.mobile) await expectNoOverflow(ctx, 'Bản đồ (người quản lý)');
     return `ô đầu: ${r.first}`;
   });
-  await step(ctx, 'Tab Điểm nóng đứng đầu, xếp Đỏ → Cam → Vàng; chế độ xem "Tình hình" bớt điểm, "Tác nghiệp" trả lại như cũ', async () => {
+  await step(ctx, 'Tab Điểm nóng đứng đầu, xếp Đỏ → Cam → Vàng; chế độ "Xem tình hình" bớt điểm, "Điều hành" trả lại như cũ, có câu giải thích', async () => {
     const bar = page.getByRole('navigation', { name: 'Thao tác nhanh' });
     if (compact) await bar.getByRole('button', { name: /^Cảnh báo/ }).click();
     const tabs = await page.locator('button[aria-pressed]').filter({ hasText: /^(Điểm nóng|Phiếu SOS|Cảm biến) \(\d+\)$/ }).allInnerTexts();
@@ -901,16 +902,35 @@ async function managerMap(ctx, layout) {
     if (layout === 'scroll') await bar.getByRole('button', { name: /^Lớp/ }).click();
     const modes = page.getByRole('group', { name: 'Chế độ xem bản đồ' }).first();
     const before = await markers();
-    await modes.getByRole('button', { name: 'Tình hình' }).click();
+    await modes.getByRole('button', { name: 'Xem tình hình', exact: true }).click();
     await page.waitForTimeout(800);
     const situation = await markers();
-    await modes.getByRole('button', { name: 'Tác nghiệp' }).click();
+    await modes.getByRole('button', { name: 'Điều hành', exact: true }).click();
     await page.waitForTimeout(800);
     const back = await markers();
+    // Câu giải thích chế độ đang chọn ngay dưới nút (Điều hành: kèm mẹo kéo – thả đội vào điểm cầu cứu)
+    if (!(await page.getByText(/để điều đội/).first().isVisible())) throw new Error('thiếu câu giải thích chế độ "Điều hành"');
     if (layout === 'scroll') await page.keyboard.press('Escape');
-    if (!(situation < before) || back < before - 2) throw new Error(`số điểm: ${before} → Tình hình ${situation} → Tác nghiệp ${back}`);
+    if (!(situation < before) || back < before - 2) throw new Error(`số điểm: ${before} → Xem tình hình ${situation} → Điều hành ${back}`);
     return `${levels.length} điểm nóng đang hiện · ${before} → ${situation} → ${back} điểm trên bản đồ`;
   });
+  if (layout === 'grid') {
+    await step(ctx, 'Thanh thời gian: mốc "12 giờ trước · Bây giờ · 24 giờ tới", nút Phát chạy từng giờ, chọn "Bây giờ" thì dừng', async () => {
+      const now = page.getByRole('status', { name: 'Thời điểm đang xem' });
+      if (!/Bây giờ/.test(await now.innerText())) throw new Error(`mở bản đồ không ở "Bây giờ": ${await now.innerText()}`);
+      await page.getByText('12 giờ trước', { exact: true }).first().waitFor({ timeout: 5_000 });
+      await page.getByText('24 giờ tới', { exact: true }).first().waitFor({ timeout: 5_000 });
+      await page.getByRole('button', { name: /^Phát/ }).click();
+      await page.waitForFunction(() => /\d+ giờ tới/.test(document.querySelector('[aria-label="Thời điểm đang xem"]')?.innerText || ''), null, { timeout: 6_000 });
+      const playing = (await now.innerText()).replace(/\s+/g, ' ');
+      if (!(await page.getByText(/Đổi theo giờ:/).first().isVisible())) throw new Error('đang xem giờ khác nhưng không nói lớp nào đổi theo giờ');
+      await page.getByRole('button', { name: 'Bây giờ', exact: true }).click();
+      await page.waitForTimeout(2_000);
+      const after = (await now.innerText()).replace(/\s+/g, ' ');
+      if (!/^Bây giờ/.test(after)) throw new Error(`chọn "Bây giờ" nhưng thanh vẫn chạy: ${after}`);
+      return `Phát → ${playing} · dừng ở ${after}`;
+    });
+  }
   if (await page.evaluate(() => matchMedia('(pointer: coarse)').matches)) {
     await step(ctx, 'Màn cảm ứng: mọi vùng chạm của trang Bản đồ ≥ 44 px', async () => {
       const small = await smallTargets(page, { onScreen: true });
@@ -1331,8 +1351,8 @@ async function mapLayers(ctx, phone) {
     await pop.getByRole('button', { name: 'Mở tab Hồ chứa' }).waitFor({ timeout: 5_000 });
     if (label) {
       const t = (await pop.innerText()).replace(/\s+/g, ' ');
-      const gates = t.match(/Cửa xả mở (\d+)\/\d+/)?.[1];
-      const flow = t.match(/Lưu lượng xả ([\d.,]+) m³\/s/)?.[1];
+      const gates = t.match(/Cửa xả đang mở (\d+)\/\d+/)?.[1];
+      const flow = t.match(/Đang xả ([\d.,]+) m³\/s/)?.[1];
       const [, lg, lf] = label.match(/^(\d+) cửa(?: · ([\d.]+) m³\/s)?$/) || [];
       const num = (x) => (x == null ? null : Math.round(Number(String(x).replace(/\./g, '').replace(',', '.'))));
       if (lg !== gates || (lf != null && num(lf) !== num(flow))) throw new Error(`nhãn "${label}" khác popup (cửa ${gates}, xả ${flow} m³/s)`);
@@ -1363,10 +1383,10 @@ async function mapLayers(ctx, phone) {
     const vehicles = (layers0?.vehicles?.features || []).map((f) => f.properties);
     if (!vehicles.length) return `${labels.length} nhãn xả · popup hồ ${hasOps ? 'có' : 'chưa có'} số liệu · không có phương tiện`;
     if (phone) await page.getByRole('navigation', { name: 'Thao tác nhanh' }).getByRole('button', { name: /^Lớp/ }).click();
-    else if (!(await page.getByRole('checkbox', { name: /Xuồng, xe, thiết bị/ }).count())) {
+    else if (!(await page.getByRole('checkbox', { name: /Xuồng, xe, máy xúc/ }).count())) {
       await visible(page.getByRole('button', { name: /Lớp dữ liệu/ })).click();
     }
-    const box = page.getByRole('checkbox', { name: /Xuồng, xe, thiết bị/ });
+    const box = page.getByRole('checkbox', { name: /Xuồng, xe, máy xúc/ });
     if (!(await box.isChecked())) await box.check();
     if (phone) await page.keyboard.press('Escape');
     await page.waitForTimeout(400);

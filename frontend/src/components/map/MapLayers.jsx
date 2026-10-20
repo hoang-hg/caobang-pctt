@@ -60,7 +60,7 @@ function StationPopup({ p }) {
         // Đang xem thời điểm khác trên thanh thời gian: quá khứ = số đo, tương lai = bản tin dự báo
         <div className="mb-1 flex flex-wrap items-center gap-2">
           <span className="text-xs text-muted">Lúc {fmtVn(p.at)}:</span>
-          {value ? <><span className="font-mono text-lg">{value}</span>{chip}</> : <span className="chip bg-panel2 text-muted">Không có số đo / dự báo</span>}
+          {value ? <><span className="num text-lg">{value}</span>{chip}</> : <span className="chip bg-panel2 text-muted">Không có số đo / dự báo</span>}
         </div>
       ) : value == null ? (
         // Chưa có thiết bị / chưa từng nhận số đo — KHÔNG phải "dưới BĐ I"
@@ -69,11 +69,11 @@ function StationPopup({ p }) {
         // Mất tín hiệu: không hiện số cũ như đang đo; số cuối vượt báo động thì vẫn nêu cấp để chỉ huy biết
         <div className="mb-1 space-y-1 text-xs">
           <span className="chip bg-panel2 text-muted">Mất tín hiệu từ {fmtVn(p.time)}</span>
-          <div>Số đo cuối <b className="font-mono">{value}</b> {lv > 0 && chip} — không xác nhận được hiện trạng</div>
+          <div>Số đo cuối <b className="num">{value}</b> {lv > 0 && chip} — không xác nhận được hiện trạng</div>
         </div>
       ) : (
         <div className="mb-1 flex items-center gap-2">
-          <span className="font-mono text-lg">{value}</span>
+          <span className="num text-lg">{value}</span>
           {chip}
           <span className="text-[11px] text-muted">{fmtVn(p.time)}</span>
         </div>
@@ -117,7 +117,7 @@ function WarehousePopup({ p, onIssue }) {
             <li key={k} className="flex items-center gap-1.5">
               <span className="h-2 w-2 rounded-full" style={{ background: c[CAT_SERIES[k]] || c.muted }} />
               {CATEGORY[k]}
-              <b className={clsx('ml-auto font-mono', v < STOCK_LOW && 'text-danger')}>{v}%</b>
+              <b className={clsx('ml-auto num', v < STOCK_LOW && 'text-danger')}>{v}%</b>
             </li>
           ))}
         </ul>
@@ -149,7 +149,7 @@ function SosPopup({ p, onDispatch }) {
           <button className="btn-danger mt-2 px-2 py-1 text-xs" onClick={() => onDispatch(p)}><Send size={12} /> Điều đội</button>
         </Can>
       )}
-      <p className="mt-1 text-[11px] text-muted">Mẹo: kéo biểu tượng đội cứu hộ thả vào điểm SOS để điều động nhanh.</p>
+      <p className="mt-1 text-[11px] text-muted">Mẹo: kéo biểu tượng đội cứu hộ thả vào điểm cầu cứu này để điều động nhanh.</p>
     </div>
   );
 }
@@ -222,12 +222,12 @@ function BlackspotPopup({ p, near, level }) {
       <ul className="mt-1 space-y-0.5 text-[11px] text-ink-2">
         {p.tilt_info && (
           <li>
-            Nghiêng taluy <b className="font-mono">+{p.tilt_info.current_tilt_deg}°</b>
+            Nghiêng taluy <b className="num">+{p.tilt_info.current_tilt_deg}°</b>
             {p.tilt_info.alarm_threshold != null && ` (ngưỡng BĐ III ${p.tilt_info.alarm_threshold}°)`} · {p.tilt_info.sensor_name}
           </li>
         )}
         {p.soil_info && <li>{p.soil_info.status_text} · {p.soil_info.sensor_name}</li>}
-        {p.rain_info && <li>Mưa 24 giờ <b className="font-mono">{num(p.rain_info.rain_24h_mm, 1)} mm</b> · {p.rain_info.station_name}</li>}
+        {p.rain_info && <li>Mưa 24 giờ <b className="num">{num(p.rain_info.rain_24h_mm, 1)} mm</b> · {p.rain_info.station_name}</li>}
         {!p.monitored && <li className="text-muted">Chưa có cảm biến nghiêng / độ ẩm đất báo số đo trong 6 giờ qua</li>}
       </ul>
       {near.length > 0 && (
@@ -310,11 +310,11 @@ function ReservoirPopup({ p, lv, onOperate }) {
         <>
           <table className="mt-1 w-full text-xs">
             <tbody>
-              <tr><td>Mực nước hồ</td><td className="text-right font-mono">{num(p.current_level, 2)} m</td></tr>
-              <tr><td>MNDBT</td><td className="text-right font-mono">{num(p.normal_level, 1)} m</td></tr>
-              <tr><td>Lưu lượng về</td><td className="text-right font-mono">{num(p.inflow_m3s)} m³/s</td></tr>
-              <tr><td>Lưu lượng xả</td><td className="text-right font-mono font-semibold">{num(p.outflow_m3s)} m³/s</td></tr>
-              <tr><td>Cửa xả mở</td><td className="text-right font-mono">{p.spill_gates_open}/{p.spill_gates}</td></tr>
+              <tr><td>Mực nước hồ</td><td className="num text-right">{num(p.current_level, 2)} m</td></tr>
+              <tr><td>Mực nước dâng bình thường</td><td className="num text-right">{num(p.normal_level, 1)} m</td></tr>
+              <tr><td>Nước về hồ</td><td className="num text-right">{num(p.inflow_m3s)} m³/s</td></tr>
+              <tr><td>Đang xả</td><td className="num text-right font-semibold">{num(p.outflow_m3s)} m³/s</td></tr>
+              <tr><td>Cửa xả đang mở</td><td className="num text-right">{p.spill_gates_open}/{p.spill_gates}</td></tr>
             </tbody>
           </table>
           <div className="mt-1.5 border-t border-line pt-1.5">
@@ -371,7 +371,7 @@ function EvacPopup({ p, onOccupancy }) {
   return (
     <div className="w-56">
       <b>{p.name}</b>
-      <div className="text-sm">Đang chứa: <b className={clsx('font-mono', p.current_occupancy > p.capacity && 'text-danger')}>{p.current_occupancy}/{p.capacity}</b> người</div>
+      <div className="text-sm">Đang chứa: <b className={clsx('num', p.current_occupancy > p.capacity && 'text-danger')}>{p.current_occupancy}/{p.capacity}</b> người</div>
       <div className="mt-1 flex flex-wrap gap-1">
         {canUpdate && <button className="btn-primary px-2 py-1 text-xs" onClick={() => onOccupancy(p)}><Users size={12} /> Cập nhật số người</button>}
         <Tel phone={p.contact_phone} />
@@ -476,7 +476,7 @@ export default function MapLayers({
                 <b>{p.name}</b>
                 <div className="text-xs">
                   Kịch bản ngập khi {p.station_name} {p.alarm_level ? `đạt BĐ ${ROMAN[p.alarm_level]}` : 'đạt'} ({p.trigger} m) — mực nước
-                  {timeline ? ` lúc ${fmtVn(timeline.time)}` : ' hiện tại'} <b className="font-mono">{level} m</b>
+                  {timeline ? ` lúc ${fmtVn(timeline.time)}` : ' hiện tại'} <b className="num">{level} m</b>
                 </div>
                 {p.depth_m != null && <div className="text-xs text-muted">Độ sâu ngập điển hình ~{p.depth_m} m</div>}
               </Popup>
@@ -583,7 +583,7 @@ export default function MapLayers({
                   <div className="text-xs">Sẵn sàng {p.personnel_ready} · Nhiệm vụ {p.personnel_on_mission} · 📻 {p.radio_freq}</div>
                   <div className="mt-1 flex flex-wrap gap-1">{p.skills.map((s) => <span key={s} className="chip bg-panel2">{SKILL[s]}</span>)}</div>
                   <div className="mt-2"><Tel phone={p.contact_phone} label="Gọi chỉ huy" /></div>
-                  <p className="mt-1 text-[11px] text-muted">Kéo biểu tượng này thả vào điểm SOS để điều động.</p>
+                  <p className="mt-1 text-[11px] text-muted">Kéo biểu tượng đội này thả vào điểm cầu cứu để điều động.</p>
                 </div>
               </Popup>
             </Marker>

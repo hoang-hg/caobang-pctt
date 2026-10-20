@@ -1,8 +1,9 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
 import {
-  Activity, AlertTriangle, ArrowUp, Circle as CircleIcon, Clock, CloudRain, Compass, Droplets, FileSpreadsheet, LifeBuoy, MapPin, Megaphone,
-  MessageCircle, Mountain, PenTool, Route, Ruler, Search, RotateCcw, Send, Settings2, Siren, Waves, X,
+  Activity, AlertTriangle, ArrowUp, Cctv, Circle as CircleIcon, CloudRain, Compass, Construction, Droplets, FileSpreadsheet, House,
+  LifeBuoy, Map as MapIcon, MapPin, Megaphone, MessageCircle, Mountain, Pause, PenTool, Play, Radar, Route, Ruler, Search, RotateCcw, Send,
+  Settings2, Siren, Tornado, TrafficCone, TriangleAlert, Truck, Users, Warehouse, Waves, X,
 } from 'lucide-react';
 import { ErrorState, Segmented, ShowMore, Skeleton, TrendTag, useEscapeToClose } from '../common/ui';
 import { useStore } from '../../app/store';
@@ -23,45 +24,46 @@ const HOT_STEP = 10;
 const PRIO_CHIPS = [[1, 'Đỏ'], [2, 'Cam'], [3, 'Vàng']];
 
 /**
- * Các lớp của bản đồ giám sát (thiết kế B.2, 4 nhóm). `perm`: quyền xem cần có — API trả lớp rỗng khi thiếu quyền
+ * Các lớp của bản đồ giám sát (thiết kế B.2, 4 nhóm — tên đời thường: Mưa & mực nước · Vùng nguy hiểm · Lực lượng & kho ·
+ * Người dân cầu cứu). `icon`: biểu tượng mẫu cạnh tên lớp. `perm`: quyền xem cần có — API trả lớp rỗng khi thiếu quyền
  * (map_layers.py), giao diện ẩn hẳn lớp đó thay vì hiện "0 SOS" như thể không có sự cố.
  */
 export const LAYER_GROUPS = [
   {
-    title: 'Thủy văn & Khí tượng',
+    title: 'Mưa & mực nước',
     items: [
-      { key: 'stations', label: 'Trạm đo mưa, mực nước, cảm biến IoT' },
-      { key: 'reservoirs', label: 'Hồ chứa & đập thủy điện' },
-      { key: 'forecast', label: 'Mưa dự báo theo xã (ECMWF + GFS)' }, // ghi chú dưới tên: 24 giờ tới / 1 giờ theo thanh thời gian
-      { key: 'radar', label: 'Radar mưa thời gian thực' },
-      { key: 'storm', label: 'Quỹ đạo bão / áp thấp' },
+      { key: 'stations', label: 'Trạm đo mưa, mực nước, cảm biến sạt lở', icon: Activity },
+      { key: 'reservoirs', label: 'Hồ chứa, thủy điện', icon: Droplets },
+      { key: 'forecast', label: 'Mưa dự báo theo xã', icon: CloudRain }, // ghi chú dưới tên: 24 giờ tới / 1 giờ theo thanh thời gian
+      { key: 'radar', label: 'Mây mưa trên ảnh radar', icon: Radar },
+      { key: 'storm', label: 'Đường đi của bão, áp thấp', icon: Tornado },
     ],
   },
   {
-    title: 'Cảnh báo & Vùng nguy hiểm',
+    title: 'Vùng nguy hiểm',
     items: [
-      { key: 'flood', label: 'Vùng ngập lụt' },
-      { key: 'floodScenario', label: 'Vùng ngập theo kịch bản (BĐ I–III)' },
-      { key: 'landslide', label: 'Vùng sạt lở / lũ quét' },
-      { key: 'blackspots', label: 'Điểm đen sạt lở, đèo dốc' }, // danh mục + trạng thái giám sát — /dashboard/kpis
-      { key: 'hazardPoints', label: 'Điểm nguy hiểm, sự cố giao thông – hạ tầng' },
-      { key: 'reports', label: 'Phản ánh của người dân (72 giờ)', perm: 'report' },
-      { key: 'roads', label: 'Mạng đường & đoạn bị chặn' },
+      { key: 'flood', label: 'Vùng ngập', icon: Waves },
+      { key: 'floodScenario', label: 'Vùng sẽ ngập khi lên báo động I–III', icon: Waves },
+      { key: 'landslide', label: 'Vùng sạt lở, lũ quét', icon: Mountain },
+      { key: 'blackspots', label: 'Điểm đen sạt lở, đèo dốc', icon: TriangleAlert }, // danh mục + trạng thái giám sát — /dashboard/kpis
+      { key: 'hazardPoints', label: 'Điểm nguy hiểm: cây đổ, đứt điện, sập cầu', icon: TrafficCone },
+      { key: 'reports', label: 'Phản ánh của người dân (3 ngày)', icon: MessageCircle, perm: 'report' },
+      { key: 'roads', label: 'Đường giao thông, đoạn bị chặn', icon: Construction },
     ],
   },
   {
-    title: 'Lực lượng & Vật tư',
+    title: 'Lực lượng & kho',
     items: [
-      { key: 'forces', label: 'Lực lượng cứu hộ', perm: 'resource' },
-      { key: 'vehicles', label: 'Xuồng, xe, thiết bị', perm: 'resource' },
-      { key: 'routes', label: 'Lộ trình đang điều động', perm: 'sos' },
-      { key: 'warehouses', label: 'Kho vật tư', perm: 'resource' },
-      { key: 'evac', label: 'Điểm sơ tán an toàn', perm: 'resource' },
-      { key: 'cameras', label: 'Camera CCTV' },
+      { key: 'forces', label: 'Đội cứu hộ', icon: Users, perm: 'resource' },
+      { key: 'vehicles', label: 'Xuồng, xe, máy xúc', icon: Truck, perm: 'resource' },
+      { key: 'routes', label: 'Đường đi của đội đang điều động', icon: Route, perm: 'sos' },
+      { key: 'warehouses', label: 'Kho vật tư', icon: Warehouse, perm: 'resource' },
+      { key: 'evac', label: 'Điểm sơ tán', icon: House, perm: 'resource' },
+      { key: 'cameras', label: 'Camera quan sát', icon: Cctv },
     ],
   },
-  { title: 'Yêu cầu cứu hộ', items: [{ key: 'sos', label: 'Điểm SOS từ người dân / cảm biến', perm: 'sos' }] },
-  { title: 'Nền hành chính', items: [{ key: 'admin', label: 'Ranh giới xã/phường' }] },
+  { title: 'Người dân cầu cứu', items: [{ key: 'sos', label: 'Điểm cầu cứu (phiếu cứu hộ)', icon: Siren, perm: 'sos' }] },
+  { title: 'Ranh giới', items: [{ key: 'admin', label: 'Ranh giới xã, phường', icon: MapIcon }] },
 ];
 export const LAYER_ORDER = LAYER_GROUPS.flatMap((g) => g.items.map((it) => it.key));
 
@@ -106,41 +108,48 @@ export function layerCounts(data) {
   };
 }
 
-/** Bảng bật / tắt lớp. `touch`: dòng cao ≥ 44 px (điện thoại, máy tính bảng). */
+/** Bảng bật / tắt lớp: mỗi lớp một dòng — biểu tượng mẫu, tên, số đối tượng, công tắc to (chính là ô chọn, vẽ kiểu công tắc:
+ * trình đọc màn hình, bàn phím dùng như ô chọn). `touch`: dòng cao ≥ 48 px (điện thoại, máy tính bảng). */
 export function LayerList({ groups, layers, setLayers, unavailable, notes, counts, canStorm, onStorm, touch }) {
   return (
     <div className="space-y-3">
       {groups.map((g) => (
         <div key={g.title} className="space-y-1">
-          <div className="px-1 text-[11px] font-bold uppercase tracking-wider text-muted">{g.title}</div>
+          <div className="px-1 text-xs font-semibold text-muted">{g.title}</div>
           <div className="space-y-0.5">
-            {g.items.map(({ key, label }) => {
+            {g.items.map(({ key, label, icon: Icon }) => {
               const off = unavailable[key];
+              const on = !!layers[key] && !off;
               const n = counts[key];
               const note = off || (n === 0 && EMPTY_NOTE[key]) || notes[key] || FIXED_NOTE[key];
               return (
                 <Fragment key={key}>
                   <label
                     className={clsx(
-                      'flex items-center gap-2.5 rounded-lg px-2 text-xs transition-colors',
-                      touch ? 'min-h-[44px] py-1.5' : 'min-h-[32px] py-1',
+                      'flex items-center gap-2.5 rounded-lg px-2 text-[13px] transition-colors',
+                      touch ? 'min-h-[48px] py-1.5' : 'min-h-[36px] py-1',
                       off
                         ? 'cursor-not-allowed text-muted'
-                        : layers[key] ? 'cursor-pointer bg-panel2 font-medium text-ink' : 'cursor-pointer text-ink-2 hover:bg-panel2/60',
+                        : on ? 'cursor-pointer bg-accent/10 font-medium text-ink' : 'cursor-pointer text-ink-2 hover:bg-panel2/60',
                     )}
                   >
+                    {Icon && <Icon size={16} className={clsx('shrink-0', on ? 'text-accent' : 'text-muted')} aria-hidden="true" />}
+                    <span className="min-w-0 flex-1">
+                      <span className="block leading-snug">{label}</span>
+                      {note && <span className={clsx('block text-[11px] font-normal leading-snug', !off && 'text-muted')}>{note}</span>}
+                    </span>
+                    {n != null && !off && <span className="num shrink-0 text-xs text-muted" title="Số đối tượng trong vùng đang xem">{n}</span>}
                     <input
                       type="checkbox"
-                      checked={layers[key] && !off}
+                      checked={on}
                       disabled={!!off}
                       onChange={(e) => setLayers((l) => ({ ...l, [key]: e.target.checked }))}
-                      className={clsx('shrink-0 rounded accent-[rgb(var(--accent))]', touch && 'h-5 w-5')}
+                      className={clsx(
+                        "relative h-5 w-9 shrink-0 cursor-pointer appearance-none rounded-full bg-line transition-colors checked:bg-accent disabled:cursor-not-allowed disabled:opacity-50",
+                        "before:absolute before:left-0.5 before:top-0.5 before:h-4 before:w-4 before:rounded-full before:bg-white before:shadow before:transition-transform before:content-[''] checked:before:translate-x-4",
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1',
+                      )}
                     />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate">{label}</span>
-                      {note && <span className={clsx('block text-[10px] font-normal', !off && 'text-muted')}>{note}</span>}
-                    </span>
-                    {n != null && !off && <span className="shrink-0 font-mono text-[11px] text-muted" title="Số đối tượng trong vùng đang xem">{n}</span>}
                   </label>
                   {key === 'storm' && canStorm && (
                     <button
@@ -508,57 +517,112 @@ export function AlertsList({
 }
 
 /**
- * Chế độ xem bản đồ: "Tình hình" — chỉ giữ lớp rủi ro (SOS, trạm, hồ, vùng nguy hiểm, sạt lở, sự cố) cho lãnh đạo nắm tình
- * hình; "Tác nghiệp" — đủ lớp như trước (thêm lực lượng, phương tiện, kho, lộ trình, điểm sơ tán, phản ánh, camera). Chỉ
- * đổi lớp đang bật — không đổi số liệu. `touch`: nút cao 44 px.
+ * Chế độ xem bản đồ: "Xem tình hình" — chỉ giữ lớp rủi ro (phiếu cứu hộ, trạm, hồ, vùng nguy hiểm, sạt lở, sự cố) cho lãnh
+ * đạo nắm tình hình (mặc định); "Điều hành" — thêm đội cứu hộ, xuồng – xe, kho, đường đi, điểm sơ tán, phản ánh, camera để
+ * điều đội. Chỉ đổi lớp đang bật — không đổi số liệu. `touch`: nút cao 44 px. `caption`: câu giải thích chế độ đang chọn
+ * ngay dưới nút (Điều hành: kèm mẹo kéo – thả đội vào điểm cầu cứu khi `canDispatch`).
  */
 export const VIEW_MODES = [
-  ['tinh_hinh', 'Tình hình', 'Chỉ lớp rủi ro: SOS, trạm, hồ, vùng nguy hiểm, sạt lở, sự cố — mở tab Điểm nóng'],
-  ['tac_nghiep', 'Tác nghiệp', 'Đủ lớp: thêm lực lượng, phương tiện, kho, lộ trình, điểm sơ tán, phản ánh, camera'],
+  ['tinh_hinh', 'Xem tình hình', 'Chỉ lớp rủi ro: phiếu cứu hộ, trạm đo, hồ, vùng nguy hiểm — để nắm tình hình.'],
+  ['tac_nghiep', 'Điều hành', 'Thêm đội cứu hộ, xuồng – xe, kho, điểm sơ tán, đường đi của đội — để điều đội.'],
 ];
-export function ViewModeSwitch({ mode, onChange, touch, className }) {
+export function ViewModeSwitch({ mode, onChange, touch, caption = false, canDispatch = false, help, className, captionClass }) {
+  const hint = VIEW_MODES.find(([id]) => id === mode)?.[2];
   return (
-    <Segmented
-      label="Chế độ xem bản đồ"
-      value={mode}
-      onChange={onChange}
-      touch={touch}
-      className={clsx('flex bg-panel/95 !shadow-lg backdrop-blur-md', className)}
-      options={VIEW_MODES.map(([id, label, hint]) => ({ value: id, label, hint }))}
-    />
+    <>
+      <Segmented
+        label="Chế độ xem bản đồ"
+        value={mode}
+        onChange={onChange}
+        touch={touch}
+        className={clsx('flex bg-panel/95 !shadow-lg backdrop-blur-md', className)}
+        options={VIEW_MODES.map(([id, label, h]) => ({ value: id, label, hint: h }))}
+      />
+      {caption && hint && (
+        <p className={clsx('text-xs leading-snug text-ink-2', captionClass)}>
+          {hint}
+          {mode === 'tac_nghiep' && canDispatch && <> Kéo biểu tượng đội cứu hộ thả vào điểm cầu cứu để điều động.</>}
+          {help && <> {help}</>}
+        </p>
+      )}
+    </>
   );
 }
 
 const QUICK_HOURS = [-12, -6, 0, 6, 12, 24];
+const PLAY_MS = 1200; // mỗi giờ trên thanh khi bấm "Phát"
+/** Nhãn giờ trên thanh: "Bây giờ", "6 giờ trước", "12 giờ tới". */
+export const hourText = (h) => (h === 0 ? 'Bây giờ' : h < 0 ? `${-h} giờ trước` : `${h} giờ tới`);
 
-/** Thanh thời gian (thiết kế B.1): −12 giờ (số đo đã qua) → +24 giờ (dự báo, quỹ đạo bão). */
+/**
+ * Thanh thời gian (thiết kế B.1): 12 giờ trước (số đo đã qua) → Bây giờ → 24 giờ tới (dự báo, đường đi bão). Nút "Phát" chạy
+ * lần lượt từng giờ tới hết 24 giờ tới (đang ở cuối thì chạy lại từ 12 giờ trước) — xem mưa, bão diễn biến; kéo thanh / chọn
+ * mốc thì dừng. Ghi rõ lớp nào đổi theo giờ, lớp nào không.
+ */
 export function TimeControl({ offset, setOffset, touch }) {
+  const [playing, setPlaying] = useState(false);
+  // Đang phát: mỗi PLAY_MS sang giờ kế tiếp; tới 24 giờ tới thì dừng
+  useEffect(() => {
+    if (!playing) return undefined;
+    if (offset >= 24) {
+      setPlaying(false);
+      return undefined;
+    }
+    const id = setTimeout(() => setOffset(offset + 1), PLAY_MS);
+    return () => clearTimeout(id);
+  }, [playing, offset, setOffset]);
+  const pick = (h) => {
+    setPlaying(false);
+    setOffset(h);
+  };
+  const play = () => {
+    if (playing) return setPlaying(false);
+    if (offset >= 24) setOffset(-12);
+    return setPlaying(true);
+  };
   const when = new Date(Date.now() + offset * 3600_000).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
   return (
     <div>
-      <div className="flex items-center gap-3">
-        <Clock size={16} className="shrink-0 text-accent" aria-hidden="true" />
-        <input
-          type="range"
-          min={-12}
-          max={24}
-          step={1}
-          value={offset}
-          onChange={(e) => setOffset(Number(e.target.value))}
-          className={clsx('min-w-0 flex-1 accent-[rgb(var(--accent))]', touch && 'h-11')}
-          aria-label="Thanh trượt thời gian"
-          aria-valuetext={offset === 0 ? 'Hiện tại' : `${offset > 0 ? '+' : ''}${offset} giờ — ${when}`}
-        />
-        <div className="w-32 shrink-0 text-right text-xs">
+      <div className="flex items-center gap-2.5">
+        <button
+          type="button"
+          onClick={play}
+          aria-pressed={playing}
+          aria-label={playing ? 'Dừng chạy thời gian' : 'Phát: xem lần lượt từng giờ'}
+          title={playing ? 'Dừng' : 'Phát — xem mưa, bão diễn biến từng giờ'}
+          className={clsx('flex shrink-0 items-center justify-center rounded-full text-white shadow-sm', touch ? 'h-11 w-11' : 'h-9 w-9', playing ? 'bg-serious' : 'bg-accent')}
+        >
+          {playing ? <Pause size={16} aria-hidden="true" /> : <Play size={16} className="ml-0.5" aria-hidden="true" />}
+        </button>
+        <div className="min-w-0 flex-1">
+          <input
+            type="range"
+            min={-12}
+            max={24}
+            step={1}
+            value={offset}
+            onChange={(e) => pick(Number(e.target.value))}
+            className={clsx('w-full accent-[rgb(var(--accent))]', touch && 'h-11')}
+            aria-label="Thanh trượt thời gian"
+            aria-valuetext={offset === 0 ? 'Bây giờ' : `${hourText(offset)} — ${when}`}
+          />
+          {/* Mốc chữ dưới thanh: Bây giờ nằm đúng chỗ của nó (12 / 36 bề ngang) */}
+          <div className="relative h-4 text-[11px] text-muted" aria-hidden="true">
+            <span className="absolute left-0">12 giờ trước</span>
+            <span className="absolute left-[33.3%] -translate-x-1/2 font-semibold text-ink-2">Bây giờ</span>
+            <span className="absolute right-0">24 giờ tới</span>
+          </div>
+        </div>
+        <div className="w-28 shrink-0 text-right text-xs" role="status" aria-label="Thời điểm đang xem">
           {offset === 0 ? (
             <>
-              <b className="font-bold text-good">Hiện tại</b>
-              <span className="block text-[11px] text-muted">thời gian thực</span>
+              <b className="font-bold text-good">Bây giờ</b>
+              <span className="block text-[11px] text-muted">số liệu mới nhất</span>
             </>
           ) : (
             <>
-              <b className="text-accent">{offset > 0 ? `+${offset}h · dự báo` : `${offset}h · đã qua`}</b>
-              <span className="block text-[11px] text-muted">{when}</span>
+              <b className="text-accent">{hourText(offset)}</b>
+              <span className="block text-[11px] text-muted">{offset > 0 ? 'dự báo' : 'đã qua'} · {when}</span>
             </>
           )}
         </div>
@@ -568,7 +632,7 @@ export function TimeControl({ offset, setOffset, touch }) {
           <button
             key={h}
             type="button"
-            onClick={() => setOffset(h)}
+            onClick={() => pick(h)}
             aria-pressed={offset === h}
             className={clsx(
               'rounded-lg text-[11px] font-semibold',
@@ -576,10 +640,17 @@ export function TimeControl({ offset, setOffset, touch }) {
               offset === h ? 'bg-accent/15 text-accent' : 'text-muted hover:bg-panel2',
             )}
           >
-            {h === 0 ? 'Hiện tại' : `${h > 0 ? '+' : ''}${h}h`}
+            {h === 0 ? 'Bây giờ' : `${h > 0 ? '+' : '−'}${Math.abs(h)} giờ`}
           </button>
         ))}
       </div>
+      {/* Đang xem giờ khác: nói rõ lớp nào đổi theo giờ — đứng ở "Bây giờ" thì thanh gọn, không che thêm bản đồ */}
+      {(offset !== 0 || playing) && (
+        <p className="mt-1 text-[11px] leading-snug text-muted">
+          Đổi theo giờ: số đo trạm, mưa dự báo theo xã, ảnh radar, đường đi bão, vùng ngập theo mực nước. Không đổi: đội cứu hộ, kho,
+          điểm sơ tán, phiếu cứu hộ.
+        </p>
+      )}
     </div>
   );
 }

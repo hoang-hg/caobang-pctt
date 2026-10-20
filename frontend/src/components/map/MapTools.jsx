@@ -513,9 +513,9 @@ export function rainScale(areas) {
     // Mốc giờ = lượng mưa của 1 giờ TRƯỚC mốc → ghi khoảng giờ, VD "Mưa 21:00–22:00 10-10"
     const from = new Date(Date.parse(a.window_to) - 3600e3).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
     const span = `Mưa ${from}–${fmtVn(a.window_to)}`;
-    return { hourly: true, bins: RAIN_BINS_HOURLY, title: `${span} (dự báo, P50)`, short: span };
+    return { hourly: true, bins: RAIN_BINS_HOURLY, title: `${span} (dự báo — khả năng cao nhất)`, short: span };
   }
-  return { hourly: false, bins: RAIN_BINS, title: 'Mưa dự báo 24 giờ tới (P50)', short: 'Mưa 24h tới' };
+  return { hourly: false, bins: RAIN_BINS, title: 'Mưa dự báo 24 giờ tới (khả năng cao nhất)', short: 'Mưa 24 giờ tới' };
 }
 
 /** Lớp mưa dự báo (P50 kết hợp ECMWF/GFS) tô theo xã: tổng 24 giờ tới, hoặc mưa 1 giờ tại thời điểm trên thanh thời gian. */

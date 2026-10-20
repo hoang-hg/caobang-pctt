@@ -75,6 +75,18 @@ export const PAGE_TIPS = {
       'Nhận hàng tỉnh cấp: bấm "Nhập kho". Xuồng, xe hỏng: báo tình trạng ở thẻ "Phương tiện".',
     ],
   },
+  'ban-do': {
+    tinh: [
+      '"Xem tình hình" chỉ hiện rủi ro; "Điều hành" thêm đội cứu hộ, kho, điểm sơ tán để điều đội.',
+      '"Lớp dữ liệu": bật, tắt từng lớp — mưa, vùng ngập, sạt lở, điểm cầu cứu; "Về mặc định" để trở lại.',
+      'Kéo đội cứu hộ thả vào điểm cầu cứu để điều động; thanh thời gian (nút Phát) xem 12 giờ trước tới 24 giờ tới.',
+    ],
+    xa: [
+      'Bản đồ mở sẵn xã mình: điểm sạt lở, vùng ngập, điểm sơ tán quanh xã.',
+      '"Lớp dữ liệu": bật, tắt từng lớp; "Về mặc định" để trở lại như cũ.',
+      'Chạm một điểm để xem chi tiết. Người gặp nạn: bấm "Báo SOS" (điện thoại) hoặc "Báo cáo nhanh".',
+    ],
+  },
   'phan-anh': {
     tinh: [
       'Phản ánh người dân gửi qua cổng công khai (ảnh, vị trí) nằm ở đây, mới nhất trên cùng.',
@@ -222,9 +234,10 @@ export const SCENARIOS = {
       to: '/ban-do',
       cta: 'Mở Bản đồ giám sát',
       steps: [
-        'Chọn "Tình hình" để chỉ xem rủi ro; "Tác nghiệp" để thấy thêm lực lượng, kho, điểm sơ tán.',
-        'Bấm "Lớp dữ liệu" để bật, tắt từng lớp: mưa, mực nước, vùng ngập, sạt lở, phiếu cứu hộ.',
-        'Kéo thanh thời gian ở dưới để xem từ 12 giờ trước tới 24 giờ tới.',
+        'Chọn "Xem tình hình" để chỉ xem rủi ro; "Điều hành" để thấy thêm đội cứu hộ, kho, điểm sơ tán.',
+        'Bấm "Lớp dữ liệu" để bật, tắt từng lớp: mưa & mực nước, vùng nguy hiểm, lực lượng & kho, người dân cầu cứu.',
+        'Kéo thanh thời gian ở dưới (hoặc bấm nút Phát) để xem từ 12 giờ trước tới 24 giờ tới.',
+        'Ở chế độ "Điều hành": kéo biểu tượng đội cứu hộ thả vào điểm cầu cứu để mở lệnh điều động.',
         'Khoanh vùng nguy hiểm để đếm số hộ trong vùng và chuyển sang soạn cảnh báo.',
       ],
     },
