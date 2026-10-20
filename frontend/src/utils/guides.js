@@ -41,14 +41,14 @@ export const PAGE_TIPS = {
   },
   'cuu-ho': {
     tinh: [
-      'Cột "Chờ xử lý" là phiếu mới, đã xếp sẵn: quá hạn trước, rồi cấp 1 Đỏ. Làm từ trên xuống.',
-      'Bấm "Điều phối" trên thẻ: chọn đội được gợi ý gần nhất, vật tư mang theo, rồi phát lệnh.',
-      'Đội báo đã tới: bấm "Đội đã đến". Cứu xong: bấm "Đã an toàn" để đóng phiếu.',
+      'Cột "Mới báo — chưa ai nhận" đã xếp sẵn: quá hạn trước, rồi cấp 1 Đỏ. Làm từ trên xuống.',
+      'Bấm "Điều đội" trên thẻ: chọn đội được gợi ý, vật tư mang theo, xác nhận rồi phát lệnh.',
+      'Đội báo đã tới: bấm "Đội đã đến". Người dân an toàn: bấm "Xác nhận đã cứu" để đóng phiếu.',
     ],
     xa: [
-      'Ở đây là phiếu cứu hộ của xã mình. Phiếu mới: gọi xác minh rồi bấm "Tiếp nhận".',
-      'Tỉnh điều đội đến: theo dõi ở cột "Đang thực thi"; nút điện thoại để gọi người báo tin.',
-      'Người dân đã an toàn: bấm "Đã an toàn". Cần thêm lực lượng: gửi yêu cầu chi viện lên tỉnh.',
+      'Ở đây là phiếu cứu hộ của xã mình. Phiếu mới: gọi xác minh rồi bấm "Nhận phiếu".',
+      'Tỉnh điều đội đến: theo dõi ở cột "Đội đang đến"; nút "Gọi" để gọi người báo tin.',
+      'Người dân đã an toàn: bấm "Xác nhận đã cứu". Cần thêm lực lượng: gửi yêu cầu chi viện lên tỉnh.',
     ],
   },
   'canh-bao': {
@@ -152,11 +152,12 @@ export const SCENARIOS = {
       cta: 'Mở Điều hành cứu hộ',
       steps: [
         'Tin đến qua điện thoại, Zalo: bấm "Báo cáo nhanh" trên thanh trên cùng, ghi ai, ở đâu, mấy người, chuyện gì.',
-        'Ở cột "Chờ xử lý", làm phiếu trên cùng trước — đã xếp sẵn: quá hạn, rồi cấp 1 Đỏ, rồi phiếu đến trước.',
-        'Bấm "Điều phối": chọn đội được gợi ý (gần, đủ người, đúng kỹ năng), vật tư mang theo, phát lệnh và gửi link nhiệm vụ cho trưởng nhóm.',
-        'Đội báo đã tới: bấm "Đội đã đến". Cứu xong: bấm "Đã an toàn" để đóng phiếu.',
+        'Ở cột "Mới báo — chưa ai nhận", làm phiếu trên cùng trước — đã xếp sẵn: quá hạn, rồi cấp 1 Đỏ, rồi phiếu đến trước.',
+        'Bấm "Điều đội": 3 bước — chọn đội được gợi ý (gần, đủ người, đúng kỹ năng) → vật tư mang theo → xác nhận và phát lệnh.',
+        'Phát lệnh xong: bấm "Gọi trưởng nhóm" hoặc "Sao chép lệnh gửi Zalo"; link nhiệm vụ đã kèm trong lệnh.',
+        'Đội báo đã tới: bấm "Đội đã đến". Người dân an toàn: bấm "Xác nhận đã cứu" để đóng phiếu.',
       ],
-      note: 'Hạn phản hồi: cấp 1 Đỏ 3 phút, cấp 2 Cam 15 phút, cấp 3 Vàng 60 phút. Quá hạn, thẻ phiếu có viền đỏ.',
+      note: 'Hạn phản hồi: cấp 1 Đỏ 3 phút, cấp 2 Cam 15 phút, cấp 3 Vàng 60 phút. Thẻ phiếu ghi rõ "Chờ 5 phút — quá hạn 2 phút"; quá hạn có viền đỏ.',
     },
     {
       id: 'chi-vien',
@@ -166,9 +167,9 @@ export const SCENARIOS = {
       to: '/cuu-ho',
       cta: 'Xem phiếu xin chi viện',
       steps: [
-        'Phiếu xin chi viện nằm ở cột "Chờ xử lý" của trang Điều hành cứu hộ, có nhãn đỏ "Xã xin chi viện".',
+        'Phiếu xin chi viện nằm ở cột "Mới báo — chưa ai nhận" của trang Điều hành cứu hộ, đầu thẻ có dải đỏ "Xã xin chi viện".',
         'Gọi chỉ huy xã để nắm rõ cần người, xuồng, máy xúc hay lương thực.',
-        'Cần lực lượng: bấm "Điều phối". Cần hàng: trang "Vật tư & Lực lượng" → "Xuất kho" từ kho gần nhất.',
+        'Cần lực lượng: bấm "Điều đội". Cần hàng: trang "Vật tư & Lực lượng" → "Xuất kho" từ kho gần nhất.',
       ],
     },
     {
@@ -265,8 +266,8 @@ export const SCENARIOS = {
       steps: [
         'Bấm "Báo cáo nhanh" trên thanh trên cùng (điện thoại: nút đỏ "Báo SOS" ở dưới cùng).',
         'Ghi người báo, số điện thoại, ở đâu (đang ở hiện trường thì lấy vị trí), mấy người, có người già, trẻ em không.',
-        'Gửi: phiếu hiện ngay ở trực ban tỉnh. Xã đã gọi xác minh thì bấm "Tiếp nhận" trên phiếu.',
-        'Lực lượng xã tự cứu được: cứu xong bấm "Đã an toàn".',
+        'Gửi: phiếu hiện ngay ở trực ban tỉnh. Xã đã gọi xác minh thì bấm "Nhận phiếu" trên thẻ phiếu.',
+        'Lực lượng xã tự cứu được: cứu xong bấm "Xác nhận đã cứu".',
       ],
     },
     {

@@ -26,7 +26,7 @@ export const DEMO_ROLES = [
   {
     key: 'tinh_truc',
     label: 'Cấp tỉnh — trực ban (chưa có PIN)',
-    hint: 'Tiếp nhận SOS, điều phối lực lượng, soạn lệnh cảnh báo',
+    hint: 'Nhận tin báo cứu hộ, điều đội, soạn lệnh cảnh báo',
     user: user('tinh', {
       id: 'demo-tinh-truc', username: 'demo.trucban', full_name: 'Trực ban tỉnh (giả lập)',
       position: 'Cán bộ trực ban Văn phòng BCH tỉnh (giả lập)', has_pin: false,

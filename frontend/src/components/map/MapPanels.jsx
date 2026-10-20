@@ -440,7 +440,7 @@ export function AlertsList({
                     className={clsx('mx-1.5 mb-1.5 inline-flex items-center gap-1 rounded-lg px-2 text-[11px] font-bold text-danger hover:bg-danger/10', touch ? 'min-h-[44px]' : 'min-h-[26px]')}
                     onClick={() => onDispatch(s)}
                   >
-                    <Send size={12} aria-hidden="true" /> Điều phối lực lượng
+                    <Send size={12} aria-hidden="true" /> Điều đội
                   </button>
                 )}
               </div>

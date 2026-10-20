@@ -149,7 +149,7 @@ export default function CommuneView({ code, units, onChange, onSupport, children
                 icon={Siren}
                 title={`Phiếu SOS đang mở · ${open.length}`}
                 q={sosQ}
-                right={<Link to="/cuu-ho" className="touch-hit text-xs font-semibold text-accent hover:underline">Điều phối →</Link>}
+                right={<Link to="/cuu-ho" className="touch-hit text-xs font-semibold text-accent hover:underline">Xem bảng cứu hộ →</Link>}
                 empty={!open.length && 'Không có phiếu SOS đang mở ở xã này'}
               >
                 <ul className="scroll-thin flex max-h-56 flex-col gap-1.5 overflow-y-auto pr-1 print:max-h-none print:overflow-visible">

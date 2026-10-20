@@ -487,8 +487,8 @@ async def dispatch(body: DispatchIn, user: dict = Depends(require_any("dispatch"
         )
     await log_event(
         f"LỆNH ĐIỀU ĐỘNG: {force['name']} ({personnel} người, {len(vehicle_ids)} phương tiện) → {ticket['code']}, "
-        f"{route['distance_km']} km, ETA {route['duration_min']} phút"
-        + ("" if route["safe"] else " – ⚠ lộ trình qua vùng nguy hiểm"),
+        f"{route['distance_km']} km, dự kiến đến sau {route['duration_min']} phút"
+        + ("" if route["safe"] else " – đường đi qua vùng nguy hiểm"),
         "cuu_ho",
         "info" if route["safe"] else "warning",
         lat=ticket["lat"],

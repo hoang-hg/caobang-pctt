@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { AlertTriangle, Bot, ChevronLeft, ChevronRight, Inbox, Loader2, Sparkles } from 'lucide-react';
+import { AlertTriangle, ChevronLeft, ChevronRight, Inbox, Loader2, ScanText } from 'lucide-react';
 import { api } from '../../api/client';
 import { useStore } from '../../app/store';
 import { FieldError, Section, StepChips } from '../common/ui';
@@ -9,7 +9,7 @@ import QtyStepper from '../common/QtyStepper';
 import { INCIDENT, PRIORITY, SOURCE, VULNERABLE } from '../../utils/labels';
 import { risk, sosLevel } from '../../utils/risk';
 
-const STEPS = ['Nội dung tin', 'Kiểm tra phân loại'];
+const STEPS = ['Dán tin nhắn', 'Kiểm tra & tạo phiếu'];
 const CHANNELS = ['ZALO', 'APP', 'HOTLINE', 'CAN_BO'];
 const SLA = { 1: 3, 2: 15, 3: 60 };
 const MIN_TEXT = 8;
@@ -20,9 +20,13 @@ const cleanPhone = (s) => s.replace(/[\s.\-()]/g, '');
 // Chưa bóc tách / bóc tách lỗi: chưa chọn gì — trực ban không chọn thì máy chủ tự phân loại từ nội dung khi tạo phiếu
 const EMPTY = { incident_type: null, priority: null, trapped_count: '', vulnerable: [] };
 
+// Nhãn cạnh ô máy tự điền từ nội dung tin — mất đi khi người dùng tự chọn / sửa ô đó
+const AutoTag = ({ on }) => (on ? <span className="chip ml-1.5 bg-warn/25 py-0 text-[11px] font-semibold text-ink">Máy tự điền — kiểm tra lại</span> : null);
+
 /**
- * Tiếp nhận đa kênh & bóc tách tin nhắn (thiết kế D.1) — form 2 bước: (1) kênh (nút to), SĐT người báo, nội dung tin;
- * (2) kết quả bóc tách SỬA ĐƯỢC (loại sự cố, mức ưu tiên kèm SLA, số người bằng nút −/+, nhóm yếu thế, địa bàn) rồi tạo phiếu.
+ * Nhận tin báo cứu hộ (thiết kế D.1: đa kênh, máy bóc tách tin nhắn) — form 2 bước: (1) kênh (nút to), SĐT người báo, dán
+ * nội dung tin; (2) máy tự điền SỬA ĐƯỢC (mức ưu tiên kèm hạn phản hồi, loại sự cố, số người bằng nút −/+, nhóm yếu thế, địa
+ * bàn) — ô máy tự đoán có nhãn "Máy tự điền — kiểm tra lại" tới khi người dùng chọn lại — rồi "Tạo phiếu".
  * Lỗi hiện ngay dưới ô (SĐT sai khi gõ; nội dung quá ngắn, số người ngoài khoảng khi bấm Tiếp / Tạo). Bóc tách lỗi (mất
  * mạng, máy chủ) → nói rõ, vẫn sang bước 2 để trực ban tự phân loại; mất mạng → không tạo phiếu được, nói lý do.
  */
@@ -36,6 +40,7 @@ export default function Intake({ online = true }) {
   const [parsed, setParsed] = useState(null); // kết quả bóc tách (null = chưa / không bóc tách được)
   const [parseError, setParseError] = useState(null);
   const [edit, setEdit] = useState(EMPTY);
+  const [auto, setAuto] = useState({}); // ô máy tự điền, người dùng chưa chọn lại
   const [shown, setShown] = useState({}); // ô đã "chạm" (rời ô / bấm Tiếp) → hiện lỗi
   const [busy, setBusy] = useState(false);
   const [creating, setCreating] = useState(false); // chống bấm đúp → 2 phiếu SOS trùng
@@ -54,7 +59,7 @@ export default function Intake({ online = true }) {
   const touch = (...keys) => setShown((s) => ({ ...s, ...Object.fromEntries(keys.map((k) => [k, true])) }));
 
   const reset = () => {
-    setStep(0); setText(''); setPhone(''); setParsed(null); setParseError(null); setEdit(EMPTY); setShown({});
+    setStep(0); setText(''); setPhone(''); setParsed(null); setParseError(null); setEdit(EMPTY); setAuto({}); setShown({});
   };
   const next = async () => {
     const bad = ['phone', 'text'].find((k) => errors[k]);
@@ -69,10 +74,12 @@ export default function Intake({ online = true }) {
       const p = await api('/sos/parse', { method: 'POST', body: { text } });
       setParsed(p);
       setEdit({ incident_type: p.incident_type, priority: p.priority, trapped_count: String(p.trapped_count ?? 0), vulnerable: p.vulnerable || [] });
+      setAuto({ priority: !!p.priority, incident_type: !!p.incident_type, trapped_count: p.trapped_count != null, vulnerable: !!p.vulnerable?.length, place: !!p.place });
     } catch (e) {
       // Không bóc tách được: vẫn sang bước 2, trực ban tự chọn — máy chủ bóc tách lại khi tạo phiếu nếu có thể
       setParsed(null);
-      setParseError(navigator.onLine === false ? 'Đang mất mạng — chưa bóc tách được' : `Không bóc tách được: ${e.message}`);
+      setAuto({});
+      setParseError(navigator.onLine === false ? 'Đang mất mạng — máy chưa tự điền được' : `Máy chưa tự điền được: ${e.message}`);
     } finally {
       setBusy(false);
       setStep(1);
@@ -109,11 +116,15 @@ export default function Intake({ online = true }) {
     }
   };
 
+  const pick = (patch) => {
+    setEdit((v) => ({ ...v, ...patch }));
+    setAuto((a) => ({ ...a, ...Object.fromEntries(Object.keys(patch).map((k) => [k, false])) }));
+  };
   const chip = (on, tone) => clsx('chip tap min-h-[36px] border px-3 text-xs', on ? (tone || 'border-accent bg-accent text-white') : 'border-line bg-panel2 text-ink-2 hover:bg-panel');
   const big = 'tap min-h-[40px] text-xs sm:text-sm';
 
   return (
-    <Section title="Tiếp nhận đa kênh & bóc tách tin nhắn" right={<Bot size={16} className="text-accent" aria-hidden="true" />}>
+    <Section title="Nhận tin báo cứu hộ">
       <StepChips steps={STEPS} step={step} onStep={setStep} done={[!errors.text && !errors.phone]} disabled={busy || creating} />
       {step === 0 ? (
         <div className="flex flex-col gap-2.5 text-sm">
@@ -156,7 +167,7 @@ export default function Intake({ online = true }) {
             <FieldError id="loi-noi-dung-tiep-nhan">{err('text')}</FieldError>
           </label>
           <button type="button" className={clsx('btn-primary self-end', big)} onClick={next} disabled={busy} onMouseDown={(e) => e.preventDefault()}>
-            {busy ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Sparkles size={14} aria-hidden="true" />} Bóc tách & kiểm tra <ChevronRight size={14} aria-hidden="true" />
+            {busy ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <ScanText size={14} aria-hidden="true" />} Tự điền & kiểm tra <ChevronRight size={14} aria-hidden="true" />
           </button>
         </div>
       ) : (
@@ -164,15 +175,16 @@ export default function Intake({ online = true }) {
           {parseError ? (
             <p role="alert" className="flex items-start gap-1.5 rounded-lg border border-serious/50 bg-serious/10 p-2 text-ink">
               <AlertTriangle size={14} className="mt-0.5 shrink-0 text-serious" aria-hidden="true" />
-              <span><b>{parseError}</b> — chọn loại sự cố, mức ưu tiên, số người nếu đã rõ; phần để trống máy chủ tự bóc tách từ nội dung khi tạo phiếu, định vị theo tên xóm / xã.</span>
+              <span><b>{parseError}</b> — chọn mức ưu tiên, loại sự cố, số người nếu đã rõ; ô để trống hệ thống tự điền từ nội dung khi tạo phiếu, định vị theo tên xóm, xã.</span>
             </p>
           ) : (
-            <p className="font-semibold text-accent">
-              Phân loại tự động ({parsed?.engine === 'rules' ? 'quy tắc' : 'mô hình AI'}) — kiểm tra, sửa nếu cần rồi tạo phiếu
+            <p className="text-ink-2">
+              <b className="text-ink">Máy đã tự điền từ nội dung tin.</b> Ô có nhãn “Máy tự điền — kiểm tra lại” là máy đoán: đúng thì
+              để nguyên, sai thì chọn lại, rồi bấm “Tạo phiếu”.
             </p>
           )}
           <div>
-            <div className="mb-1 font-medium text-muted" id="muc-uu-tien-tiep-nhan">Mức ưu tiên</div>
+            <div className="mb-1 font-medium text-muted" id="muc-uu-tien-tiep-nhan">Mức ưu tiên<AutoTag on={auto.priority} /></div>
             <div className="grid grid-cols-3 gap-1.5" role="radiogroup" aria-labelledby="muc-uu-tien-tiep-nhan">
               {[1, 2, 3].map((p) => (
                 <button
@@ -180,30 +192,30 @@ export default function Intake({ online = true }) {
                   type="button"
                   role="radio"
                   aria-checked={edit.priority === p}
-                  onClick={() => setEdit({ ...edit, priority: p })}
+                  onClick={() => pick({ priority: p })}
                   className={clsx('tap flex min-h-[48px] flex-col items-center justify-center rounded-lg border-2 px-1 text-center font-semibold', edit.priority === p ? clsx(risk(sosLevel(p)).chip, 'border-transparent') : 'border-line bg-panel2/50 text-ink-2')}
                 >
                   <span>Cấp {p} · {PRIORITY[p].short}</span>
-                  <span className="text-[10px] font-normal opacity-90">SLA {SLA[p]}′</span>
+                  <span className="text-[11px] font-normal opacity-90">phản hồi trong {SLA[p]} phút</span>
                 </button>
               ))}
             </div>
           </div>
           <div>
-            <div className="mb-1 font-medium text-muted" id="loai-su-co-tiep-nhan">Loại sự cố</div>
+            <div className="mb-1 font-medium text-muted" id="loai-su-co-tiep-nhan">Loại sự cố<AutoTag on={auto.incident_type} /></div>
             <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-labelledby="loai-su-co-tiep-nhan">
               {Object.entries(INCIDENT).map(([k, v]) => (
-                <button key={k} type="button" role="radio" aria-checked={edit.incident_type === k} className={chip(edit.incident_type === k)} onClick={() => setEdit({ ...edit, incident_type: k })}>{v}</button>
+                <button key={k} type="button" role="radio" aria-checked={edit.incident_type === k} className={chip(edit.incident_type === k)} onClick={() => pick({ incident_type: k })}>{v}</button>
               ))}
             </div>
           </div>
           <div>
-            <label htmlFor="so-nguoi-tiep-nhan" className="font-medium text-muted">Số người cần cứu / mắc kẹt</label>
+            <label htmlFor="so-nguoi-tiep-nhan" className="font-medium text-muted">Số người cần cứu / mắc kẹt<AutoTag on={auto.trapped_count} /></label>
             <QtyStepper
               id="so-nguoi-tiep-nhan"
               ref={refs.trapped}
               value={edit.trapped_count}
-              onChange={(v) => setEdit({ ...edit, trapped_count: v })}
+              onChange={(v) => pick({ trapped_count: v })}
               min={0}
               max={MAX_TRAPPED}
               steps={[1, 5]}
@@ -214,7 +226,7 @@ export default function Intake({ online = true }) {
             <FieldError id="loi-so-nguoi-tiep-nhan">{err('trapped')}</FieldError>
           </div>
           <div>
-            <div className="mb-1 font-medium text-muted">Nhóm yếu thế</div>
+            <div className="mb-1 font-medium text-muted">Người già, trẻ em, người bị thương<AutoTag on={auto.vulnerable} /></div>
             <div className="flex flex-wrap gap-1.5">
               {Object.entries(VULNERABLE).map(([k, label]) => (
                 <button
@@ -222,7 +234,7 @@ export default function Intake({ online = true }) {
                   type="button"
                   aria-pressed={edit.vulnerable.includes(k)}
                   className={chip(edit.vulnerable.includes(k), 'border-danger bg-danger text-white')}
-                  onClick={() => setEdit({ ...edit, vulnerable: edit.vulnerable.includes(k) ? edit.vulnerable.filter((x) => x !== k) : [...edit.vulnerable, k] })}
+                  onClick={() => pick({ vulnerable: edit.vulnerable.includes(k) ? edit.vulnerable.filter((x) => x !== k) : [...edit.vulnerable, k] })}
                 >
                   {label}
                 </button>
@@ -231,7 +243,8 @@ export default function Intake({ online = true }) {
           </div>
           <div className="rounded-lg border border-line bg-panel2/40 p-2">
             <span className="text-muted">Địa bàn: </span>
-            <b className={clsx(!parsed?.place && 'text-serious')}>{parsed?.place ? parsed.place.name : 'Chưa xác định — cán bộ cần xác minh toạ độ trước khi điều động'}</b>
+            <b className={clsx(!parsed?.place && 'text-serious')}>{parsed?.place ? parsed.place.name : 'Chưa xác định — gọi lại người báo để hỏi rõ vị trí trước khi điều đội'}</b>
+            <AutoTag on={auto.place} />
           </div>
           <div className="grid grid-cols-2 gap-2 sm:flex sm:justify-end">
             <button type="button" className={clsx('btn-ghost', big)} onClick={() => setStep(0)} disabled={creating}><ChevronLeft size={14} aria-hidden="true" /> Quay lại</button>
@@ -243,7 +256,7 @@ export default function Intake({ online = true }) {
               title={!online ? 'Mất mạng — chưa tạo phiếu được; việc khẩn hãy gọi trực ban' : undefined}
               onMouseDown={(e) => e.preventDefault()}
             >
-              {creating ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Inbox size={14} aria-hidden="true" />} Tạo phiếu SOS
+              {creating ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Inbox size={14} aria-hidden="true" />} Tạo phiếu
             </button>
           </div>
         </div>

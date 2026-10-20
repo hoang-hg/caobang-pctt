@@ -65,9 +65,8 @@ export default function UrgentStrip({ label, items, action, calm, gray, failed =
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <Siren size={16} className={clsx('shrink-0', onRed && 'motion-safe:animate-pulse')} aria-hidden="true" />
           <div className={clsx('flex min-w-0 flex-1 items-center gap-1.5 leading-snug', opened ? 'flex-wrap' : 'max-sm:flex-nowrap sm:flex-wrap')}>
-            <b className={clsx('hidden whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider sm:inline', onRed ? 'bg-white/20' : 'bg-black/10')}>
-              {onRed ? 'Khẩn cấp' : 'Cần chú ý'}
-            </b>
+            {/* Nhãn chữ thường như dải tình huống của Tổng quan — không viết IN HOA giãn cách */}
+            <b className="hidden whitespace-nowrap font-bold sm:inline">{onRed ? 'Khẩn cấp:' : 'Cần chú ý:'}</b>
             {items.map((it, i) => {
               const inner = (
                 <>

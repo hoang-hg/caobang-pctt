@@ -28,7 +28,7 @@ export function MissionLinkBox({ url, expiresAt }) {
       <p className="mt-0.5 text-xs text-ink-2">
         Đã kèm trong nội dung lệnh. Trưởng nhóm mở trên điện thoại (không cần đăng nhập) để xem điểm SOS, chỉ đường, báo
         đã đến / đã cứu / cần chi viện. Hết hạn {dateTime(expiresAt)} hoặc khi xác nhận hoàn thành. Link chỉ hiện một lần —
-        mất thì bấm “Link” trên thẻ phiếu để cấp link mới.
+        mất thì bấm “Link nhiệm vụ” trên thẻ phiếu để cấp link mới.
       </p>
       <div className="mt-2 flex gap-2">
         <input

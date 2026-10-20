@@ -53,14 +53,14 @@ export default function SosTrend({ query, tickets, now }) {
   const ticks = data.filter((b) => new Date(b.start).getHours() % 12 === 0).map((b) => b.start);
   const label = `Phiếu SOS nhận trong 48 giờ: ${total} phiếu — cấp 1 ${sum('p1')}, cấp 2 ${sum('p2')}, cấp 3 ${sum('p3')}; nhiều nhất ${data[peak].total} phiếu lúc ${hh(data[peak].start)} ngày ${dm(data[peak].start)}`;
   const cells = [
-    ['Tiếp nhận', s.ack, s.ackN, 'nhận tin → tiếp nhận'],
-    ['Có đội đi', s.disp, s.dispN, 'nhận tin → điều động'],
-    ['Đội đến nơi', s.reach, s.reachN, 'điều động → đến'],
+    ['Nhận phiếu', s.ack, s.ackN, 'từ lúc báo tới lúc nhận'],
+    ['Có đội đi', s.disp, s.dispN, 'từ lúc báo tới lúc điều đội'],
+    ['Đội đến nơi', s.reach, s.reachN, 'từ lúc điều tới lúc đến'],
   ];
   return (
     <div className="flex min-w-0 flex-col gap-2">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h3 className="text-sm font-semibold text-ink">Phiếu SOS nhận 48 giờ qua <span className="font-mono">({total})</span></h3>
+        <h3 className="text-sm font-semibold text-ink">Phiếu cứu hộ nhận 48 giờ qua <span className="num">({total})</span></h3>
         {/* Số từng mức ngay trên chú giải: Vàng và Cam của thang chung gần nhau (kiểm định màu ΔE 13,6) — không đọc số chỉ bằng màu */}
         <Legend items={parts.map((p) => ({ label: `${p.label}: ${sum(p.key)}`, color: p.color }))} />
       </div>
@@ -87,7 +87,7 @@ export default function SosTrend({ query, tickets, now }) {
                   <LabelList
                     dataKey="total"
                     content={({ x, y, width, index }) => (index === peak ? (
-                      <text x={x + width / 2} y={y - 4} textAnchor="middle" fontSize={11} fill={c.ink} fontFamily="ui-monospace, monospace">{data[index].total}</text>
+                      <text x={x + width / 2} y={y - 4} textAnchor="middle" fontSize={11} fill={c.ink}>{data[index].total}</text>
                     ) : null)}
                   />
                 )}
@@ -96,20 +96,20 @@ export default function SosTrend({ query, tickets, now }) {
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <h3 className="mt-1 text-sm font-semibold text-ink">Thời gian xử lý <span className="text-xs font-normal text-muted">(trung vị — một nửa số phiếu nhanh hơn)</span></h3>
+      <h3 className="mt-1 text-sm font-semibold text-ink">Thời gian xử lý <span className="text-xs font-normal text-muted">(một nửa số phiếu nhanh hơn mức này)</span></h3>
       <dl className="grid grid-cols-3 gap-2 text-center">
         {cells.map(([name, v, n, hint]) => (
           <div key={name} className="rounded-lg bg-panel2/60 px-1.5 py-2">
             <dt className="text-[11px] font-medium text-ink-2">{name}</dt>
-            <dd className="font-mono text-lg font-bold leading-tight text-ink">{dur(v)}</dd>
+            <dd className="num text-base font-bold leading-tight text-ink">{dur(v)}</dd>
             <dd className="text-[10px] leading-tight text-muted">{hint} · {n} phiếu</dd>
           </div>
         ))}
       </dl>
       {s.slaPct != null && (
         <p className="text-xs text-ink-2">
-          Tiếp nhận trong SLA: <b className="font-mono text-ink">{s.slaPct}%</b> ({s.inSla}/{s.inSla + s.late} phiếu)
-          {s.late > 0 && <b className="text-danger"> · {s.late} phiếu tiếp nhận trễ / còn chờ quá hạn</b>}
+          Nhận phiếu đúng hạn: <b className="num text-ink">{s.slaPct}%</b> ({s.inSla}/{s.inSla + s.late} phiếu)
+          {s.late > 0 && <b className="text-danger"> · {s.late} phiếu nhận trễ / còn chờ quá hạn</b>}
         </p>
       )}
     </div>

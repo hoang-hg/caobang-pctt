@@ -9,8 +9,9 @@ export const PRIORITY = {
   2: { label: 'Cấp 2 · Nguy hiểm', short: 'Cam', cls: RISK[2].chip, tone: 'serious' },
   3: { label: 'Cấp 3 · Hỗ trợ', short: 'Vàng', cls: RISK[1].chip, tone: 'warn' },
 };
-export const SOS_STATUS = { moi: 'Chờ xử lý', dieu_phoi: 'Đang điều phối', thuc_thi: 'Đang thực thi', hoan_thanh: 'Hoàn thành' };
-export const SOURCE = { ZALO: 'Zalo OA', APP: 'Ứng dụng', HOTLINE: 'Tổng đài', SENSOR: 'Cảm biến IoT', CAN_BO: 'Cán bộ' };
+// Bước của phiếu cứu hộ bằng lời đời thường — cũng là tên 4 cột bảng điều phối (rescueFacts COLUMNS), trang Hướng dẫn
+export const SOS_STATUS = { moi: 'Mới báo — chưa ai nhận', dieu_phoi: 'Đang tìm đội', thuc_thi: 'Đội đang đến', hoan_thanh: 'Đã cứu xong' };
+export const SOURCE = { ZALO: 'Zalo', APP: 'Ứng dụng', HOTLINE: 'Tổng đài', SENSOR: 'Cảm biến tự động', CAN_BO: 'Cán bộ' };
 // Báo cáo của trưởng nhóm từ link nhiệm vụ (trang /nhiem-vu)
 export const FIELD_REPORT = { arrived: 'Đã đến hiện trường', rescued: 'Đã cứu an toàn', need_support: 'Cần chi viện' };
 export const VULNERABLE = { nguoi_gia: 'Người già', tre_em: 'Trẻ em', thuong_nang: 'Thương nặng', thai_phu: 'Thai phụ' };
