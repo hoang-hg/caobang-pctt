@@ -53,9 +53,9 @@ export const PAGE_TIPS = {
   },
   'canh-bao': {
     tinh: [
-      'Lãnh đạo có mã PIN: lệnh chờ bạn nằm ở khối "Chờ phê duyệt" — đọc trước rồi bấm "Phê duyệt".',
-      'Trực ban soạn lệnh 3 bước: nội dung (chọn mẫu) → xã nhận tin → kênh gửi, rồi "Gửi lãnh đạo phê duyệt".',
-      'Đã phát: xem bao nhiêu người đã nhận theo từng kênh ngay trên thẻ lệnh.',
+      'Lãnh đạo có mã PIN: lệnh chờ bạn nằm ở khối "Chờ bạn duyệt" — đọc tin xem trước, bấm "Duyệt bằng PIN" hoặc "Trả lại".',
+      'Trực ban soạn lệnh 3 bước: chạm thẻ mẫu tin (xả lũ, sạt lở, bão…) và điền chỗ trống → chọn xã → kênh, rồi "Gửi lãnh đạo phê duyệt".',
+      'Đã phát: thẻ lệnh ghi bằng lời tin đã tới bao nhiêu người theo từng kênh; kênh chưa nối ghi rõ "chưa gửi được".',
     ],
     xa: [
       'Ở đây là các lệnh cảnh báo đang có hiệu lực tại xã mình. Cán bộ xã xem, không soạn lệnh.',
@@ -181,9 +181,9 @@ export const SCENARIOS = {
       cta: 'Mở Cảnh báo & Hotline',
       steps: [
         'Mở "Cảnh báo & Hotline", thẻ "Phát cảnh báo", khối soạn lệnh.',
-        'Bước 1 — chọn mẫu dựng sẵn (hồ chứa xả lũ, di dời do sạt lở…), điền chỗ trống: giờ, mực nước, địa điểm.',
+        'Bước 1 — chạm thẻ mẫu tin (Hồ chứa xả lũ, Yêu cầu di dời do sạt lở, Bão…), điền chỗ trống theo ví dụ trong ô: giờ, lưu lượng, địa điểm.',
         'Bước 2 — chọn xã nhận tin (hoặc khoanh vùng trên Bản đồ rồi chuyển sang).',
-        'Bước 3 — chọn kênh gửi, bấm "Gửi lãnh đạo phê duyệt".',
+        'Bước 3 — chọn kênh gửi, xem tin trên khung điện thoại đúng như người dân nhận, bấm "Gửi lãnh đạo phê duyệt".',
       ],
       note: 'Người soạn không tự duyệt lệnh của mình. Tin chỉ tới người dân sau khi lãnh đạo ký duyệt bằng mã PIN.',
     },
@@ -195,9 +195,9 @@ export const SCENARIOS = {
       to: '/canh-bao',
       cta: 'Xem lệnh chờ duyệt',
       steps: [
-        'Mở "Cảnh báo & Hotline": lệnh chờ bạn nằm ở khối "Chờ phê duyệt".',
-        'Đọc nội dung tin người dân sẽ nhận, xã nhận tin, số hộ nhận.',
-        'Bấm "Phê duyệt", nhập mã PIN, bấm "Ký duyệt & phát". Chưa đồng ý: chọn "Từ chối", ghi lý do để trực ban sửa.',
+        'Mở "Cảnh báo & Hotline": lệnh chờ bạn nằm ở khối "Chờ bạn duyệt", tin xem trước đúng như người dân nhận.',
+        'Đọc nội dung, xã nhận tin, số hộ nhận. Lệnh có nhãn "Máy đề xuất" là hệ thống tự soạn khi trạm đo vượt ngưỡng.',
+        'Bấm "Duyệt bằng PIN", nhập mã PIN, bấm "Ký duyệt & phát". Chưa đồng ý: bấm "Trả lại", ghi lý do để trực ban sửa.',
       ],
       note: 'Chưa có mã PIN: đề nghị Quản trị hệ thống cấp ở trang Phân quyền.',
     },

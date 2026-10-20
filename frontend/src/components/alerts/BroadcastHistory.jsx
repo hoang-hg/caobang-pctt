@@ -2,7 +2,6 @@ import { useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { Bot } from 'lucide-react';
 import { api } from '../../api/client';
 import { useUnits } from '../../api/hooks';
 import { useStore } from '../../app/store';
@@ -32,7 +31,7 @@ function Row({ b, x, pdf }) {
     <tr className={clsx(x.pending && 'bg-warn/10')}>
       <td className={clsx('whitespace-nowrap border-l-4', risk(SEVERITY_LEVEL[b.severity]).edge)}>
         <b className="font-mono text-ink">{b.code}</b>
-        {b.auto_generated && <div className="flex items-center gap-1 text-xs text-accent"><Bot size={11} aria-hidden="true" /> Tự động</div>}
+        {b.auto_generated && <div className="text-xs text-ink-2">Máy đề xuất</div>}
       </td>
       <td><span className={clsx('chip whitespace-nowrap', LEVEL[b.severity]?.cls)}>{LEVEL[b.severity]?.label}</span></td>
       <td className="max-w-[20rem]">
@@ -48,7 +47,7 @@ function Row({ b, x, pdf }) {
       <td className="whitespace-nowrap text-xs">{b.created_by_name || 'Hệ thống'}<div className="text-muted">{dateTime(b.created_at)}</div></td>
       <td className="text-xs">
         {b.status === 'rejected'
-          ? <span className="text-danger [overflow-wrap:anywhere]">Từ chối: {b.rejected_reason}</span>
+          ? <span className="text-danger [overflow-wrap:anywhere]">Trả lại: {b.rejected_reason}</span>
           : b.approved_by_name ? <>{b.approved_by_name}<div className="text-muted">{dateTime(b.approved_at)}</div></> : <span className="text-muted">—</span>}
       </td>
       <td className="whitespace-nowrap text-xs">
@@ -67,7 +66,7 @@ function Card({ b, x }) {
         <b className="font-mono text-sm">{b.code}</b>
         <span className={clsx('chip whitespace-nowrap', LEVEL[b.severity]?.cls)}>{LEVEL[b.severity]?.label}</span>
         <span className={clsx('chip whitespace-nowrap', broadcastStatus(b).cls)}>{x.pending ? PHASE_LABEL.cho_duyet : broadcastStatus(b).label}</span>
-        {b.auto_generated && <span className="chip whitespace-nowrap bg-accent/15 text-accent"><Bot size={11} aria-hidden="true" /> Tự động</span>}
+        {b.auto_generated && <span className="chip whitespace-nowrap border border-warn bg-warn/20 text-ink">Máy đề xuất</span>}
       </div>
       <h3 className="mt-1 text-sm font-semibold text-ink [overflow-wrap:anywhere]">{b.title}</h3>
       <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-muted">
@@ -78,7 +77,7 @@ function Card({ b, x }) {
         Soạn {dateTime(b.created_at)} — {b.created_by_name || 'hệ thống'}
         {b.approved_by_name && b.status !== 'rejected' && <> · duyệt {dateTime(b.approved_at)} — {b.approved_by_name}</>}
       </div>
-      {b.status === 'rejected' && <div className="mt-1 text-danger [overflow-wrap:anywhere]">Từ chối ({b.approved_by_name || 'lãnh đạo'}): {b.rejected_reason}</div>}
+      {b.status === 'rejected' && <div className="mt-1 text-danger [overflow-wrap:anywhere]">Trả lại ({b.approved_by_name || 'lãnh đạo'}): {b.rejected_reason}</div>}
       {b.ended_at && <div className="mt-1 text-muted [overflow-wrap:anywhere]">Kết thúc {dateTime(b.ended_at)}{b.end_note ? `: ${b.end_note}` : ''}</div>}
     </article>
   );
@@ -133,7 +132,7 @@ export default function BroadcastHistory({ now, scopeLabel }) {
         const x = factsOf(b);
         return {
           'Mã lệnh': b.code, 'Mức': LEVEL[b.severity]?.label || b.severity, 'Tiêu đề': b.title, 'Nội dung tin': b.message_body,
-          'Trạng thái': x.pending ? PHASE_LABEL.cho_duyet : broadcastStatus(b).label, 'Nguồn': b.auto_generated ? `Tự động (${b.trigger_source || 'trạm'})` : 'Cán bộ soạn',
+          'Trạng thái': x.pending ? PHASE_LABEL.cho_duyet : broadcastStatus(b).label, 'Nguồn': b.auto_generated ? `Máy đề xuất (${b.trigger_source || 'trạm'})` : 'Cán bộ soạn',
           'Xã/phường nhận': (b.target_admin_codes || []).map(unitName).join(', '), 'Số hộ': b.audience?.households ?? '',
           'Thuê bao': b.audience?.subscribers ?? '', 'Loa': b.audience?.speakers ?? '', 'Kênh': (b.channels || []).map((c) => CHANNEL[c] || c).join(', '),
           'Đã nhận (%)': deliveredPct(b) ?? '', 'Người soạn': b.created_by_name || 'Hệ thống', 'Soạn lúc': dateTime(b.created_at),

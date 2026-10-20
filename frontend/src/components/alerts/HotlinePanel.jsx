@@ -79,9 +79,9 @@ export default function HotlinePanel({ online }) {
       <Section title="Đường dây nóng">
         <Hotlines list={hot.hotlines.map((h) => [h.number, h.name])} />
       </Section>
-      <Section title="Mô phỏng phân luồng cuộc gọi SOS (IVR)">
+      <Section title="Tập dượt phân luồng cuộc gọi cầu cứu">
         <div className="flex flex-col gap-2 text-sm">
-          <p className="text-[11px] text-muted">Chưa nối tổng đài SIP thật — dùng để tập huấn trực ban: chọn phím như người gọi; có lời nhắn thì tạo phiếu SOS.</p>
+          <p className="text-xs text-muted">Chưa nối tổng đài thật — dùng để tập huấn trực ban: chọn phím như người gọi (phím 1 báo ngập, 2 báo sạt lở…); có lời nhắn thì tạo phiếu cứu hộ.</p>
           <label className="flex flex-col gap-1 text-xs font-medium">
             Số gọi đến
             <input className="input tap min-h-[40px] font-mono" value={caller} onChange={(e) => setCaller(e.target.value)} inputMode="tel" />

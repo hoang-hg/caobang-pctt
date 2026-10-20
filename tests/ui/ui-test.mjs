@@ -2345,7 +2345,7 @@ async function alertsPage(ctx) {
     if (!(await group.isVisible())) await page.getByRole('button', { name: /^Bộ lọc/ }).click();
     await group.selectOption('tai_khoan');
     await page.waitForTimeout(300);
-    const texts = await page.locator('main table tbody tr td:nth-child(3), main li.card b').allInnerTexts();
+    const texts = await page.locator('main table tbody tr td:nth-child(3), main ol[aria-label^="Nhật ký pháp lý"] [data-thao-tac]').allInnerTexts();
     if (!texts.length || !texts.every((t) => /Đăng nhập|mật khẩu|2 lớp|tài khoản/i.test(t))) throw new Error(`nhóm "Tài khoản & bảo mật" ra: ${texts.slice(0, 3).join(' | ')}`);
     await page.getByRole('button', { name: 'Tuỳ chọn' }).click();
     await page.getByLabel('Từ ngày').fill('2026-10-10');
@@ -2355,22 +2355,22 @@ async function alertsPage(ctx) {
     return `${texts.length} thao tác tài khoản`;
   });
 
-  await step(ctx, 'Không tải được danh sách lệnh → báo rõ (không ghi "không có lệnh chờ duyệt"); mất mạng → dải báo, nút Phê duyệt tắt', async () => {
+  await step(ctx, 'Không tải được danh sách lệnh → báo rõ (không ghi "không có lệnh chờ duyệt"); mất mạng → dải báo, nút Duyệt bằng PIN tắt', async () => {
     await page.route('**/api/v1/alerts/broadcasts**', safeRoute((r) => r.abort('failed')));
     try {
       await page.goto(`${ROOT}/canh-bao`);
       await page.getByText(/Không tải được danh sách lệnh cảnh báo — không có nghĩa là không có lệnh chờ duyệt/).waitFor({ timeout: 30_000 });
-      if (await page.getByText('Không có lệnh chờ phê duyệt').count()) throw new Error('lỗi tải nhưng vẫn ghi "không có lệnh chờ phê duyệt"');
+      if (await page.getByText('Không có lệnh chờ duyệt', { exact: true }).count()) throw new Error('lỗi tải nhưng vẫn ghi "không có lệnh chờ duyệt"');
     } finally {
       await page.unroute('**/api/v1/alerts/broadcasts**');
     }
     await open();
-    const btn = page.getByRole('button', { name: 'Phê duyệt', exact: true }).first();
+    const btn = page.getByRole('button', { name: 'Duyệt bằng PIN', exact: true }).first();
     const has = await btn.waitFor({ timeout: 10_000 }).then(() => true, () => false);
     await page.context().setOffline(true);
     try {
       await page.getByText('Mất kết nối mạng').waitFor({ timeout: 5_000 });
-      if (has && !(await btn.isDisabled())) throw new Error('mất mạng nhưng nút Phê duyệt vẫn bấm được');
+      if (has && !(await btn.isDisabled())) throw new Error('mất mạng nhưng nút Duyệt bằng PIN vẫn bấm được');
     } finally {
       await page.context().setOffline(false);
     }
@@ -2448,9 +2448,9 @@ async function alertsForms(ctx) {
     return note;
   });
 
-  await step(ctx, 'Ký duyệt: PIN sai định dạng → báo dưới ô; sai PIN (máy chủ) → báo dưới ô, hộp thoại vẫn mở; Từ chối thiếu lý do → báo', async () => {
+  await step(ctx, 'Ký duyệt: PIN sai định dạng → báo dưới ô; sai PIN (máy chủ) → báo dưới ô, hộp thoại vẫn mở; Trả lại thiếu lý do → báo; thẻ lệnh có nút Trả lại, xem trước tin', async () => {
     await open();
-    const btn = visible(page.getByRole('button', { name: 'Phê duyệt', exact: true }));
+    const btn = visible(page.getByRole('button', { name: 'Duyệt bằng PIN', exact: true }));
     if (!(await btn.count())) return 'không có lệnh tài khoản này được duyệt';
     await btn.click();
     await dlg.waitFor();
@@ -2464,14 +2464,20 @@ async function alertsForms(ctx) {
       if (!(await dlg.isVisible())) throw new Error('sai PIN nhưng hộp thoại đã đóng');
       note += ' · sai PIN báo dưới ô';
     }
-    await dlg.getByRole('radio', { name: /Từ chối/ }).click();
-    await dlg.getByRole('button', { name: /Từ chối lệnh/ }).click();
-    await dlg.getByText(/Ghi lý do từ chối/).waitFor({ timeout: 3_000 });
+    await dlg.getByRole('radio', { name: /Trả lại/ }).click();
+    await dlg.getByRole('button', { name: /Trả lại lệnh/ }).click();
+    await dlg.getByText(/Ghi lý do trả lại/).waitFor({ timeout: 3_000 });
     await expectNoOverflow(ctx, 'hộp thoại ký duyệt', dlg);
     await noSmall('hộp thoại ký duyệt');
     await dlg.getByRole('button', { name: 'Đóng', exact: true }).last().click();
     await dlg.waitFor({ state: 'hidden' });
-    return note;
+    // Nút "Trả lại" ngay trên thẻ lệnh → hộp thoại chọn sẵn Trả lại (lãnh đạo không phải chuyển thêm một lần)
+    await visible(page.getByRole('button', { name: 'Trả lại', exact: true })).click();
+    await dlg.waitFor();
+    if ((await dlg.getByRole('radio', { name: /Trả lại/ }).getAttribute('aria-checked')) !== 'true') throw new Error('bấm "Trả lại" trên thẻ nhưng hộp thoại không chọn sẵn Trả lại');
+    await dlg.getByRole('button', { name: 'Đóng', exact: true }).last().click();
+    await dlg.waitFor({ state: 'hidden' });
+    return `${note} · nút Trả lại chọn sẵn`;
   });
 
   await step(ctx, 'Kết thúc cảnh báo: thiếu lý do / PIN → báo dưới ô, chọn nhanh lý do điền được; Gia hạn: chọn thời gian bằng chip', async () => {

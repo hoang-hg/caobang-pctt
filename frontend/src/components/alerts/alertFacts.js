@@ -12,7 +12,7 @@ export const SOON_MS = 2 * 3600e3; // còn dưới 2 giờ hiệu lực → nh�
 export const LONG_WAIT_MIN = 10; // lệnh chờ duyệt quá 10 phút: tin cảnh báo tới dân chậm → Đỏ
 
 /** Kênh: tên ngắn cho thẻ / điện thoại. */
-export const CHANNEL_SHORT = { SMS: 'SMS', CELL_BROADCAST: 'Cell Broadcast', ZALO_OA: 'Zalo', PUSH: 'Push', LOA: 'Loa' };
+export const CHANNEL_SHORT = { SMS: 'SMS', CELL_BROADCAST: 'Tin nhắn vùng', ZALO_OA: 'Zalo', PUSH: 'Ứng dụng', LOA: 'Loa' };
 
 /** "2 giờ 05 phút" / "35 phút". */
 export const leftText = (ms) => {

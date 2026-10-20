@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { BellOff, Bot, KeyRound, Loader2, ShieldCheck, TimerReset, XCircle } from 'lucide-react';
+import { BellOff, CornerUpLeft, KeyRound, Loader2, ShieldCheck, TimerReset } from 'lucide-react';
 import { api } from '../../api/client';
 import { useUnits } from '../../api/hooks';
 import { useStore } from '../../app/store';
@@ -60,16 +60,16 @@ function Chips({ list, value, onPick, label }) {
 }
 
 /**
- * Lãnh đạo (Checker) xem đủ nội dung — mức, tin người dân nhận, vùng (tên xã), người nhận, kênh, hiệu lực, người soạn — rồi
- * "Phê duyệt & phát" (ký PIN) hoặc "Từ chối" (lý do chọn nhanh / tự ghi). Lỗi hiện ngay dưới ô: PIN sai định dạng, sai PIN,
- * tạm khoá 15 phút; thiếu lý do. Mất mạng → không gửi được, nói lý do.
+ * Người duyệt (lãnh đạo) xem đủ nội dung — mức, tin người dân nhận, vùng (tên xã), người nhận, kênh, hiệu lực, người soạn — rồi
+ * "Ký duyệt & phát" (mã PIN) hoặc "Trả lại" (lý do chọn nhanh / tự ghi). `initial`: 'approve' | 'reject' theo nút đã bấm trên
+ * thẻ lệnh. Lỗi hiện ngay dưới ô: PIN sai định dạng, sai PIN, tạm khoá 15 phút; thiếu lý do. Mất mạng → không gửi được.
  */
-export function ApproveModal({ b, onClose }) {
+export function ApproveModal({ b, initial = 'approve', onClose }) {
   const qc = useQueryClient();
   const toast = useStore((s) => s.toast);
   const online = useOnline();
   const { data: units = [] } = useUnits();
-  const [mode, setMode] = useState('approve');
+  const [mode, setMode] = useState(initial);
   const [pin, setPin] = useState('');
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
@@ -79,7 +79,7 @@ export function ApproveModal({ b, onClose }) {
   const reasonRef = useRef(null);
   const approve = mode === 'approve';
   const pinErr = serverErr || (tried && !PIN_RE.test(pin) ? 'Nhập mã PIN 4–8 chữ số' : null);
-  const reasonErr = tried && reason.trim().length < 3 ? 'Ghi lý do từ chối (chọn nhanh ở trên hoặc tự ghi) — người soạn sẽ thấy để sửa' : null;
+  const reasonErr = tried && reason.trim().length < 3 ? 'Ghi lý do trả lại (chọn nhanh ở trên hoặc tự ghi) — người soạn sẽ thấy để sửa' : null;
   const names = (b.target_admin_codes || []).map((c) => units.find((u) => u.code === c)?.name || c);
 
   const run = async () => {
@@ -94,11 +94,11 @@ export function ApproveModal({ b, onClose }) {
       if (approve) {
         const res = await api(`/alerts/broadcasts/${b.id}/approve`, { method: 'POST', body: { pin } });
         toast(notIntegrated(res)
-          ? { tone: 'good', title: `Đã phê duyệt ${b.code} – đã công bố trên cổng công khai`, body: 'Kênh SMS / Zalo / Cell Broadcast chưa tích hợp: tin CHƯA gửi tới điện thoại người dân.' }
-          : { tone: 'good', title: `Đã phê duyệt – bắt đầu phát ${b.code}` });
+          ? { tone: 'good', title: `Đã duyệt ${b.code} – đã công bố trên cổng thông tin cho người dân`, body: 'Kênh SMS / Zalo / tin nhắn vùng chưa nối cổng gửi tin: tin CHƯA gửi tới điện thoại người dân.' }
+          : { tone: 'good', title: `Đã duyệt – bắt đầu phát ${b.code}` });
       } else {
         await api(`/alerts/broadcasts/${b.id}/reject`, { method: 'POST', body: { reason: reason.trim() } });
-        toast({ tone: 'info', title: `Đã từ chối ${b.code}`, body: 'Người soạn thấy lý do và soạn lại' });
+        toast({ tone: 'info', title: `Đã trả lại ${b.code}`, body: 'Người soạn thấy lý do và soạn lại' });
       }
       qc.invalidateQueries({ queryKey: ['broadcasts'] });
       onClose();
@@ -118,21 +118,21 @@ export function ApproveModal({ b, onClose }) {
     <Modal
       open
       onClose={onClose}
-      title={`Phê duyệt lệnh ${b.code}`}
+      title={`Duyệt lệnh ${b.code}`}
       footer={
         <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:justify-end">
           <button type="button" className={clsx('btn-ghost', BIG)} onClick={onClose} disabled={busy}>Đóng</button>
           <button
             type="button"
             className={clsx(approve ? 'btn-danger' : 'btn-ghost text-danger', 'font-bold', BIG)}
-            aria-label={approve ? 'Ký duyệt & phát' : 'Từ chối lệnh'}
+            aria-label={approve ? 'Ký duyệt & phát' : 'Trả lại lệnh'}
             disabled={busy || !online}
             title={!online ? OFFLINE : undefined}
             onMouseDown={(e) => e.preventDefault()}
             onClick={run}
           >
-            {busy ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : approve ? <ShieldCheck size={15} aria-hidden="true" /> : <XCircle size={15} aria-hidden="true" />}
-            {approve ? <><span className="sm:hidden">Ký & phát</span><span className="hidden sm:inline">Ký duyệt & phát</span></> : 'Từ chối lệnh'}
+            {busy ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : approve ? <ShieldCheck size={15} aria-hidden="true" /> : <CornerUpLeft size={15} aria-hidden="true" />}
+            {approve ? <><span className="sm:hidden">Ký & phát</span><span className="hidden sm:inline">Ký duyệt & phát</span></> : 'Trả lại lệnh'}
           </button>
         </div>
       }
@@ -141,7 +141,7 @@ export function ApproveModal({ b, onClose }) {
         <div className="rounded-lg bg-panel2 p-3">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className={clsx('chip', LEVEL[b.severity]?.cls)}>{LEVEL[b.severity]?.label}</span>
-            {b.auto_generated && <span className="chip bg-accent/15 text-accent"><Bot size={11} aria-hidden="true" /> Tự động{b.trigger_source ? ` · ${b.trigger_source}` : ''}</span>}
+            {b.auto_generated && <span className="chip border border-warn bg-warn/20 text-ink">Máy đề xuất — cần người duyệt{b.trigger_source ? ` · ${b.trigger_source}` : ''}</span>}
           </div>
           <div className="mt-1 font-semibold text-ink [overflow-wrap:anywhere]">{b.title}</div>
           <p className="mt-1 max-h-48 overflow-y-auto whitespace-pre-wrap rounded bg-panel p-2 text-xs leading-relaxed [overflow-wrap:anywhere]">{b.message_body}</p>
@@ -150,22 +150,28 @@ export function ApproveModal({ b, onClose }) {
             <li>Người nhận: {int(b.audience?.households)} hộ · {int(b.audience?.subscribers)} thuê bao · {int(b.audience?.speakers)} loa</li>
             <li>Kênh: {(b.channels || []).map((c) => CHANNEL[c]).join(', ')}</li>
             <li>Hiệu lực: {ALERT_VALID_HOURS.find(([h]) => h === b.valid_hours)?.[1] || `${b.valid_hours} giờ`} kể từ khi duyệt</li>
-            <li>Người soạn: {b.created_by_name || 'Hệ thống (tự động)'} · {dateTime(b.created_at)}</li>
+            <li>Người soạn: {b.created_by_name || 'Hệ thống (máy đề xuất)'} · {dateTime(b.created_at)}</li>
           </ul>
         </div>
         <div className="grid grid-cols-2 gap-1.5" role="radiogroup" aria-label="Quyết định">
           <button type="button" role="radio" aria-checked={approve} onClick={() => { setMode('approve'); setTried(false); }} className={clsx('tap flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg border-2 text-sm font-semibold', approve ? 'border-transparent bg-accent text-white' : 'border-line bg-panel2/50 text-ink-2')}>
-            <ShieldCheck size={15} aria-hidden="true" /> Phê duyệt
+            <ShieldCheck size={15} aria-hidden="true" /> Duyệt
           </button>
           <button type="button" role="radio" aria-checked={!approve} onClick={() => { setMode('reject'); setTried(false); setServerErr(null); }} className={clsx('tap flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg border-2 text-sm font-semibold', !approve ? 'border-transparent bg-danger text-white' : 'border-line bg-panel2/50 text-ink-2')}>
-            <XCircle size={15} aria-hidden="true" /> Từ chối
+            <CornerUpLeft size={15} aria-hidden="true" /> Trả lại
           </button>
         </div>
         {approve ? (
-          <PinField value={pin} onChange={(v) => { setPin(v); setServerErr(null); }} error={pinErr} inputRef={pinRef} />
+          <>
+            <p className="text-xs leading-snug text-ink-2">
+              Mã PIN xác nhận đúng lãnh đạo có thẩm quyền ký lệnh — tin sẽ tới hàng nghìn người dân, không thu hồi được. Người soạn
+              không tự duyệt lệnh của mình.
+            </p>
+            <PinField value={pin} onChange={(v) => { setPin(v); setServerErr(null); }} error={pinErr} inputRef={pinRef} />
+          </>
         ) : (
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="ly-do-tu-choi" className="font-medium">Lý do từ chối *</label>
+            <label htmlFor="ly-do-tu-choi" className="font-medium">Lý do trả lại *</label>
             <Chips list={REJECT_REASONS} value={reason} onPick={setReason} label="Chọn nhanh lý do" />
             <textarea
               id="ly-do-tu-choi"
