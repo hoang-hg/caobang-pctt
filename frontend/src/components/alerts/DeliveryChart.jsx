@@ -13,9 +13,9 @@ function Tip({ active, payload }) {
   return (
     <div className="card px-3 py-2 text-xs shadow-lg">
       <div className="mb-1 font-semibold text-ink">{r.name}</div>
-      <div className="font-mono text-ink-2">Đã nhận {int(r.delivered)} / {int(r.target)} ({r.pDelivered}%)</div>
-      <div className="font-mono text-ink-2">Đã gửi {int(r.sent)} ({pct(r.sent, r.target)}%)</div>
-      {r.read != null && <div className="font-mono text-ink-2">Đã xem {int(r.read)} ({pct(r.read, r.target)}%)</div>}
+      <div className="num text-ink-2">Đã tới {int(r.delivered)} / {int(r.target)} ({r.pDelivered}%)</div>
+      <div className="num text-ink-2">Đã gửi đi {int(r.sent)} ({pct(r.sent, r.target)}%)</div>
+      {r.read != null && <div className="num text-ink-2">Đã xem {int(r.read)} ({pct(r.read, r.target)}%)</div>}
     </div>
   );
 }
@@ -51,11 +51,11 @@ export default function DeliveryChart({ broadcasts, factsOf }) {
 
   return (
     <div className="flex min-w-0 flex-col gap-2">
-      <h3 className="text-sm font-semibold text-ink">Chuyển giao theo kênh <span className="text-xs font-normal text-muted">· {live.length} cảnh báo đang hiệu lực</span></h3>
+      <h3 className="text-sm font-semibold text-ink">Tin đã tới người dân theo kênh <span className="text-xs font-normal text-muted">· {live.length} cảnh báo đang hiệu lực</span></h3>
       {portal > 0 && (
         <p className="rounded-lg border border-dashed border-warn/70 bg-warn/10 p-2 text-xs text-ink-2">
-          <b className="text-ink">{portal} cảnh báo chưa có số liệu chuyển giao</b> — kênh SMS / Zalo / Cell Broadcast chưa tích hợp cổng gửi tin:
-          tin mới được công bố trên cổng công khai và bản nhẹ, chưa tới điện thoại người dân.
+          <b className="text-ink">{portal} cảnh báo chưa có số liệu chuyển giao</b> — kênh SMS, Zalo, tin nhắn vùng chưa nối cổng gửi tin:
+          tin mới được công bố trên cổng thông tin cho người dân và bản nhẹ, chưa tới điện thoại người dân.
         </p>
       )}
       {data.length ? (

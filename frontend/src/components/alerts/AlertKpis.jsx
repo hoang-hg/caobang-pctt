@@ -79,22 +79,22 @@ export default function AlertKpis({ query, broadcasts, factsOf, onGo }) {
         <StatCard
           compact
           icon={Send}
-          title="Chuyển giao"
+          title="Tới người dân"
           level={portal > 0 ? 1 : undefined}
           badge={portal > 0 && <Badge level={1}>Chưa tới điện thoại</Badge>}
           value={portal > 0 ? int(portal) : '—'}
           unit={portal > 0 ? 'chỉ trên cổng' : undefined}
-          footer={portal > 0 ? 'Kênh SMS / Zalo / Cell Broadcast chưa tích hợp' : 'Không có cảnh báo đang phát'}
+          footer={portal > 0 ? 'Kênh SMS, Zalo, tin nhắn vùng chưa nối cổng gửi tin' : 'Không có cảnh báo đang phát'}
           onClick={() => onGo({ anchor: 'dang-hieu-luc' })}
-          hint="Lệnh đã duyệt nhưng kênh gửi tin chưa nối cổng của nhà mạng / Zalo: tin chỉ được công bố trên cổng công khai và bản nhẹ"
+          hint="Lệnh đã duyệt nhưng kênh gửi tin chưa nối cổng của nhà mạng / Zalo: tin chỉ được công bố trên cổng thông tin cho người dân và bản nhẹ"
         />
       ) : (
         <StatCard
           compact
           icon={Send}
-          title="Chuyển giao"
+          title="Tới người dân"
           value={`${pct(tot.delivered, tot.target)}%`}
-          unit="đã nhận"
+          unit="đã tới máy"
           footer={Object.entries(byCh).map(([ch, c]) => `${CHANNEL_SHORT[ch] || ch} ${pct(c.delivered, c.target)}%`).join(' · ')}
           onClick={() => onGo({ anchor: 'dang-hieu-luc' })}
           hint="Tỉ lệ tin đã tới người nhận trên tổng số cần gửi, cộng mọi kênh của các cảnh báo đang hiệu lực"

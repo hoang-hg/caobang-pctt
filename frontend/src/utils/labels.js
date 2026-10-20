@@ -42,15 +42,15 @@ export const LEVEL = {
 };
 export const CATEGORY = { luong_thuc: 'Lương thực', nuoc_uong: 'Nước uống', y_te: 'Y tế', do_dung: 'Đồ dùng cứu sinh' };
 export const CHANNEL = {
-  SMS: 'SMS Brandname', CELL_BROADCAST: 'Cell Broadcast', ZALO_OA: 'Zalo OA', PUSH: 'Push (Critical)', LOA: 'Loa thông minh',
+  SMS: 'Tin nhắn SMS', CELL_BROADCAST: 'Tin nhắn vùng (Cell Broadcast)', ZALO_OA: 'Zalo của tỉnh', PUSH: 'Thông báo trên ứng dụng', LOA: 'Loa phát thanh',
 };
 export const BROADCAST_STATUS = {
-  pending_approval: { label: 'Chờ phê duyệt', cls: 'bg-warn text-black' },
+  pending_approval: { label: 'Chờ duyệt', cls: 'bg-warn text-black' },
   sending: { label: 'Đang phát', cls: 'bg-accent text-white' },
   sent: { label: 'Đã phát', cls: 'bg-good text-black' },
   // Đã duyệt nhưng kênh SMS / Zalo / Cell Broadcast chưa tích hợp → chỉ công bố trên cổng công khai & bản nhẹ
-  published: { label: 'Đã công bố trên cổng', cls: 'bg-accent/15 text-accent' },
-  rejected: { label: 'Từ chối', cls: 'bg-panel2 text-muted' },
+  published: { label: 'Đã công bố trên cổng thông tin', cls: 'bg-accent/15 text-accent' },
+  rejected: { label: 'Bị trả lại', cls: 'bg-panel2 text-muted' },
   draft: { label: 'Nháp', cls: 'bg-panel2 text-muted' },
 };
 // Phản ánh của người dân (community.citizen_reports)

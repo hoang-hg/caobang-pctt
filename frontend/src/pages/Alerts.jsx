@@ -65,7 +65,7 @@ export default function Alerts() {
   const canReport = usePermission('sos', 'create');
   const [reportOpen, setReportOpen] = useState(false);
   const tab = TAB_IDS.includes(params.get('tab')) && (params.get('tab') !== 'nhat_ky' || canAudit) ? params.get('tab') : 'phat';
-  const [approve, setApprove] = useState(null);
+  const [approve, setApprove] = useState(null); // { b, mode: 'approve' | 'reject' }
   const [manage, setManage] = useState(null); // { b, mode: 'extend' | 'end' }
   const [refreshing, setRefreshing] = useState(false);
   // Bản đồ + chuyển giao: mặc định thu gọn để danh sách lệnh chờ duyệt & soạn lệnh lên ngay tầm mắt
@@ -76,6 +76,7 @@ export default function Alerts() {
   const { data: units = [] } = useUnits();
   const scopeUnit = scope?.length === 1 ? units.find((u) => u.code === scope[0]) : null;
   const scopeLabel = scope === null ? 'Toàn tỉnh Cao Bằng' : scopeUnit ? unitLabel(scopeUnit) : `${scope.length} xã/phường được giao`;
+  const unitName = (c) => units.find((u) => u.code === c)?.name || c;
   const role = auth?.user?.assignments?.map((a) => a.role_name).join(', ');
 
   const bq = useQuery({ queryKey: ['broadcasts'], queryFn: () => api('/alerts/broadcasts'), refetchInterval: 15_000 });
@@ -132,17 +133,17 @@ export default function Alerts() {
   } else {
     lists = (
       <>
-        <Section id="cho-duyet" className="order-1 scroll-mt-20" title={`Chờ phê duyệt · ${pending.length}`} right={<ShieldCheck size={16} className="text-serious" aria-hidden="true" />}>
+        <Section id="cho-duyet" className="order-1 scroll-mt-20" title={`${pending.some((x) => x.can_approve) ? 'Chờ bạn duyệt' : 'Chờ lãnh đạo duyệt'} · ${pending.length}`} right={<ShieldCheck size={16} className="text-serious" aria-hidden="true" />}>
           {pending.length ? (
             <div className="grid gap-2 lg:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
-              {pending.map((b) => <PendingCard key={b.id} b={b} x={factsOf(b)} me={me} online={online} onApprove={setApprove} />)}
+              {pending.map((b) => <PendingCard key={b.id} b={b} x={factsOf(b)} me={me} online={online} unitName={unitName} onApprove={(x, mode) => setApprove({ b: x, mode })} />)}
             </div>
-          ) : <EmptyState height={72}>Không có lệnh chờ phê duyệt</EmptyState>}
+          ) : <EmptyState height={72}>Không có lệnh chờ duyệt</EmptyState>}
         </Section>
         <Section
           id="dang-hieu-luc"
           className="order-3 scroll-mt-20"
-          title={`Đang hiệu lực · ${live.length} — giám sát chuyển giao`}
+          title={`Đang hiệu lực · ${live.length} — người dân đã nhận chưa?`}
           right={<Radio size={16} className="text-accent" aria-hidden="true" />}
         >
           <div className="flex flex-col gap-2">
@@ -156,9 +157,9 @@ export default function Alerts() {
             ) : <EmptyState height={72}>Không có cảnh báo đang hiệu lực</EmptyState>}
             {past.length > 0 && (
               <>
-                <div className="mt-1 flex flex-wrap items-center justify-between gap-2 text-[11px] font-semibold uppercase text-muted">
+                <div className="mt-1 flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-muted">
                   Đã kết thúc / hết hiệu lực gần đây
-                  <button type="button" className="tap rounded px-2 normal-case text-accent hover:bg-accent/10" onClick={() => setTab('lich_su')}>Xem tất cả trong Lịch sử lệnh</button>
+                  <button type="button" className="tap rounded px-2 text-accent hover:bg-accent/10" onClick={() => setTab('lich_su')}>Xem tất cả trong Lịch sử lệnh</button>
                 </div>
                 <div className="grid gap-2 lg:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
                   {past.map((b) => <LiveCard key={b.id} b={b} x={factsOf(b)} online={online} onManage={setManage} />)}
@@ -168,7 +169,7 @@ export default function Alerts() {
           </div>
         </Section>
         {rejected.length > 0 && (
-          <Section id="bi-tu-choi" className="order-4 scroll-mt-20" title={`Bị từ chối gần đây · ${rejected.length}`} right={<XCircle size={16} className="text-danger" aria-hidden="true" />}>
+          <Section id="bi-tu-choi" className="order-4 scroll-mt-20" title={`Bị trả lại gần đây · ${rejected.length}`} right={<XCircle size={16} className="text-danger" aria-hidden="true" />}>
             <div className="grid gap-2 lg:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
               {rejected.map((b) => (
                 <RejectedCard key={b.id} b={b} mine={b.created_by === me} onRedraft={canCreate && b.created_by === me ? redraft : null} />
@@ -199,7 +200,7 @@ export default function Alerts() {
         scope={scopeLabel}
         meta={[
           role && <span key="role">{auth.user.full_name} — {role}</span>,
-          <span key="mc" className="hidden md:inline">Maker–Checker: người soạn ≠ người duyệt, ký bằng PIN · mọi thao tác ghi nhật ký pháp lý</span>,
+          <span key="mc" className="hidden md:inline">Người soạn — người duyệt là hai người khác nhau; lãnh đạo ký bằng mã PIN · mọi thao tác ghi nhật ký pháp lý</span>,
         ]}
         onRefresh={refresh}
         refreshing={refreshing}
@@ -253,7 +254,7 @@ export default function Alerts() {
       )}
       {tab === 'nhat_ky' && canAudit && <AuditLog />}
 
-      {approve && <ApproveModal b={approve} onClose={() => setApprove(null)} />}
+      {approve && <ApproveModal b={approve.b} initial={approve.mode} onClose={() => setApprove(null)} />}
       {/* Điện thoại: việc hay làm ở vùng ngón cái (khung chung với Tổng quan, Bản đồ, Vật tư, Cứu hộ). Cấp tỉnh: Chờ duyệt (số =
           lệnh chờ) · Soạn lệnh; tài khoản chỉ xem: Đang phát (số = sắp hết hạn) · Lịch sử. Danh bạ cho mọi tài khoản */}
       <QuickActionBar

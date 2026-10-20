@@ -9,7 +9,6 @@ import { FieldError, ErrorState, Pager, Skeleton, SortTh } from '../common/ui';
 import { foldVi, int, vnFileStamp } from '../../utils/format';
 import { exportExcel } from '../../utils/exportExcel';
 import { exportSnapshotPdf } from '../../utils/exportPdf';
-import { useMediaQuery } from '../../utils/useMediaQuery';
 import { usePaged } from '../../utils/usePaged';
 import { AUDIT_GROUPS, auditAction, auditDetail } from './alertFacts';
 
@@ -29,7 +28,6 @@ const isoDay = (d) => new Date(d.getTime() + 7 * 3600e3).toISOString().slice(0, 
  */
 export default function AuditLog() {
   const toast = useStore((s) => s.toast);
-  const isLg = useMediaQuery('(min-width: 1024px)');
   const [params, setParams] = useSearchParams();
   const range = RANGES.find(([k]) => k === params.get('ky')) || RANGES[1];
   const today = isoDay(new Date());
@@ -109,7 +107,8 @@ export default function AuditLog() {
   else if (query.isError && !query.data) body = <ErrorState height={200} onRetry={query.refetch}>Không tải được nhật ký pháp lý</ErrorState>;
   else if (!rows.length) {
     body = <p className="card p-6 text-center text-xs text-muted">{all.length ? 'Không có thao tác khớp ô tìm / bộ lọc.' : `Không có thao tác nào trong ${rangeLabel}.`}</p>;
-  } else if (isLg || pdf) {
+  } else if (pdf) {
+    // Bản in / PDF: bảng đủ cột cho hồ sơ; trên màn hình: dòng thời gian "ai — làm gì — lúc nào"
     body = (
       <div className="card overflow-x-auto">
         <table className="table-base">
@@ -125,13 +124,13 @@ export default function AuditLog() {
           <tbody>
             {(pdf ? rows : paged.visible).map((a) => (
               <tr key={a.id} className={clsx(a.act.failed && 'bg-danger/5')}>
-                <td className="whitespace-nowrap font-mono text-xs">{stamp(a.time)}</td>
+                <td className="num whitespace-nowrap text-xs">{stamp(a.time)}</td>
                 <td className="text-sm">{a.actor_name}</td>
                 <td className="text-sm">
                   {a.act.label}
                   {a.act.failed && <span className="chip ml-1.5 bg-danger text-white">Thất bại</span>}
                 </td>
-                <td className="font-mono text-xs [overflow-wrap:anywhere]">{a.entity_id}</td>
+                <td className="text-xs [overflow-wrap:anywhere]">{a.entity_id}</td>
                 <td className={clsx('max-w-md text-xs text-muted [overflow-wrap:anywhere]', !pdf && 'line-clamp-2')} title={a.text}>{a.text}</td>
               </tr>
             ))}
@@ -141,19 +140,22 @@ export default function AuditLog() {
     );
   } else {
     body = (
-      <ul className="flex flex-col gap-2">
+      <ol className="card flex flex-col divide-y divide-line/60" aria-label="Nhật ký pháp lý — ai, làm gì, lúc nào">
         {paged.visible.map((a) => (
-          <li key={a.id} className={clsx('card min-w-0 p-2.5 text-xs', a.act.failed && 'border-danger/50 bg-danger/5')}>
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-              <b className="text-sm text-ink">{a.act.label}</b>
-              {a.act.failed && <span className="chip bg-danger text-white">Thất bại</span>}
-              <span className="ml-auto whitespace-nowrap font-mono text-muted">{stamp(a.time)}</span>
+          <li key={a.id} className={clsx('flex min-w-0 flex-col gap-0.5 px-3 py-2.5 sm:flex-row sm:gap-3', a.act.failed && 'bg-danger/5')}>
+            <time className="num shrink-0 text-xs text-muted sm:w-32 sm:pt-0.5">{stamp(a.time)}</time>
+            <div className="min-w-0 flex-1 text-sm">
+              <div className="[overflow-wrap:anywhere]">
+                <b className="font-semibold text-ink">{a.actor_name || 'Hệ thống'}</b>
+                <span className="text-ink-2" data-thao-tac=""> — {a.act.label}</span>
+                {a.entity_id && <span className="text-xs text-muted"> · {a.entity_id}</span>}
+                {a.act.failed && <span className="chip ml-1.5 bg-danger text-white">Thất bại</span>}
+              </div>
+              {a.text && <div className="mt-0.5 line-clamp-2 text-xs text-muted [overflow-wrap:anywhere]" title={a.text}>{a.text}</div>}
             </div>
-            <div className="mt-0.5 text-ink-2">{a.actor_name}{a.entity_id ? <> · <span className="font-mono [overflow-wrap:anywhere]">{a.entity_id}</span></> : null}</div>
-            {a.text && <div className="mt-0.5 line-clamp-3 text-muted [overflow-wrap:anywhere]">{a.text}</div>}
           </li>
         ))}
-      </ul>
+      </ol>
     );
   }
 

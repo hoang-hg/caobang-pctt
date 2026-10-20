@@ -2,7 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { Check, ChevronLeft, ChevronRight, Loader2, MapPinned, Megaphone, Pencil, Search, Send, X } from 'lucide-react';
+import {
+  Check, ChevronLeft, ChevronRight, CloudRainWind, Dam, House, Loader2, MapPinned, Megaphone, Mountain, Pencil, Search, Send, Smartphone, Tornado,
+  Waves, X,
+} from 'lucide-react';
 import { api } from '../../api/client';
 import { usePresets, useUnits } from '../../api/hooks';
 import { useStore } from '../../app/store';
@@ -21,6 +24,22 @@ const PARAM_LABEL = {
   muc_nuoc: 'Mực nước (m)', cap_bao_dong: 'Cấp báo động', nguy_co: 'Nguy cơ', ten_bao: 'Tên bão/ATNĐ',
 };
 const NUMERIC = new Set(['luu_luong', 'luong_mua', 'so_gio', 'muc_nuoc']);
+// Ví dụ trong ô điền — người mới thấy ngay phải ghi gì, ghi kiểu nào
+const PARAM_EXAMPLE = {
+  ten_ho: 'VD: Thủy điện Bảo Lâm 1', luu_luong: 'VD: 1200', thoi_gian: 'VD: 14 giờ ngày 21/10', song: 'VD: Gâm',
+  dia_diem: 'VD: xã Bảo Lâm, xã Lý Bôn', luong_mua: 'VD: 215', diem_so_tan: 'VD: Trường THCS Nà Pồng', ten_suoi: 'VD: Nà Ngần',
+  so_gio: 'VD: 6', tram: 'VD: Bằng Giang', muc_nuoc: 'VD: 182,5', cap_bao_dong: 'VD: II', nguy_co: 'VD: lũ quét, sạt lở',
+  ten_bao: 'VD: bão số 3',
+};
+// Thẻ mẫu tin (thiết kế E.1): hình + tên việc + dùng khi nào; xếp việc hay gặp lên trước, "Tự soạn" cuối
+const TEMPLATE_CARD = {
+  XA_LU: { icon: Dam, when: 'Thủy điện, hồ chứa mở cửa xả', order: 1 },
+  SAT_LO: { icon: Mountain, when: 'Di dời hộ dưới taluy, sườn đồi', order: 2 },
+  BAO_ATND: { icon: Tornado, when: 'Hoàn lưu bão gây mưa rất to', order: 3 },
+  LU_QUET: { icon: CloudRainWind, when: 'Nguy cơ lũ quét trên suối', order: 4 },
+  NGAP: { icon: Waves, when: 'Mực nước sông vượt báo động', order: 5 },
+  CHUAN_BI_SO_TAN: { icon: House, when: 'Dự báo mưa lớn — sẵn sàng sơ tán', order: 6 },
+};
 // Người nhận theo kênh — như channel_target (backend services/broadcast.py)
 const REACH = {
   SMS: ['subscribers', 'thuê bao'], CELL_BROADCAST: ['subscribers', 'máy trong vùng phủ sóng'], ZALO_OA: ['zalo_followers', 'người theo dõi Zalo'],
@@ -32,12 +51,13 @@ const sms = (n) => Math.max(1, Math.ceil(n / 70)); // tin Unicode: 70 ký tự /
 const big = 'tap min-h-[44px] text-sm sm:min-h-0';
 
 /**
- * Soạn lệnh cảnh báo (Maker, thiết kế E.1–E.2) — 3 bước, lỗi hiện ngay dưới ô:
- * (1) Nội dung: chạm chọn mẫu tin dựng sẵn (tham số có nhãn, số phải là số), tiêu đề, nội dung (đếm ký tự / SMS), mức
+ * Soạn lệnh cảnh báo (người soạn — thiết kế E.1–E.2) — 3 bước, lỗi hiện ngay dưới ô:
+ * (1) Nội dung: chạm thẻ mẫu tin có hình (xả lũ, sạt lở, bão…; ô điền có ví dụ, số phải là số), tiêu đề, nội dung (đếm ký tự / SMS), mức
  *     Rất cao / Cao / Trung bình theo thang màu chung;
  * (2) Vùng nhận: lưu vực chọn nhanh, chạm chọn xã (tìm không dấu, chọn cả nhóm đang lọc) hoặc vùng vẽ trên Bản đồ giám sát;
  *     số hộ / thuê bao / loa ước tính ngay;
- * (3) Kênh & gửi: mỗi kênh kèm số người nhận, hiệu lực, xem lại tin như người dân nhận được rồi gửi lãnh đạo phê duyệt.
+ * (3) Kênh & gửi: mỗi kênh kèm số người nhận, hiệu lực, xem trước tin trên khung điện thoại như người dân nhận rồi gửi lãnh đạo
+ *     phê duyệt.
  * Chỉ chọn được xã trong phạm vi alert.create; bấm Tiếp / Gửi khi còn lỗi → nói rõ, đưa con trỏ tới ô lỗi; mất mạng → không
  * gửi được, nói lý do. "Soạn lại" lệnh bị từ chối: điền lại cả 3 bước, mở bước xem lại.
  */
@@ -182,6 +202,7 @@ export default function Composer({ online = true }) {
   const preset = presets.find((p) => p.unit_codes.length === codes.length && p.unit_codes.every((c) => codes.includes(c)));
 
   const chip = (on) => clsx('chip tap min-h-[36px] border px-3', on ? 'border-accent bg-accent text-white' : 'border-line bg-panel2 text-ink-2 hover:bg-panel');
+  const card = (on) => clsx('tap flex min-h-[56px] items-start gap-2.5 rounded-lg border-2 px-2.5 py-2 text-left text-xs', on ? 'border-accent bg-accent/10' : 'border-line bg-panel hover:border-accent/50');
   const field = (key, label, input, i, typed, help) => (
     <div className="flex flex-col gap-1">
       <label htmlFor={`soan-${key}`} className="font-medium">{label}</label>
@@ -198,23 +219,36 @@ export default function Composer({ online = true }) {
         <div>
           <div className="mb-1 font-medium" id="mau-tin">Mẫu tin dựng sẵn</div>
           {tplLoading ? <Skeleton height={88} /> : (
-            <div className="grid grid-cols-2 gap-1.5" role="radiogroup" aria-labelledby="mau-tin">
-              <button type="button" role="radio" aria-checked={!tpl} className={clsx(chip(!tpl), 'justify-start rounded-lg text-left')} onClick={() => { setTpl(''); setParams({}); }}>
-                <Pencil size={13} aria-hidden="true" /> Tự soạn
+            <div className="grid grid-cols-1 gap-1.5 min-[400px]:grid-cols-2" role="radiogroup" aria-labelledby="mau-tin">
+              {[...templates].sort((a, b) => (TEMPLATE_CARD[a.code]?.order ?? 99) - (TEMPLATE_CARD[b.code]?.order ?? 99)).map((t) => {
+                const Icon = TEMPLATE_CARD[t.code]?.icon || Megaphone;
+                return (
+                  <button
+                    key={t.code}
+                    type="button"
+                    role="radio"
+                    aria-checked={tpl === t.code}
+                    className={card(tpl === t.code)}
+                    onClick={() => { setTpl(t.code); setParams({}); if (!title.trim()) setTitle(t.name); }}
+                  >
+                    <Icon size={20} strokeWidth={1.75} className={clsx('mt-0.5 shrink-0', tpl === t.code ? 'text-accent' : 'text-ink-2')} aria-hidden="true" />
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-1.5 font-semibold text-ink [overflow-wrap:anywhere]">
+                        {t.name}
+                        <span className={clsx('h-2 w-2 shrink-0 rounded-full', risk(SEVERITY_LEVEL[t.severity]).fill)} title={`Mức ${LEVEL[t.severity]?.label?.toLowerCase()}`} aria-hidden="true" />
+                      </span>
+                      {TEMPLATE_CARD[t.code]?.when && <span className="block text-[11px] leading-snug text-muted">{TEMPLATE_CARD[t.code].when}</span>}
+                    </span>
+                  </button>
+                );
+              })}
+              <button type="button" role="radio" aria-checked={!tpl} className={card(!tpl)} onClick={() => { setTpl(''); setParams({}); }}>
+                <Pencil size={20} strokeWidth={1.75} className={clsx('mt-0.5 shrink-0', !tpl ? 'text-accent' : 'text-ink-2')} aria-hidden="true" />
+                <span className="min-w-0 flex-1">
+                  <span className="block font-semibold text-ink">Tự soạn</span>
+                  <span className="block text-[11px] leading-snug text-muted">Viết tin riêng cho tình huống khác</span>
+                </span>
               </button>
-              {templates.map((t) => (
-                <button
-                  key={t.code}
-                  type="button"
-                  role="radio"
-                  aria-checked={tpl === t.code}
-                  className={clsx(chip(tpl === t.code), 'justify-start rounded-lg text-left text-xs')}
-                  onClick={() => { setTpl(t.code); setParams({}); if (!title.trim()) setTitle(t.name); }}
-                >
-                  <span className={clsx('h-2.5 w-2.5 shrink-0 rounded-full', risk(SEVERITY_LEVEL[t.severity]).fill)} aria-hidden="true" />
-                  <span className="min-w-0 [overflow-wrap:anywhere]">{t.name}</span>
-                </button>
-              ))}
             </div>
           )}
         </div>
@@ -228,6 +262,7 @@ export default function Composer({ online = true }) {
                 ref={(el) => { paramRefs.current[p] = el; }}
                 className={clsx('input tap', show(0, `p_${p}`, !!params[p]) && 'border-danger')}
                 inputMode={NUMERIC.has(p) ? 'decimal' : undefined}
+                placeholder={PARAM_EXAMPLE[p]}
                 value={params[p] || ''}
                 onChange={(e) => setParams((x) => ({ ...x, [p]: e.target.value }))}
                 aria-invalid={!!show(0, `p_${p}`, !!params[p])}
@@ -352,7 +387,7 @@ export default function Composer({ online = true }) {
                       >
                         <span className={clsx('flex h-4 w-4 shrink-0 items-center justify-center rounded border', on ? 'border-accent bg-accent text-white' : 'border-muted')} aria-hidden="true">{on && <Check size={11} />}</span>
                         <span className="min-w-0 flex-1 truncate">{u.unit_type === 'phuong' ? 'Phường' : 'Xã'} {u.name}</span>
-                        {u.households ? <span className="shrink-0 font-mono text-[11px] text-muted">{int(u.households)} hộ</span> : null}
+                        {u.households ? <span className="num shrink-0 text-[11px] text-muted">{int(u.households)} hộ</span> : null}
                       </button>
                     </li>
                   );
@@ -406,12 +441,19 @@ export default function Composer({ online = true }) {
           <p className="mt-1 text-[11px] text-muted">Hết hạn thì thôi hiện cho người dân; còn nguy hiểm thì gia hạn, hết nguy hiểm sớm thì kết thúc.</p>
         </div>
         <div className="rounded-lg border border-line bg-panel2/40 p-2.5">
-          <div className="mb-1.5 text-[11px] font-semibold uppercase text-muted">Xem lại trước khi gửi</div>
+          <div className="mb-1.5 text-xs font-semibold text-muted">Xem lại trước khi gửi</div>
           <div className="flex flex-wrap items-center gap-1.5">
             <span className={clsx('chip', LEVEL[severity].cls)}>{LEVEL[severity].label}</span>
             <b className="min-w-0 text-ink [overflow-wrap:anywhere]">{title || '(chưa có tiêu đề)'}</b>
           </div>
-          <p className="mt-1.5 whitespace-pre-wrap rounded-lg bg-panel p-2 text-xs leading-relaxed text-ink [overflow-wrap:anywhere]">{body || '(chưa có nội dung)'}</p>
+          {/* Khung điện thoại: tin đúng như người dân nhận */}
+          <figure className="mx-auto mt-2 w-full max-w-[280px] rounded-[24px] border-[5px] border-ink/70 bg-panel p-2 shadow-sm">
+            <figcaption className="mb-1.5 flex items-center gap-1.5 border-b border-line pb-1.5 text-[11px] font-semibold text-muted">
+              <Smartphone size={12} aria-hidden="true" /> Người dân nhận được
+            </figcaption>
+            <p className="whitespace-pre-wrap rounded-xl rounded-tl-sm bg-panel2 px-2.5 py-2 text-xs leading-relaxed text-ink [overflow-wrap:anywhere]">{body || '(chưa có nội dung)'}</p>
+            <div className="mt-1 text-right text-[11px] text-muted">{sms(body.length)} tin SMS</div>
+          </figure>
           <ul className="mt-1.5 flex flex-col gap-0.5 text-xs text-ink-2">
             <li>Vùng: {polygon ? `vùng vẽ ${alertDraft?.stats?.area_km2 ?? ''} km²` : `${codes.length} xã/phường — ${codes.slice(0, 5).map(unitName).join(', ')}${codes.length > 5 ? '…' : ''}`}</li>
             {audience && <li>Người nhận: {int(audience.households)} hộ · {int(audience.subscribers)} thuê bao · {int(audience.speakers)} loa</li>}
@@ -425,7 +467,7 @@ export default function Composer({ online = true }) {
   }
 
   return (
-    <Section title="Soạn lệnh cảnh báo (Maker)" right={<Megaphone size={16} className="text-accent" aria-hidden="true" />}>
+    <Section title="Soạn lệnh cảnh báo" right={<Megaphone size={16} className="text-accent" aria-hidden="true" />}>
       <StepChips steps={STEPS} step={step} onStep={setStep} done={[valid(0), valid(1), valid(2)]} disabled={sending} />
       {content}
       <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:justify-end">
@@ -462,9 +504,9 @@ function Audience({ q, audience }) {
         <p className="col-span-3 text-muted"><Loader2 size={13} className="mr-1 inline animate-spin" aria-hidden="true" /> Đang ước tính người nhận…</p>
       ) : (
         <>
-          <div><div className="font-mono text-base font-semibold text-ink">{int(audience.households)}</div>hộ dân</div>
-          <div><div className="font-mono text-base font-semibold text-ink">{int(audience.subscribers)}</div>thuê bao</div>
-          <div><div className="font-mono text-base font-semibold text-ink">{int(audience.speakers)}</div>loa phường/xã</div>
+          <div><div className="num text-base font-semibold text-ink">{int(audience.households)}</div>hộ dân</div>
+          <div><div className="num text-base font-semibold text-ink">{int(audience.subscribers)}</div>thuê bao</div>
+          <div><div className="num text-base font-semibold text-ink">{int(audience.speakers)}</div>loa phường/xã</div>
         </>
       )}
     </div>
