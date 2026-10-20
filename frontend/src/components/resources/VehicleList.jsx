@@ -24,7 +24,7 @@ function StatusText({ v }) {
       </div>
       {v.status === 'nhiem_vu' && v.mission_code && (
         <div className="mt-0.5 text-xs text-muted">
-          {v.mission_code} · {v.mission_status === 'da_den' ? `đã đến lúc ${time(v.mission_arrived_at)}` : `đang đến, ETA ${time(v.mission_eta)}`}
+          {v.mission_code} · {v.mission_status === 'da_den' ? `đã đến lúc ${time(v.mission_arrived_at)}` : `đang đến, dự kiến tới lúc ${time(v.mission_eta)}`}
         </div>
       )}
       {v.status === 'bao_duong' && v.status_note && <div className="mt-0.5 text-xs text-muted">{v.status_note}</div>}
@@ -135,7 +135,7 @@ function VehicleCard({ v, online, onEdit, onMap }) {
       {(v.mission_code || (v.status === 'bao_duong' && v.status_note)) && (
         <div className="text-xs text-muted">
           {v.status === 'nhiem_vu' && v.mission_code
-            ? `${v.mission_code} · ${v.mission_status === 'da_den' ? `đã đến lúc ${time(v.mission_arrived_at)}` : `đang đến, ETA ${time(v.mission_eta)}`}`
+            ? `${v.mission_code} · ${v.mission_status === 'da_den' ? `đã đến lúc ${time(v.mission_arrived_at)}` : `đang đến, dự kiến tới lúc ${time(v.mission_eta)}`}`
             : v.status_note}
         </div>
       )}

@@ -8,7 +8,8 @@ import { ago, int } from '../../utils/format';
 
 /**
  * "Điều động nhanh" từ một đơn vị (thiết kế C.1): chọn phiếu SOS đang chờ (cấp 1 và phiếu chờ lâu lên đầu — máy chủ đã xếp)
- * → mở lệnh điều động 2 bước có sẵn, đơn vị này chọn sẵn.
+ * → mở lệnh điều động 3 bước có sẵn (đội này chọn sẵn ở bước "Chọn đội"). Mỗi phiếu một câu: mức, việc gì, mấy người, ở đâu,
+ * chờ bao lâu.
  */
 export default function QuickDispatch({ force, onClose }) {
   const sosQ = useAreaQuery('sos', '/sos');
@@ -18,20 +19,20 @@ export default function QuickDispatch({ force, onClose }) {
   return (
     <Modal open onClose={onClose} title={`Điều động nhanh – ${force.name}`}>
       <p className="mb-2 text-sm text-muted">
-        <b className="text-ink">{int(force.personnel_ready)}</b> người sẵn sàng. Chọn phiếu SOS cần đến (cấp 1, phiếu chờ lâu lên đầu):
+        Đội có <b className="text-ink">{int(force.personnel_ready)}</b> người sẵn sàng. Chọn phiếu cứu hộ cần đến (cấp 1, phiếu chờ lâu lên đầu):
       </p>
       {sosQ.isLoading ? <Skeleton height={120} />
-        : sosQ.isError && !sosQ.data ? <ErrorState onRetry={sosQ.refetch}>Không tải được danh sách phiếu SOS</ErrorState>
-          : !open.length ? <EmptyState>Không có phiếu SOS đang chờ điều phối trong vùng đang xem</EmptyState>
+        : sosQ.isError && !sosQ.data ? <ErrorState onRetry={sosQ.refetch}>Không tải được danh sách phiếu cứu hộ</ErrorState>
+          : !open.length ? <EmptyState>Không có phiếu cứu hộ đang chờ điều đội trong vùng đang xem</EmptyState>
             : (
               <ul className="flex flex-col gap-1.5">
                 {open.map((t) => (
                   <li key={t.id}>
                     <button type="button" className="card tap flex w-full items-center gap-2 p-2 text-left hover:border-accent" onClick={() => setTicket(t)}>
-                      <span className={clsx('chip shrink-0', PRIORITY[t.priority]?.cls || 'bg-panel2')}>{PRIORITY[t.priority]?.short || `Cấp ${t.priority}`}</span>
+                      <span className={clsx('chip shrink-0 whitespace-nowrap', PRIORITY[t.priority]?.cls || 'bg-panel2')}>Cấp {t.priority}{PRIORITY[t.priority] ? ` · ${PRIORITY[t.priority].short}` : ''}</span>
                       <span className="min-w-0 text-sm">
-                        <b>{t.code}</b> · {INCIDENT[t.incident_type] || t.incident_type}
-                        <span className="block truncate text-xs text-muted">{t.address || t.admin_name} · nhận {ago(t.received_at)}</span>
+                        <b>{t.code}</b> · {INCIDENT[t.incident_type] || t.incident_type} · {t.trapped_count ?? 0} người
+                        <span className="block truncate text-xs text-muted">{t.address || t.admin_name} · báo {ago(t.received_at)}</span>
                       </span>
                     </button>
                   </li>

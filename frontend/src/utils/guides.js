@@ -65,9 +65,9 @@ export const PAGE_TIPS = {
   },
   'nguon-luc': {
     tinh: [
-      'Ô chỉ số trên cùng: quân số sẵn sàng, xuồng và xe đang rảnh, kho dưới 20% định mức.',
+      'Khối "Cần bổ sung / cần sửa" dưới ô chỉ số: kho thiếu hàng, hàng sắp hết hạn, xe hỏng — mỗi việc một nút xử lý.',
       'Thẻ "Lực lượng": bấm "Điều động nhanh" để giao một đội cho phiếu cứu hộ đang chờ.',
-      'Thẻ "Vật tư – Nhu yếu phẩm": kho màu đỏ cần bổ sung; "Xuất kho" khi cấp hàng cho đội, cho dân.',
+      'Thẻ "Kho vật tư": vạch màu cho biết còn bao nhiêu so với định mức; "Xuất kho" khi cấp hàng cho đội, cho dân.',
     ],
     xa: [
       'Bạn thấy lực lượng, kho, phương tiện của xã mình.',
@@ -209,8 +209,8 @@ export const SCENARIOS = {
       to: '/nguon-luc',
       cta: 'Mở Vật tư & Lực lượng',
       steps: [
-        'Dải trên cùng trang "Vật tư & Lực lượng" nói kho nào dưới 20% định mức, hàng nào sắp hết hạn, xe nào hỏng.',
-        'Thẻ "Vật tư – Nhu yếu phẩm": xem từng kho còn bao nhiêu so với định mức.',
+        'Khối "Cần bổ sung / cần sửa" trên trang "Vật tư & Lực lượng" ghi từng việc: kho nào dưới 20% định mức, hàng nào sắp hết hạn, xe nào hỏng — bấm nút ngay dòng đó.',
+        'Thẻ "Kho vật tư": xem từng kho còn bao nhiêu so với định mức.',
         'Cấp hàng: bấm "Xuất kho" → chọn kho → mặt hàng, số lượng, lý do. Hàng về: "Nhập kho".',
       ],
     },

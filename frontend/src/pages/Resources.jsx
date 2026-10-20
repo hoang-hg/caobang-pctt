@@ -23,6 +23,7 @@ import QuickDispatch from '../components/resources/QuickDispatch';
 import { ForceReadinessChart, VehicleStatusChart } from '../components/resources/ReadinessCharts';
 import ResourceAlerts from '../components/resources/ResourceAlerts';
 import ResourceKpis from '../components/resources/ResourceKpis';
+import ResourceTodo from '../components/resources/ResourceTodo';
 import FilterToolbar from '../components/common/FilterToolbar';
 import VehicleList, { FuelDepots, VehicleMap } from '../components/resources/VehicleList';
 import WarehouseList, { STOCK_NOTE } from '../components/resources/WarehouseList';
@@ -54,7 +55,8 @@ const REFRESH_KEYS = ['resources-summary', 'forces', 'warehouses', 'vehicles', '
 
 /**
  * Quản lý Vật tư & Lực lượng cứu hộ (thiết kế C). Trên cùng: dải thông tin khẩn (kho cạn kiệt, hàng sắp hết hạn, phương tiện
- * thiếu nhiên liệu / hỏng, phiếu SOS chờ) → 4 ô chỉ số → 3 thẻ Lực lượng · Vật tư · Phương tiện, mỗi thẻ có tìm kiếm, bộ lọc
+ * thiếu nhiên liệu / hỏng, phiếu SOS chờ) → 4 ô chỉ số → "Cần bổ sung / cần sửa" (mỗi việc một câu + một nút) → 3 thẻ Lực
+ * lượng · Kho vật tư · Phương tiện, mỗi thẻ có tìm kiếm, bộ lọc
  * riêng, cách xếp, phân trang, xuất Excel / PDF (mọi dòng đang lọc, không chỉ trang đang xem).
  * Thẻ và bộ lọc nằm trên địa chỉ trang (?tab=vat_tu&tt=can_kiet): dải khẩn / ô chỉ số dẫn thẳng tới danh sách đã lọc, nút
  * Quay lại của trình duyệt trả lại. Danh sách tải đủ một lần theo vùng đang xem rồi lọc tại máy — dải khẩn, ô chỉ số, số
@@ -329,17 +331,28 @@ export default function Resources() {
       <ConnectionBanner updatedAt={summaryQ.dataUpdatedAt || null} />
 
       <PageHeader
-        title="Quản lý Vật tư & Lực lượng cứu hộ"
-        short="Vật tư & Lực lượng"
+        title="Vật tư & Lực lượng"
         scope={scopeLabel}
         time={dataTime}
         timeNote={summaryQ.isError ? 'Chưa tải được số liệu' : 'Đang tải số liệu…'}
-        meta={[<span key="auto" className="hidden lg:inline">tự cập nhật khi kho xuất / nhập, lực lượng nhận lệnh</span>]}
+        meta={[<span key="auto" className="hidden lg:inline">số liệu tự cập nhật khi kho xuất, nhập, đội nhận lệnh</span>]}
         onRefresh={refresh}
         refreshing={refreshing}
       />
 
       <ResourceKpis summaryQ={summaryQ} warehouses={warehousesQ.data} onGo={(id, f) => go(id, f)} />
+
+      <ResourceTodo
+        warehouses={warehousesQ.data}
+        vehicles={vehiclesQ.data}
+        factsOf={factsOf}
+        scope={{ receive: receiveCodes, issue: issueCodes, vehicle: vehicleCodes }}
+        online={online}
+        onReceive={setReceive}
+        onIssue={setIssue}
+        onVehicle={setVehicleEdit}
+        onShow={(id, f) => go(id, f)}
+      />
 
       <RoleTips page="nguon-luc" />
 

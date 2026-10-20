@@ -140,7 +140,7 @@ export default function ForceList({ rows, asTable, pdf, sort, onSort, canDispatc
           <div className="mt-auto flex gap-2 pt-1 no-print">
             {f.contact_phone && (
               <a href={tel(f.contact_phone)} className={clsx('btn-ghost flex-1', BTN)} title={`Gọi ${f.commander || 'chỉ huy'} — ${f.contact_phone}`}>
-                <Phone size={13} aria-hidden="true" /> Gọi
+                <Phone size={13} aria-hidden="true" /> Gọi chỉ huy
               </a>
             )}
             {f.lat != null && (
