@@ -343,9 +343,10 @@ const tipsSeen = (id) => { try { return localStorage.getItem(tipsKey(id)) === '1
 
 /**
  * Gợi ý 3 bước lần đầu mở một màn hình: "Bắt đầu từ đâu" cho người mới, không phải đọc hướng dẫn. Bấm "Đã hiểu" → không
- * hiện lại trên máy này (localStorage, khoá theo `id` của màn). `steps`: 2–4 câu ngắn, mỗi câu một việc.
+ * hiện lại trên máy này (localStorage, khoá theo `id` của màn). `steps`: 2–4 câu ngắn, mỗi câu một việc; `more`: liên kết
+ * đứng trước nút "Đã hiểu" (VD tới trang Hướng dẫn xử lý — RoleTips). Gợi ý theo vai trò: dùng RoleTips.
  */
-export function PageTips({ id, title = 'Bắt đầu từ đâu?', steps, className }) {
+export function PageTips({ id, title = 'Bắt đầu từ đâu?', steps, more, className }) {
   const [open, setOpen] = useState(() => !tipsSeen(id));
   if (!open) return null;
   const done = () => {
@@ -363,9 +364,12 @@ export function PageTips({ id, title = 'Bắt đầu từ đâu?', steps, classN
           </li>
         ))}
       </ol>
-      <button type="button" onClick={done} className="btn-secondary tap shrink-0 self-end px-3 py-1 text-xs sm:self-center">
-        <Check size={14} aria-hidden="true" /> Đã hiểu
-      </button>
+      <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5 self-end sm:self-center">
+        {more}
+        <button type="button" onClick={done} className="btn-secondary tap px-3 py-1 text-xs">
+          <Check size={14} aria-hidden="true" /> Đã hiểu
+        </button>
+      </div>
     </section>
   );
 }

@@ -3,7 +3,7 @@ import { useStore } from '../../app/store';
 import { DEMO_ROLES, demoAuth } from '../../api/demoUsers';
 
 /** Vào nhanh CHẾ ĐỘ GIẢ LẬP — chỉ máy dev (Login nạp lười trong nhánh import.meta.env.DEV): bật giả lập rồi đăng nhập bằng
- * một trong 3 vai trò thật (api/demoUsers.js) — App.jsx chuyển trang như đăng nhập thường (?next= hoặc Tổng quan). Không
+ * một tài khoản theo vai trò thật (api/demoUsers.js) — App.jsx chuyển trang như đăng nhập thường (?next= hoặc Tổng quan). Không
  * gửi gì lên máy chủ. */
 export default function DemoLoginPanel() {
   const enter = (key) => {

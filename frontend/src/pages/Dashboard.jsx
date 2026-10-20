@@ -8,7 +8,8 @@ import {
 } from 'lucide-react';
 import { useAreaQuery, usePresets, useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
-import { EmptyState, ErrorState, Hint, PageTips, RiskLegend, Section, Segmented, Skeleton } from '../components/common/ui';
+import { EmptyState, ErrorState, Hint, RiskLegend, Section, Segmented, Skeleton } from '../components/common/ui';
+import RoleTips from '../components/common/RoleTips';
 import EventLog from '../components/common/EventLog';
 import Hydrograph from '../components/charts/Hydrograph';
 import RainfallChart from '../components/charts/RainfallChart';
@@ -113,7 +114,7 @@ function LiveClock() {
  * - iPad dọc: Việc chờ → 6 ô 3×2 → bản đồ | nhật ký → biểu đồ;
  * - điện thoại: 6 ô 2×3 (thấy trọn cùng dải khẩn, không cuộn) → Việc chờ → bản đồ → biểu đồ thu gọn được → nhật ký
  *   5 mục → bảng dạng thẻ; thanh đáy.
- * Lần đầu mở: gợi ý 3 bước (PageTips, tắt được, nhớ trên máy). Tiêu đề biểu đồ là câu kết luận (chartTitles.js).
+ * Lần đầu mở: gợi ý 3 bước theo vai trò (RoleTips, tắt được, nhớ trên máy). Tiêu đề biểu đồ là câu kết luận (chartTitles.js).
  */
 export default function Dashboard() {
   const qc = useQueryClient();
@@ -622,6 +623,8 @@ export default function Dashboard() {
       {tab === 'cap_xa' && (
         <div ref={ref} className="flex flex-col gap-3.5">
           <CommuneView code={communeCode} units={scopeUnits} onChange={(code) => enterCommune(code)} onSupport={() => setSupportOpen(true)}>
+            {/* Tài khoản xã: gợi ý lần đầu ngay dưới các ô chỉ số của xã (cấp tỉnh xem thẻ này đã có gợi ý ở thẻ Tổng hợp) */}
+            {isCommuneUser && <RoleTips page="tong-quan" />}
             <div className="grid gap-3.5 xl:grid-cols-[1fr_360px] [&>*]:min-w-0">
               <div className="grid gap-3.5 lg:grid-cols-2 [&>*]:min-w-0">
                 {/* Biểu đồ số đo trạm chỉ khi xã có trạm đo mưa — không thì 2 khung trống "chưa có số đo" chiếm nửa trang */}
@@ -694,14 +697,9 @@ export default function Dashboard() {
                 đồ xuống dưới màn hình đầu */}
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_420px] [&>*]:min-w-0">
               {!presentation && (
-                <PageTips
-                  id="tong-quan"
+                <RoleTips
+                  page="tong-quan"
                   className="md:col-start-2 md:row-start-1 md:!flex-col md:!items-stretch md:self-start [&_ol]:md:!grid-cols-1"
-                  steps={[
-                    'Đọc câu tóm tắt trên cùng: tình hình chung và chỗ nguy hiểm nhất. Dải đỏ là việc khẩn.',
-                    'Xử lý "Việc chờ quyết định": bấm vào từng việc để tới thẳng chỗ duyệt lệnh, điều động.',
-                    'Bấm ô chỉ số hoặc điểm trên bản đồ để xem chi tiết; nút "?" giải thích thuật ngữ.',
-                  ]}
                 />
               )}
               <div className="flex min-w-0 flex-col gap-3 md:col-start-1 md:row-span-2 md:row-start-1">

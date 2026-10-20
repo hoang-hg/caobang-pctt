@@ -20,6 +20,7 @@ import {
 import { api } from '../api/client';
 import { useStore } from '../app/store';
 import PageHeader from '../components/common/PageHeader';
+import RoleTips from '../components/common/RoleTips';
 import { PAGE } from '../components/layout/page';
 import { Empty, Modal, Tabs } from '../components/common/ui';
 import { usePermission } from '../rbac/usePermission';
@@ -754,13 +755,15 @@ export default function AccessControl() {
         description="3 cấp, mỗi cấp 1 vai trò, mỗi tài khoản 1 vai trò: Cấp 1 Quản trị hệ thống · Cấp 2 Quản trị tỉnh · Cấp 3 Quản trị xã/phường."
       />
 
+      <RoleTips page="phan-quyen" />
+
       <Tabs
         value={tab}
         onChange={setTab}
         tabs={[
           { value: 'users', label: 'Tài khoản người dùng', icon: Users },
           { value: 'roles', label: '3 vai trò & quyền', icon: ShieldCheck },
-          { value: 'audit', label: 'Nhật ký pháp lý RBAC', icon: History },
+          { value: 'audit', label: 'Nhật ký thao tác', icon: History },
         ]}
       />
 

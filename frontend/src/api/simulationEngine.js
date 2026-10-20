@@ -434,7 +434,10 @@ function handle(path, { method = 'GET', body, params } = {}) {
 
   // Phiên giả lập: /auth/me, /auth/refresh trả đúng vai trò đang chọn — refresh phải kèm user: SessionKeeper gọi
   // setAuth(phản hồi), thiếu user thì Shell (key = user.id) bị dựng lại liên tục, trang treo
-  if (pathname === '/auth/login') return demoAuth(/xa/i.test(body?.username || '') ? 'xa' : /truc/i.test(body?.username || '') ? 'tinh_truc' : 'tinh_duyet');
+  if (pathname === '/auth/login') {
+    const name = body?.username || '';
+    return demoAuth(/quan.?tri|^admin$/i.test(name) ? 'quan_tri' : /xa/i.test(name) ? 'xa' : /truc/i.test(name) ? 'tinh_truc' : 'tinh_duyet');
+  }
   if (pathname === '/auth/me') return useStore.getState().auth?.user || demoAuth().user;
   if (pathname === '/auth/refresh') return { token: DEMO_TOKEN, user: useStore.getState().auth?.user || demoAuth().user };
   if (pathname === '/auth/logout') return null;
