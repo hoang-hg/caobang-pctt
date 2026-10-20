@@ -104,7 +104,7 @@ body {
   .badge-live { @apply relative inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold bg-good/15 text-good border border-good/30; }
   
   .table-base { @apply w-full text-sm; }
-  .table-base th { @apply sticky top-0 bg-panel2 text-left text-xs font-semibold uppercase tracking-wide text-muted px-3 py-2.5 border-b border-line z-10; }
+  .table-base th { @apply sticky top-0 bg-panel2 text-left text-xs font-semibold text-muted px-3 py-2.5 border-b border-line z-10; }
   .table-base td { @apply px-3 py-2 border-b border-line/60 align-top; }
   .table-base tr:hover td { @apply bg-panel2/60; }
 }

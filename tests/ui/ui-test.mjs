@@ -1490,6 +1490,22 @@ async function resourcesPage(ctx) {
     return (await strip.innerText()).replace(/\s+/g, ' ').slice(0, 80);
   });
 
+  // Chỉnh giao diện cho người mới (thiết kế C): mở trang thấy ngay "Cần bổ sung / cần sửa" — mỗi kho thiếu một câu + một nút
+  await step(ctx, '"Cần bổ sung / cần sửa": mỗi việc một câu + một nút, đứng trên các thẻ danh mục', async () => {
+    const n = Number((await kpis.getByRole('button', { name: /Kho cạn kiệt/ }).innerText()).match(/(\d+)\s*kho dưới/)?.[1] ?? 0);
+    if (!n) return 'không có kho cạn kiệt';
+    const todo = page.getByRole('list', { name: 'Việc cần bổ sung, sửa chữa' });
+    await todo.waitFor({ timeout: 10_000 });
+    const lines = await todo.locator(':scope > li').allInnerTexts();
+    const low = lines.filter((t) => /định mức — cần bổ sung/.test(t));
+    if (!low.length) throw new Error('khối không có dòng kho thiếu hàng');
+    if (!lines.every((t) => /Nhập kho|Xuất kho|Báo tình trạng|Xem/.test(t))) throw new Error('có việc không kèm nút xử lý');
+    const [a, b] = await Promise.all([todo.boundingBox(), tabs.boundingBox()]);
+    if (a.y > b.y) throw new Error('khối "Cần bổ sung / cần sửa" nằm dưới các thẻ danh mục');
+    await expectNoOverflow(ctx, 'khối cần bổ sung');
+    return `${lines.length} việc đang hiện, ${low.length} kho thiếu hàng`;
+  });
+
   await step(ctx, 'Chạm ô chỉ số / dải khẩn → đúng danh sách đã lọc; Quay lại trả bộ lọc cũ', async () => {
     const tile = kpis.getByRole('button', { name: /Kho cạn kiệt/ });
     const n = Number((await tile.innerText()).match(/(\d+)\s*kho dưới/)?.[1] ?? 0);

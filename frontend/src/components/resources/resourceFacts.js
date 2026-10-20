@@ -9,8 +9,8 @@ import { STOCK_LOW, STOCK_WATCH, EXPIRY_DAYS, stockLevel } from '../../utils/ris
 
 export const TABS = [
   { id: 'luc_luong', label: 'Lực lượng', icon: Users, noun: 'đơn vị' },
-  { id: 'vat_tu', label: 'Vật tư – Nhu yếu phẩm', short: 'Vật tư', icon: Package, noun: 'kho' },
-  { id: 'phuong_tien', label: 'Phương tiện – Trang thiết bị', short: 'Phương tiện', icon: Truck, noun: 'phương tiện' },
+  { id: 'vat_tu', label: 'Kho vật tư', short: 'Kho', icon: Package, noun: 'kho' },
+  { id: 'phuong_tien', label: 'Phương tiện', icon: Truck, noun: 'phương tiện' },
 ];
 export const TAB_IDS = TABS.map((t) => t.id);
 
