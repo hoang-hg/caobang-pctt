@@ -65,9 +65,10 @@ export default function Header() {
         <OmniSearch />
       </div>
 
-      {/* Cụm công cụ bên phải — không co (ô tìm kiếm co thay). Từ 1024 px thanh trên chỉ còn địa bàn · tìm kiếm · Báo cáo nhanh
-          · tài khoản: kết nối, chuông SOS, Sáng/Tối, cổng người dân, đồng hồ nằm ở thanh trạng thái dưới cùng (StatusBar —
-          docs/ke-hoach-lam-moi-giao-dien.md mục 5). Hẹp hơn: các nút đó ở đây, chỉ còn biểu tượng (có title / aria-label) */}
+      {/* Cụm công cụ bên phải — không co (ô tìm kiếm co thay). Màn rộng ≥ 1024 px và cao ≥ 860 px (`lg:tall:`): thanh trên
+          chỉ còn địa bàn · tìm kiếm · Báo cáo nhanh · tài khoản — kết nối, chuông SOS, Sáng/Tối, cổng người dân, đồng hồ nằm ở
+          thanh trạng thái dưới cùng (StatusBar — docs/ke-hoach-lam-moi-giao-dien.md mục 5). Màn khác: các nút đó ở đây, chỉ
+          còn biểu tượng */}
       <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
         {/* Điều khiển Giả lập tác chiến */}
         {SimulationBar && <Suspense fallback={null}><SimulationBar /></Suspense>}
@@ -95,7 +96,7 @@ export default function Header() {
           to="/cong-khai"
           target="_blank"
           rel="noopener noreferrer"
-          className="btn-ghost touch-hit hidden md:inline-flex lg:hidden text-xs px-2.5 py-1.5 text-accent border-accent/30 bg-accent/5 hover:bg-accent/10"
+          className="btn-ghost touch-hit hidden md:inline-flex lg:tall:hidden text-xs px-2.5 py-1.5 text-accent border-accent/30 bg-accent/5 hover:bg-accent/10"
           title="Mở Cổng thông tin công khai dành cho người dân"
           aria-label="Cổng người dân"
         >
@@ -109,7 +110,7 @@ export default function Header() {
           className={clsx(
             'chip text-[11px] font-medium py-1 px-2.5 transition-colors',
             wsStatus === 'online' && 'max-sm:hidden',
-            'lg:hidden',
+            'lg:tall:hidden',
             wsStatus === 'online' ? 'bg-good/15 text-good border-good/30' : wsStatus === 'connecting' ? 'bg-warn/15 text-warn border-warn/30' : 'bg-danger/15 text-danger border-danger/30'
           )}
           title={`Kết nối thời gian thực: ${wsStatus === 'online' ? 'Đang hoạt động' : wsStatus === 'connecting' ? 'Đang kết nối lại' : 'Mất kết nối'}`}
@@ -125,7 +126,7 @@ export default function Header() {
         {soundOn && !audioReady && (
           <button
             type="button"
-            className="chip touch-hit border border-warn bg-warn/15 px-2.5 py-1 text-[11px] font-semibold text-ink lg:hidden"
+            className="chip touch-hit border border-warn bg-warn/15 px-2.5 py-1 text-[11px] font-semibold text-ink lg:tall:hidden"
             title="Trình duyệt chặn âm thanh tới khi bấm vào trang — bấm để chuông SOS kêu được"
           >
             <VolumeX size={13} className="text-warn" /> <span className="hidden 2xl:inline">Bấm để bật chuông SOS</span>
@@ -134,7 +135,7 @@ export default function Header() {
 
         {/* Nút bật/tắt âm báo SOS — điện thoại: trong menu tài khoản (nhường chỗ cho bộ lọc địa phương) */}
         <button
-          className={clsx('btn-ghost touch-hit p-2 transition-colors max-sm:hidden lg:hidden', soundOn ? 'text-accent' : 'text-muted')}
+          className={clsx('btn-ghost touch-hit p-2 transition-colors max-sm:hidden lg:tall:hidden', soundOn ? 'text-accent' : 'text-muted')}
           onClick={toggleSound}
           title={soundOn ? 'Âm báo SOS: BẬT (bấm để tắt)' : 'Âm báo SOS: TẮT (bấm để bật)'}
           aria-label="Bật tắt âm báo SOS"
@@ -144,7 +145,7 @@ export default function Header() {
 
         {/* Nút đổi giao diện Sáng / Tối — điện thoại: chỉ trong menu tài khoản (Theo máy / Sáng / Tối), nhường chỗ cho tên địa bàn */}
         <button
-          className="btn-ghost touch-hit p-2 transition-transform active:rotate-45 max-sm:hidden lg:hidden"
+          className="btn-ghost touch-hit p-2 transition-transform active:rotate-45 max-sm:hidden lg:tall:hidden"
           onClick={toggleTheme}
           title={theme === 'dark' ? 'Chuyển sang nền Sáng' : 'Chuyển sang nền Tối'}
           aria-label="Nền tối"

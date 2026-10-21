@@ -51,5 +51,12 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    // `tall:` = màn cao ≥ 860 px. Dùng `lg:tall:` (rộng ≥ 1024 VÀ cao ≥ 860 — laptop 1440×900, màn rời, TV): có thanh trạng thái
+    // dưới cùng (StatusBar); laptop 1366×768 không — màn hình đầu của Tổng quan không đủ chỗ cho thêm 32 px.
+    // - KHÔNG khai báo trong `screens` kiểu `raw`: Tailwind sẽ bỏ hết các biến thể `max-sm:` / `max-lg:` (điện thoại vỡ bố cục).
+    // - Biến thể của plugin sinh TRƯỚC các mốc màn: `tall:hidden` một mình thua `md:inline-flex`; `lg:tall:` / `xl:tall:` sinh
+    //   sau `lg:` / `xl:` nên thắng.
+    ({ addVariant }) => addVariant('tall', '@media (min-height: 860px)'),
+  ],
 };

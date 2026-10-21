@@ -946,18 +946,21 @@ async function firstScreen(ctx) {
         const vh = window.innerHeight;
         const nav = document.querySelector('nav[aria-label="Thao tác nhanh"]');
         const navTop = nav && nav.getBoundingClientRect().height ? nav.getBoundingClientRect().top : vh; // thanh đáy che phần dưới
+        // Thanh trạng thái dưới cùng (màn rộng, đủ cao): vùng nội dung kết thúc ở mép trên của thanh
+        const bar = document.querySelector('footer[aria-label="Thanh trạng thái"]');
+        const barTop = bar && bar.getBoundingClientRect().height ? bar.getBoundingClientRect().top : vh;
         const tiles = [...document.querySelectorAll('[aria-label="Chỉ số nhanh"] > *')];
         const map = document.querySelector('.leaflet-container');
         const dec = document.querySelector('[aria-label="Việc chờ quyết định"]');
-        const strip = document.querySelector('[role="status"]');
+        const strip = document.querySelector('main [role="status"]');
         const main = document.querySelector('main');
         return {
           pageExtra: document.documentElement.scrollHeight - vh,
           wideBy: main ? main.scrollWidth - main.clientWidth : 0,
           tiles: tiles.length,
           kpiBottom: Math.round(Math.max(...tiles.map((t) => t.getBoundingClientRect().bottom))),
-          visibleBottom: Math.round(navTop),
-          mapVisible: map ? Math.round(Math.min(navTop, map.getBoundingClientRect().bottom) - map.getBoundingClientRect().top) : 0,
+          visibleBottom: Math.round(Math.min(navTop, barTop)),
+          mapVisible: map ? Math.round(Math.min(navTop, barTop, map.getBoundingClientRect().bottom) - map.getBoundingClientRect().top) : 0,
           decisionTop: dec ? Math.round(dec.getBoundingClientRect().top) : null,
           stripTop: strip ? Math.round(strip.getBoundingClientRect().top) : null,
           vh,

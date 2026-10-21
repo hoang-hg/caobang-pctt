@@ -28,10 +28,11 @@ const WS = {
 };
 
 /**
- * Thanh trạng thái dưới cùng — máy tính ≥ 1024 px (docs/ke-hoach-lam-moi-giao-dien.md mục 5, như trang tham khảo): cảm giác
- * trung tâm đang trực. Kết nối tức thì · chuông SOS (bấm bật / tắt; trình duyệt chặn âm thanh thì nhắc bấm) · nguồn số liệu
- * (chỉ tài khoản được xem nguồn dữ liệu; nguồn lỗi → chữ đỏ, bấm mở trang Nguồn dữ liệu) · cổng người dân · nền Sáng / Tối ·
- * đồng hồ. Dưới 1024 px các nút này nằm ở thanh trên / menu tài khoản như cũ (Header). Nền tối cố định ở cả hai giao diện.
+ * Thanh trạng thái dưới cùng — màn rộng ≥ 1024 px và cao ≥ 860 px (`lg:tall:`; docs/ke-hoach-lam-moi-giao-dien.md mục 5,
+ * như trang tham khảo): cảm giác trung tâm đang trực. Kết nối tức thì · chuông SOS (bấm bật / tắt; trình duyệt chặn âm thanh
+ * thì nhắc bấm) · nguồn số liệu (chỉ tài khoản được xem nguồn dữ liệu; nguồn lỗi → chữ đỏ, bấm mở trang Nguồn dữ liệu) ·
+ * cổng người dân · nền Sáng / Tối · đồng hồ. Màn hẹp hoặc thấp hơn (laptop 1366×768): các nút này ở thanh trên / menu tài
+ * khoản như cũ (Header). Nền tối cố định.
  */
 export default function StatusBar() {
   const { theme, toggleTheme, wsStatus, soundOn, toggleSound, audioReady } = useStore();
@@ -48,7 +49,7 @@ export default function StatusBar() {
 
   return (
     <footer
-      className="no-print hidden h-8 shrink-0 items-center gap-4 border-t border-black/30 bg-[#0f172a] px-4 text-xs text-slate-300 lg:flex"
+      className="no-print hidden h-8 shrink-0 items-center gap-4 border-t border-black/30 bg-[#0f172a] px-4 text-xs text-slate-300 lg:tall:flex"
       aria-label="Thanh trạng thái"
     >
       <span className={clsx('flex items-center gap-1.5 font-medium', text)} role="status">

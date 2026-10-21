@@ -649,7 +649,7 @@ export default function Dashboard() {
               {logSection({
                 title: 'Nhật ký sự kiện của xã',
                 limit: 40,
-                className: 'xl:sticky xl:top-16 xl:h-[calc(100vh-10.5rem)] xl:self-start xl:overflow-hidden', // trừ cả thanh trạng thái (StatusBar)
+                className: 'xl:sticky xl:top-16 xl:h-[calc(100vh-8.5rem)] xl:self-start xl:overflow-hidden xl:tall:h-[calc(100vh-10.5rem)]', // màn đủ cao: trừ cả thanh trạng thái
                 listClass: isLg ? 'h-[60vh] xl:h-full' : undefined,
               })}
             </div>
@@ -782,7 +782,7 @@ export default function Dashboard() {
               {logSection({
                 title: 'Nhật ký sự kiện',
                 limit: 60,
-                className: 'min-w-0 md:col-start-2 lg:sticky lg:top-16 lg:h-[calc(100vh-10.5rem)] lg:self-start lg:overflow-hidden', // trừ cả thanh trạng thái
+                className: 'min-w-0 md:col-start-2 lg:sticky lg:top-16 lg:h-[calc(100vh-8.5rem)] lg:self-start lg:overflow-hidden lg:tall:h-[calc(100vh-10.5rem)]', // màn đủ cao: trừ cả thanh trạng thái
               })}
             </div>
           </div>
