@@ -68,7 +68,7 @@ export default function SimulationBar() {
       </button>
       {open && (
         <div role="menu" className="card absolute right-0 top-full z-[1200] mt-2 w-80 p-2 shadow-2xl">
-          <div className="px-2 pb-1 pt-0.5 text-[11px] font-semibold uppercase tracking-wide text-muted">Kịch bản thiên tai</div>
+          <div className="px-2 pb-1 pt-0.5 text-xs font-semibold text-muted">Kịch bản thiên tai</div>
           {SCENARIOS.map((s) => (
             <button key={s.id} type="button" role="menuitemradio" aria-checked={s.id === current.id} onClick={() => pickScenario(s.id)}
               className={clsx('tap flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-panel2', s.id === current.id && 'bg-accent/10')}>
@@ -79,7 +79,7 @@ export default function SimulationBar() {
               </span>
             </button>
           ))}
-          <div className="mt-1 flex items-center gap-1 border-t border-line px-2 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
+          <div className="mt-1 flex items-center gap-1 border-t border-line px-2 pb-1 pt-2 text-xs font-semibold text-muted">
             <UserCheck size={12} aria-hidden="true" /> Xem với vai trò
           </div>
           {DEMO_ROLES.map((r) => (

@@ -301,7 +301,7 @@ export function ReceiveModal({ warehouse: w, onClose }) {
             <input className="input tap min-h-[40px] pl-8" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm mặt hàng (gõ không dấu được)…" aria-label="Tìm mặt hàng" />
           </div>
           <div ref={refs.code} role="radiogroup" aria-label="Mặt hàng cần nhập" aria-describedby="loi-mat-hang-nhap" className="flex flex-col gap-1.5">
-            {inStock.length > 0 && <div className="pt-1 text-[11px] font-semibold uppercase tracking-wide text-muted">Đang có ở kho</div>}
+            {inStock.length > 0 && <div className="pt-1 text-xs font-semibold text-muted">Đang có ở kho</div>}
             {inStock.map((i) => (
               <button key={i.item_code} type="button" role="radio" aria-checked={code === i.item_code} className={row(code === i.item_code)} onClick={() => pick(i.item_code)}>
                 <span className="min-w-0 flex-1">
@@ -321,7 +321,7 @@ export function ReceiveModal({ warehouse: w, onClose }) {
               : itemsQ.isError && !itemsQ.data ? <ErrorState onRetry={itemsQ.refetch}>Không tải được danh mục vật tư</ErrorState>
                 : others.length > 0 && (
                   <>
-                    <div className="pt-1 text-[11px] font-semibold uppercase tracking-wide text-muted">Mặt hàng khác (mới ở kho này)</div>
+                    <div className="pt-1 text-xs font-semibold text-muted">Mặt hàng khác (mới ở kho này)</div>
                     {others.map((i) => (
                       <button key={i.code} type="button" role="radio" aria-checked={code === i.code} className={row(code === i.code)} onClick={() => pick(i.code)}>
                         <span className="min-w-0 flex-1">

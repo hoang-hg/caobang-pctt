@@ -499,7 +499,7 @@ export function SortTh({ k, dir = 'ascending', sort, onSort, pdf, children, clas
   if (!k || pdf) return <th scope="col" className={className}>{children}</th>;
   return (
     <th scope="col" className={className} aria-sort={sort === k ? dir : undefined}>
-      <button type="button" className="tap inline-flex items-center gap-1 uppercase hover:text-ink" onClick={() => onSort(k)} title="Xếp theo cột này">
+      <button type="button" className="tap inline-flex items-center gap-1 hover:text-ink" onClick={() => onSort(k)} title="Xếp theo cột này">
         {children}
         <ArrowUpDown size={11} className={sort === k ? 'text-accent' : 'opacity-40'} aria-hidden="true" />
       </button>

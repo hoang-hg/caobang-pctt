@@ -155,7 +155,7 @@ export default function StormBulletinModal({ onClose }) {
           </label>
         </div>
         <div className="flex flex-col gap-2">
-          <div className="text-[11px] font-semibold uppercase text-muted">Xem trước</div>
+          <div className="text-xs font-semibold text-muted">Xem trước</div>
           {errors.length > 0 && (
             <ul className="rounded-lg border border-danger/40 bg-danger/10 p-2 text-xs text-danger">
               {errors.slice(0, 8).map((e) => <li key={e}>{e}</li>)}

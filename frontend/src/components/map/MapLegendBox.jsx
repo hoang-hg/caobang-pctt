@@ -206,7 +206,7 @@ export default function MapLegendBox({
               {POINT_EMOJI[selectedPoint.type] || '📍'}
             </span>
             <div className="min-w-0 flex-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-accent">
+              <span className="text-xs font-bold text-accent">
                 Chi tiết điểm đang chọn
               </span>
               <h3 className="font-bold text-sm text-ink leading-tight mt-0.5">{selectedPoint.name}</h3>
@@ -327,12 +327,12 @@ export default function MapLegendBox({
       <div className="flex items-center gap-2.5 p-2 rounded-xl bg-panel2/60 border border-line/60 text-[11px] text-muted leading-tight">
         <div className="relative flex h-6 w-6 shrink-0 items-center justify-center">
           <span className="absolute inset-0 rounded-full bg-sky-400/35 animate-ping" />
-          <span className="relative flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-sky-400 to-blue-600 text-white font-mono text-[10px] font-bold border border-white shadow-xs">
+          <span className="relative flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-white text-xs font-bold border border-white">
             28
           </span>
         </div>
         <span>
-          <b className="text-ink font-semibold">Icon Radar phát sáng có số:</b> Cụm gom các trạm/điểm gần nhau. <b>Bấm vào số</b> để phóng to và xem từng điểm cụ thể.
+          <b className="text-ink font-semibold">Số trong vòng tròn:</b> số điểm ở gần nhau. <b>Bấm vào số</b> để phóng to và xem từng điểm.
         </span>
       </div>
 

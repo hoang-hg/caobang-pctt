@@ -1694,7 +1694,8 @@ Chạy lại nhiều lần liên tiếp: xoá khoá `rl:*` trong Redis trước 
 và **điện thoại** (Pixel 7, GPS giả lập ở TP Cao Bằng):
 - cổng công khai: bản đồ thật sự có chỗ hiển thị (không bị ép còn 0 px), mọi tab, gửi phản ánh (chấm bản đồ / nút "Lấy
   vị trí của tôi") → mã tra cứu → theo dõi tiến độ, tra cứu mã không tồn tại, `/ban-nhe`;
-- cán bộ: đăng nhập, mọi trang ở thanh menu, menu trên điện thoại, điều động (chọn lực lượng → phát lệnh → báo chưa gửi
+- cán bộ: đăng nhập, mọi trang ở thanh menu (máy tính: kèm bài quét — không còn chữ IN HOA, màu chuyển trang trí; cổng
+  công khai mọi tab và trang đăng nhập cũng quét), menu trên điện thoại, điều động (chọn lực lượng → phát lệnh → báo chưa gửi
   cho đội), duyệt phản ánh (nội dung công khai gợi ý sẵn, không chọn sẵn vị trí chính xác), nhập dữ liệu bằng form +
   chọn vị trí trên bản đồ, báo cáo văn bản PDF định dạng chuẩn (qua 3 bước, PDF có nhúng font tiếng Việt); **mục G**: chọn
   loại bằng thẻ, tệp mẫu có dòng ví dụ, tệp điểm sơ tán có lỗi (chỉ gửi kiểm tra, không ghi) → báo "Còn N lỗi", "Dòng 3 ·

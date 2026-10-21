@@ -144,6 +144,31 @@ const waitMain = (page) => page.waitForFunction(() => (document.querySelector('m
 const visible = (loc) => loc.filter({ visible: true }).first();
 
 // ================================================================ Cổng công khai (không đăng nhập)
+/**
+ * Dấu hiệu giao diện "làm cho có" (docs/ke-hoach-lam-moi-giao-dien.md mục 1.3) trên trang đang mở: chữ IN HOA (CSS
+ * `text-transform: uppercase`) cho chữ thường dài ≥ 4 ký tự — mã viết hoa sẵn (SOS-1001) không tính; màu chuyển trang trí
+ * (`background-image: …gradient`) — trừ dải màu chú giải đánh dấu `data-thang-mau`. Trả danh sách mô tả, rỗng = đạt.
+ */
+const designFlaws = (page) => page.evaluate(() => {
+  const out = new Set();
+  for (const el of document.querySelectorAll('body *')) {
+    if (!el.getClientRects().length) continue;
+    const cs = getComputedStyle(el);
+    if (cs.textTransform === 'uppercase') {
+      const own = [...el.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join(' ').replace(/\s+/g, ' ').trim();
+      if (own.length >= 4 && own !== own.toUpperCase()) out.add(`chữ IN HOA "${own.slice(0, 30)}"`);
+    }
+    if (cs.backgroundImage.includes('gradient') && !el.closest('[data-thang-mau]')) {
+      out.add(`màu chuyển ở <${el.tagName.toLowerCase()} class="${String(el.className).slice(0, 50)}">`);
+    }
+  }
+  return [...out];
+});
+const expectNoDesignFlaws = async (page, where) => {
+  const flaws = await designFlaws(page);
+  if (flaws.length) throw new Error(`${where}: ${flaws.slice(0, 4).join('; ')}${flaws.length > 4 ? ` … (+${flaws.length - 4})` : ''}`);
+};
+
 async function publicPortal(ctx) {
   const { page, vp } = ctx;
   let trackCode = null;
@@ -168,6 +193,22 @@ async function publicPortal(ctx) {
     await visible(page.getByRole('button', { name: 'Bản đồ & Cảnh báo' })).click();
     return `${PUBLIC_TABS.length} tab`;
   });
+
+  if (!vp.mobile) {
+    await step(ctx, 'Cổng công khai, trang đăng nhập: không chữ IN HOA, không màu chuyển trang trí (mọi tab)', async () => {
+      await page.goto(`${ROOT}/cong-khai`);
+      await page.locator('.leaflet-container').first().waitFor({ state: 'attached', timeout: 20_000 });
+      for (const tab of PUBLIC_TABS) {
+        await visible(page.getByRole('button', { name: tab })).click();
+        await page.waitForTimeout(500);
+        await expectNoDesignFlaws(page, `tab "${tab}"`);
+      }
+      await page.goto(`${ROOT}/dang-nhap`);
+      await page.getByPlaceholder('Nhập tên đăng nhập hoặc email...').waitFor();
+      await expectNoDesignFlaws(page, '/dang-nhap');
+      return `${PUBLIC_TABS.length} tab + đăng nhập`;
+    });
+  }
 
   await step(ctx, '"Tôi đang ở đâu?": kết quả theo vị trí, chỉ đường tới điểm sơ tán (điện thoại không tràn ngang)', async () => {
     await page.goto(`${ROOT}/cong-khai`);
@@ -238,12 +279,13 @@ async function staff(ctx, trackCode) {
   });
 
   for (const [path, label] of STAFF_PAGES) {
-    await step(ctx, `Trang "${label}" (${path}) hiển thị đầy đủ`, async () => {
+    await step(ctx, `Trang "${label}" (${path}) hiển thị đầy đủ${vp.mobile ? '' : ', không chữ IN HOA, màu chuyển'}`, async () => {
       await page.goto(`${ROOT}${path}`);
       await waitMain(page);
       await page.waitForTimeout(800); // biểu đồ / bản đồ vẽ xong
       if (path === '/ban-do') await expectMapShown(page, path);
       await expectNoOverflow(ctx, path);
+      if (!vp.mobile) await expectNoDesignFlaws(page, path);
     });
   }
 

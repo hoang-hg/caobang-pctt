@@ -169,20 +169,20 @@ export default function Login() {
   );
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-bg via-bg to-panel/50 p-4 sm:p-6 lg:p-8">
+    <div className="flex min-h-screen items-center justify-center bg-bg p-4 sm:p-6 lg:p-8">
       <div className="w-full max-w-md">
         {/* Hộp đăng nhập chính */}
         <div className="card shadow-2xl border-line/80 bg-panel/95 backdrop-blur-md rounded-2xl p-6 sm:p-8">
           {/* Header & Logo Quốc huy / Ban chỉ huy */}
           <div className="flex flex-col items-center text-center pb-6 border-b border-line/60">
-            <div className="relative mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 via-red-600 to-amber-600 text-white shadow-xl shadow-red-600/25 ring-4 ring-red-500/10">
+            <div className="relative mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-danger text-white">
               <ShieldAlert size={34} className="drop-shadow-sm" />
               <div className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-panel text-accent border border-line shadow-sm">
                 <Building2 size={13} />
               </div>
             </div>
 
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 font-bold tracking-wider text-[10px] uppercase mb-1">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 font-bold text-xs mb-1">
               <span>Hệ thống chỉ huy tác chiến 24/7</span>
             </div>
 
@@ -216,7 +216,7 @@ export default function Login() {
 
             {/* Input Tài khoản / Email */}
             <div>
-              <label className="block text-xs font-semibold uppercase text-ink-2 mb-1.5">
+              <label className="block text-xs font-semibold text-ink-2 mb-1.5">
                 Tài khoản hoặc Email công vụ
               </label>
               <div className="relative">
@@ -239,7 +239,7 @@ export default function Login() {
             {/* Input Mật khẩu */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-semibold uppercase text-ink-2">
+                <label className="text-xs font-semibold text-ink-2">
                   Mật khẩu
                 </label>
                 <Link

@@ -480,7 +480,7 @@ export function AlertsList({
               );
             })}
             {silentStations.length > 0 && (
-              <div className="pt-1 text-[11px] font-bold uppercase tracking-wide text-muted">Mất tín hiệu ({silentStations.length})</div>
+              <div className="pt-1 text-xs font-bold text-muted">Mất tín hiệu ({silentStations.length})</div>
             )}
             {silentStations.map((p) => {
               const lv = alarmLevel(p.value, p.thresholds);

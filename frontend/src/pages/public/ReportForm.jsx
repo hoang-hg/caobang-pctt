@@ -212,7 +212,7 @@ export default function ReportForm({ onClose, myLocation, onTrack }) {
         {/* Cột 1: Thông tin mô tả & Ảnh */}
         <div className="flex flex-col gap-3 text-sm">
           <div>
-            <label className="block text-xs font-semibold uppercase text-muted mb-1.5">
+            <label className="block text-xs font-semibold text-muted mb-1.5">
               Loại sự việc trọng tâm <span className="text-danger">*</span>
             </label>
             <div className="grid grid-cols-2 gap-2 mb-2">
@@ -267,7 +267,7 @@ export default function ReportForm({ onClose, myLocation, onTrack }) {
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-semibold uppercase text-muted">
+              <label className="text-xs font-semibold text-muted">
                 Mô tả hiện trường <span className="text-danger">*</span>
               </label>
               <span className={clsx('text-[11px]', f.description.trim().length < 10 ? 'text-warn font-medium' : 'text-good')}>
@@ -284,7 +284,7 @@ export default function ReportForm({ onClose, myLocation, onTrack }) {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase text-muted mb-1">
+            <label className="block text-xs font-semibold text-muted mb-1">
               Địa chỉ / Điểm mốc nhận biết (tuỳ chọn)
             </label>
             <input
@@ -298,11 +298,11 @@ export default function ReportForm({ onClose, myLocation, onTrack }) {
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="block text-xs font-semibold uppercase text-muted mb-1">Họ tên của bạn</label>
+              <label className="block text-xs font-semibold text-muted mb-1">Họ tên của bạn</label>
               <input className="input" maxLength={100} value={f.reporter_name} onChange={set('reporter_name')} placeholder="Tuỳ chọn" />
             </div>
             <div>
-              <label className="block text-xs font-semibold uppercase text-muted mb-1">Số điện thoại</label>
+              <label className="block text-xs font-semibold text-muted mb-1">Số điện thoại</label>
               <input className="input" inputMode="tel" maxLength={20} value={f.reporter_phone} onChange={set('reporter_phone')} placeholder="Để cán bộ liên hệ" />
             </div>
           </div>
@@ -317,7 +317,7 @@ export default function ReportForm({ onClose, myLocation, onTrack }) {
 
           {/* Đính kèm ảnh */}
           <div>
-            <div className="flex items-center justify-between text-xs font-semibold uppercase text-muted mb-1.5">
+            <div className="flex items-center justify-between text-xs font-semibold text-muted mb-1.5">
               <span>Ảnh chụp hiện trường (Tối đa {MAX_PHOTOS})</span>
               <span className="text-[11px] normal-case text-muted">Rõ ràng, dung lượng &lt; 8MB</span>
             </div>
@@ -326,7 +326,7 @@ export default function ReportForm({ onClose, myLocation, onTrack }) {
                 <div key={x.url} className="relative group">
                   <img src={x.url} alt={`Ảnh ${i + 1}`} className="h-20 w-20 rounded-xl object-cover border border-line shadow-sm" />
                   <button
-                    className="absolute -right-1.5 -top-1.5 rounded-full bg-danger p-1 text-white shadow hover:scale-110 transition-transform"
+                    className="absolute -right-1.5 -top-1.5 rounded-full bg-danger p-1 text-white shadow hover:brightness-110"
                     onClick={() => { URL.revokeObjectURL(x.url); setFiles(files.filter((_, j) => j !== i)); }}
                     aria-label="Xoá ảnh này"
                     title="Xoá ảnh"
@@ -356,7 +356,7 @@ export default function ReportForm({ onClose, myLocation, onTrack }) {
         {/* Cột 2: Chọn vị trí trên bản đồ */}
         <div className="flex flex-col gap-2 text-sm">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase text-muted flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-muted flex items-center gap-1.5">
               <MapPin size={14} className={pos ? 'text-good' : 'text-danger'} />
               <span>Vị trí sự việc: {pos ? <b className="text-good font-mono">{pos.lat.toFixed(4)}, {pos.lon.toFixed(4)}</b> : <span className="text-danger">Chưa chọn</span>}</span>
             </span>
@@ -392,7 +392,7 @@ export default function ReportForm({ onClose, myLocation, onTrack }) {
 
           <div className="grid gap-2 sm:grid-cols-2">
             <div>
-              <label className="block text-xs font-semibold uppercase text-muted mb-1">Xã / phường</label>
+              <label className="block text-xs font-semibold text-muted mb-1">Xã / phường</label>
               <select
                 className="input"
                 value={xa}
@@ -406,7 +406,7 @@ export default function ReportForm({ onClose, myLocation, onTrack }) {
               {xa && !xaManual && <div className="mt-1 text-[11px] text-muted">Tự xác định theo điểm đã chấm — sai thì chọn lại</div>}
             </div>
             <div>
-              <label className="block text-xs font-semibold uppercase text-muted mb-1">Xóm / tổ dân phố (tuỳ chọn)</label>
+              <label className="block text-xs font-semibold text-muted mb-1">Xóm / tổ dân phố (tuỳ chọn)</label>
               <select className="input" value={f.hamlet} onChange={set('hamlet')} disabled={!xa || !hamlets.length}>
                 <option value="">
                   {!xa ? '— Chọn xã / phường trước —' : hamlets.length ? '— Không rõ / không có trong danh sách —' : 'Xã chưa có danh sách xóm'}
