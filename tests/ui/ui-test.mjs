@@ -2758,6 +2758,27 @@ async function areaFilter(ctx) {
     return `${chips.length} xã có chấm màu · ${rows.length} dòng cần chú ý đang hiện · chạm "${name}" → lọc`;
   });
 
+  // Người mới: đổi sang một xã rồi về toàn tỉnh trong 3 chạm — nút "Về toàn tỉnh" ngay cạnh nút địa bàn (mọi cỡ màn); hộp chọn
+  // có "Chọn gần đây" (chọn lại một chạm)
+  await step(ctx, 'Đổi sang một phường rồi "Về toàn tỉnh" trong 3 chạm; "Chọn gần đây" chọn lại một chạm', async () => {
+    const back = page.locator('header').getByRole('button', { name: 'Về toàn tỉnh', exact: true });
+    if (await back.count()) throw new Error('chưa lọc mà đã có nút "Về toàn tỉnh"');
+    await trig.click(); // chạm 1
+    await dlg.getByRole('button', { name: new RegExp(`^Phường ${WARD.name}`) }).click(); // chạm 2
+    await dlg.waitFor({ state: 'hidden', timeout: 3_000 });
+    if (!(await trig.innerText()).includes(WARD.name)) throw new Error('chọn phường nhưng nút địa bàn không đổi');
+    await back.click(); // chạm 3
+    await page.waitForFunction(() => /Toàn tỉnh/.test(document.querySelector('header button[title="Lọc dữ liệu theo địa phương"]')?.innerText || ''), null, { timeout: 5_000 });
+    if (await back.count()) throw new Error('đã về toàn tỉnh nhưng nút "Về toàn tỉnh" vẫn còn');
+    await trig.click();
+    await dlg.getByRole('button', { name: `Chọn lại: Phường ${WARD.name}` }).click();
+    await dlg.waitFor({ state: 'hidden', timeout: 3_000 });
+    if (!(await trig.innerText()).includes(WARD.name)) throw new Error('"Chọn gần đây" không chọn lại được phường');
+    await back.click();
+    await page.waitForFunction(() => /Toàn tỉnh/.test(document.querySelector('header button[title="Lọc dữ liệu theo địa phương"]')?.innerText || ''), null, { timeout: 5_000 });
+    return 'chọn phường → Về toàn tỉnh: 3 chạm · Chọn gần đây: 1 chạm';
+  });
+
   // Sáng / Tối (thiết kế F.2–F.3): Theo máy · Sáng · Tối trong menu tài khoản; đổi tức thì, nhớ qua tải lại (áp trước khi nạp
   // trang — không nháy), chọn lại "Theo máy" thì theo hệ điều hành; nút nhanh trên thanh báo trạng thái (aria-pressed)
   await step(ctx, 'Giao diện Theo máy / Sáng / Tối (menu tài khoản): đổi tức thì, nhớ qua tải lại, "Theo máy" theo hệ điều hành; nút nhanh có aria-pressed', async () => {
@@ -2783,6 +2804,38 @@ async function areaFilter(ctx) {
     }
     await menu.click(); // đóng menu tài khoản
     return `máy: ${system}`;
+  });
+
+  // Thiết kế F: chữ đọc rõ ở cả hai nền — mọi màu chữ (chính, phụ, mờ, nhấn, cảnh báo) ≥ 4,5 : 1 trên nền trang, ô, ô phụ;
+  // chữ trắng trên nút màu nhấn ≥ 4,5 : 1. Đọc biến màu thật của trang (index.css), không phải số chép lại
+  await step(ctx, 'Tương phản chữ ≥ 4,5 : 1 ở nền Sáng và Tối (chữ chính, phụ, mờ, nhấn, cảnh báo; chữ trắng trên nút nhấn)', async () => {
+    const bad = await page.evaluate(() => {
+      const root = document.documentElement;
+      const had = root.classList.contains('dark');
+      const lum = ([r, g, b]) => {
+        const f1 = (c) => { const x = c / 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; };
+        return 0.2126 * f1(r) + 0.7152 * f1(g) + 0.0722 * f1(b);
+      };
+      const ratio = (a, b) => { const x = lum(a); const y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+      const out = [];
+      for (const dark of [false, true]) {
+        root.classList.toggle('dark', dark);
+        const cs = getComputedStyle(root);
+        const v = (n) => cs.getPropertyValue(n).trim().split(/\s+/).map(Number);
+        for (const fg of ['--ink', '--ink-2', '--muted', '--accent-text', '--danger-text', '--serious-text', '--warn-text', '--good-text']) {
+          for (const bg of ['--bg', '--panel', '--panel-2']) {
+            const r = ratio(v(fg), v(bg));
+            if (!(r >= 4.5)) out.push(`${dark ? 'Tối' : 'Sáng'} ${fg} trên ${bg}: ${r.toFixed(2)}`);
+          }
+        }
+        const w = ratio([255, 255, 255], v('--accent'));
+        if (!(w >= 4.5)) out.push(`${dark ? 'Tối' : 'Sáng'} chữ trắng trên nút màu nhấn: ${w.toFixed(2)}`);
+      }
+      root.classList.toggle('dark', had);
+      return out;
+    });
+    if (bad.length) throw new Error(bad.slice(0, 6).join('; '));
+    return '8 màu chữ × 3 nền × 2 giao diện đạt';
   });
 }
 

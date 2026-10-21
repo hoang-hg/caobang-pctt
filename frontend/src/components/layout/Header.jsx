@@ -56,7 +56,7 @@ export default function Header() {
 
       {/* Logo & Tiêu đề cơ quan */}
       <Link to="/dashboard" className="touch-hit flex items-center gap-2.5 pr-2 transition-opacity hover:opacity-90">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-danger to-red-700 text-white shadow-sm shadow-danger/25">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-danger text-white">
           <ShieldAlert size={20} />
         </div>
         <div className="hidden leading-tight lg:block">
@@ -155,9 +155,9 @@ export default function Header() {
           {soundOn ? <Volume2 size={16} /> : <VolumeX size={16} />}
         </button>
 
-        {/* Nút đổi giao diện Sáng / Tối */}
+        {/* Nút đổi giao diện Sáng / Tối — điện thoại: chỉ trong menu tài khoản (Theo máy / Sáng / Tối), nhường chỗ cho tên địa bàn */}
         <button
-          className="btn-ghost touch-hit p-2 transition-transform active:rotate-45"
+          className="btn-ghost touch-hit p-2 transition-transform active:rotate-45 max-sm:hidden"
           onClick={toggleTheme}
           title={theme === 'dark' ? 'Chuyển sang nền Sáng' : 'Chuyển sang nền Tối'}
           aria-label="Nền tối"

@@ -14,16 +14,16 @@ import { useOnline } from '../../utils/useOnline';
 import { Modal } from './ui';
 
 const KIND = {
-  hanh_chinh: { icon: Landmark, label: 'Hành chính' },
+  hanh_chinh: { icon: Landmark, label: 'Xã / phường' },
   dia_danh: { icon: MapPin, label: 'Địa danh' },
   tram: { icon: Radio, label: 'Trạm quan trắc' },
   ho_chua: { icon: Droplets, label: 'Hồ chứa' },
   luc_luong: { icon: Users, label: 'Lực lượng' },
   kho: { icon: Warehouse, label: 'Kho' },
-  sos: { icon: Siren, label: 'Sự cố SOS' },
+  sos: { icon: Siren, label: 'Phiếu cứu hộ' },
   toa_do: { icon: Crosshair, label: 'Toạ độ' },
 };
-const HINT = 'tên xã, xóm, địa danh, trạm, hồ, mã SOS (VD SOS-1001), toạ độ (22.66, 106.25) hoặc dán link Google Maps';
+const HINT = 'tên xóm, xã, địa danh, trạm, hồ, mã phiếu cứu hộ (VD SOS-1001), toạ độ (VD 22.66, 106.25) hoặc dán link Google Maps';
 
 // Tìm gần đây (5 mục, máy này): chỉ giữ tên / toạ độ / mã — không giữ địa chỉ người báo SOS
 const RECENT_KEY = 'pctt_search_recent';
@@ -168,7 +168,7 @@ export default function OmniSearch() {
       <input
         ref={input}
         className="input tap pl-9 pr-10"
-        placeholder={wide ? 'Tìm địa danh, mã SOS, toạ độ GPS, link Google Maps…' : 'Tìm địa danh, mã SOS, toạ độ…'}
+        placeholder={wide ? 'Gõ tên xóm, mã phiếu SOS hoặc toạ độ…' : 'Tên xóm, mã phiếu, toạ độ…'}
         value={q}
         onChange={(e) => { setQ(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)}
@@ -194,9 +194,9 @@ export default function OmniSearch() {
         {typing && search.status === 'done' ? `${search.items.length} kết quả` : search.status === 'loading' ? 'Đang tìm' : ''}
       </div>
       {!typing && recent.length > 0 && (
-        <div className="flex items-center justify-between px-2 pt-1 text-[11px] font-bold uppercase tracking-wide text-muted">
+        <div className="flex items-center justify-between px-2 pt-1 text-xs font-semibold text-muted">
           Tìm gần đây
-          <button type="button" className="tap rounded px-2 normal-case text-accent hover:bg-accent/10" onClick={() => { setRecent([]); writeRecent([]); }}>Xoá</button>
+          <button type="button" className="tap rounded px-2 text-accent hover:bg-accent/10" onClick={() => { setRecent([]); writeRecent([]); }}>Xoá</button>
         </div>
       )}
       <ul id={listId} role="listbox" aria-label={typing ? 'Kết quả tìm kiếm' : 'Tìm gần đây'} className="flex flex-col">
@@ -240,14 +240,18 @@ export default function OmniSearch() {
           <WifiOff size={13} aria-hidden="true" /> Mất mạng — chưa tìm được, có mạng lại sẽ tự tìm
         </p>
       )}
-      {!typing && <p className="px-2 py-2 text-xs text-muted">Gõ ít nhất 2 ký tự: {HINT}.</p>}
+      {!typing && (
+        <p className="px-2 py-2 text-xs leading-relaxed text-muted">
+          Gõ ít nhất 2 ký tự: {HINT}. Chạm một kết quả là bản đồ bay tới chỗ đó (phiếu cứu hộ: mở đúng phiếu).
+        </p>
+      )}
     </div>
   );
 
   if (!wide) {
     return (
       <>
-        <button type="button" className="btn-ghost touch-hit p-2" onClick={() => setOpen(true)} aria-label="Tìm kiếm toàn năng" title="Tìm địa danh, mã SOS, toạ độ">
+        <button type="button" className="btn-ghost touch-hit p-2" onClick={() => setOpen(true)} aria-label="Tìm kiếm toàn năng" title="Tìm tên xóm, mã phiếu SOS, toạ độ">
           <Search size={16} />
         </button>
         <Modal open={open} onClose={close} title="Tìm kiếm">
