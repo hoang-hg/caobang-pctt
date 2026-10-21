@@ -18,8 +18,11 @@ import { ErrorState, Hint, Skeleton } from '../common/ui';
  * liệu xã chờ duyệt (data.import toàn tỉnh), phản ánh người dân chờ duyệt (report.view). Số Đỏ chỉ cho việc thật sự khẩn
  * (xã xin chi viện, phiếu quá hạn). Việc mới xuất hiện → dòng trượt vào (một lần). Không ghi vào báo cáo PDF.
  * Chưa tải được KPI (máy chủ lỗi / đang tải) → KHÔNG nói "không có việc nào" khi thực ra chưa biết.
+ * `stacked`: danh sách dọc ở mọi cỡ màn (cột trái của Tổng quan màn lớn ≥ 1680 px — cạnh bản đồ lớn).
  */
-export default function DecisionPanel({ k, kState, className }) {
+export default function DecisionPanel({ k, kState, className, stacked = false }) {
+  // Lớp chỉ áp từ 640 px khi xếp ngang; `stacked` giữ kiểu danh sách dọc của điện thoại
+  const row = (cls) => (stacked ? null : cls);
   const badges = useNavBadges();
   const canSos = usePermission('sos', 'view');
   const { data: tickets = [] } = useAreaQuery('sos', '/sos', {}, { refetchInterval: 20_000, enabled: canSos });
@@ -44,8 +47,8 @@ export default function DecisionPanel({ k, kState, className }) {
   return (
     // Từ 640 px: tiêu đề bên trái, các việc thành MỘT hàng thẻ ngang bên phải — khối thấp, 6 ô chỉ số và bản đồ vẫn trong
     // màn hình đầu của laptop 1366 × 768. Điện thoại: danh sách dọc, mỗi dòng: số · việc · nút
-    <section className={clsx('card flex flex-col gap-2 p-3 no-print sm:flex-row sm:items-stretch sm:gap-3', className)} aria-label="Việc chờ quyết định">
-      <div className="flex items-center justify-between gap-2 sm:w-32 sm:shrink-0 sm:flex-col sm:items-start sm:justify-center sm:gap-1">
+    <section className={clsx('card flex flex-col gap-2 p-3 no-print', row('sm:flex-row sm:items-stretch sm:gap-3'), className)} aria-label="Việc chờ quyết định">
+      <div className={clsx('flex items-center justify-between gap-2', row('sm:w-32 sm:shrink-0 sm:flex-col sm:items-start sm:justify-center sm:gap-1'))}>
         <div className="flex min-w-0 items-center gap-2">
           <h2 className="text-base font-bold leading-tight text-ink">Việc chờ quyết định</h2>
           <Hint label="Việc chờ quyết định">
@@ -60,23 +63,25 @@ export default function DecisionPanel({ k, kState, className }) {
             ? <ErrorState onRetry={kState.refetch} className="!py-3">Không tải được — chưa biết việc nào đang chờ</ErrorState>
             : <Skeleton height={56} />
         ) : rows.length ? (
-          <ul className="flex flex-col divide-y divide-line sm:grid sm:auto-cols-fr sm:grid-flow-col sm:gap-2 sm:divide-y-0">
+          <ul className={clsx('flex flex-col divide-y divide-line', row('sm:grid sm:auto-cols-fr sm:grid-flow-col sm:gap-2 sm:divide-y-0'))}>
             {rows.map((r) => (
               <li key={r.key} className={clsx('min-w-0', fresh(r.key) && 'motion-safe:animate-enter')}>
                 <Link
                   to={r.to}
-                  className="group -mx-1 flex min-h-[46px] items-center gap-3 rounded-lg px-1 py-1 hover:bg-panel2 sm:mx-0 sm:h-full sm:gap-2.5 sm:border sm:border-line sm:px-2.5 sm:py-1.5 sm:hover:border-accent"
+                  className={clsx('group -mx-1 flex min-h-[46px] items-center gap-3 rounded-lg px-1 py-1 hover:bg-panel2', row('sm:mx-0 sm:h-full sm:gap-2.5 sm:border sm:border-line sm:px-2.5 sm:py-1.5 sm:hover:border-accent'))}
                 >
-                  <span className={clsx('num w-10 shrink-0 text-right text-[26px] font-extrabold leading-none sm:w-auto', r.level != null ? risk(r.level).text : 'text-ink')}>
+                  <span className={clsx('num w-10 shrink-0 text-right text-[26px] font-extrabold leading-none', row('sm:w-auto'), r.level != null ? risk(r.level).text : 'text-ink')}>
                     {int(r.n)}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-medium leading-snug text-ink sm:text-[13px]">{r.text}</span>
-                    <span className="hidden items-center text-xs font-semibold text-accent group-hover:underline sm:inline-flex">
-                      {r.action} <ChevronRight size={13} aria-hidden="true" />
-                    </span>
+                    <span className={clsx('block text-sm font-medium leading-snug text-ink', row('sm:text-[13px]'))}>{r.text}</span>
+                    {!stacked && (
+                      <span className="hidden items-center text-xs font-semibold text-accent group-hover:underline sm:inline-flex">
+                        {r.action} <ChevronRight size={13} aria-hidden="true" />
+                      </span>
+                    )}
                   </span>
-                  <span className="btn-secondary pointer-events-none shrink-0 px-2.5 py-1 text-xs font-semibold sm:hidden">
+                  <span className={clsx('btn-secondary pointer-events-none shrink-0 px-2.5 py-1 text-xs font-semibold', row('sm:hidden'))}>
                     {r.action} <ChevronRight size={14} aria-hidden="true" />
                   </span>
                 </Link>
