@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { GeoJSON, MapContainer, Marker, useMap, useMapEvents } from 'react-leaflet';
 import { FileCheck2, MapPin, Pentagon, Plus, Trash2 } from 'lucide-react';
 import { FieldError, Modal } from '../components/common/ui';
-import { AdminBoundaries, BaseLayer, DrawTool } from '../components/map/MapTools';
+import { AdminBoundaries, BaseLayer, DrawTool, ProvinceMask } from '../components/map/MapTools';
 import { pinIcon } from '../components/map/icons';
 import { useUnits, useUnitsGeo } from '../api/hooks';
 import { choiceLabel } from './dataImportFacts';
@@ -216,6 +216,7 @@ function LocationModal({ ds, row, onPick, onClose }) {
       <div className="h-[26rem] overflow-hidden rounded-lg border border-line">
         <MapContainer center={[22.75, 106.05]} zoom={9} zoomSnap={0.25} className="h-full w-full">
           <BaseLayer basemap="auto" />
+          <ProvinceMask />
           <AdminBoundaries geo={geo} />
           <FitCommune code={row.ma_xa} />
           {polygon ? (

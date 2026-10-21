@@ -4,7 +4,9 @@ import { GeoJSON, Marker, Pane, Polygon, Polyline, TileLayer, Tooltip, useMap, u
 import L from './leafletGlobal';
 import 'leaflet-draw';
 import { api, ApiError } from '../../api/client';
+import { useProvinceArea } from '../../api/hooks';
 import { useStore } from '../../app/store';
+import { useMediaQuery } from '../../utils/useMediaQuery';
 import { pinIcon, COLORS } from './icons';
 import { fmtVn } from '../../utils/bulletin';
 
@@ -38,6 +40,9 @@ const LOCAL_TILES = '/tiles/caobang.pmtiles';
 // thấp của tệp tự lưu trữ (dữ liệu OSM) phủ cả Biển Đông nên không được hiện.
 const LOCAL_MIN_ZOOM = 7;
 
+// Quyết định 21/10/2026 (docs/ke-hoach-lam-moi-giao-dien.md mục 7.1): Địa lý / Địa hình / Vệ tinh lấy ô Google như các trang
+// tham khảo; nền Địa lý tự lưu trữ (`local`) chỉ còn là DỰ PHÒNG — tự bật khi không tải được ô Google (mất kết nối quốc tế).
+// `preferLocal`: Ban đêm vẫn ưu tiên nền tự lưu trữ (ô Google tối chỉ là ô sáng đảo màu bằng CSS).
 export const BASEMAPS = {
   street: {
     label: 'Bản đồ Địa lý',
@@ -64,6 +69,7 @@ export const BASEMAPS = {
   dark: {
     label: 'Chế độ ban đêm',
     local: 'dark',
+    preferLocal: true,
     url: 'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}&hl=vi&gl=vn',
     subdomains: ['0', '1', '2', '3'],
     attr: '© Google Maps',
@@ -131,13 +137,39 @@ function LocalBaseLayer({ source, flavor, fallback }) {
   return inside ? null : fallback;
 }
 
-/** Nền bản đồ: Địa lý / Ban đêm ưu tiên bản đồ tự lưu trữ; Vệ tinh / Địa hình là nguồn ngoài (README §6.9). */
+// Không tải được ô ngoài: ≥ 6 ô lỗi mà chưa ô nào tải được → coi như mất kết nối quốc tế, chuyển nền dự phòng
+const DOWN_AFTER = 6;
+
+/**
+ * Nền bản đồ (README §6.9): Địa lý / Địa hình / Vệ tinh là ô Google như các trang tham khảo — Địa lý có nền tự lưu trữ
+ * dự phòng; Ban đêm ưu tiên nền tự lưu trữ. Màn rộng (≥ 1024 px), zoom < 12: lấy ô 128 px của mức zoom kế tiếp như trang
+ * Cảnh báo đa thiên tai Cao Bằng — chữ nhỏ, nét, nhiều chi tiết; điện thoại giữ ô 256 px (đỡ tốn dữ liệu di động).
+ */
 export function BaseLayer({ basemap }) {
   const map = useMap();
   const theme = useStore((s) => s.theme);
   const local = useLocalBasemap();
   const key = basemap === 'auto' ? (theme === 'dark' ? 'dark' : 'street') : basemap;
   const b = BASEMAPS[key] || BASEMAPS.street;
+  const wide = useMediaQuery('(min-width: 1024px)');
+  const [zoom, setZoom] = useState(() => map.getZoom());
+  useMapEvents({ zoomend: () => setZoom(map.getZoom()) });
+  const crisp = wide && zoom < 12;
+  const tiles = useRef({ ok: 0, err: 0 });
+  const [down, setDown] = useState(false);
+  useEffect(() => {
+    tiles.current = { ok: 0, err: 0 };
+    setDown(false);
+  }, [key]);
+  const watch = b.local && !b.preferLocal
+    ? {
+      tileload: () => { tiles.current.ok += 1; },
+      tileerror: () => {
+        tiles.current.err += 1;
+        if (tiles.current.err >= DOWN_AFTER && !tiles.current.ok) setDown(true);
+      },
+    }
+    : undefined;
   const maxZoom = b.maxZoom || 20;
   // Đặt maxZoom cho bản đồ trước khi các lớp khác được thêm (layout effect chạy trước effect thêm lớp của
   // react-leaflet): cụm điểm (markercluster) báo lỗi nếu bản đồ chưa có maxZoom, mà nền tự lưu trữ nạp sau.
@@ -147,18 +179,22 @@ export function BaseLayer({ basemap }) {
   const external = (
     <>
       <TileLayer
-        key={key}
+        key={`${key}-${crisp ? 128 : 256}`}
         url={b.url}
         subdomains={b.subdomains || ['0', '1', '2', '3']}
         attribution={b.attr}
         maxZoom={b.maxZoom || 20}
+        tileSize={crisp ? 128 : 256}
+        zoomOffset={crisp ? 1 : 0}
         className={b.className}
+        eventHandlers={watch}
       />
       {b.labels && <TileLayer key={`${key}-labels`} url={b.labels} maxZoom={b.maxZoom || 19} zIndex={350} />}
     </>
   );
   if (!b.local) return external;
-  if (local === undefined) return null; // chờ kiểm tra xong, tránh tải nền ngoài rồi lại đổi
+  if (!b.preferLocal && !down) return external; // ô Google trước; mất kết nối quốc tế → nền tự lưu trữ (nếu máy chủ có)
+  if (local === undefined) return b.preferLocal ? null : external; // chờ kiểm tra xong, tránh tải nền ngoài rồi lại đổi
   if (!local) return external;
   return <LocalBaseLayer key={b.local} source={local} flavor={b.local} fallback={external} />;
 }
@@ -243,17 +279,23 @@ export function MapResize() {
 }
 
 // Viền vùng đang xem: màu nhấn (xanh) của giao diện — KHÔNG dùng đỏ (Đỏ chỉ nghĩa là mức Khẩn cấp của thang rủi ro chung), viền
-// nền tương phản bên dưới để rõ trên nền sáng, tối, vệ tinh. Phủ mờ ngoài vùng theo chế độ: tối → phủ tối, sáng → phủ trắng
-// (phủ xanh đen trên nền sáng làm bản đồ nặng, khó đọc ngoài trời)
+// nền tương phản bên dưới để rõ trên nền sáng, tối, vệ tinh. Ngoài vùng làm mờ ĐẬM (quyết định 21/10/2026: bản đồ chỉ rõ tỉnh
+// Cao Bằng / vùng đang xem — docs/ke-hoach-lam-moi-giao-dien.md mục 7.2): nền sáng phủ trắng, nền tối và vệ tinh phủ tối.
 const AREA_STYLE = {
-  dark: { line: '#3987e5', halo: '#0b1220', mask: '#0b1220', maskOn: 0.5, maskOff: 0.25 },
-  light: { line: '#2a78d6', halo: '#ffffff', mask: '#ffffff', maskOn: 0.6, maskOff: 0.3 },
+  dark: { line: '#3987e5', halo: '#0b1220', mask: '#0b1220', maskOn: 0.65, maskOff: 0.65 },
+  light: { line: '#2a78d6', halo: '#ffffff', mask: '#ffffff', maskOn: 0.7, maskOff: 0.7 },
 };
 
-/** `fly` = false: chỉ vẽ ranh giới / phủ mờ ngoài vùng, không bay tới vùng (nơi gọi tự đặt khung nhìn, VD vừa các phiếu SOS). */
-export function AreaFocus({ area, filtered, padding = {}, fly = true }) {
+/**
+ * Vùng đang xem (tỉnh, vùng lọc, phạm vi được giao): bay tới vùng + làm mờ ngoài ranh giới + viền màu nhấn. Lớp mờ ở pane
+ * riêng (trên ô nền, dưới mọi lớp số liệu: điểm, vùng nguy hiểm, quỹ đạo bão vẫn rõ dù ở ngoài vùng); không khoá kéo bản đồ
+ * ra ngoài. `fly` = false: không bay tới vùng (nơi gọi tự đặt khung nhìn, VD vừa các phiếu SOS). `basemap`: nền Vệ tinh →
+ * phủ tối.
+ */
+export function AreaFocus({ area, filtered, padding = {}, fly = true, basemap }) {
   const map = useMap();
-  const s = AREA_STYLE[useStore((st) => st.theme)] || AREA_STYLE.dark;
+  const theme = useStore((st) => st.theme);
+  const s = AREA_STYLE[basemap === 'satellite' ? 'dark' : theme] || AREA_STYLE.dark;
   useEffect(() => {
     if (!fly || !area?.bbox) return;
     const [x1, y1, x2, y2] = area.bbox;
@@ -274,11 +316,21 @@ export function AreaFocus({ area, filtered, padding = {}, fly = true }) {
   const world = [[-89, -179], [-89, 179], [89, 179], [89, -179]];
   return (
     <>
-      <Polygon positions={[world, ...rings]} pathOptions={{ stroke: false, fillColor: s.mask, fillOpacity: filtered ? s.maskOn : s.maskOff }} interactive={false} />
-      <Polygon positions={rings} pathOptions={{ color: s.halo, weight: 5, opacity: 0.7, fill: false }} interactive={false} />
-      <Polygon positions={rings} pathOptions={{ color: s.line, weight: 2.5, fill: false, dashArray: filtered ? undefined : '6 4' }} interactive={false} />
+      <Pane name="mat-na-ngoai-vung" style={{ zIndex: 350 }}>
+        <Polygon key={`mask-${s.mask}`} positions={[world, ...rings]} pathOptions={{ stroke: false, fillColor: s.mask, fillOpacity: filtered ? s.maskOn : s.maskOff }} interactive={false} />
+      </Pane>
+      <Pane name="vien-vung" style={{ zIndex: 425 }}>
+        <Polygon key={`halo-${s.halo}`} positions={rings} pathOptions={{ color: s.halo, weight: 5, opacity: 0.7, fill: false }} interactive={false} />
+        <Polygon key={`line-${s.line}-${filtered}`} positions={rings} pathOptions={{ color: s.line, weight: filtered ? 2.5 : 2, fill: false }} interactive={false} />
+      </Pane>
     </>
   );
+}
+
+/** Làm mờ ngoài tỉnh Cao Bằng cho bản đồ không gắn vùng lọc (cổng người dân, chọn vị trí, hồ sơ, phương tiện…). */
+export function ProvinceMask({ basemap }) {
+  const { data: area } = useProvinceArea();
+  return <AreaFocus area={area} filtered={false} fly={false} basemap={basemap} />;
 }
 
 /**

@@ -2854,7 +2854,8 @@ async function areaFilter(ctx) {
     let strokes = [];
     for (let i = 0; i < 20 && !strokes.some((c) => AREA_LINE.test(c)); i += 1) {
       await page.waitForTimeout(500);
-      strokes = await page.evaluate(() => [...document.querySelectorAll('.leaflet-overlay-pane path[fill="none"]')].map((p) => p.getAttribute('stroke')));
+      // viền vùng đang xem nằm ở pane riêng "vien-vung" (MapTools AreaFocus), không trong overlay-pane
+      strokes = await page.evaluate(() => [...document.querySelectorAll('.leaflet-map-pane path[fill="none"]')].map((p) => p.getAttribute('stroke')));
     }
     if (!strokes.some((c) => AREA_LINE.test(c))) throw new Error(`không thấy viền vùng màu nhấn (${[...new Set(strokes)].slice(0, 4).join(', ')})`);
     if (strokes.some((c) => /^#ef4444$/i.test(c))) throw new Error('viền vùng đang xem vẫn màu đỏ');

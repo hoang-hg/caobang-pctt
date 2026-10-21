@@ -2,7 +2,7 @@ import clsx from 'clsx';
 import { MapContainer, Marker, Popup } from 'react-leaflet';
 import { Fuel, MapPin, Pencil, Phone, Wrench } from 'lucide-react';
 import { EmptyState, ErrorState, Progress, Section, Skeleton, SortTh, StatusDot } from '../common/ui';
-import { BaseLayer, MapResize } from '../map/MapTools';
+import { BaseLayer, MapResize, ProvinceMask } from '../map/MapTools';
 import { vehicleIcon } from '../map/icons';
 import { Can, usePermission } from '../../rbac/usePermission';
 import { RES_STATUS, VEHICLE, VEHICLE_CAT } from '../../utils/labels';
@@ -169,6 +169,7 @@ export function VehicleMap({ rows, className }) {
       <div className="h-56 overflow-hidden rounded-lg sm:h-72">
         <MapContainer center={[22.75, 106.05]} zoom={8} className="h-full w-full" scrollWheelZoom={false}>
           <BaseLayer basemap="auto" />
+          <ProvinceMask />
           <MapResize />
           {located.map((v) => (
             <Marker key={v.id} position={[v.lat, v.lon]} icon={vehicleIcon(v)}>

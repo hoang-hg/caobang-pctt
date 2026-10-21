@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Circle, GeoJSON, MapContainer, Marker, Pane, Polyline, Popup, Tooltip, useMap } from 'react-leaflet';
+import { Circle, GeoJSON, MapContainer, Marker, Polyline, Popup, Tooltip, useMap } from 'react-leaflet';
 import clsx from 'clsx';
 import {
   ShieldAlert, LocateFixed, Megaphone, Phone, Home, CloudRain, Waves, Camera, LogIn, Moon, Sun, Navigation, AlertTriangle,
@@ -11,7 +11,7 @@ import {
 import { api } from '../../api/client';
 import { useUnitsGeo, useUnits, useProvinceArea } from '../../api/hooks';
 import { useStore } from '../../app/store';
-import { AdminBoundaries, BaseLayer, RAIN_BINS } from '../../components/map/MapTools';
+import { AdminBoundaries, AreaFocus, BaseLayer, RAIN_BINS } from '../../components/map/MapTools';
 import { evacIcon, hazardIcon, pinIcon, stationIcon, reservoirIcon } from '../../components/map/icons';
 import { LEVEL, landslideStatus } from '../../utils/labels';
 import { levelOf, RESERVOIR_LEVEL, RISK as RISK_SCALE, risk as riskStyle, TILT_LEVEL } from '../../utils/risk';
@@ -30,7 +30,6 @@ import NetworkBanner from './NetworkBanner';
 const SOURCE_TAB_LABEL = { hochua: 'Quay lại Hồ chứa', satlo: 'Quay lại Sạt trượt', sotan: 'Quay lại Điểm sơ tán' };
 const REFRESH = 60_000;
 const pub = (path, params) => api(`/public${path}`, { params });
-const PROVINCE_COLOR = '#dc2626'; // ranh giới tỉnh: một màu cố định
 const RISK = {
   cao: { label: 'Nguy cơ CAO', cls: RISK_SCALE[3].chip, icon: AlertTriangle, tip: 'Bạn đang nằm trong vùng có nguy cơ ngập lụt hoặc sạt lở đất. Hãy chủ động di dời tới điểm an toàn!' },
   trung_binh: { label: 'Cần theo dõi', cls: RISK_SCALE[1].chip, icon: AlertTriangle, tip: 'Khu vực lân cận có nguy cơ hoặc dự báo mưa to. Cần chuẩn bị phương án phòng tránh.' },
@@ -84,24 +83,9 @@ function PublicMap({ data, forecast, geo, me, route, target, layers, basemap = '
       <BaseLayer basemap={basemap} />
       <FlyTo target={target} />
 
-      {/* Ranh giới xã/phường (luôn hiện) rồi ranh giới tỉnh trên cùng — pane riêng, không bị lớp tô màu che */}
+      {/* Ranh giới xã/phường (luôn hiện); chỉ rõ tỉnh Cao Bằng — ngoài tỉnh làm mờ, viền tỉnh màu nhấn (quyết định 21/10/2026) */}
       <AdminBoundaries geo={geo} basemap={basemap} interactive={false} />
-      {provinceArea?.geometry && (
-        <Pane name="ranh-gioi-tinh" style={{ zIndex: 430 }}>
-          <GeoJSON
-            key={`prov-casing-${basemap}`}
-            data={provinceArea.geometry}
-            style={{ color: basemap === 'satellite' ? '#000000' : '#ffffff', weight: 6, opacity: 0.9, fill: false }}
-            interactive={false}
-          />
-          <GeoJSON
-            key={`prov-line-${basemap}`} // vẽ lại cùng viền nền khi đổi nền → luôn nằm trên viền
-            data={provinceArea.geometry}
-            style={{ color: PROVINCE_COLOR, weight: 3.5, opacity: 1, fill: false, dashArray: '10 4' }}
-            interactive={false}
-          />
-        </Pane>
-      )}
+      <AreaFocus area={provinceArea} filtered={false} fly={false} basemap={basemap} />
 
       {layers.forecast && geo && forecast?.length > 0 && (
         <GeoJSON
