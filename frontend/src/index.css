@@ -35,6 +35,7 @@
   --serious-text: 194 65 12; /* #C2410C — 5,2 : 1 trên nền trắng */
   --warn-text: 150 90 5; /* #965A05 — 5,1 : 1 trên panel-2 */
   --good-text: 21 128 61; /* #15803D — 5,0 : 1 */
+  --shadow-float: 0 8px 24px rgb(15 23 42 / 0.12); /* bóng của lớp nổi trên bản đồ (.float-panel) */
 
   /* Màu biểu đồ (theo bộ palette đã kiểm định CVD) */
   --series-1: #2a78d6;
@@ -65,6 +66,7 @@
     --serious-text: 236 131 90; /* nền tối: chính màu trạng thái đã đủ tương phản */
     --warn-text: 247 200 0;
     --good-text: 22 178 22; /* 5,2 : 1 trên panel-2 nền tối (#0CA30C chỉ 4,4 : 1) */
+    --shadow-float: 0 8px 24px rgb(0 0 0 / 0.4);
 
     --series-1: #3987e5;
     --series-2: #d95926;
@@ -83,9 +85,11 @@ body {
 }
 
 @layer components {
-  .card { @apply bg-panel border border-line rounded-xl shadow-sm transition-all; }
-  .card-hover { @apply card hover:shadow-md hover:border-line/90; }
-  .card-glass { @apply bg-panel/90 backdrop-blur-md border border-line rounded-xl shadow-lg; }
+  /* Thẻ: một kiểu cho mọi màn — nền ô, viền 1 px, bo 12 px, không bóng (kế hoạch làm mới giao diện, mục 4) */
+  .card { @apply bg-panel border border-line rounded-xl transition-[border-color,background-color,box-shadow] duration-150; }
+  .card-hover { @apply card hover:border-accent/50; }
+  /* Lớp nổi trên bản đồ (bảng lớp, chú giải, thanh thời gian…): một kiểu — nền ô hơi trong, làm mờ phía sau, một mức bóng */
+  .float-panel { @apply bg-panel/95 backdrop-blur-md border border-line/80 rounded-xl; box-shadow: var(--shadow-float); }
   /* Tiêu đề khối: chữ thường có dấu, đậm vừa — chữ IN HOA dàn rộng khó đọc với dấu tiếng Việt */
   .card-title { @apply text-sm font-semibold text-ink flex items-center gap-1.5; }
   
@@ -101,13 +105,13 @@ body {
   .input { @apply w-full rounded-lg border border-line bg-panel2 px-3 py-1.5 text-sm text-ink placeholder:text-muted transition-colors focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25; }
   /* Số liệu: chữ số đều bề ngang (cột số thẳng hàng, số đổi không làm chữ nhảy) — không dùng font mono cho số đếm */
   .num { font-variant-numeric: tabular-nums lining-nums; }
-  .chip { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-wide border border-transparent; }
+  .chip { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold border border-transparent; }
   
   .badge-live { @apply relative inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold bg-good/15 text-good border border-good/30; }
   
   .table-base { @apply w-full text-sm; }
   .table-base th { @apply sticky top-0 bg-panel2 text-left text-xs font-semibold text-muted px-3 py-2.5 border-b border-line z-10; }
-  .table-base td { @apply px-3 py-2 border-b border-line/60 align-top; }
+  .table-base td { @apply px-3 py-2.5 border-b border-line/60 align-top; }
   .table-base tr:hover td { @apply bg-panel2/60; }
 }
 

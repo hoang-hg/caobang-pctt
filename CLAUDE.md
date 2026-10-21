@@ -349,7 +349,10 @@ chỉ khi `DEMO_MODE`; `DEMO_MODE=false` xoá đoạn `so_do` còn sót mỗi l�
   `text-[rgb(var(--danger))]`). Bảng màu tối nằm trong `@media screen` → in luôn nền sáng; vùng cuộn cao cố định (`max-h-…` +
   `overflow-y-auto`) thêm `print:max-h-none print:overflow-visible` để in không bị cắt (mẫu cột Kanban ở RescueCenter). Component
   dùng chung trong `components/common/ui.jsx` (KpiCard, Modal, Confirm, Tabs, Section, Empty, Progress, StatusDot,
-  Skeleton, ErrorState, EmptyState, RiskLegend). Icon `lucide-react`. Thao tác khó quay lại (khoá tài khoản, xoá, cấp khoá
+  Skeleton, ErrorState, EmptyState, RiskLegend). Icon `lucide-react`. Thẻ (`.card`) không bóng; bảng nổi trên bản đồ dùng
+  `.float-panel`; vạch màu bên trái của ô số chỉ từ mức Vàng (StatCard `level` ≥ 1, KpiCard `tone` warn / serious /
+  danger); màn trống có hình nét đơn: `EmptyState` / `Empty` `art` (`components/common/EmptyArt.jsx`). Trang mẫu
+  `/mau-giao-dien` (chỉ máy dev) bày mọi thành phần ở hai nền. Kế hoạch giao diện: `docs/ke-hoach-lam-moi-giao-dien.md`. Thao tác khó quay lại (khoá tài khoản, xoá, cấp khoá
   mới…) hỏi lại bằng `Confirm`: tiêu đề là câu hỏi, thân nói rõ hậu quả, nút ghi đúng việc — không dùng `window.confirm`.
 - **Mức rủi ro**: MỘT thang cho cả hệ thống — `src/utils/risk.js`: `risk(level)` với 0 Xanh · 1 Vàng · 2 Cam · 3 Đỏ, `null`
   Xám = chưa có dữ liệu; trả class chip / nền nhạt / chữ / viền trái và mã hex (biểu đồ, bản đồ). Mã nghiệp vụ quy về mức qua

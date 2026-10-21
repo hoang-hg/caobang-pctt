@@ -3,8 +3,10 @@
 Kế hoạch sắp xếp lại bố cục và hình thức của **cổng người dân** và **trang điều hành**, học cách trình bày của 3 trang
 tham khảo, **không đổi chức năng**: cùng đường dẫn, cùng số liệu, cùng phân quyền, cùng thao tác.
 
-- Lập: 21/10/2026, sau đợt chỉnh giao diện cho người mới (PR #102 → #108, đã merge). **Chưa làm** phần nào trong kế hoạch
-  này — mục 9 theo dõi tiến độ.
+- Lập: 21/10/2026, sau đợt chỉnh giao diện cho người mới (PR #102 → #108, đã merge). Mục 9 theo dõi tiến độ.
+- **Quyết định ngày 21/10/2026** (mục 10): ưu tiên trang điều hành; nền Địa hình / Vệ tinh lấy như các trang tham khảo
+  (ô Google); bản đồ cổng người dân và trang điều hành chỉ rõ tỉnh Cao Bằng, ngoài tỉnh làm mờ; **thêm yêu cầu mới** —
+  người dân phải đăng ký tài khoản mới gửi được phản ánh, yêu cầu cứu hộ (Đ5, mục 11 — đây là thay đổi chức năng).
 - Căn cứ: phân tích 3 trang tham khảo ngày 20/10/2026 (đọc mã nguồn, chụp màn máy tính + điện thoại); chụp hiện trạng ngày
   21/10/2026 (chế độ giả lập). Ảnh chỉ để phân tích, **không đưa lên repo** (có số liệu mẫu, repo công khai).
 - Ràng buộc như mọi đợt trước (CLAUDE.md): React 18 + Tailwind 3 + lucide-react + Recharts + Leaflet (cùng `pmtiles`,
@@ -21,9 +23,9 @@ lời); còn thiếu phần **"ấn tượng ngay khi mở"**:
    màu, phóng to khi rê chuột — dồn ở cổng người dân và trang đăng nhập.
 4. Mỗi màn một kiểu thẻ, cỡ tiêu đề, khoảng cách hơi khác nhau; thanh trên cùng của máy tính có khoảng 10 nút nhỏ.
 
-Làm theo **5 đợt, khoảng 12 PR**: nền móng chung trước để mọi màn cùng đẹp lên (Đ0) → cổng người dân và đăng nhập, bộ mặt
-của tỉnh (Đ1) → bản đồ nền địa hình tự lưu trữ (Đ2) → khung ứng dụng, Tổng quan, Bản đồ giám sát (Đ3) → đồng bộ các trang
-nghiệp vụ (Đ4). Mục 10 là các việc cần quyết định trước khi bắt đầu.
+Thứ tự làm (theo quyết định ngày 21/10/2026 — **trang điều hành trước**): nền móng chung (Đ0) → bản đồ nền như trang tham
+khảo và làm mờ ngoài tỉnh (Đ2) → khung ứng dụng, đăng nhập, Tổng quan, Bản đồ giám sát (Đ3) → các trang nghiệp vụ (Đ4) →
+cổng người dân (Đ1) → tài khoản người dân (Đ5). Khoảng 15 PR.
 
 ## 1. Nguyên tắc
 
@@ -65,7 +67,7 @@ tục; thuật ngữ tiếng Anh, viết tắt chuyên môn trên màn.
 | Điều học | Áp dụng ở | Đợt |
 |---|---|---|
 | Bản đồ toàn màn, bảng nổi | Cổng người dân (màn đầu). Bản đồ giám sát đã có (PR #53 → #62) | Đ1 |
-| Nền địa hình bóng núi | Nền "Địa hình" **tự lưu trữ** từ dữ liệu độ cao mở, thay ô ảnh Google (mục 7) | Đ2 |
+| Nền địa hình bóng núi | Nền như trang tham khảo — ô Google Địa lý / Địa hình / Vệ tinh (quyết định 21/10/2026, mục 7.1) | Đ2 |
 | Thanh thời gian có nút Phát, dải màu mưa liền | Bản đồ giám sát đã có (PR #106); mang sang cổng người dân | Đ1 |
 | Thanh trạng thái dưới cùng | Máy tính: giờ số liệu, nguồn dữ liệu, kết nối tức thì, đồng hồ (mục 5) | Đ1, Đ3 |
 | Ít mục menu | Cổng người dân: 8 tab → 5 nhóm việc (vẫn đủ 8 màn) | Đ1 |
@@ -182,7 +184,7 @@ Phải còn đủ: định vị "Tôi đang ở đâu" và chọn theo 56 xã; �
 cứu phiếu bằng mã + số điện thoại; hồ chứa, xả lũ; mực nước; đường dây nóng; cẩm nang; gửi phản ánh có ảnh và vị trí; Gọi
 112; Bản nhẹ; Sáng / Tối; vào trang điều hành; chỉ hiện cảnh báo đã duyệt.
 
-### 6.2. Đăng nhập (Đ1)
+### 6.2. Đăng nhập (Đ3)
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -197,8 +199,8 @@ cứu phiếu bằng mã + số điện thoại; hồ chứa, xả lũ; mực n�
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- Ảnh nền là ảnh tĩnh chụp từ bản đồ tự lưu trữ của hệ thống — trước Đ2 dùng nền Địa lý đã có, sau Đ2 đổi sang nền Địa
-  hình (mục 7); WebP ≤ 150 KB, có ghi nguồn; không dùng ảnh trên mạng.
+- Hình nền: ranh giới tỉnh và 56 xã vẽ từ dữ liệu ranh giới của chính hệ thống (SVG nét mảnh màu nhấn, đổi theo nền Sáng /
+  Tối, rất nhẹ) — không dùng ảnh chụp ô Google (giấy phép), không dùng ảnh trên mạng.
 - Chữ thường, bỏ "tác chiến", logo một màu. Điện thoại: chỉ cột đăng nhập.
 - Giữ nguyên: ghi nhớ, quên mật khẩu, xác thực 2 lớp, đổi mật khẩu lần đầu, link cổng người dân, khối giả lập chỉ trên
   máy dev.
@@ -226,7 +228,7 @@ cứu phiếu bằng mã + số điện thoại; hồ chứa, xả lũ; mực n�
 
 ### 6.4. Bản đồ giám sát (Đ3)
 
-- Nền mặc định: **Địa hình tự lưu trữ** (mục 7); vẫn chọn được Địa lý, Ban đêm.
+- Nền mặc định như trang tham khảo (mục 7.1), ngoài tỉnh làm mờ (mục 7.2); vẫn chọn được Địa hình, Vệ tinh, Ban đêm.
 - Mọi bảng nổi dùng một kiểu `.float-panel`; giờ số liệu, toạ độ con trỏ xuống thanh trạng thái.
 - Dải màu mưa liền, chữ "Mưa nhỏ → Mưa rất to" như trang tham khảo.
 - Giữ: 2 chế độ xem, 4 nhóm lớp có công tắc, thanh thời gian có Phát, đo, khoanh vùng, kéo – thả điều động.
@@ -240,25 +242,34 @@ cứu phiếu bằng mã + số điện thoại; hồ chứa, xả lũ; mực n�
 - Bỏ chữ IN HOA còn lại: Phản ánh (4 chỗ), hộp thoại kho, menu tài khoản, chú giải bản đồ, bản tin bão.
 - Hướng dẫn xử lý: mỗi tình huống một hình nét đơn.
 
-## 7. Bản đồ nền địa hình tự lưu trữ (Đ2)
+## 7. Bản đồ nền như trang tham khảo, làm mờ ngoài tỉnh (Đ2)
 
-**Vì sao:** đẹp như trang tham khảo (bóng núi, màu rừng — hợp tỉnh miền núi); **hết rủi ro giấy phép** (điều khoản Google
-không cho lấy thẳng ô ảnh như hiện nay ở nền Địa hình, Vệ tinh); chạy được khi mất kết nối quốc tế — như nền Địa lý, Ban
-đêm đã tự lưu trữ (`deploy/fetch-basemap.sh`, README 6.9).
+Quyết định ngày 21/10/2026: nền Địa hình, Vệ tinh **lấy như các trang tham khảo**; bản đồ ở cổng người dân và trang điều
+hành **chỉ rõ tỉnh Cao Bằng, phần xung quanh làm mờ**.
 
-**Cách làm (không thêm thư viện):**
+**7.1. Nền bản đồ** — chép cách trang Cảnh báo đa thiên tai Cao Bằng dùng ô ảnh Google (đọc từ mã nguồn của trang):
 
-1. Lấy dữ liệu độ cao mở cho đúng vùng của `fetch-basemap.sh` (BBOX 103.6,21.3,108.5,24.2): SRTM 30 m (NASA) hoặc
-   Copernicus DEM GLO-30 — **kiểm lại điều khoản và câu ghi nguồn** trước khi dùng.
-2. Tạo bóng núi bằng GDAL (`gdaldem hillshade`, chạy trong Docker như `fetch-basemap.sh`), cắt ô, đóng gói một tệp PMTiles
-   ảnh: `data/tiles/caobang-hillshade.pmtiles` — script mới `deploy/build-hillshade.sh`, chạy một lần (cần Internet,
-   Docker).
-   Dung lượng ước vài chục đến khoảng 200 MB tuỳ mức zoom tối đa (12 hay 13) — đo khi làm.
-3. Giao diện: lớp ảnh PMTiles (`leafletRasterLayer` trong gói `pmtiles` đã có) phủ lên nền vector `light` (nền này vẽ đặc,
-   đặt bóng núi bên dưới sẽ bị che): hoà trộn kiểu nhân, độ trong khoảng 40 %, đường và tên xã vẫn đọc rõ — thử, chỉnh khi
-   làm → nền "Địa hình" mới. Máy chưa có tệp → tự dùng nền Địa lý như hiện nay.
-4. Ghi nguồn trên bản đồ: "© OpenStreetMap · Độ cao: <nguồn đã chọn>".
-5. Nền **Vệ tinh**: chưa có nguồn mở đủ chi tiết với điều khoản rõ — **cần quyết định** (mục 10).
+| Nền | Nguồn | Ghi chú |
+|---|---|---|
+| Địa lý — **mặc định ở nền Sáng** | ô Google `lyrs=m` (có bóng địa hình ở mức zoom tỉnh) | Thay nền tự lưu trữ đang làm mặc định (phẳng). Nền tự lưu trữ OpenStreetMap (`deploy/fetch-basemap.sh`) **giữ làm dự phòng**: không tải được ô Google (mất kết nối quốc tế) thì tự chuyển sang |
+| Địa hình | ô Google `lyrs=p` | Như trang tham khảo |
+| Vệ tinh | ô Google `lyrs=y` | Như trang tham khảo, giữ nhãn địa danh để định hướng |
+| Ban đêm — mặc định ở nền Tối | giữ như hiện nay | |
+
+- Mẹo của trang tham khảo: dưới zoom 12 lấy ô 128 px của mức zoom kế tiếp — chữ nhỏ, nét, nhiều chi tiết. Chỉ dùng trên màn
+  rộng (≥ 1024 px); điện thoại giữ ô 256 px cho đỡ tốn dữ liệu di động.
+- **Rủi ro giấy phép:** điều khoản Google không cho lấy thẳng ô ảnh; người dùng đã chọn làm như các trang tham khảo
+  (21/10/2026). Phương án tự lưu trữ bóng núi từ dữ liệu độ cao mở (DEM → `gdaldem hillshade` → PMTiles, lớp
+  `leafletRasterLayer` của gói `pmtiles` đã có) **giữ lại làm dự phòng** khi cần thay ô Google.
+
+**7.2. Làm mờ ngoài tỉnh** — mọi bản đồ (cổng người dân, Tổng quan, Bản đồ giám sát, Cứu hộ, Cảnh báo…):
+
+- Phủ một lớp mờ lên mọi thứ ngoài ranh giới tỉnh: nền Sáng phủ trắng khoảng 70 %, nền Tối / Vệ tinh phủ tối khoảng 65 %;
+  ranh giới tỉnh màu nhấn có viền nền (không dùng đỏ — đỏ chỉ cho mức Khẩn cấp). Đang lọc một xã thì phần ngoài xã cũng mờ
+  (như hiện nay).
+- Lớp mờ nằm trên ô nền, dưới mọi lớp số liệu: điểm, đường quỹ đạo bão, cảnh báo vẫn rõ dù ở ngoài tỉnh.
+- **Không khoá** kéo bản đồ ra ngoài tỉnh: bão, mưa lớn từ ngoài vào vẫn phải xem được.
+- Thay đường viền tỉnh màu đỏ nét đứt đang có ở cổng người dân.
 
 ## 8. Kiểm thử và nghiệm thu chung
 
@@ -281,37 +292,79 @@ Rủi ro và cách tránh:
 |---|---|
 | Sắp xếp lại làm mất chức năng | Kiểm thử toàn bộ mỗi PR; danh sách "phải còn đủ" từng màn; đổi chữ trên nút thì sửa hướng dẫn + kiểm thử cùng PR |
 | Đẹp trên máy tính nhưng chậm trên điện thoại yếu, mạng yếu | Ít chuyển động, ảnh WebP, tải lười; giữ "Bản nhẹ"; đo trên điện thoại tầm trung |
-| Giấy phép bản đồ, ảnh, font | Chỉ dùng nguồn mở có điều khoản rõ và ghi nguồn; không lấy ảnh trên mạng; font Be Vietnam Pro (OFL) |
+| Giấy phép bản đồ, ảnh, font | Ô Google dùng như trang tham khảo theo quyết định 21/10/2026 — rủi ro đã ghi nhận, có phương án dự phòng (mục 7.1); không lấy ảnh trên mạng; font Be Vietnam Pro (OFL) |
 | Người đã quen giao diện cũ bỡ ngỡ | Gợi ý 3 bước theo vai trò cập nhật cùng PR; đổi theo đợt; ghi thay đổi trong Hướng dẫn xử lý |
 | Kiểu "làm cho có" quay lại | Rà theo mục 1.3 trước khi merge; bài quét tự động (mục 8) |
 
 ## 9. Lộ trình và theo dõi tiến độ
 
-| Đợt | PR | Nội dung | Tệp chính | Nghiệm thu | Trạng thái |
+Thứ tự theo quyết định ngày 21/10/2026: trang điều hành trước, cổng người dân sau.
+
+| Thứ tự | Đợt · PR | Nội dung | Tệp chính | Nghiệm thu | Trạng thái |
 |---|---|---|---|---|---|
-| Đ0 | 0.1 | Nền móng: thang chữ, khoảng cách, thẻ, lớp nổi, ô số, bảng, chuyển động, màn trống có hình, biểu đồ; trang mẫu (máy dev) | `index.css`, `tailwind.config.js`, `ui.jsx`, `StatCard`, `chartTheme.jsx` | Ảnh trước / sau 6 màn; kiểm thử toàn bộ đạt | Chưa làm |
-| Đ0 | 0.2 | Dọn kiểu "làm cho có": 41 chữ IN HOA, 16 màu chuyển, biểu tượng trong ô màu, phóng to khi rê; thêm bài quét tự động | rà toàn bộ `frontend/src` | Bài quét đạt; không đổi bố cục | Chưa làm |
-| Đ1 | 1.1 | Cổng người dân trên máy tính: bản đồ toàn màn, "Bạn muốn làm gì?", dải cảnh báo, thanh thời gian, thanh trạng thái | `pages/public/PublicPortal.jsx` | Đủ danh sách 6.1; đường dẫn cũ mở được | Chưa làm |
-| Đ1 | 1.2 | Cổng người dân trên điện thoại + menu 5 nhóm + trang con cùng kiểu | `PublicPortal.jsx`, `ReportForm`, `TicketTracker`, `ReservoirMonitor`, `LandslideMonitor`, `MissionPage` | 360 px: bản đồ ≥ 60 % màn đầu, Gọi 112 luôn thấy | Chưa làm |
-| Đ1 | 1.3 | Đăng nhập 2 cột, ảnh nền địa hình | `pages/Login.jsx` | Đủ chức năng đăng nhập; ảnh ≤ 150 KB | Chưa làm |
-| Đ2 | 2.1 | Nền Địa hình tự lưu trữ: script tạo tệp, lớp ảnh, nền mặc định ở cổng và Bản đồ | `deploy/build-hillshade.sh`, `components/map/MapTools.jsx`, README 6.9 | Máy có tệp → nền địa hình; chưa có → nền Địa lý; ghi nguồn đúng | Chưa làm (chờ quyết định mục 10) |
-| Đ3 | 3.1 | Thanh trên gọn + thanh trạng thái (máy tính); menu chữ thường | `components/layout/Header.jsx`, `Sidebar.jsx`, khung trang | Không mất nút nào (chỉ chuyển chỗ) | Chưa làm |
-| Đ3 | 3.2 | Tổng quan màn lớn 2 cột; chế độ trình chiếu phòng điều hành | `pages/Dashboard.jsx`, `components/dashboard/*` | Bài kiểm thử màn đầu theo thiết bị đạt | Chưa làm |
-| Đ3 | 3.3 | Bản đồ giám sát: lớp nổi thống nhất, nền mặc định, dải màu mưa | `pages/MonitoringMap.jsx`, `components/map/*` | Kiểm thử Bản đồ đạt | Chưa làm |
-| Đ4 | 4.1 | Cứu hộ, Cảnh báo, Phản ánh theo nền móng; chuyển động nhỏ | `pages/RescueCenter.jsx`, `pages/Alerts.jsx`, `pages/CitizenReports.jsx` | Kiểm thử từng trang đạt | Chưa làm |
-| Đ4 | 4.2 | Vật tư, Đợt thiên tai, Nhập dữ liệu, Nguồn dữ liệu, Phân quyền theo nền móng | các trang tương ứng | Kiểm thử từng trang đạt | Chưa làm |
-| Đ4 | 4.3 | Hướng dẫn xử lý có hình; rà toàn bộ hai nền, 360 px; dùng thử lần 2 | `pages/Guide.jsx`, `utils/guides.js` | Bài "5 giây" đạt với 3 nhóm người dùng | Chưa làm |
+| 1 | Đ0 · 0.1 | Nền móng: thẻ (bỏ bóng), lớp nổi `.float-panel`, ô số (vạch màu chỉ từ Vàng), bảng, màn trống có hình nét đơn (`EmptyArt`); trang mẫu `/mau-giao-dien` (máy dev); cập nhật tài liệu này | `index.css`, `ui.jsx`, `EmptyArt.jsx`, `StatCard`, `StyleGuide.jsx` | Ảnh trước / sau; kiểm thử toàn bộ đạt | Đang làm |
+| 2 | Đ0 · 0.2 | Dọn kiểu "làm cho có": chữ IN HOA, màu chuyển, biểu tượng trong ô màu, phóng to khi rê; thêm bài quét tự động | rà toàn bộ `frontend/src` | Bài quét đạt; không đổi bố cục | Chưa làm |
+| 3 | Đ2 · 2.1 | Nền như trang tham khảo (mục 7.1) + làm mờ ngoài tỉnh mọi bản đồ (mục 7.2) | `components/map/MapTools.jsx`, các bản đồ | Nền mặc định đúng; ngoài tỉnh mờ ở mọi bản đồ; mất ô Google → nền dự phòng | Chưa làm |
+| 4 | Đ3 · 3.1 | Thanh trên gọn + thanh trạng thái (máy tính); menu chữ thường; trang đăng nhập 2 cột | `Header.jsx`, `Sidebar.jsx`, `Login.jsx` | Không mất nút nào (chỉ chuyển chỗ); đủ chức năng đăng nhập | Chưa làm |
+| 5 | Đ3 · 3.2 | Tổng quan màn lớn 2 cột; chế độ trình chiếu phòng điều hành | `pages/Dashboard.jsx`, `components/dashboard/*` | Bài kiểm thử màn đầu theo thiết bị đạt | Chưa làm |
+| 6 | Đ3 · 3.3 | Bản đồ giám sát: lớp nổi thống nhất, dải màu mưa | `pages/MonitoringMap.jsx`, `components/map/*` | Kiểm thử Bản đồ đạt | Chưa làm |
+| 7 | Đ4 · 4.1 | Cứu hộ, Cảnh báo, Phản ánh theo nền móng; chuyển động nhỏ | `RescueCenter.jsx`, `Alerts.jsx`, `CitizenReports.jsx` | Kiểm thử từng trang đạt | Chưa làm |
+| 8 | Đ4 · 4.2 | Vật tư, Đợt thiên tai, Nhập dữ liệu, Nguồn dữ liệu, Phân quyền theo nền móng | các trang tương ứng | Kiểm thử từng trang đạt | Chưa làm |
+| 9 | Đ4 · 4.3 | Hướng dẫn xử lý có hình; rà toàn bộ hai nền, 360 px | `Guide.jsx`, `utils/guides.js` | Rà ảnh hai nền đạt | Chưa làm |
+| 10 | Đ1 · 1.1 | Cổng người dân trên máy tính: bản đồ toàn màn, "Bạn muốn làm gì?", dải cảnh báo, thanh thời gian, thanh trạng thái | `pages/public/PublicPortal.jsx` | Đủ danh sách 6.1; đường dẫn cũ mở được | Chưa làm |
+| 11 | Đ1 · 1.2 | Cổng người dân trên điện thoại + menu 5 nhóm + trang con cùng kiểu | `PublicPortal.jsx`, `ReportForm`, `TicketTracker`, `ReservoirMonitor`, `LandslideMonitor`, `MissionPage` | 360 px: bản đồ ≥ 60 % màn đầu, Gọi 112 luôn thấy | Chưa làm |
+| 12 | Đ5 · 5.1 | Tài khoản người dân — máy chủ: bảng, đăng ký, đăng nhập, phiên riêng; gửi phản ánh / SOS cần phiên người dân (mục 11) | `backend/app/api/v1/public.py`, bảng mới + migration, kiểm thử | Kiểm thử API: không phiên → từ chối; phiên cán bộ không dùng thay được | Chưa làm |
+| 13 | Đ5 · 5.2 | Tài khoản người dân — giao diện: đăng ký, đăng nhập, "Phiếu của tôi"; Gọi 112 luôn mở | `pages/public/*` | Người dân mới đăng ký, gửi được phản ánh không cần gọi hỏi | Chưa làm |
+| 14 | Đ5 · 5.3 | Cán bộ quản lý tài khoản người dân: tìm theo số điện thoại, khoá, đặt lại mật khẩu | trang điều hành (quyền cấp tỉnh) | Kiểm thử quyền | Chưa làm |
 
-Mỗi PR: một phần, CI xanh mới merge; triển khai lên máy chủ theo đợt, có duyệt.
+Mỗi PR: một phần, CI xanh mới merge; triển khai lên máy chủ theo đợt, có duyệt. Dùng thử với người thật sau thứ tự 6 và 11.
 
-## 10. Cần quyết định trước khi làm
+## 10. Quyết định
 
-1. **Thứ tự**: đề xuất Đ0 → Đ1 (cổng người dân — người dân và lãnh đạo thấy đầu tiên) → Đ2 → Đ3 → Đ4. Hay ưu tiên trang
-   điều hành (Đ3) trước cổng người dân?
-2. **Gom 8 tab cổng người dân thành 5 nhóm** (đủ 8 màn; `?tra-cuu=`, `?canh-bao=` giữ nguyên).
-3. **Nền Địa hình tự lưu trữ**: đồng ý chạy script tạo tệp trên máy chủ (một lần, vài chục đến khoảng 200 MB); sau khi nền
-   mới đạt thì bỏ nền Địa hình đang lấy ô ảnh Google.
-4. **Nền Vệ tinh**: (a) giữ ô ảnh Google — rủi ro giấy phép; (b) chuyển sang nguồn có hợp đồng / khoá truy cập; (c) bỏ nền
-   Vệ tinh.
-5. **Thanh trạng thái dưới cùng** trên máy tính (chuyển đồng hồ, kết nối, chuông SOS, giờ số liệu xuống dưới).
-6. **Dùng thử với người thật**: ai tham gia, khi nào (sau Đ1 và sau Đ3).
+| Câu hỏi | Quyết định ngày 21/10/2026 |
+|---|---|
+| Thứ tự | **Trang điều hành trước** (Đ0 → Đ2 → Đ3 → Đ4), cổng người dân sau (Đ1 → Đ5) |
+| Gom 8 tab cổng người dân thành 5 nhóm | Theo đề xuất (làm cùng Đ1) |
+| Nền Địa hình | **Như các trang tham khảo** — ô Google (mục 7.1); không tự lưu trữ bóng núi (giữ làm dự phòng) |
+| Nền Vệ tinh | **Như các trang tham khảo** — ô Google (mục 7.1) |
+| Thanh trạng thái dưới cùng trên máy tính | Theo đề xuất (Đ3 · 3.1) |
+| Bản đồ chỉ rõ tỉnh Cao Bằng | **Có** — ngoài tỉnh làm mờ ở mọi bản đồ (mục 7.2) |
+| Tài khoản người dân | **Yêu cầu mới**: phải đăng ký, đăng nhập mới gửi được phản ánh, yêu cầu cứu hộ (Đ5, mục 11) |
+| Dùng thử với người thật | Chưa chốt người tham gia, thời gian |
+
+Còn chờ quyết định: các câu hỏi của Đ5 ở mục 11.3.
+
+## 11. Tài khoản người dân (Đ5) — thay đổi chức năng
+
+Yêu cầu ngày 21/10/2026: **cổng người dân phải đăng ký tạo tài khoản mới gửi được phản ánh hay yêu cầu cứu hộ (SOS).** Khác
+với các đợt khác, đây là **thay đổi chức năng** (thêm API, thêm bảng dữ liệu) — làm sau cùng, có kiểm thử riêng.
+
+### 11.1. Cách làm đề xuất
+
+- **Không cần tài khoản**: xem bản đồ, cảnh báo, mưa, mực nước, hồ chứa, đèo dốc, điểm sơ tán, đường dây nóng, cẩm nang,
+  "Bản nhẹ", tra cứu phiếu bằng mã + số điện thoại.
+- **Cần tài khoản**: gửi phản ánh (kể cả "Người mắc kẹt" — báo như SOS), gửi yêu cầu cứu hộ trên cổng.
+- **Gọi 112 và đường dây nóng luôn bấm được, không cần tài khoản** — người đang gặp nạn không bị kẹt ở bước đăng ký. Màn
+  đăng ký có dòng "Đang nguy hiểm? Gọi ngay 112".
+- Đăng ký: họ tên, số điện thoại (dùng để đăng nhập), mật khẩu, xã / phường đang ở (không bắt buộc), đồng ý cho cơ quan
+  dùng thông tin để liên hệ xử lý (Nghị định 13/2023/NĐ-CP về bảo vệ dữ liệu cá nhân). Chống đăng ký ảo: xác minh chống
+  spam (Turnstile) và giới hạn theo IP / số điện thoại — đã có ở form phản ánh.
+- Tài khoản người dân **tách hẳn** tài khoản cán bộ: bảng riêng, phiên đăng nhập riêng — phiên người dân không gọi được API
+  điều hành, phiên cán bộ không thay được phiên người dân.
+- Đã đăng nhập: form phản ánh / SOS điền sẵn họ tên, số điện thoại; "Phiếu của tôi" xem tiến độ không cần nhập mã.
+- Cán bộ cấp tỉnh: tìm tài khoản theo số điện thoại, khoá tài khoản phá rối, đặt lại mật khẩu khi người dân gọi đường dây
+  nóng; nhật ký thao tác như tài khoản cán bộ.
+
+### 11.2. API thêm (không đổi API cũ, trừ việc gửi phản ánh cần phiên người dân)
+
+`POST /public/account/register` · `POST /public/account/login` · `GET /public/account/me` · `GET /public/account/reports` ·
+`POST /public/reports` (thêm yêu cầu phiên người dân); trang điều hành: `GET /citizens`, `PATCH /citizens/{id}`.
+
+### 11.3. Cần quyết định trước khi làm Đ5
+
+1. **Xác minh số điện thoại**: chưa có cổng SMS (`docs/trang-b-viec-con-lai.md` BD7) nên chưa gửi được mã OTP. Đề xuất:
+   tạm chấp nhận số chưa xác minh (vẫn có chống spam, giới hạn); có hợp đồng SMS thì thêm OTP.
+2. **Quên mật khẩu**: chưa có SMS. Đề xuất: người dân gọi đường dây nóng, cán bộ đặt lại; ai có email thì tự lấy lại qua
+   email.
+3. **Phản ánh "Người mắc kẹt" cũng phải có tài khoản** như yêu cầu — xác nhận lại, vì đây là tình huống tính mạng (Gọi 112
+   vẫn luôn mở).

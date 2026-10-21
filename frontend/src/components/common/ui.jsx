@@ -5,14 +5,14 @@ import {
   AlertTriangle, ArrowLeft, ArrowUpDown, Check, ChevronDown, ChevronLeft, ChevronRight, Loader2, MoveRight, RefreshCw, TrendingDown, TrendingUp, X,
 } from 'lucide-react';
 import { NO_DATA, RISK, risk } from '../../utils/risk';
+import EmptyArt from './EmptyArt';
 
-/** Ô số liệu gọn (Nhập dữ liệu, Nguồn dữ liệu): `tone` = vạch màu bên trái theo mức (như StatCard), nền giữ trắng. */
+/** Ô số liệu gọn: `tone` = vạch màu bên trái theo mức (như StatCard) — chỉ Vàng / Cam / Đỏ; bình thường không vạch, nền giữ trắng. */
 export function KpiCard({ label, value, unit, sub, tone, icon: Icon, blink, children }) {
   const toneCls = {
     danger: 'border-l-4 border-l-danger',
     serious: 'border-l-4 border-l-serious',
     warn: 'border-l-4 border-l-warn',
-    good: 'border-l-4 border-l-good',
   }[tone];
   return (
     <div className={clsx('card flex flex-col gap-1 p-3', toneCls, blink && 'animate-blink')}>
@@ -247,8 +247,12 @@ export function Section({ title, hint, right, children, className, bodyClass, id
   );
 }
 
-export const Empty = ({ children = 'Không có dữ liệu trong vùng đang lọc' }) => (
-  <div className="py-8 text-center text-sm text-muted">{children}</div>
+/** Trống (dạng gọn trong danh sách / bảng). `art`: hình nét đơn phía trên (EmptyArt) — cho khối lớn; danh sách nhỏ bỏ trống. */
+export const Empty = ({ art, children = 'Không có dữ liệu trong vùng đang lọc' }) => (
+  <div className="flex flex-col items-center gap-2 py-8 text-center text-sm text-muted">
+    {art && <EmptyArt name={art} className="h-16 w-24 text-muted" />}
+    {children}
+  </div>
 );
 
 /* ---- Ba trạng thái của một khối số liệu: đang tải · lỗi · trống (cùng khung, cùng chiều cao → trang không nhảy) ---- */
@@ -278,15 +282,16 @@ export function ErrorState({ height, onRetry, className, children = 'Không tả
   );
 }
 
-/** Trống: hệ thống tải được nhưng chưa có dữ liệu — nói cần nhập gì / ở đâu. `icon` (lucide): hình minh hoạ nét mảnh phía
- * trên câu chữ (không đặt trong ô màu) — dùng cho khối lớn; danh sách nhỏ, hộp chọn thì bỏ trống. */
-export const EmptyState = ({ height, className, icon: Icon, children }) => (
+/** Trống: hệ thống tải được nhưng chưa có dữ liệu — nói cần nhập gì / ở đâu. `art`: hình nét đơn (EmptyArt: phieu, hop-thu,
+ * ban-do, tim, mat-mang, loi, canh-bao, du-lieu) phía trên câu chữ; `icon` (lucide): biểu tượng nét mảnh thay hình — dùng
+ * cho khối lớn; danh sách nhỏ, hộp chọn thì bỏ trống. Không đặt hình trong ô màu. */
+export const EmptyState = ({ height, className, icon: Icon, art, children }) => (
   <div
     style={height ? { height } : undefined}
     className={clsx('flex items-center justify-center rounded-lg border border-dashed border-line px-4 py-5 text-center text-xs text-muted', className)}
   >
     <div className="flex flex-col items-center gap-2">
-      {Icon && <Icon size={30} strokeWidth={1.4} className="text-muted/70" aria-hidden="true" />}
+      {art ? <EmptyArt name={art} className="h-16 w-24 text-muted" /> : Icon && <Icon size={30} strokeWidth={1.4} className="text-muted/70" aria-hidden="true" />}
       <div className="max-w-md text-[13px] leading-snug">{children}</div>
     </div>
   </div>
