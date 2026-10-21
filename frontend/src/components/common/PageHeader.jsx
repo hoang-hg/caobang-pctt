@@ -4,7 +4,7 @@ import ExportMenu from './ExportMenu';
 
 /**
  * Đầu trang dùng chung các trang điều hành — cùng chỗ, cùng cỡ chữ trên mọi trang, chuyển trang không phải tìm lại nút:
- * - Hàng tiêu đề: tiêu đề (`title`; `short` = tiêu đề ngắn trên điện thoại) bên trái; bên phải thao tác riêng của trang
+ * - Hàng tiêu đề: tiêu đề (`title`; `short` = tiêu đề ngắn trên điện thoại; 17 / 20 / 24 px theo cỡ màn) bên trái; bên phải thao tác riêng của trang
  *   (`actions` — nhiều nhất MỘT nút chính tô màu), menu "Xuất" (`exports` — ExportMenu), nút "Làm mới" (`onRefresh`,
  *   `refreshing`). `before`: nút "Quay lại" phía trên tiêu đề.
  * - Dòng ngữ cảnh trải hết bề ngang (điện thoại 360 px vẫn đủ một dòng): địa bàn đang xem (`scope` — chữ, hoặc nút có "Bỏ
@@ -41,7 +41,7 @@ export default function PageHeader({
     <div className={clsx('flex flex-col gap-1', className)}>
       {before}
       <div className="flex items-center justify-between gap-3">
-        <h1 className="min-w-0 text-[17px] font-bold leading-tight tracking-tight text-ink sm:text-xl">
+        <h1 className="min-w-0 text-[17px] font-bold leading-tight tracking-tight text-ink sm:text-xl lg:text-2xl">
           {short ? (
             <>
               <span className="sm:hidden">{short}</span>

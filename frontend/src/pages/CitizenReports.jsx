@@ -6,12 +6,13 @@ import { Camera, Check, X, Siren, MapPin, Phone, RotateCcw, CheckCheck, Inbox, S
 import { api } from '../api/client';
 import { useAreaQuery } from '../api/hooks';
 import { useStore } from '../app/store';
-import { Empty, Modal, Tabs } from '../components/common/ui';
+import { EmptyState, ErrorState, Modal, Skeleton, Tabs } from '../components/common/ui';
 import PageHeader from '../components/common/PageHeader';
 import RoleTips from '../components/common/RoleTips';
 import { PAGE } from '../components/layout/page';
-import { usePermission } from '../rbac/usePermission';
+import { usePermission, useScopeLabel } from '../rbac/usePermission';
 import { ago, dateTime } from '../utils/format';
+import { useNewKeys } from '../utils/useNewKeys';
 import { INCIDENT, VULNERABLE } from '../utils/labels';
 
 const STATUS = {
@@ -216,7 +217,7 @@ function ActionModal({ report, action, onClose }) {
   );
 }
 
-function ReportCard({ r, onAction, onPhoto }) {
+function ReportCard({ r, onAction, onPhoto, fresh = false }) {
   const urgent = r.category === 'mac_ket' && r.status === 'cho_duyet'; // có người mắc kẹt, chưa xử lý
   const navigate = useNavigate();
   const setFocus = useStore((s) => s.setFocus);
@@ -224,10 +225,10 @@ function ReportCard({ r, onAction, onPhoto }) {
   const st = STATUS[r.status];
 
   return (
-    <div className={clsx('card flex flex-col gap-2.5 p-3.5 shadow-sm hover:shadow-md transition-all', r.status === 'cho_duyet' && (urgent ? 'border-danger ring-1 ring-danger/40' : 'border-warn/70'))}>
+    <div className={clsx('card flex flex-col gap-2.5 p-3.5', r.status === 'cho_duyet' && (urgent ? 'border-danger ring-1 ring-danger/40' : 'border-warn/70'), fresh && 'motion-safe:animate-enter')}>
       <div className="flex items-center gap-2">
         <b className="font-bold text-sm text-ink">{r.code}</b>
-        {urgent && <span className="chip bg-danger text-white text-[10px] font-bold">KHẨN</span>}
+        {urgent && <span className="chip bg-danger text-white text-[10px] font-bold">Khẩn</span>}
         <span className={clsx('chip text-[10px] font-bold', st.cls)}>{st.label}</span>
         <span className="chip bg-panel2 text-[10px]">{r.category_label}</span>
         <span className="ml-auto text-xs text-muted" title={dateTime(r.created_at)}>{ago(r.created_at)}</span>
@@ -327,6 +328,32 @@ function ReportCard({ r, onAction, onPhoto }) {
   );
 }
 
+// Màn trống từng thẻ trạng thái: nói rõ chưa có gì và việc sẽ diễn ra (không để một dòng chữ xám)
+const EMPTY = {
+  cho_duyet: 'Không có phản ánh nào chờ duyệt. Phản ánh người dân gửi từ cổng công khai sẽ hiện ở đây — trang tự cập nhật mỗi 30 giây.',
+  da_duyet: 'Chưa có phản ánh nào đang công khai trong phạm vi của bạn. Phản ánh được duyệt hiện ở đây và trên bản đồ của cổng người dân.',
+  da_xu_ly: 'Chưa có phản ánh nào đã xử lý trong phạm vi của bạn.',
+  tu_choi: 'Chưa có phản ánh nào bị từ chối trong phạm vi của bạn.',
+};
+
+/** Lưới phản ánh của MỘT thẻ trạng thái (vẽ lại khi đổi thẻ — đổi thẻ không tính là "mới"): phản ánh mới đến trong lúc đang
+ * xem (làm mới 30 giây) → trượt vào một lần. `all` = mọi phản ánh của thẻ (ghi nhận đã thấy), `shown` = sau khi tìm. */
+function ReportGrid({ all, shown, search, empty, onAction, onPhoto }) {
+  const isNew = useNewKeys(all.map((r) => r.id), true);
+  if (!shown.length) {
+    return (
+      <EmptyState art={search ? 'tim' : 'hop-thu'} className="py-10">
+        {search ? `Không thấy phản ánh khớp "${search}" ở thẻ này — thử tên xã, mã phản ánh hoặc số điện thoại khác.` : empty}
+      </EmptyState>
+    );
+  }
+  return (
+    <div className="grid gap-3.5 md:grid-cols-2 2xl:grid-cols-3">
+      {shown.map((r) => <ReportCard key={r.id} r={r} fresh={isNew(r.id)} onAction={onAction} onPhoto={onPhoto} />)}
+    </div>
+  );
+}
+
 export default function CitizenReports() {
   const [tab, setTab] = useState('cho_duyet');
   const [modal, setModal] = useState(null);
@@ -334,8 +361,13 @@ export default function CitizenReports() {
   const [search, setSearch] = useState('');
   const qc = useQueryClient();
   const toast = useStore((s) => s.toast);
-  const { data } = useAreaQuery('reports', '/reports', { status: tab }, { refetchInterval: 30_000 });
+  const reportsQ = useAreaQuery('reports', '/reports', { status: tab }, { refetchInterval: 30_000 });
+  const { data } = reportsQ;
   const counts = data?.counts || {};
+  const scopeLabel = useScopeLabel('report', 'view');
+  const dataTime = reportsQ.dataUpdatedAt
+    ? new Date(reportsQ.dataUpdatedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    : null;
 
   const onAction = async (r, action) => {
     if (action === 'reopen') {
@@ -364,6 +396,9 @@ export default function CitizenReports() {
       <PageHeader
         title="Phản ánh hiện trường của người dân"
         short="Phản ánh người dân"
+        scope={scopeLabel}
+        time={dataTime}
+        timeNote={reportsQ.isError ? 'Chưa tải được số liệu' : 'Đang tải số liệu…'}
         description="Tiếp nhận từ cổng công khai. Chỉ công khai sau khi cán bộ phê duyệt; số điện thoại người gửi được bảo mật."
         actions={(
           <div className="relative">
@@ -392,16 +427,25 @@ export default function CitizenReports() {
         }))}
       />
 
-      <div className="grid gap-3.5 md:grid-cols-2 2xl:grid-cols-3">
-        {filteredItems.map((r) => (
-          <ReportCard key={r.id} r={r} onAction={onAction} onPhoto={setPhoto} />
-        ))}
-      </div>
-
-      {filteredItems.length === 0 && (
-        <Empty>
-          {search ? 'Không tìm thấy phản ánh nào phù hợp' : 'Không có phản ánh ở trạng thái này trong phạm vi của bạn'}
-        </Empty>
+      {/* Ba trạng thái rõ ràng: đang tải (không báo "không có phản ánh" khi chưa biết) · lỗi (Thử lại) · có số liệu */}
+      {!data && reportsQ.isError ? (
+        <ErrorState onRetry={() => reportsQ.refetch()}>
+          Không tải được danh sách phản ánh — không có nghĩa là không có phản ánh mới
+        </ErrorState>
+      ) : !data ? (
+        <div className="grid gap-3.5 md:grid-cols-2 2xl:grid-cols-3">
+          {[0, 1, 2].map((i) => <Skeleton key={i} height={220} />)}
+        </div>
+      ) : (
+        <ReportGrid
+          key={tab}
+          all={data.items || []}
+          shown={filteredItems}
+          search={search.trim()}
+          empty={EMPTY[tab]}
+          onAction={onAction}
+          onPhoto={setPhoto}
+        />
       )}
 
       {modal && modal.action !== 'reopen' && (
