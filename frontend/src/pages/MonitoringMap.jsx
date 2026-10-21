@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { MapContainer, ScaleControl, ZoomControl, useMapEvents } from 'react-leaflet';
@@ -6,9 +6,10 @@ import clsx from 'clsx';
 import { BellRing, ChevronLeft, ChevronRight, Clock, Info, Layers, Map as MapIcon, RefreshCw, Siren, Wrench } from 'lucide-react';
 import { api } from '../api/client';
 import { useAreaQuery, useUnitsGeo } from '../api/hooks';
+import { usePageStatus } from '../app/pageStatus';
 import { useStore } from '../app/store';
 import MapLayers, { blackspotStates, floodScenarioStates, StormLayer, stormQuery } from '../components/map/MapLayers';
-import MapLegend, { RadarScale } from '../components/map/MapLegend';
+import MapLegend, { RadarScale, RainBar } from '../components/map/MapLegend';
 import MapKpis from '../components/map/MapKpis';
 import { riverSummary } from '../components/dashboard/RiverKpi';
 import {
@@ -21,7 +22,7 @@ import StormBulletinModal from '../components/map/StormBulletinModal';
 import OccupancyModal from '../components/common/OccupancyModal';
 import ReservoirOperationModal from '../components/common/ReservoirOperationModal';
 import {
-  AdminBoundaries, AreaFocus, BASEMAPS, BaseLayer, DrawTool, FocusHandler, ForecastChoropleth, MapResize, MeasureTool, RadarLayer, radarFrameAt,
+  AdminBoundaries, AreaFocus, BASEMAPS, BaseLayer, CursorToStatus, DrawTool, FocusHandler, ForecastChoropleth, MapResize, MeasureTool, RadarLayer, radarFrameAt,
   rainScale, RouteTool, toolError, useRadarFrames,
 } from '../components/map/MapTools';
 import DispatchModal from '../components/common/DispatchModal';
@@ -88,8 +89,9 @@ const situationLayers = (l) => ({
   ...l, ...Object.fromEntries(OPS_LAYERS.map((x) => [x, false])), ...Object.fromEntries(RISK_LAYERS.map((x) => [x, true])),
 });
 
-const floatCard = 'card border border-line bg-panel/95 shadow-2xl backdrop-blur-md';
-const roundBtn = 'card flex flex-col items-center justify-center gap-0.5 border border-line bg-panel/95 text-[10px] font-bold text-ink-2 shadow-lg backdrop-blur-md active:scale-95';
+// Mọi lớp nổi trên bản đồ một kiểu (.float-panel — nền mờ, viền mảnh, một bóng; docs/ke-hoach-lam-moi-giao-dien.md 6.4)
+const floatCard = 'float-panel';
+const roundBtn = 'float-panel flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold text-ink-2 active:scale-95';
 
 /**
  * Bản đồ giám sát tương tác (thiết kế B). Bản đồ chiếm trọn vùng nội dung; dải tình huống (dùng chung Dashboard) luôn ở
@@ -435,6 +437,9 @@ export default function MonitoringMap() {
     />
   );
   const dataTime = layersQ.dataUpdatedAt || null;
+  // Giờ số liệu → thanh trạng thái dưới cùng (máy tính màn rộng, đủ cao); rời trang thì xoá
+  useEffect(() => { usePageStatus.setState({ dataTime }); }, [dataTime]);
+  useEffect(() => () => usePageStatus.setState({ dataTime: null }), []);
 
   return (
     <div
@@ -480,6 +485,7 @@ export default function MonitoringMap() {
       <div className="relative isolate min-h-0 w-full flex-1 select-none overflow-hidden">
         <MapContainer center={[22.75, 106.05]} zoom={9} zoomControl={false} zoomSnap={0.25} className="h-full w-full">
           <MapResize />
+          <CursorToStatus />
           <BaseLayer basemap={basemap} />
           {radarFrame && <RadarLayer host={radarQ.data.host} frame={radarFrame} />}
           <ZoomControl position="bottomright" />
@@ -555,7 +561,7 @@ export default function MonitoringMap() {
                 <div className={clsx(floatCard, 'pointer-events-auto max-w-[15rem] shrink-0 p-2.5 text-xs')}>
                   <div className="font-bold text-ink">Radar mưa</div>
                   <p className={clsx('mb-1', !radarFrame && 'text-muted')}>{radarNote}</p>
-                  {radarFrame && <RadarScale layout="list" />}
+                  {radarFrame && <RadarScale />}
                 </div>
               )}
               {!legendOpen && layers.forecast && (
@@ -563,14 +569,7 @@ export default function MonitoringMap() {
                   {rain ? (
                     <>
                       <div className="mb-1 font-bold text-ink">{rain.title}</div>
-                      <div className="space-y-1">
-                        {rain.bins.map((b) => (
-                          <div key={b.label} className="flex items-center gap-2">
-                            <span className="h-3 w-5 rounded-sm shadow-sm" style={{ background: b.color }} aria-hidden="true" />
-                            <span>{b.label}</span>
-                          </div>
-                        ))}
-                      </div>
+                      <RainBar bins={rain.bins} unit={rain.hourly ? 'mm/giờ' : 'mm'} />
                     </>
                   ) : (
                     <p className="text-muted">{rainNote}</p>
@@ -692,7 +691,7 @@ export default function MonitoringMap() {
                   <div className={clsx(floatCard, 'px-2 py-1.5')}>
                     <div className="font-bold text-ink">Radar mưa</div>
                     <div className={clsx(radarFrame ? 'mb-0.5' : 'text-muted')}>{radarNote}</div>
-                    {radarFrame && <RadarScale layout="compact" />}
+                    {radarFrame && <RadarScale />}
                   </div>
                 )}
                 {layers.forecast && (
@@ -700,9 +699,7 @@ export default function MonitoringMap() {
                     {rain ? (
                       <>
                         <div className="mb-0.5 font-bold text-ink">{rain.short}</div>
-                        <div className="flex gap-1">
-                          {rain.bins.map((b) => <span key={b.label} className="h-2.5 w-5 rounded-sm" style={{ background: b.color }} title={b.label} />)}
-                        </div>
+                        <RainBar bins={rain.bins} unit={rain.hourly ? 'mm/giờ' : 'mm'} compact />
                       </>
                     ) : (
                       <span className="text-muted">{rainNote}</span>
@@ -763,7 +760,7 @@ export default function MonitoringMap() {
         )}
         {!data && layersQ.isError && (
           <div className="pointer-events-none absolute inset-x-0 top-1/3 z-[900] flex justify-center px-4">
-            <ErrorState onRetry={() => layersQ.refetch()} className="pointer-events-auto w-full max-w-sm bg-panel shadow-2xl">
+            <ErrorState onRetry={() => layersQ.refetch()} className="pointer-events-auto w-full max-w-sm bg-panel shadow-[var(--shadow-float)]">
               Không tải được các lớp dữ liệu bản đồ (SOS, trạm, lực lượng…) — bản đồ nền vẫn xem được.
             </ErrorState>
           </div>
