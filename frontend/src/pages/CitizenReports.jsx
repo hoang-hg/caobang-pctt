@@ -404,7 +404,7 @@ export default function CitizenReports() {
           <div className="relative">
             <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted" aria-hidden="true" />
             <input
-              className="input tap h-9 w-44 py-1 pl-8 text-sm sm:w-64"
+              className="input tap h-9 w-36 py-1 pl-8 text-sm sm:w-64"
               placeholder="Tìm phản ánh, địa bàn, SĐT..."
               aria-label="Tìm phản ánh theo mã, nội dung, địa bàn, số điện thoại"
               value={search}
