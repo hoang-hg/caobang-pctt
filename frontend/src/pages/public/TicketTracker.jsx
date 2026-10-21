@@ -383,7 +383,7 @@ export default function TicketTracker({ initialCode = '', initialPhone = '', onQ
                         {isDone && <Check size={16} strokeWidth={2.5} />}
                         {isCurrent && (
                           st.name === 'dang_den' ? (
-                            <Navigation size={15} className="animate-bounce" />
+                            <Navigation size={15} aria-hidden="true" />
                           ) : (
                             <span className="h-2.5 w-2.5 rounded-full bg-white animate-ping" />
                           )

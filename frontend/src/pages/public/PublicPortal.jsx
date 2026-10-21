@@ -6,7 +6,7 @@ import clsx from 'clsx';
 import {
   ShieldAlert, LocateFixed, Megaphone, Phone, Home, CloudRain, Waves, Camera, LogIn, Moon, Sun, Navigation, AlertTriangle,
   CheckCircle2, Loader2, Share2, BookOpen, HelpCircle, MapPin, ChevronRight, PhoneCall, Compass, Search,
-  Droplets, Mountain, X, Zap, ArrowLeft, Layers
+  Droplets, Mountain, X, Zap, ArrowLeft, Layers, Menu
 } from 'lucide-react';
 import { api } from '../../api/client';
 import { useUnitsGeo, useUnits, useProvinceArea } from '../../api/hooks';
@@ -29,11 +29,21 @@ import ReservoirMonitor from './ReservoirMonitor';
 import LandslideMonitor, { maxTiltText } from './LandslideMonitor';
 import NetworkBanner from './NetworkBanner';
 
+// Menu 5 nhóm (docs/ke-hoach-lam-moi-giao-dien.md 6.1) — đủ 8 màn như trước (`tabs` = mã màn, giữ nguyên để link / nút cũ
+// chuyển đúng màn); nhóm có 2 màn thì hiện hàng trang con. Cẩm nang an toàn ở cuối hàng nhóm, menu điện thoại, chân trang
+const GROUPS = [
+  { id: 'ban-do', label: 'Bản đồ cảnh báo', icon: Compass, tabs: ['bando'] },
+  { id: 'ho-song', label: 'Hồ chứa & sông', icon: Droplets, tabs: ['hochua', 'muanuoc'] },
+  { id: 'deo-doc', label: 'Đèo dốc & sạt lở', icon: Mountain, tabs: ['satlo'] },
+  { id: 'so-tan', label: 'Sơ tán & đường dây nóng', icon: Home, tabs: ['sotan', 'hotlines'] },
+  { id: 'tra-cuu', label: 'Tra cứu phiếu', icon: Search, tabs: ['tracuu'] },
+];
+const SUB_LABEL = { hochua: 'Hồ chứa & xả lũ', muanuoc: 'Mực nước sông suối', sotan: 'Điểm sơ tán an toàn', hotlines: 'Đường dây nóng' };
 const SOURCE_TAB_LABEL = { hochua: 'Quay lại Hồ chứa', satlo: 'Quay lại Sạt trượt', sotan: 'Quay lại Điểm sơ tán' };
 const REFRESH = 60_000;
 const pub = (path, params) => api(`/public${path}`, { params });
 const RISK = {
-  cao: { label: 'Nguy cơ CAO', cls: RISK_SCALE[3].chip, icon: AlertTriangle, tip: 'Bạn đang nằm trong vùng có nguy cơ ngập lụt hoặc sạt lở đất. Hãy chủ động di dời tới điểm an toàn!' },
+  cao: { label: 'Nguy cơ cao', cls: RISK_SCALE[3].chip, icon: AlertTriangle, tip: 'Bạn đang nằm trong vùng có nguy cơ ngập lụt hoặc sạt lở đất. Hãy chủ động di dời tới điểm an toàn!' },
   trung_binh: { label: 'Cần theo dõi', cls: RISK_SCALE[1].chip, icon: AlertTriangle, tip: 'Khu vực lân cận có nguy cơ hoặc dự báo mưa to. Cần chuẩn bị phương án phòng tránh.' },
   thap: { label: 'Nguy cơ thấp', cls: RISK_SCALE[0].chip, icon: CheckCircle2, tip: 'Vị trí hiện tại an toàn, lượng mưa dự báo trong ngưỡng an toàn.' },
 };
@@ -403,6 +413,8 @@ export default function PublicPortal() {
   const resultsRef = useRef(null);
 
   useEscapeToClose(showSosModal, () => setShowSosModal(false));
+  const [menuOpen, setMenuOpen] = useState(false); // điện thoại: menu ≡
+  useEscapeToClose(menuOpen, () => setMenuOpen(false));
 
   const { data: overview } = useQuery({ queryKey: ['pub-overview'], queryFn: () => pub('/overview'), refetchInterval: REFRESH });
   const { data: map, dataUpdatedAt: mapAt } = useQuery({ queryKey: ['pub-map'], queryFn: () => pub('/map'), refetchInterval: REFRESH });
@@ -611,8 +623,39 @@ export default function PublicPortal() {
               <LogIn size={14} />
               <span className="hidden md:inline">{auth?.token ? 'Vào Điều hành' : 'Cán bộ'}</span>
             </Link>
+
+            <button
+              type="button"
+              className="btn-ghost p-2 sm:hidden"
+              onClick={() => setMenuOpen((o) => !o)}
+              aria-expanded={menuOpen}
+              aria-label="Mở menu cổng người dân"
+            >
+              {menuOpen ? <X size={18} aria-hidden="true" /> : <Menu size={18} aria-hidden="true" />}
+            </button>
           </div>
         </div>
+
+        {/* Điện thoại: menu 5 nhóm + trang con, Cẩm nang an toàn, bản nhẹ — chọn xong tự đóng */}
+        {menuOpen && (
+          <nav aria-label="Menu cổng người dân" className="absolute inset-x-0 top-full border-b border-line bg-panel px-3 pb-3 pt-1 sm:hidden">
+            <ul className="flex flex-col">
+              {GROUPS.map((g) => (
+                <li key={g.id} className="border-b border-line/60 py-1 last:border-0">
+                  <button type="button" onClick={() => { setActiveTab(g.tabs[0]); setMenuOpen(false); }} className={clsx('tap flex w-full items-center gap-2.5 rounded-lg px-2 text-left text-sm font-semibold', g.tabs.includes(activeTab) ? 'text-accent' : 'text-ink')}>
+                    <g.icon size={17} className="shrink-0" aria-hidden="true" /> {g.label}
+                  </button>
+                </li>
+              ))}
+              <li className="py-1">
+                <button type="button" onClick={() => { setActiveTab('huongdan'); setMenuOpen(false); }} className={clsx('tap flex w-full items-center gap-2.5 rounded-lg px-2 text-left text-sm font-semibold', activeTab === 'huongdan' ? 'text-accent' : 'text-ink')}>
+                  <BookOpen size={17} className="shrink-0" aria-hidden="true" /> Cẩm nang an toàn
+                </button>
+              </li>
+            </ul>
+            <a href="/ban-nhe" className="mt-1 block px-2 text-xs font-semibold text-accent hover:underline">Bản nhẹ cho mạng yếu (chỉ chữ, dưới 50 KB)</a>
+          </nav>
+        )}
       </header>
 
       <main className="mx-auto flex max-w-7xl flex-col gap-4 p-3 sm:p-5">
@@ -938,53 +981,59 @@ export default function PublicPortal() {
           </section>
         )}
 
-        {/* Thanh Điều hướng Tabs (Bản đồ / Hồ chứa / Sạt trượt / Tra cứu tiến độ / Mực nước / Điểm sơ tán / Hotline / Cẩm nang) */}
-        <div ref={tabsRef} className="flex scroll-mt-20 border-b border-line gap-1.5 sm:gap-2 overflow-x-auto scroll-thin pb-2 pt-1 scroll-smooth">
-          {[
-            { id: 'bando', label: 'Bản đồ & Cảnh báo', icon: Compass },
-            {
-              id: 'hochua',
-              label: 'Hồ chứa & Xả lũ',
-              icon: Droplets,
-              badge: overview?.reservoirs?.spill_count ? `${overview.reservoirs.spill_count} hồ xả` : null,
-              badgeCls: overview?.reservoirs?.emergency_count > 0 ? 'bg-danger text-white' : 'bg-serious text-black',
-            },
-            {
-              id: 'satlo',
-              label: 'Sạt trượt & Đường đèo',
-              icon: Mountain,
-              badge: overview?.landslides?.blocked_count ? `${overview.landslides.blocked_count} điểm tắc` : null,
-              badgeCls: 'bg-danger text-white',
-            },
-            { id: 'tracuu', label: 'Tra cứu tiến độ (SOS / Phản ánh)', icon: Search },
-            { id: 'muanuoc', label: 'Mực nước sông suối', icon: Waves },
-            { id: 'sotan', label: 'Điểm sơ tán an toàn', icon: Home },
-            { id: 'hotlines', label: 'Đường dây nóng', icon: Phone },
-            { id: 'huongdan', label: 'Cẩm nang an toàn', icon: BookOpen },
-          ].map((tab) => {
-            const Icon = tab.icon;
-            const active = activeTab === tab.id;
+        {/* Menu 5 nhóm (máy tính, máy tính bảng — điện thoại dùng menu ≡) + hàng trang con của nhóm có 2 màn. Neo cuộn tới
+            nội dung (scrollToContent) */}
+        <div ref={tabsRef} className="flex scroll-mt-20 flex-col gap-2">
+          <nav aria-label="Các mục của cổng người dân" className="scroll-thin flex gap-1.5 overflow-x-auto border-b border-line pb-2 pt-1 max-sm:hidden">
+            {GROUPS.map((g) => {
+              const on = g.tabs.includes(activeTab);
+              const badge = g.id === 'ho-song' && overview?.reservoirs?.spill_count
+                ? { text: `${overview.reservoirs.spill_count} hồ xả`, cls: overview.reservoirs.emergency_count > 0 ? 'bg-danger text-white' : 'bg-serious text-black' }
+                : g.id === 'deo-doc' && overview?.landslides?.blocked_count
+                  ? { text: `${overview.landslides.blocked_count} điểm cấm`, cls: 'bg-danger text-white' }
+                  : null;
+              return (
+                <button
+                  key={g.id}
+                  type="button"
+                  onClick={() => setActiveTab(g.tabs[0])}
+                  aria-current={on ? 'page' : undefined}
+                  className={clsx('tap flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3.5 text-sm font-medium', on ? 'bg-accent font-bold text-white' : 'text-ink-2 hover:bg-panel2 hover:text-ink')}
+                >
+                  <g.icon size={15} aria-hidden="true" />
+                  {g.label}
+                  {badge && <span className={clsx('rounded-full px-1.5 py-0.5 text-[10px] font-bold', badge.cls)}>{badge.text}</span>}
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              onClick={() => setActiveTab('huongdan')}
+              aria-current={activeTab === 'huongdan' ? 'page' : undefined}
+              className={clsx('tap ml-auto flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-3 text-sm', activeTab === 'huongdan' ? 'bg-accent font-bold text-white' : 'text-muted hover:bg-panel2 hover:text-ink')}
+            >
+              <BookOpen size={15} aria-hidden="true" /> Cẩm nang an toàn
+            </button>
+          </nav>
+          {(() => {
+            const g = GROUPS.find((x) => x.tabs.includes(activeTab));
+            if (!g || g.tabs.length < 2) return null;
             return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={clsx(
-                  'flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all whitespace-nowrap',
-                  active
-                    ? 'bg-accent text-white font-bold'
-                    : 'text-ink-2 hover:bg-panel2 hover:text-ink'
-                )}
-              >
-                <Icon size={15} />
-                <span>{tab.label}</span>
-                {tab.badge && (
-                  <span className={clsx('px-1.5 py-0.5 rounded-full text-[10px] font-bold', tab.badgeCls || 'bg-serious text-black')}>
-                    {tab.badge}
-                  </span>
-                )}
-              </button>
+              <div role="group" aria-label={g.label} className="flex gap-1.5">
+                {g.tabs.map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setActiveTab(t)}
+                    aria-pressed={activeTab === t}
+                    className={clsx('tap rounded-full border px-3 text-sm font-medium', activeTab === t ? 'border-accent bg-accent/10 font-semibold text-accent' : 'border-line text-ink-2 hover:text-ink')}
+                  >
+                    {SUB_LABEL[t]}
+                  </button>
+                ))}
+              </div>
             );
-          })}
+          })()}
         </div>
 
         {/* NỘI DUNG THEO TAB */}
@@ -1845,7 +1894,7 @@ export default function PublicPortal() {
         <footer className="mt-4 border-t border-line/60 pt-6 pb-4 text-center text-xs text-muted leading-relaxed">
           <div className="font-semibold text-ink">Ban Chỉ huy Phòng chống thiên tai & Tìm kiếm cứu nạn tỉnh Cao Bằng</div>
           <div>Cập nhật dữ liệu thời gian thực · Trực ban tác chiến: <a href="tel:112" className="text-danger font-bold hover:underline">112</a></div>
-          <div>Mạng yếu? Dùng <a href="/ban-nhe" className="text-accent font-semibold hover:underline">bản nhẹ</a> (chỉ chữ, dưới 50 KB)</div>
+          <div>Mạng yếu? Dùng <a href="/ban-nhe" className="text-accent font-semibold hover:underline">bản nhẹ</a> (chỉ chữ, dưới 50 KB) · <button type="button" onClick={() => openTab('huongdan')} className="font-semibold text-accent hover:underline">Cẩm nang an toàn</button></div>
           <div className="text-[11px] mt-1 text-muted/80">Số liệu quan trắc phục vụ chỉ đạo điều hành và thông tin cảnh báo an toàn cho nhân dân</div>
         </footer>
       </main>
