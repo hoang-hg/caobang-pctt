@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom';
 import { risk } from '../../utils/risk';
 
 /**
- * Thẻ chỉ số của Dashboard. `level` theo thang màu rủi ro chung (utils/risk.js): 0–3 = Xanh / Vàng / Cam / Đỏ (vạch màu
- * bên trái + màu biểu tượng; nền giữ trắng — cả hàng thẻ tô hồng thì mắt không còn tìm ra ô thật sự gấp); `null` = chưa có dữ liệu (viền nét đứt, biểu tượng xám — không tô xanh như "bình
+ * Thẻ chỉ số của Dashboard. `level` theo thang màu rủi ro chung (utils/risk.js): 0–3 = Xanh / Vàng / Cam / Đỏ (màu biểu
+ * tượng; vạch màu bên trái chỉ từ Vàng trở lên — Xanh không vạch, mắt chỉ dừng ở ô cần chú ý; nền giữ trắng — cả hàng thẻ tô hồng thì mắt không còn tìm ra ô thật sự gấp); `null` = chưa có dữ liệu (viền nét đứt, biểu tượng xám — không tô xanh như "bình
  * thường"); bỏ trống = chỉ số không mang mức rủi ro (sơ tán, lực lượng). `alert` = cần xử lý ngay: viền đỏ đậm, chỉ nhãn
  * góc nhấp nháy (cả thẻ nhấp nháy thì không đọc được số) — tắt khi hệ điều hành bật "giảm chuyển động".
  *
@@ -32,7 +32,7 @@ export default function StatCard({
         'card flex w-full min-w-0 flex-col text-left',
         compact ? 'gap-1 p-2 sm:p-2.5' : 'justify-between gap-1 p-3',
         (to || onClick) && 'transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
-        level != null && clsx('border-l-4', scale.edge),
+        level >= 1 && clsx('border-l-4', scale.edge),
         level === null && 'border-dashed',
         alert && 'ring-2 ring-danger',
         className,

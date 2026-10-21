@@ -29,6 +29,8 @@ const MissionPage = lazy(() => import('./pages/public/MissionPage'));
 
 // Dải CHẾ ĐỘ GIẢ LẬP: chỉ máy dev (app/store.js)
 const DemoBanner = import.meta.env.DEV ? lazy(() => import('./components/common/DemoBanner')) : null;
+// Trang mẫu giao diện — chỉ máy dev (rà thành phần dùng chung ở hai nền), bản chạy thật không có đường dẫn này
+const StyleGuide = import.meta.env.DEV ? lazy(() => import('./pages/StyleGuide')) : null;
 
 function PageLoading() {
   return <div className="flex h-full min-h-[40vh] items-center justify-center text-sm text-muted">Đang tải…</div>;
@@ -90,6 +92,7 @@ function Shell() {
               <Route path="/phan-quyen" element={<Guard obj="user" act="view"><AccessControl /></Guard>} />
               {/* Hướng dẫn xử lý theo vai trò: mọi tài khoản cán bộ */}
               <Route path="/huong-dan" element={<Guide />} />
+              {StyleGuide && <Route path="/mau-giao-dien" element={<StyleGuide />} />}
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
           </Suspense>
