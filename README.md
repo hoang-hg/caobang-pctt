@@ -319,6 +319,7 @@ docs/trang-d-viec-con-lai.md  trang Điều hành cứu hộ: đối chiếu thi
 docs/trang-e-viec-con-lai.md  trang Cảnh báo khẩn cấp: đối chiếu thiết kế mục E, việc còn lại (kênh SMS / Zalo / Cell Broadcast, tổng đài SIP…)
 docs/trang-f-viec-con-lai.md  bộ lọc địa phương & Sáng/Tối: đối chiếu thiết kế mục F, việc còn lại (ranh giới xóm, nhóm lọc nhanh, địa danh)
 docs/csdl-viec-con-lai.md     cơ sở dữ liệu: đối chiếu thiết kế mục G, đề xuất bổ sung (vai trò CSDL, khoá số đo, chỉ mục, dữ liệu cá nhân, đợt thiên tai…)
+docs/ke-hoach-lam-moi-giao-dien.md  kế hoạch làm mới giao diện, giữ nguyên chức năng: học 3 trang tham khảo, nền móng chung, cổng người dân bản đồ toàn màn, nền địa hình tự lưu trữ…
 mqtt/  db/init/     cấu hình Mosquitto (dev + thật); extension PostgreSQL khi khởi tạo
 docker-compose.yml  dev / trình diễn / CI     docker-compose.prod.yml  chạy thật
 .env.example        mẫu dev                    .env.production.example  mẫu chạy thật
