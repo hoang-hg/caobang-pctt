@@ -106,7 +106,7 @@ export default function DisasterEvents() {
   else if (q.isError && !q.data) list = <ErrorState height={200} onRetry={q.refetch}>Không tải được danh sách đợt thiên tai</ErrorState>;
   else if (!events.length) {
     list = (
-      <EmptyState height={200}>
+      <EmptyState art="canh-bao" height={240}>
         <p className="font-semibold text-ink-2">Chưa có đợt thiên tai nào</p>
         <p className="mt-1">
           Khi bắt đầu mưa lũ, sạt lở diện rộng, mở đợt để hệ thống tự gom phiếu SOS, lệnh điều động, cảnh báo, vật tư theo đợt — cuối đợt có

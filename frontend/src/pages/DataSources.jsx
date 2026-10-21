@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { api } from '../api/client';
 import { useStore } from '../app/store';
-import { Confirm, Empty, Modal, Tabs } from '../components/common/ui';
+import { Confirm, Empty, EmptyState, ErrorState, Modal, Skeleton, Tabs } from '../components/common/ui';
 import PageHeader from '../components/common/PageHeader';
 import RoleTips from '../components/common/RoleTips';
 import { PAGE } from '../components/layout/page';
@@ -217,7 +217,13 @@ function SourcesTab({ sources, devices }) {
     if (r?.token) setToken({ title: `Khoá mới: ${nameOfSource(s)}`, value: r.token });
   };
 
-  if (!sources.length) return <Empty>Chưa có nguồn dữ liệu nào</Empty>;
+  if (!sources.length) {
+    return (
+      <EmptyState art="du-lieu" className="py-10">
+        Chưa có nguồn số liệu nào được khai báo. Nguồn dự báo và cổng nhận số đo được thêm khi cài đặt hệ thống — báo quản trị hệ thống.
+      </EmptyState>
+    );
+  }
   return (
     <ul className="grid gap-3 xl:grid-cols-2" aria-label="Các nguồn dữ liệu">
       {sources.map((s) => {
@@ -411,7 +417,9 @@ function DevicesTab({ devices }) {
     <div className="flex flex-col gap-3">
       {canManage && <div><button type="button" className="btn-primary" onClick={() => setAdding(true)}><Plus size={15} /> Đăng ký thiết bị đo</button></div>}
       {!devices.length ? (
-        <div className="card"><Empty>Chưa có thiết bị. Đăng ký thiết bị và gắn với trạm đo để thay số liệu mô phỏng bằng số liệu thật.</Empty></div>
+        <EmptyState art="du-lieu" className="py-10">
+          Chưa có thiết bị đo. {canManage ? 'Bấm "Đăng ký thiết bị đo"' : 'Quản trị hệ thống đăng ký thiết bị'} và gắn với trạm đo để thay số liệu mô phỏng bằng số liệu thật.
+        </EmptyState>
       ) : (
         <ul className="flex flex-col gap-2" aria-label="Các thiết bị đo">
           {devices.map((d) => {
@@ -486,8 +494,8 @@ function DevicesTab({ devices }) {
 }
 
 function MonitorTab({ sources, devices }) {
-  const { data } = useQuery({ queryKey: ['int-monitor'], queryFn: () => api('/integrations/monitor'), refetchInterval: 10_000 });
-  if (!data) return <Empty>Đang tải…</Empty>;
+  const { data, isError, refetch } = useQuery({ queryKey: ['int-monitor'], queryFn: () => api('/integrations/monitor'), refetchInterval: 10_000 });
+  if (!data) return isError ? <ErrorState onRetry={() => refetch()}>Không tải được tình trạng nhận số liệu</ErrorState> : <Skeleton height={320} />;
   const st = Object.fromEntries(data.stations.map((s) => [s.source, s.n]));
   const stations = (st.iot || 0) + (st.simulator || 0) + (st.external || 0);
   const nameOf = (src) => {
@@ -545,8 +553,17 @@ function MonitorTab({ sources, devices }) {
 
 export default function DataSources() {
   const [tab, setTab] = useState('sources');
-  const { data: sources = [] } = useQuery({ queryKey: ['int-sources'], queryFn: () => api('/integrations/sources'), refetchInterval: 20_000 });
-  const { data: devices = [] } = useQuery({ queryKey: ['int-devices'], queryFn: () => api('/integrations/devices'), refetchInterval: 15_000 });
+  const sourcesQ = useQuery({ queryKey: ['int-sources'], queryFn: () => api('/integrations/sources'), refetchInterval: 20_000 });
+  const devicesQ = useQuery({ queryKey: ['int-devices'], queryFn: () => api('/integrations/devices'), refetchInterval: 15_000 });
+  const sources = sourcesQ.data || [];
+  const devices = devicesQ.data || [];
+  // Chưa tải xong / không tải được: nói rõ — không hiện "Chưa có nguồn / thiết bị" khi thực ra chưa biết
+  const gate = (q, what, node) => (q.data ? node : q.isError
+    ? <ErrorState onRetry={() => q.refetch()}>Không tải được {what} — không có nghĩa là chưa có</ErrorState>
+    : <Skeleton height={260} />);
+  const dataTime = sourcesQ.dataUpdatedAt
+    ? new Date(sourcesQ.dataUpdatedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    : null;
   const broken = sources.filter((s) => s.enabled && sourceState(s, devices).level === 3).length;
   const lost = devices.filter((d) => d.enabled && d.status === 'mat_tin_hieu').length;
   return (
@@ -554,6 +571,8 @@ export default function DataSources() {
       <PageHeader
         title="Nguồn dữ liệu & thiết bị đo"
         short="Nguồn dữ liệu"
+        time={dataTime}
+        timeNote={sourcesQ.isError ? 'Chưa tải được số liệu' : 'Đang tải số liệu…'}
         description="Số liệu dự báo và trạm đo hiện trường về hệ thống từ đâu, có đang về đều không."
       />
       <RoleTips page="nguon-du-lieu" />
@@ -562,8 +581,8 @@ export default function DataSources() {
         { value: 'devices', label: 'Thiết bị đo', icon: Cpu, alert: lost ? { level: 2, text: `${lost} thiết bị mất tín hiệu` } : undefined },
         { value: 'monitor', label: 'Tình trạng nhận số liệu', short: 'Tình trạng', icon: Activity },
       ]} />
-      {tab === 'sources' && <SourcesTab sources={sources} devices={devices} />}
-      {tab === 'devices' && <DevicesTab devices={devices} />}
+      {tab === 'sources' && gate(sourcesQ, 'danh sách nguồn số liệu', <SourcesTab sources={sources} devices={devices} />)}
+      {tab === 'devices' && gate(devicesQ, 'danh sách thiết bị đo', <DevicesTab devices={devices} />)}
       {tab === 'monitor' && <MonitorTab sources={sources} devices={devices} />}
     </div>
   );
