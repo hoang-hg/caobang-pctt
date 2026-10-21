@@ -316,7 +316,7 @@ Thứ tự theo quyết định ngày 21/10/2026: trang điều hành trước, 
 | 4 | Đ3 · 3.1 | Thanh trên gọn + thanh trạng thái (máy tính); menu chữ thường; trang đăng nhập 2 cột | `Header.jsx`, `Sidebar.jsx`, `Login.jsx` | Không mất nút nào (chỉ chuyển chỗ); đủ chức năng đăng nhập | Xong — PR #113 |
 | 5 | Đ3 · 3.2 | Tổng quan màn lớn 2 cột; chế độ trình chiếu phòng điều hành | `pages/Dashboard.jsx`, `components/dashboard/*` | Bài kiểm thử màn đầu theo thiết bị đạt | Xong — PR #114 |
 | 6 | Đ3 · 3.3 | Bản đồ giám sát: lớp nổi thống nhất, dải màu mưa | `pages/MonitoringMap.jsx`, `components/map/*` | Kiểm thử Bản đồ đạt | Xong — PR #115 |
-| 7 | Đ4 · 4.1 | Cứu hộ, Cảnh báo, Phản ánh theo nền móng; chuyển động nhỏ | `RescueCenter.jsx`, `Alerts.jsx`, `CitizenReports.jsx` | Kiểm thử từng trang đạt | Chưa làm |
+| 7 | Đ4 · 4.1 | Cứu hộ, Cảnh báo, Phản ánh theo nền móng; chuyển động nhỏ | `RescueCenter.jsx`, `Alerts.jsx`, `CitizenReports.jsx` | Kiểm thử từng trang đạt | Xong — PR #116 |
 | 8 | Đ4 · 4.2 | Vật tư, Đợt thiên tai, Nhập dữ liệu, Nguồn dữ liệu, Phân quyền theo nền móng | các trang tương ứng | Kiểm thử từng trang đạt | Chưa làm |
 | 9 | Đ4 · 4.3 | Hướng dẫn xử lý có hình; rà toàn bộ hai nền, 360 px | `Guide.jsx`, `utils/guides.js` | Rà ảnh hai nền đạt | Chưa làm |
 | 10 | Đ1 · 1.1 | Cổng người dân trên máy tính: bản đồ toàn màn, "Bạn muốn làm gì?", dải cảnh báo, thanh thời gian, thanh trạng thái | `pages/public/PublicPortal.jsx` | Đủ danh sách 6.1; đường dẫn cũ mở được | Chưa làm |

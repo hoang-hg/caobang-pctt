@@ -28,6 +28,7 @@ import AuditLog from '../components/alerts/AuditLog';
 import { alertAlerts, broadcastFacts, sortBroadcasts } from '../components/alerts/alertFacts';
 import { useAllowedCodes, usePermission } from '../rbac/usePermission';
 import { useOnline } from '../utils/useOnline';
+import { useNewKeys } from '../utils/useNewKeys';
 import { useShowMore } from '../utils/useShowMore';
 
 function useNow(ms) {
@@ -88,6 +89,8 @@ export default function Alerts() {
   const past = list.filter((b) => ['ket_thuc', 'het_han'].includes(factsOf(b).phase)).slice(0, 4);
   const rejected = list.filter((b) => b.status === 'rejected' && now - Date.parse(b.approved_at || b.created_at) < 3 * 86400e3).slice(0, 5);
   const liveMore = useShowMore(live, 6, 'live');
+  // Lệnh mới chờ duyệt, lệnh vừa được duyệt (chuyển sang "Đang hiệu lực") → thẻ trượt vào một lần (khoá gồm trạng thái)
+  const isNew = useNewKeys([...pending.map((b) => `cho:${b.id}`), ...live.map((b) => `song:${b.id}`)], !!bq.data);
   const alerts = alertAlerts({ broadcasts: list, factsOf, me, now });
 
   const setTab = (t, replace = false) => setParams((p) => {
@@ -136,7 +139,7 @@ export default function Alerts() {
         <Section id="cho-duyet" className="order-1 scroll-mt-20" title={`${pending.some((x) => x.can_approve) ? 'Chờ bạn duyệt' : 'Chờ lãnh đạo duyệt'} · ${pending.length}`} right={<ShieldCheck size={16} className="text-serious" aria-hidden="true" />}>
           {pending.length ? (
             <div className="grid gap-2 lg:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
-              {pending.map((b) => <PendingCard key={b.id} b={b} x={factsOf(b)} me={me} online={online} unitName={unitName} onApprove={(x, mode) => setApprove({ b: x, mode })} />)}
+              {pending.map((b) => <PendingCard key={b.id} b={b} x={factsOf(b)} me={me} online={online} unitName={unitName} onApprove={(x, mode) => setApprove({ b: x, mode })} fresh={isNew(`cho:${b.id}`)} />)}
             </div>
           ) : <EmptyState height={72}>Không có lệnh chờ duyệt</EmptyState>}
         </Section>
@@ -150,7 +153,7 @@ export default function Alerts() {
             {live.length ? (
               <>
                 <div className="grid gap-2 lg:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
-                  {liveMore.visible.map((b) => <LiveCard key={b.id} b={b} x={factsOf(b)} online={online} onManage={setManage} />)}
+                  {liveMore.visible.map((b) => <LiveCard key={b.id} b={b} x={factsOf(b)} online={online} onManage={setManage} fresh={isNew(`song:${b.id}`)} />)}
                 </div>
                 <ShowMore list={liveMore} step={6} noun="cảnh báo" />
               </>

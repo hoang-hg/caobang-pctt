@@ -46,11 +46,11 @@ function Meta({ b, extra }) {
  * (tên xã), số hộ, kênh; lãnh đạo có quyền: "Duyệt bằng PIN" (nút chính) và "Trả lại" kèm lý do — trọn hàng trên điện thoại.
  * Người soạn / không có quyền thấy lý do vì sao chưa duyệt được. `unitName(code)` → tên xã.
  */
-export function PendingCard({ b, x, me, online, onApprove, unitName = (c) => c }) {
+export function PendingCard({ b, x, me, online, onApprove, unitName = (c) => c, fresh = false }) {
   const names = (b.target_admin_codes || []).map(unitName);
   return (
     <article
-      className={clsx('card min-w-0 border-l-4 p-3', risk(SEVERITY_LEVEL[b.severity]).edge, x.waitedMin >= LONG_WAIT_MIN && 'ring-2 ring-danger')}
+      className={clsx('card min-w-0 border-l-4 p-3', risk(SEVERITY_LEVEL[b.severity]).edge, x.waitedMin >= LONG_WAIT_MIN && 'ring-2 ring-danger', fresh && 'motion-safe:animate-enter')}
       aria-label={`${b.code} — ${LEVEL[b.severity]?.label}, chờ duyệt ${waitText(x.waitedMin)}`}
     >
       <Head b={b} status={false} pending at={dateTime(b.created_at)} />
@@ -160,10 +160,10 @@ export function Delivery({ b }) {
 }
 
 /** Cảnh báo đã duyệt: thời hạn (sắp hết → nhắc gia hạn, đếm ngược), gia hạn / kết thúc (người duyệt có PIN), kết quả gửi. */
-export function LiveCard({ b, x, online, onManage }) {
+export function LiveCard({ b, x, online, onManage, fresh = false }) {
   return (
     <article
-      className={clsx('card min-w-0 border-l-4 p-3', risk(SEVERITY_LEVEL[b.severity]).edge, x.soon && 'ring-2 ring-serious')}
+      className={clsx('card min-w-0 border-l-4 p-3', risk(SEVERITY_LEVEL[b.severity]).edge, x.soon && 'ring-2 ring-serious', fresh && 'motion-safe:animate-enter')}
       aria-label={`${b.code} — ${LEVEL[b.severity]?.label}, ${broadcastStatus(b).label}${x.soon ? ', sắp hết hiệu lực' : ''}`}
     >
       <Head b={b} at={dateTime(b.sent_at || b.approved_at)} />
