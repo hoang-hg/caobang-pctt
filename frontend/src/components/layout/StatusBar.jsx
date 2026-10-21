@@ -6,6 +6,7 @@ import { Globe, Moon, Sun, Volume2, VolumeX } from 'lucide-react';
 import { api } from '../../api/client';
 import { useStore } from '../../app/store';
 import { usePermission } from '../../rbac/usePermission';
+import { useMediaQuery } from '../../utils/useMediaQuery';
 
 function Clock() {
   const [now, setNow] = useState(new Date());
@@ -21,6 +22,9 @@ function Clock() {
   );
 }
 
+// Cùng điều kiện với `lg:tall:` của Tailwind (tailwind.config.js) — Header ẩn các nút trùng bằng chính điều kiện đó
+const STATUS_BAR_QUERY = '(min-width: 1024px) and (min-height: 860px)';
+
 const WS = {
   online: ['bg-green-400', 'text-green-300', 'Đang trực — kết nối tức thì'],
   connecting: ['bg-amber-400', 'text-amber-300', 'Đang nối lại…'],
@@ -32,24 +36,26 @@ const WS = {
  * như trang tham khảo): cảm giác trung tâm đang trực. Kết nối tức thì · chuông SOS (bấm bật / tắt; trình duyệt chặn âm thanh
  * thì nhắc bấm) · nguồn số liệu (chỉ tài khoản được xem nguồn dữ liệu; nguồn lỗi → chữ đỏ, bấm mở trang Nguồn dữ liệu) ·
  * cổng người dân · nền Sáng / Tối · đồng hồ. Màn hẹp hoặc thấp hơn (laptop 1366×768): các nút này ở thanh trên / menu tài
- * khoản như cũ (Header). Nền tối cố định.
+ * khoản như cũ (Header) — thanh không được vẽ (không vẽ rồi ẩn: khỏi gọi nguồn số liệu mỗi phút trên điện thoại). Nền tối cố định.
  */
 export default function StatusBar() {
   const { theme, toggleTheme, wsStatus, soundOn, toggleSound, audioReady } = useStore();
+  const show = useMediaQuery(STATUS_BAR_QUERY);
   const canSources = usePermission('integration', 'view');
   const { data: sources } = useQuery({
     queryKey: ['int-sources'],
     queryFn: () => api('/integrations/sources'),
-    enabled: canSources,
+    enabled: canSources && show,
     refetchInterval: 60_000,
   });
+  if (!show) return null;
   const [dot, text, label] = WS[wsStatus] || WS.offline;
   const on = (sources || []).filter((s) => s.enabled);
   const broken = on.filter((s) => s.status === 'loi').length;
 
   return (
     <footer
-      className="no-print hidden h-8 shrink-0 items-center gap-4 border-t border-black/30 bg-[#0f172a] px-4 text-xs text-slate-300 lg:tall:flex"
+      className="no-print flex h-8 shrink-0 items-center gap-4 border-t border-black/30 bg-[#0f172a] px-4 text-xs text-slate-300"
       aria-label="Thanh trạng thái"
     >
       <span className={clsx('flex items-center gap-1.5 font-medium', text)} role="status">

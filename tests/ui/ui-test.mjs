@@ -2502,7 +2502,7 @@ async function alertsPage(ctx) {
     await page.goto(`${ROOT}/canh-bao?tab=lich_su`);
     const rows = page.locator('main table tbody tr').or(page.locator('main article[aria-label^="CB-"]'));
     await rows.first().or(page.getByText(/Chưa có lệnh cảnh báo nào/)).waitFor({ timeout: 20_000 });
-    const box = page.getByLabel('Trạng thái');
+    const box = page.getByLabel('Trạng thái', { exact: true });
     if (!(await box.isVisible())) await page.getByRole('button', { name: /^Bộ lọc/ }).click();
     await box.selectOption('hieu_luc');
     await page.waitForURL(/tt=hieu_luc/);

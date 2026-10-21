@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Moon, Sun, Volume2, VolumeX, ShieldAlert, Globe, Menu, X } from 'lucide-react';
 import clsx from 'clsx';
@@ -14,6 +14,22 @@ const SimulationBar = import.meta.env.DEV ? lazy(() => import('../common/Simulat
 // Báo cáo nhanh → tạo phiếu SOS: một nút cố định trên thanh trên cùng ở mọi trang (máy tính bảng, máy tính); điện thoại dùng
 // "Báo SOS" ở thanh thao tác dưới cùng. Hộp thoại chỉ tải khi bấm
 const QuickIncidentModal = lazy(() => import('../dashboard/QuickIncidentModal'));
+
+// Đồng hồ trên thanh trên: từ 1280 px khi KHÔNG có thanh trạng thái dưới cùng (laptop 1366×768); màn rộng + đủ cao thì đồng
+// hồ ở thanh trạng thái (StatusBar)
+function Clock() {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <div className="hidden border-l border-line/60 pl-2 text-right leading-tight xl:block xl:tall:hidden">
+      <div className="num text-sm font-semibold text-ink">{now.toLocaleTimeString('vi-VN')}</div>
+      <div className="text-[11px] text-muted">{now.toLocaleDateString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })}</div>
+    </div>
+  );
+}
 
 export default function Header() {
   const { theme, toggleTheme, wsStatus, soundOn, toggleSound, mobileMenuOpen, setMobileMenuOpen, audioReady } = useStore();
@@ -153,6 +169,8 @@ export default function Header() {
         >
           {theme === 'dark' ? <Sun size={16} className="text-amber-400" /> : <Moon size={16} className="text-indigo-500" />}
         </button>
+
+        <Clock />
 
         {/* Menu thông tin tài khoản */}
         <UserMenu />
