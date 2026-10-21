@@ -78,9 +78,11 @@ export default function AreaForecastChart({ height = 250 }) {
   return (
     <div>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-line/60 pb-1.5">
-        <div className="flex items-center gap-2">
+        {/* Ô chọn rộng theo dòng dài nhất ("<xã> — khoảng … mm (có thể tới … mm)", dài ngắn theo số dự báo) → giới hạn trong
+            khung, không đẩy trang tràn ngang ở 360 px */}
+        <div className="flex min-w-0 max-w-full items-center gap-2">
           <select
-            className="input tap w-auto py-1 px-2.5 text-xs border border-line bg-panel2 font-semibold text-ink rounded-lg focus:border-accent"
+            className="input tap w-auto max-w-full py-1 px-2.5 text-xs border border-line bg-panel2 font-semibold text-ink rounded-lg focus:border-accent"
             value={code}
             onChange={(e) => setCode(e.target.value)}
             aria-label="Chọn xã"
