@@ -5,6 +5,7 @@ import L from './leafletGlobal';
 import 'leaflet-draw';
 import { api, ApiError } from '../../api/client';
 import { useProvinceArea } from '../../api/hooks';
+import { usePageStatus } from '../../app/pageStatus';
 import { useStore } from '../../app/store';
 import { useMediaQuery } from '../../utils/useMediaQuery';
 import { pinIcon, COLORS } from './icons';
@@ -275,6 +276,17 @@ export function MapResize() {
       cancelAnimationFrame(frame);
     };
   }, [map]);
+  return null;
+}
+
+/** Toạ độ con trỏ trên bản đồ → thanh trạng thái dưới cùng (StatusBar — máy tính màn rộng, đủ cao); con trỏ rời bản đồ
+ * hoặc rời trang thì xoá. */
+export function CursorToStatus() {
+  useMapEvents({
+    mousemove: (e) => usePageStatus.setState({ cursor: e.latlng }),
+    mouseout: () => usePageStatus.setState({ cursor: null }),
+  });
+  useEffect(() => () => usePageStatus.setState({ cursor: null }), []);
   return null;
 }
 

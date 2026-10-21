@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { Globe, Moon, Sun, Volume2, VolumeX } from 'lucide-react';
+import { Crosshair, Globe, Moon, Sun, Volume2, VolumeX } from 'lucide-react';
 import { api } from '../../api/client';
+import { usePageStatus } from '../../app/pageStatus';
 import { useStore } from '../../app/store';
 import { usePermission } from '../../rbac/usePermission';
+import { time } from '../../utils/format';
 import { useMediaQuery } from '../../utils/useMediaQuery';
 
 function Clock() {
@@ -17,7 +19,8 @@ function Clock() {
   return (
     <span className="num whitespace-nowrap text-slate-200">
       <b className="font-semibold">{now.toLocaleTimeString('vi-VN')}</b>
-      <span className="text-slate-400"> · {now.toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
+      {/* Ngày đầy đủ từ 1536 px — 1440 px nhường chỗ cho giờ số liệu, toạ độ con trỏ */}
+      <span className="hidden text-slate-400 2xl:inline"> · {now.toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
     </span>
   );
 }
@@ -35,11 +38,14 @@ const WS = {
  * Thanh trạng thái dưới cùng — màn rộng ≥ 1024 px và cao ≥ 860 px (`lg:tall:`; docs/ke-hoach-lam-moi-giao-dien.md mục 5,
  * như trang tham khảo): cảm giác trung tâm đang trực. Kết nối tức thì · chuông SOS (bấm bật / tắt; trình duyệt chặn âm thanh
  * thì nhắc bấm) · nguồn số liệu (chỉ tài khoản được xem nguồn dữ liệu; nguồn lỗi → chữ đỏ, bấm mở trang Nguồn dữ liệu) ·
- * cổng người dân · nền Sáng / Tối · đồng hồ. Màn hẹp hoặc thấp hơn (laptop 1366×768): các nút này ở thanh trên / menu tài
- * khoản như cũ (Header) — thanh không được vẽ (không vẽ rồi ẩn: khỏi gọi nguồn số liệu mỗi phút trên điện thoại). Nền tối cố định.
+ * cổng người dân · nền Sáng / Tối · đồng hồ. Trang có đặt (usePageStatus — Bản đồ giám sát): giờ số liệu, toạ độ con trỏ trên
+ * bản đồ (vĩ độ, kinh độ — dán được vào ô tìm kiếm, Google Maps). Màn hẹp hoặc thấp hơn (laptop 1366×768): các nút này ở
+ * thanh trên / menu tài khoản như cũ (Header) — thanh không được vẽ (không vẽ rồi ẩn: khỏi gọi nguồn số liệu mỗi phút trên
+ * điện thoại). Nền tối cố định.
  */
 export default function StatusBar() {
   const { theme, toggleTheme, wsStatus, soundOn, toggleSound, audioReady } = useStore();
+  const { dataTime, cursor } = usePageStatus();
   const show = useMediaQuery(STATUS_BAR_QUERY);
   const canSources = usePermission('integration', 'view');
   const { data: sources } = useQuery({
@@ -55,9 +61,11 @@ export default function StatusBar() {
 
   return (
     <footer
-      className="no-print flex h-8 shrink-0 items-center gap-4 border-t border-black/30 bg-[#0f172a] px-4 text-xs text-slate-300"
+      className="no-print flex h-8 shrink-0 items-center gap-4 overflow-hidden whitespace-nowrap border-t border-black/30 bg-[#0f172a] px-4 text-xs text-slate-300"
       aria-label="Thanh trạng thái"
     >
+      {/* Mọi mục một dòng; chật thì nhóm trái bị cắt bớt ở cuối (toạ độ trước), nhóm phải luôn đủ */}
+      <span className="flex min-w-0 flex-1 items-center gap-4 overflow-hidden">
       <span className={clsx('flex items-center gap-1.5 font-medium', text)} role="status">
         <span className={clsx('h-2 w-2 shrink-0 rounded-full', dot)} aria-hidden="true" /> {label}
       </span>
@@ -73,7 +81,7 @@ export default function StatusBar() {
         Chuông SOS: {soundOn ? 'bật' : 'tắt'}
       </button>
       {soundOn && !audioReady && (
-        <span className="text-amber-300" title="Trình duyệt chặn âm thanh tới khi bấm vào trang">Bấm vào trang một lần để chuông kêu được</span>
+        <span className="text-amber-300" title="Trình duyệt chặn âm thanh tới khi bấm vào trang — bấm một lần để chuông SOS kêu được">Bấm vào trang để chuông kêu</span>
       )}
       {canSources && sources && (
         broken > 0 ? (
@@ -84,8 +92,17 @@ export default function StatusBar() {
           <span className="text-slate-400">{on.length} nguồn số liệu bình thường</span>
         )
       )}
+      {dataTime && <span className="text-slate-400">Số liệu lúc <b className="num font-semibold text-slate-200">{time(dataTime)}</b></span>}
+      {cursor && (
+        <span className="num flex items-center gap-1 font-semibold text-slate-200" title="Toạ độ con trỏ (vĩ độ, kinh độ)">
+          <Crosshair size={13} className="text-slate-400" aria-hidden="true" />
+          <span className="sr-only">Toạ độ con trỏ</span>
+          {cursor.lat.toFixed(5)}, {cursor.lng.toFixed(5)}
+        </span>
+      )}
+      </span>
 
-      <span className="ml-auto flex items-center gap-3">
+      <span className="flex shrink-0 items-center gap-3">
         <Link
           to="/cong-khai"
           target="_blank"

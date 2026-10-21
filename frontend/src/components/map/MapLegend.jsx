@@ -1,4 +1,5 @@
 import { Fragment } from 'react';
+import clsx from 'clsx';
 import { RiskLegend } from '../common/ui';
 import { RADAR_BINS } from './MapTools';
 import {
@@ -18,29 +19,49 @@ const Ico = ({ icon }) => (
 
 const Swatch = ({ style }) => <span className="mx-0.5 inline-block h-4 w-8 shrink-0 rounded-sm border" style={style} aria-hidden="true" />;
 
-const twoTone = ([a, b]) => `linear-gradient(90deg, ${a} 50%, ${b} 50%)`;
+/**
+ * Dải màu mưa dự báo liền như trang tham khảo (docs/ke-hoach-lam-moi-giao-dien.md 6.4): các nấc nối liền, số ngưỡng ở chỗ
+ * nối, hai đầu "Mưa nhỏ" → "Mưa rất to". Nấc rời, không chuyển màu dần — lớp mưa dự báo tô mỗi xã đúng một màu theo
+ * khoảng. `bins` = thang đang vẽ (MapTools `rainScale`), `unit` ghi sau số ngưỡng cuối ("mm", "mm/giờ"). `compact`: bỏ hàng
+ * số ngưỡng (thẻ góc bản đồ điện thoại — đỡ che bản đồ; số ngưỡng xem ở Chú giải).
+ */
+export function RainBar({ bins, unit, compact = false }) {
+  return (
+    <div className="w-full min-w-[10rem]">
+      <div className="flex h-2.5 overflow-hidden rounded-sm" role="img" aria-label={`Thang màu: ${bins.map((b) => b.label).join(', ')}`}>
+        {bins.map((b) => <span key={b.label} className="flex-1" style={{ background: b.color }} title={b.label} />)}
+      </div>
+      <div className={clsx('num relative mt-0.5 h-3 text-[10px] leading-none text-muted', compact && 'hidden')} aria-hidden="true">
+        {bins.slice(0, -1).map((b, i) => (
+          <span key={b.max} className="absolute top-0 -translate-x-1/2 whitespace-nowrap" style={{ left: `${((i + 1) / bins.length) * 100}%` }}>
+            {b.max}{i === bins.length - 2 && ` ${unit}`}
+          </span>
+        ))}
+      </div>
+      <div className={clsx('flex justify-between text-[10px] font-medium leading-tight text-ink-2', compact && 'mt-0.5')} aria-hidden="true">
+        <span>Mưa nhỏ</span>
+        <span>Mưa rất to</span>
+      </div>
+    </div>
+  );
+}
+
+const RADAR_SHORT = ['Nhỏ–vừa', 'To', 'Rất to', 'Dông'];
 
 /**
- * Thang màu radar (cường độ mưa lúc chụp ảnh). `layout`: `grid` 2 cột (chú giải), `list` một cột (thẻ góc bản đồ máy
- * tính, cùng kiểu thẻ mưa dự báo), `compact` một hàng ô màu, nhãn khi rê chuột (chip góc bản đồ điện thoại).
+ * Thang màu radar (cường độ mưa lúc chụp ảnh) — dải liền 8 sắc của bảng màu RainViewer, dưới mỗi phần tư ghi nhóm mưa
+ * (Mưa nhỏ – vừa · Mưa to · Mưa rất to · Dông rất mạnh). Dùng chung cho thẻ góc bản đồ và chú giải.
  */
-export function RadarScale({ layout = 'grid' }) {
-  if (layout === 'compact') {
-    return (
-      <div className="flex gap-1">
-        {RADAR_BINS.map((b) => <span key={b.label} className="h-2.5 w-5 rounded-sm" style={{ background: twoTone(b.colors) }} title={b.label} data-thang-mau="" />)}
-      </div>
-    );
-  }
+export function RadarScale() {
   return (
-    <ul className={layout === 'list' ? 'space-y-1' : 'grid grid-cols-2 gap-1'}>
-      {RADAR_BINS.map((b) => (
-        <li key={b.label} className="flex items-center gap-1.5">
-          <span className="h-3 w-5 shrink-0 rounded-sm" style={{ background: twoTone(b.colors) }} aria-hidden="true" data-thang-mau="" />
-          {b.label}
-        </li>
-      ))}
-    </ul>
+    <div className="w-full min-w-[10rem]">
+      <div className="flex h-2.5 overflow-hidden rounded-sm" role="img" aria-label={`Thang màu radar: ${RADAR_BINS.map((b) => b.label).join(', ')}`}>
+        {RADAR_BINS.flatMap((b) => b.colors.map((c) => <span key={c} className="flex-1" style={{ background: c }} title={b.label} />))}
+      </div>
+      <div className="mt-0.5 grid grid-cols-4 whitespace-nowrap text-center text-[10px] font-medium leading-tight text-ink-2" aria-hidden="true">
+        {RADAR_SHORT.map((t) => <span key={t}>{t}</span>)}
+      </div>
+    </div>
   );
 }
 
@@ -156,14 +177,7 @@ export default function MapLegend({ layers, order, rain, rainNote, radarNote }) 
         <div>
           <div className="mb-1 font-bold text-ink">{rain ? rain.title : 'Mưa dự báo theo xã'}</div>
           {rain ? (
-            <ul className="grid grid-cols-2 gap-1">
-              {rain.bins.map((b) => (
-                <li key={b.label} className="flex items-center gap-1.5">
-                  <span className="h-3 w-5 rounded-sm" style={{ background: b.color }} aria-hidden="true" />
-                  {b.label}
-                </li>
-              ))}
-            </ul>
+            <RainBar bins={rain.bins} unit={rain.hourly ? 'mm/giờ' : 'mm'} />
           ) : (
             <p className="text-muted">{rainNote}</p>
           )}

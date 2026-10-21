@@ -535,7 +535,7 @@ export function ViewModeSwitch({ mode, onChange, touch, caption = false, canDisp
         value={mode}
         onChange={onChange}
         touch={touch}
-        className={clsx('flex bg-panel/95 !shadow-lg backdrop-blur-md', className)}
+        className={clsx('flex bg-panel/95 !shadow-[var(--shadow-float)] backdrop-blur-md', className)}
         options={VIEW_MODES.map(([id, label, h]) => ({ value: id, label, hint: h }))}
       />
       {caption && hint && (
@@ -669,7 +669,7 @@ const TOOL_NAME = { measure: 'Thước đo', route: 'Dò đường an toàn', in
 /** Hướng dẫn công cụ đang dùng (và kết quả dò đường: đang tìm / lỗi + thử lại / lộ trình — RouteTool). */
 export function ToolHint({ tool, routeInfo, onClose, className }) {
   return (
-    <div className={clsx('card border border-accent/40 bg-panel/95 px-3.5 py-2 text-xs shadow-xl backdrop-blur-md', className)} role="status">
+    <div className={clsx('float-panel border-accent/40 px-3.5 py-2 text-xs', className)} role="status">
       <div className="mb-1 flex items-center justify-between gap-2 font-semibold text-accent">
         <span>Đang dùng: {TOOL_NAME[tool] || 'Khoanh vùng'}</span>
         <button type="button" onClick={onClose} className="tap-sq -m-1 flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-panel2 hover:text-ink" aria-label="Tắt công cụ">
@@ -752,7 +752,7 @@ export function DrawnStats({ drawn, units, onClose, onRetry, onAlert, touch, cla
   };
   return (
     // Cao tối đa 60% màn hình, phần dưới tiêu đề tự cuộn — danh sách nhiều xã không đẩy nút "Soạn cảnh báo" ra khỏi màn
-    <div className={clsx('card flex max-h-[min(60vh,34rem)] flex-col border border-line bg-panel/95 p-3.5 shadow-2xl backdrop-blur-md', className)}>
+    <div className={clsx('float-panel flex max-h-[min(60vh,34rem)] flex-col p-3.5', className)} role="region" aria-label="Phân tích vùng khoanh">
       <div className="mb-2 flex shrink-0 items-center justify-between border-b border-line pb-1.5 text-sm font-bold text-ink">
         <span>Phân tích vùng khoanh</span>
         <button type="button" onClick={onClose} className="tap-sq -m-1 flex h-8 w-8 items-center justify-center rounded-lg hover:bg-panel2" aria-label="Đóng phân tích vùng">

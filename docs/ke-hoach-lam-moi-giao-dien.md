@@ -236,7 +236,9 @@ cứu phiếu bằng mã + số điện thoại; hồ chứa, xả lũ; mực n�
 
 - Nền mặc định như trang tham khảo (mục 7.1), ngoài tỉnh làm mờ (mục 7.2); vẫn chọn được Địa hình, Vệ tinh, Ban đêm.
 - Mọi bảng nổi dùng một kiểu `.float-panel`; giờ số liệu, toạ độ con trỏ xuống thanh trạng thái.
-- Dải màu mưa liền, chữ "Mưa nhỏ → Mưa rất to" như trang tham khảo.
+- Dải màu mưa liền, chữ "Mưa nhỏ → Mưa rất to" như trang tham khảo. Đã làm (3.3): các nấc nối liền nhưng vẫn rời (không
+  chuyển màu dần) vì lớp mưa dự báo tô mỗi xã một màu theo khoảng; radar ghi Nhỏ–vừa · To · Rất to · Dông; điện thoại bản
+  gọn. Giờ số liệu, toạ độ con trỏ chỉ có ở thanh trạng thái (màn rộng + đủ cao) — màn khác giữ như cũ.
 - Giữ: 2 chế độ xem, 4 nhóm lớp có công tắc, thanh thời gian có Phát, đo, khoanh vùng, kéo – thả điều động.
 
 ### 6.5. Trang nghiệp vụ (Đ4)
@@ -313,7 +315,7 @@ Thứ tự theo quyết định ngày 21/10/2026: trang điều hành trước, 
 | 3 | Đ2 · 2.1 | Nền như trang tham khảo (mục 7.1) + làm mờ ngoài tỉnh mọi bản đồ (mục 7.2) | `components/map/MapTools.jsx`, các bản đồ | Nền mặc định đúng; ngoài tỉnh mờ ở mọi bản đồ; mất ô Google → nền dự phòng | Xong — PR #112 |
 | 4 | Đ3 · 3.1 | Thanh trên gọn + thanh trạng thái (máy tính); menu chữ thường; trang đăng nhập 2 cột | `Header.jsx`, `Sidebar.jsx`, `Login.jsx` | Không mất nút nào (chỉ chuyển chỗ); đủ chức năng đăng nhập | Xong — PR #113 |
 | 5 | Đ3 · 3.2 | Tổng quan màn lớn 2 cột; chế độ trình chiếu phòng điều hành | `pages/Dashboard.jsx`, `components/dashboard/*` | Bài kiểm thử màn đầu theo thiết bị đạt | Xong — PR #114 |
-| 6 | Đ3 · 3.3 | Bản đồ giám sát: lớp nổi thống nhất, dải màu mưa | `pages/MonitoringMap.jsx`, `components/map/*` | Kiểm thử Bản đồ đạt | Chưa làm |
+| 6 | Đ3 · 3.3 | Bản đồ giám sát: lớp nổi thống nhất, dải màu mưa | `pages/MonitoringMap.jsx`, `components/map/*` | Kiểm thử Bản đồ đạt | Xong — PR #115 |
 | 7 | Đ4 · 4.1 | Cứu hộ, Cảnh báo, Phản ánh theo nền móng; chuyển động nhỏ | `RescueCenter.jsx`, `Alerts.jsx`, `CitizenReports.jsx` | Kiểm thử từng trang đạt | Chưa làm |
 | 8 | Đ4 · 4.2 | Vật tư, Đợt thiên tai, Nhập dữ liệu, Nguồn dữ liệu, Phân quyền theo nền móng | các trang tương ứng | Kiểm thử từng trang đạt | Chưa làm |
 | 9 | Đ4 · 4.3 | Hướng dẫn xử lý có hình; rà toàn bộ hai nền, 360 px | `Guide.jsx`, `utils/guides.js` | Rà ảnh hai nền đạt | Chưa làm |

@@ -377,7 +377,8 @@ chỉ khi `DEMO_MODE`; `DEMO_MODE=false` xoá đoạn `so_do` còn sót mỗi l�
 - **Chống bot**: `components/common/Turnstile.jsx` (khoá site lấy từ `GET /public/config`; token dùng 1 lần — đổi `key` để
   lấy token mới).
 - Trạng thái toàn cục (Zustand `app/store.js`): chỉ thứ dùng chung nhiều trang (auth, bộ lọc vùng, theme, toasts…);
-  dữ liệu máy chủ để trong TanStack Query. `localStorage` luôn bọc try/catch (`safeGet/safeSet`).
+  dữ liệu máy chủ để trong TanStack Query. Thứ đổi liên tục (toạ độ con trỏ bản đồ, giờ số liệu của trang cho thanh trạng
+  thái) để ở kho riêng `app/pageStatus.js` — trong `useStore` thì mọi trang gọi `useStore()` vẽ lại theo từng lần rê chuột. `localStorage` luôn bọc try/catch (`safeGet/safeSet`).
 
 ## 8. Bảo mật — kiểm tra trước khi xong việc
 

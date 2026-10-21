@@ -1231,8 +1231,9 @@ async function mapTools(ctx, phone) {
     // Bản đồ đứng yên (bay tới vùng đang lọc xong) rồi mới chọn điểm bấm
     await page.waitForFunction(() => !document.querySelector('.leaflet-zoom-anim, .leaflet-pan-anim'), null, { timeout: 10_000 });
   };
-  const hint = visible(page.locator('div.card[role="status"]').filter({ hasText: 'Đang dùng: Dò đường an toàn' }));
-  const card = visible(page.locator('div.card').filter({ hasText: 'Phân tích vùng khoanh' }));
+  // Tìm theo vai trò + nhãn (không theo lớp CSS — lớp nổi đổi kiểu không làm hỏng bài)
+  const hint = visible(page.locator('[role="status"]').filter({ hasText: 'Đang dùng: Dò đường an toàn' }));
+  const card = visible(page.getByRole('region', { name: 'Phân tích vùng khoanh' }));
   // Lỗi giả lập là chủ ý → bỏ khỏi danh sách "API 5xx" mà bước kiểm thử bắt
   const forget = () => ctx.problems.splice(0, ctx.problems.length, ...ctx.problems.filter((x) => !/\/map\/(route|area-stats)/.test(x)));
   const fake = (j) => ({ status: 200, contentType: 'application/json', body: JSON.stringify(j) });
