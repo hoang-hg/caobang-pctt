@@ -918,6 +918,8 @@ async function tablet(ctx) {
 // khi cuộn hết, lộ khoảng trắng). Chỉ xem.
 const FIRST_SCREEN = { name: 'Màn hình đầu', opts: { viewport: { width: 1366, height: 768 } }, mobile: false };
 const SCREENS = [
+  // Màn lớn phòng điều hành (≥ 1680 px): 2 cột — việc chờ + 6 ô số bên trái, bản đồ bên phải (docs/ke-hoach-lam-moi-giao-dien.md 6.3)
+  ['Màn lớn 1920×1080', 1920, 1080, { map: true, decisions: true, twoCol: true }],
   ['Laptop 1366×768', 1366, 768, { map: true, decisions: true }],
   ['Laptop 1440×900', 1440, 900, { map: true, decisions: true }],
   ['iPad ngang 1180×820', 1180, 820, { map: true }],
@@ -935,7 +937,7 @@ async function firstScreen(ctx) {
     await page.waitForURL(/\/dashboard/, { timeout: 20_000 });
   });
   for (const [label, width, height, need] of SCREENS) {
-    const parts = ['dải tình huống', '6 KPI', need.map && 'bản đồ', need.decisions && 'việc chờ quyết định'].filter(Boolean).join(', ');
+    const parts = ['dải tình huống', '6 KPI', need.map && 'bản đồ', need.decisions && 'việc chờ quyết định', need.twoCol && 'bản đồ cạnh việc chờ'].filter(Boolean).join(', ');
     await step(ctx, `${label}: không cuộn vẫn thấy ${parts}; chỉ vùng nội dung cuộn`, async () => {
       await page.setViewportSize({ width, height });
       await page.goto(`${ROOT}/dashboard`);
@@ -962,6 +964,8 @@ async function firstScreen(ctx) {
           visibleBottom: Math.round(Math.min(navTop, barTop)),
           mapVisible: map ? Math.round(Math.min(navTop, barTop, map.getBoundingClientRect().bottom) - map.getBoundingClientRect().top) : 0,
           decisionTop: dec ? Math.round(dec.getBoundingClientRect().top) : null,
+          mapLeft: map ? Math.round(map.getBoundingClientRect().left) : null,
+          decisionRight: dec ? Math.round(dec.getBoundingClientRect().right) : null,
           stripTop: strip ? Math.round(strip.getBoundingClientRect().top) : null,
           vh,
         };
@@ -974,6 +978,7 @@ async function firstScreen(ctx) {
         need.map && m.mapVisible < 120 && `bản đồ chỉ thấy ${m.mapVisible}px`,
         need.decisions && (m.decisionTop == null || m.decisionTop > m.vh - 60) && `"Việc chờ quyết định" ở ${m.decisionTop}px`,
         (m.stripTop == null || m.stripTop > 200) && 'không thấy dải tình huống ở đầu trang',
+        need.twoCol && !(m.mapLeft > m.decisionRight) && `bản đồ không nằm cạnh "Việc chờ quyết định" (bản đồ từ ${m.mapLeft}px, việc chờ tới ${m.decisionRight}px)`,
       ].filter(Boolean);
       if (bad.length) throw new Error(bad.join('; '));
       return `KPI đáy ${m.kpiBottom}/${m.visibleBottom}px${need.map ? ` · bản đồ thấy ${m.mapVisible}px` : ''}`;

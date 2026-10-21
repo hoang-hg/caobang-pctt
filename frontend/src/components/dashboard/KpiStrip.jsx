@@ -11,7 +11,7 @@ import StatCard from './StatCard';
 import { evacFacts, rainFacts, sosFacts } from './kpiFacts';
 import { riverName, riverSummary, ROMAN, shortName } from './RiverKpi';
 
-const GRID = 'grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2.5 [&>*]:min-w-0';
+const GRID = 'grid grid-cols-2 gap-2 sm:gap-2.5 [&>*]:min-w-0';
 const WIDE = 980; // vùng chỉ số rộng từ ~980 px → 6 ô một hàng
 const TILE_H = 92; // chiều cao khung tải — gần bằng ô thật để trang không nhảy
 const HOUR = 3_600_000;
@@ -48,10 +48,11 @@ function lastHourRain(data) {
  * gọi); ô Mực nước: lên / xuống của trạm nặng nhất. Ô SOS: viền đỏ + nhãn nhấp nháy (chỉ nhãn) khi có phiếu quá hạn phản
  * hồi theo cấp hoặc chờ quá 15 phút chưa có lực lượng nhận.
  * `large`: chữ số to cho chế độ trình chiếu (màn hình lớn phòng điều hành, đọc từ xa).
+ * `stacked`: luôn 2 × 3 — cột trái của Tổng quan màn lớn ≥ 1680 px, cạnh bản đồ (3 × 2 ở cột đó làm chữ trong ô bị cắt).
  */
 export default function KpiStrip({
   k, kState, evacQ, stationsState, waterStations, rainStations, canSos, canResource, canEvacUpdate, onRiver, onRain, riverRef,
-  large = false,
+  large = false, stacked = false,
 }) {
   // Xếp 6 ô một hàng theo bề rộng THẬT của vùng chỉ số (không chỉ theo màn hình): màn rộng / trình chiếu đủ chỗ thì một
   // hàng; cạnh cột "Việc chờ quyết định" thì 3×2
@@ -68,7 +69,7 @@ export default function KpiStrip({
   if (!k && kState.error) return <ErrorState onRetry={kState.refetch}>Không tải được chỉ số tổng quan</ErrorState>;
   if (!k) {
     return (
-      <div className={GRID} aria-label="Đang tải chỉ số nhanh">
+      <div className={clsx(GRID, !stacked && 'sm:grid-cols-3')} aria-label="Đang tải chỉ số nhanh">
         {[0, 1, 2, 3, 4, 5].map((i) => <Skeleton key={i} height={TILE_H} />)}
       </div>
     );
@@ -103,7 +104,7 @@ export default function KpiStrip({
   );
 
   return (
-    <div ref={gridRef} className={clsx(GRID, wide && 'sm:grid-cols-6', large && 'kpi-lon')} aria-label="Chỉ số nhanh">
+    <div ref={gridRef} className={clsx(GRID, !stacked && (wide ? 'sm:grid-cols-6' : 'sm:grid-cols-3'), large && 'kpi-lon')} aria-label="Chỉ số nhanh">
       <StatCard
         compact
         icon={CloudRain}

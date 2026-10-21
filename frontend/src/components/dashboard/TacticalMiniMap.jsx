@@ -6,7 +6,7 @@ import { Crosshair, Maximize2 } from 'lucide-react';
 import { useAreaQuery } from '../../api/hooks';
 import { useStore } from '../../app/store';
 import { useChartTheme } from '../charts/chartTheme';
-import { AreaFocus, BaseLayer } from '../map/MapTools';
+import { AreaFocus, BaseLayer, MapResize } from '../map/MapTools';
 import { INCIDENT, SOS_STATUS } from '../../utils/labels';
 import { HAZARD_LEVEL, LANDSLIDE_LEVEL, levelOf, RESERVOIR_LEVEL, risk, sosLevel } from '../../utils/risk';
 import { stationView } from '../../utils/stations';
@@ -95,8 +95,10 @@ function FlyTo({ target }) {
 
 /** Bản đồ điểm nóng thu nhỏ cho lãnh đạo: nền bản đồ chung của hệ thống (BaseLayer — tự lưu trữ / có ghi công), vùng
  * đang lọc (AreaFocus), điểm nóng từ /map/layers + KPI. Không có điểm nóng → nói rõ, không vẽ điểm minh hoạ.
- * `focus` ({ id, at }): yêu cầu từ ngoài (câu "Nguy hiểm nhất") — cuộn tới bản đồ và bay tới điểm đó. */
-export default function TacticalMiniMap({ k, className, focus }) {
+ * `focus` ({ id, at }): yêu cầu từ ngoài (câu "Nguy hiểm nhất") — cuộn tới bản đồ và bay tới điểm đó.
+ * `tall`: cột phải của Tổng quan màn lớn ≥ 1680 px — cao ít nhất 420 px và giãn bằng cột trái (việc chờ + 6 ô số); danh
+ * sách điểm nóng cuộn trong chiều cao đó, không đẩy hàng cao thêm. */
+export default function TacticalMiniMap({ k, className, focus, tall = false }) {
   const { data: layers, isError: layersError, refetch } = useAreaQuery('map-layers', '/map/layers', {}, { refetchInterval: 30_000 });
   const { data: area } = useAreaQuery('area', '/admin-units/area', {}, { staleTime: Infinity });
   const filtered = useStore((s) => s.filter.codes.length > 0);
@@ -147,11 +149,12 @@ export default function TacticalMiniMap({ k, className, focus }) {
       </div>
 
       {/* Danh sách điểm nóng nằm cạnh bản đồ từ 1280 px; hẹp hơn (iPad, cột trái 3/5) xuống dưới để bản đồ đủ rộng */}
-      <div className="grid gap-2 xl:grid-cols-[minmax(0,1fr)_240px] [&>*]:min-w-0">
+      <div className={clsx('grid gap-2 xl:grid-cols-[minmax(0,1fr)_240px] [&>*]:min-w-0', tall && 'flex-1')}>
         {/* isolate: các lớp Leaflet (z-index tới 1000) không đè dải báo động dính trên cùng khi cuộn */}
-        <div className="relative isolate z-0 h-[220px] overflow-hidden rounded-lg border border-line sm:h-[300px] xl:h-[320px]">
+        <div className={clsx('relative isolate z-0 overflow-hidden rounded-lg border border-line', tall ? 'min-h-[420px]' : 'h-[220px] sm:h-[300px] xl:h-[320px]')}>
           <MapContainer center={CENTER} zoom={8} zoomControl={false} scrollWheelZoom={false} className="h-full w-full">
             <BaseLayer basemap="auto" />
+            <MapResize />
             <ZoomControl position="bottomright" />
             <AreaFocus area={area} filtered={filtered} />
             <FlyTo target={target} />
@@ -222,7 +225,7 @@ export default function TacticalMiniMap({ k, className, focus }) {
           )}
         </div>
 
-        <ul className="scroll-thin flex max-h-[200px] flex-col gap-1 overflow-y-auto pr-1 xl:max-h-[320px] print:max-h-none print:overflow-visible">
+        <ul className={clsx('scroll-thin flex flex-col gap-1 overflow-y-auto pr-1 print:max-h-none print:overflow-visible', tall ? 'h-0 min-h-full' : 'max-h-[200px] xl:max-h-[320px]')}>
           {shown.slice(0, 30).map((h) => {
             const isTarget = target && target.lat === h.lat && target.lon === h.lon;
             return (

@@ -124,6 +124,10 @@ export default function Dashboard() {
   const isPhone = !useMediaQuery('(min-width: 640px)');
   const [params, setParams] = useSearchParams();
   const { filter, setFilter, clearFilter, toast, auth, wsStatus, setFocus, presentation, setPresentation } = useStore();
+  // Màn lớn của lãnh đạo (≥ 1680 px — màn rời, TV phòng điều hành; cả chế độ trình chiếu): 2 cột — việc chờ + 6 ô số bên
+  // trái (trình chiếu: chỉ 6 ô số chữ to), bản đồ điểm nóng lớn bên phải (docs/ke-hoach-lam-moi-giao-dien.md mục 6.3).
+  // Laptop 1366–1600 px giữ bố cục cũ: cột trái hẹp làm chữ trong 6 ô số bị cắt
+  const bigScreen = useMediaQuery('(min-width: 1680px)');
   const isFiltered = filter.codes.length > 0;
 
   // Quyền: nút / thẻ / khối chỉ hiện khi tài khoản mở được — backend vẫn kiểm tra lại mọi thao tác
@@ -681,16 +685,20 @@ export default function Dashboard() {
           <div ref={ref} className="flex flex-col gap-2.5 bg-bg sm:gap-3.5">
             {/* 1. Việc chờ quyết định — khối nổi bật đầu tiên (hàng thẻ ngang từ 640 px), rồi 6 ô chỉ số. Điện thoại: 6 ô
                 trước (thấy trọn cùng dải khẩn, không cuộn), Việc chờ ngay sau. Trình chiếu: chỉ 6 ô, chữ to */}
-            <div className="flex flex-col gap-2.5 sm:gap-3.5">
-              {!presentation && <DecisionPanel k={k} kState={kState} className="max-sm:order-last" />}
-              <KpiStrip
-                {...kpiProps}
-                onRiver={(id) => {
-                  setChartSegment('thuy_van');
-                  focusStation(id);
-                }}
-                large={presentation}
-              />
+            <div className={clsx(bigScreen ? 'grid grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-3.5' : 'flex flex-col gap-2.5 sm:gap-3.5')}>
+              <div className={clsx(bigScreen ? 'flex min-w-0 flex-col gap-3.5' : 'contents')}>
+                {!presentation && <DecisionPanel k={k} kState={kState} className="max-sm:order-last" stacked={bigScreen} />}
+                <KpiStrip
+                  {...kpiProps}
+                  onRiver={(id) => {
+                    setChartSegment('thuy_van');
+                    focusStation(id);
+                  }}
+                  large={presentation}
+                  stacked={bigScreen}
+                />
+              </div>
+              {bigScreen && <TacticalMiniMap k={k} className="min-w-0" focus={mapFocus} tall />}
             </div>
 
             {/* Gợi ý lần đầu: điện thoại ngay trước bản đồ; máy tính bảng / laptop đầu cột phải (trên nhật ký) — không đẩy bản
@@ -703,7 +711,7 @@ export default function Dashboard() {
                 />
               )}
               <div className="flex min-w-0 flex-col gap-3 md:col-start-1 md:row-span-2 md:row-start-1">
-                <TacticalMiniMap k={k} className="min-w-0" focus={mapFocus} />
+                {!bigScreen && <TacticalMiniMap k={k} className="min-w-0" focus={mapFocus} />}
 
                 {/* Biểu đồ theo chuyên đề — xem một chuyên đề một lúc (bớt rối cho lãnh đạo) hoặc "Tất cả" */}
                 <div className="card p-2 sm:p-2.5">

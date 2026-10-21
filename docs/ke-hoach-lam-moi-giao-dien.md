@@ -223,11 +223,14 @@ cứu phiếu bằng mã + số điện thoại; hồ chứa, xả lũ; mực n�
 └─────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- Giữ **thứ tự nội dung** của PR #100, #101 (câu tóm tắt → việc chờ → 6 ô → bản đồ); chỉ đổi bố cục từ 1440 px trở lên.
-  Màn đầu vẫn phải qua bài kiểm thử theo thiết bị (laptop, iPad, điện thoại).
+- Giữ **thứ tự nội dung** của PR #100, #101 (câu tóm tắt → việc chờ → 6 ô → bản đồ); chỉ đổi bố cục từ **1680 px** trở lên
+  (màn rời, TV phòng điều hành). Đã thử 1440 px: cột trái hẹp, chữ trong 6 ô số bị cắt "…" — laptop giữ bố cục cũ. Bản đồ
+  giãn cao bằng cột trái (ít nhất 420 px). Màn đầu vẫn phải qua bài kiểm thử theo thiết bị (thêm màn lớn 1920×1080: bản đồ
+  phải nằm cạnh "Việc chờ quyết định").
 - Ô số: bỏ viền màu khi bình thường; Vàng / Cam / Đỏ có chấm màu + chữ.
-- **Chế độ trình chiếu** cho phòng điều hành (`?trinh-chieu=1`, đã có): bản đồ toàn màn, 4 số lớn, dòng diễn biến chạy
-  chậm phía dưới, tự chuyển chuyên đề — nền tối.
+- **Chế độ trình chiếu** cho phòng điều hành (`?trinh-chieu=1`, đã có): trên màn lớn cũng 2 cột — 6 ô số chữ to (2 × 3)
+  bên trái, bản đồ điểm nóng bên phải, nhật ký sự kiện tự cập nhật ở dưới; tự chuyển chuyên đề, nền tối. Giữ đủ 6 số (không
+  rút còn 4) và **không làm dòng chữ chạy**: chữ chạy khó đọc từ xa, người xem không dừng được; diễn biến mới đã có ở nhật ký.
 
 ### 6.4. Bản đồ giám sát (Đ3)
 
@@ -309,7 +312,7 @@ Thứ tự theo quyết định ngày 21/10/2026: trang điều hành trước, 
 | 2 | Đ0 · 0.2 | Dọn kiểu "làm cho có": chữ IN HOA, màu chuyển, biểu tượng trong ô màu, phóng to khi rê; thêm bài quét tự động | rà toàn bộ `frontend/src` | Bài quét đạt; không đổi bố cục | Xong — PR #111 |
 | 3 | Đ2 · 2.1 | Nền như trang tham khảo (mục 7.1) + làm mờ ngoài tỉnh mọi bản đồ (mục 7.2) | `components/map/MapTools.jsx`, các bản đồ | Nền mặc định đúng; ngoài tỉnh mờ ở mọi bản đồ; mất ô Google → nền dự phòng | Xong — PR #112 |
 | 4 | Đ3 · 3.1 | Thanh trên gọn + thanh trạng thái (máy tính); menu chữ thường; trang đăng nhập 2 cột | `Header.jsx`, `Sidebar.jsx`, `Login.jsx` | Không mất nút nào (chỉ chuyển chỗ); đủ chức năng đăng nhập | Xong — PR #113 |
-| 5 | Đ3 · 3.2 | Tổng quan màn lớn 2 cột; chế độ trình chiếu phòng điều hành | `pages/Dashboard.jsx`, `components/dashboard/*` | Bài kiểm thử màn đầu theo thiết bị đạt | Chưa làm |
+| 5 | Đ3 · 3.2 | Tổng quan màn lớn 2 cột; chế độ trình chiếu phòng điều hành | `pages/Dashboard.jsx`, `components/dashboard/*` | Bài kiểm thử màn đầu theo thiết bị đạt | Xong — PR #114 |
 | 6 | Đ3 · 3.3 | Bản đồ giám sát: lớp nổi thống nhất, dải màu mưa | `pages/MonitoringMap.jsx`, `components/map/*` | Kiểm thử Bản đồ đạt | Chưa làm |
 | 7 | Đ4 · 4.1 | Cứu hộ, Cảnh báo, Phản ánh theo nền móng; chuyển động nhỏ | `RescueCenter.jsx`, `Alerts.jsx`, `CitizenReports.jsx` | Kiểm thử từng trang đạt | Chưa làm |
 | 8 | Đ4 · 4.2 | Vật tư, Đợt thiên tai, Nhập dữ liệu, Nguồn dữ liệu, Phân quyền theo nền móng | các trang tương ứng | Kiểm thử từng trang đạt | Chưa làm |
