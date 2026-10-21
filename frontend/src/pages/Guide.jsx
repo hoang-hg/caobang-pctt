@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import clsx from 'clsx';
 import { ArrowDown, ArrowRight, Info, Printer } from 'lucide-react';
+import EmptyArt from '../components/common/EmptyArt';
 import PageHeader from '../components/common/PageHeader';
 import { Segmented } from '../components/common/ui';
 import { PAGE } from '../components/layout/page';
@@ -20,12 +21,17 @@ const jump = (id) => {
   el.querySelector('h3')?.focus({ preventScroll: true });
 };
 
-/** Một tình huống: khi nào gặp, các bước nối nhau theo thứ tự làm, lưu ý, nút mở thẳng màn hình xử lý. */
+/** Một tình huống: hình nét đơn (`art` — EmptyArt; chưa có thì biểu tượng), khi nào gặp, các bước nối nhau theo thứ tự làm,
+ * lưu ý, nút mở thẳng màn hình xử lý. */
 function Scenario({ s }) {
   return (
     <article id={s.id} aria-labelledby={`${s.id}-t`} className="card flex scroll-mt-3 flex-col gap-3 p-4 break-inside-avoid motion-safe:animate-enter">
       <div className="flex items-start gap-3">
-        <s.icon size={24} strokeWidth={1.75} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
+        {s.art ? (
+          <EmptyArt name={s.art} className="h-11 w-[66px] shrink-0 text-muted sm:h-12 sm:w-[72px]" />
+        ) : (
+          <s.icon size={24} strokeWidth={1.75} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
+        )}
         <div className="min-w-0">
           <h3 id={`${s.id}-t`} tabIndex={-1} className="text-base font-semibold leading-snug text-ink outline-none">{s.title}</h3>
           <p className="mt-0.5 text-[13px] leading-snug text-muted">

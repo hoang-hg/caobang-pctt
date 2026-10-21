@@ -144,6 +144,7 @@ export default function DisasterEvents() {
 
       <PageHeader
         title="Đợt thiên tai & báo cáo"
+        short="Đợt thiên tai"
         before={showReport && !isLg ? (
           <button type="button" className="btn-ghost tap mb-1 px-2 text-xs" onClick={() => openEvent(null)}>
             <ChevronLeft size={14} aria-hidden="true" /> Tất cả đợt

@@ -148,6 +148,7 @@ export const SCENARIOS = {
   tinh: [
     {
       id: 'dau-ca',
+      art: 'dau-ca', // hình nét đơn (EmptyArt) trên thẻ tình huống
       icon: Sunrise,
       title: 'Nắm tình hình đầu ca trực',
       when: 'Đầu ca, khi có tin mưa lớn, hồ xả lũ',
@@ -162,6 +163,7 @@ export const SCENARIOS = {
     },
     {
       id: 'sos',
+      art: 'sos',
       icon: Siren,
       title: 'Có tin báo cứu hộ',
       when: 'Người dân gọi điện, nhắn Zalo, xã báo lên, phiếu mới hiện trên bảng',
@@ -178,6 +180,7 @@ export const SCENARIOS = {
     },
     {
       id: 'chi-vien',
+      art: 'chi-vien',
       icon: HandHelping,
       title: 'Xã xin chi viện',
       when: 'Phiếu có nhãn đỏ "Xã xin chi viện"',
@@ -191,6 +194,7 @@ export const SCENARIOS = {
     },
     {
       id: 'soan-canh-bao',
+      art: 'canh-bao',
       icon: Megaphone,
       title: 'Soạn lệnh cảnh báo cho người dân',
       when: 'Hồ chuẩn bị xả lũ, nguy cơ sạt lở, bão sắp đổ bộ',
@@ -206,6 +210,7 @@ export const SCENARIOS = {
     },
     {
       id: 'duyet-canh-bao',
+      art: 'duyet',
       icon: ShieldCheck,
       title: 'Lãnh đạo duyệt lệnh cảnh báo',
       when: 'Menu "Cảnh báo & Hotline" có số đỏ — lệnh đang chờ bạn',
@@ -220,6 +225,7 @@ export const SCENARIOS = {
     },
     {
       id: 'vat-tu',
+      art: 'kho',
       icon: Boxes,
       title: 'Kiểm tra kho, cấp hàng cứu trợ',
       when: 'Kho báo đỏ (dưới 20% định mức), cần cấp hàng cho đội, cho dân',
@@ -233,6 +239,7 @@ export const SCENARIOS = {
     },
     {
       id: 'ban-do',
+      art: 'ban-do',
       icon: Map,
       title: 'Theo dõi trên bản đồ khi mưa lũ',
       when: 'Cần thấy chỗ ngập, sạt lở, đội nào ở gần một điểm cầu cứu',
@@ -248,6 +255,7 @@ export const SCENARIOS = {
     },
     {
       id: 'ho-so-xa',
+      art: 'phieu',
       icon: FileCheck2,
       title: 'Duyệt dữ liệu xã gửi lên',
       when: 'Menu "Nhập dữ liệu" có số màu cam',
@@ -263,6 +271,7 @@ export const SCENARIOS = {
   xa: [
     {
       id: 'xa-dau-ngay',
+      art: 'dau-ca',
       icon: Sunrise,
       title: 'Mở máy đầu ngày, khi trời mưa lớn',
       when: 'Mỗi sáng, khi có tin mưa lũ, khi nhận cảnh báo',
@@ -276,6 +285,7 @@ export const SCENARIOS = {
     },
     {
       id: 'xa-bao-nan',
+      art: 'sos',
       icon: Siren,
       title: 'Người dân báo gặp nạn',
       when: 'Có người gọi, nhắn báo mắc kẹt, nhà sập, cần cấp cứu',
@@ -290,6 +300,7 @@ export const SCENARIOS = {
     },
     {
       id: 'xa-chi-vien',
+      art: 'chi-vien',
       icon: HandHelping,
       title: 'Xã cần tỉnh chi viện',
       when: 'Vượt khả năng của xã: cần thêm người, xuồng, máy xúc, lương thực',
@@ -303,6 +314,7 @@ export const SCENARIOS = {
     },
     {
       id: 'xa-so-tan',
+      art: 'so-tan',
       icon: House,
       title: 'Cập nhật sơ tán dân',
       when: 'Đang di dời dân, điểm sơ tán đón thêm người',
@@ -316,6 +328,7 @@ export const SCENARIOS = {
     },
     {
       id: 'xa-canh-bao',
+      art: 'canh-bao',
       icon: Megaphone,
       title: 'Nhận lệnh cảnh báo của tỉnh',
       when: 'Có lệnh xả lũ, di dời do sạt lở, bão đổ bộ cho xã mình',
@@ -330,6 +343,7 @@ export const SCENARIOS = {
     },
     {
       id: 'xa-kho',
+      art: 'kho',
       icon: Boxes,
       title: 'Xuất, nhập kho của xã',
       when: 'Cấp gạo, mì, nước, áo phao cho dân, cho đội; nhận hàng tỉnh cấp',
@@ -343,6 +357,7 @@ export const SCENARIOS = {
     },
     {
       id: 'xa-phan-anh',
+      art: 'anh',
       icon: Camera,
       title: 'Duyệt phản ánh của người dân',
       when: 'Menu "Phản ánh người dân" có số màu cam',
@@ -356,6 +371,7 @@ export const SCENARIOS = {
     },
     {
       id: 'xa-du-lieu',
+      art: 'du-lieu',
       icon: FileUp,
       title: 'Gửi danh sách điểm sơ tán, kho, danh bạ của xã',
       when: 'Đầu mùa mưa bão, khi danh sách có thay đổi',
@@ -372,6 +388,7 @@ export const SCENARIOS = {
   quan_tri: [
     {
       id: 'qt-tai-khoan',
+      art: 'tai-khoan',
       icon: UserPlus,
       title: 'Tạo tài khoản cho cán bộ mới',
       when: 'Có cán bộ mới nhận nhiệm vụ ở tỉnh hoặc xã',
@@ -387,6 +404,7 @@ export const SCENARIOS = {
     },
     {
       id: 'qt-mat-khau',
+      art: 'khoa',
       icon: KeyRound,
       title: 'Cán bộ quên mật khẩu, mất điện thoại, nghỉ việc',
       when: 'Có người báo không đăng nhập được, mất máy, chuyển công tác',
@@ -400,6 +418,7 @@ export const SCENARIOS = {
     },
     {
       id: 'qt-nguon',
+      art: 'mat-mang',
       icon: DatabaseZap,
       title: 'Trạm đo, nguồn dự báo không gửi số liệu',
       when: 'Thẻ "Hệ thống & dữ liệu" báo lỗi, biểu đồ đứng yên',
@@ -413,6 +432,7 @@ export const SCENARIOS = {
     },
     {
       id: 'qt-danh-muc',
+      art: 'du-lieu',
       icon: FileUp,
       title: 'Cập nhật danh mục gốc của tỉnh',
       when: 'Có ranh giới xã mới, trạm đo, hồ chứa, kho mới',
@@ -426,6 +446,7 @@ export const SCENARIOS = {
     },
     {
       id: 'qt-ho-so',
+      art: 'phieu',
       icon: FileCheck2,
       title: 'Duyệt dữ liệu xã gửi lên',
       when: 'Menu "Nhập dữ liệu" có số màu cam',
@@ -439,6 +460,7 @@ export const SCENARIOS = {
     },
     {
       id: 'qt-nhat-ky',
+      art: 'tim',
       icon: History,
       title: 'Tra cứu ai đã làm gì',
       when: 'Rút kinh nghiệm sau thiên tai, kiểm tra thao tác bất thường',
