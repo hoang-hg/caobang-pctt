@@ -439,7 +439,8 @@ export default function MonitoringMap() {
   return (
     <div
       className={clsx(
-        'flex h-[calc(100vh-3.5rem)] w-full flex-col [@supports(height:100dvh)]:h-[calc(100dvh-3.5rem)]',
+        // Cao = màn trừ thanh trên (3,5 rem); màn rộng + đủ cao (`lg:tall:`) trừ thêm thanh trạng thái dưới cùng (2 rem — StatusBar)
+        'flex h-[calc(100vh-3.5rem)] w-full flex-col [@supports(height:100dvh)]:h-[calc(100dvh-3.5rem)] lg:tall:h-[calc(100vh-5.5rem)] lg:tall:[@supports(height:100dvh)]:h-[calc(100dvh-5.5rem)]',
         // Màn hẹp: chừa chỗ cho thanh thao tác dưới cùng (cố định) — nút thu phóng, bảng trượt nằm trên thanh
         !wide && 'pb-[calc(4.3rem+env(safe-area-inset-bottom))]',
       )}

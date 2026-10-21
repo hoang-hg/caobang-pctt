@@ -64,7 +64,7 @@ export default function RescueBoard({ tickets, factsOf, wide, column, onColumn, 
             onDragLeave={() => setOver(null)}
             onDrop={(e) => { e.preventDefault(); setOver(null); onDrop(e.dataTransfer.getData('text/plain'), c.key); }}
             className={clsx(
-              'card flex max-h-[calc(100vh-12rem)] min-h-[360px] min-w-0 flex-col transition-all print:max-h-none print:min-h-0',
+              'card flex max-h-[calc(100vh-12rem)] min-h-[360px] min-w-0 flex-col transition-all lg:tall:max-h-[calc(100vh-14rem)] print:max-h-none print:min-h-0',
               over === c.key ? 'border-dashed bg-accent/5 ring-2 ring-accent' : 'bg-panel',
             )}
           >

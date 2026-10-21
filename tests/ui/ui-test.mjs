@@ -946,18 +946,21 @@ async function firstScreen(ctx) {
         const vh = window.innerHeight;
         const nav = document.querySelector('nav[aria-label="Thao tác nhanh"]');
         const navTop = nav && nav.getBoundingClientRect().height ? nav.getBoundingClientRect().top : vh; // thanh đáy che phần dưới
+        // Thanh trạng thái dưới cùng (màn rộng, đủ cao): vùng nội dung kết thúc ở mép trên của thanh
+        const bar = document.querySelector('footer[aria-label="Thanh trạng thái"]');
+        const barTop = bar && bar.getBoundingClientRect().height ? bar.getBoundingClientRect().top : vh;
         const tiles = [...document.querySelectorAll('[aria-label="Chỉ số nhanh"] > *')];
         const map = document.querySelector('.leaflet-container');
         const dec = document.querySelector('[aria-label="Việc chờ quyết định"]');
-        const strip = document.querySelector('[role="status"]');
+        const strip = document.querySelector('main [role="status"]');
         const main = document.querySelector('main');
         return {
           pageExtra: document.documentElement.scrollHeight - vh,
           wideBy: main ? main.scrollWidth - main.clientWidth : 0,
           tiles: tiles.length,
           kpiBottom: Math.round(Math.max(...tiles.map((t) => t.getBoundingClientRect().bottom))),
-          visibleBottom: Math.round(navTop),
-          mapVisible: map ? Math.round(Math.min(navTop, map.getBoundingClientRect().bottom) - map.getBoundingClientRect().top) : 0,
+          visibleBottom: Math.round(Math.min(navTop, barTop)),
+          mapVisible: map ? Math.round(Math.min(navTop, barTop, map.getBoundingClientRect().bottom) - map.getBoundingClientRect().top) : 0,
           decisionTop: dec ? Math.round(dec.getBoundingClientRect().top) : null,
           stripTop: strip ? Math.round(strip.getBoundingClientRect().top) : null,
           vh,
@@ -2494,7 +2497,7 @@ async function alertsPage(ctx) {
     await page.goto(`${ROOT}/canh-bao?tab=lich_su`);
     const rows = page.locator('main table tbody tr').or(page.locator('main article[aria-label^="CB-"]'));
     await rows.first().or(page.getByText(/Chưa có lệnh cảnh báo nào/)).waitFor({ timeout: 20_000 });
-    const box = page.getByLabel('Trạng thái');
+    const box = page.getByLabel('Trạng thái', { exact: true });
     if (!(await box.isVisible())) await page.getByRole('button', { name: /^Bộ lọc/ }).click();
     await box.selectOption('hieu_luc');
     await page.waitForURL(/tt=hieu_luc/);
@@ -2948,7 +2951,8 @@ async function areaFilter(ctx) {
     if (await group.getByRole('button', { name: /Theo máy/ }).getAttribute('aria-pressed') !== 'true') throw new Error('máy mới chưa chọn gì nhưng "Theo máy" không được chọn');
     await group.getByRole('button', { name: /Tối/ }).click();
     if (!(await isDark())) throw new Error('chọn Tối nhưng giao diện chưa tối');
-    if (await page.locator('header button[aria-label="Nền tối"]').getAttribute('aria-pressed') !== 'true') throw new Error('nút nhanh trên thanh không báo đang nền tối');
+    // nút nhanh: thanh trạng thái dưới cùng (máy tính) hoặc thanh trên (máy tính bảng) — mọi bản cùng báo một trạng thái
+    if (await page.locator('button[aria-label="Nền tối"]').first().getAttribute('aria-pressed') !== 'true') throw new Error('nút nhanh không báo đang nền tối');
     await page.reload();
     if (!(await isDark())) throw new Error('tải lại mất lựa chọn Tối');
     await menu.click();
