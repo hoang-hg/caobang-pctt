@@ -485,7 +485,7 @@ export default function MonitoringMap() {
           <ScaleControl position="bottomleft" imperial={false} />
           {layers.forecast && offset >= 0 && <ForecastChoropleth geo={unitsGeo} areas={fcAreas} />}
           {layers.admin && <AdminBoundaries geo={unitsGeo} basemap={basemap} />}
-          <AreaFocus area={area} filtered={filter.codes.length > 0} padding={mapPad} />
+          <AreaFocus area={area} filtered={filter.codes.length > 0} padding={mapPad} basemap={basemap} />
           {layers.storm && !unavailable.storm && <StormLayer offset={offset} />}
           <MapLayers
             data={data}

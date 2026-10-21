@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { Modal } from '../../components/common/ui';
 import Turnstile from '../../components/common/Turnstile';
-import { BaseLayer } from '../../components/map/MapTools';
+import { BaseLayer, ProvinceMask } from '../../components/map/MapTools';
 import { pinIcon } from '../../components/map/icons';
 import { api } from '../../api/client';
 import { useUnits, useUnitsGeo } from '../../api/hooks';
@@ -374,6 +374,7 @@ export default function ReportForm({ onClose, myLocation, onTrack }) {
           <div className="h-72 overflow-hidden rounded-xl border border-line shadow-inner relative">
             <MapContainer center={pos ? [pos.lat, pos.lon] : [22.75, 106.05]} zoom={pos ? 14 : 8.5} zoomSnap={0.25} className="h-full w-full">
               <BaseLayer basemap="street" showNav={false} />
+              <ProvinceMask basemap="street" />
               <Picker value={pos} onChange={setPos} />
             </MapContainer>
             {!pos && (

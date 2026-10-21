@@ -302,9 +302,9 @@ Thứ tự theo quyết định ngày 21/10/2026: trang điều hành trước, 
 
 | Thứ tự | Đợt · PR | Nội dung | Tệp chính | Nghiệm thu | Trạng thái |
 |---|---|---|---|---|---|
-| 1 | Đ0 · 0.1 | Nền móng: thẻ (bỏ bóng), lớp nổi `.float-panel`, ô số (vạch màu chỉ từ Vàng), bảng, màn trống có hình nét đơn (`EmptyArt`); trang mẫu `/mau-giao-dien` (máy dev); cập nhật tài liệu này | `index.css`, `ui.jsx`, `EmptyArt.jsx`, `StatCard`, `StyleGuide.jsx` | Ảnh trước / sau; kiểm thử toàn bộ đạt | Đang làm |
-| 2 | Đ0 · 0.2 | Dọn kiểu "làm cho có": chữ IN HOA, màu chuyển, biểu tượng trong ô màu, phóng to khi rê; thêm bài quét tự động | rà toàn bộ `frontend/src` | Bài quét đạt; không đổi bố cục | Đang làm |
-| 3 | Đ2 · 2.1 | Nền như trang tham khảo (mục 7.1) + làm mờ ngoài tỉnh mọi bản đồ (mục 7.2) | `components/map/MapTools.jsx`, các bản đồ | Nền mặc định đúng; ngoài tỉnh mờ ở mọi bản đồ; mất ô Google → nền dự phòng | Chưa làm |
+| 1 | Đ0 · 0.1 | Nền móng: thẻ (bỏ bóng), lớp nổi `.float-panel`, ô số (vạch màu chỉ từ Vàng), bảng, màn trống có hình nét đơn (`EmptyArt`); trang mẫu `/mau-giao-dien` (máy dev); cập nhật tài liệu này | `index.css`, `ui.jsx`, `EmptyArt.jsx`, `StatCard`, `StyleGuide.jsx` | Ảnh trước / sau; kiểm thử toàn bộ đạt | Xong — PR #110 |
+| 2 | Đ0 · 0.2 | Dọn kiểu "làm cho có": chữ IN HOA, màu chuyển, biểu tượng trong ô màu, phóng to khi rê; thêm bài quét tự động | rà toàn bộ `frontend/src` | Bài quét đạt; không đổi bố cục | Xong — PR #111 |
+| 3 | Đ2 · 2.1 | Nền như trang tham khảo (mục 7.1) + làm mờ ngoài tỉnh mọi bản đồ (mục 7.2) | `components/map/MapTools.jsx`, các bản đồ | Nền mặc định đúng; ngoài tỉnh mờ ở mọi bản đồ; mất ô Google → nền dự phòng | Đang làm |
 | 4 | Đ3 · 3.1 | Thanh trên gọn + thanh trạng thái (máy tính); menu chữ thường; trang đăng nhập 2 cột | `Header.jsx`, `Sidebar.jsx`, `Login.jsx` | Không mất nút nào (chỉ chuyển chỗ); đủ chức năng đăng nhập | Chưa làm |
 | 5 | Đ3 · 3.2 | Tổng quan màn lớn 2 cột; chế độ trình chiếu phòng điều hành | `pages/Dashboard.jsx`, `components/dashboard/*` | Bài kiểm thử màn đầu theo thiết bị đạt | Chưa làm |
 | 6 | Đ3 · 3.3 | Bản đồ giám sát: lớp nổi thống nhất, dải màu mưa | `pages/MonitoringMap.jsx`, `components/map/*` | Kiểm thử Bản đồ đạt | Chưa làm |

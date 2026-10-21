@@ -7,7 +7,7 @@ import { AlertTriangle, CheckCircle2, Download, Inbox, Info, Loader2, ShieldChec
 import { api, apiDownload } from '../api/client';
 import { useStore } from '../app/store';
 import { Empty, EmptyState } from '../components/common/ui';
-import { BaseLayer } from '../components/map/MapTools';
+import { BaseLayer, ProvinceMask } from '../components/map/MapTools';
 import { dateTime } from '../utils/format';
 import { SUBMISSION_STATUS } from '../utils/labels';
 import { cardOf, choiceLabel, fieldLabel, fixFor, rowLabel } from './dataImportFacts';
@@ -404,6 +404,7 @@ function ChangesMap({ creates, updates }) {
       <div className="h-64 overflow-hidden rounded-lg border border-line">
         <MapContainer center={[22.75, 106.05]} zoom={9} zoomSnap={0.25} className="h-full w-full" scrollWheelZoom={false}>
           <BaseLayer basemap="auto" />
+          <ProvinceMask />
           <FitAll bounds={bounds} />
           {items.filter((i) => i.geometry).map((i) => (
             <GeoJSON key={`g-${i.dong}`} data={i.geometry} style={{ color: color(i.kind), weight: 2, fillOpacity: 0.2 }}>

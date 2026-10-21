@@ -319,7 +319,7 @@ docs/trang-d-viec-con-lai.md  trang Điều hành cứu hộ: đối chiếu thi
 docs/trang-e-viec-con-lai.md  trang Cảnh báo khẩn cấp: đối chiếu thiết kế mục E, việc còn lại (kênh SMS / Zalo / Cell Broadcast, tổng đài SIP…)
 docs/trang-f-viec-con-lai.md  bộ lọc địa phương & Sáng/Tối: đối chiếu thiết kế mục F, việc còn lại (ranh giới xóm, nhóm lọc nhanh, địa danh)
 docs/csdl-viec-con-lai.md     cơ sở dữ liệu: đối chiếu thiết kế mục G, đề xuất bổ sung (vai trò CSDL, khoá số đo, chỉ mục, dữ liệu cá nhân, đợt thiên tai…)
-docs/ke-hoach-lam-moi-giao-dien.md  kế hoạch làm mới giao diện, giữ nguyên chức năng: học 3 trang tham khảo, nền móng chung, cổng người dân bản đồ toàn màn, nền địa hình tự lưu trữ…
+docs/ke-hoach-lam-moi-giao-dien.md  kế hoạch làm mới giao diện, giữ nguyên chức năng: học 3 trang tham khảo, nền móng chung, nền như trang tham khảo + làm mờ ngoài tỉnh, cổng người dân bản đồ toàn màn, tài khoản người dân…
 mqtt/  db/init/     cấu hình Mosquitto (dev + thật); extension PostgreSQL khi khởi tạo
 docker-compose.yml  dev / trình diễn / CI     docker-compose.prod.yml  chạy thật
 .env.example        mẫu dev                    .env.production.example  mẫu chạy thật
@@ -554,8 +554,8 @@ cảnh báo **chưa có code kết nối** — chưa có key nào dùng được
 | Đài KTTV Cao Bằng / Cục KTTV | Mực nước, bản tin | ⛔ | Thoả thuận chia sẻ dữ liệu | Đẩy vào `/ingest/batch` hoặc viết bộ nối ([6.7](#nguon-trong-nuoc)) |
 | VRain, VNDMS, dữ liệu vận hành hồ chứa, cảnh báo sạt lở theo xã | Đo mưa, giám sát thiên tai, xả lũ | ⛔ | Thoả thuận | như trên |
 | SMS Brandname, Cell Broadcast, Zalo ZNS/OA, tổng đài SIP | **Gửi cảnh báo cho dân** | ⛔ (chưa làm) | Hợp đồng nhà mạng / Zalo | Sẽ bổ sung biến khi tích hợp |
-| Bản đồ nền tự lưu trữ (OSM, Protomaps) | Nền Địa lý, Ban đêm vùng Cao Bằng | ✅ không key | Chạy `deploy/fetch-basemap.sh` ([6.9](#ban-do-nen)) | `data/tiles/` |
-| Bản đồ nền Google / CARTO | Zoom toàn quốc, Vệ tinh, Địa hình, ngoài vùng phủ | ⚠️ | Giấy phép / API key ([6.9](#ban-do-nen)) | Frontend `components/map/MapTools.jsx` |
+| Bản đồ nền tự lưu trữ (OSM, Protomaps) | Nền Ban đêm vùng Cao Bằng; dự phòng của nền Địa lý khi mất kết nối quốc tế | ✅ không key | Chạy `deploy/fetch-basemap.sh` ([6.9](#ban-do-nen)) | `data/tiles/` |
+| Bản đồ nền Google / CARTO | Địa lý (mặc định), Địa hình, Vệ tinh — như các trang tham khảo (quyết định 21/10/2026); zoom toàn quốc, ngoài vùng phủ | ⚠️ | Giấy phép / API key ([6.9](#ban-do-nen)) — rủi ro đã ghi nhận | Frontend `components/map/MapTools.jsx` |
 | Radar mưa RainViewer | Lớp radar (ảnh ~2 giờ qua) | ⚠️ không key | Điều khoản (từ 01/01/2026) chỉ cho dùng cá nhân / giáo dục — dùng chính thức cần RainViewer đồng ý hoặc thay radar Đài KTTV; 100 lượt / phút / IP (`docs/trang-b-viec-con-lai.md` BD6) | — |
 | Cloudflare Turnstile | Chống bot form phản ánh | ✅ | Site key + secret: https://dash.cloudflare.com → Turnstile | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET` |
 | SMTP | Email quên mật khẩu | ✅ | Tài khoản máy chủ thư của tỉnh | `SMTP_*` |
@@ -678,7 +678,15 @@ gửi thật có báo cáo giao nhận từ nhà cung cấp, thay `advance_deliv
 <a id="ban-do-nen"></a>
 ### 6.9. Bản đồ nền
 
-**Bản đồ nền tự lưu trữ** (nền "Bản đồ Địa lý" và "Chế độ ban đêm"): tệp vector `data/tiles/caobang.pmtiles` (~160 MB,
+**Nền như các trang tham khảo** (quyết định 21/10/2026, `docs/ke-hoach-lam-moi-giao-dien.md` mục 7): "Bản đồ Địa lý"
+(mặc định ở nền Sáng), "Địa hình", "Vệ tinh" lấy ô Google (`lyrs=m` / `p` / `y`) như trang Cảnh báo đa thiên tai Cao Bằng;
+màn rộng (≥ 1024 px) ở zoom < 12 lấy ô 128 px của mức zoom kế tiếp như trang đó — chữ nhỏ, nét; điện thoại giữ ô 256 px.
+**Mọi bản đồ chỉ rõ tỉnh Cao Bằng**: ngoài ranh giới tỉnh (hoặc vùng đang lọc / phạm vi được giao) phủ mờ — nền Sáng phủ
+trắng 70 %, nền Tối / Vệ tinh phủ tối 65 % — ở pane riêng nằm trên ô nền, dưới mọi lớp số liệu (`AreaFocus`,
+`ProvinceMask`); không khoá kéo bản đồ ra ngoài (bão, mưa từ ngoài vào vẫn xem được).
+
+**Bản đồ nền tự lưu trữ** — nay là **dự phòng** của nền "Bản đồ Địa lý" (tự bật khi không tải được ô Google: 6 ô lỗi mà
+chưa ô nào tải được — mất kết nối quốc tế) và vẫn là nền chính của "Chế độ ban đêm": tệp vector `data/tiles/caobang.pmtiles` (~160 MB,
 dữ liệu OpenStreetMap theo sơ đồ Protomaps) phủ Cao Bằng, các tỉnh giáp ranh và Quảng Tây, zoom tới 15 (đường thôn, tên
 xóm). nginx phục vụ thẳng tệp này tại `/tiles/` (trình duyệt đọc từng ô bằng HTTP Range, không cần máy chủ tile riêng);
 trình duyệt tự vẽ bằng `protomaps-leaflet`, nhãn tiếng Việt. Khung nhìn trong vùng phủ **không gọi dịch vụ ngoài nào** →
@@ -695,10 +703,10 @@ Khi nào vẫn dùng nền ngoài (`components/map/MapTools.jsx`, `BASEMAPS`):
 
 | Trường hợp | Nền hiển thị |
 |---|---|
-| Zoom ≤ 6 (nhìn toàn quốc, Biển Đông) | Google Maps tiếng Việt, thể hiện đúng **Hoàng Sa, Trường Sa**. Ô zoom thấp của tệp OSM phủ cả Biển Đông nên không được hiện |
-| Khung nhìn vượt ra ngoài vùng phủ của tệp | Google (Ban đêm: CARTO) vẽ bên dưới phần ngoài vùng |
+| Nền "Bản đồ Địa lý", "Địa hình", "Vệ tinh" | Google (như các trang tham khảo); Địa lý mất ô Google → tệp tự lưu trữ (nếu đã tải) |
+| Ban đêm, zoom ≤ 6 (nhìn toàn quốc, Biển Đông) | Google Maps tiếng Việt, thể hiện đúng **Hoàng Sa, Trường Sa**. Ô zoom thấp của tệp OSM phủ cả Biển Đông nên không được hiện |
+| Ban đêm, khung nhìn vượt ra ngoài vùng phủ của tệp | Google (Ban đêm: CARTO) vẽ bên dưới phần ngoài vùng |
 | Chưa chạy `fetch-basemap.sh` (máy dev) | Google / CARTO như trước |
-| Nền "Vệ tinh", "Địa hình" | Luôn là Google |
 
 Ghi công OpenStreetMap / Protomaps hiện ở góc bản đồ (bắt buộc theo giấy phép ODbL). **Nền ngoài vẫn cần giấy phép khi
 dùng thật**: điều khoản Google Maps Platform không cho tải tile trực tiếp không qua API có key (có thể bị chặn bất cứ lúc
