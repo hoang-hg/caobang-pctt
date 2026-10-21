@@ -3,10 +3,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import L from 'leaflet';
 import { CircleMarker, GeoJSON, MapContainer, Tooltip, useMap } from 'react-leaflet';
-import { AlertTriangle, CheckCircle2, Download, Inbox, Info, Loader2, ShieldCheck, Undo2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Download, Info, Loader2, ShieldCheck, Undo2 } from 'lucide-react';
 import { api, apiDownload } from '../api/client';
 import { useStore } from '../app/store';
-import { Empty, EmptyState } from '../components/common/ui';
+import { Empty, EmptyState, ErrorState, Skeleton } from '../components/common/ui';
 import { BaseLayer, ProvinceMask } from '../components/map/MapTools';
 import { dateTime } from '../utils/format';
 import { SUBMISSION_STATUS } from '../utils/labels';
@@ -36,7 +36,7 @@ const counts = (s) =>
  */
 export default function Submissions({ canImport, code, onOpen, datasets = [] }) {
   const [status, setStatus] = useState(canImport ? 'cho_duyet' : '');
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['submissions', status],
     queryFn: () => api('/data-import/submissions', { params: { status: status || undefined, limit: 100 } }),
     refetchInterval: 30_000,
@@ -61,9 +61,11 @@ export default function Submissions({ canImport, code, onOpen, datasets = [] }) 
           ))}
         </div>
         {isLoading ? (
-          <Empty>Đang tải…</Empty>
+          <div className="flex flex-col gap-2 p-1">{[0, 1, 2].map((i) => <Skeleton key={i} height={56} />)}</div>
+        ) : isError && !data ? (
+          <ErrorState onRetry={() => refetch()}>Không tải được danh sách hồ sơ</ErrorState>
         ) : !items.length ? (
-          <EmptyState icon={Inbox} height={160}>
+          <EmptyState art="hop-thu" height={180}>
             {canImport
               ? status === 'cho_duyet' ? 'Không có hồ sơ nào chờ duyệt — xã gửi lên sẽ hiện ở đây.' : 'Không có hồ sơ'
               : 'Bạn chưa gửi hồ sơ nào. Gửi ở thẻ "Gửi dữ liệu".'}
@@ -103,7 +105,7 @@ export default function Submissions({ canImport, code, onOpen, datasets = [] }) 
 function SubmissionDetail({ code, datasets, canImport }) {
   const toast = useStore((s) => s.toast);
   const qc = useQueryClient();
-  const { data: s, isLoading, error } = useQuery({
+  const { data: s, isLoading, error, refetch } = useQuery({
     queryKey: ['submission', code],
     queryFn: () => api(`/data-import/submissions/${encodeURIComponent(code)}`),
   });
@@ -112,8 +114,8 @@ function SubmissionDetail({ code, datasets, canImport }) {
   const [returning, setReturning] = useState(false);
   const [withdrawing, setWithdrawing] = useState(false);
   const [busy, setBusy] = useState('');
-  if (isLoading) return <div className="card p-3"><Empty>Đang tải…</Empty></div>;
-  if (error) return <div className="card p-3"><Empty>{error.message}</Empty></div>;
+  if (isLoading) return <div className="card p-3"><Skeleton height={240} /></div>;
+  if (error) return <div className="card p-3"><ErrorState onRetry={() => refetch()}>Không tải được hồ sơ: {error.message}</ErrorState></div>;
 
   const ds = datasets.find((d) => d.name === s.dataset);
   const label = (row) => rowLabel(row, { geojson: /\.geojson$/i.test(s.filename || '') });

@@ -8,7 +8,7 @@ import {
 import { api, apiDownload, apiUpload } from '../api/client';
 import { useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
-import { BackButton, Empty, ErrorState, Segmented, Tabs } from '../components/common/ui';
+import { BackButton, Empty, ErrorState, Segmented, Skeleton, Tabs } from '../components/common/ui';
 import PageHeader from '../components/common/PageHeader';
 import RoleTips from '../components/common/RoleTips';
 import { PAGE } from '../components/layout/page';
@@ -69,7 +69,7 @@ export default function DataImport() {
       {tab === 'ho-so' ? (
         <Submissions canImport={canImport} code={code} onOpen={open} datasets={datasets} />
       ) : isLoading ? (
-        <Empty>Đang tải…</Empty>
+        <Skeleton height={320} />
       ) : isError ? (
         <ErrorState onRetry={refetch}>Không tải được danh sách loại dữ liệu</ErrorState>
       ) : ds ? (

@@ -7,7 +7,7 @@ import { useStore } from '../app/store';
 import PageHeader from '../components/common/PageHeader';
 import RoleTips from '../components/common/RoleTips';
 import { PAGE } from '../components/layout/page';
-import { Confirm, Empty, Modal, Segmented, StepChips, Tabs } from '../components/common/ui';
+import { Confirm, Empty, ErrorState, Modal, Segmented, Skeleton, StepChips, Tabs } from '../components/common/ui';
 import { usePermission } from '../rbac/usePermission';
 import { canManageAt, GLOBAL } from '../rbac/permissions';
 import { dateTime } from '../utils/format';
@@ -83,9 +83,10 @@ function TierChip({ role }) {
 /** Chọn cấp bằng thẻ có lời giải thích. Cấp 1 → mọi cấp; người khác → chỉ cấp DƯỚI mình (backend kiểm tra lại). */
 function RoleChoice({ value, onChange }) {
   const myLevel = useMyLevel();
-  const { data: roles = [], isLoading } = useRoles();
+  const { data: roles = [], isLoading, isError, refetch } = useRoles();
   const list = roles.filter((r) => myLevel === 1 || (r.level > myLevel && r.is_delegatable));
-  if (isLoading) return <p className="text-sm text-muted">Đang tải các cấp…</p>;
+  if (isLoading) return <Skeleton height={120} />;
+  if (isError && !roles.length) return <ErrorState onRetry={() => refetch()}>Không tải được danh sách cấp tài khoản</ErrorState>;
   return (
     <fieldset className="flex flex-col gap-2">
       <legend className="mb-1 text-sm font-medium">Cấp của tài khoản</legend>
@@ -400,7 +401,7 @@ function UsersTab() {
   const myLevel = useMyLevel();
   const run = useMutate();
   const canManage = usePermission('user', 'manage');
-  const { data: users = [], isLoading } = useQuery({ queryKey: ['rbac-users'], queryFn: () => api('/rbac/users') });
+  const { data: users = [], isLoading, isError, refetch } = useQuery({ queryKey: ['rbac-users'], queryFn: () => api('/rbac/users') });
   const [q, setQ] = useState('');
   const [levelFilter, setLevelFilter] = useState('all');
   const [modal, setModal] = useState(null);
@@ -556,7 +557,13 @@ function UsersTab() {
             })}
           </tbody>
         </table>
-        {!shown.length && <Empty>{isLoading ? 'Đang tải…' : 'Không tìm thấy tài khoản phù hợp trong phạm vi quản lý'}</Empty>}
+        {!shown.length && (isLoading ? (
+          <Skeleton height={160} className="m-3" />
+        ) : isError && !users.length ? (
+          <ErrorState className="m-3" onRetry={() => refetch()}>Không tải được danh sách tài khoản</ErrorState>
+        ) : (
+          <Empty art={q ? 'tim' : undefined}>Không tìm thấy tài khoản phù hợp trong phạm vi quản lý</Empty>
+        ))}
       </div>
 
       {modal?.type === 'create' && <CreateUserModal onClose={() => setModal(null)} />}

@@ -281,14 +281,14 @@ export default function Resources() {
   else if (query.isError && !query.data) body = <ErrorState height={200} onRetry={query.refetch}>Không tải được danh sách {tabInfo.noun}</ErrorState>;
   else if (!query.data?.length) {
     body = (
-      <EmptyState height={160}>
+      <EmptyState art="du-lieu" height={190}>
         {EMPTY[tab]}
         {(canImport || canSubmit) && <> <Link to="/nhap-du-lieu" className="font-semibold text-accent hover:underline">Mở Nhập dữ liệu →</Link></>}
       </EmptyState>
     );
   } else if (!rows.length) {
     body = (
-      <EmptyState height={140}>
+      <EmptyState art="tim" height={170}>
         Không có {tabInfo.noun} khớp ô tìm / bộ lọc.{' '}
         <button type="button" className="tap font-semibold text-accent hover:underline" onClick={clearAll}>Bỏ lọc</button>
       </EmptyState>
