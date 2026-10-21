@@ -1,28 +1,13 @@
-import { useState } from 'react';
+import { cloneElement, useId, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import {
-  Users,
-  ShieldCheck,
-  History,
-  UserPlus,
-  Lock,
-  Unlock,
-  KeyRound,
-  Pencil,
-  Search,
-  Crown,
-  Building2,
-  MapPin,
-  ShieldOff,
-  Info,
-} from 'lucide-react';
+import { Building2, Crown, History, KeyRound, Lock, MapPin, Pencil, Search, ShieldCheck, ShieldOff, Unlock, UserPlus, Users } from 'lucide-react';
 import { api } from '../api/client';
 import { useStore } from '../app/store';
 import PageHeader from '../components/common/PageHeader';
 import RoleTips from '../components/common/RoleTips';
 import { PAGE } from '../components/layout/page';
-import { Empty, Modal, Tabs } from '../components/common/ui';
+import { Confirm, Empty, Modal, Segmented, StepChips, Tabs } from '../components/common/ui';
 import { usePermission } from '../rbac/usePermission';
 import { canManageAt, GLOBAL } from '../rbac/permissions';
 import { dateTime } from '../utils/format';
@@ -32,7 +17,7 @@ const AUDIT_LABEL = {
   'user.create': 'Tạo tài khoản',
   'user.update': 'Sửa tài khoản',
   'user.mfa_reset': 'Đặt lại xác thực 2 lớp',
-  assign: 'Đổi cấp / phạm vi',
+  assign: 'Đổi cấp / địa bàn',
   'role.migrate': 'Chuyển sang phân quyền 3 cấp',
   grant: 'Cấp vai trò (cũ)',
   revoke: 'Thu hồi vai trò (cũ)',
@@ -43,34 +28,37 @@ const AUDIT_LABEL = {
 
 /**
  * Phân quyền 3 cấp — mỗi cấp 1 vai trò, mỗi tài khoản 1 vai trò tại 1 phạm vi (backend: app/rbac/permissions.py).
- * Chỉ cấp trên quản lý tài khoản cấp dưới; cùng cấp không đổi mật khẩu / PIN / 2 lớp của nhau.
+ * Chỉ cấp trên quản lý tài khoản cấp dưới; cùng cấp không đổi mật khẩu / PIN / 2 lớp của nhau. Mỗi cấp giải thích bằng lời:
+ * `who` dành cho ai, `can` làm được gì, `cannot` không làm được gì (thiết kế mục G — người không rành công nghệ tự đọc hiểu).
  */
 export const TIER_CONFIG = {
   super_admin: {
     level: 1,
+    name: 'Quản trị hệ thống',
     title: 'Cấp 1 · Quản trị hệ thống',
-    badge: 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30',
     icon: Crown,
+    who: 'Đơn vị kỹ thuật vận hành hệ thống.',
+    can: 'Mọi việc; tạo và quản lý tài khoản mọi cấp; cài nguồn dữ liệu, thiết bị đo.',
   },
   admin_tinh: {
     level: 2,
+    name: 'Quản trị tỉnh',
     title: 'Cấp 2 · Quản trị tỉnh',
-    badge: 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30',
     icon: Building2,
+    who: 'Lãnh đạo, trực ban Ban Chỉ huy PCTT & TKCN tỉnh.',
+    can: 'Cả tỉnh: tiếp nhận SOS, điều động, soạn và duyệt cảnh báo (cần mã PIN, không tự duyệt lệnh mình soạn), kho, nhập dữ liệu, duyệt hồ sơ xã gửi; tạo, quản lý tài khoản cấp xã.',
   },
   admin_xa: {
     level: 3,
+    name: 'Quản trị xã/phường',
     title: 'Cấp 3 · Quản trị xã/phường',
-    badge: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30',
     icon: MapPin,
+    who: 'Cán bộ UBND xã, phường.',
+    can: 'Trong xã mình: tiếp nhận, xử lý SOS, duyệt phản ánh, xuất kho của xã, gửi dữ liệu chờ tỉnh duyệt.',
+    cannot: 'Không quản lý tài khoản.',
   },
 };
-const NO_TIER = {
-  level: 9,
-  title: 'Chưa có vai trò',
-  badge: 'bg-danger/10 text-danger border border-danger/20',
-  icon: ShieldOff,
-};
+const NO_TIER = { level: 9, name: 'Chưa có cấp', title: 'Chưa có cấp', icon: ShieldOff, who: '', can: '' };
 export const getTier = (role) => TIER_CONFIG[role] || NO_TIER;
 const levelOf = (assignments) => Math.min(9, ...(assignments || []).map((a) => getTier(a.role).level));
 const isProvinceLevel = (role) => getTier(role).level <= 2;
@@ -81,20 +69,44 @@ const useScopes = () =>
   useQuery({ queryKey: ['rbac-scopes'], queryFn: () => api('/rbac/scopes'), staleTime: Infinity });
 const useRoles = () => useQuery({ queryKey: ['rbac-roles'], queryFn: () => api('/rbac/roles') });
 
-/** Cấp được cấp: Cấp 1 → mọi cấp; người khác → chỉ cấp DƯỚI mình (backend kiểm tra lại). */
-function RolePicker({ value, onChange }) {
-  const myLevel = useMyLevel();
-  const { data: roles = [] } = useRoles();
-  const list = roles.filter((r) => myLevel === 1 || (r.level > myLevel && r.is_delegatable));
+/** Chip cấp: biểu tượng + tên cấp, nền trung tính (cấp không phải mức rủi ro — không tô màu). */
+function TierChip({ role }) {
+  const t = getTier(role);
   return (
-    <select className="input" value={value} onChange={(e) => onChange(e.target.value)} aria-label="Cấp">
-      <option value="">— Chọn cấp —</option>
-      {list.map((r) => (
-        <option key={r.name} value={r.name}>
-          {getTier(r.name).title}
-        </option>
-      ))}
-    </select>
+    <span className={clsx('chip whitespace-nowrap px-2 py-0.5 text-xs font-semibold', t.level === 9 ? 'bg-danger/10 text-danger' : 'bg-panel2 text-ink-2')}>
+      <t.icon size={12} className="shrink-0" aria-hidden="true" />
+      {t.name}{t.level < 9 && <span className="font-normal text-muted"> · Cấp {t.level}</span>}
+    </span>
+  );
+}
+
+/** Chọn cấp bằng thẻ có lời giải thích. Cấp 1 → mọi cấp; người khác → chỉ cấp DƯỚI mình (backend kiểm tra lại). */
+function RoleChoice({ value, onChange }) {
+  const myLevel = useMyLevel();
+  const { data: roles = [], isLoading } = useRoles();
+  const list = roles.filter((r) => myLevel === 1 || (r.level > myLevel && r.is_delegatable));
+  if (isLoading) return <p className="text-sm text-muted">Đang tải các cấp…</p>;
+  return (
+    <fieldset className="flex flex-col gap-2">
+      <legend className="mb-1 text-sm font-medium">Cấp của tài khoản</legend>
+      {list.map((r) => {
+        const t = getTier(r.name);
+        return (
+          <label
+            key={r.name}
+            className={clsx('tap flex cursor-pointer items-start gap-3 rounded-lg border p-3', value === r.name ? 'border-accent bg-accent/5' : 'border-line hover:border-accent')}
+          >
+            <input type="radio" name="cap-tai-khoan" className="mt-1" checked={value === r.name} onChange={() => onChange(r.name)} />
+            <t.icon size={20} strokeWidth={1.75} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
+            <span className="min-w-0 text-sm">
+              <b className="block">{t.name} <span className="font-normal text-muted">· Cấp {t.level}</span></b>
+              <span className="block text-ink-2">Dành cho: {t.who}</span>
+              <span className="block text-ink-2">Làm được: {t.can}</span>
+            </span>
+          </label>
+        );
+      })}
+    </fieldset>
   );
 }
 
@@ -102,28 +114,25 @@ function RolePicker({ value, onChange }) {
 function ScopePicker({ role, value, onChange }) {
   const perms = usePerms();
   const { data } = useScopes();
-  if (!role) {
-    return (
-      <select className="input" disabled aria-label="Phạm vi">
-        <option>— Chọn cấp trước —</option>
-      </select>
-    );
-  }
+  if (!role) return null;
   if (isProvinceLevel(role)) {
-    return <div className="input bg-panel2/60 text-ink-2">Toàn tỉnh Cao Bằng</div>;
+    return <p className="rounded-lg bg-panel2 px-3 py-2 text-sm">Địa bàn: <b>Toàn tỉnh Cao Bằng</b></p>;
   }
   const communes = (data?.communes || [])
     .filter((c) => canManageAt(perms, c.domain))
     .sort((a, b) => a.label.localeCompare(b.label, 'vi'));
   return (
-    <select className="input" value={value} onChange={(e) => onChange(e.target.value)} aria-label="Phạm vi">
-      <option value="">— Chọn xã/phường —</option>
-      {communes.map((c) => (
-        <option key={c.domain} value={c.domain}>
-          {c.label}
-        </option>
-      ))}
-    </select>
+    <label className="flex flex-col gap-1 text-sm">
+      Xã/phường phụ trách
+      <select className="input" value={value} onChange={(e) => onChange(e.target.value)}>
+        <option value="">— Chọn xã/phường —</option>
+        {communes.map((c) => (
+          <option key={c.domain} value={c.domain}>
+            {c.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 
@@ -147,49 +156,72 @@ function useMutate() {
 
 const PIN_RE = /^\d{4,8}$/;
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const USERNAME_RE = /^[a-z0-9._-]{3,40}$/;
+const STEPS = ['Cấp & địa bàn', 'Thông tin cán bộ', 'Đăng nhập', 'Xem lại'];
 
+/** Ô nhập kèm một dòng hướng dẫn / báo sai ngay dưới ô (gắn vào ô bằng aria-describedby — tên ô chỉ là nhãn). */
+function Field({ label, hint, error, children }) {
+  const id = useId();
+  const note = error || hint;
+  return (
+    <div className="flex flex-col gap-1 text-sm">
+      <label className="flex flex-col gap-1">
+        {label}
+        {cloneElement(children, { 'aria-describedby': note ? id : undefined, 'aria-invalid': error ? true : undefined })}
+      </label>
+      {note && <span id={id} className={error ? 'text-xs font-medium text-danger' : 'text-xs text-muted'}>{note}</span>}
+    </div>
+  );
+}
+
+/** Tạo tài khoản từng bước: cấp & địa bàn → thông tin cán bộ → đăng nhập → xem lại (nói rõ việc sẽ xảy ra) → tạo. */
 function CreateUserModal({ onClose }) {
   const run = useMutate();
-  const [f, setF] = useState({
-    username: '',
-    full_name: '',
-    position: '',
-    email: '',
-    password: '',
-    pin: '',
-    role: '',
-    domain: '',
-  });
+  const { data: scopes } = useScopes();
+  const [step, setStep] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [f, setF] = useState({ username: '', full_name: '', position: '', email: '', password: '', pin: '', role: '', domain: '' });
   const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }));
   const province = isProvinceLevel(f.role);
   const domain = province ? GLOBAL : f.domain;
-  const valid =
-    /^[a-z0-9._-]{3,40}$/.test(f.username) &&
-    f.full_name.length > 1 &&
-    !weakPassword(f.password) &&
-    f.role &&
-    domain &&
-    (!f.email || EMAIL_RE.test(f.email)) &&
-    (!province || !f.pin || PIN_RE.test(f.pin));
+  const place = province ? 'toàn tỉnh Cao Bằng' : scopes?.communes?.find((c) => c.domain === f.domain)?.label || '';
+  const errs = {
+    email: f.email && !EMAIL_RE.test(f.email) ? 'Email chưa đúng dạng (VD canbo@caobang.gov.vn)' : '',
+    username: f.username && !USERNAME_RE.test(f.username) ? 'Chỉ chữ thường không dấu, số, dấu . _ - (3–40 ký tự)' : '',
+    password: f.password && weakPassword(f.password) ? PASSWORD_HINT : '',
+    pin: province && f.pin && !PIN_RE.test(f.pin) ? 'Mã PIN gồm 4–8 chữ số' : '',
+  };
+  const ok = [
+    !!f.role && !!domain,
+    f.full_name.trim().length > 1 && !errs.email,
+    USERNAME_RE.test(f.username) && !weakPassword(f.password) && !errs.pin,
+    true,
+  ];
+  const missing = [
+    !f.role ? 'chọn cấp' : !domain ? 'chọn xã/phường' : '',
+    f.full_name.trim().length < 2 ? 'ghi họ tên' : errs.email ? 'sửa email' : '',
+    !f.username ? 'ghi tên đăng nhập' : errs.username ? 'sửa tên đăng nhập' : !f.password ? 'ghi mật khẩu ban đầu' : errs.password ? 'mật khẩu đủ mạnh' : errs.pin ? 'sửa mã PIN' : '',
+    '',
+  ][step];
 
   const submit = async () => {
-    if (
-      await run(
-        () =>
-          api('/rbac/users', {
-            method: 'POST',
-            body: {
-              ...f,
-              domain,
-              pin: province && f.pin ? f.pin : null,
-              position: f.position || null,
-              email: f.email || null,
-            },
-          }),
-        `Đã tạo tài khoản ${f.username}`
-      )
-    )
-      onClose();
+    setBusy(true);
+    const done = await run(
+      () =>
+        api('/rbac/users', {
+          method: 'POST',
+          body: {
+            ...f,
+            domain,
+            pin: province && f.pin ? f.pin : null,
+            position: f.position || null,
+            email: f.email || null,
+          },
+        }),
+      `Đã tạo tài khoản ${f.username}`
+    );
+    setBusy(false);
+    if (done) onClose();
   };
 
   return (
@@ -199,82 +231,73 @@ function CreateUserModal({ onClose }) {
       title="Tạo tài khoản công vụ"
       footer={
         <>
-          <button className="btn-ghost" onClick={onClose}>
-            Huỷ
-          </button>
-          <button className="btn-primary" disabled={!valid} onClick={submit}>
-            <UserPlus size={15} /> Tạo tài khoản
-          </button>
+          {step > 0 ? (
+            <button type="button" className="btn-ghost" disabled={busy} onClick={() => setStep(step - 1)}>Quay lại</button>
+          ) : (
+            <button type="button" className="btn-ghost" onClick={onClose}>Huỷ</button>
+          )}
+          {step < STEPS.length - 1 ? (
+            <button type="button" className="btn-primary" disabled={!ok[step]} title={missing ? `Còn thiếu: ${missing}` : undefined} onClick={() => setStep(step + 1)}>
+              Tiếp: {STEPS[step + 1].toLowerCase()}
+            </button>
+          ) : (
+            <button type="button" className="btn-primary" disabled={busy || !ok.every(Boolean)} onClick={submit}>
+              <UserPlus size={15} /> Tạo tài khoản
+            </button>
+          )}
         </>
       }
     >
-      <div className="grid gap-3 text-sm sm:grid-cols-2">
-        <label>
-          <span className="font-semibold text-xs uppercase text-ink-2">Tên đăng nhập</span>
-          <input
-            className="input mt-1 font-mono"
-            placeholder="vd: admin.coba, nguyenvan.a"
-            value={f.username}
-            onChange={set('username')}
-          />
-        </label>
-        <label>
-          <span className="font-semibold text-xs uppercase text-ink-2">Họ và tên cán bộ</span>
-          <input className="input mt-1" placeholder="vd: Lục Văn Xã" value={f.full_name} onChange={set('full_name')} />
-        </label>
-        <label>
-          <span className="font-semibold text-xs uppercase text-ink-2">Chức vụ / Đơn vị</span>
-          <input className="input mt-1" placeholder="vd: Phó Chủ tịch UBND xã Cô Ba" value={f.position} onChange={set('position')} />
-        </label>
-        <label>
-          <span className="font-semibold text-xs uppercase text-ink-2">Email công vụ (khôi phục mật khẩu)</span>
-          <input
-            className="input mt-1"
-            type="email"
-            placeholder="vd: canbo@caobang.gov.vn"
-            value={f.email}
-            onChange={set('email')}
-          />
-        </label>
-        <label>
-          <span className="font-semibold text-xs uppercase text-ink-2">Mật khẩu ban đầu</span>
-          <input
-            className="input mt-1"
-            type="password"
-            placeholder={PASSWORD_HINT.toLowerCase()}
-            value={f.password}
-            onChange={set('password')}
-          />
-        </label>
-        <label>
-          <span className="font-semibold text-xs uppercase text-ink-2">Cấp</span>
-          <div className="mt-1">
-            <RolePicker value={f.role} onChange={(v) => setF((x) => ({ ...x, role: v }))} />
-          </div>
-        </label>
-        <label>
-          <span className="font-semibold text-xs uppercase text-ink-2">Phạm vi</span>
-          <div className="mt-1">
-            <ScopePicker role={f.role} value={f.domain} onChange={(v) => setF((x) => ({ ...x, domain: v }))} />
-          </div>
-        </label>
-        {province && (
-          <label>
-            <span className="font-semibold text-xs uppercase text-ink-2">PIN phê duyệt cảnh báo (4–8 số)</span>
-            <input
-              className="input mt-1 font-mono"
-              inputMode="numeric"
-              placeholder="Để trống nếu chưa giao duyệt cảnh báo"
-              value={f.pin}
-              onChange={set('pin')}
-            />
-          </label>
-        )}
-      </div>
-      <p className="mt-3 text-xs text-muted leading-relaxed">
-        Mỗi tài khoản có đúng 1 vai trò. Bạn chỉ tạo được tài khoản cấp dưới mình, trong phạm vi bạn quản lý. Chức vụ chỉ để
-        hiển thị — quyền do cấp quyết định. Lần đăng nhập đầu, người dùng phải đổi mật khẩu ban đầu sang mật khẩu của riêng mình.
-      </p>
+      <StepChips steps={STEPS} step={step} onStep={setStep} done={ok} disabled={busy} />
+      {step === 0 && (
+        <div className="flex flex-col gap-3">
+          <RoleChoice value={f.role} onChange={(v) => setF((x) => ({ ...x, role: v }))} />
+          <ScopePicker role={f.role} value={f.domain} onChange={(v) => setF((x) => ({ ...x, domain: v }))} />
+        </div>
+      )}
+      {step === 1 && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Họ và tên cán bộ">
+            <input className="input" placeholder="VD: Lục Văn Xã" value={f.full_name} onChange={set('full_name')} />
+          </Field>
+          <Field label="Chức vụ / đơn vị (không bắt buộc)" hint="Chỉ để hiện tên — quyền do cấp quyết định">
+            <input className="input" placeholder="VD: Phó Chủ tịch UBND xã Cô Ba" value={f.position} onChange={set('position')} />
+          </Field>
+          <Field label="Email công vụ (không bắt buộc)" hint="Để người dùng tự lấy lại mật khẩu khi quên" error={errs.email}>
+            <input className="input" type="email" placeholder="VD: canbo@caobang.gov.vn" value={f.email} onChange={set('email')} />
+          </Field>
+        </div>
+      )}
+      {step === 2 && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Tên đăng nhập" hint="Chữ thường không dấu, VD admin.coba, nguyenvan.a" error={errs.username}>
+            <input className="input font-mono" autoComplete="off" value={f.username} onChange={set('username')} />
+          </Field>
+          <Field label="Mật khẩu ban đầu" hint={PASSWORD_HINT} error={errs.password}>
+            <input className="input" type="password" autoComplete="new-password" value={f.password} onChange={set('password')} />
+          </Field>
+          {province && (
+            <Field label="Mã PIN duyệt cảnh báo (không bắt buộc)" hint="4–8 chữ số — chỉ cấp cho lãnh đạo được giao duyệt lệnh cảnh báo" error={errs.pin}>
+              <input className="input font-mono" inputMode="numeric" autoComplete="off" value={f.pin} onChange={set('pin')} />
+            </Field>
+          )}
+        </div>
+      )}
+      {step === 3 && (
+        <div className="flex flex-col gap-3 text-sm">
+          <p className="rounded-lg bg-panel2 p-3">
+            Tạo tài khoản <b className="font-mono">{f.username}</b> cho <b>{f.full_name}</b>
+            {f.position ? ` (${f.position})` : ''} — <b>{getTier(f.role).name}</b>, {place}
+            {province && f.pin ? ', có mã PIN duyệt cảnh báo' : ''}.
+          </p>
+          <ul className="list-disc space-y-1 pl-5 text-ink-2">
+            <li>Người này đăng nhập bằng mật khẩu ban đầu bạn giao, lần đầu phải đổi sang mật khẩu của riêng mình.</li>
+            <li>Giao mật khẩu tận tay hoặc qua điện thoại — không gửi qua nhóm chat.</li>
+            <li>Tài khoản này làm được: {getTier(f.role).can}</li>
+          </ul>
+        </div>
+      )}
+      {missing && <p className="mt-3 text-xs text-muted">Còn thiếu: {missing}.</p>}
     </Modal>
   );
 }
@@ -286,151 +309,90 @@ function AssignmentModal({ user, onClose }) {
   const [dom, setDom] = useState(cur && !isProvinceLevel(cur.role) ? cur.domain : '');
   const domain = isProvinceLevel(role) ? GLOBAL : dom;
   const unchanged = cur && cur.role === role && cur.domain === domain;
+  const losesPin = user.has_pin && role && !isProvinceLevel(role);
   const submit = async () => {
-    if (
-      await run(
-        () => api(`/rbac/users/${user.id}/assignment`, { method: 'PUT', body: { role, domain } }),
-        `Đã đổi ${user.full_name} sang ${getTier(role).title}`
-      )
-    )
-      onClose();
+    if (await run(() => api(`/rbac/users/${user.id}/assignment`, { method: 'PUT', body: { role, domain } }), `Đã đổi ${user.full_name} sang ${getTier(role).name}`)) onClose();
   };
   return (
     <Modal
       open
       onClose={onClose}
-      title={`Đổi cấp / phạm vi – ${user.full_name}`}
+      title={`Đổi cấp / địa bàn – ${user.full_name}`}
       footer={
         <>
-          <button className="btn-ghost" onClick={onClose}>
-            Huỷ
-          </button>
-          <button className="btn-primary" disabled={!role || !domain || unchanged} onClick={submit}>
-            <Pencil size={15} /> Lưu
+          <button type="button" className="btn-ghost" onClick={onClose}>Huỷ</button>
+          <button type="button" className="btn-primary" disabled={!role || !domain || unchanged} onClick={submit}>
+            <Pencil size={15} /> Đổi cấp
           </button>
         </>
       }
     >
       <div className="flex flex-col gap-3 text-sm">
-        <div className="text-xs text-muted">
-          Hiện tại: <b className="text-ink">{getTier(cur?.role).title}</b>
+        <p className="text-ink-2">
+          Hiện tại: <b className="text-ink">{getTier(cur?.role).name}</b>
           {cur && ` · ${cur.domain_label}`}
-        </div>
-        <label>
-          <span className="font-semibold text-xs uppercase text-ink-2">Cấp mới</span>
-          <div className="mt-1">
-            <RolePicker value={role} onChange={setRole} />
-          </div>
-        </label>
-        <label>
-          <span className="font-semibold text-xs uppercase text-ink-2">Phạm vi</span>
-          <div className="mt-1">
-            <ScopePicker role={role} value={dom} onChange={setDom} />
-          </div>
-        </label>
-        <p className="text-xs text-muted">
-          Vai trò mới thay vai trò hiện tại (mỗi tài khoản 1 vai trò). Chuyển xuống Cấp 3 sẽ xoá PIN phê duyệt cảnh báo. Người
-          dùng phải đăng nhập lại.
+        </p>
+        <RoleChoice value={role} onChange={setRole} />
+        <ScopePicker role={role} value={dom} onChange={setDom} />
+        <p className="rounded-lg bg-panel2 p-3 text-ink-2">
+          Bấm <b>Đổi cấp</b>: cấp mới thay cấp hiện tại (mỗi tài khoản một cấp); {user.full_name} bị đăng xuất trên mọi máy và đăng nhập lại với
+          quyền mới.{losesPin ? ' Chuyển xuống cấp xã sẽ xoá mã PIN duyệt cảnh báo.' : ''}
         </p>
       </div>
     </Modal>
   );
 }
 
+/** Đặt lại mật khẩu / mã PIN: hậu quả ghi ngay trên nút và câu trước nút (mật khẩu → đăng xuất mọi máy, phải đổi lần tới). */
 function CredentialsModal({ user, onClose }) {
   const run = useMutate();
   const [password, setPassword] = useState('');
   const [pin, setPin] = useState('');
   const canApprove = (user.level ?? 9) <= 2;
+  const action = password && pin ? 'Đặt lại mật khẩu và mã PIN' : pin ? 'Đổi mã PIN' : 'Đặt lại mật khẩu';
   const submit = async () => {
     const body = { ...(password ? { password } : {}), ...(pin ? { pin } : {}) };
-    if (
-      await run(
-        () => api(`/rbac/users/${user.id}`, { method: 'PATCH', body }),
-        'Đã cập nhật thông tin đăng nhập thành công'
-      )
-    )
-      onClose();
+    if (await run(() => api(`/rbac/users/${user.id}`, { method: 'PATCH', body }), `Đã ${action.toLowerCase()} cho ${user.full_name}`)) onClose();
   };
   return (
     <Modal
       open
       onClose={onClose}
-      title={canApprove ? `Đặt lại mật khẩu / PIN – ${user.full_name}` : `Đặt lại mật khẩu – ${user.full_name}`}
+      title={canApprove ? `Đặt lại mật khẩu / mã PIN – ${user.full_name}` : `Đặt lại mật khẩu – ${user.full_name}`}
       footer={
         <>
-          <button className="btn-ghost" onClick={onClose}>
-            Huỷ
-          </button>
+          <button type="button" className="btn-ghost" onClick={onClose}>Huỷ</button>
           <button
+            type="button"
             className="btn-primary"
             disabled={(!password && !pin) || (password && weakPassword(password)) || (pin && !PIN_RE.test(pin))}
             onClick={submit}
           >
-            <KeyRound size={15} /> Lưu thay đổi
+            <KeyRound size={15} /> {action}
           </button>
         </>
       }
     >
-      <div className="grid gap-3 text-sm sm:grid-cols-2">
-        <label>
-          <span className="font-semibold text-xs uppercase text-ink-2">Mật khẩu mới</span>
-          <input
-            className="input mt-1"
-            type="password"
-            placeholder={PASSWORD_HINT.toLowerCase()}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </label>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Mật khẩu mới" hint={PASSWORD_HINT} error={password && weakPassword(password) ? PASSWORD_HINT : ''}>
+          <input className="input" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+        </Field>
         {canApprove && (
-          <label>
-            <span className="font-semibold text-xs uppercase text-ink-2">PIN phê duyệt cảnh báo (4–8 số)</span>
-            <input
-              className="input mt-1 font-mono"
-              inputMode="numeric"
-              placeholder="Để trống nếu không đổi"
-              value={pin}
-              onChange={(e) => setPin(e.target.value)}
-            />
-          </label>
+          <Field label="Mã PIN duyệt cảnh báo mới" hint="4–8 chữ số — để trống nếu không đổi" error={pin && !PIN_RE.test(pin) ? 'Mã PIN gồm 4–8 chữ số' : ''}>
+            <input className="input font-mono" inputMode="numeric" autoComplete="off" value={pin} onChange={(e) => setPin(e.target.value)} />
+          </Field>
         )}
       </div>
-      <p className="mt-3 text-xs text-muted">
-        Sau khi đặt lại mật khẩu, các phiên đăng nhập khác của tài khoản này trên các thiết bị khác sẽ bị hủy phiên để đảm bảo an toàn.
-        Người dùng phải đổi sang mật khẩu của riêng mình ở lần đăng nhập tới.
-      </p>
+      {(password || pin) && (
+        <ul className="mt-3 list-disc space-y-1 rounded-lg bg-panel2 p-3 pl-7 text-sm text-ink-2">
+          {password && <li>{user.full_name} bị đăng xuất ngay trên mọi máy, đăng nhập lại bằng mật khẩu mới và phải đổi sang mật khẩu riêng.</li>}
+          {password && <li>Giao mật khẩu mới tận tay hoặc qua điện thoại — không gửi qua nhóm chat.</li>}
+          {pin && <li>Mã PIN cũ hết hiệu lực ngay — duyệt lệnh cảnh báo phải dùng mã PIN mới.</li>}
+        </ul>
+      )}
     </Modal>
   );
 }
-
-const LEVEL_CARDS = [
-  {
-    level: 1,
-    emoji: '👑',
-    title: 'Cấp 1 · Quản trị hệ thống',
-    tone: 'border-purple-500/20',
-    text: 'Toàn quyền hệ thống. Tạo và quản lý tài khoản mọi cấp.',
-  },
-  {
-    level: 2,
-    emoji: '🏛️',
-    title: 'Cấp 2 · Quản trị tỉnh',
-    tone: 'border-blue-500/20',
-    text:
-      'Toàn tỉnh: SOS, điều động, soạn và duyệt cảnh báo (cần PIN, không tự duyệt lệnh mình soạn), tổng đài, kho, nhập dữ ' +
-      'liệu, duyệt hồ sơ xã gửi. Tạo và quản lý tài khoản Cấp 3.',
-  },
-  {
-    level: 3,
-    emoji: '📍',
-    title: 'Cấp 3 · Quản trị xã/phường',
-    tone: 'border-emerald-500/20',
-    text:
-      'Trong 1 xã/phường: tiếp nhận và xử lý SOS, duyệt phản ánh, xuất kho của xã, gửi dữ liệu chờ tỉnh duyệt. Không quản ' +
-      'lý tài khoản.',
-  },
-];
 
 function UsersTab() {
   const perms = usePerms();
@@ -438,10 +400,11 @@ function UsersTab() {
   const myLevel = useMyLevel();
   const run = useMutate();
   const canManage = usePermission('user', 'manage');
-  const { data: users = [] } = useQuery({ queryKey: ['rbac-users'], queryFn: () => api('/rbac/users') });
+  const { data: users = [], isLoading } = useQuery({ queryKey: ['rbac-users'], queryFn: () => api('/rbac/users') });
   const [q, setQ] = useState('');
   const [levelFilter, setLevelFilter] = useState('all');
   const [modal, setModal] = useState(null);
+  const [busy, setBusy] = useState(false);
 
   const shown = users.filter((u) => {
     const text = `${u.full_name} ${u.username} ${u.email || ''} ${u.position || ''} ${u.assignments
@@ -450,6 +413,7 @@ function UsersTab() {
     if (q && !text.includes(q.toLowerCase())) return false;
     return levelFilter === 'all' || (u.level ?? 9) === Number(levelFilter);
   });
+  const count = (lv) => users.filter((u) => (u.level ?? 9) === lv).length;
 
   // Chỉ cấp trên quản lý tài khoản cấp dưới (cùng cấp không quản lý nhau) — backend kiểm tra lại
   const manages = (u) =>
@@ -457,76 +421,72 @@ function UsersTab() {
     (u.assignments.length
       ? (u.level ?? 9) > myLevel && u.assignments.every((a) => canManageAt(perms, a.domain))
       : u.created_by === me?.id);
+  const confirm = async (fn, ok) => {
+    setBusy(true);
+    await run(fn, ok);
+    setBusy(false);
+    setModal(null);
+  };
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        {LEVEL_CARDS.map((c) => (
-          <div key={c.level} className={clsx('card p-3.5 bg-panel border rounded-xl', c.tone)}>
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="text-sm">{c.emoji}</span>
-              <div className="font-bold text-xs text-ink uppercase tracking-wide">{c.title}</div>
-            </div>
-            <p className="text-[11px] text-muted leading-relaxed">{c.text}</p>
+      <section aria-label="3 cấp tài khoản" className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        {Object.values(TIER_CONFIG).map((t) => (
+          <div key={t.level} className="card flex flex-col gap-1 p-3.5">
+            <h3 className="flex items-center gap-2 font-semibold">
+              <t.icon size={18} strokeWidth={1.75} className="shrink-0 text-accent" aria-hidden="true" />
+              {t.name} <span className="text-sm font-normal text-muted">· Cấp {t.level}</span>
+            </h3>
+            <p className="text-sm text-ink-2"><b className="font-medium text-ink">Dành cho:</b> {t.who}</p>
+            <p className="text-sm text-ink-2"><b className="font-medium text-ink">Làm được:</b> {t.can}</p>
+            {t.cannot && <p className="text-sm text-ink-2"><b className="font-medium text-ink">Không:</b> {t.cannot}</p>}
           </div>
         ))}
-      </div>
-      <p className="flex items-start gap-1.5 text-[11px] text-muted -mt-1">
-        <Info size={13} className="shrink-0 mt-0.5 text-accent" />
-        <span>
-          Mỗi tài khoản đúng 1 vai trò. Chỉ cấp trên đổi mật khẩu, PIN, xác thực 2 lớp, khoá hoặc đổi cấp của tài khoản cấp
-          dưới; cùng cấp không quản lý nhau.
-        </span>
+      </section>
+      <p className="-mt-1 text-sm text-ink-2">
+        Mỗi tài khoản đúng một cấp. Chỉ cấp trên đổi mật khẩu, mã PIN, xác thực 2 lớp, khoá hoặc đổi cấp của tài khoản cấp dưới — cùng cấp không quản lý nhau.
       </p>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2 flex-1">
-          <div className="relative min-w-[14rem] flex-1 max-w-md">
-            <Search size={14} className="absolute left-3 top-2.5 text-muted" />
+        <div className="flex flex-1 flex-wrap items-center gap-2">
+          <div className="relative min-w-[14rem] max-w-md flex-1">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" aria-hidden="true" />
             <input
-              className="input pl-8 py-2 text-xs"
-              placeholder="Tìm tên, tài khoản, email, chức vụ, xã..."
+              className="input pl-9"
+              aria-label="Tìm tài khoản"
+              placeholder="Tìm theo tên, tài khoản, chức vụ, xã…"
               value={q}
               onChange={(e) => setQ(e.target.value)}
             />
           </div>
-          <div className="flex items-center gap-1 bg-panel2/80 p-1 rounded-xl border border-line text-xs">
-            {[
-              ['all', `Tất cả (${users.length})`, 'bg-panel text-ink'],
-              ['1', '👑 Cấp 1', 'bg-purple-500/15 text-purple-600 dark:text-purple-400'],
-              ['2', '🏛️ Cấp 2', 'bg-blue-500/15 text-blue-600 dark:text-blue-400'],
-              ['3', '📍 Cấp 3', 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'],
-            ].map(([v, label, on]) => (
-              <button
-                key={v}
-                onClick={() => setLevelFilter(v)}
-                className={clsx(
-                  'px-2.5 py-1 rounded-lg font-medium transition-all',
-                  levelFilter === v ? `${on} shadow-sm font-semibold` : 'text-muted hover:text-ink'
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          <Segmented
+            label="Lọc theo cấp"
+            value={levelFilter}
+            onChange={setLevelFilter}
+            options={[
+              { value: 'all', label: `Tất cả (${users.length})` },
+              { value: '1', label: `Hệ thống (${count(1)})`, short: `Cấp 1 (${count(1)})` },
+              { value: '2', label: `Tỉnh (${count(2)})`, short: `Cấp 2 (${count(2)})` },
+              { value: '3', label: `Xã/phường (${count(3)})`, short: `Cấp 3 (${count(3)})` },
+            ]}
+          />
         </div>
 
         {canManage && (
-          <button className="btn-primary py-2 px-3 text-xs font-semibold shadow-md" onClick={() => setModal({ type: 'create' })}>
-            <UserPlus size={15} />
-            <span>Tạo tài khoản công vụ</span>
+          <button type="button" className="btn-primary" onClick={() => setModal({ type: 'create' })}>
+            <UserPlus size={15} /> Tạo tài khoản công vụ
           </button>
         )}
       </div>
 
-      <div className="card overflow-x-auto shadow-md border-line">
+      <div className="card overflow-x-auto">
         <table className="table-base">
           <thead>
             <tr>
-              <th>Cán bộ & Tài khoản</th>
+              <th>Cán bộ</th>
               <th>Cấp</th>
-              <th>Địa bàn phụ trách</th>
-              <th>Trạng thái</th>
+              <th>Địa bàn</th>
+              <th>Tình trạng</th>
               <th className="text-right">Thao tác</th>
             </tr>
           </thead>
@@ -534,104 +494,60 @@ function UsersTab() {
             {shown.map((u) => {
               const editable = canManage && manages(u) && u.id !== me?.id;
               const a = u.assignments[0];
-              const tier = getTier(a?.role);
-              const TierIcon = tier.icon;
               return (
-                <tr key={u.id} className={clsx(!u.is_active && 'opacity-60 bg-danger/5')}>
+                <tr key={u.id} className={clsx(!u.is_active && 'bg-panel2/60')}>
                   <td>
-                    <div className="font-semibold text-ink flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 font-semibold text-ink">
                       <span>{u.full_name}</span>
-                      {u.id === me?.id && (
-                        <span className="chip py-0 px-1 text-[10px] bg-accent/15 text-accent font-semibold">Bạn</span>
-                      )}
+                      {u.id === me?.id && <span className="chip bg-accent/15 px-1.5 py-0 text-[11px] text-accent">Bạn</span>}
                     </div>
-                    <div className="text-xs text-muted flex items-center gap-1 mt-0.5">
-                      <span className="font-mono text-ink-2 bg-panel2/60 px-1 py-0.2 rounded border border-line/50">
-                        @{u.username}
-                      </span>
-                      {u.position && <span>· {u.position}</span>}
+                    <div className="mt-0.5 text-xs text-muted">
+                      <span className="font-mono text-ink-2">{u.username}</span>
+                      {u.position && <span> · {u.position}</span>}
                     </div>
-                    {u.email && <div className="text-[11px] text-muted/80 mt-0.5">{u.email}</div>}
+                    {u.email && <div className="text-xs text-muted">{u.email}</div>}
                   </td>
-                  <td>
-                    <span className={clsx('chip py-0.5 px-2 text-xs font-semibold rounded-lg', tier.badge)}>
-                      <TierIcon size={12} className="shrink-0 mr-1" />
-                      <span>{tier.title}</span>
-                    </span>
-                  </td>
-                  <td>
-                    <div className="text-xs font-medium text-ink">{a?.domain_label || 'Chưa gán'}</div>
-                    <div className="text-[11px] font-mono text-muted">{a?.domain || '–'}</div>
-                  </td>
+                  <td><TierChip role={a?.role} /></td>
+                  <td className="text-sm">{a?.domain_label || 'Chưa gán'}</td>
                   <td className="whitespace-nowrap text-xs">
                     {u.is_active ? (
-                      <span className="chip py-0.5 px-2 bg-good/10 text-good border border-good/20 font-semibold text-[11px]">
-                        ● Hoạt động
-                      </span>
+                      <div className="font-semibold text-good">Đang hoạt động</div>
                     ) : (
-                      <span className="chip py-0.5 px-2 bg-danger/10 text-danger border border-danger/20 font-semibold text-[11px]">
-                        ● Đã khóa
-                      </span>
+                      <div className="flex items-center gap-1 font-semibold text-danger"><Lock size={12} aria-hidden="true" /> Đã khoá</div>
                     )}
-                    {(u.level ?? 9) <= 2 && (
-                      <div className="text-[11px] text-muted mt-1">
-                        PIN duyệt cảnh báo:{' '}
-                        {u.has_pin ? <span className="text-good font-semibold">Đã cấp</span> : 'Chưa cấp'}
-                      </div>
-                    )}
-                    <div className="text-[11px] text-muted">
-                      Xác thực 2 lớp: {u.mfa_enabled ? <span className="text-good font-semibold">Đã bật</span> : 'Chưa bật'}
-                    </div>
+                    {(u.level ?? 9) <= 2 && <div className="text-muted">Mã PIN duyệt cảnh báo: {u.has_pin ? 'đã cấp' : 'chưa cấp'}</div>}
+                    <div className="text-muted">Xác thực 2 lớp: {u.mfa_enabled ? 'đã bật' : 'chưa bật'}</div>
                     {u.must_change_password && (
-                      <div className="text-[11px] font-semibold text-warn" title="Mật khẩu do cấp trên đặt — người dùng phải đổi ở lần đăng nhập tới">
-                        Chờ tự đổi mật khẩu
-                      </div>
+                      <div className="font-medium text-warn" title="Mật khẩu do cấp trên đặt — người dùng phải đổi ở lần đăng nhập tới">Chờ tự đổi mật khẩu</div>
                     )}
                   </td>
-                  <td className="whitespace-nowrap text-right">
+                  <td className="text-right">
                     {editable && (
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          className="btn-ghost px-2 py-1 text-xs text-accent hover:bg-accent/10"
-                          onClick={() => setModal({ type: 'assign', user: u })}
-                        >
-                          <Pencil size={13} />
-                          <span>Đổi cấp / phạm vi</span>
+                      <div className="flex flex-wrap items-center justify-end gap-1">
+                        <button type="button" className="btn-ghost px-2 py-1 text-xs" onClick={() => setModal({ type: 'assign', user: u })}>
+                          <Pencil size={13} /> Đổi cấp
                         </button>
-                        <button
-                          className="btn-ghost p-1.5 text-muted hover:text-ink"
-                          title={(u.level ?? 9) <= 2 ? 'Đặt lại mật khẩu hoặc PIN' : 'Đặt lại mật khẩu'}
-                          onClick={() => setModal({ type: 'cred', user: u })}
-                        >
-                          <KeyRound size={14} />
+                        <button type="button" className="btn-ghost px-2 py-1 text-xs" onClick={() => setModal({ type: 'cred', user: u })}>
+                          <KeyRound size={13} /> {(u.level ?? 9) <= 2 ? 'Mật khẩu / PIN' : 'Đặt lại mật khẩu'}
                         </button>
                         {u.mfa_enabled && (
-                          <button
-                            className="btn-ghost p-1.5 text-muted hover:text-warn"
-                            title="Đặt lại xác thực 2 lớp (mất điện thoại)"
-                            onClick={() =>
-                              window.confirm(
-                                `Đặt lại xác thực 2 lớp của ${u.full_name}? Chỉ làm sau khi đã xác minh đúng người yêu cầu. ` +
-                                  'Mọi phiên đăng nhập của tài khoản sẽ bị đăng xuất.'
-                              ) &&
-                              run(() => api(`/rbac/users/${u.id}/mfa/reset`, { method: 'POST' }), 'Đã đặt lại xác thực 2 lớp')
-                            }
-                          >
-                            <ShieldOff size={14} />
+                          <button type="button" className="btn-ghost px-2 py-1 text-xs" onClick={() => setModal({ type: 'mfa', user: u })}>
+                            <ShieldOff size={13} /> Đặt lại 2 lớp
                           </button>
                         )}
-                        <button
-                          className={clsx('btn-ghost p-1.5', u.is_active ? 'text-muted hover:text-danger' : 'text-danger hover:text-good')}
-                          title={u.is_active ? 'Khóa tài khoản này' : 'Mở khóa tài khoản'}
-                          onClick={() =>
-                            run(
-                              () => api(`/rbac/users/${u.id}`, { method: 'PATCH', body: { is_active: !u.is_active } }),
-                              u.is_active ? 'Đã khóa tài khoản' : 'Đã mở khóa tài khoản'
-                            )
-                          }
-                        >
-                          {u.is_active ? <Lock size={14} /> : <Unlock size={14} />}
-                        </button>
+                        {u.is_active ? (
+                          <button type="button" className="btn-ghost px-2 py-1 text-xs text-danger" onClick={() => setModal({ type: 'lock', user: u })}>
+                            <Lock size={13} /> Khoá
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="btn-ghost px-2 py-1 text-xs"
+                            onClick={() => run(() => api(`/rbac/users/${u.id}`, { method: 'PATCH', body: { is_active: true } }), `Đã mở khoá tài khoản ${u.full_name}`)}
+                          >
+                            <Unlock size={13} /> Mở khoá
+                          </button>
+                        )}
                       </div>
                     )}
                   </td>
@@ -640,17 +556,43 @@ function UsersTab() {
             })}
           </tbody>
         </table>
-        {!shown.length && <Empty>Không tìm thấy tài khoản phù hợp trong phạm vi quản lý</Empty>}
+        {!shown.length && <Empty>{isLoading ? 'Đang tải…' : 'Không tìm thấy tài khoản phù hợp trong phạm vi quản lý'}</Empty>}
       </div>
 
       {modal?.type === 'create' && <CreateUserModal onClose={() => setModal(null)} />}
       {modal?.type === 'assign' && <AssignmentModal user={modal.user} onClose={() => setModal(null)} />}
       {modal?.type === 'cred' && <CredentialsModal user={modal.user} onClose={() => setModal(null)} />}
+      {modal?.type === 'lock' && (
+        <Confirm
+          title={`Khoá tài khoản của ${modal.user.full_name}?`}
+          confirmLabel="Khoá tài khoản"
+          danger
+          busy={busy}
+          onClose={() => setModal(null)}
+          onConfirm={() => confirm(() => api(`/rbac/users/${modal.user.id}`, { method: 'PATCH', body: { is_active: false } }), `Đã khoá tài khoản ${modal.user.full_name}`)}
+        >
+          <p>{modal.user.full_name} bị đăng xuất ngay trên mọi máy và không đăng nhập được cho tới khi được mở khoá.</p>
+          <p>Phiếu cứu hộ, nhật ký do người này làm vẫn giữ nguyên. Dùng khi mất máy, nghỉ việc, chuyển công tác.</p>
+        </Confirm>
+      )}
+      {modal?.type === 'mfa' && (
+        <Confirm
+          title={`Đặt lại xác thực 2 lớp của ${modal.user.full_name}?`}
+          confirmLabel="Đặt lại xác thực 2 lớp"
+          danger
+          busy={busy}
+          onClose={() => setModal(null)}
+          onConfirm={() => confirm(() => api(`/rbac/users/${modal.user.id}/mfa/reset`, { method: 'POST' }), 'Đã đặt lại xác thực 2 lớp')}
+        >
+          <p>Chỉ làm sau khi đã gọi điện xác minh đúng người yêu cầu (mất điện thoại, hết mã khôi phục).</p>
+          <p>{modal.user.full_name} bị đăng xuất trên mọi máy; lần đăng nhập tới dùng mật khẩu như cũ, cấp bắt buộc xác thực 2 lớp thì phải cài lại.</p>
+        </Confirm>
+      )}
     </div>
   );
 }
 
-/** 3 vai trò cố định — chỉ xem (không tạo / sửa vai trò). */
+/** 3 cấp cố định — chỉ xem (không tạo / sửa vai trò). */
 function RolesTab() {
   const { data: roles = [] } = useRoles();
   const { data: catalog = [] } = useQuery({ queryKey: ['rbac-perms'], queryFn: () => api('/rbac/permissions') });
@@ -658,37 +600,26 @@ function RolesTab() {
   const inCatalogOrder = (codes) => catalog.filter((p) => codes.includes(p.code)).map((p) => p.description);
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-xs text-muted max-w-3xl">
-        Hệ thống có đúng 3 vai trò cố định — mỗi cấp 1 vai trò, mỗi tài khoản 1 vai trò. Chức vụ (lãnh đạo, trực ban, cán bộ…)
-        chỉ ghi ở hồ sơ tài khoản; quyền do cấp quyết định, nhờ vậy nhật ký luôn rõ ai làm gì với tư cách gì.
+      <p className="max-w-3xl text-sm text-ink-2">
+        Hệ thống có đúng 3 cấp cố định — mỗi tài khoản một cấp. Chức vụ (lãnh đạo, trực ban, cán bộ…) chỉ ghi ở hồ sơ tài khoản;
+        quyền do cấp quyết định, nhờ vậy nhật ký luôn rõ ai làm gì với tư cách gì.
       </p>
       <div className="grid gap-3 md:grid-cols-3">
-        {roles.map((r) => {
-          const tier = getTier(r.name);
-          const TierIcon = tier.icon;
-          return (
-            <div key={r.name} className="card p-4 flex flex-col gap-2 border-line shadow-sm">
-              <div className="flex items-center justify-between gap-2">
-                <span className={clsx('chip py-0.5 px-2 text-xs font-semibold rounded-lg', tier.badge)}>
-                  <TierIcon size={12} className="inline mr-1" />
-                  {tier.title}
-                </span>
-                <span className="chip py-0.5 px-2 bg-panel2 text-ink text-xs font-semibold">{r.user_count} tài khoản</span>
-              </div>
-              <p className="text-xs text-muted leading-relaxed">{r.description}</p>
-              <div className="text-[11px] text-ink-2">
-                Phạm vi: <b>{r.scope_kind === 'tinh' ? 'Toàn tỉnh' : 'Đúng 1 xã/phường'}</b>
-              </div>
-              <ul className="list-disc pl-4 space-y-0.5 text-[11px] text-ink-2 max-h-56 overflow-y-auto scroll-thin">
-                {r.permissions.includes('*.*') ? (
-                  <li>Toàn quyền</li>
-                ) : (
-                  inCatalogOrder(r.permissions).map((d) => <li key={d}>{d}</li>)
-                )}
-              </ul>
+        {roles.map((r) => (
+          <div key={r.name} className="card flex flex-col gap-2 p-4">
+            <div className="flex items-center justify-between gap-2">
+              <TierChip role={r.name} />
+              <span className="text-xs text-muted">{r.user_count} tài khoản</span>
             </div>
-          );
-        })}
+            <p className="text-sm text-ink-2">{r.description}</p>
+            <p className="text-sm text-ink-2">
+              Địa bàn: <b className="text-ink">{r.scope_kind === 'tinh' ? 'Toàn tỉnh' : 'Đúng 1 xã/phường'}</b>
+            </p>
+            <ul className="scroll-thin max-h-56 list-disc space-y-0.5 overflow-y-auto pl-4 text-xs text-ink-2">
+              {r.permissions.includes('*.*') ? <li>Toàn quyền</li> : inCatalogOrder(r.permissions).map((d) => <li key={d}>{d}</li>)}
+            </ul>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -697,46 +628,32 @@ function RolesTab() {
 function AuditTab() {
   const { data = [] } = useQuery({ queryKey: ['rbac-audit'], queryFn: () => api('/rbac/audit') });
   return (
-    <div className="card overflow-x-auto shadow-md border-line">
+    <div className="card overflow-x-auto">
       <table className="table-base">
         <thead>
           <tr>
-            <th>Thời gian</th>
-            <th>Người thực hiện</th>
-            <th>Hành động</th>
-            <th>Đối tượng tác động</th>
+            <th>Lúc</th>
+            <th>Người làm</th>
+            <th>Việc</th>
+            <th>Tài khoản bị tác động</th>
             <th>Cấp</th>
-            <th>Địa bàn (Domain)</th>
+            <th>Địa bàn</th>
           </tr>
         </thead>
         <tbody>
           {data.map((a) => (
             <tr key={a.id}>
-              <td className="whitespace-nowrap font-mono text-xs">{dateTime(a.time)}</td>
-              <td>
-                <span className="font-semibold text-ink">{a.actor_name}</span>
-              </td>
-              <td>
-                <span className="chip py-0.5 px-2 text-xs bg-panel2 text-ink border border-line">
-                  {AUDIT_LABEL[a.action] || a.action}
-                </span>
-              </td>
+              <td className="num whitespace-nowrap text-xs">{dateTime(a.time)}</td>
+              <td className="font-semibold text-ink">{a.actor_name}</td>
+              <td>{AUDIT_LABEL[a.action] || a.action}</td>
               <td className="font-mono text-xs">{a.target_user || '–'}</td>
-              <td>
-                {a.role ? (
-                  <span className="chip py-0.5 px-1.5 text-xs bg-accent/10 text-accent font-medium">
-                    {TIER_CONFIG[a.role]?.title || a.role}
-                  </span>
-                ) : (
-                  '–'
-                )}
-              </td>
-              <td className="text-xs text-ink-2 font-medium">{a.domain_label || a.domain || '–'}</td>
+              <td>{a.role ? <TierChip role={a.role} /> : '–'}</td>
+              <td className="text-sm text-ink-2">{a.domain_label || a.domain || '–'}</td>
             </tr>
           ))}
         </tbody>
       </table>
-      {!data.length && <Empty>Chưa có nhật ký thao tác phân quyền nào</Empty>}
+      {!data.length && <Empty>Chưa có thao tác phân quyền nào</Empty>}
     </div>
   );
 }
@@ -747,12 +664,12 @@ export default function AccessControl() {
   return (
     <div className={`${PAGE} pb-8`}>
       <PageHeader
-        title="Phân quyền & Quản lý tài khoản"
+        title="Phân quyền & tài khoản"
         short="Phân quyền"
         meta={[
-          <span key="ban">Bạn: <b className="font-semibold text-ink-2">{getTier(mine?.role).title}</b>{mine && ` · ${mine.domain_label}`}</span>,
+          <span key="ban">Bạn: <b className="font-semibold text-ink-2">{getTier(mine?.role).name}</b>{mine && ` · ${mine.domain_label}`}</span>,
         ]}
-        description="3 cấp, mỗi cấp 1 vai trò, mỗi tài khoản 1 vai trò: Cấp 1 Quản trị hệ thống · Cấp 2 Quản trị tỉnh · Cấp 3 Quản trị xã/phường."
+        description="Ai được làm gì trong hệ thống: 3 cấp, mỗi tài khoản một cấp. Chỉ cấp trên tạo và quản lý tài khoản cấp dưới."
       />
 
       <RoleTips page="phan-quyen" />
@@ -761,9 +678,9 @@ export default function AccessControl() {
         value={tab}
         onChange={setTab}
         tabs={[
-          { value: 'users', label: 'Tài khoản người dùng', icon: Users },
-          { value: 'roles', label: '3 vai trò & quyền', icon: ShieldCheck },
-          { value: 'audit', label: 'Nhật ký thao tác', icon: History },
+          { value: 'users', label: 'Tài khoản', icon: Users },
+          { value: 'roles', label: '3 cấp & quyền hạn', short: '3 cấp', icon: ShieldCheck },
+          { value: 'audit', label: 'Nhật ký thao tác', short: 'Nhật ký', icon: History },
         ]}
       />
 

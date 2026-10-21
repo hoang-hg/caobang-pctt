@@ -89,10 +89,11 @@ frontend/                  React 18, Vite 6, Tailwind 3, TanStack Query 5, Zusta
                            useIsCommuneUser, useGuideRole, Can)
   src/utils/guides.js      nội dung Hướng dẫn xử lý (pages/Guide.jsx, /huong-dan) + gợi ý 3 bước đầu trang theo vai trò
                            (components/common/RoleTips.jsx) — đổi chữ trên nút thì sửa câu hướng dẫn ở đây
-  src/pages/               trang điều hành (DataImport = nhập dữ liệu chính thức); pages/public/ = cổng công khai (PublicPortal, ReportForm, TicketTracker,
+  src/pages/               trang điều hành (DataImport = nhập dữ liệu chính thức: DataImportForm, DataSubmissions, dataImportFacts =
+                           thẻ loại dữ liệu, chữ tiếng Việt của giá trị chọn, cách sửa từng lỗi); pages/public/ = cổng công khai (PublicPortal, ReportForm, TicketTracker,
                            ReservoirMonitor, LandslideMonitor, NetworkBanner = báo mất mạng / gợi ý bản nhẹ,
                            MissionPage = /nhiem-vu link nhiệm vụ của trưởng nhóm, không đăng nhập)
-  src/components/          common/ (ui.jsx: KpiCard Modal Tabs Section Empty…, PageHeader + ExportMenu, Turnstile, DispatchModal…) ·
+  src/components/          common/ (ui.jsx: KpiCard Modal Confirm Tabs Section Empty…, PageHeader + ExportMenu, Turnstile, DispatchModal…) ·
                            layout/ (Header, Sidebar, page.js: khung trang PAGE / EDGE) ·
                            map/ (MapLayers, MapTools = nền bản đồ + công cụ, icons, leafletGlobal) · charts/ (chartTheme) ·
                            account/Mfa.jsx (cài đặt / quản lý xác thực 2 lớp — Login import tĩnh, UserMenu lazy)
@@ -347,8 +348,9 @@ chỉ khi `DEMO_MODE`; `DEMO_MODE=false` xoá đoạn `so_do` còn sót mỗi l�
   màu trạng thái mới làm chữ thì thêm cặp biến tương tự (chữ đỏ trên nền trắng cố định, vd. nút trắng trên dải đỏ:
   `text-[rgb(var(--danger))]`). Bảng màu tối nằm trong `@media screen` → in luôn nền sáng; vùng cuộn cao cố định (`max-h-…` +
   `overflow-y-auto`) thêm `print:max-h-none print:overflow-visible` để in không bị cắt (mẫu cột Kanban ở RescueCenter). Component
-  dùng chung trong `components/common/ui.jsx` (KpiCard, Modal, Tabs, Section, Empty, Progress, StatusDot, Skeleton,
-  ErrorState, EmptyState, RiskLegend). Icon `lucide-react`.
+  dùng chung trong `components/common/ui.jsx` (KpiCard, Modal, Confirm, Tabs, Section, Empty, Progress, StatusDot,
+  Skeleton, ErrorState, EmptyState, RiskLegend). Icon `lucide-react`. Thao tác khó quay lại (khoá tài khoản, xoá, cấp khoá
+  mới…) hỏi lại bằng `Confirm`: tiêu đề là câu hỏi, thân nói rõ hậu quả, nút ghi đúng việc — không dùng `window.confirm`.
 - **Mức rủi ro**: MỘT thang cho cả hệ thống — `src/utils/risk.js`: `risk(level)` với 0 Xanh · 1 Vàng · 2 Cam · 3 Đỏ, `null`
   Xám = chưa có dữ liệu; trả class chip / nền nhạt / chữ / viền trái và mã hex (biểu đồ, bản đồ). Mã nghiệp vụ quy về mức qua
   `RESERVOIR_LEVEL`, `LANDSLIDE_LEVEL`, `HAZARD_LEVEL`, `TILT_LEVEL`, `rainLevel`, `sosLevel` (`labels.js` PRIORITY / LEVEL /

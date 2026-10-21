@@ -61,10 +61,11 @@ export const REPORT_STATUS = {
   tu_choi: { label: 'Từ chối', cls: 'bg-danger text-white' },
 };
 // Hồ sơ dữ liệu xã/phường gửi chờ cấp tỉnh phê duyệt (operations.data_submissions)
+// Hồ sơ xã gửi: màu nhạt — không phải mức rủi ro; "tu_choi" là trả lại cho xã sửa, không phải việc khẩn (không dùng đỏ)
 export const SUBMISSION_STATUS = {
-  cho_duyet: { label: 'Chờ duyệt', cls: 'bg-warn text-black' },
-  da_duyet: { label: 'Đã duyệt', cls: 'bg-good text-white' },
-  tu_choi: { label: 'Từ chối', cls: 'bg-danger text-white' },
+  cho_duyet: { label: 'Chờ duyệt', cls: 'bg-warn/15 text-warn' },
+  da_duyet: { label: 'Đã duyệt', cls: 'bg-good/15 text-good' },
+  tu_choi: { label: 'Đã trả lại', cls: 'bg-panel2 text-ink-2' },
   da_rut: { label: 'Đã rút', cls: 'bg-panel2 text-muted' },
 };
 

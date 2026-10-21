@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import clsx from 'clsx';
 import {
-  AlertTriangle, ArrowLeft, ArrowUpDown, Check, ChevronDown, ChevronLeft, ChevronRight, MoveRight, RefreshCw, TrendingDown, TrendingUp, X,
+  AlertTriangle, ArrowLeft, ArrowUpDown, Check, ChevronDown, ChevronLeft, ChevronRight, Loader2, MoveRight, RefreshCw, TrendingDown, TrendingUp, X,
 } from 'lucide-react';
 import { NO_DATA, RISK, risk } from '../../utils/risk';
 
@@ -148,6 +148,31 @@ export function Modal({ open, onClose, title, children, wide, footer }) {
       </div>
     </div>,
     document.body,
+  );
+}
+
+/**
+ * Hỏi xác nhận trước thao tác khó quay lại (khoá tài khoản, đặt lại xác thực 2 lớp, cấp khoá mới, xoá thiết bị…): `title`
+ * là câu hỏi, `children` nói rõ hậu quả bằng lời; nút xác nhận ghi đúng việc sẽ làm (`confirmLabel`), `danger` → nút đỏ;
+ * `busy`: đang gửi (khoá nút). Thay window.confirm — hộp của trình duyệt không nói được hậu quả, khó đọc trên điện thoại.
+ */
+export function Confirm({ title, children, confirmLabel, danger = false, busy = false, onConfirm, onClose }) {
+  return (
+    <Modal
+      open
+      onClose={busy ? () => {} : onClose}
+      title={title}
+      footer={(
+        <>
+          <button type="button" className="btn-ghost" disabled={busy} onClick={onClose}>Huỷ</button>
+          <button type="button" className={danger ? 'btn-danger' : 'btn-primary'} disabled={busy} onClick={onConfirm}>
+            {busy && <Loader2 size={15} className="animate-spin" aria-hidden="true" />} {confirmLabel}
+          </button>
+        </>
+      )}
+    >
+      <div className="flex flex-col gap-2 text-sm leading-relaxed text-ink-2">{children}</div>
+    </Modal>
   );
 }
 

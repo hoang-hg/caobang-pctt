@@ -39,7 +39,7 @@ const STAFF_PAGES = [
   ['/phan-anh', 'Phản ánh người dân'],
   ['/nguon-luc', 'Vật tư & Lực lượng'],
   ['/canh-bao', 'Cảnh báo & Hotline'],
-  ['/nguon-du-lieu', 'Nguồn dữ liệu & IoT'],
+  ['/nguon-du-lieu', 'Nguồn dữ liệu & thiết bị đo'],
   ['/nhap-du-lieu', 'Nhập dữ liệu'],
   ['/phan-quyen', 'Phân quyền'],
   ['/huong-dan', 'Hướng dẫn xử lý'],
@@ -537,37 +537,57 @@ async function staff(ctx, trackCode) {
     return await title.innerText();
   });
 
-  // Phân quyền 3 cấp: chọn Cấp quyết định phạm vi (Cấp 3 → 1 xã; Cấp 1–2 → toàn tỉnh) và ô PIN (chỉ Cấp 1–2). Không lưu.
-  await step(ctx, 'Tạo tài khoản: Cấp 3 chọn 1 xã, không PIN; Cấp 2 toàn tỉnh, có PIN (không lưu)', async () => {
+  // Phân quyền 3 cấp (thiết kế G): mỗi cấp giải thích bằng lời; tạo tài khoản từng bước — Cấp 3 chọn đúng 1 xã, không có ô
+  // mã PIN; Cấp 2 toàn tỉnh, có ô mã PIN; mật khẩu yếu không sang bước sau; "Xem lại" nói rõ việc sẽ xảy ra. Không lưu.
+  await step(ctx, 'Tạo tài khoản 4 bước: 3 cấp giải thích bằng lời; Cấp 3 chọn 1 xã, không PIN; Cấp 2 toàn tỉnh, có PIN; Xem lại nói rõ (không lưu)', async () => {
     await page.goto(`${ROOT}/phan-quyen`);
     await waitMain(page);
     const create = visible(page.getByRole('button', { name: 'Tạo tài khoản công vụ' }));
     await create.waitFor({ timeout: READONLY ? 5_000 : 15_000 }).catch((e) => { if (!READONLY) throw e; });
     if (READONLY && !(await create.count())) return 'bỏ qua: tài khoản không quản lý tài khoản (Cấp 3)';
+    const tiers = page.getByRole('region', { name: '3 cấp tài khoản' });
+    for (const t of ['Quản trị hệ thống', 'Quản trị tỉnh', 'Quản trị xã/phường']) {
+      if (!(await tiers.getByRole('heading', { name: new RegExp(`^${t.replace('/', '\\/')}`) }).count())) throw new Error(`thiếu ô giải thích cấp "${t}"`);
+    }
+    if ((await tiers.getByText('Dành cho:').count()) < 3 || (await tiers.getByText('Làm được:').count()) < 3) throw new Error('mỗi cấp phải có "Dành cho" và "Làm được"');
     await create.click();
     const dialog = page.getByRole('dialog');
-    const level = dialog.getByLabel('Cấp', { exact: true });
-    // Danh sách cấp tải từ API sau khi hộp thoại mở (điện thoại chậm hơn) → chờ có lựa chọn Cấp 3 rồi mới đọc
-    await level.locator('option', { hasText: 'Cấp 3 · Quản trị xã/phường' }).waitFor({ state: 'attached' });
-    const levels = (await level.locator('option').allTextContents()).filter((o) => o.startsWith('Cấp'));
+    const xa = dialog.getByRole('radio', { name: /Quản trị xã\/phường/ });
+    await xa.waitFor(); // các cấp tải từ API sau khi hộp thoại mở (điện thoại chậm hơn)
+    const levels = await dialog.getByRole('radio').count();
     // Cấp 1 (tài khoản mặc định của kiểm thử) thấy đủ 3 cấp; Cấp 2 chỉ thấy Cấp 3 (chỉ tạo cấp dưới mình)
-    if (!levels.includes('Cấp 3 · Quản trị xã/phường') || (!READONLY && levels.length !== 3)) {
-      throw new Error(`các cấp được tạo: ${levels.join(' | ')}`);
-    }
-    await level.selectOption({ label: 'Cấp 3 · Quản trị xã/phường' });
-    const scope = dialog.getByLabel('Phạm vi', { exact: true });
+    if (!READONLY && levels !== 3) throw new Error(`${levels} cấp được tạo`);
+    await xa.check();
+    const scope = dialog.getByLabel('Xã/phường phụ trách');
     await scope.locator('option').nth(50).waitFor({ state: 'attached' }); // danh sách 56 xã cũng tải từ API
     const communes = await scope.locator('option').count();
     if (communes < 50) throw new Error(`chỉ có ${communes - 1} xã để chọn`);
-    if (await dialog.getByText('PIN phê duyệt cảnh báo').count()) throw new Error('Cấp 3 không được có ô PIN');
-    if (levels.includes('Cấp 2 · Quản trị tỉnh')) {
-      await level.selectOption({ label: 'Cấp 2 · Quản trị tỉnh' });
-      await dialog.getByText('Toàn tỉnh Cao Bằng').waitFor();
-      await dialog.getByText('PIN phê duyệt cảnh báo').waitFor();
-    }
+    const next = dialog.getByRole('button', { name: /^Tiếp/ });
+    if (await next.isEnabled()) throw new Error('chưa chọn xã mà đã sang bước sau được');
+    await scope.selectOption({ index: 1 });
+    await next.click();
+    await dialog.getByLabel('Họ và tên cán bộ').fill('Cán bộ kiểm thử');
+    await next.click();
+    if (await dialog.getByLabel(/Mã PIN duyệt cảnh báo/).count()) throw new Error('Cấp 3 không được có ô mã PIN');
+    await dialog.getByLabel('Tên đăng nhập').fill('kiemthu.giaodien');
+    await dialog.getByLabel('Mật khẩu ban đầu').fill('abc');
+    if (await next.isEnabled()) throw new Error('mật khẩu yếu mà vẫn sang bước sau được');
+    await dialog.getByLabel('Mật khẩu ban đầu').fill('Kiemthu2026');
+    await next.click();
+    const review = await dialog.innerText();
+    if (!/kiemthu\.giaodien/.test(review) || !/lần đầu phải đổi/.test(review)) throw new Error('bước "Xem lại" không nói rõ tài khoản và việc đổi mật khẩu');
+    if (!(await dialog.getByRole('button', { name: 'Tạo tài khoản' }).isEnabled())) throw new Error('đủ thông tin mà chưa bấm tạo được');
     await expectNoOverflow(ctx, 'hộp thoại tạo tài khoản', dialog);
-    await dialog.getByRole('button', { name: 'Huỷ' }).click();
-    return `${levels.length} cấp, ${communes - 1} xã`;
+    if (levels === 3) {
+      await dialog.getByRole('button', { name: /Cấp & địa bàn/ }).click(); // về bước 1
+      await dialog.getByRole('radio', { name: /Quản trị tỉnh/ }).check();
+      await dialog.getByText('Toàn tỉnh Cao Bằng').waitFor();
+      await next.click();
+      await next.click();
+      await dialog.getByLabel(/Mã PIN duyệt cảnh báo/).waitFor();
+    }
+    await dialog.getByRole('button', { name: 'Đóng' }).click();
+    return `${levels} cấp, ${communes - 1} xã`;
   });
 
   await step(ctx, READONLY ? 'Mở hộp thoại điều động (không phát lệnh)' : 'Điều động: chọn lực lượng → phát lệnh → báo chưa gửi cho đội', async () => {
@@ -647,14 +667,14 @@ async function staff(ctx, trackCode) {
     return code;
   });
 
-  await step(ctx, 'Nhập dữ liệu bằng form: điền bản ghi, chọn vị trí trên bản đồ, kiểm tra', async () => {
+  await step(ctx, 'Nhập dữ liệu bằng form: chọn loại bằng thẻ, điền bản ghi, chọn vị trí trên bản đồ, kiểm tra', async () => {
     await page.goto(`${ROOT}/nhap-du-lieu`);
     await waitMain(page);
-    const ds = visible(page.getByRole('navigation', { name: 'Loại dữ liệu' }).getByRole('button', { name: /Điểm nguy hiểm/ }));
+    const ds = visible(page.getByRole('navigation', { name: 'Loại dữ liệu' }).getByRole('button', { name: /^Điểm nguy hiểm/ }));
     await ds.waitFor({ timeout: READONLY ? 5_000 : 15_000 }).catch((e) => { if (!READONLY) throw e; });
     if (READONLY && !(await ds.count())) return 'bỏ qua: tài khoản không nhập / gửi loại dữ liệu này';
     await ds.click();
-    await page.getByRole('button', { name: 'Điền trực tiếp' }).click();
+    await page.getByRole('button', { name: /^Điền trực tiếp/ }).click();
     const rec = page.locator('fieldset', { hasText: 'Bản ghi 1' });
     await rec.waitFor();
     // Điền theo ví dụ của từng trường (placeholder "VD …"); ô chọn → lựa chọn đầu tiên
@@ -677,8 +697,103 @@ async function staff(ctx, trackCode) {
     await rec.getByText(/\d+\.\d{5}, \d+\.\d{5}/).waitFor();
     await expectNoOverflow(ctx, 'form nhập dữ liệu');
     await page.getByRole('button', { name: 'Kiểm tra dữ liệu' }).click();
-    await page.getByText('Tổng dòng').waitFor({ timeout: 20_000 });
-    return (await page.locator('main').innerText()).match(/Hợp lệ\s*(\d+)/)?.[0] || '';
+    const verdict = page.getByText(/^(Không có lỗi\.|Còn \d+ lỗi)/).first();
+    await verdict.waitFor({ timeout: 20_000 });
+    return await verdict.innerText();
+  });
+
+  // Thiết kế G — nhập như điền biểu mẫu: tệp mẫu có sẵn dòng ví dụ; chọn tệp là máy kiểm tra ngay; lỗi theo dòng bằng lời kèm
+  // cách sửa; nhắc dòng ví dụ còn sót; còn lỗi thì không có nút ghi. Chỉ gửi /validate — không ghi gì.
+  await step(ctx, 'Nhập dữ liệu bằng tệp: tệp mẫu có dòng ví dụ; chọn tệp là kiểm tra ngay; lỗi theo dòng kèm cách sửa; chưa ghi gì', async () => {
+    await page.goto(`${ROOT}/nhap-du-lieu`);
+    await waitMain(page);
+    const ds = visible(page.getByRole('navigation', { name: 'Loại dữ liệu' }).getByRole('button', { name: /^Điểm sơ tán/ }));
+    await ds.waitFor({ timeout: READONLY ? 5_000 : 15_000 }).catch((e) => { if (!READONLY) throw e; });
+    if (READONLY && !(await ds.count())) return 'bỏ qua: tài khoản không nhập / gửi điểm sơ tán';
+    await ds.click();
+    const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 15_000 }), page.getByRole('button', { name: 'Tải mẫu Excel' }).click()]);
+    const tpl = fs.readFileSync(await dl.path(), 'utf8').replace(/^\uFEFF/, '').split(/\r?\n/).filter(Boolean);
+    if (tpl.length < 2) throw new Error('tệp mẫu không có dòng ví dụ');
+    const head = tpl[0].split(',');
+    const row = (o) => head.map((h) => o[h] ?? '').join(',');
+    const csv = [
+      tpl[0],
+      tpl[1], // dòng 2: còn nguyên dòng ví dụ
+      row({ ma: 'KT-ST-02', ten: 'Nhà văn hoá kiểm thử', loai: 'nha_van_hoa', vi_do: '22.6660', kinh_do: '106.2530' }), // dòng 3: thiếu sức chứa
+      row({ ma: 'KT-ST-03', ten: 'Trụ sở kiểm thử', loai: 'truong', suc_chua: '120', vi_do: '22.6670', kinh_do: '106.2540' }), // dòng 4: loại sai
+    ].join('\r\n');
+    await page.locator('input[type="file"]').setInputFiles({ name: 'diem-so-tan-kiem-thu.csv', mimeType: 'text/csv', buffer: Buffer.from(`\uFEFF${csv}`) });
+    await page.getByText(/^Còn \d+ lỗi/).first().waitFor({ timeout: 20_000 });
+    const errors = page.getByRole('list', { name: 'Lỗi cần sửa' });
+    const text = await errors.innerText();
+    if (!/Dòng 3[^\n]*Sức chứa/.test(text)) throw new Error('không báo "Dòng 3 · Sức chứa"');
+    if (!/Dòng 4[^\n]*Loại/.test(text) || !/Cách sửa: Ghi đúng một trong: Trường học/.test(text)) throw new Error('lỗi "Loại" ở dòng 4 không kèm cách sửa bằng chữ');
+    if ((await errors.getByText(/^Cách sửa:/).count()) < 2) throw new Error('lỗi không kèm "Cách sửa"');
+    if (!/Dòng 2: Còn nguyên dòng ví dụ/.test(await page.locator('main').innerText())) throw new Error('không nhắc dòng ví dụ còn sót');
+    if (await page.getByRole('button', { name: /^(Ghi vào hệ thống|Gửi tỉnh duyệt)$/ }).count()) throw new Error('còn lỗi mà đã có nút ghi');
+    await page.getByText('Chưa có gì được ghi vào hệ thống').first().waitFor();
+    await expectNoOverflow(ctx, 'kết quả kiểm tra tệp');
+    return `${await errors.locator(':scope > li').count()} lỗi theo dòng, kèm cách sửa`;
+  });
+
+  // Hồ sơ xã gửi: "Duyệt" / "Trả lại" — trả lại phải ghi lý do (chạm chọn nhanh lý do hay gặp). Không bấm duyệt / trả lại.
+  await step(ctx, 'Hồ sơ xã gửi: nút "Duyệt" và "Trả lại"; trả lại phải có lý do, chọn nhanh được (không bấm)', async () => {
+    await page.goto(`${ROOT}/nhap-du-lieu?tab=ho-so`);
+    await waitMain(page);
+    const first = page.getByRole('list', { name: 'Danh sách hồ sơ' }).getByRole('button').first();
+    if (!(await first.waitFor({ timeout: 8_000 }).then(() => true, () => false))) return 'bỏ qua: không có hồ sơ chờ duyệt';
+    await first.click();
+    const back = page.getByRole('button', { name: 'Trả lại', exact: true });
+    if (!(await back.waitFor({ timeout: 10_000 }).then(() => true, () => false))) return 'bỏ qua: tài khoản không duyệt hồ sơ này';
+    await page.getByRole('button', { name: 'Duyệt', exact: true }).waitFor();
+    await back.click();
+    const confirmBack = page.getByRole('button', { name: 'Trả lại hồ sơ' });
+    if (await confirmBack.isEnabled()) throw new Error('chưa ghi lý do mà đã trả lại được');
+    await page.getByRole('group', { name: 'Lý do hay gặp' }).getByRole('button').first().click();
+    if (!(await confirmBack.isEnabled())) throw new Error('đã chọn lý do mà chưa trả lại được');
+    await expectNoOverflow(ctx, 'hồ sơ xã gửi');
+    await page.getByRole('button', { name: 'Quay lại', exact: true }).click();
+    return 'trả lại phải có lý do';
+  });
+
+  // Nguồn dữ liệu (thiết kế G): mỗi nguồn MỘT câu trạng thái bằng lời; khoá, địa chỉ máy chủ, câu lệnh gửi thử chỉ thấy khi mở
+  // "Nâng cao"
+  await step(ctx, 'Nguồn dữ liệu: mỗi nguồn một câu trạng thái; khoá, câu lệnh kỹ thuật chỉ hiện khi mở "Nâng cao"', async () => {
+    await page.goto(`${ROOT}/nguon-du-lieu`);
+    await waitMain(page);
+    const list = page.getByRole('list', { name: 'Các nguồn dữ liệu' });
+    if (!(await list.waitFor({ timeout: 10_000 }).then(() => true, () => false))) return 'bỏ qua: tài khoản không xem nguồn dữ liệu';
+    const items = list.locator(':scope > li');
+    const n = await items.count();
+    for (let i = 0; i < n; i += 1) {
+      const line = (await items.nth(i).locator('[data-trang-thai]').innerText()).trim();
+      if (line.length < 10) throw new Error(`nguồn thứ ${i + 1} không có câu trạng thái`);
+    }
+    const tech = (main) => ['curl ', 'X-Device-Key', 'Bearer', 'mosquitto_pub'].filter((w) => main.includes(w));
+    const hidden = tech(await page.locator('main').innerText());
+    if (hidden.length) throw new Error(`chữ kỹ thuật lộ ra ngoài "Nâng cao": ${hidden.join(', ')}`);
+    const push = items.filter({ hasText: 'Cổng nhận số đo' }).first();
+    if (await push.count()) {
+      await push.getByText('Nâng cao — dành cho kỹ thuật viên').click();
+      if (!tech(await push.innerText()).length) throw new Error('mở "Nâng cao" mà không thấy câu lệnh gửi thử');
+    }
+    await expectNoOverflow(ctx, '/nguon-du-lieu');
+    return `${n} nguồn, mỗi nguồn một câu trạng thái`;
+  });
+
+  // Phân quyền: "Khoá" hỏi lại bằng câu nói rõ hậu quả (bị đăng xuất ngay trên mọi máy). Bấm Huỷ — không khoá.
+  await step(ctx, 'Phân quyền: "Khoá" hỏi lại, nói rõ hậu quả (Huỷ — không khoá)', async () => {
+    await page.goto(`${ROOT}/phan-quyen`);
+    await waitMain(page);
+    const lock = visible(page.getByRole('button', { name: 'Khoá', exact: true }));
+    if (!(await lock.waitFor({ timeout: 10_000 }).then(() => true, () => false))) return 'bỏ qua: không có tài khoản cấp dưới để khoá';
+    await lock.click();
+    const dialog = page.getByRole('dialog', { name: /^Khoá tài khoản của / });
+    await dialog.waitFor();
+    if (!/đăng xuất ngay trên mọi máy/.test(await dialog.innerText())) throw new Error('hộp hỏi lại không nói rõ hậu quả');
+    await dialog.getByRole('button', { name: 'Huỷ' }).click();
+    await dialog.waitFor({ state: 'detached' });
+    return 'hỏi lại trước khi khoá';
   });
 }
 
