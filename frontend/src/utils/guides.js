@@ -34,7 +34,7 @@ export const PAGE_TIPS = {
       'Người dân báo gặp nạn: bấm "Báo cáo nhanh" (điện thoại: nút đỏ "Báo SOS" ở dưới) để tạo phiếu.',
     ],
     quan_tri: [
-      'Thẻ "Hệ thống & dữ liệu": trạm, nguồn số liệu nào đang lỗi — xử lý ở "Nguồn dữ liệu & IoT".',
+      'Thẻ "Hệ thống & dữ liệu": trạm, nguồn số liệu nào đang lỗi — xử lý ở "Nguồn dữ liệu".',
       '"Việc chờ quyết định" có hồ sơ xã gửi chờ duyệt: bấm để duyệt hoặc trả lại.',
       'Cán bộ mới, quên mật khẩu, mất máy: vào "Phân quyền" ở cuối menu.',
     ],
@@ -96,38 +96,43 @@ export const PAGE_TIPS = {
   },
   'nhap-du-lieu': {
     tinh: [
-      'Chọn loại dữ liệu ở cột trái (điểm sơ tán, kho, danh bạ…), bấm "Tải tệp mẫu".',
-      'Điền tệp mẫu, tải lên, bấm "Kiểm tra tệp": máy báo lỗi theo từng dòng; hết lỗi mới ghi.',
-      'Dữ liệu xã gửi lên nằm ở thẻ "Hồ sơ xã/phường gửi": xem trước rồi duyệt hoặc trả lại.',
+      'Chọn thẻ loại dữ liệu cần cập nhật (điểm sơ tán, kho, danh bạ…).',
+      'Bấm "Tải mẫu Excel", điền đè lên dòng ví dụ rồi chọn tệp: máy kiểm tra ngay, báo lỗi theo từng dòng kèm cách sửa.',
+      'Hết lỗi bấm "Ghi vào hệ thống". Hồ sơ xã gửi lên ở thẻ "Hồ sơ xã/phường gửi": Duyệt hoặc Trả lại kèm lý do.',
     ],
     xa: [
-      'Chọn loại dữ liệu của xã (điểm sơ tán, xóm, danh bạ, kho…), bấm "Tải tệp mẫu".',
-      'Điền tệp mẫu (mỗi dòng một điểm), tải lên, bấm "Kiểm tra tệp" và sửa hết dòng báo lỗi.',
-      'Gửi lên tỉnh. Theo dõi ở thẻ "Hồ sơ đã gửi": tỉnh duyệt xong mới hiện trên hệ thống.',
+      'Chọn thẻ loại dữ liệu của xã (điểm sơ tán, xóm, danh bạ, kho…).',
+      'Bấm "Tải mẫu Excel", mỗi dòng một điểm — ít điểm thì chọn "Điền trực tiếp trên web". Chọn tệp, máy kiểm tra ngay.',
+      'Hết lỗi bấm "Gửi tỉnh duyệt". Theo dõi ở thẻ "Hồ sơ đã gửi": tỉnh duyệt xong mới hiện trên hệ thống.',
     ],
     quan_tri: [
-      'Danh mục gốc của tỉnh (ranh giới xã, trạm, hồ chứa, kho…) cập nhật ở đây: chọn loại ở cột trái.',
-      'Bấm "Tải tệp mẫu", điền, tải lên rồi "Kiểm tra tệp" — chỉ ghi khi không còn dòng lỗi.',
-      'Hồ sơ xã gửi lên: thẻ "Hồ sơ xã/phường gửi" — xem trước rồi duyệt hoặc trả lại kèm lý do.',
+      'Danh mục gốc của tỉnh (ranh giới xã, trạm đo, hồ chứa, kho…): chọn thẻ loại dữ liệu.',
+      'Bấm "Tải mẫu Excel", điền rồi chọn tệp — máy kiểm tra ngay; chỉ ghi khi không còn dòng lỗi.',
+      'Hồ sơ xã gửi lên: thẻ "Hồ sơ xã/phường gửi" — xem hiện tại và sau khi duyệt, rồi Duyệt hoặc Trả lại kèm lý do.',
     ],
   },
   'nguon-du-lieu': {
     tinh: [
-      'Mỗi thẻ là một nguồn số liệu (dự báo, trạm đo). Nhãn đỏ "Lỗi" là đang không nhận được số liệu.',
-      'Thẻ "Giám sát kết nối": thiết bị nào lâu không gửi số liệu, lần cuối lúc nào.',
-      'Nguồn lỗi: bấm "Chạy ngay" để thử lại; vẫn lỗi thì báo đơn vị kỹ thuật kèm dòng báo lỗi.',
+      'Mỗi thẻ là một nguồn số liệu (dự báo, cổng nhận số đo) kèm một câu: đang về đều hay đã lỗi, từ lúc nào.',
+      'Thẻ "Thiết bị đo": thiết bị nào mất tín hiệu, từ lúc nào.',
+      'Nguồn lỗi: bấm "Thử lại ngay"; vẫn lỗi thì báo đơn vị kỹ thuật (chi tiết lỗi ở mục "Nâng cao").',
+    ],
+    quan_tri: [
+      'Mỗi nguồn một câu trạng thái; chi tiết kỹ thuật (mã, khoá, câu lệnh gửi thử) ở mục "Nâng cao".',
+      'Lắp thiết bị mới: thẻ "Thiết bị đo" → "Đăng ký thiết bị đo", gắn với trạm, cài khoá vào thiết bị.',
+      'Thẻ "Tình trạng nhận số liệu": số đo nhận được, bị loại, lỗi trong 24 giờ.',
     ],
   },
   'phan-quyen': {
     tinh: [
-      'Cấp tỉnh tạo và quản lý tài khoản cán bộ xã (Cấp 3) trong toàn tỉnh.',
-      'Cán bộ xã mới: "Tạo tài khoản công vụ" → chọn xã → giao mật khẩu tạm tận tay người đó.',
-      'Quên mật khẩu, mất máy: nút chìa khoá để đặt lại; nút ổ khoá để khoá tài khoản ngay.',
+      'Cấp tỉnh tạo và quản lý tài khoản cán bộ xã (Quản trị xã/phường) trong toàn tỉnh.',
+      'Cán bộ xã mới: "Tạo tài khoản công vụ", làm theo 4 bước, giao mật khẩu tạm tận tay người đó.',
+      'Quên mật khẩu: "Đặt lại mật khẩu"; mất máy, nghỉ việc: "Khoá" — máy hỏi lại, nói rõ hậu quả trước khi làm.',
     ],
     quan_tri: [
-      'Mỗi tài khoản đúng một cấp: Cấp 1 Quản trị hệ thống, Cấp 2 Quản trị tỉnh, Cấp 3 Quản trị xã.',
-      'Cán bộ mới: "Tạo tài khoản công vụ" → chọn cấp, địa bàn → giao mật khẩu tạm tận tay người đó.',
-      'Quên mật khẩu, mất máy: nút chìa khoá để đặt lại; nút ổ khoá để khoá tài khoản ngay.',
+      'Mỗi tài khoản đúng một cấp: Quản trị hệ thống, Quản trị tỉnh, Quản trị xã/phường — xem ô giải thích đầu trang.',
+      'Cán bộ mới: "Tạo tài khoản công vụ" → cấp & địa bàn → thông tin → đăng nhập → xem lại rồi tạo.',
+      'Quên mật khẩu: "Đặt lại mật khẩu"; mất máy, nghỉ việc: "Khoá" — máy hỏi lại, nói rõ hậu quả trước khi làm.',
     ],
   },
 };
@@ -250,8 +255,8 @@ export const SCENARIOS = {
       cta: 'Xem hồ sơ chờ duyệt',
       steps: [
         'Mở "Nhập dữ liệu", thẻ "Hồ sơ xã/phường gửi".',
-        'Xem trước từng dòng xã gửi (điểm sơ tán, danh bạ, kho…).',
-        'Đúng: duyệt — dữ liệu ghi vào hệ thống. Sai: trả lại kèm lý do để xã sửa.',
+        'Xem bản đồ và bảng "Hiện tại → Sau khi duyệt" của hồ sơ (điểm sơ tán, danh bạ, kho…).',
+        'Đúng: bấm "Duyệt" — dữ liệu ghi vào hệ thống. Sai: "Trả lại" kèm lý do để xã sửa.',
       ],
     },
   ],
@@ -357,10 +362,10 @@ export const SCENARIOS = {
       to: '/nhap-du-lieu',
       cta: 'Mở Nhập dữ liệu',
       steps: [
-        'Mở "Nhập dữ liệu", chọn loại (điểm sơ tán, danh bạ, kho vật tư…), bấm "Tải tệp mẫu".',
-        'Điền tệp mẫu bằng Excel, mỗi dòng một điểm — hoặc chọn "Điền trực tiếp".',
-        'Tải lên, bấm "Kiểm tra tệp", sửa hết dòng báo lỗi rồi gửi.',
-        'Theo dõi ở thẻ "Hồ sơ đã gửi": tỉnh duyệt xong dữ liệu mới hiện trên hệ thống.',
+        'Mở "Nhập dữ liệu", chọn thẻ loại (điểm sơ tán, danh bạ, kho vật tư…), bấm "Tải mẫu Excel".',
+        'Điền đè lên dòng ví dụ, mỗi dòng một điểm — hoặc chọn "Điền trực tiếp trên web".',
+        'Chọn tệp: máy kiểm tra ngay; sửa hết dòng báo lỗi (có ghi cách sửa) rồi bấm "Gửi tỉnh duyệt".',
+        'Theo dõi ở thẻ "Hồ sơ đã gửi": tỉnh duyệt xong mới hiện trên hệ thống; bị trả lại thì sửa theo lý do rồi gửi lại.',
       ],
     },
   ],
@@ -374,9 +379,9 @@ export const SCENARIOS = {
       cta: 'Mở Phân quyền',
       steps: [
         'Mở "Phân quyền", bấm "Tạo tài khoản công vụ".',
-        'Chọn cấp: Cấp 2 Quản trị tỉnh cho cán bộ tỉnh, Cấp 3 Quản trị xã cho cán bộ xã (chọn đúng xã).',
-        'Ghi họ tên, chức vụ, tên đăng nhập; giao mật khẩu tạm tận tay người đó — lần đầu đăng nhập phải đổi.',
-        'Lãnh đạo duyệt cảnh báo: cấp thêm mã PIN.',
+        'Bước 1 chọn cấp: Quản trị tỉnh cho cán bộ tỉnh, Quản trị xã/phường cho cán bộ xã (chọn đúng xã).',
+        'Ghi họ tên, chức vụ, tên đăng nhập, mật khẩu tạm; xem lại rồi tạo — giao mật khẩu tận tay, lần đầu đăng nhập phải đổi.',
+        'Lãnh đạo duyệt cảnh báo: cấp thêm mã PIN ở bước "Đăng nhập".',
       ],
       note: 'Mỗi tài khoản đúng một cấp. Chỉ cấp trên quản lý cấp dưới; cùng cấp không đổi mật khẩu của nhau.',
     },
@@ -389,8 +394,8 @@ export const SCENARIOS = {
       cta: 'Mở Phân quyền',
       steps: [
         'Tìm tài khoản theo tên ở trang "Phân quyền".',
-        'Quên mật khẩu, mã PIN: bấm nút chìa khoá để đặt lại, giao mật khẩu mới tận tay.',
-        'Mất máy, nghỉ việc: bấm nút ổ khoá để khoá tài khoản ngay.',
+        'Quên mật khẩu, mã PIN: bấm "Đặt lại mật khẩu" (cấp tỉnh: "Mật khẩu / PIN"), giao mật khẩu mới tận tay.',
+        'Mất máy, nghỉ việc: bấm "Khoá" — người đó bị đăng xuất ngay trên mọi máy.',
       ],
     },
     {
@@ -399,11 +404,11 @@ export const SCENARIOS = {
       title: 'Trạm đo, nguồn dự báo không gửi số liệu',
       when: 'Thẻ "Hệ thống & dữ liệu" báo lỗi, biểu đồ đứng yên',
       to: '/nguon-du-lieu',
-      cta: 'Mở Nguồn dữ liệu & IoT',
+      cta: 'Mở Nguồn dữ liệu',
       steps: [
-        'Mở "Nguồn dữ liệu & IoT": nguồn có nhãn đỏ "Lỗi" là đang không nhận được số liệu.',
-        'Thẻ "Giám sát kết nối": thiết bị nào lâu không gửi, lần cuối lúc nào.',
-        'Bấm "Chạy ngay" để thử lại nguồn dự báo; trạm hỏng thì báo đơn vị lắp đặt kèm tên trạm, giờ mất tín hiệu.',
+        'Mở "Nguồn dữ liệu": nguồn có nhãn đỏ "Lỗi" là đang không lấy được số liệu — câu bên dưới ghi từ lúc nào.',
+        'Thẻ "Thiết bị đo": thiết bị nào mất tín hiệu, từ lúc nào.',
+        'Bấm "Thử lại ngay" cho nguồn dự báo; trạm hỏng thì báo đơn vị lắp đặt kèm tên trạm, giờ mất tín hiệu.',
       ],
     },
     {
@@ -414,9 +419,9 @@ export const SCENARIOS = {
       to: '/nhap-du-lieu',
       cta: 'Mở Nhập dữ liệu',
       steps: [
-        'Mở "Nhập dữ liệu", chọn loại ở cột trái, bấm "Tải tệp mẫu".',
-        'Điền, tải lên, bấm "Kiểm tra tệp": máy báo lỗi theo từng dòng.',
-        'Hết lỗi mới ghi — ghi toàn bộ hoặc không ghi gì, không có dữ liệu nửa chừng.',
+        'Mở "Nhập dữ liệu", chọn thẻ loại dữ liệu, bấm "Tải mẫu Excel".',
+        'Điền rồi chọn tệp: máy kiểm tra ngay, báo lỗi theo từng dòng kèm cách sửa.',
+        'Hết lỗi mới "Ghi vào hệ thống" — ghi toàn bộ hoặc không ghi gì, không có dữ liệu nửa chừng.',
       ],
     },
     {
@@ -428,8 +433,8 @@ export const SCENARIOS = {
       cta: 'Xem hồ sơ chờ duyệt',
       steps: [
         'Mở "Nhập dữ liệu", thẻ "Hồ sơ xã/phường gửi".',
-        'Xem trước từng dòng xã gửi.',
-        'Đúng: duyệt — dữ liệu ghi vào hệ thống. Sai: trả lại kèm lý do để xã sửa.',
+        'Xem bản đồ và bảng "Hiện tại → Sau khi duyệt".',
+        'Đúng: bấm "Duyệt" — dữ liệu ghi vào hệ thống. Sai: "Trả lại" kèm lý do để xã sửa.',
       ],
     },
     {

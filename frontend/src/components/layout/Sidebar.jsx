@@ -31,7 +31,7 @@ const NAV_GROUPS = [
       { to: '/dot-thien-tai', label: 'Đợt thiên tai', icon: CalendarRange, perm: ['monitoring', 'view'] },
       // Cấp tỉnh nhập thẳng + duyệt hồ sơ; xã/phường gửi dữ liệu chờ duyệt
       { to: '/nhap-du-lieu', label: 'Nhập dữ liệu', icon: FileUp, perm: ['data', 'import'], alt: ['data', 'submit'], badgeKey: 'submissions' },
-      { to: '/nguon-du-lieu', label: 'Nguồn dữ liệu & IoT', icon: DatabaseZap, perm: ['integration', 'view'] },
+      { to: '/nguon-du-lieu', label: 'Nguồn dữ liệu', icon: DatabaseZap, perm: ['integration', 'view'] },
     ],
   },
   {

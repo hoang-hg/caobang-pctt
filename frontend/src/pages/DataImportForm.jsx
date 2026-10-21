@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { GeoJSON, MapContainer, Marker, useMap, useMapEvents } from 'react-leaflet';
 import { FileCheck2, MapPin, Pentagon, Plus, Trash2 } from 'lucide-react';
-import { Modal } from '../components/common/ui';
+import { FieldError, Modal } from '../components/common/ui';
 import { AdminBoundaries, BaseLayer, DrawTool } from '../components/map/MapTools';
 import { pinIcon } from '../components/map/icons';
 import { useUnits, useUnitsGeo } from '../api/hooks';
+import { choiceLabel } from './dataImportFacts';
 
 const LOCATION = new Set(['vi_do', 'kinh_do']);
-const pretty = (code) => String(code).replaceAll('_', ' ');
 
 /** CSV theo RFC 4180 (ô có dấu phẩy / nháy / xuống dòng được bọc nháy kép). */
 function toCsv(fields, rows) {
@@ -33,9 +33,9 @@ function formToFile(ds, rows) {
 
 function FieldInput({ f, value, onChange, communes }) {
   const label = (
-    <span className="text-xs">
+    <span className="text-sm">
       {f.label}
-      {f.required && <span className="text-danger"> *</span>}
+      {f.required && <><span className="text-danger" aria-hidden="true"> *</span><span className="sr-only"> (bắt buộc)</span></>}
     </span>
   );
   let input;
@@ -50,7 +50,7 @@ function FieldInput({ f, value, onChange, communes }) {
     input = (
       <select className="input" value={value} onChange={(e) => onChange(e.target.value)}>
         {(!f.required || f.choices.length > 1) && <option value="">—</option>}
-        {f.choices.map((c) => <option key={c} value={c}>{pretty(c)}</option>)}
+        {f.choices.map((c) => <option key={c} value={c}>{choiceLabel(f, c)}</option>)}
       </select>
     );
   } else if (f.kind === 'bool') {
@@ -78,10 +78,11 @@ function FieldInput({ f, value, onChange, communes }) {
 }
 
 /**
- * Nhập trực tiếp từng bản ghi (thay cho tải tệp) — dành cho cán bộ không quen Excel / GIS.
- * `communes`: xã/phường được chọn (hồ sơ của xã: chỉ các xã mình phụ trách); `onReady(file)`: tệp đã sinh để kiểm tra.
+ * Nhập trực tiếp từng bản ghi (thay cho tải tệp) — dành cho cán bộ không quen Excel / GIS, dùng được trên điện thoại.
+ * `communes`: xã/phường được chọn (hồ sơ của xã: chỉ các xã mình phụ trách); `noun`: một bản ghi là gì ("điểm sơ tán");
+ * `onReady(file)`: tệp đã sinh để kiểm tra.
  */
-export default function RecordForm({ ds, communes, onReady }) {
+export default function RecordForm({ ds, noun = 'bản ghi', communes, onReady }) {
   const blank = useCallback(() => {
     const r = {};
     ds.fields.forEach((f) => {
@@ -92,6 +93,7 @@ export default function RecordForm({ ds, communes, onReady }) {
   }, [ds, communes]);
   const [rows, setRows] = useState(() => [blank()]);
   const [picking, setPicking] = useState(null); // chỉ số bản ghi đang chọn vị trí / vẽ vùng
+  const [empty, setEmpty] = useState(false); // bấm kiểm tra khi chưa điền gì
   // Danh sách xã tải xong sau khi mở form: phụ trách đúng 1 xã → điền sẵn cho các bản ghi chưa chọn
   const only = communes?.length === 1 ? communes[0].code : null;
   useEffect(() => {
@@ -100,12 +102,19 @@ export default function RecordForm({ ds, communes, onReady }) {
   const set = (i, patch) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
   const fields = ds.fields.filter((f) => !LOCATION.has(f.name));
   const located = (r) => (ds.geometry === 'polygon' ? !!r.geometry : r.vi_do !== '' && r.kinh_do !== '');
+  // Chưa điền ô nào (bỏ qua ô tự điền sẵn: xã, lựa chọn duy nhất) → nhắc ngay, không gửi tệp rỗng lên máy chủ
+  const filled = rows.some((r) => located(r) || fields.some((f) => f.name !== 'ma_xa' && f.choices.length !== 1 && String(r[f.name] ?? '').trim()));
+  const ready = () => {
+    if (!filled) return setEmpty(true);
+    setEmpty(false);
+    return onReady(formToFile(ds, rows));
+  };
 
   return (
     <div className="flex flex-col gap-3">
       {rows.map((r, i) => (
         <fieldset key={i} className="rounded-lg border border-line p-3">
-          <legend className="px-1 text-xs font-semibold text-muted">Bản ghi {i + 1}</legend>
+          <legend className="px-1 text-sm font-semibold text-ink-2">Bản ghi {i + 1}</legend>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {fields.map((f) => (
               <FieldInput key={f.name} f={f} value={r[f.name] ?? ''} communes={communes} onChange={(v) => set(i, { [f.name]: v })} />
@@ -114,11 +123,11 @@ export default function RecordForm({ ds, communes, onReady }) {
           <div className="mt-2 flex flex-wrap items-center gap-2">
             {ds.geometry !== 'none' && (
               <>
-                <button type="button" className="btn-ghost text-xs" onClick={() => setPicking(i)}>
+                <button type="button" className="btn-secondary text-sm" onClick={() => setPicking(i)}>
                   {ds.geometry === 'polygon' ? <Pentagon size={14} /> : <MapPin size={14} />}
                   {ds.geometry === 'polygon' ? 'Vẽ vùng trên bản đồ' : 'Chọn vị trí trên bản đồ'}
                 </button>
-                <span className={located(r) ? 'text-xs text-good' : 'text-xs text-muted'}>
+                <span className={located(r) ? 'text-sm text-good' : 'text-sm text-muted'}>
                   {ds.geometry === 'polygon'
                     ? r.geometry ? 'Đã vẽ vùng' : 'Chưa vẽ vùng'
                     : located(r) ? `${Number(r.vi_do).toFixed(5)}, ${Number(r.kinh_do).toFixed(5)}` : 'Chưa chọn vị trí'}
@@ -126,21 +135,22 @@ export default function RecordForm({ ds, communes, onReady }) {
               </>
             )}
             {rows.length > 1 && (
-              <button type="button" className="btn-ghost ml-auto text-xs text-danger" onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))}>
-                <Trash2 size={14} /> Bỏ bản ghi
+              <button type="button" className="btn-ghost ml-auto text-sm text-danger" onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))}>
+                <Trash2 size={14} /> Bỏ bản ghi này
               </button>
             )}
           </div>
         </fieldset>
       ))}
       <div className="flex flex-wrap gap-2">
-        <button type="button" className="btn-ghost" onClick={() => setRows((rs) => [...rs, blank()])}>
-          <Plus size={15} /> Thêm bản ghi
+        <button type="button" className="btn-secondary" onClick={() => setRows((rs) => [...rs, blank()])}>
+          <Plus size={15} /> Thêm {noun}
         </button>
-        <button type="button" className="btn-primary" onClick={() => onReady(formToFile(ds, rows))}>
+        <button type="button" className="btn-primary" onClick={ready}>
           <FileCheck2 size={15} /> Kiểm tra dữ liệu
         </button>
       </div>
+      {empty && !filled && <FieldError>Chưa điền gì — điền các ô có dấu * rồi bấm "Kiểm tra dữ liệu".</FieldError>}
       {picking !== null && (
         <LocationModal
           ds={ds}
@@ -198,7 +208,7 @@ function LocationModal({ ds, row, onPick, onClose }) {
         </>
       }
     >
-      <p className="mb-2 text-xs text-muted">
+      <p className="mb-2 text-sm text-ink-2">
         {polygon
           ? 'Bấm lần lượt các đỉnh của vùng, bấm lại đỉnh đầu tiên để khép vùng.'
           : 'Bấm lên bản đồ để đặt vị trí (phóng to để đặt chính xác).'}
