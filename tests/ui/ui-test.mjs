@@ -2948,7 +2948,8 @@ async function areaFilter(ctx) {
     if (await group.getByRole('button', { name: /Theo máy/ }).getAttribute('aria-pressed') !== 'true') throw new Error('máy mới chưa chọn gì nhưng "Theo máy" không được chọn');
     await group.getByRole('button', { name: /Tối/ }).click();
     if (!(await isDark())) throw new Error('chọn Tối nhưng giao diện chưa tối');
-    if (await page.locator('header button[aria-label="Nền tối"]').getAttribute('aria-pressed') !== 'true') throw new Error('nút nhanh trên thanh không báo đang nền tối');
+    // nút nhanh: thanh trạng thái dưới cùng (máy tính) hoặc thanh trên (máy tính bảng) — mọi bản cùng báo một trạng thái
+    if (await page.locator('button[aria-label="Nền tối"]').first().getAttribute('aria-pressed') !== 'true') throw new Error('nút nhanh không báo đang nền tối');
     await page.reload();
     if (!(await isDark())) throw new Error('tải lại mất lựa chọn Tối');
     await menu.click();

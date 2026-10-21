@@ -94,7 +94,7 @@ frontend/                  React 18, Vite 6, Tailwind 3, TanStack Query 5, Zusta
                            ReservoirMonitor, LandslideMonitor, NetworkBanner = báo mất mạng / gợi ý bản nhẹ,
                            MissionPage = /nhiem-vu link nhiệm vụ của trưởng nhóm, không đăng nhập)
   src/components/          common/ (ui.jsx: KpiCard Modal Confirm Tabs Section Empty…, PageHeader + ExportMenu, Turnstile, DispatchModal…) ·
-                           layout/ (Header, Sidebar, page.js: khung trang PAGE / EDGE) ·
+                           layout/ (Header, Sidebar, StatusBar = thanh trạng thái dưới cùng ≥ 1024 px, page.js: khung trang PAGE / EDGE) ·
                            map/ (MapLayers, MapTools = nền bản đồ + công cụ, icons, leafletGlobal) · charts/ (chartTheme) ·
                            account/Mfa.jsx (cài đặt / quản lý xác thực 2 lớp — Login import tĩnh, UserMenu lazy)
   src/index.css            biến màu CSS sáng/tối; tailwind.config.js ánh xạ token

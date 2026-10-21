@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Moon, Sun, Volume2, VolumeX, ShieldAlert, Globe, Menu, X } from 'lucide-react';
 import clsx from 'clsx';
@@ -14,20 +14,6 @@ const SimulationBar = import.meta.env.DEV ? lazy(() => import('../common/Simulat
 // Báo cáo nhanh → tạo phiếu SOS: một nút cố định trên thanh trên cùng ở mọi trang (máy tính bảng, máy tính); điện thoại dùng
 // "Báo SOS" ở thanh thao tác dưới cùng. Hộp thoại chỉ tải khi bấm
 const QuickIncidentModal = lazy(() => import('../dashboard/QuickIncidentModal'));
-
-function Clock() {
-  const [now, setNow] = useState(new Date());
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(id);
-  }, []);
-  return (
-    <div className="hidden text-right leading-tight xl:block pl-2 border-l border-line/60">
-      <div className="font-mono text-sm font-semibold tabular-nums text-ink">{now.toLocaleTimeString('vi-VN')}</div>
-      <div className="text-[11px] text-muted">{now.toLocaleDateString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })}</div>
-    </div>
-  );
-}
 
 export default function Header() {
   const { theme, toggleTheme, wsStatus, soundOn, toggleSound, mobileMenuOpen, setMobileMenuOpen, audioReady } = useStore();
@@ -79,9 +65,9 @@ export default function Header() {
         <OmniSearch />
       </div>
 
-      {/* Cụm công cụ bên phải — không co (ô tìm kiếm co thay). Nhãn chữ hiện dần theo bề rộng để header không tràn và ô tìm
-          kiếm luôn còn chỗ: tên cơ quan từ md, bộ lọc từ lg, đồng hồ + tên tài khoản từ xl, chữ "Cổng người dân" / "Trực
-          tuyến" / "Bấm để bật chuông SOS" từ 2xl; hẹp hơn chỉ còn biểu tượng (có title / aria-label) */}
+      {/* Cụm công cụ bên phải — không co (ô tìm kiếm co thay). Từ 1024 px thanh trên chỉ còn địa bàn · tìm kiếm · Báo cáo nhanh
+          · tài khoản: kết nối, chuông SOS, Sáng/Tối, cổng người dân, đồng hồ nằm ở thanh trạng thái dưới cùng (StatusBar —
+          docs/ke-hoach-lam-moi-giao-dien.md mục 5). Hẹp hơn: các nút đó ở đây, chỉ còn biểu tượng (có title / aria-label) */}
       <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
         {/* Điều khiển Giả lập tác chiến */}
         {SimulationBar && <Suspense fallback={null}><SimulationBar /></Suspense>}
@@ -109,7 +95,7 @@ export default function Header() {
           to="/cong-khai"
           target="_blank"
           rel="noopener noreferrer"
-          className="btn-ghost touch-hit hidden md:inline-flex text-xs px-2.5 py-1.5 text-accent border-accent/30 bg-accent/5 hover:bg-accent/10"
+          className="btn-ghost touch-hit hidden md:inline-flex lg:hidden text-xs px-2.5 py-1.5 text-accent border-accent/30 bg-accent/5 hover:bg-accent/10"
           title="Mở Cổng thông tin công khai dành cho người dân"
           aria-label="Cổng người dân"
         >
@@ -123,6 +109,7 @@ export default function Header() {
           className={clsx(
             'chip text-[11px] font-medium py-1 px-2.5 transition-colors',
             wsStatus === 'online' && 'max-sm:hidden',
+            'lg:hidden',
             wsStatus === 'online' ? 'bg-good/15 text-good border-good/30' : wsStatus === 'connecting' ? 'bg-warn/15 text-warn border-warn/30' : 'bg-danger/15 text-danger border-danger/30'
           )}
           title={`Kết nối thời gian thực: ${wsStatus === 'online' ? 'Đang hoạt động' : wsStatus === 'connecting' ? 'Đang kết nối lại' : 'Mất kết nối'}`}
@@ -138,7 +125,7 @@ export default function Header() {
         {soundOn && !audioReady && (
           <button
             type="button"
-            className="chip touch-hit animate-pulse border border-warn bg-warn/15 px-2.5 py-1 text-[11px] font-semibold text-ink"
+            className="chip touch-hit border border-warn bg-warn/15 px-2.5 py-1 text-[11px] font-semibold text-ink lg:hidden"
             title="Trình duyệt chặn âm thanh tới khi bấm vào trang — bấm để chuông SOS kêu được"
           >
             <VolumeX size={13} className="text-warn" /> <span className="hidden 2xl:inline">Bấm để bật chuông SOS</span>
@@ -147,7 +134,7 @@ export default function Header() {
 
         {/* Nút bật/tắt âm báo SOS — điện thoại: trong menu tài khoản (nhường chỗ cho bộ lọc địa phương) */}
         <button
-          className={clsx('btn-ghost touch-hit p-2 transition-colors max-sm:hidden', soundOn ? 'text-accent' : 'text-muted')}
+          className={clsx('btn-ghost touch-hit p-2 transition-colors max-sm:hidden lg:hidden', soundOn ? 'text-accent' : 'text-muted')}
           onClick={toggleSound}
           title={soundOn ? 'Âm báo SOS: BẬT (bấm để tắt)' : 'Âm báo SOS: TẮT (bấm để bật)'}
           aria-label="Bật tắt âm báo SOS"
@@ -157,7 +144,7 @@ export default function Header() {
 
         {/* Nút đổi giao diện Sáng / Tối — điện thoại: chỉ trong menu tài khoản (Theo máy / Sáng / Tối), nhường chỗ cho tên địa bàn */}
         <button
-          className="btn-ghost touch-hit p-2 transition-transform active:rotate-45 max-sm:hidden"
+          className="btn-ghost touch-hit p-2 transition-transform active:rotate-45 max-sm:hidden lg:hidden"
           onClick={toggleTheme}
           title={theme === 'dark' ? 'Chuyển sang nền Sáng' : 'Chuyển sang nền Tối'}
           aria-label="Nền tối"
@@ -165,9 +152,6 @@ export default function Header() {
         >
           {theme === 'dark' ? <Sun size={16} className="text-amber-400" /> : <Moon size={16} className="text-indigo-500" />}
         </button>
-
-        {/* Đồng hồ số */}
-        <Clock />
 
         {/* Menu thông tin tài khoản */}
         <UserMenu />

@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect } from 'react';
 import { Navigate, Route, Routes, useLocation, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import Header from './components/layout/Header';
+import StatusBar from './components/layout/StatusBar';
 import Sidebar from './components/layout/Sidebar';
 import SessionKeeper from './components/layout/SessionKeeper';
 import Toasts from './components/common/Toasts';
@@ -98,6 +99,7 @@ function Shell() {
           </Suspense>
         </main>
       </div>
+      {!presentation && <StatusBar />}
     </div>
   );
 }
