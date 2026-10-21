@@ -168,7 +168,7 @@ export default function MapKpis({ k, kState, stations, layout, onPick, pickable 
   return (
     <section className={clsx('px-2.5 pb-2 pt-1.5', className)} aria-label={`Tình hình · ${area}`}>
       <div className="mb-1 flex items-center justify-between gap-2">
-        <span className="min-w-0 truncate text-[11px] font-bold uppercase tracking-wide text-muted">Tình hình · {area}</span>
+        <span className="min-w-0 truncate text-xs font-bold text-muted">Tình hình · {area}</span>
         <button
           type="button"
           onClick={toggle}

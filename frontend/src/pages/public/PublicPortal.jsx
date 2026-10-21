@@ -531,7 +531,7 @@ export default function PublicPortal() {
       <header className="sticky top-0 z-[1100] border-b border-line bg-panel/95 backdrop-blur-md px-3 sm:px-6 py-2.5">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-red-600 to-red-700 text-white shadow-md shadow-red-600/30">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-danger text-white">
               <ShieldAlert size={22} />
             </div>
             <div className="min-w-0 leading-tight">
@@ -707,7 +707,7 @@ export default function PublicPortal() {
             className="card p-4 flex flex-col justify-between cursor-pointer hover:border-accent hover:shadow-md transition-all group border-l-4 border-l-accent"
           >
             <div className="flex items-center justify-between">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/15 text-accent group-hover:scale-105 transition-transform">
+              <div className="flex h-10 w-10 items-center justify-center text-accent">
                 <LocateFixed size={20} />
               </div>
               <span className="text-[11px] font-semibold text-accent group-hover:underline">Kiểm tra ngay →</span>
@@ -730,7 +730,7 @@ export default function PublicPortal() {
             className="card p-4 flex flex-col justify-between cursor-pointer hover:border-emerald-500 hover:shadow-md transition-all group border-l-4 border-l-emerald-500"
           >
             <div className="flex items-center justify-between">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 group-hover:scale-105 transition-transform">
+              <div className="flex h-10 w-10 items-center justify-center text-good">
                 <Home size={20} />
               </div>
               <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 group-hover:underline">Xem điểm sơ tán →</span>
@@ -753,7 +753,7 @@ export default function PublicPortal() {
             className="card p-4 flex flex-col justify-between cursor-pointer hover:border-amber-500 hover:shadow-md transition-all group border-l-4 border-l-amber-500"
           >
             <div className="flex items-center justify-between">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 group-hover:scale-105 transition-transform">
+              <div className="flex h-10 w-10 items-center justify-center text-serious">
                 <Mountain size={20} />
               </div>
               <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 group-hover:underline">Xem đèo dốc →</span>
@@ -776,7 +776,7 @@ export default function PublicPortal() {
             className="card p-4 flex flex-col justify-between cursor-pointer hover:border-sky-500 hover:shadow-md transition-all group border-l-4 border-l-sky-500"
           >
             <div className="flex items-center justify-between">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-500/15 text-sky-600 dark:text-sky-400 group-hover:scale-105 transition-transform">
+              <div className="flex h-10 w-10 items-center justify-center text-accent">
                 <Search size={20} />
               </div>
               <span className="text-[11px] font-semibold text-sky-600 dark:text-sky-400 group-hover:underline">Tra cứu tiến độ →</span>
@@ -889,7 +889,7 @@ export default function PublicPortal() {
 
                     {here.hazards.length > 0 && (
                       <div className="mt-2 space-y-1">
-                        <div className="text-xs font-semibold text-danger uppercase tracking-wide">Cảnh báo điểm nguy cơ gần bạn:</div>
+                        <div className="text-xs font-semibold text-danger">Cảnh báo điểm nguy cơ gần bạn:</div>
                         {here.hazards.slice(0, 3).map((h) => (
                           <div key={h.name} className="text-xs text-ink-2 flex items-center gap-1.5 bg-danger/10 px-2 py-1 rounded-lg">
                             <AlertTriangle size={12} className="text-danger shrink-0" />
@@ -901,7 +901,7 @@ export default function PublicPortal() {
                   </div>
 
                   <div>
-                    <div className="mb-2 text-xs font-semibold uppercase text-muted flex items-center gap-1.5">
+                    <div className="mb-2 text-xs font-semibold text-muted flex items-center gap-1.5">
                       <Home size={14} className="text-good" />
                       <span>Điểm sơ tán an toàn gần nhất còn chỗ trống</span>
                     </div>
@@ -1314,7 +1314,7 @@ export default function PublicPortal() {
                   {mapSidebarTab === 'alerts' && (
                     <div className="flex flex-col gap-2.5">
                       <div className="flex items-center justify-between pb-2 border-b border-line/60">
-                        <div className="text-xs font-bold uppercase tracking-wider text-muted flex items-center gap-1.5">
+                        <div className="text-xs font-bold text-muted flex items-center gap-1.5">
                           <Megaphone size={14} className="text-danger" />
                           <span>Bản tin chỉ đạo điều hành</span>
                         </div>
@@ -1345,7 +1345,7 @@ export default function PublicPortal() {
                   {mapSidebarTab === 'rain' && (
                     <div className="flex flex-col gap-3">
                       <div className="flex items-center justify-between pb-2 border-b border-line/60">
-                        <div className="text-xs font-bold uppercase tracking-wider text-muted flex items-center gap-1.5">
+                        <div className="text-xs font-bold text-muted flex items-center gap-1.5">
                           <CloudRain size={14} className="text-accent" />
                           <span>Dự báo lượng mưa 24h tới</span>
                         </div>
@@ -1387,7 +1387,7 @@ export default function PublicPortal() {
                               </div>
                               <div className="h-1.5 w-full bg-panel rounded-full overflow-hidden">
                                 <div
-                                  className="h-full rounded-full bg-gradient-to-r from-sky-400 to-blue-600 transition-all"
+                                  className="h-full rounded-full bg-accent transition-all"
                                   style={{ width: `${Math.max(5, pctWidth)}%` }}
                                 />
                               </div>
@@ -1404,7 +1404,7 @@ export default function PublicPortal() {
             {/* 2 Bảng Chuyên Đề Nổi Bật: Lũ/Hồ Chứa & Sạt Lở/Đường Đèo */}
             <section className="space-y-2.5 pt-2">
               <div className="flex items-center justify-between">
-                <h2 className="text-xs font-bold uppercase tracking-wider text-muted flex items-center gap-1.5">
+                <h2 className="text-xs font-bold text-muted flex items-center gap-1.5">
                   <span>2 Chuyên đề trọng tâm tỉnh Cao Bằng</span>
                 </h2>
                 <span className="text-[11px] text-muted font-medium hidden sm:inline">
@@ -1419,15 +1419,15 @@ export default function PublicPortal() {
                     setActiveTab('hochua');
                     scrollToContent();
                   }}
-                  className="card p-4 sm:p-5 border-l-4 border-l-sky-500 bg-gradient-to-br from-sky-500/10 via-panel to-panel hover:shadow-lg hover:border-sky-600 transition-all cursor-pointer group"
+                  className="card p-4 sm:p-5 hover:border-accent cursor-pointer group"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-md shadow-sky-500/30 group-hover:scale-105 transition-transform">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-accent text-white">
                         <Waves size={24} />
                       </div>
                       <div>
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400">
+                        <span className="text-xs font-bold text-sky-600 dark:text-sky-400">
                           Chuyên đề 1
                         </span>
                         <h3 className="text-base font-bold text-ink group-hover:text-accent transition-colors">
@@ -1471,15 +1471,15 @@ export default function PublicPortal() {
                     setActiveTab('satlo');
                     scrollToContent();
                   }}
-                  className="card p-4 sm:p-5 border-l-4 border-l-danger bg-gradient-to-br from-danger/10 via-panel to-panel hover:shadow-lg hover:border-danger transition-all cursor-pointer group"
+                  className="card p-4 sm:p-5 border-l-4 border-l-danger hover:border-danger cursor-pointer group"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-danger text-white shadow-md shadow-danger/30 group-hover:scale-105 transition-transform">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-danger text-white transition-transform">
                         <Mountain size={24} />
                       </div>
                       <div>
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-danger">
+                        <span className="text-xs font-bold text-danger">
                           Chuyên đề 2
                         </span>
                         <h3 className="text-base font-bold text-ink group-hover:text-danger transition-colors">
@@ -1724,7 +1724,7 @@ export default function PublicPortal() {
 
             {/* Số khẩn cấp quốc gia */}
             <div>
-              <div className="text-xs font-bold uppercase tracking-wider text-muted mb-3">Tổng đài cứu hộ cứu nạn khẩn cấp</div>
+              <div className="text-xs font-bold text-muted mb-3">Tổng đài cứu hộ cứu nạn khẩn cấp</div>
               <div className="grid gap-3 sm:grid-cols-3">
                 {(hotlines?.national || [
                   { number: '112', name: 'Yêu cầu cứu nạn & cứu hộ khẩn cấp' },
@@ -1750,7 +1750,7 @@ export default function PublicPortal() {
 
             {/* Đường dây trực ban BCH tỉnh */}
             <div>
-              <div className="text-xs font-bold uppercase tracking-wider text-muted mb-3">Đường dây trực ban PCTT & TKCN tỉnh</div>
+              <div className="text-xs font-bold text-muted mb-3">Đường dây trực ban PCTT & TKCN tỉnh</div>
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {(hotlines?.province || []).map((p) => (
                   <a

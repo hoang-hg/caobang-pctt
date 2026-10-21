@@ -106,7 +106,7 @@ function ActionModal({ report, action, onClose }) {
     >
       <div className="flex flex-col gap-3 text-sm">
         <div>
-          {publishing && <span className="font-semibold text-xs text-muted uppercase">Nội dung người dân gửi (chỉ cán bộ xem)</span>}
+          {publishing && <span className="font-semibold text-xs text-muted">Nội dung người dân gửi (chỉ cán bộ xem)</span>}
           <p className="rounded-xl bg-panel2 p-3 italic text-ink border border-line/60 mt-1">
             “{report.description}”
           </p>
@@ -115,7 +115,7 @@ function ActionModal({ report, action, onClose }) {
         {publishing && (
           <>
             <label className="space-y-1">
-              <span className="font-semibold text-xs text-muted uppercase">Nội dung công khai (người dân sẽ thấy trên cổng)</span>
+              <span className="font-semibold text-xs text-muted">Nội dung công khai (người dân sẽ thấy trên cổng)</span>
               <textarea
                 className="input mt-1 min-h-[80px] leading-relaxed"
                 maxLength={1000}
@@ -146,7 +146,7 @@ function ActionModal({ report, action, onClose }) {
 
         {(action === 'approve' || action === 'resolve') && (
           <label className="space-y-1">
-            <span className="font-semibold text-xs text-muted uppercase">Ghi chú công khai (người dân sẽ thấy trên cổng)</span>
+            <span className="font-semibold text-xs text-muted">Ghi chú công khai (người dân sẽ thấy trên cổng)</span>
             <input
               className="input mt-1"
               maxLength={500}
@@ -163,7 +163,7 @@ function ActionModal({ report, action, onClose }) {
 
         {action === 'reject' && (
           <label className="space-y-1">
-            <span className="font-semibold text-xs text-muted uppercase">Lý do từ chối (lưu hồ sơ nội bộ)</span>
+            <span className="font-semibold text-xs text-muted">Lý do từ chối (lưu hồ sơ nội bộ)</span>
             <input
               className="input mt-1"
               autoFocus
@@ -256,7 +256,7 @@ function ReportCard({ r, onAction, onPhoto }) {
               className="relative group overflow-hidden rounded-xl border border-line hover:border-accent shadow-sm"
               title="Xem ảnh phóng to"
             >
-              <img src={p.thumb} alt={`Ảnh ${i + 1} của ${r.code}`} className="h-24 w-24 object-cover group-hover:scale-105 transition-transform" loading="lazy" />
+              <img src={p.thumb} alt={`Ảnh ${i + 1} của ${r.code}`} className="h-24 w-24 object-cover" loading="lazy" />
               <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity">
                 <ZoomIn size={16} />
               </div>
@@ -417,7 +417,7 @@ export default function CitizenReports() {
             <img src={photo} alt="Ảnh phản ánh phóng to" className="max-h-[85vh] max-w-full rounded-2xl shadow-2xl border border-line/40" />
             <button
               onClick={() => setPhoto(null)}
-              className="absolute -top-3 -right-3 rounded-full bg-panel p-1.5 text-ink shadow-lg hover:scale-110 transition-transform"
+              className="absolute -top-3 -right-3 rounded-full bg-panel p-1.5 text-ink shadow-lg hover:bg-panel2"
               title="Đóng ảnh"
             >
               <X size={18} />

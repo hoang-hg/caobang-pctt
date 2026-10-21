@@ -81,7 +81,7 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScope
   const header = (
     <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-panel p-4 sm:p-5 rounded-2xl border border-line shadow-sm">
       <div className="flex items-center gap-2.5">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-600 to-red-600 text-white shadow-md shadow-amber-600/30">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-serious text-white">
           <Mountain size={22} />
         </div>
         <div>
@@ -357,9 +357,9 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScope
               className={clsx(
                 'card flex flex-col justify-between overflow-hidden transition-all duration-200 hover:shadow-lg',
                 isBlocked
-                  ? 'border-danger/80 bg-gradient-to-b from-danger/5 to-transparent ring-1 ring-danger/40'
+                  ? 'border-danger/80 bg-danger/5 ring-1 ring-danger/40'
                   : isWarning
-                  ? 'border-serious/60 bg-gradient-to-b from-serious/5 to-transparent'
+                  ? 'border-serious/60 bg-serious/5'
                   : 'border-line hover:border-accent/60'
               )}
             >

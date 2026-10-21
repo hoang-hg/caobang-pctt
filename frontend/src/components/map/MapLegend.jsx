@@ -28,7 +28,7 @@ export function RadarScale({ layout = 'grid' }) {
   if (layout === 'compact') {
     return (
       <div className="flex gap-1">
-        {RADAR_BINS.map((b) => <span key={b.label} className="h-2.5 w-5 rounded-sm" style={{ background: twoTone(b.colors) }} title={b.label} />)}
+        {RADAR_BINS.map((b) => <span key={b.label} className="h-2.5 w-5 rounded-sm" style={{ background: twoTone(b.colors) }} title={b.label} data-thang-mau="" />)}
       </div>
     );
   }
@@ -36,7 +36,7 @@ export function RadarScale({ layout = 'grid' }) {
     <ul className={layout === 'list' ? 'space-y-1' : 'grid grid-cols-2 gap-1'}>
       {RADAR_BINS.map((b) => (
         <li key={b.label} className="flex items-center gap-1.5">
-          <span className="h-3 w-5 shrink-0 rounded-sm" style={{ background: twoTone(b.colors) }} aria-hidden="true" />
+          <span className="h-3 w-5 shrink-0 rounded-sm" style={{ background: twoTone(b.colors) }} aria-hidden="true" data-thang-mau="" />
           {b.label}
         </li>
       ))}

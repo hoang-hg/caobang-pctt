@@ -220,7 +220,7 @@ export default function MissionPage() {
       <header className="card overflow-hidden">
         <div className="flex items-center gap-2 bg-danger px-4 py-2.5 text-white">
           <Siren size={18} />
-          <b className="text-sm uppercase tracking-wide">Lệnh cứu hộ khẩn</b>
+          <b className="text-sm">Lệnh cứu hộ khẩn</b>
           <span className="ml-auto font-mono text-sm font-bold">{m.code}</span>
         </div>
         <div className="flex flex-wrap items-center gap-2 px-4 py-2.5">

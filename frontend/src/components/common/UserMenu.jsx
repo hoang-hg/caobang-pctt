@@ -39,7 +39,7 @@ export default function UserMenu() {
         <div className="card scroll-thin absolute right-0 top-11 z-[1200] max-h-[calc(100vh-4rem)] w-80 overflow-y-auto p-3 shadow-2xl supports-[height:100dvh]:max-h-[calc(100dvh-4rem)]">
           <div className="font-semibold">{user.full_name}</div>
           <div className="text-xs text-muted">{user.position} · <span className="font-mono">{user.username}</span></div>
-          <div className="mt-2 text-[11px] font-semibold uppercase text-muted">Vai trò & phạm vi</div>
+          <div className="mt-2 text-xs font-semibold text-muted">Vai trò & phạm vi</div>
           <ul className="mt-1 flex flex-col gap-1">
             {user.assignments.map((a) => (
               <li key={`${a.role}@${a.domain}`} className="flex items-start gap-2 rounded-md bg-panel2 px-2 py-1 text-xs">
@@ -68,7 +68,7 @@ export default function UserMenu() {
           </div>
           {/* Tối: phòng điều hành, màn hình lớn (chống chói khi nhìn lâu); Sáng: hiện trường ngoài trời, in báo cáo */}
           <div className="mt-3 border-t border-line pt-2">
-            <div className="text-[11px] font-semibold uppercase text-muted">Giao diện</div>
+            <div className="text-xs font-semibold text-muted">Giao diện</div>
             <div className="mt-1 grid grid-cols-3 gap-1" role="group" aria-label="Giao diện">
               {THEMES.map(([value, label, Icon]) => (
                 <button

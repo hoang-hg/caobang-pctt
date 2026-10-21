@@ -98,10 +98,10 @@ export default function TicketTracker({ initialCode = '', initialPhone = '', onQ
   return (
     <div className="flex flex-col gap-5">
       {/* Khung tìm kiếm chính */}
-      <div className="card p-4 sm:p-6 bg-gradient-to-br from-panel via-panel to-panel2 border-line shadow-sm">
+      <div className="card p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
           <div className="max-w-2xl">
-            <div className="flex items-center gap-2 text-accent font-bold text-xs uppercase tracking-wider mb-1">
+            <div className="flex items-center gap-2 text-accent font-bold text-xs mb-1">
               <Sparkles size={14} />
               <span>Tra cứu trực tuyến 24/7</span>
             </div>
@@ -274,7 +274,7 @@ export default function TicketTracker({ initialCode = '', initialPhone = '', onQ
                     'flex h-11 w-11 shrink-0 items-center justify-center rounded-xl font-bold shadow-sm',
                     currentItem.type === 'sos'
                       ? 'bg-danger text-white'
-                      : 'bg-gradient-to-br from-indigo-600 to-accent text-white'
+                      : 'bg-accent text-white'
                   )}
                 >
                   {currentItem.type === 'sos' ? <PhoneCall size={20} /> : <FileText size={20} />}
@@ -348,7 +348,7 @@ export default function TicketTracker({ initialCode = '', initialPhone = '', onQ
             {/* Nội dung thanh tiến độ (Timeline Stepper) */}
             <div className="p-4 sm:p-6 bg-panel">
               <div className="mb-4 flex items-center justify-between text-xs text-muted border-b border-line pb-2">
-                <span className="font-semibold uppercase tracking-wider text-ink flex items-center gap-1.5">
+                <span className="font-semibold text-ink flex items-center gap-1.5">
                   <Clock size={14} className="text-accent" />
                   <span>Tiến độ xử lý điều hành tác chiến</span>
                 </span>
@@ -407,7 +407,7 @@ export default function TicketTracker({ initialCode = '', initialPhone = '', onQ
                           <div className="font-bold text-sm sm:text-base text-ink flex items-center gap-2">
                             <span>{st.title}</span>
                             {isCurrent && (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-accent text-white uppercase tracking-wider animate-pulse">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-accent text-white">
                                 Đang diễn ra
                               </span>
                             )}
