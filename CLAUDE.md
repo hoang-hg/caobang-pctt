@@ -497,8 +497,10 @@ chỉ khi `DEMO_MODE`; `DEMO_MODE=false` xoá đoạn `so_do` còn sót mỗi l�
   (`ws/hub.py`), thêm nhóm quyền mới ở `SCOPE_ACTIONS`. Không gắn gì = gửi mọi tài khoản đăng nhập.
 - `api()` (frontend) trả `null` cho 204 — route xoá trả 204, không trả JSON rỗng.
 - Phiếu SOS còn lệnh điều động đang thực hiện không chuyển về `moi` / `dieu_phoi` được (409); bỏ đội phải qua
-  `POST /dispatch/{id}/cancel` (trả quân số / phương tiện). Xác nhận cứu xong (`update_sos` → `hoan_thanh`) tự chuyển phản
-  ánh đã chuyển SOS sang `da_xu_ly` (`close_linked_reports`) — thêm đường đóng phiếu mới phải gọi cả hai bước.
+  `POST /dispatch/{id}/cancel` (trả quân số / phương tiện). Phiếu yêu cầu `PA-` nối phiếu SOS đổi trạng thái THEO phiếu SOS
+  (`api/v1/sos.py`): rời "Chờ xử lý" (`VERIFIED_STATUSES`, điều động) → `publish_linked_requests`; cứu xong →
+  `release_dispatch` rồi `close_linked_reports`; đóng không cần cứu (`/sos/{id}/close`, `close_reason`) → `close_linked_requests`. Thêm đường đổi
+  trạng thái / đóng phiếu mới phải gọi đúng các bước này. "Đã cứu" trong thống kê = `hoan_thanh AND close_reason IS NULL`.
 - Endpoint không đăng nhập trả dữ liệu theo **mã bí mật / header** (VD link nhiệm vụ `/mission`, `X-Mission-Token`) không được
   đặt dưới `/api/v1/public/`: nginx cache tiền tố đó theo URI + vài tham số, **không theo header** → trả dữ liệu của người
   này cho người khác. Mã bí mật gửi qua đường dẫn để sau `#` (không vào log), CSDL chỉ lưu SHA-256 (mẫu `services/mission.py`).

@@ -6,7 +6,7 @@ from collections.abc import Callable
 from app.db import fetch_all, fetch_one
 from app.rbac import domains
 from app.services.events import log_event
-from app.services.sos_nlp import extract
+from app.services.sos_nlp import extract, structured_priority
 from app.ws.hub import hub
 
 # Thời hạn phản hồi điều phối (phút) theo cấp ưu tiên — trung tâm cứu hộ và KPI "quá hạn" của dashboard dùng chung
@@ -53,10 +53,21 @@ INCIDENT_LABEL = {
     "tiep_te": "Tiếp tế",
 }
 
+# Đóng phiếu KHÔNG CẦN CỨU (POST /sos/{id}/close) — phiếu vẫn "hoan_thanh" nhưng không tính là đã cứu. Câu cho người dân
+# tra cứu ở services/tracking.py (CLOSE_PUBLIC)
+CLOSE_REASON = {
+    "trung": "Trùng với phiếu khác",
+    "khong_xac_minh": "Không xác minh được",
+    "da_an_toan": "Người gặp nạn đã tự an toàn",
+}
+# Phiếu được tính số người mắc kẹt trong thống kê: bỏ phiếu trùng (đếm 2 lần) và phiếu không xác minh được (tin giả)
+COUNTS_PEOPLE_SQL = "(close_reason IS NULL OR close_reason = 'da_an_toan')"
+
 TICKET_SELECT = """
 SELECT t.id, t.code, t.reporter_name, t.reporter_phone, t.source, t.raw_message, t.address,
        t.incident_type, t.priority, t.status, t.trapped_count, t.vulnerable, t.received_at, t.acknowledged_at,
-       t.resolved_at, t.status_changed_at, t.notes, ST_Y(t.location) AS lat, ST_X(t.location) AS lon,
+       t.resolved_at, t.status_changed_at, t.notes, t.close_reason, ST_Y(t.location) AS lat, ST_X(t.location) AS lon,
+       rq.id AS request_id, rq.code AS request_code, rq.n_photos AS request_photos,
        u.code AS admin_code, u.name AS admin_name, ev.code AS event_code, ev.name AS event_name,
        d.id AS dispatch_id, d.status AS dispatch_status, d.eta, d.progress, d.distance_km, d.route_safe,
        d.dispatched_at, d.arrived_at,
@@ -75,6 +86,9 @@ SELECT t.id, t.code, t.reporter_name, t.reporter_phone, t.source, t.raw_message,
                        FROM operations.dispatch_field_reports r JOIN operations.dispatch_orders o2 ON o2.id = r.order_id
                       WHERE o2.ticket_id = t.id AND o2.status <> 'huy'
                       ORDER BY r.created_at DESC LIMIT 1) fr ON TRUE
+  -- Phiếu yêu cầu của người dân đã tạo / được chuyển thành phiếu này (mã PA-, số ảnh — bảng cứu hộ xem ảnh)
+  LEFT JOIN LATERAL (SELECT q.id, q.code, jsonb_array_length(q.photos) AS n_photos FROM community.citizen_reports q
+                      WHERE q.sos_ticket_id = t.id ORDER BY q.created_at LIMIT 1) rq ON TRUE
 """
 
 
@@ -140,11 +154,16 @@ async def create_ticket(
     authorize: Callable[[str], None] | None = None,
     external_id: str | None = None,
     conn=None,
+    parsed: dict | None = None,
 ) -> dict:
     """Tạo phiếu SOS. ``external_id``: mã tin gốc của hệ thống gửi — gửi lại cùng (nguồn, mã) trả phiếu đã có
     (``duplicate: True``), không tạo / báo lại. ``conn``: tạo trong transaction của nơi gọi — khi đó KHÔNG phát sự
-    kiện / ghi nhật ký; nơi gọi gọi ``announce_ticket`` sau khi commit. Kết quả kèm ``possible_duplicates``."""
-    parsed = await extract(raw_message) if raw_message else {}
+    kiện / ghi nhật ký; nơi gọi gọi ``announce_ticket`` sau khi commit. ``parsed``: kết quả ``extract(raw_message)`` nơi
+    gọi đã bóc tách TRƯỚC khi mở transaction (bóc tách có thể gọi LLM — không giữ kết nối CSDL trong lúc chờ). Không truyền
+    mức ưu tiên → lấy mức bóc tách được, nhưng không thấp hơn mức của loại sự cố / nhóm yếu thế (``structured_priority``).
+    Kết quả kèm ``possible_duplicates``."""
+    if parsed is None:
+        parsed = await extract(raw_message) if raw_message else {}
     place = parsed.get("place")
     if lat is None or lon is None:
         if parsed.get("coords"):
@@ -163,6 +182,8 @@ async def create_ticket(
     )
     if authorize:  # kiểm tra quyền theo xã của vị trí TRƯỚC khi ghi
         authorize(domains.domain_of_unit_id(unit["id"] if unit else None))
+    incident = incident_type or parsed.get("incident_type", "ngap_lut")
+    vulnerable = vulnerable if vulnerable is not None else parsed.get("vulnerable", [])
 
     row = await fetch_one(
         """
@@ -183,10 +204,10 @@ async def create_ticket(
             "unit": unit["id"] if unit else None,
             "lat": lat,
             "lon": lon,
-            "it": incident_type or parsed.get("incident_type", "ngap_lut"),
-            "pr": priority or parsed.get("priority", 2),
+            "it": incident,
+            "pr": priority or min(parsed.get("priority", 2), structured_priority(incident, vulnerable)),
             "tc": trapped_count if trapped_count is not None else parsed.get("trapped_count", 0),
-            "vu": vulnerable if vulnerable is not None else parsed.get("vulnerable", []),
+            "vu": vulnerable,
             "notes": notes,
         },
         conn,

@@ -29,6 +29,28 @@ SOS_STATUS_LABELS = {
     "hoan_thanh": "Đã cứu hộ an toàn",
 }
 
+# Phiếu đóng KHÔNG CẦN CỨU (sos_tickets.close_reason): nhãn trạng thái + mốc cuối người dân thấy. Không nêu ghi chú nội bộ
+# (trùng phiếu nào, ai gọi lại) — chỉ lý do chung và việc người dân nên làm nếu vẫn cần giúp
+CLOSE_PUBLIC = {
+    "trung": (
+        "Đã đóng – trùng với yêu cầu khác",
+        "Đã gộp với yêu cầu khác cùng nơi",
+        "Yêu cầu này trùng với một phiếu khác cùng nơi đang được xử lý — lực lượng đi theo phiếu đó. Nếu tình hình xấu "
+        "đi hoặc vẫn chưa có ai đến, gọi ngay 112.",
+    ),
+    "khong_xac_minh": (
+        "Đã đóng – chưa xác minh được",
+        "Chưa xác minh được, phiếu đã đóng",
+        "Cán bộ chưa liên lạc được hoặc không thấy sự việc tại vị trí đã báo. Nếu bạn vẫn cần giúp đỡ, gọi ngay 112 hoặc "
+        "gửi yêu cầu mới kèm vị trí chính xác.",
+    ),
+    "da_an_toan": (
+        "Đã đóng – người gặp nạn đã an toàn",
+        "Đã an toàn, không cần lực lượng",
+        "Cán bộ đã xác nhận người gặp nạn đã tự đến nơi an toàn nên phiếu được đóng.",
+    ),
+}
+
 REPORT_STATUS_LABELS = {
     "cho_duyet": "Đã tiếp nhận – Chờ xác minh",
     "da_duyet": "Đã xác minh – Đang triển khai xử lý",
@@ -66,9 +88,76 @@ def eta_text(eta: datetime | None, now: datetime) -> str:
     return "Chậm hơn dự kiến (đường khó đi) — đội vẫn đang tiếp cận, BCH đang giữ liên lạc với đội"
 
 
+def sos_status_label(t: dict) -> str:
+    """Nhãn trạng thái phiếu SOS cho người dân (tra cứu, "Phiếu của tôi"). t: status, incident_type, close_reason,
+    dispatch_status (lệnh điều động mới nhất chưa huỷ)."""
+    status = t["status"]
+    if status == "hoan_thanh" and t.get("close_reason") in CLOSE_PUBLIC:
+        return CLOSE_PUBLIC[t["close_reason"]][0]
+    if status == "thuc_thi" and t.get("dispatch_status") == "da_den":
+        return "Đội cứu hộ đã đến hiện trường"
+    if status == "hoan_thanh" and t.get("incident_type") == "tiep_te":
+        return "Đã tiếp tế xong"
+    return SOS_STATUS_LABELS.get(status, status)
+
+
+def request_progress_label(r: dict) -> str:
+    """Một nhãn tiến độ cho phiếu yêu cầu PA- ("Phiếu của tôi"): đã nối phiếu SOS → theo phiếu SOS (sos_status,
+    close_reason, incident_type, dispatch_status); còn lại → theo trạng thái phản ánh."""
+    if not r.get("sos_code"):
+        return REPORT_STATUS_LABELS.get(r["status"], r["status"])
+    return sos_status_label({**r, "status": r["sos_status"]})
+
+
+def _closed_sos_item(t: dict, reason: str, supply: bool) -> dict:
+    """Phiếu đóng không cần cứu: mốc tiếp nhận + mốc đóng phiếu (không vẽ các mốc điều động chưa từng diễn ra)."""
+    _, title, detail = CLOSE_PUBLIC[reason]
+    safe = reason == "da_an_toan"
+    return {
+        "code": t["code"],
+        "type": "sos",
+        "type_label": "Yêu cầu tiếp tế" if supply else "Cứu trợ khẩn cấp (SOS)",
+        "incident_type": t["incident_type"],
+        "incident_label": INCIDENT_LABEL.get(t["incident_type"], t["incident_type"]),
+        "status": t["status"],
+        "status_label": sos_status_label(t),
+        "close_reason": reason,
+        "created_at": t["received_at"].isoformat() if t.get("received_at") else None,
+        "admin_name": t.get("admin_name"),
+        "reporter_phone_masked": mask_phone(t.get("reporter_phone")),
+        "force_name": None,
+        "public_note": None,
+        "timeline": [
+            {
+                "step": 1,
+                "name": "tiep_nhan",
+                "title": "Đã tiếp nhận yêu cầu",
+                "time": format_vn_time(t["received_at"]),
+                "state": "done",
+                "color": "yellow",
+                "icon": "check",
+                "detail": "BCH PCTT & TKCN tỉnh đã ghi nhận yêu cầu và đưa vào hệ thống điều hành.",
+            },
+            {
+                "step": 2,
+                "name": "dong_phieu",
+                "title": title,
+                "time": format_vn_time(t.get("resolved_at")),
+                "state": "done" if safe else "rejected",
+                "color": "blue" if safe else "red",
+                "icon": "shield" if safe else "x",
+                "detail": detail,
+            },
+        ],
+    }
+
+
 def format_sos_item(t: dict, now: datetime) -> dict:
     code = t["code"]
     status = t["status"]
+    supply = t["incident_type"] == "tiep_te"  # yêu cầu tiếp tế: mốc cuối là "đã tiếp tế", không phải "đã cứu"
+    if status == "hoan_thanh" and t.get("close_reason") in CLOSE_PUBLIC:
+        return _closed_sos_item(t, t["close_reason"], supply)
     force_name = t.get("force_name")
     dispatch_status = t.get("dispatch_status")
     dispatched_at = t.get("dispatched_at")
@@ -161,12 +250,24 @@ def format_sos_item(t: dict, now: datetime) -> dict:
         s4 = {
             "step": 4,
             "name": "hoan_thanh",
-            "title": "Đã cứu hộ an toàn",
+            "title": "Đã tiếp tế xong" if supply else "Đã cứu hộ an toàn",
             "time": format_vn_time(resolved_at),
             "state": "done",
             "color": "blue",
             "icon": "shield",
-            "detail": "Cán bộ điều hành đã xác nhận hoàn thành cứu hộ.",
+            "detail": "Cán bộ điều hành đã xác nhận "
+            + ("giao xong hàng tiếp tế." if supply else "hoàn thành cứu hộ."),
+        }
+    elif supply:
+        s4 = {
+            "step": 4,
+            "name": "hoan_thanh",
+            "title": "Đang giao hàng tiếp tế" if arrived else "Hoàn thành tiếp tế",
+            "time": "Đang thực hiện" if arrived else None,
+            "state": "current" if arrived else "waiting",
+            "color": "blue",
+            "icon": "shield",
+            "detail": "Cán bộ điều hành xác nhận khi đã giao xong nước uống, lương thực, thuốc.",
         }
     else:
         s4 = {
@@ -180,14 +281,15 @@ def format_sos_item(t: dict, now: datetime) -> dict:
             "detail": "Cán bộ điều hành xác nhận khi đã đưa người gặp nạn tới nơi an toàn.",
         }
 
+    status_label = sos_status_label(t)
     return {
         "code": code,
         "type": "sos",
-        "type_label": "Cứu trợ khẩn cấp (SOS)",
+        "type_label": "Yêu cầu tiếp tế" if supply else "Cứu trợ khẩn cấp (SOS)",
         "incident_type": t["incident_type"],
         "incident_label": INCIDENT_LABEL.get(t["incident_type"], t["incident_type"]),
         "status": status,
-        "status_label": "Đội cứu hộ đã đến hiện trường" if arrived else SOS_STATUS_LABELS.get(status, status),
+        "status_label": status_label,
         "created_at": t["received_at"].isoformat() if t.get("received_at") else None,
         # KHÔNG trả địa chỉ / nội dung: người gửi đã biết; lỡ bị dò trúng mã + SĐT cũng không lộ nơi người đang mắc kẹt
         "admin_name": t.get("admin_name"),
@@ -198,36 +300,26 @@ def format_sos_item(t: dict, now: datetime) -> dict:
     }
 
 
-def _sos_progress(r: dict, now: datetime) -> tuple[str, str | None, str]:
-    """(tiêu đề, thời gian, chi tiết) bước "xử lý" của phản ánh đã chuyển thành phiếu cứu hộ — theo tiến độ phiếu."""
-    sos, force = r["sos_code"], r.get("force_name") or "Lực lượng cứu hộ"
-    if r.get("dispatch_status") == "da_den":
-        return (
-            "Đội cứu hộ đã đến hiện trường",
-            format_vn_time(r.get("arrived_at")),
-            f"{force} đã đến, đang cứu hộ ({sos}).",
-        )
-    if r.get("dispatch_status") == "dang_di":
-        return (
-            "Đội cứu hộ đang trên đường đến",
-            eta_text(r.get("eta"), now),
-            f"{force} đang di chuyển tới hiện trường ({sos}).",
-        )
-    return (
-        f"Đã chuyển thành yêu cầu cứu hộ {sos}",
-        "Đang bố trí lực lượng",
-        "BCH đang bố trí lực lượng cứu hộ gần nhất.",
+def format_linked_item(report: dict, sos: dict, now: datetime) -> dict:
+    """Phiếu yêu cầu PA- đã nối phiếu SOS (người dân gửi "cần cứu người / tiếp tế", hoặc cán bộ chuyển SOS một phản ánh):
+    MỘT dòng tiến độ — đúng tiến độ của phiếu SOS (tra mã PA- hay mã SOS- đều thấy như nhau), giữ mã người dân đã tra."""
+    item = format_sos_item(sos, now)
+    item.update(
+        code=report["code"],
+        sos_code=sos["code"],
+        category=report["category"],
+        category_label=CATEGORY.get(report["category"], report["category"]),
     )
+    return item
 
 
-def format_report_item(r: dict, now: datetime | None = None) -> dict:
+def format_report_item(r: dict) -> dict:
+    """Phản ánh (báo tin hiện trường) CHƯA nối phiếu SOS: tiếp nhận → cán bộ xác minh → xử lý → hoàn tất."""
     code = r["code"]
     status = r["status"]
-    force_name = r.get("force_name")
     public_note = r.get("public_note")
     moderated_at = r.get("moderated_at")
     created_at = r["created_at"]
-    now = now or datetime.now(UTC)
 
     # Mốc 1: Tiếp nhận phản ánh
     s1 = {
@@ -289,18 +381,6 @@ def format_report_item(r: dict, now: datetime | None = None) -> dict:
             "color": "green",
             "icon": "truck",
             "detail": public_note or "Cán bộ địa phương đã xử lý phản ánh.",
-        }
-    elif status == "da_duyet" and r.get("sos_code"):
-        title, when, detail = _sos_progress(r, now)
-        s3 = {
-            "step": 3,
-            "name": "xu_ly",
-            "title": title,
-            "time": when,
-            "state": "current",
-            "color": "green",
-            "icon": "truck",
-            "detail": detail,
         }
     elif status == "da_duyet":
         s3 = {
@@ -383,9 +463,9 @@ def format_report_item(r: dict, now: datetime | None = None) -> dict:
         # Không trả mô tả / địa chỉ (xem format_sos_item)
         "admin_name": r.get("admin_name"),
         "reporter_phone_masked": mask_phone(r.get("reporter_phone")),
-        "force_name": force_name,
+        "force_name": None,
         "public_note": public_note,
-        "sos_code": r.get("sos_code"),  # phản ánh đã chuyển thành phiếu cứu hộ (người gửi tra được bằng SĐT)
+        "sos_code": None,  # phản ánh đã nối phiếu SOS → format_linked_item
         "timeline": [s1, s2, s3, s4],
     }
 
@@ -394,7 +474,7 @@ def format_report_item(r: dict, now: datetime | None = None) -> dict:
 CODE_RE = re.compile(r"^(SOS|PA)-?(\d{3,7})(?:-?([A-Z]{6}))?$")
 
 SOS_SQL = """
-    SELECT t.code, t.status, t.incident_type, t.received_at, t.acknowledged_at, t.resolved_at,
+    SELECT t.code, t.status, t.close_reason, t.incident_type, t.received_at, t.acknowledged_at, t.resolved_at,
            t.address, t.reporter_phone, u.name AS admin_name,
            d.status AS dispatch_status, d.dispatched_at, d.eta, d.arrived_at, f.name AS force_name
       FROM operations.sos_tickets t
@@ -410,17 +490,10 @@ SOS_SQL = """
 
 REPORT_SQL = """
     SELECT r.code, r.category, r.description, r.status, r.public_note, r.created_at, r.moderated_at,
-           r.address, r.reporter_phone, r.track_key, u.name AS admin_name, f.name AS force_name,
-           st.code AS sos_code, d.status AS dispatch_status, d.eta, d.arrived_at
+           r.address, r.reporter_phone, r.track_key, u.name AS admin_name, st.code AS sos_code
       FROM community.citizen_reports r
       LEFT JOIN spatial_admin.administrative_units u ON u.id = r.admin_unit_id
       LEFT JOIN operations.sos_tickets st ON st.id = r.sos_ticket_id
-      LEFT JOIN LATERAL (
-          SELECT o.force_id, o.status, o.eta, o.arrived_at FROM operations.dispatch_orders o
-           WHERE o.ticket_id = r.sos_ticket_id AND o.status <> 'huy'
-           ORDER BY o.dispatched_at DESC LIMIT 1
-      ) d ON TRUE
-      LEFT JOIN resources.forces f ON f.id = d.force_id
      WHERE r.code = :code
 """
 
@@ -469,5 +542,13 @@ async def track_ticket(code_raw: str, phone: str | None = None) -> dict:
     # tạo), phản ánh cũ không SĐT (chưa từng được cấp mã tra cứu) → người dân không tra được.
     if not verified:
         return _empty(code)
-    item = format_sos_item(row, datetime.now(UTC)) if is_sos else format_report_item(row)
+    now = datetime.now(UTC)
+    if is_sos:
+        item = format_sos_item(row, now)
+    elif row[
+        "sos_code"
+    ]:  # đã thành phiếu cứu hộ: tiến độ của phiếu SOS (đã xác minh người tra là người gửi ở trên)
+        item = format_linked_item(row, (await fetch_all(SOS_SQL, {"code": row["sos_code"]}))[0], now)
+    else:
+        item = format_report_item(row)
     return {"query": code, "total": 1, "results": [item], "verified": True}

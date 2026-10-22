@@ -25,6 +25,7 @@ from app.services.reports import (
     REPORT_SOS_NOTE,
     redact_public_text,
     signed_photo_url,
+    sos_public_text,
     verify_photo_signature,
 )
 from app.services.sos import announce_ticket, create_ticket
@@ -57,6 +58,12 @@ def _with_urls(r: dict) -> dict:
     return r
 
 
+# Phiếu cứu người / tiếp tế người dân gửi (đã có phiếu SOS) mà bảng cứu hộ chưa xác minh: cán bộ xử lý ở bảng cứu hộ —
+# không nằm trong "Chờ duyệt" (không xử lý hai nơi). Xác minh / đóng phiếu SOS → phiếu yêu cầu tự sang đã duyệt / đã xử lý
+# / từ chối (api/v1/sos.py) và hiện lại ở các thẻ tương ứng.
+AT_RESCUE_BOARD_SQL = "(r.status = 'cho_duyet' AND r.sos_ticket_id IS NOT NULL)"
+
+
 @router.get("")
 async def list_reports(
     status: str | None = None, limit: int = 200, codes: list[str] = Depends(area_scope("report", "view"))
@@ -64,12 +71,13 @@ async def list_reports(
     rows = await fetch_all(
         REPORT_SELECT
         + f""" WHERE {area_clause('r.location', codes)} AND (CAST(:s AS text) IS NULL OR r.status = :s)
+                 AND NOT {AT_RESCUE_BOARD_SQL}
                ORDER BY (r.status = 'cho_duyet') DESC, r.created_at DESC LIMIT :l""",
         {"codes": codes, "s": status, "l": min(limit, 500)},
     )
     counts = await fetch_all(
         f"""SELECT status, count(*) AS n FROM community.citizen_reports r
-             WHERE {area_clause('r.location', codes)} GROUP BY status""",
+             WHERE {area_clause('r.location', codes)} AND NOT {AT_RESCUE_BOARD_SQL} GROUP BY status""",
         {"codes": codes},
     )
     return {"items": [_with_urls(r) for r in rows], "counts": {c["status"]: c["n"] for c in counts}}
@@ -128,12 +136,6 @@ def _public_params(
         "exact": exact,
         "pp": photos,
     }
-
-
-def sos_public_text(category: str) -> str:
-    """Phần công khai khi chuyển SOS phản ánh chưa duyệt: thao tác khẩn cấp, cán bộ chưa đọc lại nội dung → không lấy mô
-    tả gốc (tên người, số nhà không che tự động được), chỉ nêu loại sự cố."""
-    return f"{CATEGORY.get(category, 'Phản ánh hiện trường')} — cán bộ đã tiếp nhận; nội dung chi tiết chưa công khai."
 
 
 @router.post("/{report_id}/moderate")

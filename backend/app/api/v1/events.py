@@ -18,6 +18,7 @@ from app.db import fetch_all, fetch_one, transaction
 from app.rbac import domains
 from app.rbac.authz import area_scope, require_permission
 from app.services.events import log_event
+from app.services.sos import COUNTS_PEOPLE_SQL
 from app.ws.hub import hub
 
 router = APIRouter(prefix="/events", tags=["Đợt thiên tai"])
@@ -243,7 +244,8 @@ async def list_events(codes: list[str] = Depends(MON)):
             f"""SELECT (SELECT count(*) FROM operations.sos_tickets t WHERE t.event_id = e.id AND {area_clause("t.location", codes)})
                        AS sos,
                    (SELECT COALESCE(sum(t.trapped_count), 0) FROM operations.sos_tickets t
-                     WHERE t.event_id = e.id AND t.status = 'hoan_thanh' AND {area_clause("t.location", codes)}) AS rescued,
+                     WHERE t.event_id = e.id AND t.status = 'hoan_thanh' AND t.close_reason IS NULL
+                       AND {area_clause("t.location", codes)}) AS rescued,
                    (SELECT count(*) FROM communications.alert_broadcasts b
                      WHERE b.event_id = e.id AND b.status IN ('sending', 'sent')
                        AND (CAST(:all AS boolean) OR b.target_admin_codes && CAST(:codes AS text[]))) AS alerts,
@@ -383,8 +385,8 @@ async def event_summary(code: str, codes: list[str] = Depends(MON)):
     sos = await fetch_one(
         f"""SELECT count(*) AS total, count(*) FILTER (WHERE status <> 'hoan_thanh') AS open,
                    count(*) FILTER (WHERE status = 'hoan_thanh') AS done,
-                   COALESCE(sum(trapped_count), 0) AS trapped,
-                   COALESCE(sum(trapped_count) FILTER (WHERE status = 'hoan_thanh'), 0) AS rescued,
+                   COALESCE(sum(trapped_count) FILTER (WHERE {COUNTS_PEOPLE_SQL}), 0) AS trapped,
+                   COALESCE(sum(trapped_count) FILTER (WHERE status = 'hoan_thanh' AND close_reason IS NULL), 0) AS rescued,
                    round((percentile_cont(0.5) WITHIN GROUP (
                        ORDER BY extract(epoch FROM acknowledged_at - received_at) / 60))::numeric, 1) AS median_ack_min
               FROM operations.sos_tickets t WHERE t.event_id = CAST(:id AS uuid) AND {in_area}""",
@@ -403,7 +405,8 @@ async def event_summary(code: str, codes: list[str] = Depends(MON)):
         p,
     )
     by_commune = await fetch_all(
-        f"""SELECT u.code, u.name, u.unit_type, count(*) AS sos, COALESCE(sum(t.trapped_count), 0) AS trapped,
+        f"""SELECT u.code, u.name, u.unit_type, count(*) AS sos,
+                   COALESCE(sum(t.trapped_count) FILTER (WHERE {COUNTS_PEOPLE_SQL}), 0) AS trapped,
                    count(*) FILTER (WHERE t.status <> 'hoan_thanh') AS open
               FROM operations.sos_tickets t JOIN spatial_admin.administrative_units u ON u.id = t.admin_unit_id
              WHERE t.event_id = CAST(:id AS uuid) AND {in_area} GROUP BY u.code, u.name, u.unit_type ORDER BY 4 DESC, 2""",

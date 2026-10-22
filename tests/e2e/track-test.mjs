@@ -105,6 +105,74 @@ check('Không trả trường nhạy cảm', leaked.length === 0, leaked.join(',
 check('Mã không tồn tại → rỗng', (await track('SOS-9999999', PHONE)).data?.total === 0);
 check('SOS: không trả địa chỉ nơi người mắc kẹt', !JSON.stringify(r4.data).includes('Thôn thử nghiệm'));
 
+// ---- Một chức năng gửi yêu cầu: "Cần cứu người" / "Cần tiếp tế" → phiếu SOS ngay, vào thẳng "Chờ xử lý"
+function requestForm(category, desc, extra = {}) {
+  const f = new FormData();
+  f.append('category', category);
+  f.append('description', desc);
+  f.append('lat', String(COBA.lat));
+  f.append('lon', String(COBA.lon));
+  for (const [k, v] of Object.entries(extra)) for (const x of [].concat(v)) f.append(k, String(x));
+  return f;
+}
+const tokMine = await citizenToken(PHONE);
+const rescue = await call('POST', '/public/reports', requestForm('mac_ket',
+  'Đất đá đổ vào nhà sau núi, 2 người kẹt trong bếp (kiểm thử yêu cầu cứu người)',
+  { incident_type: 'sap_nha', trapped_count: 2, vulnerable: ['nguoi_gia'] }), tokMine);
+check('Cần cứu người → tạo phiếu SOS ngay trong lần gửi', rescue.status === 201 && /^SOS-\d+$/.test(rescue.data?.sos_code || ''),
+  `HTTP ${rescue.status} ${rescue.data?.sos_code || JSON.stringify(rescue.data).slice(0, 120)}`);
+check('Sập nhà → ưu tiên Cấp 1 (người dân không tự chọn mức)', rescue.data?.priority === 1, String(rescue.data?.priority));
+const floor = await call('POST', '/public/reports', requestForm('mac_ket',
+  'Hết lương thực hai ngày, cần nước sạch cho cả nhà (kiểm thử cứu người)'), tokMine);
+check('"Cần cứu người" không bao giờ dưới Cấp 2 (nội dung chỉ nói lương thực)', floor.status === 201 && floor.data?.priority === 2,
+  String(floor.data?.priority));
+const floorCard = ((await call('GET', '/sos', null, T.trucban)).data || []).find((t) => t.code === floor.data?.sos_code);
+const dup = await call('POST', `/sos/${floorCard?.id}/close`, { reason: 'trung', note: `Trùng ${rescue.data?.sos_code}` }, T.trucban);
+check('Đóng phiếu trùng → người dân thấy "trùng với yêu cầu khác"', dup.status === 200
+  && (await track(floor.data?.code, PHONE)).data?.results?.[0]?.status_label === 'Đã đóng – trùng với yêu cầu khác');
+const card = ((await call('GET', '/sos', null, T.trucban)).data || []).find((t) => t.code === rescue.data?.sos_code);
+check('Phiếu vào thẳng "Chờ xử lý", kèm mã yêu cầu PA-, số người, nhóm yếu thế',
+  card?.status === 'moi' && card.request_code === rescue.data.code && card.trapped_count === 2 && card.vulnerable.includes('nguoi_gia'),
+  JSON.stringify(card && { status: card.status, request: card.request_code, n: card.trapped_count }));
+check('Không nằm trong "Chờ duyệt" của trang Phản ánh (xử lý ở bảng cứu hộ)',
+  !((await call('GET', '/reports?status=cho_duyet', null, T.coba)).data?.items || []).some((x) => x.code === rescue.data.code));
+check('Chưa xác minh → chưa hiện trên cổng công khai', !JSON.stringify((await call('GET', '/public/reports')).data).includes(rescue.data.code));
+const r5 = await track(rescue.data.code, PHONE);
+const r6 = await track(rescue.data.sos_code, PHONE);
+check('Tra mã PA- hay SOS- đều ra cùng một dòng tiến độ cứu hộ', r5.data?.results?.[0]?.type === 'sos'
+  && r5.data.results[0].sos_code === rescue.data.sos_code
+  && JSON.stringify(r5.data.results[0].timeline) === JSON.stringify(r6.data?.results?.[0]?.timeline));
+// Cán bộ gọi lại không được → đóng phiếu KHÔNG CẦN CỨU (không ghi "Đã cứu an toàn")
+check('Đóng phiếu phải có ghi chú → 422', (await call('POST', `/sos/${card?.id}/close`, { reason: 'khong_xac_minh', note: '' }, T.trucban)).status === 422);
+const closed = await call('POST', `/sos/${card?.id}/close`, { reason: 'khong_xac_minh', note: 'GHI_CHU_DONG_PHIEU gọi 3 lần không nghe máy' }, T.trucban);
+check('Đóng phiếu không cần cứu (không xác minh được)', closed.status === 200 && closed.data?.status === 'hoan_thanh'
+  && closed.data?.close_reason === 'khong_xac_minh', `HTTP ${closed.status}`);
+check('Đóng lần hai → 409', (await call('POST', `/sos/${card?.id}/close`, { reason: 'trung', note: 'thử lại' }, T.trucban)).status === 409);
+const r7 = await track(rescue.data.code, PHONE);
+check('Người dân thấy "Đã đóng – chưa xác minh được", không phải "đã cứu", không lộ ghi chú',
+  r7.data?.results?.[0]?.status_label?.startsWith('Đã đóng') && !JSON.stringify(r7.data).includes('Đã cứu hộ an toàn')
+  && !JSON.stringify(r7.data).includes('GHI_CHU_DONG_PHIEU'), r7.data?.results?.[0]?.status_label);
+check('Yêu cầu cứu hộ: tra cứu không trả trường nhạy cảm, không trả nội dung',
+  SENSITIVE.every((k) => !JSON.stringify([r5.data, r6.data, r7.data]).includes(`"${k}`)) && !JSON.stringify(r5.data).includes('kẹt trong bếp'));
+const rejected = ((await call('GET', '/reports?status=tu_choi', null, T.coba)).data?.items || []).find((x) => x.code === rescue.data.code);
+check('Phiếu yêu cầu theo phiếu SOS: không công khai, lý do nêu phiếu cứu hộ đã đóng', !!rejected?.reject_reason?.includes('không xác minh được'));
+// Tiếp tế: Cấp 3; cán bộ xác minh tại bảng → công khai câu chung; người dân đã tự an toàn → "đã xử lý"
+const supply = await call('POST', '/public/reports', requestForm('tiep_te',
+  'Xóm bị cô lập 3 ngày, hết lương thực, cần nước sạch (kiểm thử tiếp tế)'), tokMine);
+const sCard = ((await call('GET', '/sos', null, T.trucban)).data || []).find((t) => t.code === supply.data?.sos_code);
+check('Cần tiếp tế → phiếu SOS loại tiếp tế, Cấp 3', supply.status === 201 && sCard?.incident_type === 'tiep_te' && sCard.priority === 3,
+  `${sCard?.incident_type} ${sCard?.priority}`);
+await call('PATCH', `/sos/${sCard?.id}`, { status: 'dieu_phoi' }, T.trucban);
+const shownS = ((await call('GET', '/public/reports')).data || []).find((r) => r.code === supply.data?.code);
+check('Xác minh tại bảng cứu hộ → cổng chỉ hiện câu chung, không nội dung gốc, không ảnh, vị trí làm tròn',
+  !!shownS && !shownS.description.includes('cô lập 3 ngày') && shownS.photos.length === 0 && shownS.approx_m === 150, shownS?.description);
+await call('POST', `/sos/${sCard?.id}/close`, { reason: 'da_an_toan', note: 'Thôn đã tiếp tế bằng xuồng' }, T.trucban);
+const ms = ((await call('GET', '/public/account/reports', null, tokMine)).data || []).find((x) => x.code === supply.data?.code);
+check('"Phiếu của tôi": một nhãn tiến độ theo phiếu cứu hộ', ms?.sos_code === supply.data?.sos_code && ms.progress_label?.startsWith('Đã đóng'),
+  ms?.progress_label);
+const doneS = ((await call('GET', '/reports?status=da_xu_ly', null, T.coba)).data?.items || []).find((x) => x.code === supply.data?.code);
+check('Đã công khai + người gặp nạn tự an toàn → phiếu yêu cầu "đã xử lý"', !!doneS?.public_note?.includes('an toàn'), doneS?.public_note);
+
 // ---- Chống dò: giới hạn số lần KHÔNG ra kết quả theo SĐT và theo mã (ngoài giới hạn theo IP)
 // Biết SĐT → thử lần lượt mã tăng dần
 const P2 = `0988${String(Date.now()).slice(-6)}`;

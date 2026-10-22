@@ -32,6 +32,7 @@ from app.services.reports import (
     CATEGORY,
     PUBLIC_APPROX_M,
     PUBLIC_POINT_SQL,
+    RESCUE_CATEGORIES,
     ReportError,
     create_report,
     public_photo_url,
@@ -41,7 +42,7 @@ from app.services.reports import (
 from app.services.reservoirs import get_reservoirs_overview
 from app.services.safe_routing import haversine_km, plan_route
 from app.services.simulator import alarm_level
-from app.services.tracking import normalize_code, track_ticket
+from app.services.tracking import mask_phone, normalize_code, track_ticket
 
 router = APIRouter(prefix="/public", tags=["Công khai"])
 
@@ -435,7 +436,11 @@ def phone_key(phone: str) -> str:
 
 @router.get("/report-categories")
 async def report_categories():
-    return [{"code": k, "label": v} for k, v in CATEGORY.items()]
+    # rescue: gửi là tạo phiếu cứu hộ ngay (cứu người / tiếp tế) — form "Gửi yêu cầu" tách riêng 2 lựa chọn này
+    return [{"code": k, "label": v, "rescue": k in RESCUE_CATEGORIES} for k, v in CATEGORY.items()]
+
+
+VULNERABLE_CODES = {"nguoi_gia", "tre_em", "thuong_nang", "thai_phu"}
 
 
 @router.post("/reports", status_code=201)
@@ -453,15 +458,26 @@ async def submit_report(
     turnstile_token: str | None = Form(None),
     photos: list[UploadFile] | None = File(None),
     citizen: dict | None = Depends(optional_citizen),
+    # Chỉ cho "Cần cứu người" (category mac_ket): chuyện gì đang xảy ra; số người cần giúp; nhóm yếu thế (gửi lặp lại)
+    incident_type: str | None = Form(None, pattern="^(ngap_lut|sat_lo|lu_quet|sap_nha|cap_cuu)$"),
+    trapped_count: int | None = Form(None, ge=0, le=10000),
+    vulnerable: list[str] | None = Form(None),
 ):
-    """Người dân gửi phản ánh hiện trường kèm ảnh. Phản ánh chỉ hiển thị công khai sau khi cán bộ duyệt.
+    """Một chức năng gửi yêu cầu của người dân, kèm ảnh:
 
-    Đã đăng nhập tài khoản người dân (Đ5): họ tên, số điện thoại lấy từ tài khoản, phản ánh gắn vào "Phiếu của tôi".
+    - Cần cứu người / cần tiếp tế (category ``mac_ket`` / ``tiep_te``) → tạo phiếu SOS ngay, vào thẳng "Chờ xử lý" của bảng
+      cứu hộ (cán bộ gọi lại xác minh tại bảng) — bắt buộc số điện thoại.
+    - Báo tin hiện trường (các loại còn lại) → phản ánh chờ cán bộ duyệt; chỉ công khai sau khi duyệt.
+
+    Đã đăng nhập tài khoản người dân (Đ5): họ tên, số điện thoại lấy từ tài khoản, phiếu gắn vào "Phiếu của tôi".
     CITIZEN_ACCOUNT_REQUIRED: chưa đăng nhập → 401 (Gọi 112 vẫn luôn mở trên giao diện).
     """
     ip = request.client.host if request.client else None
     if website:
         raise HTTPException(400, "Yêu cầu không hợp lệ")
+    vulnerable = [v for v in (vulnerable or []) if v]
+    if set(vulnerable) - VULNERABLE_CODES:
+        raise HTTPException(422, "Nhóm người cần ưu tiên không hợp lệ")
     if citizen is None and settings.citizen_account_required:
         raise HTTPException(
             401, "Cần đăng nhập tài khoản người dân để gửi phản ánh — đang nguy hiểm thì gọi ngay 112"
@@ -491,16 +507,25 @@ async def submit_report(
             client_ip=ip,
             hamlet=hamlet or None,
             citizen_id=citizen["id"] if citizen else None,
+            incident_type=incident_type,
+            trapped_count=trapped_count,
+            vulnerable=vulnerable or None,
         )
     except ReportError as exc:
         raise HTTPException(422, str(exc)) from exc
     if phone:
         await ratelimit.count_hit("report_phone", phone, 3600)
-    return {
-        **result,
-        "message": "Đã tiếp nhận phản ánh. Cán bộ sẽ xác minh trước khi hiển thị công khai. "
-        "Trường hợp nguy hiểm đến tính mạng, hãy gọi ngay 112.",
-    }
+    if result["sos_code"]:
+        message = (
+            f"Đã chuyển yêu cầu tới bảng điều hành cứu hộ (phiếu {result['sos_code']}). Giữ điện thoại bên mình — cán bộ "
+            f"sẽ gọi lại số {mask_phone(reporter_phone)} để xác minh. Nguy hiểm đến tính mạng: gọi ngay 112."
+        )
+    else:
+        message = (
+            "Đã tiếp nhận phản ánh. Cán bộ sẽ xác minh trước khi hiển thị công khai. "
+            "Trường hợp nguy hiểm đến tính mạng, hãy gọi ngay 112."
+        )
+    return {**result, "message": message}
 
 
 @router.get("/hamlets")
