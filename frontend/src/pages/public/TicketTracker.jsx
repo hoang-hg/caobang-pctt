@@ -323,6 +323,10 @@ export default function TicketTracker({ initialCode = '', initialPhone = '', onQ
                         <span>SĐT gửi: <b className="font-mono text-ink">{currentItem.reporter_phone_masked}</b></span>
                       </span>
                     )}
+                    {/* Phiếu yêu cầu đã thành phiếu cứu hộ: một dòng tiến độ — tra mã PA- hay SOS- như nhau */}
+                    {currentItem.sos_code && currentItem.sos_code !== currentItem.code && (
+                      <span>Phiếu cứu hộ: <b className="font-mono text-ink">{currentItem.sos_code}</b></span>
+                    )}
                   </div>
                 </div>
               </div>

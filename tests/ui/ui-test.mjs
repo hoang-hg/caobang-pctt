@@ -233,10 +233,16 @@ async function publicPortal(ctx) {
 
   if (!READONLY) {
     // Gửi + theo dõi là một bước (nút "Theo dõi tiến độ" nằm trong hộp thoại gửi thành công)
-    await step(ctx, 'Gửi phản ánh hiện trường (form + vị trí) → nhận mã tra cứu → theo dõi tiến độ', async () => {
-      await visible(page.getByRole('button', { name: 'Gửi phản ánh' })).click();
+    await step(ctx, 'Gửi yêu cầu → Báo tin hiện trường (form + vị trí) → nhận mã tra cứu → theo dõi tiến độ', async () => {
+      await visible(page.getByRole('button', { name: 'Gửi yêu cầu', exact: true })).click();
       const dialog = page.getByRole('dialog');
       await dialog.waitFor();
+      // Một chức năng gửi: Gọi 112 trên cùng, rồi chọn Cần cứu người / Cần tiếp tế / Báo tin hiện trường
+      if (!(await dialog.getByRole('link', { name: /Gọi ngay 112/ }).isVisible())) throw new Error('bước chọn yêu cầu thiếu "Gọi ngay 112"');
+      for (const name of [/Cần cứu người/, /Cần tiếp tế/]) {
+        if (!(await dialog.getByRole('button', { name }).isVisible())) throw new Error(`bước chọn yêu cầu thiếu ${name}`);
+      }
+      await dialog.getByRole('button', { name: /Báo tin hiện trường/ }).click();
       // Tài khoản người dân (Đ5): bắt buộc đăng nhập → đăng ký ngay trong hộp thoại (có dòng Gọi 112), xong thì hiện biểu mẫu
       const regTab = dialog.getByRole('button', { name: 'Đăng ký tài khoản' });
       if (await regTab.isVisible().catch(() => false)) {
@@ -265,6 +271,25 @@ async function publicPortal(ctx) {
       await page.getByText('Tiến độ xử lý điều hành tác chiến').waitFor({ timeout: 15_000 });
       await expectNoOverflow(ctx, 'kết quả tra cứu');
       return trackCode;
+    });
+
+    // Không gửi thật: phiếu cứu người vào thẳng bảng cứu hộ (Cấp 1 lên đầu) — bước điều động của cán bộ bấm "Điều đội" đầu
+    // tiên. Luồng gửi thật kiểm ở tests/e2e/track-test.mjs
+    await step(ctx, '"Cần cứu hộ khẩn cấp" → "Gửi yêu cầu cứu người": form có loại sự cố, số người, nhóm cần ưu tiên (không gửi)', async () => {
+      await visible(page.getByRole('button', { name: 'Cần cứu hộ khẩn cấp' })).click();
+      const sosDlg = page.getByRole('dialog', { name: 'Yêu cầu cứu nạn khẩn cấp' });
+      await sosDlg.waitFor();
+      if (!(await sosDlg.getByRole('link', { name: /Gọi 112/ }).isVisible())) throw new Error('hộp thoại thiếu nút Gọi 112');
+      await sosDlg.getByRole('button', { name: 'Gửi yêu cầu cứu người' }).click();
+      const dialog = page.getByRole('dialog');
+      await dialog.getByText('Chuyện gì đang xảy ra?').waitFor({ timeout: 10_000 });
+      const send = dialog.getByRole('button', { name: 'Gửi yêu cầu cứu người' });
+      if (!(await send.isDisabled())) throw new Error('chưa chọn chuyện gì đang xảy ra mà nút gửi vẫn bấm được');
+      await dialog.getByRole('button', { name: 'Sập nhà', exact: true }).click();
+      await dialog.getByRole('button', { name: 'Trẻ em', exact: true }).click();
+      await expectNoOverflow(ctx, 'form yêu cầu cứu người', dialog);
+      await dialog.getByRole('button', { name: 'Huỷ', exact: true }).click();
+      return 'mở được, không gửi';
     });
   }
 

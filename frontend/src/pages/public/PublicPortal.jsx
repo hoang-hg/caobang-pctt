@@ -6,7 +6,7 @@ import clsx from 'clsx';
 import {
   ShieldAlert, LocateFixed, Megaphone, Phone, Home, CloudRain, Waves, Camera, LogIn, Moon, Sun, Navigation, AlertTriangle,
   CheckCircle2, Loader2, Share2, BookOpen, HelpCircle, MapPin, ChevronRight, PhoneCall, Compass, Search,
-  Droplets, Mountain, X, Zap, ArrowLeft, Layers, Menu
+  Droplets, Mountain, X, Zap, ArrowLeft, Layers, Menu, Send, Siren, Package
 } from 'lucide-react';
 import { api } from '../../api/client';
 import { useUnitsGeo, useUnits, useProvinceArea } from '../../api/hooks';
@@ -406,7 +406,8 @@ export default function PublicPortal() {
   const [locErr, setLocErr] = useState('');
   const [route, setRoute] = useState(null);
   const [target, setTarget] = useState(null);
-  const [reporting, setReporting] = useState(false);
+  // Form "Gửi yêu cầu": null = đóng, '' = chọn việc cần (cứu người / tiếp tế / báo tin), hoặc mở thẳng một loại
+  const [reporting, setReporting] = useState(null);
   const [showSosModal, setShowSosModal] = useState(false);
   // Máy tính (≥ 1024 px): "Bạn muốn làm gì?" nổi trên bản đồ; điện thoại / máy tính bảng: ngay dưới bản đồ. Vẽ MỘT dạng
   const wide = useMediaQuery('(min-width: 1024px)');
@@ -601,13 +602,13 @@ export default function PublicPortal() {
               <span>Gọi 112</span>
             </a>
 
-            {/* Điện thoại: nút "Gửi phản ánh" ở thanh đáy (biểu tượng máy ảnh) */}
+            {/* Một chức năng gửi: cứu người / tiếp tế / báo tin hiện trường. Điện thoại: nút ở thanh đáy */}
             <button
               className="btn-danger max-sm:hidden inline-flex text-xs px-2.5 sm:px-3 py-1.5 font-semibold"
-              onClick={() => setReporting(true)}
+              onClick={() => setReporting('')}
             >
-              <Camera size={14} />
-              <span>Gửi phản ánh</span>
+              <Send size={14} />
+              <span>Gửi yêu cầu</span>
             </button>
 
             <button
@@ -1830,7 +1831,7 @@ export default function PublicPortal() {
             <h3 className="card-title text-sm">
               <Camera size={15} className="text-accent" /> Phản ánh hiện trường đã được xác minh
             </h3>
-            <button className="btn-ghost text-xs px-2.5 py-1 text-danger" onClick={() => setReporting(true)}>
+            <button className="btn-ghost text-xs px-2.5 py-1 text-danger" onClick={() => setReporting('bao_tin')}>
               + Gửi phản ánh của bạn
             </button>
           </div>
@@ -1894,7 +1895,7 @@ export default function PublicPortal() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setReporting(true)}
+                  onClick={() => setReporting('bao_tin')}
                   className="btn bg-danger/10 text-danger hover:bg-danger hover:text-white border border-danger/30 text-xs px-3 py-1.5 font-bold shrink-0 transition-colors"
                 >
                   <Camera size={13} /> Gửi phản ánh hiện trường
@@ -1967,6 +1968,26 @@ export default function PublicPortal() {
                   <Phone size={16} /> Gọi 115 (Cấp cứu Y tế)
                 </a>
               </div>
+              {/* Không gọi được (nghẽn mạng, mất sóng thoại): gửi yêu cầu kèm vị trí — vào thẳng bảng điều hành cứu hộ */}
+              <div className="border-t border-line pt-3">
+                <p className="mb-2 text-xs text-muted">Không gọi được? Gửi yêu cầu kèm vị trí — tới thẳng bảng điều hành cứu hộ, cán bộ gọi lại:</p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    className="btn-ghost tap min-h-[44px] justify-center border-danger/40 text-sm font-semibold text-danger"
+                    onClick={() => { setShowSosModal(false); setReporting('cuu_nguoi'); }}
+                  >
+                    <Siren size={16} aria-hidden="true" /> Gửi yêu cầu cứu người
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-ghost tap min-h-[44px] justify-center text-sm font-semibold"
+                    onClick={() => { setShowSosModal(false); setReporting('tiep_te'); }}
+                  >
+                    <Package size={16} aria-hidden="true" /> Gửi yêu cầu tiếp tế
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div className="flex justify-end gap-2 border-t border-line pt-3">
@@ -1993,19 +2014,20 @@ export default function PublicPortal() {
           <LocateFixed size={14} /> Vị trí của tôi
         </button>
         <button
-          onClick={() => setReporting(true)}
+          onClick={() => setReporting('')}
           className="btn-ghost p-2"
-          title="Gửi phản ánh"
-          aria-label="Gửi phản ánh"
+          title="Gửi yêu cầu (cứu người, tiếp tế, báo tin hiện trường)"
+          aria-label="Gửi yêu cầu"
         >
-          <Camera size={16} />
+          <Send size={16} />
         </button>
       </div>
 
-      {/* Form Gửi phản ánh hiện trường */}
-      {reporting && (
+      {/* Form "Gửi yêu cầu": cứu người / tiếp tế (tạo phiếu SOS ngay) / báo tin hiện trường */}
+      {reporting !== null && (
         <ReportForm
-          onClose={() => setReporting(false)}
+          initialKind={reporting}
+          onClose={() => setReporting(null)}
           myLocation={me}
           onTrack={(code, phone) => {
             setTrack({ code, phone: phone || '' });

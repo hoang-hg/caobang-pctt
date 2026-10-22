@@ -149,11 +149,15 @@ async def moderate(
     if body.category and body.category not in CATEGORY:
         raise HTTPException(422, "Loại phản ánh không hợp lệ")
     current = await fetch_one(
-        "SELECT status, description FROM community.citizen_reports WHERE id = CAST(:id AS uuid)",
+        "SELECT status, description, sos_ticket_id FROM community.citizen_reports WHERE id = CAST(:id AS uuid)",
         {"id": report_id},
     )
     if not current:
         raise HTTPException(404, "Không tìm thấy phản ánh")
+    # Phiếu đã nối phiếu cứu hộ đổi trạng thái theo phiếu SOS: "chờ duyệt" + đã nối SOS = đang ở bảng cứu hộ (ẩn khỏi trang
+    # Phản ánh) → mở lại ở đây làm phiếu biến mất khỏi mọi thẻ
+    if body.action == "reopen" and current["sos_ticket_id"]:
+        raise HTTPException(409, "Phiếu này theo phiếu cứu hộ — xem, mở lại phiếu ở trang Cứu hộ")
     if body.action == "edit_public" and current["status"] not in ("da_duyet", "da_xu_ly"):
         raise HTTPException(409, "Chỉ sửa phần công khai của phản ánh đã duyệt")
     status = STATUS_BY_ACTION.get(body.action, current["status"])

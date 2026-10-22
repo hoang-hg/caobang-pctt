@@ -156,6 +156,9 @@ check('Yêu cầu cứu hộ: tra cứu không trả trường nhạy cảm, kh�
   SENSITIVE.every((k) => !JSON.stringify([r5.data, r6.data, r7.data]).includes(`"${k}`)) && !JSON.stringify(r5.data).includes('kẹt trong bếp'));
 const rejected = ((await call('GET', '/reports?status=tu_choi', null, T.coba)).data?.items || []).find((x) => x.code === rescue.data.code);
 check('Phiếu yêu cầu theo phiếu SOS: không công khai, lý do nêu phiếu cứu hộ đã đóng', !!rejected?.reject_reason?.includes('không xác minh được'));
+// "Mở lại" ở trang Phản ánh đưa phiếu về "chờ duyệt" + đã nối SOS = ẩn khỏi mọi thẻ → máy chủ chặn, mở lại ở trang Cứu hộ
+check('Phiếu theo phiếu cứu hộ: không "Mở lại" ở trang Phản ánh (409)',
+  (await call('POST', `/reports/${rejected?.id}/moderate`, { action: 'reopen' }, T.coba)).status === 409);
 // Tiếp tế: Cấp 3; cán bộ xác minh tại bảng → công khai câu chung; người dân đã tự an toàn → "đã xử lý"
 const supply = await call('POST', '/public/reports', requestForm('tiep_te',
   'Xóm bị cô lập 3 ngày, hết lương thực, cần nước sạch (kiểm thử tiếp tế)'), tokMine);

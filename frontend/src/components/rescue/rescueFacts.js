@@ -13,7 +13,7 @@ export const COLUMNS = [
   { key: 'moi', title: SOS_STATUS.moi, short: 'Mới báo', hint: 'Tin mới đến — nhận phiếu, điều đội ngay', icon: Inbox },
   { key: 'dieu_phoi', title: SOS_STATUS.dieu_phoi, short: 'Tìm đội', hint: 'Đã nhận phiếu, đang chọn đội và phương tiện', icon: Send },
   { key: 'thuc_thi', title: SOS_STATUS.thuc_thi, short: 'Đang đến', hint: 'Đội đã xuất phát, đang tới hiện trường', icon: Navigation },
-  { key: 'hoan_thanh', title: SOS_STATUS.hoan_thanh, short: 'Đã xong', hint: 'Người dân đã tới nơi an toàn (48 giờ qua)', icon: CheckCircle2 },
+  { key: 'hoan_thanh', title: SOS_STATUS.hoan_thanh, short: 'Đã xong', hint: 'Người dân đã tới nơi an toàn, hoặc phiếu đóng không cần cứu (48 giờ qua)', icon: CheckCircle2 },
 ];
 export const COLUMN_KEYS = COLUMNS.map((c) => c.key);
 

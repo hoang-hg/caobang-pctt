@@ -1,10 +1,11 @@
 import clsx from 'clsx';
 import {
   Ban, CheckCircle2, HandHelping, Inbox, Link2, LifeBuoy, MapPin, MapPinCheck, Navigation, Pencil, Phone, Send, Timer, TriangleAlert,
+  XCircle,
 } from 'lucide-react';
 import { Progress } from '../common/ui';
 import { usePermission } from '../../rbac/usePermission';
-import { INCIDENT, PRIORITY, SOURCE, VULNERABLE } from '../../utils/labels';
+import { CLOSE_REASON, INCIDENT, PRIORITY, VULNERABLE, sourceLabel } from '../../utils/labels';
 import { time } from '../../utils/format';
 import { risk, sosLevel } from '../../utils/risk';
 import { hasActiveTeam } from '../../utils/sla';
@@ -17,10 +18,12 @@ const BTN = 'tap inline-flex min-h-[32px] items-center justify-center gap-1.5 wh
  * 3 Vàng), nhãn mức ghi cả chữ ("Cấp 1 · Đỏ"); xã xin chi viện → dải đỏ trên đầu thẻ. Thời gian chờ viết thành câu theo hạn
  * phản hồi ("Chờ 5 phút — quá hạn 2 phút"); quá hạn → viền đỏ + nhãn "Quá hạn" nhấp nháy (tắt khi hệ điều hành bật giảm
  * chuyển động). Mỗi bước MỘT nút chính to: "Điều đội" (quyền dispatch.create) / "Nhận phiếu" (chỉ có sos.update) → "Đội đã
- * đến" khi đội đang đi → "Xác nhận đã cứu"; rồi các nút phụ (bản đồ, gọi, link nhiệm vụ, huỷ lệnh, chuyển cột). Nút ≥ 44 px
- * trên màn cảm ứng; mất mạng → nút ghi tắt, nói lý do. `fresh`: phiếu vừa đến khi đang xem → trượt vào một lần.
+ * đến" khi đội đang đi → "Xác nhận đã cứu"; rồi các nút phụ (bản đồ, gọi, link nhiệm vụ, huỷ lệnh, chuyển cột, đóng phiếu
+ * không cần cứu — phiếu người dân gửi qua cổng vào thẳng "Mới báo", cán bộ gọi lại xác minh tại đây). Phiếu từ cổng người dân
+ * ghi mã yêu cầu PA- và ảnh người dân gửi. Nút ≥ 44 px trên màn cảm ứng; mất mạng → nút ghi tắt, nói lý do. `fresh`: phiếu
+ * vừa đến khi đang xem → trượt vào một lần.
  */
-export default function TicketCard({ t, x, now, online, compact = false, fresh = false, onDispatch, onResolve, onFocus, onArrived, onLink, onCancel, onEdit, onMove }) {
+export default function TicketCard({ t, x, now, online, compact = false, fresh = false, onDispatch, onResolve, onFocus, onArrived, onLink, onCancel, onEdit, onMove, onCloseTicket }) {
   const canUpdate = usePermission('sos', 'update', t.admin_code);
   const canResolve = usePermission('sos', 'resolve', t.admin_code);
   const canDispatch = usePermission('dispatch', 'create', t.admin_code);
@@ -105,11 +108,11 @@ export default function TicketCard({ t, x, now, online, compact = false, fresh =
 
       {/* Nhiều nhãn (mức, quá hạn) trên điện thoại 360 px: xuống dòng, không tràn ngang */}
       <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-        <b className="whitespace-nowrap text-sm font-bold text-ink" title={compact ? `Kênh: ${SOURCE[t.source] || t.source}` : undefined}>{t.code}</b>
+        <b className="whitespace-nowrap text-sm font-bold text-ink" title={compact ? `Kênh: ${sourceLabel(t)}` : undefined}>{t.code}</b>
         <span className={clsx('chip whitespace-nowrap py-0.5 text-[11px] font-bold', pr.cls)} title={pr.label}>Cấp {t.priority} · {pr.short}</span>
         {overdue && <span className="chip whitespace-nowrap bg-danger py-0.5 text-[11px] font-bold text-white motion-safe:animate-blink">Quá hạn</span>}
         {/* Cột hẹp của bảng 4 cột: bỏ tên kênh (rê lên mã phiếu để xem) — mã, mức, nhãn quá hạn nằm một dòng */}
-        <span className={clsx('ml-auto truncate text-[11px] font-medium text-muted', compact && 'hidden')}>{SOURCE[t.source] || t.source}</span>
+        <span className={clsx('ml-auto truncate text-[11px] font-medium text-muted', compact && 'hidden')}>{sourceLabel(t)}</span>
         {compact && <span className="ml-auto" />}
         {canUpdate && t.status !== 'hoan_thanh' && (
           <button
@@ -143,6 +146,18 @@ export default function TicketCard({ t, x, now, online, compact = false, fresh =
 
       {t.raw_message && (
         <p className="mt-1.5 line-clamp-2 rounded-lg border border-line/40 bg-panel2/60 p-1.5 text-xs italic text-ink-2">“{t.raw_message}”</p>
+      )}
+
+      {/* Người dân gửi trên cổng: mã phiếu yêu cầu (người dân tra cứu bằng mã này) + ảnh kèm theo — bấm mở cỡ lớn */}
+      {t.request_code && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted">
+          <span>Yêu cầu của người dân <b className="num text-ink-2">{t.request_code}</b></span>
+          {t.request_photo_urls?.map((p, i) => (
+            <a key={p.thumb} href={p.full} target="_blank" rel="noreferrer" className="tap-sq block overflow-hidden rounded-md border border-line hover:border-accent" title={`Ảnh ${i + 1} người dân gửi — mở cỡ lớn`}>
+              <img src={p.thumb} alt={`Ảnh ${i + 1} của ${t.request_code}`} className="h-10 w-10 object-cover" loading="lazy" />
+            </a>
+          ))}
+        </div>
       )}
 
       <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-line/50 pt-2 text-xs">
@@ -189,11 +204,15 @@ export default function TicketCard({ t, x, now, online, compact = false, fresh =
           </div>
         )}
 
-        {t.status === 'hoan_thanh' && (
+        {t.status === 'hoan_thanh' && (t.close_reason ? (
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-muted">
+            <XCircle size={13} aria-hidden="true" /> Đã đóng — {(CLOSE_REASON[t.close_reason] || t.close_reason).toLowerCase()} lúc {time(t.resolved_at)}
+          </span>
+        ) : (
           <span className="inline-flex items-center gap-1 text-xs font-semibold text-good">
             <CheckCircle2 size={13} aria-hidden="true" /> Đã cứu xong lúc {time(t.resolved_at)}
           </span>
-        )}
+        ))}
       </div>
 
       {/* Nút chính (bước kế tiếp) — điện thoại trọn hàng, vùng ngón cái; rồi các nút phụ */}
@@ -225,6 +244,18 @@ export default function TicketCard({ t, x, now, online, compact = false, fresh =
                 <Ban size={13} aria-hidden="true" /> Huỷ lệnh
               </button>
             </>
+          )}
+          {canUpdate && t.status !== 'hoan_thanh' && !hasActiveTeam(t) && onCloseTicket && (
+            <button
+              type="button"
+              className={clsx('btn-ghost text-muted', BTN, compact && 'tap-sq px-2')}
+              onClick={() => onCloseTicket(t)}
+              disabled={!online}
+              title={offline || 'Đóng phiếu không cần cứu: trùng phiếu khác, không xác minh được, người gặp nạn đã tự an toàn'}
+              aria-label={`Đóng phiếu ${t.code} — không cần cứu`}
+            >
+              <XCircle size={13} aria-hidden="true" /> {!compact && 'Không cần cứu'}
+            </button>
           )}
           {canUpdate && t.status !== 'hoan_thanh' && targets.length > 0 && (
             <select

@@ -11,7 +11,13 @@ export const PRIORITY = {
 };
 // Bước của phiếu cứu hộ bằng lời đời thường — cũng là tên 4 cột bảng điều phối (rescueFacts COLUMNS), trang Hướng dẫn
 export const SOS_STATUS = { moi: 'Mới báo — chưa ai nhận', dieu_phoi: 'Đang tìm đội', thuc_thi: 'Đội đang đến', hoan_thanh: 'Đã cứu xong' };
+// Đóng phiếu KHÔNG CẦN CỨU (POST /sos/{id}/close) — phiếu nằm ở cột cuối nhưng không phải "đã cứu"
+export const CLOSE_REASON = { trung: 'Trùng phiếu khác', khong_xac_minh: 'Không xác minh được', da_an_toan: 'Người gặp nạn đã tự an toàn' };
+export const sosStatusLabel = (t) =>
+  t.status === 'hoan_thanh' && t.close_reason ? `Đã đóng — ${(CLOSE_REASON[t.close_reason] || t.close_reason).toLowerCase()}` : SOS_STATUS[t.status] || t.status;
 export const SOURCE = { ZALO: 'Zalo', APP: 'Ứng dụng', HOTLINE: 'Tổng đài', SENSOR: 'Cảm biến tự động', CAN_BO: 'Cán bộ' };
+// Phiếu có phiếu yêu cầu PA- của người dân (gửi trên cổng / cán bộ chuyển SOS) → kênh là cổng người dân
+export const sourceLabel = (t) => (t.request_code ? 'Cổng người dân' : SOURCE[t.source] || t.source);
 // Báo cáo của trưởng nhóm từ link nhiệm vụ (trang /nhiem-vu)
 export const FIELD_REPORT = { arrived: 'Đã đến hiện trường', rescued: 'Đã cứu an toàn', need_support: 'Cần chi viện' };
 export const VULNERABLE = { nguoi_gia: 'Người già', tre_em: 'Trẻ em', thuong_nang: 'Thương nặng', thai_phu: 'Thai phụ' };

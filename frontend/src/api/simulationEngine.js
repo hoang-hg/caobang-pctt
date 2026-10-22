@@ -454,7 +454,13 @@ function handle(path, { method = 'GET', body, params } = {}) {
     return output(t);
   }
   m = pathname.match(/^\/sos\/([^/]+)\/resolve$/);
-  if (m && method === 'POST') return patchTicket(m[1], { status: 'hoan_thanh', notes: 'Đã cứu an toàn – xác nhận từ hiện trường' });
+  if (m && method === 'POST') return patchTicket(m[1], { status: 'hoan_thanh', close_reason: null, notes: 'Đã cứu an toàn – xác nhận từ hiện trường' });
+  // Đóng phiếu không cần cứu (trùng / không xác minh được / tự an toàn) — như POST /sos/{id}/close
+  m = pathname.match(/^\/sos\/([^/]+)\/close$/);
+  if (m && method === 'POST') {
+    if (findTicket(m[1])?.status === 'hoan_thanh') throw new ApiError(409, 'Phiếu đã đóng');
+    return patchTicket(m[1], { status: 'hoan_thanh', close_reason: body?.reason || 'khong_xac_minh' });
+  }
   if (method === 'POST' && pathname === '/dispatch') return dispatch(body || {});
   m = pathname.match(/^\/dispatch\/([^/]+)\/(arrived|cancel)$/);
   if (m && method === 'POST') {
