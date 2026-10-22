@@ -26,11 +26,12 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 
 from app.area import IN_PROVINCE_SQL
 from app.config import settings
-from app.db import fetch_one
+from app.db import execute, fetch_one, transaction
 from app.infra import storage
 from app.rbac import domains
 from app.services.events import log_event
-from app.services.sos_nlp import PHONE_RE
+from app.services.sos import announce_ticket, create_ticket, get_ticket
+from app.services.sos_nlp import PHONE_RE, extract, structured_priority
 from app.ws.hub import hub
 
 log = logging.getLogger(__name__)
@@ -43,14 +44,21 @@ CATEGORY = {
     "dut_dien": "Đứt dây điện / mất điện",
     "hu_hong_duong": "Hư hỏng đường",
     "sap_cau": "Sập cầu, ngầm tràn",
-    "mac_ket": "Người mắc kẹt",
+    "mac_ket": "Cần cứu người (mắc kẹt, bị thương)",
+    "tiep_te": "Cần tiếp tế (nước, lương thực, thuốc)",
     "khac": "Khác",
 }
+# Yêu cầu cần lực lượng: gửi là tạo phiếu SOS ngay, vào thẳng cột "Chờ xử lý" của bảng cứu hộ (thiết kế Part 2 mục J —
+# "Phát tín hiệu SOS"; cán bộ xác minh tại bảng). Giá trị: loại sự cố của phiếu khi người dân không chọn (None = bóc tách
+# từ nội dung). Các loại còn lại là "báo tin hiện trường": chờ cán bộ duyệt như cũ.
+RESCUE_CATEGORIES = {"mac_ket": None, "tiep_te": "tiep_te"}
 # Ghi chú công khai tự đặt cho phản ánh đã chuyển SOS: lúc chuyển (chưa điều đội — câu cũ ghi "đã chuyển lực lượng"
 # khi chưa có ai được điều) và khi SOS đã cứu xong. Cán bộ viết ghi chú riêng thì không bị ghi đè.
 REPORT_SOS_NOTE = "Đã chuyển thành yêu cầu cứu hộ — BCH đang bố trí lực lượng"
 REPORT_SOS_NOTES = (REPORT_SOS_NOTE, "Đã chuyển lực lượng cứu hộ xử lý")
 REPORT_SOS_DONE = "Lực lượng cứu hộ đã hoàn thành, đưa người tới nơi an toàn"
+# Phiếu cứu hộ đã xác minh (đang công khai) rồi đóng vì người gặp nạn đã tự đến nơi an toàn
+REPORT_SAFE_NOTE = "Người gặp nạn đã tự đến nơi an toàn — không cần lực lượng cứu hộ"
 MAX_PHOTOS = 3
 MAX_BYTES = 8 * 1024 * 1024
 MAX_PIXELS = 40_000_000  # chống "ảnh bom" giải nén
@@ -84,6 +92,13 @@ def redact_public_text(text: str | None) -> str:
     """Che SĐT / số giấy tờ / email trước khi công khai — người dân hay ghi SĐT, số nhà… vào mô tả. Không thay cán bộ
     đọc lại (tên người, địa chỉ nhà không che tự động được)."""
     return _EMAIL_RE.sub(REDACTED, PHONE_RE.sub(REDACTED, text or ""))
+
+
+def sos_public_text(category: str) -> str:
+    """Phần công khai khi phiếu yêu cầu thành phiếu cứu hộ mà cán bộ chưa đọc lại nội dung (chuyển SOS phản ánh chưa
+    duyệt; phiếu cứu hộ người dân gửi được xác minh tại bảng cứu hộ): không lấy mô tả gốc (tên người, số nhà không che tự
+    động được), chỉ nêu loại sự cố."""
+    return f"{CATEGORY.get(category, 'Phản ánh hiện trường')} — cán bộ đã tiếp nhận; nội dung chi tiết chưa công khai."
 
 
 def new_track_key() -> str:
@@ -196,9 +211,22 @@ async def create_report(
     client_ip: str | None,
     hamlet: str | None = None,
     citizen_id=None,  # tài khoản người dân đã đăng nhập (Đ5) — "Phiếu của tôi"
+    # Chỉ dùng cho yêu cầu cứu người / tiếp tế (RESCUE_CATEGORIES): người dân chọn sẵn; trống → bóc tách từ nội dung
+    incident_type: str | None = None,
+    trapped_count: int | None = None,
+    vulnerable: list[str] | None = None,
 ) -> dict:
+    """Một chức năng gửi cho người dân: báo tin hiện trường → phiếu PA- chờ cán bộ duyệt; cần cứu người / tiếp tế → phiếu
+    PA- kèm phiếu SOS tạo trong CÙNG transaction (vào thẳng "Chờ xử lý", chuông như mọi phiếu SOS). Phiếu yêu cầu chưa công
+    khai tới khi cán bộ xác minh tại bảng cứu hộ (api/v1/sos.py — publish_linked_requests)."""
     if category not in CATEGORY:
         raise ReportError("Loại phản ánh không hợp lệ")
+    rescue = category in RESCUE_CATEGORIES
+    # Lực lượng phải gọi lại được để xác minh trước khi điều đội (phiếu vào thẳng bảng, không qua bước duyệt)
+    if rescue and len(re.sub(r"\D", "", reporter_phone or "")) < 9:
+        raise ReportError(
+            "Yêu cầu cứu người / tiếp tế cần số điện thoại để lực lượng gọi lại xác minh — đang nguy hiểm thì gọi ngay 112"
+        )
     hamlet_name = None
     if hamlet:  # mã xóm người dân chọn (GET /public/hamlets) → lưu tên kèm xã tại thời điểm gửi
         h = await fetch_one(
@@ -221,6 +249,11 @@ async def create_report(
     # Giải mã / thu nhỏ ảnh tốn CPU ~1 giây/ảnh → chạy trong thread để không chặn các yêu cầu khác của tiến trình.
     # Kiểm tra hết ảnh trước khi ghi gì.
     processed = await asyncio.to_thread(lambda: [process_image(p) for p in photos])
+    # Bóc tách (có thể gọi LLM) TRƯỚC transaction. Nhóm yếu thế: gộp lựa chọn của người dân với điều đọc được trong nội
+    # dung (chọn "trẻ em" mà viết "bà tôi bị thương nặng" → cả hai)
+    parsed = await extract(description) if rescue else None
+    if rescue:
+        vulnerable = sorted(set(vulnerable or []) | set(parsed.get("vulnerable") or [])) or None
 
     report_id = str(uuid.uuid4())
     track_key = new_track_key()
@@ -233,30 +266,68 @@ async def create_report(
         await storage.put(tkey, thumb, "image/jpeg")
         meta.append({"key": key, "thumb_key": tkey, "width": w, "height": h})
 
-    row = await fetch_one(
-        """INSERT INTO community.citizen_reports (id, category, description, location, address, hamlet_name,
-                 admin_unit_id, reporter_name, reporter_phone, photos, client_ip_hash, track_key, citizen_id)
-           VALUES (CAST(:id AS uuid), :c, :d, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326), :addr, :hamlet,
-                   (SELECT id FROM spatial_admin.administrative_units WHERE level = 'xa'
-                     ORDER BY geom <-> ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) LIMIT 1),
-                   :rn, :rp, CAST(:ph AS jsonb), :ip, :tk, CAST(:cid AS uuid))
-           RETURNING code, admin_unit_id""",
-        {
-            "id": report_id,
-            "c": category,
-            "d": description,
-            "lat": lat,
-            "lon": lon,
-            "addr": address,
-            "hamlet": hamlet_name,
-            "rn": reporter_name,
-            "rp": reporter_phone,
-            "ph": json.dumps(meta),
-            "ip": ip_hash(client_ip),
-            "tk": track_key,
-            "cid": str(citizen_id) if citizen_id else None,
-        },
-    )
+    # Phiếu yêu cầu + phiếu SOS trong một transaction: lỗi giữa chừng không để lại phiếu yêu cầu cứu người mà không có
+    # phiếu trên bảng cứu hộ (hay ngược lại)
+    ticket = None
+    async with transaction() as conn:
+        row = await fetch_one(
+            """INSERT INTO community.citizen_reports (id, category, description, location, address, hamlet_name,
+                     admin_unit_id, reporter_name, reporter_phone, photos, client_ip_hash, track_key, citizen_id)
+               VALUES (CAST(:id AS uuid), :c, :d, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326), :addr, :hamlet,
+                       (SELECT id FROM spatial_admin.administrative_units WHERE level = 'xa'
+                         ORDER BY geom <-> ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) LIMIT 1),
+                       :rn, :rp, CAST(:ph AS jsonb), :ip, :tk, CAST(:cid AS uuid))
+               RETURNING code, admin_unit_id""",
+            {
+                "id": report_id,
+                "c": category,
+                "d": description,
+                "lat": lat,
+                "lon": lon,
+                "addr": address,
+                "hamlet": hamlet_name,
+                "rn": reporter_name,
+                "rp": reporter_phone,
+                "ph": json.dumps(meta),
+                "ip": ip_hash(client_ip),
+                "tk": track_key,
+                "cid": str(citizen_id) if citizen_id else None,
+            },
+            conn,
+        )
+        if rescue:
+            incident = RESCUE_CATEGORIES[category] or incident_type or parsed.get("incident_type", "ngap_lut")
+            priority = min(parsed.get("priority", 2), structured_priority(incident, vulnerable or []))
+            if category == "mac_ket":
+                # "Cần cứu người" không bao giờ dưới Cấp 2 (hạn 15 phút), kể cả khi nội dung chỉ nói lương thực, nước
+                # uống (bóc tách ra loại tiếp tế — Cấp 3, hạn 60 phút)
+                priority = min(priority, 2)
+            ticket = await create_ticket(
+                raw_message=description,
+                source="APP",
+                reporter_name=reporter_name,
+                reporter_phone=reporter_phone,
+                lat=lat,
+                lon=lon,
+                incident_type=incident,
+                priority=priority,
+                trapped_count=trapped_count,
+                vulnerable=vulnerable,
+                address=", ".join(x for x in (address, hamlet_name) if x) or None,
+                notes=f"Người dân gửi qua cổng — phiếu yêu cầu {row['code']}",
+                conn=conn,
+                parsed=parsed,
+            )
+            await execute(
+                "UPDATE community.citizen_reports SET sos_ticket_id = CAST(:t AS uuid) WHERE id = CAST(:id AS uuid)",
+                {"t": str(ticket["id"]), "id": report_id},
+                conn,
+            )
+            # Đọc lại sau khi gắn → phiếu kèm mã yêu cầu PA-, số ảnh (thẻ trên bảng cứu hộ)
+            ticket = {
+                **await get_ticket(ticket["id"], conn),
+                "possible_duplicates": ticket["possible_duplicates"],
+            }
     code = domains.code_of_unit_id(row["admin_unit_id"])
     unit = next((u for u in domains.units() if u.code == code), None)
     await hub.publish(
@@ -267,24 +338,30 @@ async def create_report(
             "category": category,
             "admin_name": unit.name if unit else None,
             "photos": len(meta),
+            # Đã vào bảng cứu hộ — chuông, thông báo theo sự kiện "sos.new" của phiếu SOS
+            "sos_code": ticket["code"] if ticket else None,
         },
         "report",
         code,
     )
-    urgent = category == "mac_ket"  # có người mắc kẹt: báo như SOS (giao diện: chuông, thông báo đỏ)
-    await log_event(
-        ("PHẢN ÁNH KHẨN " if urgent else "Phản ánh mới ")
-        + f"{row['code']} – {CATEGORY[category]}"
-        + (f" tại {unit.name}" if unit else "")
-        + " (chờ duyệt)",
-        "nguoi_dan",
-        "danger" if urgent else "info",
-        admin_unit_id=row["admin_unit_id"],
-    )
+    if ticket:
+        # Sau commit: sự kiện "sos.new" (chuông, thẻ mới trên bảng) + nhật ký, như mọi phiếu SOS
+        await announce_ticket(ticket, f"cổng người dân ({row['code']})")
+    else:
+        await log_event(
+            f"Phản ánh mới {row['code']} – {CATEGORY[category]}"
+            + (f" tại {unit.name}" if unit else "")
+            + " (chờ duyệt)",
+            "nguoi_dan",
+            "info",
+            admin_unit_id=row["admin_unit_id"],
+        )
     # track_code chỉ trả 1 lần cho người gửi (không lưu ở đâu khác ngoài CSDL, không hiện cho cán bộ)
     return {
         "id": report_id,
         "code": row["code"],
         "track_code": f"{row['code']}-{track_key}",
         "photos": len(meta),
+        "sos_code": ticket["code"] if ticket else None,
+        "priority": ticket["priority"] if ticket else None,
     }

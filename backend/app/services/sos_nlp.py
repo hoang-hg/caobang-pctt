@@ -80,6 +80,15 @@ WORD_PEOPLE_VI_RE = re.compile(r"(?<!\w)(" + "|".join(NUM_WORDS_VI) + r")\s+(ng�
 WORD_PEOPLE_ASCII_RE = re.compile(r"\b(" + "|".join(NUM_WORDS_ASCII) + r")\s+nguoi\b")
 
 
+def structured_priority(incident: str, vulnerable: list[str]) -> int:
+    """Mức ưu tiên theo loại sự cố + nhóm yếu thế (không cần đọc nội dung tin): sập nhà, lũ quét, cấp cứu, người bị thương
+    nặng, thai phụ → 1; tiếp tế → 3; còn lại → 2. parse_rules dùng làm nền; phiếu có loại sự cố / nhóm yếu thế chọn sẵn
+    (người dân chọn trên cổng, cán bộ nhập) không bao giờ bị xếp thấp hơn mức này."""
+    if incident in ("sap_nha", "lu_quet", "cap_cuu") or {"thuong_nang", "thai_phu"} & set(vulnerable):
+        return 1
+    return 3 if incident == "tiep_te" else 2
+
+
 def parse_rules(text: str, gazetteer: list[dict]) -> dict:
     t = norm(text)
 
@@ -113,21 +122,12 @@ def parse_rules(text: str, gazetteer: list[dict]) -> dict:
         coords = (float(m.group(1)), float(m.group(2)))
 
     # Mức ưu tiên SLA: 1 = sinh tử, 2 = nguy hiểm, 3 = hỗ trợ
-    if (
-        incident in ("sap_nha", "lu_quet")
-        or "thuong_nang" in vulnerable
-        or "thai_phu" in vulnerable
-        or incident == "cap_cuu"
-    ):
-        priority = 1
-    elif incident == "sat_lo" and ("vui" in t or "mac ket" in t or "thuong" in t):
+    if incident == "sat_lo" and ("vui" in t or "mac ket" in t or "thuong" in t):
         priority = 1
     elif (ROOF_VI_RE.search(low) or any(k in t for k in ROOF_ASCII)) and (trapped > 0 or "mac ket" in t):
         priority = 1
-    elif incident == "tiep_te":
-        priority = 3
     else:
-        priority = 2
+        priority = structured_priority(incident, vulnerable)
 
     return {
         "incident_type": incident,

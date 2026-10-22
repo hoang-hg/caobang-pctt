@@ -170,11 +170,9 @@ export function useSocket() {
         case 'report.new':
           inv('reports');
           notified.add(data.code);
-          if (data.category === 'mac_ket') {
-            // Có người mắc kẹt: báo như SOS — trước đây chỉ thông báo vàng, không chuông như phản ánh "cây đổ"
-            if (useStore.getState().soundOn) playAlarm(1);
-            toast({ tone: 'danger', title: `Phản ánh KHẨN ${data.code}: có người mắc kẹt`, body: `${data.admin_name || ''} — duyệt và chuyển SOS ngay`, duration: 15000 });
-          } else {
+          // Yêu cầu cứu người / tiếp tế đã thành phiếu SOS ngay khi gửi: chuông + thông báo theo sự kiện "sos.new" (không báo
+          // hai lần); chỉ báo tin hiện trường mới là phản ánh chờ duyệt
+          if (!data.sos_code) {
             toast({ tone: 'warn', title: `Phản ánh mới ${data.code}`, body: `${data.admin_name || ''} · ${data.photos} ảnh — chờ duyệt` });
           }
           break;

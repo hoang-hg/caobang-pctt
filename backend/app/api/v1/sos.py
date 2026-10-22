@@ -19,9 +19,16 @@ from app.rbac.authz import area_scope, can, forbidden, require_any, require_perm
 from app.services import dispatch_matching, logistics, mission
 from app.services.events import log_event
 from app.services.ledger import ledger_context
-from app.services.reports import REPORT_SOS_DONE, REPORT_SOS_NOTES
+from app.services.reports import (
+    REPORT_SAFE_NOTE,
+    REPORT_SOS_DONE,
+    REPORT_SOS_NOTE,
+    REPORT_SOS_NOTES,
+    signed_photo_url,
+    sos_public_text,
+)
 from app.services.safe_routing import VEHICLE_SPEED, plan_route
-from app.services.sos import SLA_MINUTES, TICKET_SELECT, create_ticket, get_ticket
+from app.services.sos import CLOSE_REASON, SLA_MINUTES, TICKET_SELECT, create_ticket, get_ticket
 from app.services.sos_nlp import extract
 from app.ws.hub import hub
 
@@ -56,6 +63,12 @@ async def list_sos(
     )
     for r in rows:
         r["sla_minutes"] = SLA_MINUTES[r["priority"]]
+        # Ảnh người dân gửi kèm yêu cầu (riêng tư — link có chữ ký, hết hạn sau 1 giờ; danh sách tự làm mới)
+        rid = str(r["request_id"]) if r["request_id"] else None
+        r["request_photo_urls"] = [
+            {"full": signed_photo_url(rid, i), "thumb": signed_photo_url(rid, i, thumb=True)}
+            for i in range(r["request_photos"] or 0)
+        ]
     return rows
 
 
@@ -164,7 +177,9 @@ async def update_sos(
                   acknowledged_at = CASE WHEN COALESCE(CAST(:s AS text), 'moi') <> 'moi' THEN COALESCE(acknowledged_at, now())
                                          ELSE acknowledged_at END,
                   resolved_at = CASE WHEN CAST(:s AS text) = 'hoan_thanh' THEN now()
-                                     WHEN CAST(:s AS text) IS NOT NULL THEN NULL ELSE resolved_at END
+                                     WHEN CAST(:s AS text) IS NOT NULL THEN NULL ELSE resolved_at END,
+                  -- Đặt trạng thái (kể cả xác nhận cứu xong) → bỏ lý do "đóng không cần cứu" của lần đóng trước
+                  close_reason = CASE WHEN CAST(:s AS text) IS NOT NULL THEN NULL ELSE close_reason END
             WHERE id = CAST(:id AS uuid)""",
         {
             "s": body.status,
@@ -175,6 +190,8 @@ async def update_sos(
             "id": ticket_id,
         },
     )
+    if body.status in VERIFIED_STATUSES:
+        await announce_reports(await publish_linked_requests(ticket_id, user["id"]))
     if body.status == "hoan_thanh":
         await release_dispatch(ticket_id)
         await close_linked_reports(ticket_id)
@@ -237,6 +254,77 @@ async def release_dispatch(ticket_id: str) -> None:
             await _release_order(conn, ticket_id, o)
 
 
+# Phiếu rời cột "Chờ xử lý" = cán bộ đã xác minh (thiết kế Part 1 mục D: cột 2 "Đã xác minh thông tin")
+VERIFIED_STATUSES = ("dieu_phoi", "thuc_thi", "hoan_thanh")
+
+
+async def announce_reports(rows: list[dict]) -> None:
+    """Sau commit: báo màn hình Phản ánh + xoá cache cổng công khai cho các phiếu yêu cầu vừa đổi trạng thái theo phiếu SOS."""
+    for r in rows:
+        await hub.publish(
+            "report.updated",
+            {"id": str(r["id"]), "code": r["code"], "status": r["status"]},
+            "report",
+            domains.code_of_unit_id(r["admin_unit_id"]),
+        )
+    if rows:
+        await invalidate("public:")
+
+
+async def publish_linked_requests(ticket_id: str, user_id, conn=None) -> list[dict]:
+    """Phiếu SOS do người dân gửi (cứu người / tiếp tế — vào thẳng "Chờ xử lý") được cán bộ xác minh → phiếu yêu cầu còn
+    chờ công khai sang "đã duyệt" như khi cán bộ bấm "Chuyển SOS" một phản ánh chưa duyệt: chỉ câu chung theo loại
+    (sos_public_text), KHÔNG ảnh, vị trí làm tròn, ghi chú "đã chuyển yêu cầu cứu hộ". Cán bộ đọc lại rồi "Sửa phần công
+    khai" nếu muốn công khai thêm. Trước khi xác minh phiếu không hiện trên cổng (có thể là tin giả). Gọi announce_reports
+    với kết quả sau khi commit."""
+    rows = await fetch_all(
+        """SELECT id, category FROM community.citizen_reports
+            WHERE sos_ticket_id = CAST(:t AS uuid) AND status = 'cho_duyet' FOR UPDATE""",
+        {"t": ticket_id},
+        conn,
+    )
+    out = []
+    for r in rows:
+        out += await fetch_all(
+            """UPDATE community.citizen_reports
+                  SET status = 'da_duyet', moderated_by = :u, moderated_at = now(),
+                      public_description = COALESCE(public_description, :pd), public_photos = false,
+                      public_note = COALESCE(public_note, :note)
+                WHERE id = :id AND status = 'cho_duyet'
+            RETURNING id, code, status, admin_unit_id""",
+            {"id": r["id"], "u": user_id, "pd": sos_public_text(r["category"]), "note": REPORT_SOS_NOTE},
+            conn,
+        )
+    return out
+
+
+async def close_linked_requests(ticket_id: str, reason: str, user_id, conn=None) -> list[dict]:
+    """Phiếu SOS đóng KHÔNG CẦN CỨU → phiếu yêu cầu của người dân theo: đã công khai mà người gặp nạn tự an toàn → "đã xử
+    lý" kèm ghi chú; còn lại (trùng, không xác minh được — có thể là tin giả; hoặc chưa từng công khai) → "từ chối" = không
+    công khai, lý do nội bộ ghi mã phiếu SOS. Người dân tra cứu thấy câu theo lý do đóng (services/tracking.py).
+    Gọi announce_reports với kết quả sau khi commit."""
+    return await fetch_all(
+        """UPDATE community.citizen_reports
+              SET status = CASE WHEN :reason = 'da_an_toan' AND status = 'da_duyet' THEN 'da_xu_ly' ELSE 'tu_choi' END,
+                  reject_reason = CASE WHEN :reason = 'da_an_toan' AND status = 'da_duyet' THEN NULL ELSE :rr END,
+                  public_note = CASE WHEN :reason = 'da_an_toan' AND status = 'da_duyet'
+                                      AND (public_note IS NULL OR public_note = ANY(:auto)) THEN :safe
+                                     ELSE public_note END,
+                  moderated_by = :u, moderated_at = now()
+            WHERE sos_ticket_id = CAST(:t AS uuid) AND status IN ('cho_duyet', 'da_duyet')
+        RETURNING id, code, status, admin_unit_id""",
+        {
+            "t": ticket_id,
+            "reason": reason,
+            "rr": f"Phiếu cứu hộ đã đóng: {CLOSE_REASON[reason].lower()}",
+            "auto": list(REPORT_SOS_NOTES),
+            "safe": REPORT_SAFE_NOTE,
+            "u": user_id,
+        },
+        conn,
+    )
+
+
 async def close_linked_reports(ticket_id: str) -> None:
     """Phản ánh của người dân đã chuyển thành phiếu này → "đã xử lý": người dân tra cứu mã PA- thấy hoàn tất (trước đây
     "đang xử lý" mãi tới khi cán bộ tự đóng phản ánh). Ghi chú công khai do cán bộ viết riêng thì giữ nguyên."""
@@ -245,18 +333,10 @@ async def close_linked_reports(ticket_id: str) -> None:
               SET status = 'da_xu_ly', moderated_at = now(),
                   public_note = CASE WHEN public_note IS NULL OR public_note = ANY(:auto) THEN :done ELSE public_note END
             WHERE sos_ticket_id = CAST(:t AS uuid) AND status = 'da_duyet'
-        RETURNING id, code, admin_unit_id""",
+        RETURNING id, code, status, admin_unit_id""",
         {"t": ticket_id, "auto": list(REPORT_SOS_NOTES), "done": REPORT_SOS_DONE},
     )
-    for r in rows:
-        await hub.publish(
-            "report.updated",
-            {"id": str(r["id"]), "code": r["code"], "status": "da_xu_ly"},
-            "report",
-            domains.code_of_unit_id(r["admin_unit_id"]),
-        )
-    if rows:
-        await invalidate("public:")
+    await announce_reports(rows)
 
 
 @router.post("/sos/{ticket_id}/resolve")
@@ -267,6 +347,71 @@ async def resolve(
     return await update_sos(
         ticket_id, SosPatch(status="hoan_thanh", notes="Đã cứu an toàn – xác nhận từ hiện trường"), user
     )
+
+
+class CloseIn(BaseModel):
+    reason: Literal["trung", "khong_xac_minh", "da_an_toan"]
+    # Nội bộ: trùng phiếu nào, đã gọi lại lúc mấy giờ, ai xác nhận… (không trả cho người dân)
+    note: str = Field(..., min_length=3, max_length=500)
+
+
+@router.post("/sos/{ticket_id}/close")
+async def close_ticket(
+    ticket_id: str,
+    body: CloseIn,
+    user: dict = Depends(require_permission("sos", "update", scope_loaders.sos_ticket)),
+):
+    """Đóng phiếu KHÔNG CẦN CỨU: trùng phiếu khác / không xác minh được (gọi lại không được, tới nơi không thấy — có thể là
+    tin giả) / người gặp nạn đã tự an toàn. Phiếu người dân gửi qua cổng vào thẳng "Chờ xử lý" nên cán bộ phải đóng được
+    mà không ghi "Đã cứu an toàn": người dân tra cứu thấy đúng lý do, thống kê "người đã cứu" không tính phiếu này."""
+    label = CLOSE_REASON[body.reason]
+    async with transaction() as conn:
+        # Khoá phiếu: cùng lúc có người điều động → một trong hai thao tác thấy trạng thái mới và dừng
+        t = await fetch_one(
+            "SELECT status FROM operations.sos_tickets WHERE id = CAST(:id AS uuid) FOR UPDATE",
+            {"id": ticket_id},
+            conn,
+        )
+        if not t:
+            raise HTTPException(404, "Không tìm thấy phiếu")
+        if t["status"] == "hoan_thanh":
+            raise HTTPException(409, "Phiếu đã đóng")
+        if await fetch_one(
+            """SELECT 1 FROM operations.dispatch_orders
+                WHERE ticket_id = CAST(:t AS uuid) AND status IN ('dang_di', 'da_den') LIMIT 1""",
+            {"t": ticket_id},
+            conn,
+        ):
+            raise HTTPException(
+                409,
+                "Phiếu đang có lực lượng thực hiện — huỷ lệnh điều động trước (nút “Huỷ lệnh” trên thẻ phiếu); đã cứu "
+                "xong thì bấm “Xác nhận cứu xong”",
+            )
+        await execute(
+            """UPDATE operations.sos_tickets
+                  SET status = 'hoan_thanh', close_reason = :r, resolved_at = now(), status_changed_at = now(),
+                      acknowledged_at = COALESCE(acknowledged_at, now()), notes = concat_ws(E'\n', notes, CAST(:n AS text))
+                WHERE id = CAST(:id AS uuid)""",
+            {
+                "r": body.reason,
+                "n": f"Đóng phiếu — {label}: {body.note.strip()} ({user['full_name']})",
+                "id": ticket_id,
+            },
+            conn,
+        )
+        reports = await close_linked_requests(ticket_id, body.reason, user["id"], conn)
+    await announce_reports(reports)
+    ticket = await get_ticket(ticket_id)
+    await audit(user, "sos.close", "sos_ticket", ticket["code"], body.model_dump())
+    await hub.publish("sos.updated", ticket, "sos", ticket["admin_code"])
+    await log_event(
+        f"{ticket['code']} đóng không cần cứu — {label.lower()} ({user['full_name']})",
+        "cuu_ho",
+        "info",
+        lat=ticket["lat"],
+        lon=ticket["lon"],
+    )
+    return ticket
 
 
 @router.get("/sos/{ticket_id}/match")
@@ -450,6 +595,8 @@ async def dispatch(body: DispatchIn, user: dict = Depends(require_any("dispatch"
             {"t": body.ticket_id},
             conn,
         )
+        # Điều đội thẳng từ "Chờ xử lý" cũng là xác minh → phiếu yêu cầu của người dân công khai như "Chuyển SOS"
+        reports = await publish_linked_requests(body.ticket_id, user["id"], conn)
         await audit(
             user,
             "dispatch.create",
@@ -466,6 +613,7 @@ async def dispatch(body: DispatchIn, user: dict = Depends(require_any("dispatch"
             conn,
         )
 
+    await announce_reports(reports)
     updated = await get_ticket(body.ticket_id)
     await hub.publish("sos.updated", updated, "sos", updated["admin_code"])
     await hub.publish(

@@ -743,7 +743,10 @@ sequenceDiagram
     Dispatcher->>Dispatcher: Gọi xác nhận → hoan_thanh (lưu nhật ký pháp lý)
 ```
 
-1. **Tiếp nhận**: cổng công khai (phản ánh chuyển SOS), hotline, cán bộ nhập, cảm biến (`SENSOR`), webhook (khi bật).
+1. **Tiếp nhận**: cổng công khai (người dân chọn **Cần cứu người** / **Cần tiếp tế** → phiếu tạo ngay, vào thẳng "Chờ xử
+   lý" — mục 7.2; báo tin hiện trường thì cán bộ "Chuyển SOS" khi cần), hotline, cán bộ nhập, cảm biến (`SENSOR`), webhook
+   (khi bật). Phiếu không nêu mức ưu tiên → lấy mức bóc tách được nhưng **không thấp hơn mức của loại sự cố / nhóm yếu thế**
+   đã chọn (sập nhà, lũ quét, cấp cứu, người bị thương nặng, thai phụ → Cấp 1; tiếp tế → Cấp 3 — `structured_priority`).
    Bộ luật bóc tách địa danh xã/thôn, số người mắc kẹt, nhóm yếu thế (trẻ em, người cao tuổi, phụ nữ mang thai). Số người
    **cộng theo nhóm** ("2 cụ già và 1 trẻ em" = 3; tin ghi tổng thì lấy tổng: "4 người, trong đó 2 trẻ em" = 4); "mắc kẹt
    trên mái / nước tới mái" → **Cấp 1**. Kết quả bóc tách ở khung **Tiếp nhận đa kênh** **sửa được** (loại, mức ưu tiên,
@@ -806,6 +809,13 @@ sequenceDiagram
    /api/v1/dispatch/{lệnh}/arrived`, ghi giờ đến — link nhiệm vụ hiện "trực ban ghi"); trước đó thanh tiến độ là ước tính
    theo giờ xuất phát và ETA. Đưa người về điểm sơ tán rồi đánh dấu **Đã cứu an toàn** / **Xác nhận hoàn thành** (lực lượng,
    phương tiện tự về "sẵn sàng", link nhiệm vụ đóng).
+   **Đóng phiếu không cần cứu** (`POST /api/v1/sos/{id}/close`, quyền `sos.update`, bắt buộc ghi chú nội bộ): **trùng phiếu
+   khác** / **không xác minh được** (gọi lại không được, tới nơi không thấy — có thể là tin giả) / **người gặp nạn đã tự an
+   toàn**. Phiếu người dân gửi qua cổng vào thẳng bảng, cán bộ xác minh tại bảng → phải đóng được mà không ghi "Đã cứu an
+   toàn". Phiếu đóng vẫn là `hoan_thanh` (rời bảng như phiếu xong) nhưng có `close_reason`: người dân tra cứu thấy đúng lý do
+   (không thấy ghi chú), thống kê đợt thiên tai không tính vào "người đã cứu" (phiếu trùng / không xác minh được cũng không
+   tính vào "người mắc kẹt"). Đang có đội thực hiện → 409, huỷ lệnh điều động trước. Đặt lại trạng thái (kể cả xác nhận cứu
+   xong) bỏ lý do đóng.
 7. **Nguồn lực** (trang Vật tư & Lực lượng): **Cập nhật** từng phương tiện — Sẵn sàng ↔ Bảo dưỡng / hỏng kèm lý do, mức
    nhiên liệu % (`PATCH /api/v1/resources/vehicles/{id}`, quyền `vehicle.update`; "đang làm nhiệm vụ" chỉ do lệnh điều
    động gán, báo hỏng giữa nhiệm vụ thì phương tiện rời nhiệm vụ). **Nhập hàng** vào kho (`POST
@@ -823,23 +833,42 @@ sequenceDiagram
 
 ```mermaid
 graph TD
-    A[Người dân mở cổng công khai] -->|Ảnh + vị trí + mô tả| B[Phản ánh PA-xxxx: cho_duyet]
+    A[Người dân mở cổng công khai: Gửi yêu cầu] -->|Ảnh + vị trí + mô tả| K{Bạn cần gì?}
+    K -->|Cần cứu người / Cần tiếp tế| S[Phiếu PA-xxxx + phiếu SOS-yyyy cùng lúc]
+    S --> R[Bảng cứu hộ: cột Chờ xử lý + chuông]
+    R -->|Gọi lại xác minh, điều phối / điều động| V[PA- sang đã duyệt: câu chung, không ảnh] --> X[Cứu xong: PA- đã xử lý]
+    R -->|Trùng / không xác minh được / đã tự an toàn| C[Đóng không cần cứu: PA- từ chối hoặc đã xử lý]
+    K -->|Báo tin hiện trường| B[Phản ánh PA-xxxx: cho_duyet]
     B --> D{Cán bộ đúng địa bàn kiểm tra tại /phan-anh}
     D -->|Thông tin chính xác| E[Duyệt: chọn nội dung / vị trí / ảnh công khai + ghi chú]
     D -->|Sai, trùng, tin giả| F[Từ chối: tu_choi + lý do nội bộ]
-    D -->|Có người đang gặp nguy hiểm| G[Chuyển thành phiếu SOS]
+    D -->|Có người đang gặp nguy hiểm| G[Chuyển thành phiếu SOS] --> R
     E --> H[Hiện trên bản đồ công khai] --> I[Đã xử lý: da_xu_ly]
 ```
 
+- **Một chức năng gửi yêu cầu** (22/10/2026): người dân chỉ có một nút **Gửi yêu cầu**; bước đầu chọn **Cần cứu người**
+  (mắc kẹt, bị thương, nhà sập — chọn thêm chuyện gì đang xảy ra, số người, nhóm cần ưu tiên), **Cần tiếp tế** (nước uống,
+  lương thực, thuốc) hoặc **Báo tin hiện trường** (các loại phản ánh còn lại).
+  - Cứu người / tiếp tế (`category` = `mac_ket` / `tiep_te`, `RESCUE_CATEGORIES`): phiếu yêu cầu `PA-` và phiếu `SOS-`
+    tạo **trong cùng một giao dịch**, phiếu SOS vào thẳng cột **Chờ xử lý** kèm chuông (thiết kế Part 2 mục J — "Phát tín
+    hiệu SOS"); bắt buộc **số điện thoại** (lực lượng gọi lại xác minh). Tiếp tế luôn là phiếu loại tiếp tế, Cấp 3. Thẻ
+    phiếu trên bảng ghi mã `PA-` và ảnh người dân gửi (link có chữ ký, chỉ cán bộ xem được).
+  - Phiếu này **không nằm trong "Chờ duyệt"** của trang Phản ánh (không xử lý hai nơi) và **chưa công khai** (có thể là tin
+    giả). Cán bộ xác minh tại bảng — chuyển sang Đang điều phối, điều đội, hoặc xác nhận xong — thì phiếu `PA-` tự sang **đã
+    duyệt** với phần công khai như "Chuyển SOS" phản ánh chưa duyệt (câu chung, không ảnh, vị trí làm tròn); cứu xong →
+    **đã xử lý**. Đóng không cần cứu → **từ chối** (lý do nội bộ ghi phiếu cứu hộ đã đóng), riêng phiếu đã công khai mà
+    người gặp nạn tự an toàn → **đã xử lý** kèm ghi chú.
+  - **Một mã, một dòng tiến độ**: phiếu `PA-` đã nối phiếu SOS (gửi thẳng hoặc cán bộ chuyển) tra cứu ra **đúng tiến độ của
+    phiếu SOS** — tra `PA-` hay `SOS-` như nhau; "Phiếu của tôi" ghi một nhãn tiến độ theo phiếu SOS (`progress_label`).
+
 - Ảnh bị xoá EXIF/GPS, họ tên và SĐT người gửi chỉ cán bộ có `report.view` tại địa bàn đó xem được, IP chỉ lưu dạng băm.
-- Phản ánh loại **"Người mắc kẹt"** báo khẩn như SOS: thông báo đỏ kèm chuông cho cán bộ, nhật ký mức nguy hiểm, thẻ phản
-  ánh ghi **KHẨN** — duyệt và chuyển SOS ngay.
-- **Chuyển SOS**: số người mắc kẹt, mức ưu tiên, loại sự cố **điền sẵn từ nội dung người dân viết** ("3 người già mắc kẹt" →
-  3; cán bộ kiểm tra lại); để trống số người thì máy chủ tự bóc tách. Nội dung người dân gửi trở thành **tin gốc** của
-  phiếu — thẻ phiếu và link nhiệm vụ của đội hiện trường đều thấy (trước đây chỉ nằm trong ghi chú nội bộ, phiếu "0 người").
-  Người dân tra mã `PA-` thấy tiến độ của phiếu cứu hộ: đã chuyển yêu cầu cứu hộ (BCH đang bố trí) → đội đang trên đường →
-  đội đã đến; trực ban xác nhận cứu xong → phản ánh **tự chuyển "đã xử lý"** (trước đây "đang xử lý" mãi tới khi cán bộ tự
-  đóng phản ánh).
+- Phản ánh "Người mắc kẹt" cũ (gửi trước khi có chức năng chung, chưa nối phiếu SOS) vẫn ghi **KHẨN** trên trang Phản ánh
+  — duyệt và chuyển SOS ngay.
+- **Chuyển SOS** (báo tin hiện trường hoá ra có người gặp nguy hiểm): số người mắc kẹt, mức ưu tiên, loại sự cố **điền sẵn
+  từ nội dung người dân viết** ("3 người già mắc kẹt" → 3; cán bộ kiểm tra lại); để trống số người thì máy chủ tự bóc tách.
+  Nội dung người dân gửi trở thành **tin gốc** của phiếu — thẻ phiếu và link nhiệm vụ của đội hiện trường đều thấy (trước
+  đây chỉ nằm trong ghi chú nội bộ, phiếu "0 người"). Người dân tra mã `PA-` thấy tiến độ của phiếu cứu hộ; trực ban xác
+  nhận cứu xong → phản ánh **tự chuyển "đã xử lý"** (trước đây "đang xử lý" mãi tới khi cán bộ tự đóng phản ánh).
 - Khi duyệt, cán bộ ghi chú kết quả (VD "Đã cử dân quân cắm biển cảnh báo") để người dân yên tâm.
 - **Duyệt = chọn phần công khai** — cổng công khai không bao giờ trả mô tả / toạ độ gốc người dân gửi:
   - **Nội dung**: gợi ý sẵn mô tả gốc đã **tự che SĐT, email, số giấy tờ**; cán bộ bỏ tiếp tên người, số nhà. API công khai
@@ -1155,9 +1184,9 @@ cùng lúc trước đây là bị 429).
 | `GET /hotlines` | Đường dây nóng | 1 giờ |
 | `GET /lite?xa=` (nginx: `/ban-nhe`) | Trang bản nhẹ HTML < 50 KB ([9.4](#ban-nhe)) | 30 s, xoá khi phát cảnh báo |
 | `GET /reports`, `/reports/{id}/photos/{idx}` | Phản ánh **đã duyệt** + ảnh | 30 s |
-| `GET /report-categories`, `/config` | Loại sự việc; cấu hình công khai (khoá site Turnstile) | – |
+| `GET /report-categories`, `/config` | Loại sự việc (`rescue: true` = cứu người / tiếp tế, tạo phiếu SOS ngay); cấu hình công khai (khoá site Turnstile) | – |
 | `GET /hamlets?xa=` | Xóm / tổ dân phố của 1 xã (người dân chọn khi gửi phản ánh) | 1 giờ, xoá khi nhập xóm |
-| `POST /reports` | Gửi phản ánh (multipart, ≤ 3 ảnh × 8 MB; `hamlet` = mã xóm, tuỳ chọn) | – |
+| `POST /reports` | Gửi yêu cầu / phản ánh (multipart, ≤ 3 ảnh × 8 MB; `hamlet` = mã xóm, tuỳ chọn). `category` = `mac_ket` / `tiep_te` → tạo luôn phiếu SOS (trả `sos_code`; cần SĐT; cứu người thêm `incident_type`, `trapped_count`, `vulnerable` lặp lại) — mục 7.2 | – |
 | `POST /track` `{code, phone}` | Tra cứu tiến độ phiếu (POST để SĐT không nằm trên URL / log) | – |
 
 **Không bao giờ trả ra công khai**: vị trí, quân số lực lượng, kho, phương tiện; nội dung / toạ độ / SĐT trong phiếu SOS;
@@ -1177,7 +1206,7 @@ phần lớn do cache nginx 10 giây trả (không tới backend, không bị đ
 
 | Quy tắc | Giới hạn |
 |---|---|
-| Gửi phản ánh | 200 / giờ / IP + 5 phản ánh **thành công** / giờ / SĐT người gửi (gửi lỗi không mất lượt) |
+| Gửi phản ánh / yêu cầu cứu hộ | 200 / giờ / IP + 5 phiếu **thành công** / giờ / SĐT người gửi (gửi lỗi không mất lượt; yêu cầu cứu người / tiếp tế tính chung) |
 | Chỉ đường · Định vị · Tra cứu tiến độ | 60 · 240 · 120 / phút; tra cứu thêm: 10 lần không ra kết quả / giờ theo SĐT và theo mã phiếu |
 | API công khai khác | 600 / phút |
 | Đăng nhập | 30 / phút. Sai mật khẩu 10 lần → khoá 15′ **theo tài khoản + IP** (kẻ xấu biết tên đăng nhập của lãnh đạo chỉ tự khoá IP của mình); 100 lần từ mọi IP → khoá tài khoản **chưa bật 2 lớp**; sai mã 2 lớp 10 lần → khoá cả tài khoản |
@@ -1690,7 +1719,7 @@ Kiểm thử API (cần stack dev đang chạy với `DEMO_MODE=true`; tham số
 | Phân quyền 3 cấp: đúng 3 vai trò, phạm vi xã, cấp trên quản lý cấp dưới (chống mạo danh cùng cấp), đổi cấp / phạm vi, 4 mắt + PIN | `node tests/e2e/rbac-test.mjs` · `node tests/e2e/login-hierarchy-test.mjs` |
 | IoT HTTP / batch / LoRaWAN / MQTT, dự báo, xu hướng & giờ chạm báo động của `/stations` | `node tests/e2e/iot-test.mjs` |
 | Cổng & API công khai, phản ánh, tài khoản, giới hạn tần suất | `node tests/e2e/public-test.mjs [backend] [mailpit]` |
-| Tra cứu tiến độ phiếu | `node tests/e2e/track-test.mjs` |
+| Tra cứu tiến độ phiếu; gửi yêu cầu cứu người / tiếp tế (phiếu SOS ngay, một dòng tiến độ, đóng phiếu không cần cứu) | `node tests/e2e/track-test.mjs` |
 | Xác thực 2 lớp: bật / đăng nhập 2 bước / mã khôi phục / tắt / đặt lại / khoá; bắt buộc theo vai trò khi backend có `TOTP_REQUIRED_ROLES=admin_xa` và chạy với `REQUIRED_ROLE=admin_xa` (~1,5 phút; CI kiểm bắt buộc 2 lớp ở job prod) | `node tests/e2e/totp-test.mjs` |
 | Hồ chứa & xả lũ | `node tests/e2e/reservoir-test.mjs` |
 | Điểm đen sạt lở & đường đèo, heatmap cảm biến sạt lở | `node tests/e2e/landslide-test.mjs` |

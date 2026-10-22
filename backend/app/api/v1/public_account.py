@@ -32,6 +32,7 @@ from app.db import execute, fetch_all, fetch_one
 from app.infra import ratelimit
 from app.infra.mailer import send_mail
 from app.services.reports import CATEGORY, verify_turnstile
+from app.services.tracking import request_progress_label
 
 router = APIRouter(prefix="/public/account", tags=["Tài khoản người dân"])
 log = logging.getLogger(__name__)
@@ -280,16 +281,34 @@ async def reset(body: ResetIn):
 
 @router.get("/reports")
 async def my_reports(acc: dict = Depends(current_citizen)):
-    """ "Phiếu của tôi": phản ánh đã gửi khi đăng nhập (mới trước). Xem tiến độ từng phiếu: POST /public/track với mã +
-    số điện thoại của tài khoản (giao diện tự điền)."""
+    """ "Phiếu của tôi": phiếu yêu cầu đã gửi khi đăng nhập (mới trước), mỗi phiếu MỘT nhãn tiến độ (progress_label) —
+    phiếu đã thành phiếu cứu hộ theo tiến độ phiếu SOS. Xem chi tiết: POST /public/track với mã + số điện thoại của tài
+    khoản (giao diện tự điền)."""
     rows = await fetch_all(
         """SELECT r.code, r.category, r.status, r.created_at, left(r.description, 140) AS description,
-                  u.name AS admin_name
+                  u.name AS admin_name, t.code AS sos_code, t.status AS sos_status, t.close_reason, t.incident_type,
+                  d.status AS dispatch_status
              FROM community.citizen_reports r
              LEFT JOIN spatial_admin.administrative_units u ON u.id = r.admin_unit_id
+             LEFT JOIN operations.sos_tickets t ON t.id = r.sos_ticket_id
+             LEFT JOIN LATERAL (SELECT o.status FROM operations.dispatch_orders o
+                                 WHERE o.ticket_id = t.id AND o.status <> 'huy'
+                                 ORDER BY o.dispatched_at DESC LIMIT 1) d ON TRUE
             WHERE r.citizen_id = :id
             ORDER BY r.created_at DESC
             LIMIT 50""",
         {"id": acc["id"]},
     )
-    return [{**r, "category_label": CATEGORY.get(r["category"], r["category"])} for r in rows]
+    return [
+        {
+            **{
+                k: r[k]
+                for k in ("code", "category", "status", "created_at", "description", "admin_name", "sos_code")
+            },
+            "category_label": CATEGORY.get(r["category"], r["category"]),
+            "progress_label": request_progress_label(r),
+            # Phiếu cứu hộ còn mở → giao diện tô đỏ, đặt lên đầu
+            "rescue_open": bool(r["sos_code"]) and r["sos_status"] != "hoan_thanh",
+        }
+        for r in rows
+    ]
