@@ -183,6 +183,12 @@ Máy tính:
 - Trang con (Gửi phản ánh, Tra cứu, Hồ chứa, Sạt lở, Link nhiệm vụ) cùng kiểu mới: bỏ chữ IN HOA (13 chỗ ở các tệp này), màu
   chuyển (8 chỗ).
 
+Đã làm ở 1.1 (máy tính trước): thanh trên gọn, dải tình hình một dòng + chip, bản đồ vừa màn đầu với "Bạn muốn làm gì?" nổi
+(căn tỉnh chừa lề trái cho bảng), chân bản đồ dải mưa liền + giờ số liệu + bản nhẹ; điện thoại: bỏ nút trùng thanh đáy, chip
+một hàng cuộn ngang, danh sách lớp thu vào nút — bản đồ từ giữa màn đầu. Còn ở 1.2: menu 5 nhóm thay 8 tab, dải cảnh báo nổi
+trên bản đồ ở điện thoại (bản đồ ≥ 60 % màn đầu), trang con cùng kiểu. Thanh thời gian chưa đưa ra cổng (cổng chưa có số liệu
+theo giờ) — giữ nguyên chức năng.
+
 Phải còn đủ: định vị "Tôi đang ở đâu" và chọn theo 56 xã; điểm sơ tán gần nhất, chỉ đường; đèo dốc và lộ trình tránh; tra
 cứu phiếu bằng mã + số điện thoại; hồ chứa, xả lũ; mực nước; đường dây nóng; cẩm nang; gửi phản ánh có ảnh và vị trí; Gọi
 112; Bản nhẹ; Sáng / Tối; vào trang điều hành; chỉ hiện cảnh báo đã duyệt.
@@ -319,7 +325,7 @@ Thứ tự theo quyết định ngày 21/10/2026: trang điều hành trước, 
 | 7 | Đ4 · 4.1 | Cứu hộ, Cảnh báo, Phản ánh theo nền móng; chuyển động nhỏ | `RescueCenter.jsx`, `Alerts.jsx`, `CitizenReports.jsx` | Kiểm thử từng trang đạt | Xong — PR #116 |
 | 8 | Đ4 · 4.2 | Vật tư, Đợt thiên tai, Nhập dữ liệu, Nguồn dữ liệu, Phân quyền theo nền móng | các trang tương ứng | Kiểm thử từng trang đạt | Xong — PR #117 |
 | 9 | Đ4 · 4.3 | Hướng dẫn xử lý có hình; rà toàn bộ hai nền, 360 px | `Guide.jsx`, `utils/guides.js` | Rà ảnh hai nền đạt | Xong — PR #118 |
-| 10 | Đ1 · 1.1 | Cổng người dân trên máy tính: bản đồ toàn màn, "Bạn muốn làm gì?", dải cảnh báo, thanh thời gian, thanh trạng thái | `pages/public/PublicPortal.jsx` | Đủ danh sách 6.1; đường dẫn cũ mở được | Chưa làm |
+| 10 | Đ1 · 1.1 | Cổng người dân trên máy tính: bản đồ toàn màn, "Bạn muốn làm gì?", dải cảnh báo, thanh thời gian, thanh trạng thái | `pages/public/PublicPortal.jsx` | Đủ danh sách 6.1; đường dẫn cũ mở được | Xong — PR #119 |
 | 11 | Đ1 · 1.2 | Cổng người dân trên điện thoại + menu 5 nhóm + trang con cùng kiểu | `PublicPortal.jsx`, `ReportForm`, `TicketTracker`, `ReservoirMonitor`, `LandslideMonitor`, `MissionPage` | 360 px: bản đồ ≥ 60 % màn đầu, Gọi 112 luôn thấy | Chưa làm |
 | 12 | Đ5 · 5.1 | Tài khoản người dân — máy chủ: bảng, đăng ký, đăng nhập, phiên riêng; gửi phản ánh / SOS cần phiên người dân (mục 11) | `backend/app/api/v1/public.py`, bảng mới + migration, kiểm thử | Kiểm thử API: không phiên → từ chối; phiên cán bộ không dùng thay được | Chưa làm |
 | 13 | Đ5 · 5.2 | Tài khoản người dân — giao diện: đăng ký, đăng nhập, "Phiếu của tôi"; Gọi 112 luôn mở | `pages/public/*` | Người dân mới đăng ký, gửi được phản ánh không cần gọi hỏi | Chưa làm |
