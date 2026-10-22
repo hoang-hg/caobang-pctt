@@ -23,11 +23,12 @@ lần rà cuối (10/10/2026) sửa thêm 3 ô KPI trên điện thoại và nh�
 |---|---|
 | A.1 Lưới 3 khối: chỉ số nhanh (trên), biểu đồ (giữa), nhật ký (bên); màn hình lớn, thu gọn cho máy tính bảng | Đạt — bố cục laptop / iPad / điện thoại, nhật ký cột phải; chế độ trình chiếu cho màn hình lớn |
 | A.1 Nền tối mặc định | Đạt theo mục F.3: theo cài đặt Sáng / Tối của hệ điều hành và nhớ lựa chọn; trình chiếu luôn nền tối. Máy phòng điều hành cần đặt nền tối một lần (V1) |
-| A.2 Mưa trung bình lưu vực (mm/24h) và mưa cực đại cục bộ | Đạt — bình quân theo diện tích (đa giác Thiessen); dòng "Lớn nhất" thấy cả trên điện thoại. Cần trạm đo mưa (D1) |
-| A.2 Mực nước sông so với BĐ I, II, III | Đạt — kèm xu hướng, giờ dự báo vượt BĐ. Cần ngưỡng BĐ thật (D1) |
-| A.2 Hộ / nhân khẩu đã sơ tán trên kế hoạch | Đạt. Cần kế hoạch sơ tán (D1) |
-| A.2 SOS chờ xử lý, nhấp nháy đỏ khi quá 15 phút chưa có lực lượng | Đạt |
-| A.2 Quân số ứng trực / làm nhiệm vụ; xuồng, xe lội nước đang hoạt động | Đạt. Cần danh sách lực lượng, phương tiện (D1) |
+| A.2 Mưa trung bình lưu vực (mm/24h) và mưa cực đại cục bộ | Đạt — bình quân theo diện tích (đa giác Thiessen); dòng "Lớn nhất … mm" thấy ở mọi khổ màn (ô rộng thêm tên trạm). Cần trạm đo mưa (D1) |
+| A.2 Mực nước sông so với BĐ I, II, III | Đạt — số trạm trên báo động + "Cao nhất Báo động …"; màn ≥ 1536 px thêm mực nước đo được vượt mốc bao nhiêu mét (ô rộng: sông, trạm, dự báo nặng thêm có ghi nguồn); xu hướng. Cần ngưỡng BĐ thật (D1) |
+| A.2 Hộ / nhân khẩu đã sơ tán trên kế hoạch | Đạt — số lớn % hộ, dòng chính nhân khẩu đã sơ tán / kế hoạch, số hộ ở dòng thứ hai (ô rộng: cùng dòng). Cần kế hoạch sơ tán (D1) |
+| A.2 SOS chờ xử lý, nhấp nháy đỏ khi quá 15 phút chưa có lực lượng | Đạt — nhãn đỏ nhấp nháy không còn bị cắt ở ô hẹp |
+| A.2 Quân số ứng trực / làm nhiệm vụ; xuồng, xe lội nước đang hoạt động | Đạt — ô Phương tiện đếm đúng xuồng, xe lội nước (máy xúc, máy ủi ghi riêng). Cần danh sách lực lượng, phương tiện (D1) |
+| A.2 "Con số biết nói" đọc được trên mọi màn hình | Đạt (22/10/2026) — laptop 1366 / 1440 / 1600, iPad, điện thoại: không còn dòng nào bị cắt "…" mất số; điện thoại 360 × 740 vẫn thấy đủ 6 ô không cuộn |
 | A.3 Biểu đồ thủy văn: thực đo + dự báo, vạch BĐ I–III, tô phần vượt; vận hành hồ chứa | Đạt — dự báo lấy bản tin KTTV nhập tay (D5), chưa nối mô hình HEC-HMS (điểm 9); số liệu hồ nhập tay (D4) |
 | A.3 Mưa: cột theo giờ + đường tích luỹ, 1–3 giờ tới nét đứt (QPF) | Đạt — 1–3 giờ tới là dự báo mô hình số, chưa phải radar (điểm 8); chưa đánh giá ngập úng đô thị (điểm 7) |
 | A.3 Sạt lở: scatter / heatmap chuỗi thời gian, phân loại Đỏ / Cam / Vàng | Đạt — có cả hai; ngưỡng mưa còn minh hoạ (điểm 11); danh mục điểm đen viết cứng (D2) |

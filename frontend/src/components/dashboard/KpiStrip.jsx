@@ -6,6 +6,7 @@ import { ALARM } from '../../utils/labels';
 import { int, minutesSince, num } from '../../utils/format';
 import { RAIN_LABEL, risk } from '../../utils/risk';
 import { trendProps } from '../../utils/stations';
+import { useMediaQuery } from '../../utils/useMediaQuery';
 import { ErrorState, Skeleton, TrendTag } from '../common/ui';
 import StatCard from './StatCard';
 import { evacFacts, rainFacts, sosFacts } from './kpiFacts';
@@ -13,6 +14,11 @@ import { riverName, riverSummary, ROMAN, shortName } from './RiverKpi';
 
 const GRID = 'grid grid-cols-2 gap-2 sm:gap-2.5 [&>*]:min-w-0';
 const WIDE = 980; // vùng chỉ số rộng từ ~980 px → 6 ô một hàng
+// Ô từ ~300 px (cột trái màn lớn ≥ 1680 px, 2 × 3: dòng ~310 px): dòng ý nghĩa ghi thêm tên trạm, tên sông, số hộ. Ô hẹp
+// hơn (6 ô một hàng trên laptop 1366 / 1440 / 1600, 3 cột iPad dọc, 2 cột điện thoại: dòng 145–230 px ≈ 19–30 chữ) chỉ ghi
+// phần số chính — không để dấu "…" cắt mất số thiết kế yêu cầu (nhân khẩu sơ tán, mức báo động…); câu đầy đủ ở chú thích
+// khi rê chuột
+const ROOMY = 300;
 const TILE_H = 92; // chiều cao khung tải — gần bằng ô thật để trang không nhảy
 const HOUR = 3_600_000;
 
@@ -47,6 +53,10 @@ function lastHourRain(data) {
  * Xu hướng: ô Mưa so mưa giờ trọn gần nhất với giờ trước (dùng chung truy vấn 'rainfall' của biểu đồ mưa — không thêm lượt
  * gọi); ô Mực nước: lên / xuống của trạm nặng nhất. Ô SOS: viền đỏ + nhãn nhấp nháy (chỉ nhãn) khi có phiếu quá hạn phản
  * hồi theo cấp hoặc chờ quá 15 phút chưa có lực lượng nhận.
+ * Dòng ý nghĩa mang con số thứ hai của thiết kế A.2, đứng ĐẦU dòng: mưa lớn nhất; mức báo động cao nhất (màn ≥ 1536 px thêm
+ * mực nước đo được vượt mốc bao nhiêu); nhân khẩu đã sơ tán / kế hoạch (ô rộng: cả hộ); thời gian chờ lâu nhất; số người
+ * đang làm nhiệm vụ; loại phương tiện được đếm. Ô phương tiện đếm đúng "xuồng, xe lội nước" như thiết kế (máy xúc, máy ủi ghi
+ * riêng ở dòng thứ hai).
  * `large`: chữ số to cho chế độ trình chiếu (màn hình lớn phòng điều hành, đọc từ xa).
  * `stacked`: luôn 2 × 3 — cột trái của Tổng quan màn lớn ≥ 1680 px, cạnh bản đồ (3 × 2 ở cột đó làm chữ trong ô bị cắt).
  */
@@ -57,15 +67,21 @@ export default function KpiStrip({
   // Xếp 6 ô một hàng theo bề rộng THẬT của vùng chỉ số (không chỉ theo màn hình): màn rộng / trình chiếu đủ chỗ thì một
   // hàng; cạnh cột "Việc chờ quyết định" thì 3×2
   const gridRef = useRef(null);
-  const [wide, setWide] = useState(false);
+  const [gridW, setGridW] = useState(0);
+  const smUp = useMediaQuery('(min-width: 640px)'); // sm: 3 cột khi chưa đủ rộng cho 6 ô một hàng
+  const xl2 = useMediaQuery('(min-width: 1536px)'); // 2xl: ô có thêm dòng thứ hai
   const rainQ = useAreaQuery('rainfall', '/dashboard/rainfall', {}, { refetchInterval: 60_000 });
   useEffect(() => {
     const el = gridRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return undefined;
-    const ro = new ResizeObserver(([entry]) => setWide(entry.contentRect.width >= WIDE));
+    const ro = new ResizeObserver(([entry]) => setGridW(entry.contentRect.width));
     ro.observe(el);
     return () => ro.disconnect();
   }, [k]);
+  const wide = gridW >= WIDE;
+  const cols = stacked ? 2 : wide ? 6 : smUp ? 3 : 2;
+  const roomy = gridW > 0 && (gridW - (cols - 1) * 10) / cols >= ROOMY;
+  const fit = (short, full) => (roomy ? full : short);
   if (!k && kState.error) return <ErrorState onRetry={kState.refetch}>Không tải được chỉ số tổng quan</ErrorState>;
   if (!k) {
     return (
@@ -84,6 +100,10 @@ export default function KpiStrip({
   // Chạm ô → trạm sắp nặng thêm đó, không thì trạm nặng nhất
   const next = river.next && river.next.eta.level > (river.level ?? 0) ? river.next : null;
   const riverTarget = next ? next.s : river.worst?.s || river.rows[0]?.s;
+  // Mực nước đo được của trạm nặng nhất so với mốc báo động của nó (thiết kế A.2: "mực nước … so với các mốc Báo động")
+  const mark = lead ? Number(lead.s.thresholds?.[`bd${lead.st.level}`]) : null;
+  const over = lead && Number.isFinite(mark) ? lead.st.value - mark : null;
+  const riverDetail = lead && `${riverName(lead.s)}: ${num(lead.st.value, 2)} m${over != null ? `, vượt mốc Báo động ${ROMAN[lead.st.level]} (${num(mark, 2)} m) ${num(over, 2)} m` : ''}`;
   const sos = k.sos || {};
   // Mức / số chính dùng chung với bảng "Tình hình" của Bản đồ giám sát (kpiFacts) — hai nơi luôn cùng số, cùng màu
   const { late: sosLate, level: sosLv } = sosFacts(sos);
@@ -91,11 +111,15 @@ export default function KpiStrip({
   const ev = k.evacuation || {};
   const { planned, pct: evPct } = evacFacts(ev);
   const sites = evacQ.data?.sites || [];
+  const households = <><b className="num text-ink">{int(ev.evacuated_households)}/{int(planned)}</b> hộ</>;
+  const persons = ev.planned_persons > 0 && <><b className="num text-ink">{int(ev.evacuated_persons)}/{int(ev.planned_persons)}</b> người</>;
+  const sitesText = evacQ.data ? `${sites.length} điểm sơ tán` : evacQ.isError ? 'không tải được điểm sơ tán' : null;
   const fo = k.forces || {};
   const ve = k.vehicles || {};
-  const hasVehicles = ve.special_total > 0 || ve.heavy_total > 0;
-  const veActive = (ve.special_active || 0) + (ve.heavy_active || 0);
-  const veTotal = (ve.special_total || 0) + (ve.heavy_total || 0);
+  // Thiết kế A.2: "phương tiện chuyên dụng (xuồng, xe lội nước) đang hoạt động" — số lớn chỉ đếm xuồng, ca nô, ghe, xe lội
+  // nước đang làm nhiệm vụ / tổng số (trước đây cộng cả máy xúc, máy ủi: "0/17" mà không rõ 17 là gì)
+  const hasBoats = ve.special_total > 0;
+  const hasVehicles = hasBoats || ve.heavy_total > 0;
   const line = 'block truncate';
   const sosChip = (
     <span className="chip whitespace-nowrap bg-danger px-1.5 py-0 text-[11px] font-bold text-white motion-safe:animate-blink">
@@ -120,12 +144,15 @@ export default function KpiStrip({
         footer={
           rainKnown ? (
             <>
-              <span className={line} title={rainLv >= 1 ? `${RAIN_LABEL[rainLv]}: lớn nhất ${num(rain.max_24h, 1)} mm${maxAt}` : undefined}>
-                Lớn nhất <b className={clsx('num', rainLv >= 1 ? risk(rainLv).text : 'text-ink')}>{num(rain.max_24h, 1)} mm</b>{maxAt}
+              {/* Mưa cực đại cục bộ: số trước, tên trạm sau (ô hẹp: tên trạm ở chú thích) */}
+              <span className={line} title={`Lớn nhất ${num(rain.max_24h, 1)} mm/24 giờ${maxAt}${rainLv >= 1 ? ` — ${RAIN_LABEL[rainLv]}` : ''}`}>
+                Lớn nhất <b className={clsx('num', rainLv >= 1 ? risk(rainLv).text : 'text-ink')}>{num(rain.max_24h, 1)} mm</b>{roomy && maxAt}
               </span>
               {hourRain && <span className={clsx(line, 'hidden 2xl:block')}>Mưa {hourRain.span}: <b className="num text-ink">{num(hourRain.mm, 1)} mm</b></span>}
             </>
-          ) : rainStations ? `${rainStations} trạm đo mưa chưa gửi số đo 24 giờ qua` : 'Chưa có trạm đo mưa trong vùng đang xem'
+          ) : rainStations
+            ? fit(`${rainStations} trạm chưa có số đo`, `${rainStations} trạm đo mưa chưa gửi số đo 24 giờ qua`)
+            : fit('Chưa có trạm đo mưa', 'Chưa có trạm đo mưa trong vùng đang xem')
         }
       />
 
@@ -146,26 +173,33 @@ export default function KpiStrip({
             value={river.rows.length ? `${river.above}/${river.rows.length}` : '–'}
             unit={river.rows.length ? 'trạm báo động' : undefined}
             onClick={river.rows.length && onRiver ? () => onRiver(riverTarget.id) : undefined}
-            hint={riverTarget ? `Xem biểu đồ mực nước trạm ${shortName(riverTarget)}` : undefined}
+            hint={riverTarget ? `${riverDetail ? `${riverDetail}. ` : ''}Bấm xem biểu đồ mực nước trạm ${shortName(riverTarget)}` : undefined}
             footerRows={river.rows.length > 0}
             footer={
-              !river.rows.length ? 'Chưa có trạm mực nước trong vùng đang xem' : (
+              !river.rows.length ? fit('Chưa có trạm mực nước', 'Chưa có trạm mực nước trong vùng đang xem') : (
                 <>
-                  {next && (
-                    // Dự báo đáng lo nhất: mức kế tiếp · giờ · trạm · nguồn (bản tin thủy văn / mô phỏng — luôn ghi rõ)
-                    <span className={line} title={`${next.s.name}: dự báo lên báo động ${ROMAN[next.eta.level]} lúc ${next.eta.when} — ${next.eta.source}`}>
-                      {shortName(next.s)}:{' '}
-                      <b className={clsx('font-semibold', risk(next.eta.level).text)}>có thể lên Báo động {ROMAN[next.eta.level]} lúc {next.eta.when}</b>
-                      {!next.eta.kttv && ' (mô phỏng)'}
+                  {/* Dòng chính: mực nước so với mốc báo động (mức cao nhất; ô rộng thêm sông, trạm) */}
+                  <span className={line} title={riverDetail || undefined}>
+                    {river.level == null
+                      ? fit('Chưa đánh giá được', `${river.fresh}/${river.rows.length} trạm có số đo trong 60 phút qua — chưa đánh giá được`)
+                      : lead
+                        ? <>Cao nhất <b className={risk(river.level).text}>Báo động {ROMAN[river.level]}</b>{roomy && `: ${riverName(lead.s)}`}</>
+                        : fit(ALARM[0].label, `${ALARM[0].label} ở mọi trạm có số đo`)}
+                  </span>
+                  {/* Dòng thứ hai (màn ≥ 1536 px). Ô rộng có dự báo nặng thêm: nguồn ghi ĐẦU câu (bản tin / mô phỏng — câu
+                      dài bị cắt thì chỉ mất phần giờ, không bao giờ mất nguồn); còn lại: mực nước đo được vượt mốc bao nhiêu */}
+                  {roomy && next ? (
+                    <span className={clsx(line, 'hidden 2xl:block')} title={`${next.s.name}: dự báo lên báo động ${ROMAN[next.eta.level]} lúc ${next.eta.when} — ${next.eta.source}`}>
+                      {next.eta.kttv ? 'Bản tin' : 'Mô phỏng'}:{' '}
+                      <b className={clsx('font-semibold', risk(next.eta.level).text)}>
+                        {next.s.id !== lead?.s.id && `${shortName(next.s)} `}lên Báo động {ROMAN[next.eta.level]} lúc {next.eta.when}
+                      </b>
+                    </span>
+                  ) : over != null && over >= 0 && (
+                    <span className={clsx(line, 'hidden 2xl:block')} title={riverDetail}>
+                      Vượt mốc {ROMAN[lead.st.level]} <b className="num text-ink">{num(over, 2)} m</b>{roomy && ` · ${shortName(lead.s)} ${num(lead.st.value, 2)} m`}
                     </span>
                   )}
-                  <span className={clsx(line, next && 'hidden 2xl:block')}>
-                    {river.level == null
-                      ? `${river.fresh}/${river.rows.length} trạm có số đo trong 60 phút qua — chưa đánh giá được`
-                      : river.worst && river.level >= 1
-                        ? <>Cao nhất <b className={risk(river.level).text}>Báo động {ROMAN[river.level]}</b><span className="max-sm:hidden">: {riverName(river.worst.s)}</span></>
-                        : `${ALARM[0].label} ở mọi trạm có số đo`}
-                  </span>
                 </>
               )
             }
@@ -183,7 +217,8 @@ export default function KpiStrip({
         // (ô hẹp — điện thoại, 6 ô một hàng trên laptop: nhãn nằm cạnh số, hàng tiêu đề không đủ chỗ)
         trend={sosLate && <span className="hidden 2xl:inline">{sosChip}</span>}
         value={int(sos.waiting)}
-        unit={sosLate ? <span className="flex items-center gap-1.5">phiếu <span className="2xl:hidden">{sosChip}</span></span> : 'phiếu'}
+        // Ô hẹp dưới 1536 px: nhãn đỏ nằm cạnh số — bỏ chữ "phiếu" để nhãn không bị cắt mất
+        unit={sosLate ? <span className="flex items-center gap-1.5">{(roomy || xl2) && 'phiếu'}<span className="2xl:hidden">{sosChip}</span></span> : 'phiếu'}
         to={canSos ? '/cuu-ho' : undefined}
         hint="Đỏ khi có phiếu quá hạn phản hồi theo cấp (cấp 1: 3 phút · cấp 2: 15 phút · cấp 3: 60 phút, như trang Điều hành cứu hộ) hoặc chờ quá 15 phút mà chưa có đội nhận"
         footerRows
@@ -191,11 +226,15 @@ export default function KpiStrip({
           <>
             <span className={line}>
               {oldest != null && sos.waiting > 0
-                ? <>Chờ lâu nhất <b className={clsx('num', sos.overdue > 0 || oldest > 15 ? 'text-danger' : 'text-ink')}>{oldest} phút</b>{sos.critical > 0 && ` · ${sos.critical} cấp 1`}</>
-                : 'Không có phiếu đang chờ'}
+                ? <>Chờ lâu nhất <b className={clsx('num', sos.overdue > 0 || oldest > 15 ? 'text-danger' : 'text-ink')}>{oldest} phút</b>{roomy && sos.critical > 0 && ` · ${sos.critical} cấp 1`}</>
+                : fit('Không có phiếu chờ', 'Không có phiếu đang chờ')}
             </span>
             <span className={clsx(line, 'hidden 2xl:block')}>
-              Đang cứu <b className="num text-ink">{int(sos.in_progress)}</b> · xong 24 giờ <b className="num text-ink">{int(sos.resolved_24h)}</b>
+              {!roomy && sos.critical > 0 ? (
+                <><b className="num text-danger">{int(sos.critical)}</b> cấp 1 · đang cứu <b className="num text-ink">{int(sos.in_progress)}</b></>
+              ) : (
+                <>Đang cứu <b className="num text-ink">{int(sos.in_progress)}</b> · xong 24 giờ <b className="num text-ink">{int(sos.resolved_24h)}</b></>
+              )}
             </span>
           </>
         }
@@ -214,15 +253,18 @@ export default function KpiStrip({
         footer={
           planned ? (
             <>
+              {/* Số lớn là % hộ → dòng chính ghi nhân khẩu đã sơ tán / kế hoạch (ô rộng: cả số hộ) */}
               <span className={line}>
-                <b className="num text-ink">{int(ev.evacuated_households)}/{int(planned)}</b> hộ
-                {ev.planned_persons > 0 && <> · <b className="num text-ink">{int(ev.evacuated_persons)}/{int(ev.planned_persons)}</b> người</>}
+                {(roomy || !persons) && households}
+                {roomy && persons && ' · '}
+                {persons}
               </span>
-              {(evacQ.data || evacQ.isError) && (
-                <span className={clsx(line, 'hidden 2xl:block')}>{evacQ.data ? `${sites.length} điểm sơ tán` : 'không tải được điểm sơ tán'}</span>
+              {/* Dòng thứ hai (màn ≥ 1536 px): ô hẹp — số hộ (dòng chính đã ghi nhân khẩu); ô rộng — số điểm sơ tán */}
+              {(!roomy && persons ? households : sitesText) && (
+                <span className={clsx(line, 'hidden 2xl:block')}>{!roomy && persons ? households : sitesText}</span>
               )}
             </>
-          ) : 'Chưa có kế hoạch sơ tán trong vùng đang xem'
+          ) : fit('Chưa có kế hoạch', 'Chưa có kế hoạch sơ tán trong vùng đang xem')
         }
       />
 
@@ -236,26 +278,34 @@ export default function KpiStrip({
         to={canResource ? '/nguon-luc' : undefined}
         hint="Người sẵn sàng nhận nhiệm vụ / tổng quân số các đội trong vùng đang xem"
         footerRows
-        footer={<span className={line}>{fo.units > 0 ? <><b className="num text-ink">{int(fo.on_mission)}</b> người đang làm nhiệm vụ</> : 'Chưa có dữ liệu lực lượng'}</span>}
+        footer={
+          <span className={line}>
+            {fo.units > 0
+              ? fit(<>Làm nhiệm vụ: <b className="num text-ink">{int(fo.on_mission)}</b></>, <><b className="num text-ink">{int(fo.on_mission)}</b> người đang làm nhiệm vụ</>)
+              : fit('Chưa có dữ liệu', 'Chưa có dữ liệu lực lượng')}
+          </span>
+        }
       />
 
       <StatCard
         compact
         icon={Ship}
-        title={<><span className="2xl:hidden">Phương tiện</span><span className="hidden 2xl:inline">Phương tiện chuyên dụng</span></>}
+        title={roomy ? 'Phương tiện chuyên dụng' : 'Phương tiện'}
         level={hasVehicles ? undefined : null}
-        value={hasVehicles ? `${int(veActive)}/${int(veTotal)}` : '–'}
-        unit={hasVehicles ? 'hoạt động' : undefined}
+        value={hasBoats ? `${int(ve.special_active)}/${int(ve.special_total)}` : '–'}
+        unit={hasBoats ? 'hoạt động' : undefined}
         to={canResource ? '/nguon-luc' : undefined}
-        hint="Xuồng, xe lội nước (gồm ca nô, ghe) và máy xúc, máy ủi thông tuyến: đang làm nhiệm vụ / tổng số"
+        hint="Xuồng, xe lội nước (gồm ca nô, ghe): đang làm nhiệm vụ / tổng số. Máy xúc, máy ủi thông tuyến ghi riêng ở dòng dưới"
         footerRows={hasVehicles}
         footer={
           hasVehicles ? (
             <>
-              <span className={line}>Xuồng, xe lội nước <b className="num text-ink">{int(ve.special_active)}/{int(ve.special_total)}</b></span>
-              <span className={clsx(line, 'hidden 2xl:block')}>Máy xúc, máy ủi <b className="num text-ink">{int(ve.heavy_active)}/{int(ve.heavy_total)}</b></span>
+              <span className={line}>{hasBoats ? 'Xuồng, xe lội nước' : fit('Chưa có xuồng', 'Chưa có xuồng, xe lội nước')}</span>
+              {ve.heavy_total > 0 && (
+                <span className={clsx(line, 'hidden 2xl:block')}>Máy xúc, máy ủi <b className="num text-ink">{int(ve.heavy_active)}/{int(ve.heavy_total)}</b></span>
+              )}
             </>
-          ) : 'Chưa có dữ liệu phương tiện'
+          ) : fit('Chưa có dữ liệu', 'Chưa có dữ liệu phương tiện')
         }
       />
     </div>
