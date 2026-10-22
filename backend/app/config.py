@@ -126,8 +126,9 @@ class Settings(BaseSettings):
 
     # Tài khoản người dân của cổng công khai (docs/ke-hoach-lam-moi-giao-dien.md mục 11): bắt buộc đăng nhập mới gửi được
     # phản ánh / yêu cầu cứu hộ — Gọi 112, đường dây nóng luôn mở. Phiên người dân tách hẳn phiên cán bộ (JWT aud
-    # "citizen"), dài ngày vì người dân dùng điện thoại của chính mình
-    citizen_account_required: bool = False
+    # "citizen"), dài ngày vì người dân dùng điện thoại của chính mình. Tắt (false) chỉ khi cần cho gửi phản ánh không tài
+    # khoản (VD tạm thời trong lúc sửa sự cố đăng ký)
+    citizen_account_required: bool = True
     citizen_session_days: int = 30
 
     # Hook LLM tuỳ chọn để bóc tách tin nhắn SOS (mặc định dùng bộ luật). Số điện thoại được che trước khi gửi.

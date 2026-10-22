@@ -26,6 +26,7 @@ const DataImport = lazy(() => import('./pages/DataImport'));
 const DisasterEvents = lazy(() => import('./pages/DisasterEvents'));
 const Guide = lazy(() => import('./pages/Guide'));
 const PublicPortal = lazy(() => import('./pages/public/PublicPortal'));
+const CitizenResetPassword = lazy(() => import('./pages/public/ResetPassword'));
 const MissionPage = lazy(() => import('./pages/public/MissionPage'));
 
 // Dải CHẾ ĐỘ GIẢ LẬP: chỉ máy dev (app/store.js)
@@ -136,6 +137,7 @@ export default function App() {
         <Routes>
           {/* Công khai — không cần đăng nhập */}
           <Route path="/cong-khai" element={<PublicPortal />} />
+          <Route path="/cong-khai/dat-lai-mat-khau" element={<CitizenResetPassword />} />
           <Route path="/dang-nhap" element={loggedIn ? <AfterLogin /> : <Login />} />
           <Route path="/quen-mat-khau" element={<ForgotPassword />} />
           <Route path="/dat-lai-mat-khau" element={<ResetPassword />} />

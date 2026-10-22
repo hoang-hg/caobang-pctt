@@ -23,7 +23,9 @@ const track = (code, phone) => call('POST', '/public/track', { code, phone });
 
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGP8z8DAwMDAxMDAwMDAAAANHQEDasKb6QAAAABJRU5ErkJggg==', 'base64');
 const COBA = { lat: 23.005, lon: 105.718 }; // trong xã Cô Ba theo ranh giới thật (seed/caobang_communes.geojson)
-const PHONE = `0999${String(Date.now()).slice(-6)}`;
+const BASE6 = Number(String(Date.now()).slice(-6));
+const PHONE = `0999${String(BASE6).padStart(6, '0')}`;
+const PHONE2 = `0999${String((BASE6 + 1) % 1e6).padStart(6, '0')}`; // tài khoản thứ hai
 
 function reportForm({ desc, phone }) {
   const f = new FormData();
@@ -36,10 +38,18 @@ function reportForm({ desc, phone }) {
   return f;
 }
 
-// ---- Dữ liệu thử
-const mine = await call('POST', '/public/reports', reportForm({ desc: 'Đất đá sạt xuống taluy dương, lấp nửa mặt đường (kiểm thử tra cứu)', phone: PHONE }));
-const anon = await call('POST', '/public/reports', reportForm({ desc: 'Nội dung phản ánh ẩn danh không được lộ ra ngoài (kiểm thử tra cứu)' }));
-check('Tạo 2 phản ánh (có SĐT / ẩn danh)', mine.status === 201 && anon.status === 201, `${mine.data?.code} ${anon.data?.code}`);
+// Tài khoản người dân (Đ5): gửi phản ánh cần đăng nhập (CITIZEN_ACCOUNT_REQUIRED) — đăng ký, có rồi thì đăng nhập
+async function citizenToken(phone, name = 'Người dân thử nghiệm') {
+  const body = { full_name: name, phone, password: 'Nguoidan2026', consent: true };
+  const r = await call('POST', '/public/account/register', body);
+  if (r.status === 201) return r.data.token;
+  return (await call('POST', '/public/account/login', { phone, password: body.password })).data?.token;
+}
+
+// ---- Dữ liệu thử: 2 phản ánh của 2 tài khoản người dân (gửi phản ánh cần đăng nhập — SĐT lấy từ tài khoản)
+const mine = await call('POST', '/public/reports', reportForm({ desc: 'Đất đá sạt xuống taluy dương, lấp nửa mặt đường (kiểm thử tra cứu)' }), await citizenToken(PHONE));
+const anon = await call('POST', '/public/reports', reportForm({ desc: 'Nội dung phản ánh không được lộ ra ngoài (kiểm thử tra cứu)' }), await citizenToken(PHONE2));
+check('Tạo 2 phản ánh bằng 2 tài khoản người dân', mine.status === 201 && anon.status === 201, `${mine.data?.code} ${anon.data?.code}`);
 
 const T = { trucban: await login('trucban', 'trucban123'), coba: await login('admin.coba', 'admincoba123') };
 const sos = await call('POST', '/sos', { raw_message: 'Kiểm thử tra cứu', reporter_phone: PHONE, lat: COBA.lat, lon: COBA.lon, incident_type: 'sat_lo', priority: 2, trapped_count: 1, address: 'Thôn thử nghiệm' }, T.trucban);
@@ -63,10 +73,10 @@ for (const q of ['SOS', 'PA-', '100', PHONE]) {
 }
 check('GET /track không còn dùng (SĐT không nằm trên URL)', (await call('GET', `/public/track?code=${mine.data.code}`)).status === 405);
 
-// ---- Phản ánh không để lại SĐT: mã PA-… tăng dần (đoán được) → chỉ mã tra cứu đầy đủ (đuôi ngẫu nhiên cấp khi gửi)
+// ---- Mã PA-… tăng dần (đoán được) → không SĐT thì chỉ mã tra cứu đầy đủ (đuôi ngẫu nhiên cấp khi gửi) xem được
 check('Gửi phản ánh nhận mã tra cứu PA-…-XXXXXX', /^PA-\d+-[A-Z]{6}$/.test(anon.data?.track_code || '') &&
   anon.data.track_code.startsWith(`${anon.data.code}-`), anon.data?.track_code);
-check('Không SĐT, chỉ nhập mã phiếu (dò mã tăng dần) → như không tồn tại', (await track(anon.data.code)).data?.total === 0);
+check('Chỉ nhập mã phiếu, không SĐT (dò mã tăng dần) → như không tồn tại', (await track(anon.data.code)).data?.total === 0);
 const wrongKey = `${anon.data.code}-${anon.data.track_code.endsWith('AAAAAA') ? 'BBBBBB' : 'AAAAAA'}`;
 check('Sai đuôi mã tra cứu → như không tồn tại', (await track(wrongKey)).data?.total === 0);
 const r2 = await track(anon.data.track_code);

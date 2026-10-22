@@ -318,7 +318,7 @@ check('Superadmin phê duyệt → ghi dữ liệu', subOk.status === 200 && sub
 check('Sau khi duyệt: hiện trên cổng công khai (≤ 15 giây)', names(await until('/public/map', (d) => names(d).includes(SITE))).includes(SITE));
 
 // ================================================================ 7. Phản ánh → duyệt → chuyển SOS → điều động
-const PHONE = '0912 345 678';
+const PHONE = '0999 345 678'; // số giả (đầu 0999)
 const f = new FormData();
 f.append('category', 'ngap');
 f.append('description', `Nước ngập sâu trước cổng trường, xe máy không qua được (kiểm thử ${stamp})`);
@@ -326,8 +326,12 @@ f.append('lat', '22.6700');
 f.append('lon', '106.2400');
 f.append('reporter_name', 'Người dân kiểm thử');
 f.append('reporter_phone', PHONE);
-const rep = await call('POST', '/public/reports', f);
-check('Người dân gửi phản ánh (không đăng nhập)', rep.status === 201 && !!rep.data?.code, `HTTP ${rep.status} ${rep.data?.code || JSON.stringify(rep.data).slice(0, 100)}`);
+// Tài khoản người dân (Đ5): chưa đăng nhập không gửi được; đăng ký xong gửi (họ tên, SĐT lấy từ tài khoản)
+check('Chưa đăng nhập tài khoản người dân → không gửi được phản ánh (401)', (await call('POST', '/public/reports', f)).status === 401);
+const citizen = await call('POST', '/public/account/register', { full_name: 'Người dân kiểm thử', phone: PHONE, password: 'Nguoidan2026', consent: true });
+check('Người dân đăng ký tài khoản', citizen.status === 201 && !!citizen.data?.token, `HTTP ${citizen.status}`);
+const rep = await call('POST', '/public/reports', f, citizen.data?.token);
+check('Người dân đã đăng nhập gửi phản ánh', rep.status === 201 && !!rep.data?.code, `HTTP ${rep.status} ${rep.data?.code || JSON.stringify(rep.data).slice(0, 100)}`);
 const repId = rep.data?.id;
 const pending = (await call('GET', '/public/reports')).data;
 check('Phản ánh chưa duyệt không hiện công khai', !JSON.stringify(pending).includes(rep.data?.code));

@@ -7,6 +7,9 @@ import {
 } from 'lucide-react';
 import { Modal } from '../../components/common/ui';
 import Turnstile from '../../components/common/Turnstile';
+import { citizenApi } from '../../api/citizen';
+import { useCitizen } from '../../app/citizenSession';
+import CitizenAuth from './CitizenAuth';
 import { BaseLayer, ProvinceMask } from '../../components/map/MapTools';
 import { pinIcon } from '../../components/map/icons';
 import { api } from '../../api/client';
@@ -59,6 +62,11 @@ export default function ReportForm({ onClose, myLocation, onTrack }) {
   // Chống bot (Cloudflare Turnstile) — chỉ khi backend bật TURNSTILE_SITE_KEY
   const { data: pubConfig } = useQuery({ queryKey: ['pub-config'], queryFn: () => api('/public/config'), staleTime: Infinity });
   const siteKey = pubConfig?.turnstile_site_key;
+  // Tài khoản người dân (Đ5): đăng nhập → họ tên, số điện thoại lấy từ tài khoản, phiếu vào "Phiếu của tôi". Bắt buộc đăng
+  // nhập (citizen_account_required) mà chưa đăng nhập / đang dùng mật khẩu tạm → hiện khung đăng nhập thay biểu mẫu
+  const session = useCitizen((s) => s.session);
+  const setSession = useCitizen((s) => s.setSession);
+  const needAuth = (!!pubConfig?.citizen_account_required && !session) || !!session?.account?.must_change_password;
   const [token, setToken] = useState('');
   const [tokenRound, setTokenRound] = useState(0);
   const onTurnstileError = useCallback(
@@ -105,10 +113,8 @@ export default function ReportForm({ onClose, myLocation, onTrack }) {
     files.forEach((x) => form.append('photos', x.file, x.file.name));
     if (token) form.append('turnstile_token', token);
     try {
-      const res = await fetch('/api/v1/public/reports', { method: 'POST', body: form });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : res.status === 429 ? 'Bạn gửi quá nhiều phản ánh trong thời gian ngắn, vui lòng thử lại sau' : 'Gửi không thành công, vui lòng kiểm tra lại thông tin');
-      setDone(data);
+      // Có phiên người dân thì gửi kèm token người dân; phiên hết hạn (401) → citizenApi xoá phiên → hiện khung đăng nhập
+      setDone(await citizenApi('/public/reports', { method: 'POST', form }));
     } catch (e) {
       setError(e.message);
       if (siteKey) { setToken(''); setTokenRound((n) => n + 1); } // token đã dùng → lấy token mới
@@ -130,7 +136,7 @@ export default function ReportForm({ onClose, myLocation, onTrack }) {
                 className="btn bg-accent text-white hover:brightness-110 px-4 py-2 text-xs sm:text-sm font-semibold flex items-center gap-1.5 shadow-sm"
                 onClick={() => {
                   onClose();
-                  onTrack(done.track_code || done.code, f.reporter_phone);
+                  onTrack(done.track_code || done.code, session ? session.account.phone : f.reporter_phone);
                 }}
               >
                 <Search size={15} />
@@ -165,7 +171,9 @@ export default function ReportForm({ onClose, myLocation, onTrack }) {
               </div>
             )}
             <div className="text-xs text-muted">
-              {f.reporter_phone.trim()
+              {session
+                ? 'Phiếu đã vào mục "Phiếu của tôi" (Tra cứu phiếu) — xem tiến độ không cần nhập mã.'
+                : f.reporter_phone.trim()
                 ? 'Chụp màn hình hoặc lưu lại mã tra cứu. Tra cứu tiến độ bằng mã tra cứu, hoặc mã phản ánh kèm số điện thoại bạn đã nhập.'
                 : 'Chụp màn hình hoặc lưu lại mã tra cứu — bạn không để lại số điện thoại nên đây là cách duy nhất để xem tiến độ. Mã này không được cấp lại.'}
             </div>
@@ -174,6 +182,17 @@ export default function ReportForm({ onClose, myLocation, onTrack }) {
             {done.message || 'Cảm ơn bạn. Cán bộ địa phương sẽ xác minh phản ánh; nếu nguy hiểm đến tính mạng hãy gọi ngay 112.'}
           </p>
         </div>
+      </Modal>
+    );
+  }
+
+  if (needAuth) {
+    return (
+      <Modal open onClose={onClose} title="Gửi phản ánh hiện trường">
+        <CitizenAuth
+          initial="login"
+          reason="Cần tài khoản người dân để gửi phản ánh, yêu cầu cứu hộ — đăng nhập, hoặc đăng ký trong khoảng 1 phút. Cán bộ dùng số điện thoại để liên hệ xác minh."
+        />
       </Modal>
     );
   }
@@ -296,16 +315,25 @@ export default function ReportForm({ onClose, myLocation, onTrack }) {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-xs font-semibold text-muted mb-1">Họ tên của bạn</label>
-              <input className="input" maxLength={100} value={f.reporter_name} onChange={set('reporter_name')} placeholder="Tuỳ chọn" />
+          {session ? (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-panel2 px-3 py-2 text-sm">
+              <span>Gửi bằng tài khoản: <b>{session.account.full_name}</b> · <span className="num">{session.account.phone}</span></span>
+              <button type="button" className="text-xs font-semibold text-accent hover:underline" onClick={() => setSession(null)}>
+                Không phải bạn? Đăng xuất
+              </button>
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-muted mb-1">Số điện thoại</label>
-              <input className="input" inputMode="tel" maxLength={20} value={f.reporter_phone} onChange={set('reporter_phone')} placeholder="Để cán bộ liên hệ" />
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs font-semibold text-muted mb-1">Họ tên của bạn</label>
+                <input className="input" maxLength={100} value={f.reporter_name} onChange={set('reporter_name')} placeholder="Tuỳ chọn" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-muted mb-1">Số điện thoại</label>
+                <input className="input" inputMode="tel" maxLength={20} value={f.reporter_phone} onChange={set('reporter_phone')} placeholder="Để cán bộ liên hệ" />
+              </div>
             </div>
-          </div>
+          )}
 
           <p className="-mt-1 flex items-center gap-1 text-[11px] text-muted">
             <ShieldCheck size={12} className="shrink-0 text-good" /> Họ tên, số điện thoại chỉ cán bộ xác minh mới xem được, không hiển thị công khai. Nội dung được cán bộ xem lại trước khi công khai; vị trí trên cổng được làm tròn.

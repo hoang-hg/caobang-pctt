@@ -1,7 +1,7 @@
 import { cloneElement, useId, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { Building2, Crown, History, KeyRound, Lock, MapPin, Pencil, Search, ShieldCheck, ShieldOff, Unlock, UserPlus, Users } from 'lucide-react';
+import { Building2, Crown, History, KeyRound, Lock, MapPin, Pencil, Search, ShieldCheck, ShieldOff, Unlock, UserPlus, UserRound, Users } from 'lucide-react';
 import { api } from '../api/client';
 import { useStore } from '../app/store';
 import PageHeader from '../components/common/PageHeader';
@@ -12,6 +12,7 @@ import { usePermission } from '../rbac/usePermission';
 import { canManageAt, GLOBAL } from '../rbac/permissions';
 import { dateTime } from '../utils/format';
 import { PASSWORD_HINT, weakPassword } from './AccountPages';
+import CitizenAccountsTab from './CitizenAccountsTab';
 
 const AUDIT_LABEL = {
   'user.create': 'Tạo tài khoản',
@@ -668,6 +669,7 @@ function AuditTab() {
 export default function AccessControl() {
   const [tab, setTab] = useState('users');
   const mine = useStore((s) => s.auth?.user?.assignments?.[0]);
+  const canCitizens = usePermission('citizen', 'view');
   return (
     <div className={`${PAGE} pb-8`}>
       <PageHeader
@@ -688,12 +690,15 @@ export default function AccessControl() {
           { value: 'users', label: 'Tài khoản', icon: Users },
           { value: 'roles', label: '3 cấp & quyền hạn', short: '3 cấp', icon: ShieldCheck },
           { value: 'audit', label: 'Nhật ký thao tác', short: 'Nhật ký', icon: History },
+          // Tài khoản người dân của cổng (Đ5) — chỉ cán bộ cấp tỉnh (quyền citizen.view)
+          ...(canCitizens ? [{ value: 'citizens', label: 'Tài khoản người dân', short: 'Người dân', icon: UserRound }] : []),
         ]}
       />
 
       {tab === 'users' && <UsersTab />}
       {tab === 'roles' && <RolesTab />}
       {tab === 'audit' && <AuditTab />}
+      {tab === 'citizens' && canCitizens && <CitizenAccountsTab />}
     </div>
   );
 }

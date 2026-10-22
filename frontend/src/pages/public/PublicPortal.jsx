@@ -28,6 +28,8 @@ import TicketTracker from './TicketTracker';
 import ReservoirMonitor from './ReservoirMonitor';
 import LandslideMonitor, { maxTiltText } from './LandslideMonitor';
 import NetworkBanner from './NetworkBanner';
+import CitizenMenu from './CitizenMenu';
+import MyReports from './MyReports';
 
 // Menu 5 nhóm (docs/ke-hoach-lam-moi-giao-dien.md 6.1) — đủ 8 màn như trước (`tabs` = mã màn, giữ nguyên để link / nút cũ
 // chuyển đúng màn); nhóm có 2 màn thì hiện hàng trang con. Cẩm nang an toàn ở cuối hàng nhóm, menu điện thoại, chân trang
@@ -616,9 +618,13 @@ export default function PublicPortal() {
               {theme === 'dark' ? <Sun size={16} className="text-amber-400" /> : <Moon size={16} className="text-indigo-500" />}
             </button>
 
+            {/* Tài khoản người dân (Đ5) — tách nút "Cán bộ" (trang điều hành) */}
+            <CitizenMenu onMyReports={() => openTab('tracuu')} />
+
             <Link
               to={auth?.token ? '/dashboard' : '/dang-nhap'}
-              className="btn-ghost text-xs px-2.5 py-1.5"
+              className="btn-ghost text-xs px-2.5 py-1.5 max-sm:hidden"
+              title="Đăng nhập trang điều hành (cán bộ)"
             >
               <LogIn size={14} />
               <span className="hidden md:inline">{auth?.token ? 'Vào Điều hành' : 'Cán bộ'}</span>
@@ -654,6 +660,10 @@ export default function PublicPortal() {
               </li>
             </ul>
             <a href="/ban-nhe" className="mt-1 block px-2 text-xs font-semibold text-accent hover:underline">Bản nhẹ cho mạng yếu (chỉ chữ, dưới 50 KB)</a>
+            {/* Điện thoại: nút "Cán bộ" ở đây — thanh trên nhường chỗ cho tên cổng và tài khoản người dân */}
+            <Link to={auth?.token ? '/dashboard' : '/dang-nhap'} className="mt-2 flex items-center gap-1.5 px-2 text-xs font-semibold text-ink-2 hover:underline">
+              <LogIn size={13} aria-hidden="true" /> {auth?.token ? 'Vào trang điều hành' : 'Cán bộ đăng nhập trang điều hành'}
+            </Link>
           </nav>
         )}
       </header>
@@ -1572,12 +1582,16 @@ export default function PublicPortal() {
 
         {/* TAB TRA CỨU TIẾN ĐỘ CỨU HỘ & PHẢN ÁNH */}
         {activeTab === 'tracuu' && (
-          <TicketTracker
-            initialCode={track.code}
-            initialPhone={track.phone}
-            onQueryChange={setTrack}
-            onBackToMap={goToMap}
-          />
+          <>
+            {/* Đã đăng nhập tài khoản người dân: các phiếu đã gửi — xem tiến độ không cần nhập mã */}
+            <MyReports onTrack={(code, phone) => setTrack({ code, phone })} />
+            <TicketTracker
+              initialCode={track.code}
+              initialPhone={track.phone}
+              onQueryChange={setTrack}
+              onBackToMap={goToMap}
+            />
+          </>
         )}
 
         {/* TAB 2: MỰC NƯỚC SÔNG SUỐI */}

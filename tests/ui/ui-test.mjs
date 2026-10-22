@@ -237,6 +237,18 @@ async function publicPortal(ctx) {
       await visible(page.getByRole('button', { name: 'Gửi phản ánh' })).click();
       const dialog = page.getByRole('dialog');
       await dialog.waitFor();
+      // Tài khoản người dân (Đ5): bắt buộc đăng nhập → đăng ký ngay trong hộp thoại (có dòng Gọi 112), xong thì hiện biểu mẫu
+      const regTab = dialog.getByRole('button', { name: 'Đăng ký tài khoản' });
+      if (await regTab.isVisible().catch(() => false)) {
+        if (!(await dialog.getByRole('link', { name: /Gọi ngay 112/ }).isVisible())) throw new Error('khung đăng nhập thiếu "Gọi ngay 112"');
+        await regTab.click();
+        await dialog.getByLabel('Họ tên', { exact: true }).fill(`Người dân thử (${vp.name})`);
+        await dialog.getByLabel('Số điện thoại', { exact: true }).fill(`0999${String(Date.now()).slice(-6)}`);
+        await dialog.getByLabel('Mật khẩu', { exact: true }).fill('Nguoidan2026');
+        await dialog.getByRole('checkbox').check();
+        await dialog.getByRole('button', { name: 'Đăng ký', exact: true }).click();
+        await dialog.locator('textarea').waitFor({ timeout: 15_000 });
+      }
       await dialog.locator('textarea').fill(`Kiểm thử giao diện (${vp.name}): nước ngập qua đường liên thôn khoảng 30cm`);
       if (vp.mobile) {
         await dialog.getByRole('button', { name: 'Lấy vị trí của tôi' }).click(); // GPS giả lập của điện thoại
