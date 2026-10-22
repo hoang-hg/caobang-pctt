@@ -41,12 +41,12 @@ export const PAGE_TIPS = {
   },
   'cuu-ho': {
     tinh: [
-      'Cột "Mới báo — chưa ai nhận" đã xếp sẵn: quá hạn trước, rồi cấp 1 Đỏ. Làm từ trên xuống.',
-      'Bấm "Điều đội" trên thẻ: chọn đội được gợi ý, vật tư mang theo, xác nhận rồi phát lệnh.',
+      'Cột "Mới báo — chưa ai nhận" đã xếp sẵn: quá hạn trước, rồi cấp 1 Đỏ. Phiếu ghi "Cổng người dân": gọi lại số trên thẻ để xác minh.',
+      'Bấm "Điều đội" trên thẻ: chọn đội được gợi ý, vật tư mang theo, xác nhận rồi phát lệnh. Trùng, tin giả, đã tự an toàn: "Không cần cứu".',
       'Đội báo đã tới: bấm "Đội đã đến". Người dân an toàn: bấm "Xác nhận đã cứu" để đóng phiếu.',
     ],
     xa: [
-      'Ở đây là phiếu cứu hộ của xã mình. Phiếu mới: gọi xác minh rồi bấm "Nhận phiếu".',
+      'Ở đây là phiếu cứu hộ của xã mình. Phiếu mới: gọi xác minh rồi bấm "Nhận phiếu"; không cần cứu thì bấm "Không cần cứu".',
       'Tỉnh điều đội đến: theo dõi ở cột "Đội đang đến"; nút "Gọi" để gọi người báo tin.',
       'Người dân đã an toàn: bấm "Xác nhận đã cứu". Cần thêm lực lượng: gửi yêu cầu chi viện lên tỉnh.',
     ],
@@ -91,7 +91,7 @@ export const PAGE_TIPS = {
     tinh: [
       'Phản ánh người dân gửi qua cổng công khai (ảnh, vị trí) nằm ở đây, mới nhất trên cùng.',
       'Đúng sự thật: "Duyệt công khai" để hiện trên bản đồ cho người dân. Sai, trùng: "Từ chối".',
-      'Có người gặp nạn: bấm "Chuyển SOS" để tạo phiếu cứu hộ ngay.',
+      'Có người gặp nạn: bấm "Chuyển SOS" để tạo phiếu cứu hộ ngay. Yêu cầu "Cần cứu người", "Cần tiếp tế" đã vào thẳng trang Cứu hộ.',
     ],
   },
   'nhap-du-lieu': {
@@ -295,6 +295,7 @@ export const SCENARIOS = {
         'Bấm "Báo cáo nhanh" trên thanh trên cùng (điện thoại: nút đỏ "Báo SOS" ở dưới cùng).',
         'Ghi người báo, số điện thoại, ở đâu (đang ở hiện trường thì lấy vị trí), mấy người, có người già, trẻ em không.',
         'Gửi: phiếu hiện ngay ở trực ban tỉnh. Xã đã gọi xác minh thì bấm "Nhận phiếu" trên thẻ phiếu.',
+        'Người dân tự gửi "Cần cứu người", "Cần tiếp tế" trên cổng: phiếu vào thẳng cột "Mới báo" — gọi lại số trên thẻ; trùng, tin giả hoặc người đã tự an toàn thì bấm "Không cần cứu".',
         'Lực lượng xã tự cứu được: cứu xong bấm "Xác nhận đã cứu".',
       ],
     },
@@ -366,7 +367,7 @@ export const SCENARIOS = {
       steps: [
         'Xem ảnh, vị trí, nội dung người dân gửi.',
         'Đúng sự thật: "Duyệt công khai". Sai, trùng: "Từ chối".',
-        'Có người gặp nạn: "Chuyển SOS" để tạo phiếu cứu hộ ngay.',
+        'Có người gặp nạn: "Chuyển SOS" để tạo phiếu cứu hộ ngay. Yêu cầu "Cần cứu người", "Cần tiếp tế" đã vào thẳng trang Cứu hộ.',
       ],
     },
     {

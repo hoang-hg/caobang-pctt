@@ -27,7 +27,8 @@ export default function RescueKpis({ ticketsQ, tickets, factsOf, evacQ, onGo, on
     return s && (!m || s.waitedSec > m.sec) ? { sec: s.waitedSec, code: t.code } : m;
   }, null);
   const trapped = open.reduce((n, t) => n + (t.trapped_count || 0), 0);
-  const saved = tickets.filter((t) => t.status === 'hoan_thanh').reduce((n, t) => n + (t.trapped_count || 0), 0);
+  // Phiếu đóng không cần cứu (trùng, không xác minh được, tự an toàn) không tính là đã cứu
+  const saved = tickets.filter((t) => t.status === 'hoan_thanh' && !t.close_reason).reduce((n, t) => n + (t.trapped_count || 0), 0);
   const ev = evacQ.data;
   const planned = ev?.progress.reduce((n, r) => n + r.planned_households, 0) || 0;
   const done = ev?.progress.reduce((n, r) => n + r.evacuated_households, 0) || 0;

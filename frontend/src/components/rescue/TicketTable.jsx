@@ -2,7 +2,7 @@ import clsx from 'clsx';
 import { MapPin, Send } from 'lucide-react';
 import { SortTh } from '../common/ui';
 import { usePermission } from '../../rbac/usePermission';
-import { INCIDENT, PRIORITY, SOS_STATUS, SOURCE } from '../../utils/labels';
+import { INCIDENT, PRIORITY, sosStatusLabel, sourceLabel } from '../../utils/labels';
 import { dateTime, time } from '../../utils/format';
 import { risk, sosLevel } from '../../utils/risk';
 import { etaText, waitText } from './rescueFacts';
@@ -19,7 +19,7 @@ function Row({ t, x, now, pdf, online, onDispatch, onFocus }) {
     <tr className={clsx(x.overdue && 'bg-danger/5')}>
       <td className={clsx('whitespace-nowrap border-l-4', risk(sosLevel(t.priority)).edge)}>
         <b className="num text-ink">{t.code}</b>
-        <div className="text-xs text-muted">{SOURCE[t.source] || t.source}</div>
+        <div className="text-xs text-muted">{sourceLabel(t)}</div>
       </td>
       <td><span className={clsx('chip whitespace-nowrap py-0.5 text-[11px] font-bold', pr.cls)} title={pr.label}>Cấp {t.priority} · {pr.short}</span></td>
       <td>
@@ -30,7 +30,7 @@ function Row({ t, x, now, pdf, online, onDispatch, onFocus }) {
         <div className={clsx('text-sm', !pdf && 'line-clamp-2')}>{t.address || t.admin_name}</div>
         {t.admin_name && t.address !== t.admin_name && <div className="text-xs text-muted">{t.admin_name}</div>}
       </td>
-      <td className="whitespace-nowrap text-sm">{SOS_STATUS[t.status] || t.status}</td>
+      <td className="whitespace-nowrap text-sm">{sosStatusLabel(t)}</td>
       <td className="text-xs">
         {x.sla
           ? <span className={clsx(x.overdue ? 'font-bold text-danger' : 'text-ink-2')} title={`Hạn phản hồi cấp ${t.priority}: ${t.sla_minutes} phút`}>{waitText(t, x.sla)}</span>

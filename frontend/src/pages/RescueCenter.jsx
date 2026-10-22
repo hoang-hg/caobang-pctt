@@ -14,6 +14,7 @@ import { PAGE } from '../components/layout/page';
 import DispatchModal from '../components/common/DispatchModal';
 import { MissionLinkModal } from '../components/common/MissionLink';
 import CancelDispatchModal from '../components/common/CancelDispatchModal';
+import CloseTicketModal from '../components/common/CloseTicketModal';
 import EditTicketModal from '../components/common/EditTicketModal';
 import QuickActionBar from '../components/common/QuickActionBar';
 import ConnectionBanner from '../components/dashboard/ConnectionBanner';
@@ -30,7 +31,7 @@ import {
   COLUMN_KEYS, FILTERS, SORTS, matchTicket, optionCounts, rescueAlerts, sortTickets, ticketFacts,
 } from '../components/rescue/rescueFacts';
 import { Can, useAllowedCodes, usePermission } from '../rbac/usePermission';
-import { INCIDENT, PRIORITY, SOS_STATUS, SOURCE, VULNERABLE } from '../utils/labels';
+import { INCIDENT, PRIORITY, VULNERABLE, sosStatusLabel, sourceLabel } from '../utils/labels';
 import { dateTime, foldVi, vnFileStamp } from '../utils/format';
 import { exportExcel } from '../utils/exportExcel';
 import { exportSnapshotPdf } from '../utils/exportPdf';
@@ -87,6 +88,7 @@ export default function RescueCenter() {
   const [dispatch, setDispatch] = useState(null);
   const [linkFor, setLinkFor] = useState(null);
   const [cancelFor, setCancelFor] = useState(null);
+  const [closeFor, setCloseFor] = useState(null);
   const [editFor, setEditFor] = useState(null);
   const [reportOpen, setReportOpen] = useState(false);
   const [evacOpen, setEvacOpen] = useState(false);
@@ -235,8 +237,8 @@ export default function RescueCenter() {
         return {
           'Mã phiếu': t.code, 'Mức ưu tiên': PRIORITY[t.priority]?.label || t.priority, 'Loại sự cố': INCIDENT[t.incident_type] || t.incident_type,
           'Số người': t.trapped_count ?? '', 'Nhóm yếu thế': (t.vulnerable || []).map((v) => VULNERABLE[v] || v).join(', '),
-          'Địa chỉ': t.address || '', 'Xã/phường': t.admin_name || '', 'Kênh tiếp nhận': SOURCE[t.source] || t.source,
-          'Trạng thái': SOS_STATUS[t.status] || t.status, 'Nhận lúc': dateTime(t.received_at),
+          'Địa chỉ': t.address || '', 'Xã/phường': t.admin_name || '', 'Kênh tiếp nhận': sourceLabel(t),
+          'Trạng thái': sosStatusLabel(t), 'Nhận lúc': dateTime(t.received_at),
           'Tiếp nhận sau (phút)': minutes(t.received_at, t.acknowledged_at), 'Đang chờ (phút)': x.sla ? Math.floor(x.sla.waitedSec / 60) : '',
           'Quá hạn phản hồi': x.overdue ? 'Có' : '', 'Đội': t.force_name || '', 'Điều động lúc': t.dispatched_at ? dateTime(t.dispatched_at) : '',
           'Đến hiện trường lúc': t.arrived_at ? dateTime(t.arrived_at) : '', 'Cứu xong lúc': t.resolved_at ? dateTime(t.resolved_at) : '',
@@ -278,6 +280,7 @@ export default function RescueCenter() {
     onCancel: setCancelFor,
     onEdit: setEditFor,
     onMove: (x, status) => move(x.id, status),
+    onCloseTicket: setCloseFor,
   };
   const dataTime = ticketsQ.dataUpdatedAt ? new Date(ticketsQ.dataUpdatedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : null;
   const listView = view === 'danh_sach' || pdf;
@@ -423,6 +426,7 @@ export default function RescueCenter() {
       {dispatch && <DispatchModal ticket={dispatch} onClose={() => setDispatch(null)} />}
       {linkFor && <MissionLinkModal ticket={linkFor} onClose={() => setLinkFor(null)} />}
       {cancelFor && <CancelDispatchModal ticket={cancelFor} onClose={() => setCancelFor(null)} />}
+      {closeFor && <CloseTicketModal ticket={closeFor} onClose={() => setCloseFor(null)} />}
       {editFor && <EditTicketModal ticket={editFor} onClose={() => setEditFor(null)} />}
       {evacOpen && <EvacuationModal row={evacRow} progress={evacQ.data?.progress} onClose={() => setEvacOpen(false)} />}
       {/* Điện thoại: việc hay làm ở vùng ngón cái — phiếu mới báo (số = phiếu chưa ai nhận), báo sơ tán, đội đang đến (số =

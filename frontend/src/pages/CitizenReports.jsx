@@ -288,7 +288,11 @@ function ReportCard({ r, onAction, onPhoto, fresh = false }) {
       {r.public_note && <div className="text-xs text-good bg-good/10 p-2 rounded-lg">Ghi chú công khai: {r.public_note}</div>}
       {r.reject_reason && <div className="text-xs text-muted bg-panel2 p-2 rounded-lg">Lý do từ chối: {r.reject_reason}</div>}
       {r.moderated_by_name && <div className="text-[11px] text-muted">Xử lý bởi {r.moderated_by_name} · {dateTime(r.moderated_at)}</div>}
-      {r.sos_code && <div className="text-xs font-semibold text-danger">Đã chuyển thành phiếu SOS: {r.sos_code}</div>}
+      {r.sos_code && (
+        <div className="text-xs font-semibold text-danger">
+          Phiếu cứu hộ {r.sos_code} — tiến độ, đóng phiếu ở trang Cứu hộ; phiếu này đổi trạng thái theo
+        </div>
+      )}
 
       {canModerate && (
         <div className="flex flex-wrap items-center gap-1.5 border-t border-line pt-2 mt-auto">
@@ -317,7 +321,8 @@ function ReportCard({ r, onAction, onPhoto, fresh = false }) {
               <Siren size={12} /> Chuyển SOS
             </button>
           )}
-          {r.status === 'tu_choi' && (
+          {/* Phiếu đã nối phiếu cứu hộ đổi trạng thái theo phiếu SOS — mở lại ở trang Cứu hộ (máy chủ cũng chặn) */}
+          {r.status === 'tu_choi' && !r.sos_ticket_id && (
             <button className="btn-ghost px-2.5 py-1 text-xs" onClick={() => onAction(r, 'reopen')}>
               <RotateCcw size={12} /> Mở lại
             </button>
