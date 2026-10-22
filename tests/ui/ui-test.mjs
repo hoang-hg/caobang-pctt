@@ -44,10 +44,20 @@ const STAFF_PAGES = [
   ['/phan-quyen', 'Phân quyền'],
   ['/huong-dan', 'Hướng dẫn xử lý'],
 ];
+// Cổng người dân: menu 5 nhóm (docs/ke-hoach-lam-moi-giao-dien.md 6.1) — [nhóm, trang con]; đủ 8 màn như trước
 const PUBLIC_TABS = [
-  'Bản đồ & Cảnh báo', 'Hồ chứa & Xả lũ', 'Sạt trượt & Đường đèo', 'Tra cứu tiến độ', 'Mực nước sông suối',
-  'Điểm sơ tán an toàn', 'Đường dây nóng', 'Cẩm nang an toàn',
+  ['Bản đồ cảnh báo'], ['Hồ chứa & sông', 'Hồ chứa & xả lũ'], ['Hồ chứa & sông', 'Mực nước sông suối'], ['Đèo dốc & sạt lở'],
+  ['Sơ tán & đường dây nóng', 'Điểm sơ tán an toàn'], ['Sơ tán & đường dây nóng', 'Đường dây nóng'], ['Tra cứu phiếu'], ['Cẩm nang an toàn'],
 ];
+// Mở một màn của cổng: điện thoại mở menu ≡ trước; nhóm có 2 màn thì chọn tiếp trang con (hàng dưới menu). Tên nhóm đứng
+// đầu, sau có thể là số đếm ("Hồ chứa & sông 6 hồ xả") — không khớp nhầm nút "Tra cứu phiếu đã gửi"
+async function openPublic(page, [group, sub]) {
+  const menu = page.getByRole('button', { name: 'Mở menu cổng người dân' });
+  if (await menu.isVisible()) await menu.click();
+  const esc = group.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  await visible(page.getByRole('button', { name: new RegExp(`^${esc}( \\d.*)?$`) })).click();
+  if (sub) await visible(page.getByRole('button', { name: sub, exact: true })).click();
+}
 
 let failures = 0;
 const check = (name, cond, extra = '') => {
@@ -186,11 +196,11 @@ async function publicPortal(ctx) {
 
   await step(ctx, 'Mở được mọi tab của cổng công khai', async () => {
     for (const tab of PUBLIC_TABS) {
-      await visible(page.getByRole('button', { name: tab })).click();
+      await openPublic(page, tab);
       await page.waitForTimeout(400);
-      await expectNoOverflow(ctx, `tab "${tab}"`);
+      await expectNoOverflow(ctx, `màn "${tab.join(' › ')}"`);
     }
-    await visible(page.getByRole('button', { name: 'Bản đồ & Cảnh báo' })).click();
+    await openPublic(page, ['Bản đồ cảnh báo']);
     return `${PUBLIC_TABS.length} tab`;
   });
 
@@ -199,9 +209,9 @@ async function publicPortal(ctx) {
       await page.goto(`${ROOT}/cong-khai`);
       await page.locator('.leaflet-container').first().waitFor({ state: 'attached', timeout: 20_000 });
       for (const tab of PUBLIC_TABS) {
-        await visible(page.getByRole('button', { name: tab })).click();
+        await openPublic(page, tab);
         await page.waitForTimeout(500);
-        await expectNoDesignFlaws(page, `tab "${tab}"`);
+        await expectNoDesignFlaws(page, `màn "${tab.join(' › ')}"`);
       }
       await page.goto(`${ROOT}/dang-nhap`);
       await page.getByPlaceholder('Nhập tên đăng nhập hoặc email...').waitFor();
@@ -247,7 +257,7 @@ async function publicPortal(ctx) {
   }
 
   await step(ctx, 'Tra cứu mã không tồn tại → báo không tìm thấy', async () => {
-    await visible(page.getByRole('button', { name: 'Tra cứu tiến độ' })).click();
+    await openPublic(page, ['Tra cứu phiếu']);
     await page.getByLabel('Mã phiếu').fill('PA-9999999');
     await page.getByLabel('Số điện thoại đã dùng khi gửi').fill('0900000000');
     await page.getByRole('button', { name: 'Tra cứu', exact: true }).click();
@@ -395,7 +405,7 @@ async function staff(ctx, trackCode) {
       await page.goto(`${ROOT}/dashboard?tab=ho_chua`);
       await page.getByText('Không tải được số liệu hồ chứa').waitFor({ timeout: 25_000 });
       let text = await page.locator('main').innerText();
-      if (/TRỰC TIẾP|Không có hồ xả lũ lớn/.test(text)) throw new Error('tab Hồ chứa vẫn khẳng định "an toàn" khi không tải được');
+      if (/trực tiếp|Không có hồ xả lũ lớn/i.test(text)) throw new Error('tab Hồ chứa vẫn khẳng định "an toàn" khi không tải được');
       await expectNoOverflow(ctx, 'tab Hồ chứa (lỗi)');
       await page.goto(`${ROOT}/dashboard?tab=sat_lo`);
       await page.getByText('Không tải được danh sách điểm đen sạt lở').waitFor({ timeout: 25_000 });

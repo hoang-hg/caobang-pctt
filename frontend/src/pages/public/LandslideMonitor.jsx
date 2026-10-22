@@ -81,22 +81,20 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScope
   const header = (
     <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-panel p-4 sm:p-5 rounded-2xl border border-line shadow-sm">
       <div className="flex items-center gap-2.5">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-serious text-white">
-          <Mountain size={22} />
-        </div>
+        <Mountain size={26} className="shrink-0 text-serious" aria-hidden="true" />
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-base sm:text-lg font-bold text-ink">
-              Bản Đồ Điểm Đen Sạt Trượt & Trạng Thái Đường Đèo
+              Bản đồ điểm đen sạt trượt & trạng thái đường đèo
             </h1>
             {data && isError ? (
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-panel2 text-muted border border-dashed border-line" title="Lần tải lại gần nhất bị lỗi — đang hiện số liệu đã tải trước đó">
-                CHƯA CẬP NHẬT ĐƯỢC · SỐ LIỆU LÚC {time(dataUpdatedAt)}
+                Chưa cập nhật được · số liệu lúc {time(dataUpdatedAt)}
               </span>
             ) : live ? (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-good/15 text-good border border-good/30 animate-pulse">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-good/15 text-good border border-good/30">
                 <span className="h-1.5 w-1.5 rounded-full bg-good" />
-                TRỰC TIẾP
+                Trực tiếp
               </span>
             ) : (
               data && (
@@ -160,9 +158,7 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScope
       {blockedCount > 0 && (
         <div className="rounded-2xl p-4 sm:p-5 border border-danger/60 bg-danger text-white shadow-lg shadow-danger/20">
           <div className="flex items-start gap-3">
-            <div className="p-2 bg-white/20 rounded-xl text-white shrink-0 mt-0.5 motion-safe:animate-bounce">
-              <Ban size={24} />
-            </div>
+            <Ban size={26} className="mt-0.5 shrink-0 text-white" aria-hidden="true" />
             <div className="flex-1">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-bold text-sm bg-white text-[rgb(var(--danger))] px-2.5 py-0.5 rounded-md">
@@ -209,7 +205,7 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScope
             <span>Tắc đường / Cấm phương tiện</span>
             <div className={clsx(
               'h-8 w-8 rounded-lg flex items-center justify-center font-bold',
-              blockedCount > 0 ? 'bg-danger/15 text-danger animate-pulse' : noRoads ? 'bg-panel2 text-muted' : 'bg-good/10 text-good'
+              blockedCount > 0 ? 'bg-danger/15 text-danger motion-safe:animate-pulse' : noRoads ? 'bg-panel2 text-muted' : 'bg-good/10 text-good'
             )}>
               <Ban size={16} />
             </div>

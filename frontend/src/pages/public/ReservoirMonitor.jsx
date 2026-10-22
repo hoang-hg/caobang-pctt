@@ -94,26 +94,24 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap, areaScope
     <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-panel p-4 sm:p-5 rounded-2xl border border-line shadow-sm">
       <div>
         <div className="flex items-center gap-2.5">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent text-white">
-            <Waves size={22} />
-          </div>
+          <Waves size={26} className="shrink-0 text-accent" aria-hidden="true" />
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-base sm:text-lg font-bold text-ink">
-                Giám Sát Hồ Chứa & Cảnh Báo Xả Lũ Tỉnh Cao Bằng
+                Giám sát hồ chứa & cảnh báo xả lũ tỉnh Cao Bằng
               </h1>
               {!data ? null : isError ? (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-panel2 text-muted border border-dashed border-line" title="Lần tải lại gần nhất bị lỗi — đang hiện số liệu đã tải trước đó">
-                  <Clock size={11} /> CHƯA CẬP NHẬT ĐƯỢC · SỐ LIỆU LÚC {time(dataUpdatedAt)}
+                  <Clock size={11} /> Chưa cập nhật được · số liệu lúc {time(dataUpdatedAt)}
                 </span>
               ) : noOperatingData ? (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-panel2 text-muted border border-line">
-                  <Clock size={11} /> CHƯA CÓ SỐ LIỆU VẬN HÀNH
+                  <Clock size={11} /> Chưa có số liệu vận hành
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-good/15 text-good border border-good/30 animate-pulse">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-good/15 text-good border border-good/30">
                   <span className="h-1.5 w-1.5 rounded-full bg-good" />
-                  TRỰC TIẾP
+                  Trực tiếp
                 </span>
               )}
               {staleCount > 0 && (
@@ -178,9 +176,7 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap, areaScope
       {emergencyCount > 0 && (
         <div className="rounded-2xl p-4 sm:p-5 border border-danger/60 bg-danger text-white shadow-lg shadow-danger/20">
           <div className="flex items-start gap-3">
-            <div className="p-2 bg-white/20 rounded-xl text-white shrink-0 mt-0.5 motion-safe:animate-bounce">
-              <Siren size={24} />
-            </div>
+            <Siren size={26} className="mt-0.5 shrink-0 text-white" aria-hidden="true" />
             <div className="flex-1">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-bold text-sm bg-white text-[rgb(var(--danger))] px-2.5 py-0.5 rounded-md">
@@ -251,7 +247,7 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap, areaScope
             <span>Xả lũ lớn</span>
             <div className={clsx(
               'h-8 w-8 rounded-lg flex items-center justify-center font-bold',
-              emergencyCount > 0 ? 'bg-danger/15 text-danger animate-pulse' : noOperatingData ? 'bg-panel2 text-muted' : 'bg-good/10 text-good'
+              emergencyCount > 0 ? 'bg-danger/15 text-danger motion-safe:animate-pulse' : noOperatingData ? 'bg-panel2 text-muted' : 'bg-good/10 text-good'
             )}>
               <AlertTriangle size={16} />
             </div>
@@ -661,10 +657,10 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap, areaScope
       )}
 
       {/* 6. Hướng dẫn & Quy chuẩn cảnh báo xả lũ cho nhân dân */}
-      <div className="card p-4 sm:p-5 border-l-4 border-l-sky-600 space-y-3">
+      <div className="card p-4 sm:p-5 space-y-3">
         <h3 className="font-bold text-sm text-ink flex items-center gap-2">
-          <ShieldCheck size={18} className="text-sky-600" />
-          Quy Chuẩn Cảnh Báo An Toàn Xả Lũ Tỉnh Cao Bằng
+          <ShieldCheck size={18} className="text-accent" />
+          Quy chuẩn cảnh báo an toàn xả lũ tỉnh Cao Bằng
         </h3>
         <div className="grid gap-3 sm:grid-cols-3 text-xs leading-relaxed text-ink-2">
           <div className="p-3 rounded-xl bg-panel2/60 border border-line/60">
