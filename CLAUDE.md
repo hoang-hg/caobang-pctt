@@ -48,6 +48,7 @@ backend/                   Python 3.12, FastAPI, SQLAlchemy async (psycopg3), Ca
   app/worker.py            tiến trình nền (RUN_MODE=worker)
   app/db.py                engine + fetch_all / fetch_one / execute / transaction
   app/auth.py              JWT, băm mật khẩu/PIN (PBKDF2), current_user, audit(), password_problem, bump_token_version
+  app/citizen_auth.py      phiên NGƯỜI DÂN (JWT aud "citizen" — tách hẳn cán bộ), current_citizen / optional_citizen
   app/mfa.py               xác thực 2 lớp TOTP: mã, mã khôi phục, phiếu đăng nhập, required() theo TOTP_REQUIRED_ROLES
   app/area.py              parse_codes, area_clause, unit_clause (bộ lọc địa phương)
   app/api/v1/*.py          router: admin_units alerts auth mfa dashboard forecast ingest integrations map_layers mission

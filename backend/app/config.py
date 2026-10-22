@@ -124,6 +124,12 @@ class Settings(BaseSettings):
     turnstile_site_key: str = ""  # khoá công khai, frontend lấy qua GET /api/v1/public/config
     turnstile_secret: str = ""
 
+    # Tài khoản người dân của cổng công khai (docs/ke-hoach-lam-moi-giao-dien.md mục 11): bắt buộc đăng nhập mới gửi được
+    # phản ánh / yêu cầu cứu hộ — Gọi 112, đường dây nóng luôn mở. Phiên người dân tách hẳn phiên cán bộ (JWT aud
+    # "citizen"), dài ngày vì người dân dùng điện thoại của chính mình
+    citizen_account_required: bool = False
+    citizen_session_days: int = 30
+
     # Hook LLM tuỳ chọn để bóc tách tin nhắn SOS (mặc định dùng bộ luật). Số điện thoại được che trước khi gửi.
     llm_api_url: str = ""
     llm_api_key: str = ""

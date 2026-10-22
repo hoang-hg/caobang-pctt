@@ -515,7 +515,9 @@ Mọi biến của backend khai báo ở `backend/app/config.py`. Tệp mẫu: `
 | `OPENWEATHER_API_KEY` | trống | tuỳ chọn | OpenWeather One Call 3.0 (đặt → tự bật nguồn) |
 | `MQTT_URL` / `MQTT_TOPIC` | `mqtt://mqtt:1883` / `caobang/pctt/+/readings` | trống = tắt | Cầu nối IoT MQTT |
 | `INTAKE_API_KEY` | trống (tắt) | tuỳ chọn, ≥ 32 ký tự | Cổng tiếp nhận SOS tự động |
-| `TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET` | trống | *khuyến nghị* (cả hai) | Chống bot form phản ánh |
+| `TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET` | trống | *khuyến nghị* (cả hai) | Chống bot form phản ánh, đăng ký tài khoản người dân |
+| `CITIZEN_ACCOUNT_REQUIRED` | `false` | bật khi giao diện đăng ký / đăng nhập người dân đã có | Người dân phải đăng nhập tài khoản mới gửi được phản ánh / yêu cầu cứu hộ trên cổng (Gọi 112, đường dây nóng luôn mở) — `GET /public/config` trả cờ này cho giao diện |
+| `CITIZEN_SESSION_DAYS` | `30` | — | Phiên đăng nhập của người dân (điện thoại của chính họ — phiên dài; đổi / đặt lại mật khẩu, bị khoá → hết hiệu lực ngay) |
 | `LLM_API_URL` / `_KEY` / `_MODEL` | trống | để trống ([11](#bao-mat)) | Bóc tách tin SOS bằng LLM |
 | `SMTP_HOST` / `_PORT` / `_USER` / `_PASSWORD` / `_STARTTLS` / `_FROM` | Mailpit | **bắt buộc** `SMTP_HOST` | Email quên mật khẩu, cảnh báo sự cố |
 
@@ -1067,6 +1069,7 @@ hành). Yêu cầu ở phạm vi toàn tỉnh không khớp quyền cấp xã.
 | `audit.view` | toàn tỉnh | Nhật ký pháp lý (`GET /api/v1/alerts/audit?since=&until=&limit=` — khoảng thời gian ISO 8601, tối đa 5.000 dòng / lần) |
 | `user.view` / `user.manage` | ✓ | Xem / tạo tài khoản cấp dưới, đổi cấp – phạm vi, đặt lại mật khẩu / PIN / 2 lớp, khoá |
 | `report.view` / `report.moderate` | ✓ | Xem (kể cả SĐT người gửi) / duyệt – từ chối – chuyển SOS phản ánh |
+| `citizen.view` / `citizen.manage` | — | Tài khoản người dân của cổng: tìm theo số điện thoại / khoá – mở khoá, đặt mật khẩu tạm khi người dân gọi đường dây nóng (`GET /citizens`, `PATCH /citizens/{id}`, `POST /citizens/{id}/reset-password`; ghi nhật ký pháp lý) |
 | `integration.view` / `integration.manage` | toàn tỉnh | Xem / cấu hình nguồn dữ liệu, thiết bị IoT, cấp khoá |
 | `data.import` | toàn tỉnh | Nhập dữ liệu chính thức từ tệp; phê duyệt / từ chối hồ sơ xã gửi ([2.4](#nhap-du-lieu)) |
 | `data.submit` | ✓ | Gửi dữ liệu của xã mình chờ cấp tỉnh phê duyệt ([2.4](#nhap-du-lieu)) |
@@ -1195,7 +1198,14 @@ phần lớn do cache nginx 10 giây trả (không tới backend, không bị đ
   2.4) hoặc "không rõ". Lưu **tên** xóm kèm xã tại thời điểm gửi (`citizen_reports.hamlet_name`) → xóm sau này sáp nhập /
   đổi tên, phản ánh cũ vẫn đúng. Xã dùng để phân quyền duyệt vẫn lấy theo vị trí điểm chấm.
 - Chống spam: honeypot, giới hạn tần suất, vị trí phải trong tỉnh, chỉ JPEG/PNG/WebP, **Cloudflare Turnstile** (đặt cả
-  `TURNSTILE_SITE_KEY` và `TURNSTILE_SECRET` → form hiện ô xác minh, không cần build lại giao diện). Backend không gọi
+  `TURNSTILE_SITE_KEY` và `TURNSTILE_SECRET` → form hiện ô xác minh, không cần build lại giao diện).
+- **Tài khoản người dân** (Đ5 — `docs/ke-hoach-lam-moi-giao-dien.md` mục 11): `POST /public/account/register` (họ tên, số
+  điện thoại = tên đăng nhập, mật khẩu, email / xã không bắt buộc, đồng ý dùng thông tin theo NĐ 13/2023; Turnstile +
+  trường ẩn), `/login`, `GET|PATCH /me`, `/change-password`, `/forgot` (email — luôn trả cùng câu), `/reset`
+  (đường dẫn 30 phút, dùng 1 lần), `GET /reports` ("Phiếu của tôi"). Phiên riêng: JWT `aud: "citizen"` — không gọi
+  được API điều hành, token cán bộ không thay được (`app/citizen_auth.py`). Chưa xác minh số điện thoại (chưa có cổng
+  SMS); quên mật khẩu không có email → gọi đường dây nóng, cán bộ tỉnh đặt mật khẩu tạm (người dân phải đổi). Đăng
+  nhập khi gửi phản ánh: họ tên, số điện thoại lấy từ tài khoản. Bắt buộc đăng nhập: `CITIZEN_ACCOUNT_REQUIRED`. Backend không gọi
   được Cloudflare (mất kết nối quốc tế) → cho qua và ghi cảnh báo, để người dân vẫn gửi được lúc thiên tai; trình duyệt
   không tải được ô xác minh → form báo lỗi và nhắc gọi 112.
 - Phản ánh gán xã theo vị trí → chỉ cán bộ có quyền ở xã đó hoặc toàn tỉnh thấy và duyệt; phản ánh mới đẩy thông

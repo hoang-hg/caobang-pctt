@@ -11,12 +11,13 @@ from __future__ import annotations
 
 import html
 
-from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from app.api.v1.reports import _serve_photo
 from app.area import IN_PROVINCE_SQL, thiessen_ctes
+from app.citizen_auth import optional_citizen
 from app.config import settings
 from app.db import fetch_all, fetch_all_no_jit, fetch_one
 from app.infra import ratelimit
@@ -418,8 +419,12 @@ async def public_report_photo(report_id: str, idx: int, thumb: int = 0):
 
 @router.get("/config")
 async def public_config():
-    """Cấu hình công khai cho frontend (không bí mật): khoá site Cloudflare Turnstile nếu bật."""
-    return {"turnstile_site_key": settings.turnstile_site_key or None}
+    """Cấu hình công khai cho frontend (không bí mật): khoá site Cloudflare Turnstile nếu bật; có bắt buộc tài khoản người
+    dân mới gửi được phản ánh không (Đ5)."""
+    return {
+        "turnstile_site_key": settings.turnstile_site_key or None,
+        "citizen_account_required": settings.citizen_account_required,
+    }
 
 
 def phone_key(phone: str) -> str:
@@ -447,11 +452,22 @@ async def submit_report(
     website: str | None = Form(None),  # honeypot — người thật không điền
     turnstile_token: str | None = Form(None),
     photos: list[UploadFile] | None = File(None),
+    citizen: dict | None = Depends(optional_citizen),
 ):
-    """Người dân gửi phản ánh hiện trường kèm ảnh. Phản ánh chỉ hiển thị công khai sau khi cán bộ duyệt."""
+    """Người dân gửi phản ánh hiện trường kèm ảnh. Phản ánh chỉ hiển thị công khai sau khi cán bộ duyệt.
+
+    Đã đăng nhập tài khoản người dân (Đ5): họ tên, số điện thoại lấy từ tài khoản, phản ánh gắn vào "Phiếu của tôi".
+    CITIZEN_ACCOUNT_REQUIRED: chưa đăng nhập → 401 (Gọi 112 vẫn luôn mở trên giao diện).
+    """
     ip = request.client.host if request.client else None
     if website:
         raise HTTPException(400, "Yêu cầu không hợp lệ")
+    if citizen is None and settings.citizen_account_required:
+        raise HTTPException(
+            401, "Cần đăng nhập tài khoản người dân để gửi phản ánh — đang nguy hiểm thì gọi ngay 112"
+        )
+    if citizen is not None:
+        reporter_name, reporter_phone = citizen["full_name"], citizen["phone"]
     if not await verify_turnstile(turnstile_token, ip):
         raise HTTPException(400, "Xác minh chống spam không thành công")
     # Nhiều người chung IP nhà mạng (CGNAT) → siết theo SĐT (5 phản ánh thành công / giờ), nới theo IP
@@ -474,6 +490,7 @@ async def submit_report(
             photos=blobs,
             client_ip=ip,
             hamlet=hamlet or None,
+            citizen_id=citizen["id"] if citizen else None,
         )
     except ReportError as exc:
         raise HTTPException(422, str(exc)) from exc
