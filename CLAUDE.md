@@ -313,7 +313,9 @@ chỉ khi `DEMO_MODE`; `DEMO_MODE=false` xoá đoạn `so_do` còn sót mỗi l�
 
 - **Gọi API**: `api(path, { method, body, params })` trong `src/api/client.js` — tự thêm tiền tố `/api/v1`, Bearer token từ
   store, lỗi → `ApiError(status, detail)`, 401 → đăng xuất (kèm thông báo lý do), 403 có header `X-Must-Change-Password`
-  → màn hình đổi mật khẩu. Upload multipart (phản ánh) dùng `fetch` trực tiếp.
+  → màn hình đổi mật khẩu. Upload multipart dùng `apiUpload`. **Cổng người dân** gọi API tài khoản người dân và gửi
+  phản ánh bằng `citizenApi` (`src/api/citizen.js`): token NGƯỜI DÂN từ `app/citizenSession.js` (tách hẳn
+  `useStore().auth`), 401 chỉ xoá phiên người dân — không dùng `api()` (gắn token cán bộ, 401 đăng xuất cán bộ).
 - **Chế độ giả lập** (README §4.7): mã giả lập chỉ nạp trong nhánh `import.meta.env.DEV` bằng `lazy` / `import()` động →
   bản build không có (kiểm tra: build rồi tìm chữ "GIẢ LẬP" trong `dist/`). Không bao giờ "máy chủ lỗi thì trả dữ liệu giả";
   `/public/*` luôn gọi máy chủ thật. Dữ liệu = phản hồi API thật đã ghi (`tests/ui/demo-record.mjs` → `api/demo/fixtures.json`)

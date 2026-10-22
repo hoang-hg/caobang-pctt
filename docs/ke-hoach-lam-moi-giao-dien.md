@@ -330,7 +330,7 @@ Thứ tự theo quyết định ngày 21/10/2026: trang điều hành trước, 
 | 10 | Đ1 · 1.1 | Cổng người dân trên máy tính: bản đồ toàn màn, "Bạn muốn làm gì?", dải cảnh báo, thanh thời gian, thanh trạng thái | `pages/public/PublicPortal.jsx` | Đủ danh sách 6.1; đường dẫn cũ mở được | Xong — PR #119 |
 | 11 | Đ1 · 1.2 | Cổng người dân trên điện thoại + menu 5 nhóm + trang con cùng kiểu | `PublicPortal.jsx`, `ReportForm`, `TicketTracker`, `ReservoirMonitor`, `LandslideMonitor`, `MissionPage` | 360 px: bản đồ ≥ 60 % màn đầu, Gọi 112 luôn thấy | Xong — PR #120 |
 | 12 | Đ5 · 5.1 | Tài khoản người dân — máy chủ: bảng, đăng ký, đăng nhập, phiên riêng; gửi phản ánh / SOS cần phiên người dân (mục 11) | `backend/app/api/v1/public.py`, bảng mới + migration, kiểm thử | Kiểm thử API: không phiên → từ chối; phiên cán bộ không dùng thay được | Xong — PR #121 (bắt buộc đăng nhập bật ở 5.2) |
-| 13 | Đ5 · 5.2 | Tài khoản người dân — giao diện: đăng ký, đăng nhập, "Phiếu của tôi"; Gọi 112 luôn mở | `pages/public/*` | Người dân mới đăng ký, gửi được phản ánh không cần gọi hỏi | Chưa làm |
+| 13 | Đ5 · 5.2 | Tài khoản người dân — giao diện: đăng ký, đăng nhập, "Phiếu của tôi"; Gọi 112 luôn mở | `pages/public/*` | Người dân mới đăng ký, gửi được phản ánh không cần gọi hỏi | Xong — PR #122 (bật bắt buộc đăng nhập) |
 | 14 | Đ5 · 5.3 | Cán bộ quản lý tài khoản người dân: tìm theo số điện thoại, khoá, đặt lại mật khẩu | trang điều hành (quyền cấp tỉnh) | Kiểm thử quyền | Chưa làm |
 
 Mỗi PR: một phần, CI xanh mới merge; triển khai lên máy chủ theo đợt, có duyệt. Dùng thử với người thật sau thứ tự 6 và 11.
