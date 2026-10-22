@@ -195,6 +195,7 @@ async def create_report(
     photos: list[bytes],
     client_ip: str | None,
     hamlet: str | None = None,
+    citizen_id=None,  # tài khoản người dân đã đăng nhập (Đ5) — "Phiếu của tôi"
 ) -> dict:
     if category not in CATEGORY:
         raise ReportError("Loại phản ánh không hợp lệ")
@@ -234,11 +235,11 @@ async def create_report(
 
     row = await fetch_one(
         """INSERT INTO community.citizen_reports (id, category, description, location, address, hamlet_name,
-                 admin_unit_id, reporter_name, reporter_phone, photos, client_ip_hash, track_key)
+                 admin_unit_id, reporter_name, reporter_phone, photos, client_ip_hash, track_key, citizen_id)
            VALUES (CAST(:id AS uuid), :c, :d, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326), :addr, :hamlet,
                    (SELECT id FROM spatial_admin.administrative_units WHERE level = 'xa'
                      ORDER BY geom <-> ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) LIMIT 1),
-                   :rn, :rp, CAST(:ph AS jsonb), :ip, :tk)
+                   :rn, :rp, CAST(:ph AS jsonb), :ip, :tk, CAST(:cid AS uuid))
            RETURNING code, admin_unit_id""",
         {
             "id": report_id,
@@ -253,6 +254,7 @@ async def create_report(
             "ph": json.dumps(meta),
             "ip": ip_hash(client_ip),
             "tk": track_key,
+            "cid": str(citizen_id) if citizen_id else None,
         },
     )
     code = domains.code_of_unit_id(row["admin_unit_id"])

@@ -329,7 +329,7 @@ Thứ tự theo quyết định ngày 21/10/2026: trang điều hành trước, 
 | 9 | Đ4 · 4.3 | Hướng dẫn xử lý có hình; rà toàn bộ hai nền, 360 px | `Guide.jsx`, `utils/guides.js` | Rà ảnh hai nền đạt | Xong — PR #118 |
 | 10 | Đ1 · 1.1 | Cổng người dân trên máy tính: bản đồ toàn màn, "Bạn muốn làm gì?", dải cảnh báo, thanh thời gian, thanh trạng thái | `pages/public/PublicPortal.jsx` | Đủ danh sách 6.1; đường dẫn cũ mở được | Xong — PR #119 |
 | 11 | Đ1 · 1.2 | Cổng người dân trên điện thoại + menu 5 nhóm + trang con cùng kiểu | `PublicPortal.jsx`, `ReportForm`, `TicketTracker`, `ReservoirMonitor`, `LandslideMonitor`, `MissionPage` | 360 px: bản đồ ≥ 60 % màn đầu, Gọi 112 luôn thấy | Xong — PR #120 |
-| 12 | Đ5 · 5.1 | Tài khoản người dân — máy chủ: bảng, đăng ký, đăng nhập, phiên riêng; gửi phản ánh / SOS cần phiên người dân (mục 11) | `backend/app/api/v1/public.py`, bảng mới + migration, kiểm thử | Kiểm thử API: không phiên → từ chối; phiên cán bộ không dùng thay được | Chưa làm |
+| 12 | Đ5 · 5.1 | Tài khoản người dân — máy chủ: bảng, đăng ký, đăng nhập, phiên riêng; gửi phản ánh / SOS cần phiên người dân (mục 11) | `backend/app/api/v1/public.py`, bảng mới + migration, kiểm thử | Kiểm thử API: không phiên → từ chối; phiên cán bộ không dùng thay được | Xong — PR #121 (bắt buộc đăng nhập bật ở 5.2) |
 | 13 | Đ5 · 5.2 | Tài khoản người dân — giao diện: đăng ký, đăng nhập, "Phiếu của tôi"; Gọi 112 luôn mở | `pages/public/*` | Người dân mới đăng ký, gửi được phản ánh không cần gọi hỏi | Chưa làm |
 | 14 | Đ5 · 5.3 | Cán bộ quản lý tài khoản người dân: tìm theo số điện thoại, khoá, đặt lại mật khẩu | trang điều hành (quyền cấp tỉnh) | Kiểm thử quyền | Chưa làm |
 
@@ -346,9 +346,12 @@ Mỗi PR: một phần, CI xanh mới merge; triển khai lên máy chủ theo �
 | Thanh trạng thái dưới cùng trên máy tính | Theo đề xuất (Đ3 · 3.1) |
 | Bản đồ chỉ rõ tỉnh Cao Bằng | **Có** — ngoài tỉnh làm mờ ở mọi bản đồ (mục 7.2) |
 | Tài khoản người dân | **Yêu cầu mới**: phải đăng ký, đăng nhập mới gửi được phản ánh, yêu cầu cứu hộ (Đ5, mục 11) |
+| Đ5 — xác minh số điện thoại (22/10/2026) | **Tạm chưa xác minh** (chưa có cổng SMS); vẫn Turnstile + giới hạn theo IP / số; có SMS thì thêm OTP |
+| Đ5 — quên mật khẩu (22/10/2026) | **Gọi đường dây nóng, cán bộ tỉnh đặt mật khẩu tạm**; ai khai email thì tự lấy lại qua email |
+| Đ5 — "Người mắc kẹt" (22/10/2026) | **Cũng phải đăng nhập** như yêu cầu; Gọi 112, đường dây nóng luôn mở, màn đăng nhập có "Đang nguy hiểm? Gọi ngay 112" |
 | Dùng thử với người thật | Chưa chốt người tham gia, thời gian |
 
-Còn chờ quyết định: các câu hỏi của Đ5 ở mục 11.3.
+Còn chờ quyết định: dùng thử với người thật.
 
 ## 11. Tài khoản người dân (Đ5) — thay đổi chức năng
 
@@ -376,7 +379,7 @@ với các đợt khác, đây là **thay đổi chức năng** (thêm API, thê
 `POST /public/account/register` · `POST /public/account/login` · `GET /public/account/me` · `GET /public/account/reports` ·
 `POST /public/reports` (thêm yêu cầu phiên người dân); trang điều hành: `GET /citizens`, `PATCH /citizens/{id}`.
 
-### 11.3. Cần quyết định trước khi làm Đ5
+### 11.3. Đã quyết định ngày 22/10/2026 (cả 3 theo đề xuất — xem mục 10)
 
 1. **Xác minh số điện thoại**: chưa có cổng SMS (`docs/trang-b-viec-con-lai.md` BD7) nên chưa gửi được mã OTP. Đề xuất:
    tạm chấp nhận số chưa xác minh (vẫn có chống spam, giới hạn); có hợp đồng SMS thì thêm OTP.

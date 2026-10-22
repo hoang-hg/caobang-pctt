@@ -52,6 +52,12 @@ RULES: tuple[Rule, ...] = (
     Rule("public_locate", "GET", "/api/v1/public/locate", 240, 60),
     # Trang tra cứu tự làm mới 15 giây (4 lần/phút/người). Dò không khả thi: phiếu có SĐT phải khớp đủ 9 số cuối
     Rule("public_track", "POST", "/api/v1/public/track", 120, 60),
+    # Tài khoản người dân (Đ5): theo IP nới rộng vì nhiều người chung IP nhà mạng (CGNAT); siết thêm theo số điện thoại /
+    # email trong public_account.py (đăng nhập sai 10 lần/giờ, đăng ký trùng số 3 lần/giờ, quên mật khẩu 3 lần/giờ)
+    Rule("pub_acc_login", "POST", "/api/v1/public/account/login", 60, 60),
+    Rule("pub_acc_register", "POST", "/api/v1/public/account/register", 60, 3600),
+    Rule("pub_acc_forgot", "POST", "/api/v1/public/account/forgot", 20, 3600),
+    Rule("pub_acc_reset", "POST", "/api/v1/public/account/reset", 30, 3600),
     Rule("public", "*", "/api/v1/public", 600, 60),
     Rule(
         "intake", "POST", "/api/v1/sos/intake", 300, 60

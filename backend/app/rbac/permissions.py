@@ -31,6 +31,7 @@ class Resource(StrEnum):
     EVACUATION = "evacuation"  # kế hoạch và tiến độ sơ tán nhân dân theo xã
     INCIDENT = "incident"  # điểm sự cố (sạt lở, giao thông, hạ tầng) cán bộ đánh dấu trên bản đồ
     EVENT = "event"  # đợt thiên tai (gom phiếu SOS, lệnh, cảnh báo, vật tư theo đợt để báo cáo)
+    CITIZEN = "citizen"  # tài khoản người dân của cổng công khai (Đ5)
 
 
 class Action(StrEnum):
@@ -107,6 +108,10 @@ ALL_PERMISSIONS: Final[tuple[Permission, ...]] = (
     Permission(R.USER, A.MANAGE, True, "Tạo tài khoản con, cấp / thu hồi vai trò trong phạm vi"),
     Permission(R.REPORT, A.VIEW, True, "Xem phản ánh của người dân (kể cả SĐT người gửi)"),
     Permission(R.REPORT, A.MODERATE, True, "Duyệt / từ chối / chuyển SOS phản ánh của người dân"),
+    Permission(
+        R.CITIZEN, A.VIEW, False, "Xem tài khoản người dân của cổng công khai (tìm theo số điện thoại)"
+    ),
+    Permission(R.CITIZEN, A.MANAGE, False, "Khoá / mở khoá, đặt lại mật khẩu tài khoản người dân"),
     Permission(R.INTEGRATION, A.VIEW, False, "Xem nguồn dữ liệu, thiết bị IoT, giám sát kết nối"),
     Permission(R.INTEGRATION, A.MANAGE, False, "Cấu hình nguồn dữ liệu, đăng ký thiết bị IoT, cấp khoá"),
     Permission(
