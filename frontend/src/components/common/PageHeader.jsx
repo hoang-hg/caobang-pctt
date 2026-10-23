@@ -19,7 +19,7 @@ import ExportMenu from './ExportMenu';
  */
 export default function PageHeader({
   title, short, before, scope, time, timeNote, meta = [], description, actions, exports, onRefresh, refreshing, children, className,
-  icon,
+  icon, ...rest // thuộc tính khác của thẻ gốc (VD data-mau-chuyen của khối nổi bật Tổng quan)
 }) {
   const { pathname } = useLocation();
   const Icon = icon === undefined ? navItemFor(pathname)?.icon : icon;
@@ -45,7 +45,7 @@ export default function PageHeader({
   ].filter(Boolean);
 
   return (
-    <div className={clsx('flex flex-col gap-1', className)}>
+    <div className={clsx('flex flex-col gap-1', className)} {...rest}>
       {before}
       <div className="flex min-w-0 items-start gap-3">
       {Icon && (

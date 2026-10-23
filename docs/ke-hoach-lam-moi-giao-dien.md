@@ -56,7 +56,8 @@ trên màn.
 
 > **Đổi ngày 23/10/2026** (người dùng chọn diện mạo "phòng chỉ huy" — mục 12): được dùng **màu chuyển nhẹ** (dải khẩn,
 > biểu tượng thương hiệu, ô gợi ý), **bóng mềm** cho thẻ, **biểu tượng trong ô màu nhấn nhạt** (`.icon-tile`, đầu trang và
-> khối). Bóng phát sáng, IN HOA, emoji vẫn không dùng.
+> khối). Bóng phát sáng, IN HOA, emoji vẫn không dùng. Chỗ dùng màu chuyển phải đánh dấu `data-mau-chuyen` (ui-test bắt
+> mọi màu chuyển không đánh dấu).
 
 ## 2. Học gì từ 3 trang tham khảo
 
