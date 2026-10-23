@@ -414,5 +414,5 @@ nền, vùng chạm 44 px, màn hình đầu theo thiết bị (mục 8), in ra 
 | 4 | Cảnh báo & Hotline: thanh tiến trình nối liền cho mọi biểu mẫu nhiều bước (`StepChips` — soạn lệnh, nhập kho, xuất kho, đợt thiên tai, sơ tán), thẻ mẫu tin có ô biểu tượng; ô chỉ số có ô biểu tượng (đợt 2) | Xong — PR #130 |
 | 5 | Vật tư & Lực lượng: "Cần bổ sung / cần sửa" — mỗi việc có ô biểu tượng loại việc (kho thiếu, sắp hết hạn, xe hỏng, thiếu nhiên liệu) màu theo mức, thanh "thấp nhất x% định mức" / nhiên liệu còn lại; ô chỉ số có ô biểu tượng (đợt 2) | Xong — PR #131 |
 | 6 | Bản đồ giám sát: bảng nổi bo 14 px như thẻ (`.float-panel`), bảng "Cảnh báo khẩn cấp" có ô biểu tượng đỏ nhạt (trang đã theo kiểu bản đồ toàn màn + bảng nổi — chỉ chỉnh cho đồng bộ khung mới) | Xong — PR #132 |
-| 7 | Phản ánh, Đợt thiên tai, Nhập dữ liệu, Nguồn dữ liệu, Phân quyền, Hướng dẫn | Chưa làm |
+| 7 | Các trang còn lại: biểu tượng trơn bên trái thẻ thành ô biểu tượng (Nhập dữ liệu — thẻ loại dữ liệu, Nguồn dữ liệu, Hướng dẫn, Phân quyền), ô số dùng chung `KpiCard` (Đợt thiên tai…) có ô biểu tượng như ô chỉ số Tổng quan; Phản ánh dùng thẻ, tab chung (đợt 1) | Xong — PR #133 |
 | 8 | Đăng nhập: cột trái có chiều sâu (màu chuyển xanh đêm, hình bóng tỉnh) | Chưa làm |

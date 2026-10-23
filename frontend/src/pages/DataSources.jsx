@@ -233,7 +233,7 @@ function SourcesTab({ sources, devices }) {
         return (
           <li key={s.id} className={clsx('card flex min-w-0 flex-col gap-3 p-4', st.level === 3 && 'border-danger/60')}>
             <div className="flex items-start gap-3">
-              <T.icon size={24} strokeWidth={1.75} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
+              <span className="icon-tile mt-0.5 h-10 w-10" aria-hidden="true"><T.icon size={20} strokeWidth={1.75} /></span>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <h3 className="font-semibold">{T.name}</h3>

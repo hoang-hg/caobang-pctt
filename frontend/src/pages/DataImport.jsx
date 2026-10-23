@@ -104,7 +104,7 @@ function DatasetChooser({ datasets, submitMode, onPick }) {
                     onClick={() => onPick(d.name)}
                     className="card tap flex h-full w-full items-start gap-3 p-3 text-left transition-colors hover:border-accent"
                   >
-                    <c.icon size={28} strokeWidth={1.75} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
+                    <span className="icon-tile mt-0.5 h-11 w-11" aria-hidden="true"><c.icon size={22} strokeWidth={1.75} /></span>
                     <span className="min-w-0 flex-1">
                       <span className="block font-semibold text-ink">{d.label}</span>
                       <span className="mt-0.5 block text-sm text-ink-2">{c.hint}</span>
@@ -243,7 +243,7 @@ function DatasetPanel({ ds, submitMode, onBack, onSubmitted }) {
       <BackButton onClick={onBack} className="self-start">Chọn loại khác</BackButton>
       <section className="card flex min-w-0 flex-col gap-4 p-4">
         <div className="flex items-start gap-3">
-          <c.icon size={28} strokeWidth={1.75} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
+          <span className="icon-tile mt-0.5 h-11 w-11" aria-hidden="true"><c.icon size={22} strokeWidth={1.75} /></span>
           <div className="min-w-0">
             <h2 className="text-lg font-semibold leading-tight">{submitMode ? `Gửi ${ds.label.toLowerCase()}` : ds.label}</h2>
             <p className="mt-0.5 text-sm text-ink-2">{c.hint}</p>

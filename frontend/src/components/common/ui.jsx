@@ -17,7 +17,12 @@ export function KpiCard({ label, value, unit, sub, tone, icon: Icon, blink, chil
   return (
     <div className={clsx('card flex flex-col gap-1 p-3', toneCls, blink && 'animate-blink')}>
       <div className="flex items-center gap-1.5 text-xs font-semibold text-ink-2">
-        {Icon && <Icon size={14} className="text-accent" aria-hidden="true" />}
+        {/* Ô biểu tượng như ô chỉ số của Tổng quan (StatCard); lề âm — ô không cao thêm */}
+        {Icon && (
+          <span className="-my-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent" aria-hidden="true">
+            <Icon size={14} />
+          </span>
+        )}
         <span className="truncate">{label}</span>
       </div>
       <div className="flex items-baseline gap-1">
