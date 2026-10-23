@@ -7,6 +7,7 @@ import { usePermission } from '../../rbac/usePermission';
 import AdminFilter from '../common/AdminFilter';
 import OmniSearch from '../common/OmniSearch';
 import UserMenu from '../common/UserMenu';
+import BrandMark from './BrandMark';
 import { useNavBadges } from './Sidebar';
 
 // Điều khiển chế độ giả lập: CHỈ máy dev (bản build chạy thật không có mã giả lập — app/store.js)
@@ -66,10 +67,7 @@ export default function Header() {
           sidebarCollapsed ? 'lg:w-16 lg:justify-center lg:pl-0 lg:pr-0' : 'lg:w-60',
         )}
       >
-        {/* data-mau-chuyen: màu chuyển đã duyệt (kế hoạch giao diện mục 12) — ui-test bỏ qua */}
-        <div data-mau-chuyen="" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#3B82F6] to-[#1E40AF] text-white shadow-sm ring-1 ring-inset ring-white/20">
-          <ShieldAlert size={20} />
-        </div>
+        <BrandMark size={36} />
         <div className={clsx('hidden min-w-0 leading-tight lg:block', sidebarCollapsed && 'lg:hidden')}>
           {/* Hai dòng ngắn vừa khối 240 px (một dòng "… Cao Bằng" bị cắt) */}
           <div className="truncate text-sm font-bold tracking-tight text-ink lg:text-white">BCH PCTT & TKCN</div>
