@@ -517,22 +517,37 @@ export const StatusDot = ({ cls }) => <span className={clsx('inline-block h-2 w-
  * bước i đã điền đủ (dấu ✓). Nút ≥ 44 px trên màn cảm ứng.
  */
 export function StepChips({ steps, step, onStep, done = [], disabled }) {
+  // Thanh tiến trình nối liền: số trong vòng tròn (đang làm: màu nhấn chữ trắng; đã xong: xanh lá nhạt, dấu tích; chưa tới:
+  // xám), vạch nối giữa các bước tô xanh khi đã qua. Bấm bước đã qua để quay lại (bước chưa tới bị khoá như trước)
   return (
-    <ol className="mb-3 flex flex-wrap gap-1.5 text-[11px]" aria-label="Các bước">
+    <ol className="mb-3 flex min-w-0 items-center gap-1 text-xs" aria-label="Các bước">
       {steps.map((s, i) => (
-        <li key={s}>
+        <li key={s} className={clsx('flex min-w-0 items-center gap-1', i < steps.length - 1 && 'flex-1')}>
           <button
             type="button"
             disabled={i > step || disabled}
             onClick={() => onStep(i)}
             aria-current={i === step ? 'step' : undefined}
             className={clsx(
-              'chip tap min-h-[32px] px-2.5 py-0.5',
-              i === step ? 'bg-accent text-white' : i < step ? 'bg-good/15 text-good hover:bg-good/25' : 'bg-panel2 text-muted',
+              'tap flex min-h-[32px] min-w-0 items-center gap-1.5 rounded-full py-0.5 pl-0.5 pr-2.5 font-semibold transition-colors',
+              i === step ? 'bg-accent/10 text-accent' : i < step ? 'text-good hover:bg-good/10' : 'text-muted',
             )}
           >
-            {i < step && done[i] && <Check size={11} aria-hidden="true" />} {i + 1}. {s}
+            <span
+              className={clsx(
+                'num flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold',
+                i === step ? 'bg-accent text-white shadow-sm' : i < step ? 'bg-good/15 text-good' : 'bg-panel2 text-muted ring-1 ring-inset ring-line',
+              )}
+              aria-hidden="true"
+            >
+              {i < step && done[i] ? <Check size={12} /> : i + 1}
+            </span>
+            <span className="truncate">{s}</span>
+            <span className="sr-only">{i < step ? ' (đã xong)' : i === step ? ' (đang làm)' : ''}</span>
           </button>
+          {i < steps.length - 1 && (
+            <span className={clsx('h-0.5 min-w-3 flex-1 rounded-full', i < step ? 'bg-good/50' : 'bg-line')} aria-hidden="true" />
+          )}
         </li>
       ))}
     </ol>
