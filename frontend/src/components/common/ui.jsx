@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import clsx from 'clsx';
 import {
-  AlertTriangle, ArrowLeft, ArrowUpDown, Check, ChevronDown, ChevronLeft, ChevronRight, Loader2, MoveRight, RefreshCw, TrendingDown, TrendingUp, X,
+  AlertTriangle, ArrowLeft, ArrowUpDown, Check, ChevronDown, ChevronLeft, ChevronRight, Lightbulb, Loader2, MoveRight, RefreshCw, TrendingDown, TrendingUp, X,
 } from 'lucide-react';
 import { NO_DATA, RISK, risk } from '../../utils/risk';
 import EmptyArt from './EmptyArt';
@@ -194,7 +194,7 @@ export function Tabs({ tabs, value, onChange, fit = false, label }) {
           className={clsx(
             'tap flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium',
             fit && 'max-sm:min-w-0 max-sm:flex-1 max-sm:flex-col max-sm:gap-0.5 max-sm:px-1 max-sm:py-1.5',
-            value === t.value ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-ink',
+            value === t.value ? 'border-accent font-semibold text-accent' : 'border-transparent text-muted hover:text-ink',
           )}
         >
           {t.icon && <t.icon size={16} className={clsx('shrink-0', fit && 'max-sm:hidden')} aria-hidden="true" />}
@@ -384,8 +384,11 @@ export function PageTips({ id, title = 'Bắt đầu từ đâu?', steps, more, 
     setOpen(false);
   };
   return (
-    <section aria-label="Gợi ý cho người mới" className={clsx('card flex flex-col gap-2 border-accent/40 px-3 py-2.5 no-print sm:flex-row sm:items-center sm:gap-4', className)}>
-      <b className="shrink-0 text-sm font-semibold text-ink">{title}</b>
+    <section aria-label="Gợi ý cho người mới" data-mau-chuyen="" className={clsx('card flex flex-col gap-2 border-accent/25 bg-gradient-to-r from-accent/[0.07] via-accent/[0.02] to-transparent px-3 py-2.5 no-print sm:flex-row sm:items-center sm:gap-4', className)}>
+      <b className="flex shrink-0 items-center gap-2 text-sm font-semibold text-ink">
+        <span className="icon-tile h-8 w-8 max-sm:hidden" aria-hidden="true"><Lightbulb size={16} /></span>
+        {title}
+      </b>
       <ol className="grid min-w-0 flex-1 gap-1.5 text-[13px] leading-snug text-ink-2 md:grid-cols-3 md:gap-3">
         {steps.map((s, i) => (
           <li key={s} className="flex min-w-0 gap-2">

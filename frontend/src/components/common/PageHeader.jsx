@@ -1,5 +1,7 @@
 import clsx from 'clsx';
+import { useLocation } from 'react-router-dom';
 import { MapPin, RefreshCw } from 'lucide-react';
+import { navItemFor } from '../layout/nav';
 import ExportMenu from './ExportMenu';
 
 /**
@@ -11,11 +13,16 @@ import ExportMenu from './ExportMenu';
  *   lọc"), giờ số liệu (`time`; chưa có giờ → `timeNote`, VD "Đang tải số liệu…"), thông tin riêng của trang (`meta` — mảng;
  *   mục nào chỉ hiện trên màn lớn thì tự bọc lớp ẩn). `description`: một câu giải thích dài hơn (điện thoại gọn 2 dòng).
  * - `children`: hàng dưới cùng chiếm trọn bề ngang (VD thang màu, ô chọn lưu vực).
+ * - Ô biểu tượng bên trái (từ 640 px): biểu tượng của mục menu ứng với trang (layout/nav.js) — chuyển trang vẫn thấy cùng một
+ *   mốc như trên menu. `icon` đặt riêng (null = không có ô). Ô cao đúng bằng tiêu đề + dòng ngữ cảnh: đầu trang không cao thêm.
  * Thẻ gốc là <div>: <header> dành cho thanh trên cùng của ứng dụng (kiểm thử giao diện tìm thanh đó bằng thẻ header).
  */
 export default function PageHeader({
   title, short, before, scope, time, timeNote, meta = [], description, actions, exports, onRefresh, refreshing, children, className,
+  icon, ...rest // thuộc tính khác của thẻ gốc (VD data-mau-chuyen của khối nổi bật Tổng quan)
 }) {
+  const { pathname } = useLocation();
+  const Icon = icon === undefined ? navItemFor(pathname)?.icon : icon;
   const facts = [
     scope && (
       <span key="scope" className="inline-flex min-w-0 max-w-full items-center gap-1 font-semibold text-accent">
@@ -38,8 +45,15 @@ export default function PageHeader({
   ].filter(Boolean);
 
   return (
-    <div className={clsx('flex flex-col gap-1', className)}>
+    <div className={clsx('flex flex-col gap-1', className)} {...rest}>
       {before}
+      <div className="flex min-w-0 items-start gap-3">
+      {Icon && (
+        <span className="icon-tile mt-0.5 h-11 w-11 max-sm:hidden" aria-hidden="true">
+          <Icon size={22} strokeWidth={1.9} />
+        </span>
+      )}
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
       <div className="flex items-center justify-between gap-3">
         <h1 className="min-w-0 text-[17px] font-bold leading-tight tracking-tight text-ink sm:text-xl lg:text-2xl">
           {short ? (
@@ -75,6 +89,8 @@ export default function PageHeader({
         </div>
       )}
       {description && <p className="max-w-4xl text-xs leading-relaxed text-muted max-sm:line-clamp-2">{description}</p>}
+      </div>
+      </div>
       {children}
     </div>
   );

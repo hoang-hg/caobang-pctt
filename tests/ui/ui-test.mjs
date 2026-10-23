@@ -157,7 +157,9 @@ const visible = (loc) => loc.filter({ visible: true }).first();
 /**
  * Dấu hiệu giao diện "làm cho có" (docs/ke-hoach-lam-moi-giao-dien.md mục 1.3) trên trang đang mở: chữ IN HOA (CSS
  * `text-transform: uppercase`) cho chữ thường dài ≥ 4 ký tự — mã viết hoa sẵn (SOS-1001) không tính; màu chuyển trang trí
- * (`background-image: …gradient`) — trừ dải màu chú giải đánh dấu `data-thang-mau`. Trả danh sách mô tả, rỗng = đạt.
+ * (`background-image: …gradient`) — trừ dải màu chú giải đánh dấu `data-thang-mau` và màu chuyển ĐÃ DUYỆT của diện mạo
+ * "phòng chỉ huy" đánh dấu `data-mau-chuyen` (khiên xanh, ô gợi ý, dải khẩn Đỏ, khối nổi bật Tổng quan — kế hoạch mục 12).
+ * Trả danh sách mô tả, rỗng = đạt.
  */
 const designFlaws = (page) => page.evaluate(() => {
   const out = new Set();
@@ -168,7 +170,7 @@ const designFlaws = (page) => page.evaluate(() => {
       const own = [...el.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join(' ').replace(/\s+/g, ' ').trim();
       if (own.length >= 4 && own !== own.toUpperCase()) out.add(`chữ IN HOA "${own.slice(0, 30)}"`);
     }
-    if (cs.backgroundImage.includes('gradient') && !el.closest('[data-thang-mau]')) {
+    if (cs.backgroundImage.includes('gradient') && !el.closest('[data-thang-mau], [data-mau-chuyen]')) {
       out.add(`màu chuyển ở <${el.tagName.toLowerCase()} class="${String(el.className).slice(0, 50)}">`);
     }
   }
