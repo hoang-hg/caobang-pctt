@@ -64,13 +64,18 @@ export default function RescueBoard({ tickets, factsOf, wide, column, onColumn, 
             onDragLeave={() => setOver(null)}
             onDrop={(e) => { e.preventDefault(); setOver(null); onDrop(e.dataTransfer.getData('text/plain'), c.key); }}
             className={clsx(
-              'card flex max-h-[calc(100vh-12rem)] min-h-[360px] min-w-0 flex-col transition-all lg:tall:max-h-[calc(100vh-14rem)] print:max-h-none print:min-h-0',
-              over === c.key ? 'border-dashed bg-accent/5 ring-2 ring-accent' : 'bg-panel',
+              // Kiểu bảng Kanban: thân cột lõm (màu nền trang) — thẻ phiếu trắng nổi lên; đầu cột trắng có vạch màu nhấn phía
+              // trên (cột đã xong: xanh lá như biểu tượng). Không dùng màu Đỏ / Cam / Vàng (dành cho mức ưu tiên của phiếu)
+              'card flex max-h-[calc(100vh-12rem)] min-h-[360px] min-w-0 flex-col overflow-hidden border-t-[3px] shadow-none transition-all lg:tall:max-h-[calc(100vh-14rem)] print:max-h-none print:min-h-0',
+              c.key === 'hoan_thanh' ? 'border-t-good' : 'border-t-accent',
+              over === c.key ? 'border-dashed bg-accent/5 ring-2 ring-accent' : 'bg-bg',
             )}
           >
-            <div className="border-b border-line/60 px-3 py-2.5">
-              <div className="flex items-center gap-1.5 text-sm font-bold text-ink">
-                <c.icon size={15} className={c.key === 'hoan_thanh' ? 'text-good' : 'text-accent'} aria-hidden="true" />
+            <div className="border-b border-line/60 bg-panel px-3 py-2.5">
+              <div className="flex items-center gap-2 text-sm font-bold text-ink">
+                <span className={clsx('icon-tile h-7 w-7', c.key === 'hoan_thanh' && 'bg-good/10 text-good ring-good/20')} aria-hidden="true">
+                  <c.icon size={15} />
+                </span>
                 <span className="min-w-0 flex-1 leading-tight">{c.title}</span>
                 {late > 0 && <span className="chip bg-danger px-1.5 py-0 text-[11px] font-bold text-white" title={`${late} phiếu quá hạn phản hồi`}>{late} quá hạn</span>}
                 <span className="chip bg-panel2 px-2 py-0.5 text-xs font-semibold">{byCol[c.key].length}</span>

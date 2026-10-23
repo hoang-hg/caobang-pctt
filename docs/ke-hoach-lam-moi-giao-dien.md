@@ -409,7 +409,7 @@ nền, vùng chạm 44 px, màn hình đầu theo thiết bị (mục 8), in ra 
 |---|---|---|
 | 1 | Nền móng + khung: bảng màu mới (nền trang `#F1F5FA`, màu nhấn `#1D5BC7`; nền tối xanh đêm `#09101E`), thẻ bo 14 px bóng mềm, khung chữ L xanh đêm (menu trái + góc logo, thu gọn cùng menu), khiên xanh (thanh trên, đăng nhập), ô biểu tượng đầu trang theo mục menu (`layout/nav.js`), ô gợi ý nền xanh nhạt, dải khẩn đỏ chuyển nhẹ, thanh trạng thái xanh đêm | Xong — PR #127 |
 | 2 | Tổng quan: khối tóm tắt nền xanh đêm có hình bóng tỉnh, ô chỉ số có ô biểu tượng màu, "Việc chờ quyết định" có biểu tượng; biểu tượng đầu tiêu đề khối (`.card-title`) trong ô màu nhạt cùng màu — áp mọi trang | Xong — PR #128 |
-| 3 | Điều hành cứu hộ: đầu cột bảng điều phối có màu theo bước, thẻ phiếu rõ mức ưu tiên | Chưa làm |
+| 3 | Điều hành cứu hộ: bảng điều phối kiểu Kanban — thân cột lõm (màu nền trang) để thẻ phiếu trắng nổi lên, đầu cột trắng có ô biểu tượng và vạch màu nhấn (cột đã xong: xanh lá), không dùng màu rủi ro cho cột; 4 ô chỉ số có ô biểu tượng theo mức (đợt 2) | Xong — PR #129 |
 | 4 | Cảnh báo & Hotline: thanh tiến trình 3 bước soạn lệnh, thẻ mẫu tin có biểu tượng | Chưa làm |
 | 5 | Vật tư & Lực lượng: thanh tồn kho so với định mức, thẻ lực lượng | Chưa làm |
 | 6 | Bản đồ giám sát: bảng nổi, chú giải cùng kiểu mới | Chưa làm |
