@@ -411,7 +411,7 @@ nền, vùng chạm 44 px, màn hình đầu theo thiết bị (mục 8), in ra 
 | 2 | Tổng quan: khối tóm tắt nền xanh đêm có hình bóng tỉnh, ô chỉ số có ô biểu tượng màu, "Việc chờ quyết định" có biểu tượng; biểu tượng đầu tiêu đề khối (`.card-title`) trong ô màu nhạt cùng màu — áp mọi trang | Xong — PR #128 |
 | 3 | Điều hành cứu hộ: bảng điều phối kiểu Kanban — thân cột lõm (màu nền trang) để thẻ phiếu trắng nổi lên, đầu cột trắng có ô biểu tượng và vạch màu nhấn (cột đã xong: xanh lá), không dùng màu rủi ro cho cột; 4 ô chỉ số có ô biểu tượng theo mức (đợt 2) | Xong — PR #129 |
 | 4 | Cảnh báo & Hotline: thanh tiến trình nối liền cho mọi biểu mẫu nhiều bước (`StepChips` — soạn lệnh, nhập kho, xuất kho, đợt thiên tai, sơ tán), thẻ mẫu tin có ô biểu tượng; ô chỉ số có ô biểu tượng (đợt 2) | Xong — PR #130 |
-| 5 | Vật tư & Lực lượng: thanh tồn kho so với định mức, thẻ lực lượng | Chưa làm |
+| 5 | Vật tư & Lực lượng: "Cần bổ sung / cần sửa" — mỗi việc có ô biểu tượng loại việc (kho thiếu, sắp hết hạn, xe hỏng, thiếu nhiên liệu) màu theo mức, thanh "thấp nhất x% định mức" / nhiên liệu còn lại; ô chỉ số có ô biểu tượng (đợt 2) | Xong — PR #131 |
 | 6 | Bản đồ giám sát: bảng nổi, chú giải cùng kiểu mới | Chưa làm |
 | 7 | Phản ánh, Đợt thiên tai, Nhập dữ liệu, Nguồn dữ liệu, Phân quyền, Hướng dẫn | Chưa làm |
 | 8 | Đăng nhập: cột trái có chiều sâu (màu chuyển xanh đêm, hình bóng tỉnh) | Chưa làm |
