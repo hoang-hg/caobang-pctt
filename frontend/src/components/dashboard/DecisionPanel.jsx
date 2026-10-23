@@ -1,6 +1,6 @@
 import clsx from 'clsx';
 import { Link } from 'react-router-dom';
-import { ChevronRight, CircleCheckBig } from 'lucide-react';
+import { Camera, ChevronRight, CircleCheckBig, FileUp, HandHelping, Megaphone, Siren } from 'lucide-react';
 import { useNavBadges } from '../layout/Sidebar';
 import { useAreaQuery } from '../../api/hooks';
 import { isCommuneSupport } from '../rescue/rescueFacts';
@@ -30,15 +30,15 @@ export default function DecisionPanel({ k, kState, className, stacked = false })
   const sos = k?.sos || {};
   const rows = [
     canSos && communeRequests > 0 && {
-      key: 'chi-vien', to: '/cuu-ho?th=xa_chi_vien', n: communeRequests, level: 3, text: 'xã/phường xin chi viện', action: 'Điều động',
+      key: 'chi-vien', to: '/cuu-ho?th=xa_chi_vien', n: communeRequests, level: 3, text: 'xã/phường xin chi viện', action: 'Điều động', icon: HandHelping,
     },
-    badges.alerts > 0 && { key: 'canh-bao', to: '/canh-bao', n: badges.alerts, text: 'lệnh cảnh báo chờ duyệt', action: 'Duyệt lệnh' },
-    canSos && sos.overdue > 0 && { key: 'sos-qua-han', to: '/cuu-ho', n: sos.overdue, level: 3, text: 'phiếu SOS quá hạn', action: 'Điều động' },
+    badges.alerts > 0 && { key: 'canh-bao', to: '/canh-bao', n: badges.alerts, text: 'lệnh cảnh báo chờ duyệt', action: 'Duyệt lệnh', icon: Megaphone },
+    canSos && sos.overdue > 0 && { key: 'sos-qua-han', to: '/cuu-ho', n: sos.overdue, level: 3, text: 'phiếu SOS quá hạn', action: 'Điều động', icon: Siren },
     canSos && !(sos.overdue > 0) && sos.waiting > 0 && {
-      key: 'sos-cho', to: '/cuu-ho', n: sos.waiting, level: sos.no_team_15m > 0 ? 3 : undefined, text: 'phiếu SOS chờ nhận', action: 'Điều động',
+      key: 'sos-cho', to: '/cuu-ho', n: sos.waiting, level: sos.no_team_15m > 0 ? 3 : undefined, text: 'phiếu SOS chờ nhận', action: 'Điều động', icon: Siren,
     },
-    badges.submissions > 0 && { key: 'ho-so', to: '/nhap-du-lieu', n: badges.submissions, text: 'hồ sơ của xã chờ duyệt', action: 'Duyệt hồ sơ' },
-    badges.reports > 0 && { key: 'phan-anh', to: '/phan-anh', n: badges.reports, text: 'phản ánh của dân chờ duyệt', action: 'Duyệt' },
+    badges.submissions > 0 && { key: 'ho-so', to: '/nhap-du-lieu', n: badges.submissions, text: 'hồ sơ của xã chờ duyệt', action: 'Duyệt hồ sơ', icon: FileUp },
+    badges.reports > 0 && { key: 'phan-anh', to: '/phan-anh', n: badges.reports, text: 'phản ánh của dân chờ duyệt', action: 'Duyệt', icon: Camera },
   ].filter(Boolean);
   // Dòng có từ lần vẽ đầu thì không trượt vào — chỉ việc MỚI phát sinh khi đang xem
   const fresh = useNewKeys(rows.map((r) => r.key), !!k);
@@ -70,6 +70,10 @@ export default function DecisionPanel({ k, kState, className, stacked = false })
                   to={r.to}
                   className={clsx('group -mx-1 flex min-h-[46px] items-center gap-3 rounded-lg px-1 py-1 hover:bg-panel2', row('sm:mx-0 sm:h-full sm:gap-2.5 sm:border sm:border-line sm:px-2.5 sm:py-1.5 sm:hover:border-accent'))}
                 >
+                  {/* Ô biểu tượng loại việc (từ 640 px): việc khẩn — ô đỏ nhạt */}
+                  <span className={clsx('icon-tile h-8 w-8 max-sm:hidden', r.level === 3 && 'bg-danger/10 text-danger ring-danger/20')} aria-hidden="true">
+                    <r.icon size={16} />
+                  </span>
                   <span className={clsx('num w-10 shrink-0 text-right text-[26px] font-extrabold leading-none', row('sm:w-auto'), r.level != null ? risk(r.level).text : 'text-ink')}>
                     {int(r.n)}
                   </span>

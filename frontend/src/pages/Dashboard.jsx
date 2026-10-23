@@ -32,6 +32,7 @@ import CommuneView, { unitLabel } from '../components/dashboard/CommuneView';
 import SystemView from '../components/dashboard/SystemView';
 import QuickIncidentModal from '../components/dashboard/QuickIncidentModal';
 import PageHeader from '../components/common/PageHeader';
+import ProvinceArt from '../components/layout/ProvinceArt';
 import { PAGE } from '../components/layout/page';
 import ReportDocModal from '../components/dashboard/ReportDocModal';
 import QuickActionBar from '../components/common/QuickActionBar';
@@ -501,7 +502,9 @@ export default function Dashboard() {
       {/* 1. Đầu trang (dùng chung các trang): phạm vi đang xem · giờ số liệu; Trình chiếu · Xuất · Làm mới. "Báo cáo nhanh"
           nằm cố định trên thanh trên cùng (máy tính) / thanh dưới cùng (điện thoại) */}
       <PageHeader
-        className="card px-3 py-2.5 sm:px-4"
+        // Khối nổi bật xanh đêm (diện mạo phòng chỉ huy — đợt 2): lớp `dark` riêng cho khối → chữ, nút, ô chọn bên trong dùng
+        // bảng màu tối đã kiểm tương phản; hình ranh giới tỉnh mờ bên phải (trang trí, trình đọc màn hình bỏ qua)
+        className="card dark hero-brand relative isolate overflow-hidden border-white/10 px-3 py-2.5 sm:px-4"
         title="Tổng quan"
         short="Tổng quan"
         scope={(
@@ -560,6 +563,7 @@ export default function Dashboard() {
         onRefresh={presentation ? undefined : refresh}
         refreshing={refreshing}
       >
+        <ProvinceArt className="pointer-events-none absolute -right-8 top-1/2 -z-10 h-[230%] w-auto -translate-y-1/2 text-sky-200 opacity-25 max-md:hidden" />
         {/* Câu tóm tắt tình hình bằng lời + chỗ nguy hiểm nhất (thẻ Cấp xã có phần riêng của xã) */}
         {tab !== 'cap_xa' && (
           <div className="mt-1.5">

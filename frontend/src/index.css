@@ -106,6 +106,25 @@ body {
   .card-hover:hover { box-shadow: var(--shadow-card-hover); }
   /* Biểu tượng của trang / khối: ô bo tròn màu nhấn nhạt — mốc nhìn nhanh, cùng một kiểu ở mọi trang */
   .icon-tile { @apply inline-flex shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent ring-1 ring-inset ring-accent/15; }
+  /* Khối nổi bật đầu trang (Tổng quan): xanh đêm, quầng sáng xanh nhẹ ở góc trên phải (sau các nút — không nằm sau chữ phụ).
+     Đặt cùng lớp `dark`: chữ, nút bên trong dùng bảng màu tối đã kiểm tương phản (chữ phụ ≥ 4,5 : 1 ở mọi điểm ngoài quầng) */
+  .hero-brand {
+    background:
+      radial-gradient(55% 120% at 100% 0%, rgb(37 99 235 / 0.28) 0%, transparent 70%),
+      linear-gradient(135deg, #0b1a33 0%, #0e2245 55%, #102a50 100%);
+  }
+}
+
+/* Biểu tượng đứng đầu tiêu đề khối (.card-title > svg đầu tiên): nằm trong ô bo tròn nhạt CÙNG MÀU biểu tượng (màu rủi ro
+   giữ nguyên nghĩa) — lề âm: hàng tiêu đề không cao thêm. Trình duyệt cũ không có color-mix → biểu tượng như trước */
+@layer components {
+  .card-title > svg:first-child {
+    box-sizing: content-box;
+    padding: 5px;
+    margin: -5px 2px -5px 0;
+    border-radius: 8px;
+    background: color-mix(in srgb, currentColor 12%, transparent);
+  }
   /* Lớp nổi trên bản đồ (bảng lớp, chú giải, thanh thời gian…): một kiểu — nền ô hơi trong, làm mờ phía sau, một mức bóng */
   .float-panel { @apply bg-panel/95 backdrop-blur-md border border-line/80 rounded-xl; box-shadow: var(--shadow-float); }
   /* Tiêu đề khối: chữ thường có dấu, đậm vừa — chữ IN HOA dàn rộng khó đọc với dấu tiếng Việt */

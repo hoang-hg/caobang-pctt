@@ -2,6 +2,14 @@ import clsx from 'clsx';
 import { Link } from 'react-router-dom';
 import { risk } from '../../utils/risk';
 
+// Ô biểu tượng của ô gọn theo mức rủi ro (thang chung: 0 Xanh · 1 Vàng · 2 Cam · 3 Đỏ); chữ dùng sắc --*-text đủ tương phản
+const TILE = {
+  0: 'bg-good/10 text-good',
+  1: 'bg-warn/15 text-warn',
+  2: 'bg-serious/15 text-serious',
+  3: 'bg-danger/10 text-danger',
+};
+
 /**
  * Thẻ chỉ số của Dashboard. `level` theo thang màu rủi ro chung (utils/risk.js): 0–3 = Xanh / Vàng / Cam / Đỏ (màu biểu
  * tượng; vạch màu bên trái chỉ từ Vàng trở lên — Xanh không vạch, mắt chỉ dừng ở ô cần chú ý; nền giữ trắng — cả hàng thẻ tô hồng thì mắt không còn tìm ra ô thật sự gấp); `null` = chưa có dữ liệu (viền nét đứt, biểu tượng xám — không tô xanh như "bình
@@ -40,7 +48,12 @@ export default function StatCard({
     >
       <div className="flex items-center justify-between gap-2 text-xs font-semibold text-ink-2">
         <span className={clsx('flex min-w-0 items-center gap-1.5', compact && 'text-[13px] [.kpi-lon_&]:text-lg')}>
-          {Icon && <Icon size={15} className={clsx('shrink-0', scale ? scale.text : 'text-accent')} aria-hidden="true" />}
+          {Icon && compact ? (
+            // Ô gọn: biểu tượng trong ô màu theo mức (không mức → màu nhấn; chưa có dữ liệu → xám). Lề âm: hàng không cao thêm
+            <span className={clsx('-my-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg [.kpi-lon_&]:h-8 [.kpi-lon_&]:w-8', TILE[level] ?? (level === null ? 'bg-panel2 text-muted' : 'bg-accent/10 text-accent'))} aria-hidden="true">
+              <Icon size={14} />
+            </span>
+          ) : Icon && <Icon size={15} className={clsx('shrink-0', scale ? scale.text : 'text-accent')} aria-hidden="true" />}
           <span className="truncate">{title}</span>
         </span>
         {!compact && badgeEl}
