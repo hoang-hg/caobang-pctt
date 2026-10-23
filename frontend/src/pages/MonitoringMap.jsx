@@ -624,8 +624,10 @@ export default function MonitoringMap() {
                 {rightOpen && (
                   <div className={clsx(floatCard, 'flex h-full w-[20rem] flex-col overflow-hidden')}>
                     <div className="flex items-center justify-between border-b border-line px-3 py-2">
-                      <div className="flex items-center gap-1.5 text-sm font-bold text-danger">
-                        <Siren size={16} aria-hidden="true" /> Cảnh báo khẩn cấp
+                      <div className="flex items-center gap-2 text-sm font-bold text-danger">
+                        {/* Ô biểu tượng đỏ nhạt như "Việc chờ quyết định" của Tổng quan (diện mạo phòng chỉ huy — đợt 6) */}
+                        <span className="icon-tile h-7 w-7 bg-danger/10 text-danger ring-danger/20" aria-hidden="true"><Siren size={15} /></span>
+                        Cảnh báo khẩn cấp
                       </div>
                       {canSos && <span className="chip bg-danger text-[11px] font-bold text-white">{sos.length} SOS</span>}
                     </div>
