@@ -231,7 +231,10 @@ export default function Composer({ online = true }) {
                     className={card(tpl === t.code)}
                     onClick={() => { setTpl(t.code); setParams({}); if (!title.trim()) setTitle(t.name); }}
                   >
-                    <Icon size={20} strokeWidth={1.75} className={clsx('mt-0.5 shrink-0', tpl === t.code ? 'text-accent' : 'text-ink-2')} aria-hidden="true" />
+                    {/* Ô biểu tượng loại tin: thẻ đang chọn màu nhấn, thẻ khác xám */}
+                    <span className={clsx('icon-tile h-9 w-9', tpl !== t.code && 'bg-panel2 text-ink-2 ring-line')} aria-hidden="true">
+                      <Icon size={18} strokeWidth={1.75} />
+                    </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-1.5 font-semibold text-ink [overflow-wrap:anywhere]">
                         {t.name}
@@ -243,7 +246,9 @@ export default function Composer({ online = true }) {
                 );
               })}
               <button type="button" role="radio" aria-checked={!tpl} className={card(!tpl)} onClick={() => { setTpl(''); setParams({}); }}>
-                <Pencil size={20} strokeWidth={1.75} className={clsx('mt-0.5 shrink-0', !tpl ? 'text-accent' : 'text-ink-2')} aria-hidden="true" />
+                <span className={clsx('icon-tile h-9 w-9', tpl && 'bg-panel2 text-ink-2 ring-line')} aria-hidden="true">
+                  <Pencil size={18} strokeWidth={1.75} />
+                </span>
                 <span className="min-w-0 flex-1">
                   <span className="block font-semibold text-ink">Tự soạn</span>
                   <span className="block text-[11px] leading-snug text-muted">Viết tin riêng cho tình huống khác</span>
