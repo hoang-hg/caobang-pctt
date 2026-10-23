@@ -66,7 +66,8 @@ export default function Header() {
           sidebarCollapsed ? 'lg:w-16 lg:justify-center lg:pl-0 lg:pr-0' : 'lg:w-60',
         )}
       >
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#3B82F6] to-[#1E40AF] text-white shadow-sm ring-1 ring-inset ring-white/20">
+        {/* data-mau-chuyen: màu chuyển đã duyệt (kế hoạch giao diện mục 12) — ui-test bỏ qua */}
+        <div data-mau-chuyen="" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#3B82F6] to-[#1E40AF] text-white shadow-sm ring-1 ring-inset ring-white/20">
           <ShieldAlert size={20} />
         </div>
         <div className={clsx('hidden min-w-0 leading-tight lg:block', sidebarCollapsed && 'lg:hidden')}>
