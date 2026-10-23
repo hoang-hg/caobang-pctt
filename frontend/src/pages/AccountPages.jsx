@@ -1,35 +1,37 @@
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { KeyRound, Loader2, LogOut, Mail, ShieldAlert } from 'lucide-react';
+import { KeyRound, Loader2, LogOut, Mail } from 'lucide-react';
 import { api } from '../api/client';
 import { useStore } from '../app/store';
 import { Modal } from '../components/common/ui';
+import { BrandLockup } from '../components/layout/BrandMark';
 
 export const PASSWORD_HINT = 'Tối thiểu 8 ký tự, gồm cả chữ và số';
 export const weakPassword = (p) => p.length < 8 || !/\d/.test(p) || !/[A-Za-zÀ-ỹ]/.test(p);
 
+/** Khung chung các trang tài khoản (đổi mật khẩu lần đầu, quên / đặt lại mật khẩu): dải xanh đêm có biểu trưng như trang
+ * Đăng nhập trên điện thoại, thẻ nội dung đè lên mép dưới dải (màu chuyển chỉ trong khối có data-mau-chuyen). */
 function Shell({ title, children, footer }) {
   return (
-    <div className="flex min-h-full items-center justify-center bg-bg p-4">
-      <div className="card w-full max-w-md p-6">
-        <div className="mb-4 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-danger text-white"><ShieldAlert size={22} /></div>
-          <div>
-            <div className="font-bold">{title}</div>
-            <div className="text-xs text-muted">BCH PCTT & TKCN tỉnh Cao Bằng</div>
+    <div className="flex min-h-full flex-col bg-bg">
+      <header data-mau-chuyen="" className="hero-brand px-4 pb-16 pt-6 text-slate-200 sm:pb-24 sm:pt-10">
+        <BrandLockup className="mx-auto max-w-md" />
+      </header>
+      <main className="relative -mt-10 flex flex-1 justify-center px-4 pb-8 sm:-mt-14">
+        <div className="card h-fit w-full max-w-md p-6">
+          <h1 className="mb-3 text-xl font-bold text-ink">{title}</h1>
+          {children}
+          <div className="mt-4 flex justify-between text-xs">
+            {footer || (
+              <>
+                <Link to="/dang-nhap" className="text-accent hover:underline">← Đăng nhập</Link>
+                <Link to="/" className="text-muted hover:underline">Cổng thông tin công khai</Link>
+              </>
+            )}
           </div>
         </div>
-        {children}
-        <div className="mt-4 flex justify-between text-xs">
-          {footer || (
-            <>
-              <Link to="/dang-nhap" className="text-accent hover:underline">← Đăng nhập</Link>
-              <Link to="/" className="text-muted hover:underline">Cổng thông tin công khai</Link>
-            </>
-          )}
-        </div>
-      </div>
+      </main>
     </div>
   );
 }
