@@ -30,7 +30,7 @@ function Scenario({ s }) {
         {s.art ? (
           <EmptyArt name={s.art} className="h-11 w-[66px] shrink-0 text-muted sm:h-12 sm:w-[72px]" />
         ) : (
-          <s.icon size={24} strokeWidth={1.75} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
+          <span className="icon-tile mt-0.5 h-10 w-10" aria-hidden="true"><s.icon size={20} strokeWidth={1.75} /></span>
         )}
         <div className="min-w-0">
           <h3 id={`${s.id}-t`} tabIndex={-1} className="text-base font-semibold leading-snug text-ink outline-none">{s.title}</h3>
@@ -191,7 +191,7 @@ export default function Guide() {
               onClick={() => jump(s.id)}
               className="card tap flex min-h-[56px] items-center gap-3 px-3 py-2.5 text-left text-sm font-semibold text-ink hover:border-accent"
             >
-              <s.icon size={20} strokeWidth={1.75} className="shrink-0 text-accent" aria-hidden="true" />
+              <span className="icon-tile h-9 w-9" aria-hidden="true"><s.icon size={18} strokeWidth={1.75} /></span>
               <span className="min-w-0 flex-1 leading-snug">{s.title}</span>
               <ArrowDown size={15} className="shrink-0 text-muted" aria-hidden="true" />
             </button>

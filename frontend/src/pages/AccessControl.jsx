@@ -99,7 +99,7 @@ function RoleChoice({ value, onChange }) {
             className={clsx('tap flex cursor-pointer items-start gap-3 rounded-lg border p-3', value === r.name ? 'border-accent bg-accent/5' : 'border-line hover:border-accent')}
           >
             <input type="radio" name="cap-tai-khoan" className="mt-1" checked={value === r.name} onChange={() => onChange(r.name)} />
-            <t.icon size={20} strokeWidth={1.75} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
+            <span className="icon-tile mt-0.5 h-10 w-10" aria-hidden="true"><t.icon size={20} strokeWidth={1.75} /></span>
             <span className="min-w-0 text-sm">
               <b className="block">{t.name} <span className="font-normal text-muted">· Cấp {t.level}</span></b>
               <span className="block text-ink-2">Dành cho: {t.who}</span>
@@ -436,7 +436,7 @@ function UsersTab() {
         {Object.values(TIER_CONFIG).map((t) => (
           <div key={t.level} className="card flex flex-col gap-1 p-3.5">
             <h3 className="flex items-center gap-2 font-semibold">
-              <t.icon size={18} strokeWidth={1.75} className="shrink-0 text-accent" aria-hidden="true" />
+              <span className="icon-tile h-8 w-8" aria-hidden="true"><t.icon size={16} strokeWidth={1.75} /></span>
               {t.name} <span className="text-sm font-normal text-muted">· Cấp {t.level}</span>
             </h3>
             <p className="text-sm text-ink-2"><b className="font-medium text-ink">Dành cho:</b> {t.who}</p>
