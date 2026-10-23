@@ -505,6 +505,7 @@ export default function Dashboard() {
         // Khối nổi bật xanh đêm (diện mạo phòng chỉ huy — đợt 2): lớp `dark` riêng cho khối → chữ, nút, ô chọn bên trong dùng
         // bảng màu tối đã kiểm tương phản; hình ranh giới tỉnh mờ bên phải (trang trí, trình đọc màn hình bỏ qua)
         className="card dark hero-brand relative isolate overflow-hidden border-white/10 px-3 py-2.5 sm:px-4"
+        data-mau-chuyen="" // màu chuyển đã duyệt (kế hoạch giao diện mục 12) — ui-test bỏ qua
         title="Tổng quan"
         short="Tổng quan"
         scope={(

@@ -384,7 +384,7 @@ export function PageTips({ id, title = 'Bắt đầu từ đâu?', steps, more, 
     setOpen(false);
   };
   return (
-    <section aria-label="Gợi ý cho người mới" className={clsx('card flex flex-col gap-2 border-accent/25 bg-gradient-to-r from-accent/[0.07] via-accent/[0.02] to-transparent px-3 py-2.5 no-print sm:flex-row sm:items-center sm:gap-4', className)}>
+    <section aria-label="Gợi ý cho người mới" data-mau-chuyen="" className={clsx('card flex flex-col gap-2 border-accent/25 bg-gradient-to-r from-accent/[0.07] via-accent/[0.02] to-transparent px-3 py-2.5 no-print sm:flex-row sm:items-center sm:gap-4', className)}>
       <b className="flex shrink-0 items-center gap-2 text-sm font-semibold text-ink">
         <span className="icon-tile h-8 w-8 max-sm:hidden" aria-hidden="true"><Lightbulb size={16} /></span>
         {title}
