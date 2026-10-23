@@ -20,6 +20,11 @@ export default {
         warn: v('warn'),
         good: v('good'),
         info: v('info'),
+        // Menu trái, góc thương hiệu thanh trên, thanh trạng thái: xanh đêm ở cả hai nền
+        nav: v('nav-bg'),
+        'nav-ink': v('nav-ink'),
+        'nav-muted': v('nav-muted'),
+        'nav-active': v('nav-active'),
       },
       // Chữ màu nhấn / trạng thái: sắc riêng đủ tương phản 4,5 : 1 (src/index.css --*-text); bg-/border-/ring-… giữ màu gốc
       textColor: {

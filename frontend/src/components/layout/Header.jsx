@@ -32,7 +32,7 @@ function Clock() {
 }
 
 export default function Header() {
-  const { theme, toggleTheme, wsStatus, soundOn, toggleSound, mobileMenuOpen, setMobileMenuOpen, audioReady } = useStore();
+  const { theme, toggleTheme, wsStatus, soundOn, toggleSound, mobileMenuOpen, setMobileMenuOpen, audioReady, sidebarCollapsed } = useStore();
   // Điện thoại: menu thu vào nút ☰ — SOS chờ xử lý / lệnh cảnh báo chờ bạn duyệt hiện số đỏ ngay trên nút
   const badges = useNavBadges();
   const urgent = badges.sos + badges.alerts;
@@ -56,16 +56,23 @@ export default function Header() {
         )}
       </button>
 
-      {/* Logo & Tiêu đề cơ quan */}
-      <Link to="/dashboard" className="touch-hit flex items-center gap-2.5 pr-2 transition-opacity hover:opacity-90">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-danger text-white">
+      {/* Logo & tên cơ quan. Màn ≥ 1024 px: khối xanh đêm rộng đúng bằng menu trái (thu gọn theo menu) — cùng menu thành khung
+          chữ L mang nhận diện; biểu tượng xanh (đỏ chỉ dành cho báo động) */}
+      <Link
+        to="/dashboard"
+        className={clsx(
+          'touch-hit flex items-center gap-2.5 pr-2 transition-opacity hover:opacity-90',
+          'lg:-my-px lg:-ml-3 lg:h-14 lg:shrink-0 lg:self-stretch lg:border-r lg:border-black/20 lg:bg-nav lg:pl-3',
+          sidebarCollapsed ? 'lg:w-16 lg:justify-center lg:pl-0 lg:pr-0' : 'lg:w-60',
+        )}
+      >
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#3B82F6] to-[#1E40AF] text-white shadow-sm ring-1 ring-inset ring-white/20">
           <ShieldAlert size={20} />
         </div>
-        <div className="hidden leading-tight lg:block">
-          <div className="text-sm font-bold tracking-tight text-ink flex items-center gap-1.5">
-            BCH PCTT & TKCN Cao Bằng
-          </div>
-          <div className="text-[11px] text-muted truncate max-w-[280px]">Trung tâm Điều hành Phòng chống thiên tai</div>
+        <div className={clsx('hidden min-w-0 leading-tight lg:block', sidebarCollapsed && 'lg:hidden')}>
+          {/* Hai dòng ngắn vừa khối 240 px (một dòng "… Cao Bằng" bị cắt) */}
+          <div className="truncate text-sm font-bold tracking-tight text-ink lg:text-white">BCH PCTT & TKCN</div>
+          <div className="truncate text-[11px] text-muted lg:text-nav-muted">Tỉnh Cao Bằng · điều hành</div>
         </div>
       </Link>
 

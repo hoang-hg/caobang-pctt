@@ -50,9 +50,13 @@ cổng người dân (Đ1) → tài khoản người dân (Đ5). Khoảng 15 PR.
 
 ### 1.3. Không dùng (dấu hiệu giao diện "làm cho có")
 
-Chữ IN HOA giãn cách; màu chuyển; bóng phát sáng; biểu tượng đặt trong ô vuông màu; viền màu bên trái khắp nơi (chỉ dùng
-cho mức rủi ro Vàng / Cam / Đỏ); khung lồng khung; biểu tượng cảm xúc (emoji); phóng to khi rê chuột; chấm nhấp nháy liên
-tục; thuật ngữ tiếng Anh, viết tắt chuyên môn trên màn.
+Chữ IN HOA giãn cách; bóng phát sáng; viền màu bên trái khắp nơi (chỉ dùng cho mức rủi ro Vàng / Cam / Đỏ); khung lồng
+khung; biểu tượng cảm xúc (emoji); phóng to khi rê chuột; chấm nhấp nháy liên tục; thuật ngữ tiếng Anh, viết tắt chuyên môn
+trên màn.
+
+> **Đổi ngày 23/10/2026** (người dùng chọn diện mạo "phòng chỉ huy" — mục 12): được dùng **màu chuyển nhẹ** (dải khẩn,
+> biểu tượng thương hiệu, ô gợi ý), **bóng mềm** cho thẻ, **biểu tượng trong ô màu nhấn nhạt** (`.icon-tile`, đầu trang và
+> khối). Bóng phát sáng, IN HOA, emoji vẫn không dùng.
 
 ## 2. Học gì từ 3 trang tham khảo
 
@@ -92,15 +96,15 @@ tục; thuật ngữ tiếng Anh, viết tắt chuyên môn trên màn.
 |---|---|---|
 | Chữ | Be Vietnam Pro (đã tự lưu trữ, giấy phép OFL). Thang cỡ: 12 · **14 (tối thiểu cho nội dung)** · 16 · 18 · 20 · 24 (tiêu đề trang) · 30 · 36 · 48 (con số chính trên màn lớn). Số dùng lớp `num` (chữ số đều nhau). Tiêu đề đậm 600, con số 700–800. Không IN HOA, trừ mã (SOS-1001, HS-…) | `tailwind.config.js`, `src/index.css` |
 | Khoảng cách | Lưới 4 px: trong thẻ 16; giữa các thẻ 12 (điện thoại) / 16 (máy tính); giữa các khối 24 | `components/layout/page.js`, `ui.jsx` |
-| Thẻ | Một kiểu: nền `panel`, viền 1 px `line`, bo 12 px, không bóng. Viền màu bên trái **chỉ** khi mức Vàng / Cam / Đỏ | `ui.jsx` (KpiCard, Section), `components/dashboard/StatCard` |
+| Thẻ | Một kiểu: nền `panel`, viền 1 px `line`, bo 14 px, bóng mềm hai lớp `--shadow-card` (từ 23/10/2026 — mục 12; in ra giấy không bóng). Viền màu bên trái **chỉ** khi mức Vàng / Cam / Đỏ | `index.css` (`.card`), `ui.jsx` (KpiCard, Section), `components/dashboard/StatCard` |
 | Lớp nổi trên bản đồ | Một kiểu cho mọi bảng nổi: nền `panel` đục 94 %, làm mờ phía sau 8 px, bo 12 px, một mức bóng mềm (`0 8px 24px rgb(0 0 0 / .12)`; nền tối `.40`) | `index.css` (lớp `.float-panel`), `components/map/*` |
 | Ô số | Nhãn 14 · số 30–36 (màn lớn 48) · câu giải thích 14; mức rủi ro bằng chấm màu + chữ, không tô cả ô | `StatCard`, `KpiCard` |
 | Bảng | Dòng cao 44–48 px, đầu bảng dính khi cuộn, số canh phải, chữ thường | `index.css` (`.table-base`) |
-| Biểu tượng | lucide; nét 1,75 khi ≥ 20 px, nét 2 khi nhỏ hơn; luôn kèm chữ; **không đặt trong ô màu**; màu chữ phụ, hoặc màu nhấn khi là thao tác | rà toàn bộ |
+| Biểu tượng | lucide; nét 1,75 khi ≥ 20 px, nét 2 khi nhỏ hơn; luôn kèm chữ; màu chữ phụ, hoặc màu nhấn khi là thao tác. Từ 23/10/2026: biểu tượng đầu trang / khối đặt trong ô màu nhấn nhạt `.icon-tile` (đầu trang lấy đúng biểu tượng của mục menu — `layout/nav.js`) | rà toàn bộ |
 | Chuyển động | 120 ms (bấm) · 200 ms (mở bảng, hộp thoại) · 300 ms (trượt bảng trên điện thoại) · 600–900 ms (bản đồ bay tới); chỉ dùng cho việc có ý nghĩa; máy bật giảm chuyển động → tắt | `tailwind.config.js`, `index.css` |
 | Màn trống, lỗi, mất mạng | 6–8 hình nét đơn tự vẽ (SVG viết thẳng trong mã, theo màu chữ, không tải thêm tệp): chưa có phiếu, không có cảnh báo, chưa có dữ liệu, không tìm thấy, mất mạng, máy chủ lỗi — kèm một câu "cần làm gì" | `ui.jsx` (`EmptyState` thêm hình) |
 | Biểu đồ | Theo `components/charts/chartTheme`: nét 2 px, lưới mờ, **một trục tung**, nhãn ghi thẳng ở điểm cuối, chú giải phía dưới, ô thông tin khi rê cùng một kiểu; màu theo vai trò (mức rủi ro hoặc thứ tự chuỗi), kiểm cho người mù màu | `charts/chartTheme.jsx` |
-| Màu | Giữ biến màu hiện có (tương phản đã kiểm ≥ 4,5 : 1 ở PR #107); chỉ thêm biến nền cho lớp nổi. Không thêm màu mới | `index.css` |
+| Màu | Bảng màu "phòng chỉ huy" từ 23/10/2026 (mục 12): nền trang xám xanh, thẻ trắng, màu nhấn xanh hoàng gia, menu xanh đêm `--nav-*`; nền tối xanh đêm. Mọi màu chữ vẫn ≥ 4,5 : 1 trên 3 nền × 2 giao diện (ui-test "Tương phản chữ"). Thang màu rủi ro không đổi | `index.css`, `tailwind.config.js` |
 
 Thêm một trang mẫu **chỉ chạy trên máy dev** (`/mau-giao-dien`, không vào bản chạy thật): bày mọi thành phần ở cả hai nền
 để rà nhanh khi sửa. Không phải chức năng mới cho người dùng.
@@ -387,3 +391,27 @@ với các đợt khác, đây là **thay đổi chức năng** (thêm API, thê
    email.
 3. **Phản ánh "Người mắc kẹt" cũng phải có tài khoản** như yêu cầu — xác nhận lại, vì đây là tình huống tính mạng (Gọi 112
    vẫn luôn mở).
+
+## 12. Diện mạo "phòng chỉ huy" (23/10/2026)
+
+Yêu cầu ngày 22/10/2026: rà từng trang của nhà quản lý, làm giao diện **bắt mắt, ấn tượng, hình ảnh và màu sắc như các
+trang điều hành lớn trên thế giới**. Rà 11 trang (nền Sáng + Tối, 1440×900): chức năng rõ, chữ thống nhất — nhưng trang nào
+cũng nền trắng, thẻ trắng viền xám, không chiều sâu; menu và thanh trên trắng trơn, không nhận diện; đỏ phủ khắp nơi (dải
+khẩn, nút, logo, viền thẻ); nền tối xám phẳng.
+
+Người dùng chọn (23/10/2026): hướng **"phòng chỉ huy hiện đại"** (kiểu Stripe, Linear, Palantir), **khiên xanh** thay khiên
+đỏ — đỏ chỉ dành cho báo động. Nới mục 1.3 (màu chuyển nhẹ, bóng mềm, biểu tượng trong ô màu nhạt).
+
+Nguyên tắc giữ nguyên: mục 1.1 (cùng đường dẫn, số liệu, thao tác), thang màu rủi ro chỉ cho rủi ro, chữ ≥ 4,5 : 1 ở cả hai
+nền, vùng chạm 44 px, màn hình đầu theo thiết bị (mục 8), in ra giấy nền sáng không bóng. Mỗi đợt một PR, có ảnh trước / sau.
+
+| Đợt | Việc | Trạng thái |
+|---|---|---|
+| 1 | Nền móng + khung: bảng màu mới (nền trang `#F1F5FA`, màu nhấn `#1D5BC7`; nền tối xanh đêm `#09101E`), thẻ bo 14 px bóng mềm, khung chữ L xanh đêm (menu trái + góc logo, thu gọn cùng menu), khiên xanh (thanh trên, đăng nhập), ô biểu tượng đầu trang theo mục menu (`layout/nav.js`), ô gợi ý nền xanh nhạt, dải khẩn đỏ chuyển nhẹ, thanh trạng thái xanh đêm | Xong — PR #127 |
+| 2 | Tổng quan: khối tóm tắt nền xanh đêm có hình bóng tỉnh, ô chỉ số có ô biểu tượng màu, "Việc chờ quyết định" có biểu tượng | Chưa làm |
+| 3 | Điều hành cứu hộ: đầu cột bảng điều phối có màu theo bước, thẻ phiếu rõ mức ưu tiên | Chưa làm |
+| 4 | Cảnh báo & Hotline: thanh tiến trình 3 bước soạn lệnh, thẻ mẫu tin có biểu tượng | Chưa làm |
+| 5 | Vật tư & Lực lượng: thanh tồn kho so với định mức, thẻ lực lượng | Chưa làm |
+| 6 | Bản đồ giám sát: bảng nổi, chú giải cùng kiểu mới | Chưa làm |
+| 7 | Phản ánh, Đợt thiên tai, Nhập dữ liệu, Nguồn dữ liệu, Phân quyền, Hướng dẫn | Chưa làm |
+| 8 | Đăng nhập: cột trái có chiều sâu (màu chuyển xanh đêm, hình bóng tỉnh) | Chưa làm |

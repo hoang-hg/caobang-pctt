@@ -61,7 +61,7 @@ export default function StatusBar() {
 
   return (
     <footer
-      className="no-print flex h-8 shrink-0 items-center gap-4 overflow-hidden whitespace-nowrap border-t border-black/30 bg-[#0f172a] px-4 text-xs text-slate-300"
+      className="no-print flex h-8 shrink-0 items-center gap-4 overflow-hidden whitespace-nowrap border-t border-black/30 bg-nav px-4 text-xs text-slate-300"
       aria-label="Thanh trạng thái"
     >
       {/* Mọi mục một dòng; chật thì nhóm trái bị cắt bớt ở cuối (toạ độ trước), nhóm phải luôn đủ */}

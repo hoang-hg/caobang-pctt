@@ -57,6 +57,9 @@ export default function UrgentStrip({ label, items, action, calm, gray, failed =
           bleed,
           EDGE_PAD,
           risk(worst).chip,
+          // Đỏ: chuyển nhẹ đỏ đậm → đỏ của thang rủi ro cho dải có chiều sâu; mọi điểm của dải giữ chữ trắng ≥ 4,5 : 1
+          // (đầu trái #A42A2A 7,5 : 1, giữa #D03B3B 4,8 : 1, đầu phải #CC3A35 5,0 : 1)
+          onRed && 'bg-gradient-to-r from-[#a42a2a] via-danger to-[#cc3a35]',
         )}
         role="status"
         aria-live="polite"

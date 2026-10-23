@@ -159,7 +159,8 @@ export default function Login() {
   const wide = useMediaQuery('(min-width: 1024px)');
   const brand = (
     <div className="flex items-center gap-3">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-danger text-white">
+      {/* Khiên xanh như thanh trên (Header): màu đỏ chỉ dành cho báo động — quyết định 23/10/2026 */}
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#3B82F6] to-[#1E40AF] text-white shadow-sm ring-1 ring-inset ring-white/20">
         <ShieldAlert size={22} aria-hidden="true" />
       </div>
       <div className="leading-tight">
