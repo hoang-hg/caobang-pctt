@@ -64,6 +64,7 @@ export default function UrgentStrip({ label, items, action, calm, gray, failed =
         role="status"
         aria-live="polite"
         aria-label={label}
+        {...(onRed ? { 'data-mau-chuyen': '' } : {})}
       >
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <Siren size={16} className={clsx('shrink-0', onRed && 'motion-safe:animate-pulse')} aria-hidden="true" />
