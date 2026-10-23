@@ -68,7 +68,11 @@ export default function DecisionPanel({ k, kState, className, stacked = false })
               <li key={r.key} className={clsx('min-w-0', fresh(r.key) && 'motion-safe:animate-enter')}>
                 <Link
                   to={r.to}
-                  className={clsx('group -mx-1 flex min-h-[46px] items-center gap-3 rounded-lg px-1 py-1 hover:bg-panel2', row('sm:mx-0 sm:h-full sm:gap-2.5 sm:border sm:border-line sm:px-2.5 sm:py-1.5 sm:hover:border-accent'))}
+                  className={clsx(
+                    'group -mx-1 flex min-h-[46px] items-center gap-3 rounded-lg px-1 py-1 hover:bg-panel2',
+                    row('sm:mx-0 sm:h-full sm:gap-2.5 sm:border sm:border-line sm:px-2.5 sm:py-1.5 sm:hover:border-accent'),
+                    r.level === 3 && row('sm:border-danger/35 sm:bg-danger/[0.04] sm:hover:border-danger'),
+                  )}
                 >
                   {/* Ô biểu tượng loại việc (từ 640 px): việc khẩn — ô đỏ nhạt */}
                   <span className={clsx('icon-tile h-8 w-8 max-sm:hidden', r.level === 3 && 'bg-danger/10 text-danger ring-danger/20')} aria-hidden="true">
@@ -78,14 +82,21 @@ export default function DecisionPanel({ k, kState, className, stacked = false })
                     {int(r.n)}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className={clsx('block text-sm font-medium leading-snug text-ink', row('sm:text-[13px]'))}>{r.text}</span>
+                    <span className={clsx('block text-sm font-medium leading-snug text-ink', row('sm:text-[13px]'), r.level === 3 && 'font-semibold text-danger')}>{r.text}</span>
                     {!stacked && (
-                      <span className="hidden items-center text-xs font-semibold text-accent group-hover:underline sm:inline-flex">
+                      <span className={clsx(
+                        'hidden items-center text-xs font-semibold sm:inline-flex',
+                        r.level === 3 ? 'text-danger group-hover:underline' : 'text-accent group-hover:underline',
+                      )}>
                         {r.action} <ChevronRight size={13} aria-hidden="true" />
                       </span>
                     )}
                   </span>
-                  <span className={clsx('btn-secondary pointer-events-none shrink-0 px-2.5 py-1 text-xs font-semibold', row('sm:hidden'))}>
+                  <span className={clsx(
+                    'pointer-events-none shrink-0 px-2.5 py-1 text-xs font-semibold',
+                    r.level === 3 ? 'btn-danger' : 'btn-secondary',
+                    row('sm:hidden'),
+                  )}>
                     {r.action} <ChevronRight size={14} aria-hidden="true" />
                   </span>
                 </Link>

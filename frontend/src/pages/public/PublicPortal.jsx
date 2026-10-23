@@ -1123,7 +1123,7 @@ export default function PublicPortal() {
                 <div className="flex-1 w-full min-h-0 relative">
                   {/* Máy tính: "Bạn muốn làm gì?" nổi góc trái, dưới nút phóng to / thu nhỏ — thu gọn được */}
                   {wide && (quickOpen ? (
-                    <nav aria-label="Bạn muốn làm gì?" className="float-panel absolute left-3 top-24 z-[1000] w-72 p-2">
+                    <nav aria-label="Bạn muốn làm gì?" className="float-panel absolute left-3 top-24 z-[1000] w-72 p-2 shadow-lg">
                       <div className="flex items-center justify-between gap-2 px-2 pb-1">
                         <span className="text-sm font-bold text-ink">Bạn muốn làm gì?</span>
                         <button type="button" onClick={() => setQuickOpen(false)} className="rounded p-1 text-muted hover:bg-panel2 hover:text-ink" aria-label="Thu gọn bảng Bạn muốn làm gì" title="Thu gọn">
@@ -1133,8 +1133,14 @@ export default function PublicPortal() {
                       {quickList}
                     </nav>
                   ) : (
-                    <button type="button" onClick={() => setQuickOpen(true)} className="float-panel absolute left-3 top-24 z-[1000] px-3 py-2 text-xs font-semibold text-ink-2 hover:text-ink">
-                      Bạn muốn làm gì?
+                    <button
+                      type="button"
+                      onClick={() => setQuickOpen(true)}
+                      className="float-panel absolute left-3 top-24 z-[1000] inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-accent shadow-md hover:bg-panel2"
+                      title="Mở bảng tra cứu Bạn muốn làm gì"
+                    >
+                      <HelpCircle size={14} aria-hidden="true" />
+                      <span>Bạn muốn làm gì?</span>
                     </button>
                   ))}
                   {/* Thanh điều khiển lộ trình, vị trí & điểm chọn nổi trên bản đồ — left-14: bên phải nút phóng to / thu nhỏ của Leaflet */}

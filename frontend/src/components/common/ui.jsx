@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import clsx from 'clsx';
 import {
-  AlertTriangle, ArrowLeft, ArrowUpDown, Check, ChevronDown, ChevronLeft, ChevronRight, Lightbulb, Loader2, MoveRight, RefreshCw, TrendingDown, TrendingUp, X,
+  AlertTriangle, ArrowLeft, ArrowUpDown, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Lightbulb, Loader2, MoveRight, RefreshCw, TrendingDown, TrendingUp, X,
 } from 'lucide-react';
 import { NO_DATA, RISK, risk } from '../../utils/risk';
 import EmptyArt from './EmptyArt';
@@ -383,6 +383,7 @@ const tipsSeen = (id) => { try { return localStorage.getItem(tipsKey(id)) === '1
  */
 export function PageTips({ id, title = 'Bắt đầu từ đâu?', steps, more, className }) {
   const [open, setOpen] = useState(() => !tipsSeen(id));
+  const [collapsed, setCollapsed] = useState(false);
   if (!open) return null;
   const done = () => {
     try { localStorage.setItem(tipsKey(id), '1'); } catch { /* chế độ riêng tư: chỉ ẩn lần này */ }
@@ -390,19 +391,41 @@ export function PageTips({ id, title = 'Bắt đầu từ đâu?', steps, more, 
   };
   return (
     <section aria-label="Gợi ý cho người mới" data-mau-chuyen="" className={clsx('card flex flex-col gap-2 border-accent/25 bg-gradient-to-r from-accent/[0.07] via-accent/[0.02] to-transparent px-3 py-2.5 no-print sm:flex-row sm:items-center sm:gap-4', className)}>
-      <b className="flex shrink-0 items-center gap-2 text-sm font-semibold text-ink">
-        <span className="icon-tile h-8 w-8 max-sm:hidden" aria-hidden="true"><Lightbulb size={16} /></span>
-        {title}
-      </b>
-      <ol className="grid min-w-0 flex-1 gap-1.5 text-[13px] leading-snug text-ink-2 md:grid-cols-3 md:gap-3">
-        {steps.map((s, i) => (
-          <li key={s} className="flex min-w-0 gap-2">
-            <span className="num w-4 shrink-0 font-bold text-accent">{i + 1}.</span>
-            <span className="min-w-0">{s}</span>
-          </li>
-        ))}
-      </ol>
+      <div className="flex shrink-0 items-center justify-between gap-2">
+        <b className="flex items-center gap-2 text-sm font-semibold text-ink">
+          <span className="icon-tile h-8 w-8 max-sm:hidden" aria-hidden="true"><Lightbulb size={16} /></span>
+          {title}
+        </b>
+        <button
+          type="button"
+          onClick={() => setCollapsed((v) => !v)}
+          className="btn-ghost tap inline-flex items-center gap-1 px-2 py-0.5 text-xs text-muted hover:text-ink md:hidden"
+          title={collapsed ? 'Mở rộng hướng dẫn' : 'Thu gọn hướng dẫn'}
+        >
+          {collapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+          <span className="text-[11px]">{collapsed ? 'Mở' : 'Gập'}</span>
+        </button>
+      </div>
+      {!collapsed && (
+        <ol className="grid min-w-0 flex-1 gap-1.5 text-[13px] leading-snug text-ink-2 md:grid-cols-3 md:gap-3">
+          {steps.map((s, i) => (
+            <li key={s} className="flex min-w-0 gap-2">
+              <span className="num w-4 shrink-0 font-bold text-accent">{i + 1}.</span>
+              <span className="min-w-0">{s}</span>
+            </li>
+          ))}
+        </ol>
+      )}
       <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5 self-end sm:self-center">
+        <button
+          type="button"
+          onClick={() => setCollapsed((v) => !v)}
+          className="btn-ghost tap hidden items-center gap-1 px-2 py-1 text-xs text-muted hover:text-ink md:inline-flex"
+          title={collapsed ? 'Mở rộng hướng dẫn' : 'Thu gọn hướng dẫn'}
+        >
+          {collapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+          <span>{collapsed ? 'Mở rộng' : 'Thu gọn'}</span>
+        </button>
         {more}
         <button type="button" onClick={done} className="btn-secondary tap px-3 py-1 text-xs">
           <Check size={14} aria-hidden="true" /> Đã hiểu

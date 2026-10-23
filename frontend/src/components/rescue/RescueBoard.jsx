@@ -77,7 +77,12 @@ export default function RescueBoard({ tickets, factsOf, wide, column, onColumn, 
                   <c.icon size={15} />
                 </span>
                 <span className="min-w-0 flex-1 leading-tight">{c.title}</span>
-                {late > 0 && <span className="chip bg-danger px-1.5 py-0 text-[11px] font-bold text-white" title={`${late} phiếu quá hạn phản hồi`}>{late} quá hạn</span>}
+                {late > 0 && (
+                  <span className="chip inline-flex items-center gap-1 bg-danger px-1.5 py-0 text-[11px] font-bold text-white" title={`${late} phiếu quá hạn phản hồi`}>
+                    <span className="inline-block h-1.5 w-1.5 animate-ping rounded-full bg-white" aria-hidden="true" />
+                    {late} quá hạn
+                  </span>
+                )}
                 <span className="chip bg-panel2 px-2 py-0.5 text-xs font-semibold">{byCol[c.key].length}</span>
               </div>
               <div className="mt-0.5 text-[11px] text-muted">{c.hint}</div>

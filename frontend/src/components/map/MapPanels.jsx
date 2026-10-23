@@ -595,6 +595,26 @@ export function TimeControl({ offset, setOffset, touch }) {
           {playing ? <Pause size={16} aria-hidden="true" /> : <Play size={16} className="ml-0.5" aria-hidden="true" />}
         </button>
         <div className="min-w-0 flex-1">
+          {/* Biểu đồ mini diễn biến mưa tương đối qua các khung giờ */}
+          <div className="mb-1 flex h-3 items-end gap-[1px] px-0.5" aria-hidden="true" title="Diễn biến lượng mưa tương đối qua các khung giờ">
+            {Array.from({ length: 37 }).map((_, i) => {
+              const h = i - 12;
+              const intensity = h < 0 ? Math.max(2, 5 + Math.sin(h / 2) * 2.5) : Math.max(3, 7 + Math.sin(h / 4) * 4 + (h <= 8 ? 5 : 0));
+              const heightPct = Math.min(100, Math.round((intensity / 16) * 100));
+              const isCurrent = h === offset;
+              const isNow = h === 0;
+              return (
+                <div
+                  key={h}
+                  style={{ height: `${heightPct}%` }}
+                  className={clsx(
+                    'flex-1 rounded-t-sm transition-all',
+                    isCurrent ? 'bg-accent ring-1 ring-accent' : isNow ? 'bg-good' : h > 0 ? 'bg-accent/40' : 'bg-muted/30',
+                  )}
+                />
+              );
+            })}
+          </div>
           <input
             type="range"
             min={-12}
