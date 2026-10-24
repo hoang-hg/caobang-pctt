@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Columns3, Home, Inbox, List, Navigation } from 'lucide-react';
@@ -158,7 +158,7 @@ export default function RescueCenter() {
     scrollTo(boardRef.current);
   };
   // Bản đồ → phiếu trên bảng: tìm theo mã, mở đúng cột (một mục lịch sử)
-  const openTicket = (t) => {
+  const openTicket = useCallback((t) => {
     const next = new URLSearchParams();
     if (view !== 'bang') next.set('xem', view);
     if (period[0]) next.set('ky', period[0]);
@@ -166,7 +166,7 @@ export default function RescueCenter() {
     setParams(next);
     setQ(t.code);
     scrollTo(boardRef.current);
-  };
+  }, [view, period, setParams]);
   // Tìm kiếm toàn năng → /cuu-ho?phieu=SOS-1001: mở đúng phiếu (đúng cột của bảng, ô tìm điền sẵn mã). Không có trong danh
   // sách 48 giờ (phiếu đã xong lâu hơn) → tra cứu hồ sơ 30 ngày. Thay địa chỉ (replace): nút Quay lại không mở lại phiếu
   const wanted = params.get('phieu');
@@ -362,11 +362,11 @@ export default function RescueCenter() {
         collapsible
         open={overviewOpen}
         onToggle={() => setOverviewOpen((v) => !v)}
-        className="no-print"
+        className="no-print scroll-mt-28"
       >
         {overviewOpen && (
           <div className="grid gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-            <RescueMap tickets={tickets} factsOf={factsOf} now={now} onOpen={openTicket} />
+            <RescueMap tickets={tickets} now={now} onOpen={openTicket} />
             <SosTrend query={ticketsQ} tickets={tickets} now={now} />
           </div>
         )}

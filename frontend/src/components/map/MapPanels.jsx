@@ -608,7 +608,7 @@ export function TimeControl({ offset, setOffset, touch }) {
                   key={h}
                   style={{ height: `${heightPct}%` }}
                   className={clsx(
-                    'flex-1 rounded-t-sm transition-all',
+                    'flex-1 rounded-t-sm',
                     isCurrent ? 'bg-accent ring-1 ring-accent' : isNow ? 'bg-good' : h > 0 ? 'bg-accent/40' : 'bg-muted/30',
                   )}
                 />
@@ -772,7 +772,7 @@ export function DrawnStats({ drawn, units, onClose, onRetry, onAlert, touch, cla
   };
   return (
     // Cao tối đa 60% màn hình, phần dưới tiêu đề tự cuộn — danh sách nhiều xã không đẩy nút "Soạn cảnh báo" ra khỏi màn
-    <div className={clsx('float-panel flex max-h-[min(60vh,34rem)] flex-col p-3.5', className)} role="region" aria-label="Phân tích vùng khoanh">
+    <div className={clsx('float-panel flex max-h-[min(52vh,34rem)] sm:max-h-[min(60vh,34rem)] flex-col p-3.5', className)} role="region" aria-label="Phân tích vùng khoanh">
       <div className="mb-2 flex shrink-0 items-center justify-between border-b border-line pb-1.5 text-sm font-bold text-ink">
         <span>Phân tích vùng khoanh</span>
         <button type="button" onClick={onClose} className="tap-sq -m-1 flex h-8 w-8 items-center justify-center rounded-lg hover:bg-panel2" aria-label="Đóng phân tích vùng">

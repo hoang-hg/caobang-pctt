@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Circle, CircleMarker, GeoJSON, Marker, Polyline, Popup, Tooltip, useMap } from 'react-leaflet';
 import { Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, YAxis } from 'recharts';
 import { Phone, Send, Video, PackageMinus, PencilLine, Users } from 'lucide-react';
 import clsx from 'clsx';
-import L from './leafletGlobal';
 import { api } from '../../api/client';
 import { useStore } from '../../app/store';
 import Hydrograph from '../charts/Hydrograph';
@@ -284,17 +283,41 @@ function ReservoirPopup({ p, lv, onOperate }) {
   const roomy = useMediaQuery('(min-width: 768px)');
   const [chart, setChart] = useState(roomy);
   const map = useMap();
+  const ref = useRef(null);
+
   // Mở biểu đồ bằng nút làm popup cao lên → canh lại cho lọt khung (Leaflet chỉ tự kéo bản đồ lúc mở popup)
   useEffect(() => {
-    if (!chart || roomy) return undefined;
-    const id = setTimeout(() => map.eachLayer((l) => { if (l instanceof L.Popup && l.isOpen()) l.update(); }), 60);
-    return () => clearTimeout(id);
+    if (roomy) return undefined;
+    const adjust = () => {
+      const popup = map._popup;
+      const popEl = popup?.getElement() || document.querySelector('.leaflet-popup');
+      const mapEl = map.getContainer();
+      if (popEl && mapEl) {
+        if (popup) popup.update();
+        const pRect = popEl.getBoundingClientRect();
+        const mRect = mapEl.getBoundingClientRect();
+        const dy = pRect.bottom > mRect.bottom - 12
+          ? pRect.bottom - (mRect.bottom - 12)
+          : pRect.top < mRect.top + 12
+            ? pRect.top - (mRect.top + 12)
+            : 0;
+        if (dy) map.panBy([0, dy], { animate: false });
+      }
+    };
+    const ro = ref.current ? new ResizeObserver(adjust) : null;
+    if (ref.current && ro) ro.observe(ref.current);
+    const id = setTimeout(adjust, 120);
+    return () => {
+      if (ro) ro.disconnect();
+      clearTimeout(id);
+    };
   }, [chart, roomy, map]);
+
   return (
-    <div className={POP_W}>
+    <div ref={ref} className={POP_W}>
       <b>{p.name}</b>
-      <div className="text-xs text-muted">Sông {p.river}{p.capacity_mw ? ` · ${p.capacity_mw} MW` : ''}</div>
-      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+      <div className="text-[11px] text-muted">Sông {p.river}{p.capacity_mw ? ` · ${p.capacity_mw} MW` : ''}</div>
+      <div className="mt-0.5 flex flex-wrap items-center gap-1">
         {p.status_label && <span className={clsx('chip text-[11px]', risk(lv).chip)}>{p.status_label}</span>}
         {p.operating_at && (
           <span className={clsx('text-[11px]', p.stale ? 'font-semibold text-warn' : 'text-muted')}>
@@ -308,7 +331,7 @@ function ReservoirPopup({ p, lv, onOperate }) {
         </p>
       ) : (
         <>
-          <table className="mt-1 w-full text-xs">
+          <table className="mt-0.5 w-full text-[11px] leading-tight [&_td]:py-0.25">
             <tbody>
               <tr><td>Mực nước hồ</td><td className="num text-right">{num(p.current_level, 2)} m</td></tr>
               <tr><td>Mực nước dâng bình thường</td><td className="num text-right">{num(p.normal_level, 1)} m</td></tr>
@@ -317,13 +340,13 @@ function ReservoirPopup({ p, lv, onOperate }) {
               <tr><td>Cửa xả đang mở</td><td className="num text-right">{p.spill_gates_open}/{p.spill_gates}</td></tr>
             </tbody>
           </table>
-          <div className="mt-1.5 border-t border-line pt-1.5">
+          <div className="mt-1 border-t border-line pt-1">
             {/* Nút giữ nguyên trong DOM (chỉ đổi chữ): React gỡ phần tử vừa bấm trước khi sự kiện lan tới bản đồ → Leaflet
                 thấy cú bấm "ngoài popup" và đóng popup */}
             {!roomy && (
               <button
                 type="button"
-                className="btn-ghost tap w-full justify-center px-2 py-1 text-xs"
+                className="btn-ghost tap w-full justify-center px-1.5 py-0.5 text-[11px]"
                 aria-expanded={chart}
                 onClick={() => setChart((v) => !v)}
               >
@@ -334,13 +357,13 @@ function ReservoirPopup({ p, lv, onOperate }) {
           </div>
         </>
       )}
-      <div className="mt-2 flex flex-wrap gap-1">
+      <div className="mt-1 flex flex-wrap gap-1">
         {canUpdate && (
-          <button type="button" className="btn-primary px-2 py-1 text-xs" onClick={() => onOperate(p)}>
+          <button type="button" className="btn-primary px-2 py-0.5 text-xs" onClick={() => onOperate(p)}>
             <PencilLine size={12} aria-hidden="true" /> Cập nhật vận hành
           </button>
         )}
-        <button type="button" className="btn-ghost px-2 py-1 text-xs" onClick={() => navigate('/dashboard?tab=ho_chua')}>Mở tab Hồ chứa</button>
+        <button type="button" className="btn-ghost px-2 py-0.5 text-xs" onClick={() => navigate('/dashboard?tab=ho_chua')}>Mở tab Hồ chứa</button>
       </div>
     </div>
   );

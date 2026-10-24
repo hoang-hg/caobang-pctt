@@ -48,14 +48,21 @@ export default function DecisionPanel({ k, kState, className, stacked = false })
     // Từ 640 px: tiêu đề bên trái, các việc thành MỘT hàng thẻ ngang bên phải — khối thấp, 6 ô chỉ số và bản đồ vẫn trong
     // màn hình đầu của laptop 1366 × 768. Điện thoại: danh sách dọc, mỗi dòng: số · việc · nút
     <section className={clsx('card flex flex-col gap-2 p-3 no-print', row('sm:flex-row sm:items-stretch sm:gap-3'), className)} aria-label="Việc chờ quyết định">
-      <div className={clsx('flex items-center justify-between gap-2', row('sm:w-32 sm:shrink-0 sm:flex-col sm:items-start sm:justify-center sm:gap-1'))}>
+      <div className={clsx('flex items-center justify-between gap-2', row('sm:w-36 sm:shrink-0 sm:flex-col sm:items-start sm:justify-center sm:gap-1.5'))}>
         <div className="flex min-w-0 items-center gap-2">
           <h2 className="text-base font-bold leading-tight text-ink">Việc chờ quyết định</h2>
           <Hint label="Việc chờ quyết định">
             Những việc đang chờ chính bạn xử lý. Bấm vào từng việc để mở đúng nơi làm việc đó; xong việc thì việc tự mất khỏi đây.
           </Hint>
         </div>
-        {rows.length > 0 && <span className="num shrink-0 text-xs text-muted">{int(total)} việc</span>}
+        {rows.length > 0 && (
+          <span className={clsx(
+            'chip shrink-0 px-2 py-0.5 text-xs',
+            rows.some((r) => r.level === 3) ? 'bg-danger/15 font-bold text-danger' : 'bg-accent/10 font-semibold text-accent',
+          )}>
+            {int(total)} việc cần xử lý
+          </span>
+        )}
       </div>
       <div className="min-w-0 flex-1">
         {!rows.length && !k ? (
@@ -69,9 +76,9 @@ export default function DecisionPanel({ k, kState, className, stacked = false })
                 <Link
                   to={r.to}
                   className={clsx(
-                    'group -mx-1 flex min-h-[46px] items-center gap-3 rounded-lg px-1 py-1 hover:bg-panel2',
-                    row('sm:mx-0 sm:h-full sm:gap-2.5 sm:border sm:border-line sm:px-2.5 sm:py-1.5 sm:hover:border-accent'),
-                    r.level === 3 && row('sm:border-danger/35 sm:bg-danger/[0.04] sm:hover:border-danger'),
+                    'group -mx-1 flex min-h-[46px] items-center gap-3 rounded-xl px-1 py-1 transition-all duration-150 hover:bg-panel2',
+                    row('sm:mx-0 sm:h-full sm:gap-2.5 sm:border sm:border-line sm:bg-panel sm:p-2 sm:shadow-sm sm:hover:-translate-y-0.5 sm:hover:border-accent sm:hover:shadow-md'),
+                    r.level === 3 && row('sm:border-danger/35 sm:bg-danger/[0.04] sm:hover:border-danger sm:hover:shadow-danger/10'),
                   )}
                 >
                   {/* Ô biểu tượng loại việc (từ 640 px): việc khẩn — ô đỏ nhạt */}
@@ -85,10 +92,10 @@ export default function DecisionPanel({ k, kState, className, stacked = false })
                     <span className={clsx('block text-sm font-medium leading-snug text-ink', row('sm:text-[13px]'), r.level === 3 && 'font-semibold text-danger')}>{r.text}</span>
                     {!stacked && (
                       <span className={clsx(
-                        'hidden items-center text-xs font-semibold sm:inline-flex',
+                        'hidden items-center gap-0.5 text-xs font-semibold sm:inline-flex',
                         r.level === 3 ? 'text-danger group-hover:underline' : 'text-accent group-hover:underline',
                       )}>
-                        {r.action} <ChevronRight size={13} aria-hidden="true" />
+                        {r.action} <ChevronRight size={13} className="transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
                       </span>
                     )}
                   </span>

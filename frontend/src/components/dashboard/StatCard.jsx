@@ -4,10 +4,10 @@ import { risk } from '../../utils/risk';
 
 // Ô biểu tượng của ô gọn theo mức rủi ro (thang chung: 0 Xanh · 1 Vàng · 2 Cam · 3 Đỏ); chữ dùng sắc --*-text đủ tương phản
 const TILE = {
-  0: 'bg-good/10 text-good',
-  1: 'bg-warn/15 text-warn',
-  2: 'bg-serious/15 text-serious',
-  3: 'bg-danger/10 text-danger',
+  0: 'bg-good/10 text-good ring-1 ring-good/20',
+  1: 'bg-warn/15 text-warn ring-1 ring-warn/25',
+  2: 'bg-serious/15 text-serious ring-1 ring-serious/25',
+  3: 'bg-danger/10 text-danger ring-1 ring-danger/25',
 };
 
 /**
@@ -37,12 +37,12 @@ export default function StatCard({
       title={hint}
       className={clsx(
         // w-full: ô là <button> / <a> (tự co theo nội dung) nằm trong lớp bọc vẫn phải giãn hết cột
-        'card flex w-full min-w-0 flex-col text-left',
-        compact ? 'gap-1 p-2 sm:p-2.5' : 'justify-between gap-1 p-3',
-        (to || onClick) && 'transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
+        'card flex w-full min-w-0 flex-col text-left transition-all duration-200',
+        compact ? 'gap-0.5 sm:gap-1 p-1.5 sm:p-2.5 shadow-sm hover:shadow-md' : 'justify-between gap-1 p-3',
+        (to || onClick) && 'hover:-translate-y-0.5 hover:border-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
         level >= 1 && clsx('border-l-4', scale.edge),
         level === null && 'border-dashed',
-        alert && 'ring-2 ring-danger',
+        alert && 'ring-2 ring-danger shadow-danger/10',
         className,
       )}
     >
@@ -50,11 +50,11 @@ export default function StatCard({
         <span className={clsx('flex min-w-0 items-center gap-1.5', compact && 'text-[13px] [.kpi-lon_&]:text-lg')}>
           {Icon && compact ? (
             // Ô gọn: biểu tượng trong ô màu theo mức (không mức → màu nhấn; chưa có dữ liệu → xám). Lề âm: hàng không cao thêm
-            <span className={clsx('-my-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg [.kpi-lon_&]:h-8 [.kpi-lon_&]:w-8', TILE[level] ?? (level === null ? 'bg-panel2 text-muted' : 'bg-accent/10 text-accent'))} aria-hidden="true">
+            <span className={clsx('-my-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg [.kpi-lon_&]:h-8 [.kpi-lon_&]:w-8', TILE[level] ?? (level === null ? 'bg-panel2 text-muted ring-1 ring-line' : 'bg-accent/10 text-accent ring-1 ring-accent/20'))} aria-hidden="true">
               <Icon size={14} />
             </span>
           ) : Icon && <Icon size={15} className={clsx('shrink-0', scale ? scale.text : 'text-accent')} aria-hidden="true" />}
-          <span className="truncate">{title}</span>
+          <span className="truncate tracking-tight text-xs sm:text-[13px]">{title}</span>
         </span>
         {!compact && badgeEl}
         {trend && <span className="min-w-0 shrink-0 text-[11px] [.kpi-lon_&]:text-sm">{trend}</span>}
@@ -67,7 +67,7 @@ export default function StatCard({
           >
             {value}
           </span>
-          {unit && <span className={clsx('font-medium text-muted', compact ? 'truncate text-xs' : 'text-sm')}>{unit}</span>}
+          {unit && <span className={clsx('font-medium text-muted', compact ? 'shrink-0 text-[11px] sm:text-xs whitespace-nowrap' : 'text-sm')}>{unit}</span>}
         </div>
       )}
       {/* Ô gọn: nhãn mức nằm hàng riêng dưới số (góc phải của ô 2 cột trên điện thoại không đủ chỗ) */}
