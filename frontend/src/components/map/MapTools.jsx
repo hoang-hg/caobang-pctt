@@ -312,8 +312,8 @@ export function AreaFocus({ area, filtered, padding = {}, fly = true, basemap })
     if (!fly || !area?.bbox) return;
     const [x1, y1, x2, y2] = area.bbox;
     map.flyToBounds([[y1, x1], [y2, x2]], {
-      paddingTopLeft: padding.topLeft || [30, 30],
-      paddingBottomRight: padding.bottomRight || [30, 30],
+      paddingTopLeft: padding.topLeft || [16, 16],
+      paddingBottomRight: padding.bottomRight || [16, 16],
       duration: 0.8,
     });
   }, [area?.bbox?.join(','), map, fly]); // eslint-disable-line react-hooks/exhaustive-deps

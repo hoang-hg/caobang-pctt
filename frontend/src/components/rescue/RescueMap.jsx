@@ -19,6 +19,7 @@ import { useShowMore } from '../../utils/useShowMore';
 import { durWords, ticketFacts } from './rescueFacts';
 
 const CENTER = [22.75, 106.05];
+const MAP_PAD = { topLeft: [14, 14], bottomRight: [14, 14] };
 // Như Bản đồ giám sát: lộ trình an toàn xanh, qua vùng nguy hiểm cam; vùng ngập xanh dương, vùng sạt lở theo mức
 const ROUTE = { safe: RISK[0].hex, unsafe: RISK[2].hex };
 const FLOOD = '#2563eb';
@@ -169,11 +170,11 @@ export default function RescueMap({ tickets, now, onOpen }) {
       </div>
       {/* isolate: lớp Leaflet (z-index tới 1000) không đè dải thông tin khẩn dính trên cùng khi cuộn */}
       <div className="relative isolate z-0 h-80 overflow-hidden rounded-lg border border-line xl:h-96">
-        <MapContainer center={CENTER} zoom={8} zoomControl={false} scrollWheelZoom={false} dragging={!coarse} className="h-full w-full">
+        <MapContainer center={CENTER} zoom={8.8} zoomControl={false} zoomSnap={0.1} zoomDelta={0.5} scrollWheelZoom={false} dragging={!coarse} className="h-full w-full">
           <BaseLayer basemap="auto" />
           <ZoomControl position="bottomright" />
           <MapResize />
-          <AreaFocus area={area} filtered={filtered} fly={!points.length} />
+          <AreaFocus area={area} filtered={filtered} fly={!points.length} padding={MAP_PAD} />
           <FitTickets points={points} areaKey={filterCodes.join(',') || 'tinh'} />
           <FlyTo target={target} />
           {zones.map((f) => {

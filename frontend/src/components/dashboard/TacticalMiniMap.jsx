@@ -13,6 +13,7 @@ import { stationView } from '../../utils/stations';
 import { num } from '../../utils/format';
 
 const CENTER = [22.75, 106.05];
+const MAP_PAD = { topLeft: [12, 12], bottomRight: [12, 12] };
 const FILTERS = [
   { id: 'all', label: 'Tất cả', min: 1 },
   { id: 'serious', label: 'Cam trở lên', min: 2 },
@@ -152,11 +153,11 @@ export default function TacticalMiniMap({ k, className, focus, tall = false }) {
       <div className={clsx('grid gap-2 xl:grid-cols-[minmax(0,1fr)_240px] [&>*]:min-w-0', tall && 'flex-1')}>
         {/* isolate: các lớp Leaflet (z-index tới 1000) không đè dải báo động dính trên cùng khi cuộn */}
         <div className={clsx('relative isolate z-0 overflow-hidden rounded-lg border border-line', tall ? 'min-h-[420px]' : 'h-[220px] sm:h-[300px] xl:h-[320px]')}>
-          <MapContainer center={CENTER} zoom={8} zoomControl={false} scrollWheelZoom={false} className="h-full w-full">
+          <MapContainer center={CENTER} zoom={8.8} zoomSnap={0.1} zoomDelta={0.5} zoomControl={false} scrollWheelZoom={false} className="h-full w-full">
             <BaseLayer basemap="auto" />
             <MapResize />
             <ZoomControl position="bottomright" />
-            <AreaFocus area={area} filtered={filtered} />
+            <AreaFocus area={area} filtered={filtered} padding={MAP_PAD} />
             <FlyTo target={target} />
             {shown.map((h) => {
               const isSelected = target && target.lat === h.lat && target.lon === h.lon;
