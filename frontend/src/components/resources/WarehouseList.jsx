@@ -58,7 +58,7 @@ function WarehouseCard({ w, x, category, pdf, online, onReceive, onIssue, onMap,
                 <span className="min-w-0 truncate text-ink-2" title={i.name}>{i.name}</span>
                 <span className="flex shrink-0 items-center gap-1.5">
                   {stockLevel(i.pct) === 3 && <span className={clsx('chip px-1.5 py-0 text-[10px]', RISK[3].chip)}>Cạn kiệt</span>}
-                  {exp && <span className={clsx('chip px-1.5 py-0 text-[10px]', RISK[2].chip)} title={`Hạn dùng ${vnDate(i.expiry_date)}`}>HSD {vnDate(i.expiry_date).slice(0, 5)}</span>}
+                  {exp && <span className={clsx('chip px-1.5 py-0 text-[10px]', RISK[2].chip)} title={`Hạn dùng ${vnDate(i.expiry_date)}`}>Hạn {vnDate(i.expiry_date).slice(0, 5)}</span>}
                   <span className={clsx('font-mono', lv === 3 && 'font-bold text-danger')}>{int(i.quantity)} {i.unit}</span>
                 </span>
               </div>
