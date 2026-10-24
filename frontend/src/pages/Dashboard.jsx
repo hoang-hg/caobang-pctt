@@ -4,9 +4,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import {
   AlertTriangle, ChevronDown, ChevronUp, Compass, Droplets, FileDown, FileSpreadsheet, FileText, Home, LayoutDashboard, LifeBuoy,
-  MapPin, Minimize2, Monitor, Mountain, Pause, Play, Send, Server, Waves, X,
+  Minimize2, Monitor, Mountain, Pause, Play, Send, Server, Waves, X,
 } from 'lucide-react';
-import { useAreaQuery, usePresets, useUnits } from '../api/hooks';
+import { useAreaQuery, useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
 import { EmptyState, ErrorState, Hint, RiskLegend, Section, Segmented, Skeleton } from '../components/common/ui';
 import RoleTips from '../components/common/RoleTips';
@@ -167,7 +167,6 @@ export default function Dashboard() {
   const { data: layers } = useAreaQuery('map-layers', '/map/layers', {}, { refetchInterval: 30_000, enabled: tab !== 'cap_xa' });
   const hotspots = useMemo(() => buildHotspots(layers, k), [layers, k]);
   const [mapFocus, setMapFocus] = useState(null); // "Xem trên bản đồ" của câu "Nguy hiểm nhất" → bản đồ điểm nóng bay tới
-  const { data: presets = [] } = usePresets();
   const { data: units = [] } = useUnits();
 
   // Phạm vi được giao: tài khoản xã chưa lọc thì tiêu đề là xã đó, không ghi "Toàn tỉnh"
@@ -186,16 +185,6 @@ export default function Dashboard() {
   }, [tabs, isCommuneUser, scopeUnit]);
   const filterLabel = isFiltered || scope === null ? filter.label : scopeLabel;
   const role = auth?.user?.assignments?.[0]?.role_name;
-  // Lọc nhanh theo lưu vực (nhóm do BCH xác nhận — README 2.4) — ô chọn trong thanh lệnh (trước đây 1 hàng chip riêng)
-  const basinPresets = useMemo(() => presets.filter((p) => p.kind === 'luu_vuc'), [presets]);
-  const basinValue = filter.presetCode && basinPresets.some((p) => p.code === filter.presetCode)
-    ? filter.presetCode
-    : isFiltered ? 'khac' : '';
-  const pickBasin = (code) => {
-    const p = basinPresets.find((x) => x.code === code);
-    if (p) setFilter({ codes: p.unit_codes, label: p.name, presetCode: p.code });
-    else clearFilter();
-  };
 
   const waterStations = useMemo(() => allStations.filter((s) => s.type === 'muc_nuoc'), [allStations]);
   const rainStations = allStations.filter((s) => s.type === 'luong_mua').length;
@@ -538,19 +527,6 @@ export default function Dashboard() {
           </>
         ) : (
           <>
-            {/* Lọc nhanh theo lưu vực (nhóm do BCH xác nhận — README 2.4). Tài khoản xã chỉ có xã mình → không có lưu vực;
-                điện thoại: chọn lưu vực ở bộ lọc trong menu ☰ (cùng danh sách nhóm) */}
-            {tab === 'tong_hop' && scope === null && basinPresets.length > 0 && (
-              <label className="hidden items-center gap-1.5 text-xs text-muted sm:flex">
-                <MapPin size={13} aria-hidden="true" />
-                <span className="hidden 2xl:inline">Lưu vực</span>
-                <select className="input tap h-9 w-auto max-w-[12rem] py-0.5 text-xs" value={basinValue} onChange={(e) => pickBasin(e.target.value)} aria-label="Lọc theo lưu vực">
-                  <option value="">Toàn tỉnh</option>
-                  {basinValue === 'khac' && <option value="khac" disabled>{filter.label}</option>}
-                  {basinPresets.map((p) => <option key={p.code} value={p.code}>{p.name} ({p.unit_codes.length} xã)</option>)}
-                </select>
-              </label>
-            )}
             <button type="button" onClick={enterPresentation} className="btn-secondary tap-sq hidden h-9 px-2.5 lg:inline-flex" aria-label="Chế độ trình chiếu màn hình lớn" title="Trình chiếu trên màn hình lớn phòng điều hành: nền tối, chữ số to, tự chuyển chuyên đề">
               <Monitor size={15} aria-hidden="true" /> <span className="hidden xl:inline">Trình chiếu</span>
             </button>
@@ -706,8 +682,7 @@ export default function Dashboard() {
               {bigScreen && <TacticalMiniMap k={k} className="min-w-0" focus={mapFocus} tall />}
             </div>
 
-            {/* Gợi ý lần đầu: điện thoại ngay trước bản đồ; máy tính bảng / laptop đầu cột phải (trên nhật ký) — không đẩy bản
-                đồ xuống dưới màn hình đầu */}
+            {/* 2. Khối chiến thuật: bản đồ + chuyên đề (trái), gợi ý + nhật ký sự kiện (phải) */}
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_420px] [&>*]:min-w-0">
               {!presentation && (
                 <RoleTips
