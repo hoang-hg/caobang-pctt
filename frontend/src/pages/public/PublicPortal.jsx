@@ -113,7 +113,7 @@ function PublicMap({ data, forecast, geo, me, route, target, layers, basemap = '
           })}
           onEachFeature={(f, l) => {
             const a = byCode[f.properties.code];
-            l.bindTooltip(`<b>${a.name}</b><br/>Mưa 24h tới: <b>${a.p50} mm</b> (có thể tới ${a.p90} mm)`, { sticky: true });
+            l.bindTooltip(`<b>${a.name}</b><br/>Mưa 24 giờ tới: <b>${a.p50} mm</b> (có thể tới ${a.p90} mm)`, { sticky: true });
           }}
         />
       )}
@@ -849,7 +849,7 @@ export default function PublicPortal() {
 
                     <div className="text-xs text-muted flex items-center gap-2">
                       <CloudRain size={14} className="text-accent" />
-                      <span>Mưa dự báo 24h tới: <b className="text-ink font-mono">{here.forecast_24h?.p50 ?? '–'} mm</b> (có thể lên tới {here.forecast_24h?.p90 ?? '–'} mm)</span>
+                      <span>Mưa dự báo 24 giờ tới: <b className="text-ink font-mono">{here.forecast_24h?.p50 ?? '–'} mm</b> (có thể lên tới {here.forecast_24h?.p90 ?? '–'} mm)</span>
                     </div>
 
                     {here.hazards.length > 0 && (
@@ -1073,7 +1073,7 @@ export default function PublicPortal() {
                   <div className={clsx('flex flex-wrap items-center gap-x-3 gap-y-1', !wide && !layersOpen && 'hidden', !wide && 'order-last w-full')}>
                     <span className="font-semibold text-muted">Lớp hiển thị:</span>
                     {[
-                      ['forecast', 'Mưa 24h'],
+                      ['forecast', 'Mưa 24 giờ'],
                       ['hazard', 'Vùng ngập & sạt lở'],
                       ['stations', 'Trạm mực nước'],
                       ['reservoirs', 'Hồ chứa & Xả lũ'],
@@ -1307,7 +1307,7 @@ export default function PublicPortal() {
                     )}
                   >
                     <CloudRain size={14} />
-                    <span className="truncate">Mưa 24h</span>
+                    <span className="truncate">Mưa 24 giờ</span>
                   </button>
                 </div>
 
@@ -1361,7 +1361,7 @@ export default function PublicPortal() {
                       <div className="flex items-center justify-between pb-2 border-b border-line/60">
                         <div className="text-xs font-bold text-muted flex items-center gap-1.5">
                           <CloudRain size={14} className="text-accent" />
-                          <span>Dự báo lượng mưa 24h tới</span>
+                          <span>Dự báo lượng mưa 24 giờ tới</span>
                         </div>
                         <span className="text-[11px] text-muted">Mô hình khí tượng</span>
                       </div>
@@ -1369,7 +1369,7 @@ export default function PublicPortal() {
                       {/* Tóm tắt nhanh */}
                       <div className="grid grid-cols-2 gap-2 text-xs">
                         <div className="bg-panel2/60 p-2.5 rounded-xl border border-line/50">
-                          <div className="text-[11px] text-muted">Mưa TB toàn tỉnh:</div>
+                          <div className="text-[11px] text-muted">Mưa trung bình toàn tỉnh:</div>
                           <div className="font-mono text-base font-bold text-accent mt-0.5">
                             {overview?.rain?.avg_24h ?? '–'} mm
                           </div>

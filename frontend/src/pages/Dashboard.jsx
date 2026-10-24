@@ -423,8 +423,8 @@ export default function Dashboard() {
     const rows = [
       ['Phạm vi', filterLabel],
       ['Thời điểm', now.toLocaleString('vi-VN', VN_TIME)],
-      [k?.rain?.avg_method === 'thiessen' ? 'Mưa TB lưu vực 24h – theo diện tích, đa giác Thiessen (mm)' : 'Mưa TB 24h các trạm (mm)', k?.rain?.avg_24h],
-      ['Mưa 24h lớn nhất (mm)', k?.rain?.max_24h, k?.rain?.max_station],
+      [k?.rain?.avg_method === 'thiessen' ? 'Mưa trung bình lưu vực 24 giờ – theo diện tích, đa giác Thiessen (mm)' : 'Mưa trung bình 24 giờ các trạm (mm)', k?.rain?.avg_24h],
+      ['Mưa 24 giờ lớn nhất (mm)', k?.rain?.max_24h, k?.rain?.max_station],
       ...waterStations.map((s) => {
         const st = riverState(s);
         return [`Mực nước – ${s.name} (m)`, st.value, `${st.label} · ${risk(st.level).name}`];

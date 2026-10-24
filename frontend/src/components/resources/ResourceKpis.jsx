@@ -37,6 +37,7 @@ export default function ResourceKpis({ summaryQ, warehouses, onGo }) {
     <div className={GRID} role="group" aria-label="Chỉ số nguồn lực">
       <StatCard
         compact
+        footerRows
         icon={Users}
         title={<><span className="sm:hidden">Quân số sẵn sàng</span><span className="hidden sm:inline">Cán bộ, chiến sĩ sẵn sàng</span></>}
         level={!fo.total ? null : fo.ready ? undefined : 3}
@@ -49,6 +50,7 @@ export default function ResourceKpis({ summaryQ, warehouses, onGo }) {
       />
       <StatCard
         compact
+        footerRows
         icon={Ship}
         title={<><span className="sm:hidden">Xuồng rảnh</span><span className="hidden sm:inline">Xuồng, xe lội nước rảnh</span></>}
         level={!ve.boats_total ? null : ve.boats_free ? undefined : 3}
@@ -61,6 +63,7 @@ export default function ResourceKpis({ summaryQ, warehouses, onGo }) {
       />
       <StatCard
         compact
+        footerRows
         icon={Package}
         title={<><span className="sm:hidden">Lương thực, nước</span><span className="hidden sm:inline">Dự trữ lương thực · nước uống</span></>}
         level={foodWaterLv}
@@ -72,6 +75,7 @@ export default function ResourceKpis({ summaryQ, warehouses, onGo }) {
       />
       <StatCard
         compact
+        footerRows
         icon={AlertTriangle}
         title={<><span className="sm:hidden">Kho cạn kiệt</span><span className="hidden sm:inline">Kho cạn kiệt · sắp hết hạn</span></>}
         level={low ? 3 : expiring ? 2 : hasStock ? 0 : null}

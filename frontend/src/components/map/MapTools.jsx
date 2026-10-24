@@ -597,7 +597,7 @@ export function ForecastChoropleth({ geo, areas }) {
       onEachFeature={(f, layer) => {
         const a = byCode[f.properties.code];
         layer.bindTooltip(
-          `<b>${a.name}</b><br/>${scale.short}: <b>${a.p50} mm</b> (P10 ${a.p10} – P90 ${a.p90})<br/>Xác suất mưa ≥ 5 mm/h: ${Math.round(a.max_prob_heavy * 100)}%`,
+          `<b>${a.name}</b><br/>${scale.short}: <b>${a.p50} mm</b> (khoảng có thể xảy ra: ${a.p10} – ${a.p90} mm)<br/>Xác suất mưa ≥ 5 mm/giờ: ${Math.round(a.max_prob_heavy * 100)}%`,
           { sticky: true },
         );
       }}

@@ -325,12 +325,12 @@ export default function EventReport({ code, canManage, onEdit, onEnd }) {
 
       <div ref={ref} className="flex flex-col gap-3 bg-bg">
         <div className="grid grid-cols-2 gap-2 md:grid-cols-3 2xl:grid-cols-6" role="group" aria-label="Chỉ số của đợt">
-          <StatCard compact icon={Siren} title="Phiếu SOS" value={int(s.sos.total)} unit="phiếu" footer={[s.sos.open ? `${int(s.sos.open)} còn mở` : s.sos.total ? 'Đã xử lý hết' : 'Chưa có phiếu', s.sos.median_ack_min != null && `tiếp nhận ~${s.sos.median_ack_min}′`].filter(Boolean).join(' · ')} />
-          <StatCard compact icon={Users} title="Người được cứu" value={int(s.sos.rescued)} unit={`/ ${int(s.sos.trapped)}`} footer="đã cứu / mắc kẹt" />
-          <StatCard compact icon={Truck} title="Lệnh điều động" value={int(s.dispatch.orders - s.dispatch.cancelled)} unit="lệnh" footer={`${int(s.dispatch.personnel)} người${s.dispatch.cancelled ? ` · ${s.dispatch.cancelled} đã huỷ` : ''}`} />
-          <StatCard compact icon={Megaphone} title="Cảnh báo đã phát" value={int(sent)} unit="lệnh" footer={sent ? `Rất cao ${sev('do')} · Cao ${sev('cam')} · TB ${sev('vang')}` : 'Chưa phát lệnh nào'} />
-          <StatCard compact icon={House} title="Sơ tán cao nhất" value={int(peakHouseholds)} unit="hộ" footer={`${int(peakPersons)} người · ${s.evacuation.length} xã`} />
-          <StatCard compact icon={Package} title="Vật tư đã cấp" value={int(issuedTypes)} unit="mặt hàng" footer="theo sổ xuất – nhập kho" />
+          <StatCard compact footerRows icon={Siren} title="Phiếu SOS" value={int(s.sos.total)} unit="phiếu" footer={[s.sos.open ? `${int(s.sos.open)} còn mở` : s.sos.total ? 'Đã xử lý hết' : 'Chưa có phiếu', s.sos.median_ack_min != null && `tiếp nhận ~${s.sos.median_ack_min}′`].filter(Boolean).join(' · ')} />
+          <StatCard compact footerRows icon={Users} title="Người được cứu" value={int(s.sos.rescued)} unit={`/ ${int(s.sos.trapped)}`} footer="đã cứu / mắc kẹt" />
+          <StatCard compact footerRows icon={Truck} title="Lệnh điều động" value={int(s.dispatch.orders - s.dispatch.cancelled)} unit="lệnh" footer={`${int(s.dispatch.personnel)} người${s.dispatch.cancelled ? ` · ${s.dispatch.cancelled} đã huỷ` : ''}`} />
+          <StatCard compact footerRows icon={Megaphone} title="Cảnh báo đã phát" value={int(sent)} unit="lệnh" footer={sent ? `Rất cao ${sev('do')} · Cao ${sev('cam')} · Trung bình ${sev('vang')}` : 'Chưa phát lệnh nào'} />
+          <StatCard compact footerRows icon={House} title="Sơ tán cao nhất" value={int(peakHouseholds)} unit="hộ" footer={`${int(peakPersons)} người · ${s.evacuation.length} xã`} />
+          <StatCard compact footerRows icon={Package} title="Vật tư đã cấp" value={int(issuedTypes)} unit="mặt hàng" footer="theo sổ xuất – nhập kho" />
         </div>
 
         <div className={clsx('grid gap-3', asTable && 'xl:grid-cols-2')}>
