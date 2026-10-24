@@ -408,8 +408,12 @@ export default function DispatchModal({ ticket, presetForceId, onClose }) {
               <div>
                 <h4 className="mb-1 text-sm font-semibold">Tóm tắt lệnh — kiểm tra trước khi phát</h4>
                 <dl className="grid grid-cols-[auto,1fr] gap-x-3 gap-y-1 rounded-lg border border-line p-3 text-sm">
-                  <dt className="text-muted">Đội</dt>
-                  <dd><b>{force?.name || '—'}</b>{force && <span className="text-muted"> · cách {force.distance_km} km</span>}</dd>
+                  <dt className="text-muted">Đội điều động</dt>
+                  <dd><b>{force?.name || '—'}</b></dd>
+                  <dt className="text-muted">Đến đâu</dt>
+                  <dd><b>{ticket.address || ticket.admin_name}</b> (phiếu {ticket.code})</dd>
+                  <dt className="text-muted">Khoảng cách</dt>
+                  <dd>{force ? `${force.distance_km} km` : '—'}</dd>
                   <dt className="text-muted">Số người</dt>
                   <dd>{personnelText} người</dd>
                   <dt className="text-muted">Phương tiện</dt>
@@ -418,6 +422,8 @@ export default function DispatchModal({ ticket, presetForceId, onClose }) {
                   <dd>
                     {Object.keys(supplies).length === 0 ? 'Không có' : chosen ? `Xuất từ ${chosen.name}` : 'Chỉ ghi nhu cầu — không trừ kho'}
                   </dd>
+                  <dt className="text-muted">Tuyến đường</dt>
+                  <dd className="text-ink-2">Tự vạch đường an toàn, né vùng ngập và sạt lở (kết quả chi tiết ngay khi phát lệnh)</dd>
                 </dl>
               </div>
               <div className="flex flex-col gap-2 text-xs text-ink-2">

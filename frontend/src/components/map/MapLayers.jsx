@@ -27,7 +27,7 @@ const POP_W = 'w-[min(18rem,calc(100vw-7.5rem))]';
 const POP_W_SM = 'w-[min(16rem,calc(100vw-7.5rem))]';
 const Tel = ({ phone, label = 'Gọi' }) =>
   phone ? (
-    <a className="btn-ghost px-2 py-1 text-xs" href={`tel:${phone.replace(/\s/g, '')}`}><Phone size={12} /> {label}</a>
+    <a className="btn-ghost px-2 py-1 text-xs" href={`tel:${phone.replace(/\s/g, '')}`} aria-label={label}><Phone size={12} aria-hidden="true" /> {label}</a>
   ) : null;
 
 function MiniSeries({ stationId, unit }) {
@@ -222,7 +222,7 @@ function BlackspotPopup({ p, near, level }) {
         {p.tilt_info && (
           <li>
             Nghiêng taluy <b className="num">+{p.tilt_info.current_tilt_deg}°</b>
-            {p.tilt_info.alarm_threshold != null && ` (ngưỡng BĐ III ${p.tilt_info.alarm_threshold}°)`} · {p.tilt_info.sensor_name}
+            {p.tilt_info.alarm_threshold != null && ` (ngưỡng báo động III ${p.tilt_info.alarm_threshold}°)`} · {p.tilt_info.sensor_name}
           </li>
         )}
         {p.soil_info && <li>{p.soil_info.status_text} · {p.soil_info.sensor_name}</li>}
@@ -375,7 +375,7 @@ function ReservoirPopup({ p, lv, onOperate }) {
  */
 function VehiclePopup({ p }) {
   return (
-    <div className="w-60">
+    <div className={POP_W_SM}>
       <b>{p.code}</b> – {VEHICLE[p.vehicle_type]}
       <div className="text-xs text-muted">{p.force_name || 'Chưa gắn đơn vị'}{p.capacity ? ` · chở ${p.capacity} người` : ''}</div>
       <div className="text-xs">{RES_STATUS[p.status].label} · Nhiên liệu {p.fuel_level == null ? 'chưa cập nhật' : `${p.fuel_level}%`}</div>
@@ -392,7 +392,7 @@ function VehiclePopup({ p }) {
 function EvacPopup({ p, onOccupancy }) {
   const canUpdate = usePermission('evacuation', 'update', p.admin_code);
   return (
-    <div className="w-56">
+    <div className={POP_W_SM}>
       <b>{p.name}</b>
       <div className="text-sm">Đang chứa: <b className={clsx('num', p.current_occupancy > p.capacity && 'text-danger')}>{p.current_occupancy}/{p.capacity}</b> người</div>
       <div className="mt-1 flex flex-wrap gap-1">
@@ -498,7 +498,7 @@ export default function MapLayers({
               <Popup {...pad}>
                 <b>{p.name}</b>
                 <div className="text-xs">
-                  Kịch bản ngập khi {p.station_name} {p.alarm_level ? `đạt BĐ ${ROMAN[p.alarm_level]}` : 'đạt'} ({p.trigger} m) — mực nước
+                  Kịch bản ngập khi {p.station_name} {p.alarm_level ? `đạt báo động ${ROMAN[p.alarm_level]}` : 'đạt'} ({p.trigger} m) — mực nước
                   {timeline ? ` lúc ${fmtVn(timeline.time)}` : ' hiện tại'} <b className="num">{level} m</b>
                 </div>
                 {p.depth_m != null && <div className="text-xs text-muted">Độ sâu ngập điển hình ~{p.depth_m} m</div>}
@@ -598,7 +598,10 @@ export default function MapLayers({
               eventHandlers={{ dragend: (e) => onForceDrop(p, e.target) }}
               zIndexOffset={500}
             >
-              <Tooltip direction="top" offset={[0, -14]}>{p.name}</Tooltip>
+              <Tooltip direction="top" offset={[0, -14]}>
+                <span className="font-semibold">{p.name}</span>
+                {canDispatch && <span className="block text-[10px] text-muted font-normal">Kéo đội cứu hộ thả vào điểm cầu cứu để điều động</span>}
+              </Tooltip>
               <Popup {...pad}>
                 <div className={POP_W_SM}>
                   <b>{p.name}</b>
@@ -606,7 +609,7 @@ export default function MapLayers({
                   <div className="text-xs">Sẵn sàng {p.personnel_ready} · Nhiệm vụ {p.personnel_on_mission} · 📻 {p.radio_freq}</div>
                   <div className="mt-1 flex flex-wrap gap-1">{p.skills.map((s) => <span key={s} className="chip bg-panel2">{SKILL[s]}</span>)}</div>
                   <div className="mt-2"><Tel phone={p.contact_phone} label="Gọi chỉ huy" /></div>
-                  <p className="mt-1 text-[11px] text-muted">Kéo biểu tượng đội này thả vào điểm cầu cứu để điều động.</p>
+                  <p className="mt-1 text-[11px] text-muted">Kéo đội cứu hộ thả vào điểm cầu cứu để điều động.</p>
                 </div>
               </Popup>
             </Marker>

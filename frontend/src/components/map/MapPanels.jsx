@@ -801,7 +801,7 @@ export function DrawnStats({ drawn, units, onClose, onRetry, onAlert, touch, cla
               <div className="text-muted">Diện tích:</div><b className="text-right font-mono">{s.area_km2 ? `${int(s.area_km2)} km²` : '< 1 km²'}</b>
               <div className="text-muted">Dân số (ước tính):</div><b className="text-right font-mono">{int(s.population)} người</b>
               <div className="text-muted">Số hộ (ước tính):</div><b className="text-right font-mono">{int(s.households)} hộ</b>
-              <div className="text-muted">Thuê bao di động (ước tính):</div><b className="text-right font-mono">{int(s.subscribers)} TB</b>
+              <div className="text-muted">Thuê bao di động (ước tính):</div><b className="text-right font-mono">{int(s.subscribers)} thuê bao</b>
               <div className="text-muted">SOS đang mở:</div><b className={clsx('text-right font-mono', s.sos_open ? 'text-danger' : 'text-ink')}>{int(s.sos_open)}</b>
               <div className="text-muted">Lực lượng đóng trong vùng:</div><b className="text-right font-mono">{int(s.forces)} đơn vị</b>
               <div className="text-muted">Chỗ trống sơ tán:</div><b className={clsx('text-right font-mono', s.evac_free ? 'text-good' : 'text-ink')}>{int(s.evac_free)}</b>
@@ -850,7 +850,7 @@ export function DrawnStats({ drawn, units, onClose, onRetry, onAlert, touch, cla
 export function Sheet({ title, onClose, actions, children, bodyClass = 'scroll-thin overflow-y-auto p-3' }) {
   useEscapeToClose(true, onClose);
   return (
-    <section className="absolute inset-x-0 bottom-0 z-[1100] flex max-h-[72%] flex-col rounded-t-2xl border-t border-line bg-panel shadow-2xl" aria-label={title}>
+    <section role="region" className="absolute inset-x-0 bottom-0 z-[1100] flex max-h-[72%] flex-col rounded-t-2xl border-t border-line bg-panel shadow-2xl" aria-label={title}>
       <div className="mx-auto mt-1.5 h-1 w-10 shrink-0 rounded-full bg-line" aria-hidden="true" />
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-line py-0.5 pl-3 pr-1">
         <b className="text-sm text-ink">{title}</b>

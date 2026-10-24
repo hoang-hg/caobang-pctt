@@ -343,9 +343,12 @@ async function staff(ctx, trackCode) {
   await step(ctx, 'Bản đồ giám sát: bảng nổi không che bản đồ; thanh ngón cái (điện thoại) / bảng cảnh báo, chú giải (máy tính)', async () => {
     await page.goto(`${ROOT}/ban-do`);
     await page.locator('.leaflet-container').waitFor({ timeout: 20_000 });
-    await page.waitForTimeout(1500);
+    await expectMapShown(page, '/ban-do');
+    await page.locator('[aria-label="Đang tải lớp dữ liệu bản đồ"]').waitFor({ state: 'detached', timeout: 20_000 }).catch(() => {});
+    await page.waitForTimeout(500);
     const free = await page.evaluate(() => {
-      const m = document.querySelector('.leaflet-container').getBoundingClientRect();
+      const m = document.querySelector('.leaflet-container')?.getBoundingClientRect();
+      if (!m || m.height < 100) return 0;
       let ok = 0;
       let all = 0;
       for (let i = 0; i < 12; i += 1) {

@@ -546,7 +546,7 @@ export default function MonitoringMap() {
                   className={clsx(floatCard, 'pointer-events-auto flex h-10 items-center justify-center gap-1.5 text-xs font-semibold text-ink-2 hover:bg-panel2 [@media(pointer:coarse)]:h-11', leftOpen ? 'ml-1.5 w-8 [@media(pointer:coarse)]:w-11' : 'px-3')}
                   onClick={() => setLeftOpen((o) => !o)}
                   aria-expanded={leftOpen}
-                  aria-label={leftOpen ? 'Thu gọn bảng lớp dữ liệu' : undefined}
+                  aria-label={leftOpen ? 'Thu gọn Lớp dữ liệu' : 'Lớp dữ liệu'}
                   title={leftOpen ? 'Thu gọn' : undefined}
                 >
                   {leftOpen ? <ChevronLeft size={16} /> : <><Layers size={16} className="text-accent" aria-hidden="true" /> Lớp dữ liệu</>}
@@ -756,7 +756,7 @@ export default function MonitoringMap() {
 
         {/* Trạng thái: đang tải lần đầu / không tải được (bản đồ nền vẫn xem được) */}
         {!data && !layersQ.isError && (
-          <div className="absolute inset-0 z-[900] flex items-center justify-center bg-bg/40 backdrop-blur-sm" role="status" aria-label="Đang tải lớp dữ liệu bản đồ">
+          <div className="pointer-events-none absolute inset-0 z-[900] flex items-center justify-center bg-bg/40 backdrop-blur-sm" role="status" aria-label="Đang tải lớp dữ liệu bản đồ">
             <MapIcon className="animate-bounce text-accent" size={32} />
           </div>
         )}

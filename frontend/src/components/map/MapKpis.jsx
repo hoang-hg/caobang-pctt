@@ -42,7 +42,7 @@ export function kpiTiles(k, stations) {
     },
     {
       key: 'river', icon: Waves, title: 'Mực nước sông', short: 'Mực nước', level: riverFailed || stations.loading ? null : river.level,
-      value: stations.loading && !n ? '…' : n ? `${river.above}/${n}` : '–', unit: n ? 'trạm trên BĐ' : '', unitShort: n ? 'trên BĐ' : '',
+      value: stations.loading && !n ? '…' : n ? `${river.above}/${n}` : '–', unit: n ? 'trạm trên báo động' : '', unitShort: n ? 'trên báo động' : '',
       sub: riverFailed ? 'Không tải được trạm' : stations.loading && !n ? 'Đang tải trạm…' : !n ? 'Chưa có trạm'
         : river.level == null ? 'Chưa đánh giá được' : river.level >= 1 ? `Nặng nhất báo động ${ROMAN[river.level]}` : ALARM[0].label,
     },
@@ -52,8 +52,8 @@ export function kpiTiles(k, stations) {
       sub: ls.total ? `${ls.blocked_count} điểm cấm đường` : 'Chưa có điểm sạt lở',
     },
     {
-      key: 'rain', icon: CloudRain, title: 'Mưa 24 giờ', short: 'Mưa 24h', level: rainLv,
-      value: rainKnown ? num(rain.avg_24h, 1) : '–', unit: rainKnown ? 'mm TB' : '',
+      key: 'rain', icon: CloudRain, title: 'Mưa 24 giờ', short: 'Mưa 24 giờ', level: rainLv,
+      value: rainKnown ? num(rain.avg_24h, 1) : '–', unit: rainKnown ? 'mm trung bình' : '', unitShort: rainKnown ? 'mm bình quân' : '',
       sub: rainKnown ? `Lớn nhất ${num(rain.max_24h, 1)} mm` : 'Chưa có số đo mưa',
     },
     {
