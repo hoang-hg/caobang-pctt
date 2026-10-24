@@ -24,7 +24,11 @@ function sessionEnded(detail) {
 /** Chế độ giả lập (app/store.js: chỉ máy dev, bật chủ động) cho API nội bộ. Cổng công khai /public/* luôn gọi máy chủ thật.
  * Bản build chạy thật: import.meta.env.DEV = false → cả nhánh và mã giả lập bị loại khỏi gói. KHÔNG có cơ chế "máy chủ lỗi
  * thì trả dữ liệu giả" — lỗi thật phải hiện ra là lỗi. */
-const simulating = (path) => import.meta.env.DEV && useStore.getState().simulationMode && !path.startsWith('/public/');
+const simulating = (path) =>
+  import.meta.env.DEV &&
+  useStore.getState().simulationMode &&
+  !path.startsWith('/public/') &&
+  !path.startsWith('/admin-units');
 
 export async function api(path, { method = 'GET', body, params } = {}) {
   if (simulating(path)) return (await import('./simulationEngine')).simulateRequest(path, { method, body, params });

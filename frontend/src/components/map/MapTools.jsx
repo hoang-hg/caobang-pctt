@@ -294,46 +294,86 @@ export function CursorToStatus() {
 // nền tương phản bên dưới để rõ trên nền sáng, tối, vệ tinh. Ngoài vùng làm mờ ĐẬM (quyết định 21/10/2026: bản đồ chỉ rõ tỉnh
 // Cao Bằng / vùng đang xem — docs/ke-hoach-lam-moi-giao-dien.md mục 7.2): nền sáng phủ trắng, nền tối và vệ tinh phủ tối.
 const AREA_STYLE = {
-  dark: { line: '#3987e5', halo: '#0b1220', mask: '#0b1220', maskOn: 0.65, maskOff: 0.65 },
-  light: { line: '#2a78d6', halo: '#ffffff', mask: '#ffffff', maskOn: 0.7, maskOff: 0.7 },
+  dark: { line: '#3987e5', halo: '#0b1220', mask: '#0b1220', maskOn: 0.85, maskOff: 0.85 },
+  light: { line: '#2a78d6', halo: '#ffffff', mask: '#ffffff', maskOn: 0.85, maskOff: 0.85 },
 };
 
 /**
- * Vùng đang xem (tỉnh, vùng lọc, phạm vi được giao): bay tới vùng + làm mờ ngoài ranh giới + viền màu nhấn. Lớp mờ ở pane
- * riêng (trên ô nền, dưới mọi lớp số liệu: điểm, vùng nguy hiểm, quỹ đạo bão vẫn rõ dù ở ngoài vùng); không khoá kéo bản đồ
- * ra ngoài. `fly` = false: không bay tới vùng (nơi gọi tự đặt khung nhìn, VD vừa các phiếu SOS). `basemap`: nền Vệ tinh →
- * phủ tối.
+ * Vùng đang xem (tỉnh, vùng lọc, phạm vi được giao): bay tới vùng + làm mờ đậm ngoài ranh giới + viền màu nhấn.
+ * Luôn bảo đảm ngoài ranh giới tỉnh Cao Bằng được phủ mờ đậm (85%) để tỉnh Cao Bằng luôn hiển thị rõ ràng nhất.
+ * Lớp mờ ở pane riêng (trên ô nền, dưới mọi lớp số liệu: điểm, vùng nguy hiểm, quỹ đạo bão vẫn rõ dù ở ngoài vùng);
+ * không khoá kéo bản đồ ra ngoài. `fly` = false: không bay tới vùng. `basemap`: nền Vệ tinh → phủ tối.
  */
 export function AreaFocus({ area, filtered, padding = {}, fly = true, basemap }) {
   const map = useMap();
   const theme = useStore((st) => st.theme);
   const s = AREA_STYLE[basemap === 'satellite' ? 'dark' : theme] || AREA_STYLE.dark;
+  const { data: provinceArea } = useProvinceArea();
+  const targetArea = area || provinceArea;
+
   useEffect(() => {
-    if (!fly || !area?.bbox) return;
-    const [x1, y1, x2, y2] = area.bbox;
+    if (!fly || !targetArea?.bbox) return;
+    const [x1, y1, x2, y2] = targetArea.bbox;
     map.flyToBounds([[y1, x1], [y2, x2]], {
       paddingTopLeft: padding.topLeft || [16, 16],
       paddingBottomRight: padding.bottomRight || [16, 16],
       duration: 0.8,
     });
-  }, [area?.bbox?.join(','), map, fly]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [targetArea?.bbox?.join(','), map, fly]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const rings = useMemo(() => {
-    if (!area?.geometry) return null;
-    const g = area.geometry;
-    const polys = g.type === 'Polygon' ? [g.coordinates] : g.coordinates;
+  const toRings = (geom) => {
+    if (!geom) return null;
+    const polys = geom.type === 'Polygon' ? [geom.coordinates] : geom.coordinates;
     return polys.map((p) => p[0].map(([x, y]) => [y, x]));
-  }, [area]);
-  if (!rings) return null;
+  };
+
+  const provinceRings = useMemo(() => toRings(provinceArea?.geometry), [provinceArea]);
+  const activeRings = useMemo(() => toRings(area?.geometry), [area]);
+
+  // Nếu chưa có ranh giới nào được nạp thì chưa vẽ
+  if (!provinceRings && !activeRings) return null;
+
   const world = [[-89, -179], [-89, 179], [89, 179], [89, -179]];
+
   return (
     <>
       <Pane name="mat-na-ngoai-vung" style={{ zIndex: 350 }}>
-        <Polygon key={`mask-${s.mask}`} positions={[world, ...rings]} pathOptions={{ stroke: false, fillColor: s.mask, fillOpacity: filtered ? s.maskOn : s.maskOff }} interactive={false} />
+        {/* Mặt nạ ngoài tỉnh Cao Bằng: luôn phủ mờ đậm 85% để chỉ làm nổi bật lãnh thổ tỉnh Cao Bằng */}
+        {provinceRings && (
+          <Polygon
+            key={`mask-prov-${s.mask}`}
+            positions={[world, ...provinceRings]}
+            pathOptions={{ stroke: false, fillColor: s.mask, fillOpacity: s.maskOff }}
+            interactive={false}
+          />
+        )}
+        {/* Khi người dùng lọc một xã/phường cụ thể: làm mờ nhẹ (30%) phần còn lại trong tỉnh để làm nổi bật xã đang chọn */}
+        {filtered && activeRings && provinceRings && (
+          <Polygon
+            key={`mask-commune-${s.mask}`}
+            positions={[provinceRings[0], ...activeRings]}
+            pathOptions={{ stroke: false, fillColor: s.mask, fillOpacity: 0.3 }}
+            interactive={false}
+          />
+        )}
       </Pane>
       <Pane name="vien-vung" style={{ zIndex: 425 }}>
-        <Polygon key={`halo-${s.halo}`} positions={rings} pathOptions={{ color: s.halo, weight: 5, opacity: 0.7, fill: false }} interactive={false} />
-        <Polygon key={`line-${s.line}-${filtered}`} positions={rings} pathOptions={{ color: s.line, weight: filtered ? 2.5 : 2, fill: false }} interactive={false} />
+        {/* Viền ranh giới tỉnh Cao Bằng */}
+        {provinceRings && (
+          <Polygon
+            key={`prov-line-${s.line}`}
+            positions={provinceRings}
+            pathOptions={{ color: s.line, weight: 2, opacity: 0.65, fill: false }}
+            interactive={false}
+          />
+        )}
+        {/* Viền nổi bật cho vùng/xã đang lọc */}
+        {filtered && activeRings && (
+          <>
+            <Polygon key={`halo-${s.halo}`} positions={activeRings} pathOptions={{ color: s.halo, weight: 5, opacity: 0.7, fill: false }} interactive={false} />
+            <Polygon key={`line-${s.line}`} positions={activeRings} pathOptions={{ color: s.line, weight: 2.5, fill: false }} interactive={false} />
+          </>
+        )}
       </Pane>
     </>
   );
