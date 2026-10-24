@@ -444,8 +444,8 @@ export default function MonitoringMap() {
   return (
     <div
       className={clsx(
-        // Cao = màn trừ thanh trên (3,5 rem); màn rộng + đủ cao (`lg:tall:`) trừ thêm thanh trạng thái dưới cùng (2 rem — StatusBar)
-        'flex h-[calc(100vh-3.5rem)] w-full flex-col [@supports(height:100dvh)]:h-[calc(100dvh-3.5rem)] lg:tall:h-[calc(100vh-5.5rem)] lg:tall:[@supports(height:100dvh)]:h-[calc(100dvh-5.5rem)]',
+        // Chiếm trọn chiều cao vùng nội dung <main> — không bao giờ gây thanh cuộn dọc ngoài ý muốn
+        'flex h-full w-full flex-1 flex-col overflow-hidden',
         // Màn hẹp: chừa chỗ cho thanh thao tác dưới cùng (cố định) — nút thu phóng, bảng trượt nằm trên thanh
         !wide && 'pb-[calc(4.3rem+env(safe-area-inset-bottom))]',
       )}
@@ -611,25 +611,44 @@ export default function MonitoringMap() {
                 {drawnCard}
               </div>
               <div className="pointer-events-auto flex h-full items-start">
-                <button
-                  type="button"
-                  className={clsx(floatCard, 'flex h-10 items-center justify-center gap-1.5 text-xs font-semibold hover:bg-panel2 [@media(pointer:coarse)]:h-11', rightOpen ? 'mr-1.5 w-8 text-ink-2 [@media(pointer:coarse)]:w-11' : 'px-3 text-danger')}
-                  onClick={() => setRightOpen((o) => !o)}
-                  aria-expanded={rightOpen}
-                  aria-label={rightOpen ? 'Thu gọn bảng cảnh báo khẩn cấp' : undefined}
-                  title={rightOpen ? 'Thu gọn' : undefined}
-                >
-                  {rightOpen ? <ChevronRight size={16} /> : <><Siren size={16} aria-hidden="true" /> Cảnh báo{alertCount > 0 && ` (${alertCount})`}</>}
-                </button>
-                {rightOpen && (
-                  <div className={clsx(floatCard, 'flex h-full w-[20rem] flex-col overflow-hidden')}>
-                    <div className="flex items-center justify-between border-b border-line px-3 py-2">
+                {!rightOpen ? (
+                  <button
+                    type="button"
+                    className={clsx(
+                      floatCard,
+                      'flex h-10 items-center justify-center gap-2 rounded-xl px-3.5 text-xs font-bold text-danger shadow-md hover:bg-panel2 transition-all [@media(pointer:coarse)]:h-11',
+                    )}
+                    onClick={() => setRightOpen(true)}
+                    aria-expanded={false}
+                    aria-label="Mở bảng cảnh báo khẩn cấp"
+                    title="Mở bảng cảnh báo khẩn cấp"
+                  >
+                    <Siren size={16} className="text-danger animate-pulse" aria-hidden="true" />
+                    <span>Cảnh báo</span>
+                    {alertCount > 0 && <span className="chip bg-danger text-white text-[11px] font-bold px-1.5 py-0.2">{alertCount}</span>}
+                    <ChevronLeft size={14} className="text-muted ml-0.5" />
+                  </button>
+                ) : (
+                  <div className={clsx(floatCard, 'flex h-full w-[22rem] flex-col overflow-hidden')}>
+                    <div className="flex items-center justify-between border-b border-line px-3 py-2 bg-panel2/30">
                       <div className="flex items-center gap-2 text-sm font-bold text-danger">
                         {/* Ô biểu tượng đỏ nhạt như "Việc chờ quyết định" của Tổng quan (diện mạo phòng chỉ huy — đợt 6) */}
                         <span className="icon-tile h-7 w-7 bg-danger/10 text-danger ring-danger/20" aria-hidden="true"><Siren size={15} /></span>
-                        Cảnh báo khẩn cấp
+                        <span>Cảnh báo khẩn cấp</span>
                       </div>
-                      {canSos && <span className="chip bg-danger text-[11px] font-bold text-white">{sos.length} SOS</span>}
+                      <div className="flex items-center gap-1.5">
+                        {canSos && <span className="chip bg-danger text-[11px] font-bold text-white">{sos.length} SOS</span>}
+                        <button
+                          type="button"
+                          onClick={() => setRightOpen(false)}
+                          className="tap-sq -mr-1 flex h-7 items-center gap-1 rounded-lg px-2 text-xs font-medium text-muted hover:bg-panel2 hover:text-ink transition-colors"
+                          title="Thu gọn bảng cảnh báo"
+                          aria-label="Thu gọn bảng cảnh báo khẩn cấp"
+                        >
+                          <span className="text-[11px]">Thu gọn</span>
+                          <ChevronRight size={14} />
+                        </button>
+                      </div>
                     </div>
                     <MapKpis layout="grid" className="border-b border-line" {...kpiProps} />
                     {alertsList}
@@ -638,9 +657,8 @@ export default function MonitoringMap() {
               </div>
             </div>
 
-            {/* Thanh thời gian – Đáy, giữa; màn hẹp thì dịch sang phải để không đè cột trái (thẻ chú giải rộng 19rem) và nút phóng
-                to / thu nhỏ (phải dưới) */}
-            <div className={clsx(floatCard, 'absolute bottom-3 left-[max(calc(50%-300px),20.25rem)] z-[1000] w-[min(600px,calc(100%-23.75rem))] px-4 py-2')}>
+            {/* Thanh thời gian – Đáy, giữa; căn giữa và tự co giãn vừa vặn */}
+            <div className={clsx(floatCard, 'absolute bottom-3 left-1/2 -translate-x-1/2 z-[1000] w-fit max-w-[min(640px,calc(100%-25rem))] px-4 py-2 transition-all duration-200')}>
               <TimeControl offset={offset} setOffset={setOffset} touch={coarse} />
             </div>
           </>

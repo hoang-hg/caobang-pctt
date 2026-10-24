@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
 import {
-  Activity, AlertTriangle, ArrowUp, Cctv, Circle as CircleIcon, CloudRain, Compass, Construction, Droplets, FileSpreadsheet, House,
+  Activity, AlertTriangle, ArrowUp, Cctv, ChevronDown, ChevronUp, Circle as CircleIcon, Clock, CloudRain, Compass, Construction, Droplets, FileSpreadsheet, House,
   LifeBuoy, Map as MapIcon, MapPin, Megaphone, MessageCircle, Mountain, Pause, PenTool, Play, Radar, Route, Ruler, Search, RotateCcw, Send,
   Settings2, Siren, Tornado, TrafficCone, TriangleAlert, Truck, Users, Warehouse, Waves, X,
 } from 'lucide-react';
@@ -320,6 +320,7 @@ export function AlertsList({
 }) {
   const [search, setSearch] = useState('');
   const [prio, setPrio] = useState(0); // 0 = mọi mức; 1 / 2 / 3 = cấp ưu tiên (Đỏ / Cam / Vàng — cùng màu trên bản đồ)
+  const [listOpen, setListOpen] = useState(true); // Thu gọn danh sách thẻ để bản đồ rộng thoáng
   const tabs = canSos ? ['diem_nong', 'dien_bien', 'sos', 'sensors'] : ['diem_nong', 'dien_bien', 'sensors'];
   const active = tabs.includes(tab) ? tab : 'diem_nong';
   const hot = useShowMore(hotspots, HOT_STEP, 'diem-nong');
@@ -334,9 +335,17 @@ export function AlertsList({
     <button
       key={id}
       type="button"
-      className={clsx('flex-1 rounded-lg text-xs font-medium transition-colors', touch ? 'min-h-[44px]' : 'min-h-[30px]', active === id ? 'bg-accent text-white' : 'text-muted hover:bg-panel2')}
-      onClick={() => setTab(id)}
+      className={clsx(
+        'shrink-0 rounded-lg text-xs font-semibold transition-all px-2.5 py-1 whitespace-nowrap text-center',
+        touch ? 'min-h-[44px]' : 'min-h-[30px]',
+        active === id ? 'bg-accent text-white shadow-xs' : 'text-muted hover:text-ink hover:bg-panel2',
+      )}
+      onClick={() => {
+        setTab(id);
+        if (!listOpen) setListOpen(true);
+      }}
       aria-pressed={active === id}
+      title={label}
     >
       {label}
     </button>
@@ -344,14 +353,28 @@ export function AlertsList({
   const item = 'w-full rounded-xl border border-line text-left shadow-sm transition-all hover:border-accent';
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="space-y-2 border-b border-line bg-panel2/40 px-3 py-2">
-        <div className="flex gap-1">
+      <div className="space-y-1.5 border-b border-line bg-panel2/40 px-3 py-2">
+        <div className="flex items-center justify-between gap-1 pb-0.5">
+          <span className="text-[11px] font-bold text-muted uppercase tracking-wider">Danh mục cảnh báo</span>
+          <button
+            type="button"
+            onClick={() => setListOpen((o) => !o)}
+            className="btn-ghost tap-sq flex h-6 items-center gap-1 px-1.5 text-[11px] font-semibold text-muted hover:bg-panel2 hover:text-ink rounded-lg transition-colors"
+            title={listOpen ? 'Thu gọn danh sách thẻ' : 'Mở rộng danh sách thẻ'}
+            aria-label={listOpen ? 'Thu gọn danh sách thẻ' : 'Mở rộng danh sách thẻ'}
+            aria-expanded={listOpen}
+          >
+            <span>{listOpen ? 'Thu gọn' : 'Mở rộng'}</span>
+            <ChevronUp size={13} className={clsx('transition-transform duration-200', !listOpen && 'rotate-180')} />
+          </button>
+        </div>
+        <div className="scroll-thin flex gap-1 overflow-x-auto pb-0.5">
           {tabBtn('diem_nong', `Điểm nóng (${hotspots.length})`)}
           {tabBtn('dien_bien', 'Diễn biến')}
           {canSos && tabBtn('sos', `Phiếu SOS (${sos.length})`)}
           {tabBtn('sensors', `Cảm biến (${sensorAlerts.length + silentStations.length})`)}
         </div>
-        {active === 'sos' && (
+        {listOpen && active === 'sos' && (
           <div className="relative">
             <Search size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted" aria-hidden="true" />
             <input
@@ -363,7 +386,7 @@ export function AlertsList({
             />
           </div>
         )}
-        {active === 'sos' && (
+        {listOpen && active === 'sos' && (
           <div className="flex flex-wrap gap-1" role="group" aria-label="Lọc phiếu SOS theo mức">
             {[[0, 'Tất cả', sos.length], ...PRIO_CHIPS.map(([n, name]) => [n, name, perPrio[n]])].map(([n, name, count]) => (
               <button
@@ -387,6 +410,18 @@ export function AlertsList({
         )}
       </div>
 
+      {!listOpen ? (
+        <div className="p-3 text-center text-xs text-muted">
+          <span>Đã thu gọn danh sách chi tiết. </span>
+          <button
+            type="button"
+            onClick={() => setListOpen(true)}
+            className="font-semibold text-accent hover:underline"
+          >
+            Mở xem chi tiết
+          </button>
+        </div>
+      ) : (
       <div className="scroll-thin min-h-0 flex-1 space-y-2 overflow-y-auto p-2.5">
         {active === 'diem_nong' && (
           <>
@@ -512,6 +547,7 @@ export function AlertsList({
           </>
         )}
       </div>
+      )}
     </div>
   );
 }
@@ -549,18 +585,21 @@ export function ViewModeSwitch({ mode, onChange, touch, caption = false, canDisp
   );
 }
 
-const QUICK_HOURS = [-12, -6, 0, 6, 12, 24];
+const QUICK_FORECAST = [0, 1, 3, 6, 12, 24];
+const QUICK_ALL = [-12, -6, 0, 6, 12, 24];
 const PLAY_MS = 1200; // mỗi giờ trên thanh khi bấm "Phát"
 /** Nhãn giờ trên thanh: "Bây giờ", "6 giờ trước", "12 giờ tới". */
 export const hourText = (h) => (h === 0 ? 'Bây giờ' : h < 0 ? `${-h} giờ trước` : `${h} giờ tới`);
 
 /**
- * Thanh thời gian (thiết kế B.1): 12 giờ trước (số đo đã qua) → Bây giờ → 24 giờ tới (dự báo, đường đi bão). Nút "Phát" chạy
- * lần lượt từng giờ tới hết 24 giờ tới (đang ở cuối thì chạy lại từ 12 giờ trước) — xem mưa, bão diễn biến; kéo thanh / chọn
- * mốc thì dừng. Ghi rõ lớp nào đổi theo giờ, lớp nào không.
+ * Thanh thời gian (thiết kế B.1): Dự báo từ bây giờ → 24 giờ tới (mặc định), hoặc xem lại 12 giờ trước.
+ * Có thể thu gọn linh hoạt để mở rộng không gian bản đồ.
  */
 export function TimeControl({ offset, setOffset, touch }) {
   const [playing, setPlaying] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const [rangeMode, setRangeMode] = useState('forecast'); // 'forecast' (Từ bây giờ: 0 -> 24h) | 'all' (-12h -> 24h)
+
   // Đang phát: mỗi PLAY_MS sang giờ kế tiếp; tới 24 giờ tới thì dừng
   useEffect(() => {
     if (!playing) return undefined;
@@ -571,18 +610,122 @@ export function TimeControl({ offset, setOffset, touch }) {
     const id = setTimeout(() => setOffset(offset + 1), PLAY_MS);
     return () => clearTimeout(id);
   }, [playing, offset, setOffset]);
+
   const pick = (h) => {
     setPlaying(false);
     setOffset(h);
+    if (h < 0 && rangeMode === 'forecast') {
+      setRangeMode('all');
+    }
   };
+
   const play = () => {
     if (playing) return setPlaying(false);
-    if (offset >= 24) setOffset(-12);
+    if (offset >= 24) setOffset(rangeMode === 'forecast' ? 0 : -12);
     return setPlaying(true);
   };
+
   const when = new Date(Date.now() + offset * 3600_000).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
+
+  // Thu gọn: hiển thị thanh mini cực gọn gàng và bắt mắt
+  if (collapsed) {
+    return (
+      <div className="flex items-center justify-between gap-3 px-1 py-0.5">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={play}
+            aria-pressed={playing}
+            aria-label={playing ? 'Dừng chạy thời gian' : 'Phát: xem lần lượt từng giờ'}
+            title={playing ? 'Dừng' : 'Phát — xem mưa, bão diễn biến từng giờ'}
+            className={clsx(
+              'flex shrink-0 items-center justify-center rounded-full text-white shadow-sm transition-transform active:scale-95',
+              touch ? 'h-9 w-9' : 'h-7 w-7',
+              playing ? 'bg-serious' : 'bg-accent',
+            )}
+          >
+            {playing ? <Pause size={13} aria-hidden="true" /> : <Play size={13} className="ml-0.5" aria-hidden="true" />}
+          </button>
+          <div className="flex items-center gap-1.5 text-xs">
+            <Clock size={13} className="text-accent" aria-hidden="true" />
+            <span className="text-muted font-medium">Dự báo:</span>
+            <span role="status" aria-label="Thời điểm đang xem">
+              <b className={offset === 0 ? 'text-good font-bold' : 'text-accent font-bold'}>
+                {hourText(offset)}
+              </b>
+            </span>
+            <span className="text-[11px] text-muted max-sm:hidden">({when})</span>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setCollapsed(false)}
+          className="btn-ghost tap flex min-h-[30px] items-center gap-1 px-2.5 py-1 text-xs font-semibold text-accent hover:bg-accent/10 rounded-lg transition-colors whitespace-nowrap"
+          title="Mở thanh dự báo"
+          aria-label="Mở thanh dự báo"
+        >
+          <span>Mở thanh dự báo</span>
+          <ChevronUp size={14} aria-hidden="true" />
+        </button>
+      </div>
+    );
+  }
+
+  const isForecast = rangeMode === 'forecast';
+  const minVal = isForecast ? 0 : -12;
+  const maxVal = 24;
+  const quickList = isForecast ? QUICK_FORECAST : QUICK_ALL;
+  const barCount = isForecast ? 25 : 37;
+
   return (
     <div>
+      {/* Hàng điều khiển & chuyển chế độ: Từ bây giờ vs 12 giờ trước + nút Thu gọn */}
+      <div className="mb-2 flex items-center justify-between gap-2 border-b border-line/40 pb-1.5">
+        <div className="flex items-center gap-1.5 text-xs">
+          <Clock size={13} className="text-accent" aria-hidden="true" />
+          <span className="font-semibold text-ink">Thanh thời gian:</span>
+          <div className="flex items-center gap-1 rounded-lg bg-panel2/60 p-0.5">
+            <button
+              type="button"
+              onClick={() => {
+                setRangeMode('forecast');
+                if (offset < 0) pick(0);
+              }}
+              className={clsx(
+                'rounded-md px-2 py-0.5 text-[11px] font-semibold transition-all',
+                isForecast ? 'bg-accent text-white shadow-xs' : 'text-muted hover:text-ink',
+              )}
+            >
+              Từ bây giờ (Dự báo)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setRangeMode('all');
+                pick(-12);
+              }}
+              className={clsx(
+                'rounded-md px-2 py-0.5 text-[11px] font-semibold transition-all',
+                !isForecast ? 'bg-accent text-white shadow-xs' : 'text-muted hover:text-ink',
+              )}
+            >
+              12 giờ trước
+            </button>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setCollapsed(true)}
+          className="tap-sq -mr-1 flex h-7 items-center gap-1 px-2 text-xs font-medium text-muted hover:bg-panel2 hover:text-ink rounded-lg transition-colors"
+          title="Thu gọn thanh thời gian"
+          aria-label="Thu gọn thanh thời gian"
+        >
+          <span>Thu gọn</span>
+          <ChevronDown size={14} aria-hidden="true" />
+        </button>
+      </div>
+
       <div className="flex items-center gap-2.5">
         <button
           type="button"
@@ -590,15 +733,19 @@ export function TimeControl({ offset, setOffset, touch }) {
           aria-pressed={playing}
           aria-label={playing ? 'Dừng chạy thời gian' : 'Phát: xem lần lượt từng giờ'}
           title={playing ? 'Dừng' : 'Phát — xem mưa, bão diễn biến từng giờ'}
-          className={clsx('flex shrink-0 items-center justify-center rounded-full text-white shadow-sm', touch ? 'h-11 w-11' : 'h-9 w-9', playing ? 'bg-serious' : 'bg-accent')}
+          className={clsx(
+            'flex shrink-0 items-center justify-center rounded-full text-white shadow-sm transition-transform active:scale-95',
+            touch ? 'h-11 w-11' : 'h-9 w-9',
+            playing ? 'bg-serious' : 'bg-accent',
+          )}
         >
           {playing ? <Pause size={16} aria-hidden="true" /> : <Play size={16} className="ml-0.5" aria-hidden="true" />}
         </button>
         <div className="min-w-0 flex-1">
           {/* Biểu đồ mini diễn biến mưa tương đối qua các khung giờ */}
           <div className="mb-1 flex h-3 items-end gap-[1px] px-0.5" aria-hidden="true" title="Diễn biến lượng mưa tương đối qua các khung giờ">
-            {Array.from({ length: 37 }).map((_, i) => {
-              const h = i - 12;
+            {Array.from({ length: barCount }).map((_, i) => {
+              const h = isForecast ? i : i - 12;
               const intensity = h < 0 ? Math.max(2, 5 + Math.sin(h / 2) * 2.5) : Math.max(3, 7 + Math.sin(h / 4) * 4 + (h <= 8 ? 5 : 0));
               const heightPct = Math.min(100, Math.round((intensity / 16) * 100));
               const isCurrent = h === offset;
@@ -617,8 +764,8 @@ export function TimeControl({ offset, setOffset, touch }) {
           </div>
           <input
             type="range"
-            min={-12}
-            max={24}
+            min={minVal}
+            max={maxVal}
             step={1}
             value={offset}
             onChange={(e) => pick(Number(e.target.value))}
@@ -626,11 +773,20 @@ export function TimeControl({ offset, setOffset, touch }) {
             aria-label="Thanh trượt thời gian"
             aria-valuetext={offset === 0 ? 'Bây giờ' : `${hourText(offset)} — ${when}`}
           />
-          {/* Mốc chữ dưới thanh: Bây giờ nằm đúng chỗ của nó (12 / 36 bề ngang) */}
+          {/* Mốc chữ dưới thanh */}
           <div className="relative h-4 text-[11px] text-muted" aria-hidden="true">
-            <span className="absolute left-0">12 giờ trước</span>
-            <span className="absolute left-[33.3%] -translate-x-1/2 font-semibold text-ink-2">Bây giờ</span>
-            <span className="absolute right-0">24 giờ tới</span>
+            {isForecast ? (
+              <>
+                <span className="absolute left-0 font-semibold text-good">Bây giờ</span>
+                <span className="absolute right-0 font-semibold text-accent">24 giờ tới</span>
+              </>
+            ) : (
+              <>
+                <span className="absolute left-0">12 giờ trước</span>
+                <span className="absolute left-[33.3%] -translate-x-1/2 font-semibold text-ink-2">Bây giờ</span>
+                <span className="absolute right-0 font-semibold text-accent">24 giờ tới</span>
+              </>
+            )}
           </div>
         </div>
         <div className="w-28 shrink-0 text-right text-xs" role="status" aria-label="Thời điểm đang xem">
@@ -647,15 +803,16 @@ export function TimeControl({ offset, setOffset, touch }) {
           )}
         </div>
       </div>
+
       <div className="mt-1.5 grid grid-cols-6 gap-1 border-t border-line/50 pt-1.5">
-        {QUICK_HOURS.map((h) => (
+        {quickList.map((h) => (
           <button
             key={h}
             type="button"
             onClick={() => pick(h)}
             aria-pressed={offset === h}
             className={clsx(
-              'rounded-lg text-[11px] font-semibold',
+              'rounded-lg text-[11px] font-semibold transition-all',
               touch ? 'min-h-[44px]' : 'min-h-[26px]',
               offset === h ? 'bg-accent/15 text-accent' : 'text-muted hover:bg-panel2',
             )}
@@ -664,6 +821,7 @@ export function TimeControl({ offset, setOffset, touch }) {
           </button>
         ))}
       </div>
+
       {/* Đang xem giờ khác: nói rõ lớp nào đổi theo giờ — đứng ở "Bây giờ" thì thanh gọn, không che thêm bản đồ */}
       {(offset !== 0 || playing) && (
         <p className="mt-1 text-[11px] leading-snug text-muted">
