@@ -385,7 +385,8 @@ export default function PublicPortal() {
   const [params] = useSearchParams();
   const focusAlert = params.get('canh-bao');
   const trackParam = params.get('tra-cuu') || '';
-  const [activeTab, setActiveTab] = useState(trackParam ? 'tracuu' : 'bando'); // bando | tracuu | muanuoc | sotan | hotlines | huongdan
+  const tabParam = params.get('tab') || '';
+  const [activeTab, setActiveTab] = useState(tabParam || (trackParam ? 'tracuu' : 'bando')); // bando | tracuu | muanuoc | sotan | hotlines | huongdan
   const [mapSidebarTab, setMapSidebarTab] = useState(focusAlert ? 'alerts' : 'legend'); // legend | alerts | rain
   const scrolledToAlert = useRef(false);
   // Cuộn tới thanh tab (ngay trên bản đồ / nội dung tab) — theo phần tử, không theo số pixel cố định: khối phía trên
@@ -469,6 +470,11 @@ export default function PublicPortal() {
   };
 
   // Link chia sẻ ?canh-bao=MÃ: mở tab cảnh báo, rồi cuộn tới thẻ sau khi tab đã hiển thị (1 lần, không cuộn lại mỗi lần làm mới)
+  useEffect(() => {
+    if (tabParam) {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
   useEffect(() => {
     if (focusAlert && alerts.length) {
       setActiveTab('bando');
@@ -586,7 +592,7 @@ export default function PublicPortal() {
             {/* <a> chứ không phải <Link>: /ban-nhe là trang máy chủ dựng (nginx → backend), không phải route của ứng dụng */}
             <a
               href="/ban-nhe"
-              className="btn max-sm:hidden border border-amber-500/35 bg-amber-500/10 px-2.5 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-500/20 dark:text-amber-300"
+              className="btn max-sm:hidden border border-line bg-panel px-2.5 py-1.5 text-xs font-semibold text-ink-2 hover:bg-panel2 hover:text-ink"
               title="Chuyển sang bản chỉ có chữ (dưới 50 KB) khi mạng 2G/3G yếu"
             >
               <Zap size={14} className="shrink-0 text-amber-500" aria-hidden="true" />
@@ -604,7 +610,7 @@ export default function PublicPortal() {
 
             {/* Một chức năng gửi: cứu người / tiếp tế / báo tin hiện trường. Điện thoại: nút ở thanh đáy */}
             <button
-              className="btn-danger max-sm:hidden inline-flex text-xs px-2.5 sm:px-3 py-1.5 font-semibold"
+              className="btn-danger max-sm:hidden inline-flex text-xs px-2.5 sm:px-3 py-1.5 font-semibold shadow-xs"
               onClick={() => setReporting('')}
             >
               <Send size={14} />
@@ -612,11 +618,11 @@ export default function PublicPortal() {
             </button>
 
             <button
-              className="btn-ghost p-2"
+              className="btn-ghost p-2 text-ink-2 hover:text-ink"
               onClick={toggleTheme}
               aria-label="Đổi giao diện sáng/tối"
             >
-              {theme === 'dark' ? <Sun size={16} className="text-amber-400" /> : <Moon size={16} className="text-indigo-500" />}
+              {theme === 'dark' ? <Sun size={16} className="text-amber-400" /> : <Moon size={16} className="text-muted" />}
             </button>
 
             {/* Tài khoản người dân (Đ5) — tách nút "Cán bộ" (trang điều hành) */}
@@ -676,19 +682,23 @@ export default function PublicPortal() {
         <section
           aria-label="Tình hình hiện tại"
           className={clsx(
-            'flex flex-col gap-2 rounded-xl border px-3 py-2.5 sm:px-4',
-            active ? (onRed ? 'border-danger bg-danger text-white' : 'border-serious bg-serious text-black') : 'border-line bg-panel text-ink',
+            'flex flex-col gap-2 rounded-xl border px-3 py-2.5 sm:px-4 shadow-xs',
+            active
+              ? (onRed
+                  ? 'border-danger/50 bg-danger/10 text-ink dark:bg-danger/15'
+                  : 'border-serious/50 bg-serious/10 text-ink dark:bg-serious/15')
+              : 'border-line bg-panel text-ink',
           )}
         >
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             {active
-              ? <AlertTriangle size={22} className="shrink-0" aria-hidden="true" />
+              ? <AlertTriangle size={22} className={clsx('shrink-0', onRed ? 'text-danger' : 'text-serious-text')} aria-hidden="true" />
               : <CheckCircle2 size={22} className="shrink-0 text-good" aria-hidden="true" />}
             <div className="min-w-0 flex-1">
-              <div className="text-sm font-bold sm:text-base">
+              <div className={clsx('text-sm font-bold sm:text-base', active ? (onRed ? 'text-danger dark:text-red-400' : 'text-serious-text dark:text-amber-400') : 'text-ink')}>
                 {active ? <>Đang có {active} cảnh báo thiên tai khẩn cấp<span className="max-sm:hidden"> trên địa bàn tỉnh</span></> : 'Hiện không có cảnh báo khẩn cấp'}
               </div>
-              <div className={clsx('text-xs leading-relaxed', active ? (onRed ? 'text-white/90' : 'text-black/80') : 'text-muted')}>
+              <div className="text-xs leading-relaxed text-ink-2">
                 {overview?.rain?.avg_24h != null ? (
                   <>Mưa 24 giờ qua: trung bình <b className="num">{num(overview.rain.avg_24h, 1)} mm</b><span className="max-sm:hidden">, cao nhất <b className="num">{num(overview.rain.max_24h, 1)} mm</b></span></>
                 ) : 'Chưa có số liệu mưa — đang cập nhật'}
@@ -705,7 +715,7 @@ export default function PublicPortal() {
                 <button
                   type="button"
                   onClick={() => { setActiveTab('bando'); setMapSidebarTab('alerts'); scrollToContent(); }}
-                  className={clsx('btn px-3 py-1.5 text-xs font-semibold', onRed ? 'border border-white/60 text-white hover:bg-white/10' : 'border border-black/40 text-black hover:bg-black/5')}
+                  className={clsx('btn px-3 py-1.5 text-xs font-semibold border bg-panel hover:bg-panel2', onRed ? 'border-danger/30 text-danger' : 'border-serious/40 text-serious-text')}
                 >
                   Xem cảnh báo <ChevronRight size={14} aria-hidden="true" />
                 </button>
@@ -713,7 +723,7 @@ export default function PublicPortal() {
               <button
                 type="button"
                 onClick={() => setShowSosModal(true)}
-                className={clsx('btn px-3 py-1.5 text-xs font-bold sm:text-sm', active ? 'bg-white text-[rgb(var(--danger))] hover:bg-white/90' : 'bg-danger text-white hover:brightness-110')}
+                className="btn px-3 py-1.5 text-xs font-bold sm:text-sm bg-danger text-white hover:brightness-110 shadow-xs"
               >
                 <PhoneCall size={15} aria-hidden="true" /> Cần cứu hộ khẩn cấp
               </button>
@@ -725,7 +735,7 @@ export default function PublicPortal() {
                 <button
                   type="button"
                   onClick={() => openTab('hochua')}
-                  className={clsx('chip tap shrink-0 gap-1.5 whitespace-nowrap border px-2.5 text-xs font-semibold', active ? 'border-current/40 bg-black/10' : 'border-serious/50 bg-serious/10 text-ink')}
+                  className="chip tap shrink-0 gap-1.5 whitespace-nowrap border border-serious/40 bg-serious/15 text-serious-text hover:bg-serious/25 px-2.5 text-xs font-semibold"
                 >
                   <Waves size={14} aria-hidden="true" />
                   <span>
@@ -740,7 +750,7 @@ export default function PublicPortal() {
                 <button
                   type="button"
                   onClick={() => openTab('satlo')}
-                  className={clsx('chip tap shrink-0 gap-1.5 whitespace-nowrap border px-2.5 text-xs font-semibold', active ? 'border-current/40 bg-black/10' : 'border-danger/40 bg-danger/10 text-danger')}
+                  className="chip tap shrink-0 gap-1.5 whitespace-nowrap border border-danger/40 bg-danger/15 text-danger-text hover:bg-danger/25 px-2.5 text-xs font-semibold"
                 >
                   <Mountain size={14} aria-hidden="true" />
                   <span>
@@ -999,9 +1009,9 @@ export default function PublicPortal() {
             {GROUPS.map((g) => {
               const on = g.tabs.includes(activeTab);
               const badge = g.id === 'ho-song' && overview?.reservoirs?.spill_count
-                ? { text: `${overview.reservoirs.spill_count} hồ xả`, cls: overview.reservoirs.emergency_count > 0 ? 'bg-danger text-white' : 'bg-serious text-black' }
+                ? { text: `${overview.reservoirs.spill_count} hồ xả`, isEmergency: overview.reservoirs.emergency_count > 0, cls: overview.reservoirs.emergency_count > 0 ? 'bg-danger text-white' : 'bg-serious text-black' }
                 : g.id === 'deo-doc' && overview?.landslides?.blocked_count
-                  ? { text: `${overview.landslides.blocked_count} điểm cấm`, cls: 'bg-danger text-white' }
+                  ? { text: `${overview.landslides.blocked_count} điểm cấm`, isEmergency: true, cls: 'bg-danger text-white' }
                   : null;
               return (
                 <button
@@ -1013,7 +1023,18 @@ export default function PublicPortal() {
                 >
                   <g.icon size={15} aria-hidden="true" />
                   {g.label}
-                  {badge && <span className={clsx('rounded-full px-1.5 py-0.5 text-[10px] font-bold', badge.cls)}>{badge.text}</span>}
+                  {badge && (
+                    <span
+                      className={clsx(
+                        'rounded-full px-1.5 py-0.5 text-[10px] font-bold transition-colors',
+                        on
+                          ? (badge.isEmergency ? 'bg-white text-danger font-black shadow-xs' : 'bg-white text-serious-text font-black shadow-xs')
+                          : badge.cls,
+                      )}
+                    >
+                      {badge.text}
+                    </span>
+                  )}
                 </button>
               );
             })}
