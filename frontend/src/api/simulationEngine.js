@@ -345,6 +345,14 @@ function overlay(pathname, body, scope, codes, sp) {
     body.reservoirs?.reservoirs?.forEach(spillReservoir);
     if (state.scenario === 'xa_lu') recountReservoirs(body.reservoirs, body.reservoirs?.reservoirs, 'total_outflow');
     adjustSosKpi(body.sos, scope, codes);
+    if (body.forces) {
+      body.forces.on_mission = body.forces.on_mission || 55;
+    }
+    if (body.vehicles) {
+      body.vehicles.special_active = body.vehicles.special_active || 4;
+      body.vehicles.heavy_active = body.vehicles.heavy_active || 2;
+      body.vehicles.active = (body.vehicles.special_active || 4) + (body.vehicles.heavy_active || 2);
+    }
   }
   if (pathname === '/dashboard/reservoirs') {
     body.reservoirs?.forEach(spillReservoir);
@@ -428,6 +436,248 @@ const notSimulated = (method, pathname) => new ApiError(
     : 'Chế độ giả lập không thực hiện thao tác này — tắt giả lập để thao tác trên máy chủ thật',
 );
 
+function mockForecastAreas(sp, codes) {
+  const hours = Number(sp?.get('hours')) || 72;
+  const now = Date.now();
+  const list = [
+    { code: 'CB-BACHDANG', name: 'Bạch Đằng', p10: 42.5, p50: 88.0, p90: 154.2, max_hourly_p90: 28.5, max_prob_heavy: 0.85 },
+    { code: 'CB-COBA', name: 'Cô Ba', p10: 38.0, p50: 76.5, p90: 135.0, max_hourly_p90: 22.0, max_prob_heavy: 0.75 },
+    { code: 'CB-TINHTUC', name: 'Tĩnh Túc', p10: 48.0, p50: 98.5, p90: 172.0, max_hourly_p90: 34.0, max_prob_heavy: 0.90 },
+    { code: 'CB-BAOLAC', name: 'Bảo Lạc', p10: 35.0, p50: 72.0, p90: 128.0, max_hourly_p90: 21.0, max_prob_heavy: 0.70 },
+    { code: 'CB-BAOLAM', name: 'Bảo Lâm', p10: 40.0, p50: 82.0, p90: 145.0, max_hourly_p90: 26.0, max_prob_heavy: 0.80 },
+    { code: 'CB-TRUNGKHANH', name: 'Trùng Khánh', p10: 30.0, p50: 65.0, p90: 115.0, max_hourly_p90: 18.0, max_prob_heavy: 0.65 },
+    { code: 'CB-QUANGHOA', name: 'Quảng Hòa', p10: 32.0, p50: 68.0, p90: 120.0, max_hourly_p90: 19.5, max_prob_heavy: 0.68 },
+    { code: 'CB-NGUYENBINH', name: 'Nguyên Bình', p10: 45.0, p50: 92.0, p90: 160.0, max_hourly_p90: 30.0, max_prob_heavy: 0.88 },
+    { code: 'CB-THACHAN', name: 'Thạch An', p10: 28.0, p50: 58.0, p90: 105.0, max_hourly_p90: 16.0, max_prob_heavy: 0.60 },
+    { code: 'CB-HATRANG', name: 'Hà Quảng', p10: 36.0, p50: 74.0, p90: 130.0, max_hourly_p90: 23.0, max_prob_heavy: 0.72 },
+  ].map((item) => ({
+    ...item,
+    issued_at: new Date(now - 15 * 60_000).toISOString(),
+    window_from: new Date(now).toISOString(),
+    window_to: new Date(now + hours * 3600_000).toISOString(),
+  }));
+  const filterCodes = codes ? codes.split(',') : null;
+  return filterCodes ? list.filter((x) => filterCodes.includes(x.code)) : list;
+}
+
+function mockForecastSeries(code, name) {
+  const base = recordedBody('tinh', '/forecast/areas/CB-BACHDANG');
+  const now = new Date();
+  now.setMinutes(0, 0, 0);
+  const nowMs = now.getTime();
+  const series = {};
+  if (base?.series) {
+    for (const [model, list] of Object.entries(base.series)) {
+      series[model] = list.map((item, i) => ({
+        ...item,
+        time: new Date(nowMs + i * 3600_000).toISOString(),
+      }));
+    }
+  }
+  return {
+    unit: { code, name: name || code },
+    series,
+  };
+}
+
+function mockDevices(now) {
+  return [
+    {
+      id: 'DEV-RAIN-01',
+      name: 'Cảm biến đo mưa quang học V-Rain',
+      station_id: 'CB-RAIN-01',
+      station_name: 'Trạm đo mưa Phja Oắc (Nguyên Bình)',
+      protocol: 'http',
+      expected_interval_s: 600,
+      last_seen_at: new Date(now - 4 * 60_000).toISOString(),
+      last_value: 28.4,
+      enabled: true,
+      status: 'hoat_dong',
+      vendor: 'Vaisala',
+      station_source: 'iot',
+    },
+    {
+      id: 'DEV-WATER-01',
+      name: 'Radar đo mực nước tự động Bằng Giang',
+      station_id: 'CB-WL-01',
+      station_name: 'Trạm thủy văn Cao Bằng (sông Bằng Giang)',
+      protocol: 'mqtt',
+      expected_interval_s: 900,
+      last_seen_at: new Date(now - 6 * 60_000).toISOString(),
+      last_value: 18.42,
+      enabled: true,
+      status: 'hoat_dong',
+      vendor: 'OTT HydroMet',
+      station_source: 'iot',
+    },
+    {
+      id: 'DEV-WATER-02',
+      name: 'Cảm biến áp suất đáy đo mực nước sông Gâm',
+      station_id: 'CB-WL-02',
+      station_name: 'Trạm thủy văn Bảo Lạc (sông Gâm)',
+      protocol: 'mqtt',
+      expected_interval_s: 900,
+      last_seen_at: new Date(now - 8 * 60_000).toISOString(),
+      last_value: 12.15,
+      enabled: true,
+      status: 'hoat_dong',
+      vendor: 'Campbell Scientific',
+      station_source: 'iot',
+    },
+    {
+      id: 'DEV-LANDSLIDE-01',
+      name: 'Cụm cảm biến độ nghiêng mái taluy & độ ẩm đất',
+      station_id: 'CB-SL-01',
+      station_name: 'Điểm sạt trượt Đèo Khau Cốc Chà',
+      protocol: 'lorawan',
+      expected_interval_s: 1800,
+      last_seen_at: new Date(now - 12 * 60_000).toISOString(),
+      last_value: 0.42,
+      enabled: true,
+      status: 'hoat_dong',
+      vendor: 'Geokon Inclinometer',
+      station_source: 'iot',
+    },
+    {
+      id: 'DEV-RAIN-02',
+      name: 'Thùng đo mưa tự động chao lật Cô Ba',
+      station_id: 'CB-RAIN-02',
+      station_name: 'Trạm đo mưa xã Cô Ba (Bảo Lạc)',
+      protocol: 'http',
+      expected_interval_s: 600,
+      last_seen_at: new Date(now - 3 * 60_000).toISOString(),
+      last_value: 14.2,
+      enabled: true,
+      status: 'hoat_dong',
+      vendor: 'Davis Instruments',
+      station_source: 'iot',
+    },
+    {
+      id: 'DEV-RAIN-03',
+      name: 'Trạm đo mưa tự động Trùng Khánh',
+      station_id: 'CB-RAIN-03',
+      station_name: 'Trạm đo mưa Trùng Khánh',
+      protocol: 'http',
+      expected_interval_s: 600,
+      last_seen_at: new Date(now - 180 * 60_000).toISOString(),
+      last_value: 4.8,
+      enabled: true,
+      status: 'mat_tin_hieu',
+      vendor: 'V-Rain IoT',
+      station_source: 'iot',
+    },
+  ];
+}
+
+function mockAudit(now) {
+  return [
+    {
+      id: 'audit-01',
+      time: new Date(now - 18 * 60_000).toISOString(),
+      actor_name: 'Lãnh đạo BCH tỉnh (giả lập)',
+      action: 'user.create',
+      target_user: 'coba_pctt',
+      role: 'admin_xa',
+      domain_label: 'Xã Cô Ba, Huyện Bảo Lạc',
+    },
+    {
+      id: 'audit-02',
+      time: new Date(now - 45 * 60_000).toISOString(),
+      actor_name: 'Quản trị viên (giả lập)',
+      action: 'user.assignment',
+      target_user: 'bachdang_pctt',
+      role: 'admin_xa',
+      domain_label: 'Xã Bạch Đằng, Huyện Hòa An',
+    },
+    {
+      id: 'audit-03',
+      time: new Date(now - 120 * 60_000).toISOString(),
+      actor_name: 'Lãnh đạo BCH tỉnh (giả lập)',
+      action: 'user.update',
+      target_user: 'trucban_tinh',
+      role: 'truc_ban',
+      domain_label: 'Toàn tỉnh Cao Bằng',
+    },
+    {
+      id: 'audit-04',
+      time: new Date(now - 360 * 60_000).toISOString(),
+      actor_name: 'Quản trị viên (giả lập)',
+      action: 'user.mfa_reset',
+      target_user: 'tinh_trucban02',
+      role: 'truc_ban',
+      domain_label: 'Toàn tỉnh Cao Bằng',
+    },
+  ];
+}
+
+function mockCitizens(now, q) {
+  const items = [
+    {
+      id: 'cit-01',
+      phone: '0999 123 456',
+      full_name: 'Triệu Thị Mai',
+      admin_code: 'CB-COBA',
+      admin_name: 'Xã Cô Ba, Huyện Bảo Lạc',
+      created_at: new Date(now - 7 * DAY).toISOString(),
+      is_active: true,
+      report_count: 3,
+      sos_count: 1,
+      last_active_at: new Date(now - 25 * 60_000).toISOString(),
+    },
+    {
+      id: 'cit-02',
+      phone: '0999 234 567',
+      full_name: 'Nông Văn Định',
+      admin_code: 'CB-BACHDANG',
+      admin_name: 'Xã Bạch Đằng, Huyện Hòa An',
+      created_at: new Date(now - 14 * DAY).toISOString(),
+      is_active: true,
+      report_count: 2,
+      sos_count: 0,
+      last_active_at: new Date(now - 60 * 60_000).toISOString(),
+    },
+    {
+      id: 'cit-03',
+      phone: '0999 345 678',
+      full_name: 'Hoàng Văn Đức',
+      admin_code: 'CB-TINHTUC',
+      admin_name: 'Xã Tĩnh Túc, Huyện Nguyên Bình',
+      created_at: new Date(now - 20 * DAY).toISOString(),
+      is_active: true,
+      report_count: 1,
+      sos_count: 1,
+      last_active_at: new Date(now - 110 * 60_000).toISOString(),
+    },
+    {
+      id: 'cit-04',
+      phone: '0999 456 789',
+      full_name: 'Bế Thị Loan',
+      admin_code: 'CB-HUNGDAO',
+      admin_name: 'Xã Hưng Đạo, Thành phố Cao Bằng',
+      created_at: new Date(now - 30 * DAY).toISOString(),
+      is_active: true,
+      report_count: 4,
+      sos_count: 0,
+      last_active_at: new Date(now - 180 * 60_000).toISOString(),
+    },
+    {
+      id: 'cit-05',
+      phone: '0999 567 890',
+      full_name: 'Đàm Văn Nam',
+      admin_code: 'CB-TRUNGKHANH',
+      admin_name: 'Xã Trùng Khánh',
+      created_at: new Date(now - 45 * DAY).toISOString(),
+      is_active: false,
+      lock_reason: 'Gửi tin báo sai sự thật nhiều lần',
+      report_count: 5,
+      sos_count: 0,
+      last_active_at: new Date(now - 24 * 3600_000).toISOString(),
+    },
+  ];
+  const filtered = q ? items.filter((x) => x.phone.includes(q) || x.full_name.toLowerCase().includes(q.toLowerCase())) : items;
+  return { items: filtered, total: filtered.length };
+}
+
 function handle(path, { method = 'GET', body, params } = {}) {
   const req = parse(path, params);
   const { pathname, sp } = req;
@@ -470,7 +720,53 @@ function handle(path, { method = 'GET', body, params } = {}) {
       ? patchTicket(t.id, { dispatch_status: 'da_den', progress: 1, arrived_at: nowIso() })
       : patchTicket(t.id, { status: 'dieu_phoi', dispatch_status: 'huy' });
   }
+  if (method === 'POST' && pathname === '/map/area-stats') {
+    return {
+      population: 2840,
+      households: 710,
+      subscribers: 3450,
+      admin_codes: ['CB-BACHDANG'],
+      sos_open: 2,
+      forces: 3,
+      evac_free: 160,
+      hazard_zones: 1,
+    };
+  }
+  if (method === 'POST' && pathname === '/map/route') {
+    const fromLat = body?.from_lat || 22.65;
+    const fromLon = body?.from_lon || 106.25;
+    const toLat = body?.to_lat || 22.68;
+    const toLon = body?.to_lon || 106.28;
+    return {
+      distance_km: 12.4,
+      duration_min: 22,
+      safe: true,
+      hazards: [],
+      roads: ['QL 3', 'ĐT 206'],
+      warnings: [],
+      geometry: { type: 'LineString', coordinates: [[fromLon, fromLat], [toLon, toLat]] },
+    };
+  }
   if (method !== 'GET') throw notSimulated(method, pathname);
+
+  if (pathname === '/forecast/areas') {
+    return mockForecastAreas(sp, req.codes);
+  }
+  m = pathname.match(/^\/forecast\/areas\/([^/]+)$/);
+  if (m) {
+    const code = m[1];
+    const u = (units() || []).find((x) => x.code === code);
+    return mockForecastSeries(code, u?.name);
+  }
+  if (pathname === '/integrations/devices') {
+    return mockDevices(Date.now());
+  }
+  if (pathname === '/rbac/audit') {
+    return mockAudit(Date.now());
+  }
+  if (pathname === '/citizens') {
+    return mockCitizens(Date.now(), sp?.get('q'));
+  }
 
   // Gợi ý lực lượng cho phiếu tạo trong phiên: lấy gợi ý đã ghi của phiếu cùng loại sự cố
   m = pathname.match(/^\/sos\/([^/]+)\/match$/);
