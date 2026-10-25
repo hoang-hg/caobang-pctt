@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { MapContainer, ScaleControl, ZoomControl, useMapEvents } from 'react-leaflet';
 import clsx from 'clsx';
-import { BellRing, ChevronLeft, ChevronRight, Clock, Info, Layers, Map as MapIcon, RefreshCw, Siren, Wrench } from 'lucide-react';
+import { BellRing, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock, Info, Layers, Map as MapIcon, RefreshCw, Siren, Wrench } from 'lucide-react';
 import { api } from '../api/client';
 import { useAreaQuery, useUnitsGeo } from '../api/hooks';
 import { usePageStatus } from '../app/pageStatus';
@@ -123,6 +123,8 @@ export default function MonitoringMap() {
   const [leftOpen, setLeftOpen] = useState(false); // bảng lớp thu gọn sẵn để bản đồ thoáng rộng
   const [rightOpen, setRightOpen] = useState(true); // bảng cảnh báo (Tình hình, Điểm nóng) mở sẵn — chỉ huy thấy ngay
   const [legendOpen, setLegendOpen] = useState(false);
+  const [timelineCollapsed, setTimelineCollapsed] = useState(true); // mặc định thu gọn thanh thời gian để phóng to bản đồ
+  const [toolsOpen, setToolsOpen] = useState(false); // mặc định thu gọn thanh chọn nền / công cụ để phóng to bản đồ
   const [sheet, setSheet] = useState(null); // điện thoại / máy tính bảng: layers | alerts | time | tools | legend
   const [dispatch, setDispatch] = useState(null);
   const [camera, setCamera] = useState(null);
@@ -341,13 +343,17 @@ export default function MonitoringMap() {
     pickable: { rain: true, river: true, topic: true, sos: canSos, evac: canResource, forces: canResource },
   };
   // Khung nhìn (vùng đang lọc, điểm cần bay tới) chừa chỗ các bảng nổi
-  const mapPad = wide
-    ? { topLeft: [leftOpen ? 300 : 60, 30], bottomRight: [rightOpen ? 350 : 60, 100] }
-    : { topLeft: [16, 16], bottomRight: [16, 16] };
+  const mapPad = useMemo(() => {
+    if (!wide) return { topLeft: [12, 12], bottomRight: [12, 12] };
+    return {
+      topLeft: [leftOpen ? 290 : 20, toolsOpen ? 60 : 16],
+      bottomRight: [rightOpen ? 350 : 20, timelineCollapsed ? 42 : 110],
+    };
+  }, [wide, leftOpen, rightOpen, toolsOpen, timelineCollapsed]);
   // Popup tự kéo bản đồ cho lọt khung: chừa thanh công cụ / chế độ xem (trên), bảng lớp, bảng cảnh báo (hai bên), thanh thời
   // gian (dưới); điện thoại chừa cột nút Công cụ / Chú giải bên phải
   const popupPad = wide
-    ? { autoPanPaddingTopLeft: [leftOpen ? 300 : 16, 76], autoPanPaddingBottomRight: [rightOpen ? 350 : 16, 110] }
+    ? { autoPanPaddingTopLeft: [leftOpen ? 300 : 16, toolsOpen ? 76 : 40], autoPanPaddingBottomRight: [rightOpen ? 350 : 16, timelineCollapsed ? 50 : 110] }
     : { autoPanPaddingTopLeft: [12, 12], autoPanPaddingBottomRight: [76, 12] };
 
   const setAllLayers = (val) => {
@@ -483,7 +489,7 @@ export default function MonitoringMap() {
 
       {/* Vùng bản đồ: `isolate` giữ z-index của Leaflet bên trong, không đè thanh thao tác / hộp thoại */}
       <div className="relative isolate min-h-0 w-full flex-1 select-none overflow-hidden">
-        <MapContainer center={[22.75, 106.05]} zoom={9} zoomControl={false} zoomSnap={0.25} className="h-full w-full">
+        <MapContainer center={[22.75, 106.05]} zoom={9.25} zoomControl={false} zoomSnap={0.25} className="h-full w-full">
           <MapResize />
           <CursorToStatus />
           <BaseLayer basemap={basemap} />
@@ -588,25 +594,59 @@ export default function MonitoringMap() {
 
             {/* Phải: công cụ bản đồ (góc phải trên) xếp ngay cạnh bảng Cảnh báo khẩn cấp — cùng một hàng, tự nhường chỗ */}
             {/* Đáy chừa chỗ thanh thời gian — màn cảm ứng thanh cao hơn (nấc giờ 44 px) nên chừa nhiều hơn */}
-            <div className="pointer-events-none absolute bottom-[7.5rem] right-3 top-3 z-[1000] flex items-start gap-2 [@media(pointer:coarse)]:bottom-[9rem]">
+            <div
+              className={clsx(
+                'pointer-events-none absolute right-3 top-3 z-[1000] flex items-start gap-2',
+                timelineCollapsed ? 'bottom-12' : 'bottom-[7.5rem] [@media(pointer:coarse)]:bottom-[9rem]',
+              )}
+            >
               <div className="pointer-events-auto flex flex-col items-end gap-2">
-                <div className={clsx(floatCard, 'flex items-center gap-1 p-1.5')}>
-                  {basemapSelect('input w-auto border-0 bg-transparent px-2 py-1 text-xs focus:ring-0 [@media(pointer:coarse)]:min-h-[44px]')}
-                  <div className="mx-0.5 h-4 w-px bg-line/80" aria-hidden="true" />
-                  {tools.map(([t, Icon, label]) => (
+                {!toolsOpen && !tool ? (
+                  <button
+                    type="button"
+                    onClick={() => setToolsOpen(true)}
+                    className={clsx(
+                      floatCard,
+                      'flex h-10 items-center justify-center gap-1.5 px-3 text-xs font-semibold text-ink-2 hover:bg-panel2 transition-all [@media(pointer:coarse)]:h-11 shadow-sm',
+                    )}
+                    title="Mở thanh chọn nền & công cụ vẽ"
+                    aria-label="Mở thanh chọn nền & công cụ vẽ"
+                  >
+                    <Layers size={15} className="text-accent" aria-hidden="true" />
+                    <span>Nền & Công cụ</span>
+                    <ChevronDown size={14} className="text-muted" />
+                  </button>
+                ) : (
+                  <div className={clsx(floatCard, 'flex items-center gap-1 p-1.5 shadow-sm')}>
+                    {basemapSelect('input w-auto border-0 bg-transparent px-2 py-1 text-xs focus:ring-0 [@media(pointer:coarse)]:min-h-[44px]')}
+                    <div className="mx-0.5 h-4 w-px bg-line/80" aria-hidden="true" />
+                    {tools.map(([t, Icon, label]) => (
+                      <button
+                        key={t}
+                        type="button"
+                        className={clsx(
+                          'btn h-9 w-9 justify-center rounded-lg p-0 text-xs transition-colors [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11',
+                          tool === t ? 'bg-accent text-white shadow-sm' : 'text-ink-2 hover:bg-panel2',
+                        )}
+                        onClick={() => toggleTool(t)}
+                        title={label}
+                        aria-label={label}
+                        aria-pressed={tool === t}
+                      >
+                        <Icon size={16} />
+                      </button>
+                    ))}
                     <button
-                      key={t}
                       type="button"
-                      className={clsx('btn h-9 w-9 justify-center rounded-lg p-0 text-xs transition-colors [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11', tool === t ? 'bg-accent text-white shadow-sm' : 'text-ink-2 hover:bg-panel2')}
-                      onClick={() => toggleTool(t)}
-                      title={label}
-                      aria-label={label}
-                      aria-pressed={tool === t}
+                      onClick={() => { setToolsOpen(false); setTool(null); }}
+                      className="tap-sq -mr-0.5 flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-panel2 hover:text-ink transition-colors"
+                      title="Thu gọn thanh nền & công cụ"
+                      aria-label="Thu gọn thanh nền & công cụ"
                     >
-                      <Icon size={16} />
+                      <ChevronUp size={15} />
                     </button>
-                  ))}
-                </div>
+                  </div>
+                )}
                 {tool && <ToolHint tool={tool} routeInfo={routeInfo} onClose={() => setTool(null)} className="max-w-xs" />}
                 {drawnCard}
               </div>
@@ -659,7 +699,7 @@ export default function MonitoringMap() {
 
             {/* Thanh thời gian – Đáy, giữa; căn giữa và tự co giãn vừa vặn */}
             <div className={clsx(floatCard, 'absolute bottom-3 left-1/2 -translate-x-1/2 z-[1000] w-fit max-w-[min(640px,calc(100%-25rem))] px-4 py-2 transition-all duration-200')}>
-              <TimeControl offset={offset} setOffset={setOffset} touch={coarse} />
+              <TimeControl offset={offset} setOffset={setOffset} touch={coarse} onCollapseChange={setTimelineCollapsed} />
             </div>
           </>
         ) : (

@@ -595,10 +595,15 @@ export const hourText = (h) => (h === 0 ? 'Bây giờ' : h < 0 ? `${-h} giờ tr
  * Thanh thời gian (thiết kế B.1): Dự báo từ bây giờ → 24 giờ tới (mặc định), hoặc xem lại 12 giờ trước.
  * Có thể thu gọn linh hoạt để mở rộng không gian bản đồ.
  */
-export function TimeControl({ offset, setOffset, touch }) {
+export function TimeControl({ offset, setOffset, touch, onCollapseChange }) {
   const [playing, setPlaying] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const [rangeMode, setRangeMode] = useState('forecast'); // 'forecast' (Từ bây giờ: 0 -> 24h) | 'all' (-12h -> 24h)
+
+  const toggleCollapsed = (val) => {
+    setCollapsed(val);
+    onCollapseChange?.(val);
+  };
 
   // Đang phát: mỗi PLAY_MS sang giờ kế tiếp; tới 24 giờ tới thì dừng
   useEffect(() => {
@@ -659,7 +664,7 @@ export function TimeControl({ offset, setOffset, touch }) {
         </div>
         <button
           type="button"
-          onClick={() => setCollapsed(false)}
+          onClick={() => toggleCollapsed(false)}
           className="btn-ghost tap flex min-h-[30px] items-center gap-1 px-2.5 py-1 text-xs font-semibold text-accent hover:bg-accent/10 rounded-lg transition-colors whitespace-nowrap"
           title="Mở thanh dự báo"
           aria-label="Mở thanh dự báo"
@@ -716,7 +721,7 @@ export function TimeControl({ offset, setOffset, touch }) {
 
         <button
           type="button"
-          onClick={() => setCollapsed(true)}
+          onClick={() => toggleCollapsed(true)}
           className="tap-sq -mr-1 flex h-7 items-center gap-1 px-2 text-xs font-medium text-muted hover:bg-panel2 hover:text-ink rounded-lg transition-colors"
           title="Thu gọn thanh thời gian"
           aria-label="Thu gọn thanh thời gian"

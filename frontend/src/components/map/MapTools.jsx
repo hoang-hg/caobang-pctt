@@ -319,7 +319,7 @@ export function AreaFocus({ area, filtered, padding = {}, fly = true, basemap })
       paddingBottomRight: padding.bottomRight || [16, 16],
       duration: 0.8,
     });
-  }, [targetArea?.bbox?.join(','), map, fly]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [targetArea?.bbox?.join(','), map, fly, JSON.stringify(padding)]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toRings = (geom) => {
     if (!geom) return null;
