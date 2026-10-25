@@ -188,6 +188,32 @@ body {
   .tap-sq { min-height: 44px !important; min-width: 44px !important; }
 }
 .leaflet-tooltip { background: rgb(var(--panel)); color: rgb(var(--ink)); border-color: rgb(var(--line)); border-radius: 0.375rem; font-size: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+/* Nhãn địa điểm tự động trên bản đồ tác chiến (giống Google Maps khi zoom to) */
+.tactical-map-label {
+  background: rgba(255, 255, 255, 0.95) !important;
+  color: #0f172a !important;
+  border: 1px solid rgba(203, 213, 225, 0.9) !important;
+  border-radius: 5px !important;
+  padding: 2px 6px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  line-height: 1.25 !important;
+  box-shadow: 0 2px 6px -1px rgba(0, 0, 0, 0.16), 0 1px 3px -1px rgba(0, 0, 0, 0.1) !important;
+  pointer-events: none !important;
+  user-select: none !important;
+}
+.dark .tactical-map-label {
+  background: rgba(15, 23, 42, 0.94) !important;
+  color: #f1f5f9 !important;
+  border-color: rgba(51, 65, 85, 0.9) !important;
+  box-shadow: 0 2px 8px -1px rgba(0, 0, 0, 0.5) !important;
+}
+.tactical-map-label.leaflet-tooltip-top::before {
+  border-top-color: rgba(255, 255, 255, 0.95) !important;
+}
+.dark .tactical-map-label.leaflet-tooltip-top::before {
+  border-top-color: rgba(15, 23, 42, 0.94) !important;
+}
 /* Điện thoại: popup bản đồ không cao quá vùng bản đồ còn trống (đầu trang, dải khẩn cấp, hàng chỉ số, thanh dưới ≈ 340 px) —
    phần thừa cuộn trong popup, nút thao tác không bị thanh dưới che */
 @media (max-width: 767px) {

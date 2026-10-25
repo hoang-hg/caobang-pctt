@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CircleMarker, MapContainer, Pane, Popup, Tooltip, ZoomControl, useMap } from 'react-leaflet';
 import clsx from 'clsx';
-import { Crosshair, Maximize2, Minimize2 } from 'lucide-react';
+import { Crosshair, Maximize2, Minimize2, Tag } from 'lucide-react';
 import { useAreaQuery } from '../../api/hooks';
 import { useStore } from '../../app/store';
 import { useChartTheme } from '../charts/chartTheme';
@@ -94,6 +94,22 @@ function FlyTo({ target }) {
   return null;
 }
 
+/** Theo dõi mức thu phóng của bản đồ để hiển thị nhãn địa điểm tự động giống Google Maps khi zoom to. */
+function ZoomWatcher({ onChange }) {
+  const map = useMap();
+  useEffect(() => {
+    onChange(map.getZoom());
+    const onZoom = () => onChange(map.getZoom());
+    map.on('zoom', onZoom);
+    map.on('zoomend', onZoom);
+    return () => {
+      map.off('zoom', onZoom);
+      map.off('zoomend', onZoom);
+    };
+  }, [map, onChange]);
+  return null;
+}
+
 /** Bản đồ điểm nóng thu nhỏ cho lãnh đạo: nền bản đồ chung của hệ thống (BaseLayer — tự lưu trữ / có ghi công), vùng
  * đang lọc (AreaFocus), điểm nóng từ /map/layers + KPI. Không có điểm nóng → nói rõ, không vẽ điểm minh hoạ.
  * `focus` ({ id, at }): yêu cầu từ ngoài (câu "Nguy hiểm nhất") — cuộn tới bản đồ và bay tới điểm đó.
@@ -106,6 +122,8 @@ export default function TacticalMiniMap({ k, className, focus, tall = false, her
   const c = useChartTheme(); // màu nhấn theo giao diện sáng / tối (Leaflet cần mã màu cụ thể, không đọc được biến CSS)
   const [level, setLevel] = useState('all');
   const [target, setTarget] = useState(null);
+  const [mapZoom, setMapZoom] = useState(8.8);
+  const [labelMode, setLabelMode] = useState('auto'); // 'auto' | 'always' | 'off'
 
   const hotspots = useMemo(() => buildHotspots(layers, k), [layers, k]);
   const box = useRef(null);
@@ -143,6 +161,28 @@ export default function TacticalMiniMap({ k, className, focus, tall = false, her
               {f.label} ({count(f.min)})
             </button>
           ))}
+          <button
+            type="button"
+            onClick={() => setLabelMode((m) => (m === 'auto' ? 'always' : m === 'always' ? 'off' : 'auto'))}
+            title={
+              labelMode === 'auto'
+                ? 'Nhãn địa điểm: Tự động hiển thị khi phóng to giống Google Maps. Bấm để luôn hiện hết'
+                : labelMode === 'always'
+                ? 'Nhãn địa điểm: Đang luôn hiện hết. Bấm để tắt nhãn'
+                : 'Nhãn địa điểm: Đang tắt. Bấm để chuyển sang chế độ tự động theo mức zoom'
+            }
+            className={clsx(
+              'min-h-[32px] rounded-full border px-2.5 py-0.5 text-[11px] font-semibold transition flex items-center gap-1 [@media(pointer:coarse)]:min-h-[44px] [@media(pointer:coarse)]:px-3',
+              labelMode === 'always'
+                ? 'border-accent bg-accent text-white shadow-xs'
+                : labelMode === 'auto'
+                ? 'border-accent/40 bg-accent/10 text-accent hover:bg-accent/20'
+                : 'border-line bg-panel2/60 text-muted hover:text-ink',
+            )}
+          >
+            <Tag size={12} />
+            <span>{labelMode === 'auto' ? 'Tên điểm: Auto' : labelMode === 'always' ? 'Tên điểm: Hiện hết' : 'Tên điểm: Tắt'}</span>
+          </button>
           <Link to="/ban-do" className="btn-ghost px-2 py-0.5 text-[11px] [@media(pointer:coarse)]:min-h-[44px]">
             <Maximize2 size={12} /> Bản đồ đầy đủ
           </Link>
@@ -187,14 +227,28 @@ export default function TacticalMiniMap({ k, className, focus, tall = false, her
       <div className={clsx('grid gap-2 xl:grid-cols-[minmax(0,1fr)_240px] [&>*]:min-w-0', tall && 'flex-1')}>
         {/* isolate: các lớp Leaflet (z-index tới 1000) không đè dải báo động dính trên cùng khi cuộn */}
         <div className={clsx('relative isolate z-0 overflow-hidden rounded-lg border border-line', tall ? 'min-h-[420px]' : 'h-[220px] sm:h-[300px] xl:h-[320px]')}>
-          <MapContainer center={CENTER} zoom={8.8} zoomSnap={0.1} zoomDelta={0.5} zoomControl={false} scrollWheelZoom={false} className="h-full w-full">
+          <MapContainer center={CENTER} zoom={8.8} zoomSnap={0.1} zoomDelta={0.5} zoomControl={false} scrollWheelZoom className="h-full w-full">
             <BaseLayer basemap="auto" />
             <MapResize />
+            <ZoomWatcher onChange={setMapZoom} />
             <ZoomControl position="bottomright" />
             <AreaFocus area={area} filtered={filtered} padding={MAP_PAD} />
             <FlyTo target={target} />
             {shown.map((h) => {
               const isSelected = target && target.lat === h.lat && target.lon === h.lon;
+              // Tự động hiện nhãn địa điểm như Google Maps khi zoom to:
+              // - Điểm đang chọn: luôn hiện nhãn
+              // - Chế độ 'always': luôn hiện nhãn mọi điểm
+              // - Chế độ 'auto': zoom >= 9.6 hiện điểm mức 3 (đỏ); zoom >= 10.4 hiện thêm mức 2 (cam); zoom >= 11.0 hiện tất cả
+              const showLabel =
+                isSelected ||
+                labelMode === 'always' ||
+                (labelMode === 'auto' && (
+                  mapZoom >= 11.0 ||
+                  (mapZoom >= 10.4 && h.level >= 2) ||
+                  (mapZoom >= 9.6 && h.level >= 3)
+                ));
+
               return (
                 <CircleMarker
                   key={h.id}
@@ -210,13 +264,33 @@ export default function TacticalMiniMap({ k, className, focus, tall = false, her
                     click: () => setTarget({ lat: h.lat, lon: h.lon, at: Date.now() }),
                   }}
                 >
-                  <Tooltip direction="top">{h.kind}: {h.name}</Tooltip>
+                  <Tooltip
+                    key={`tt-${h.id}-${showLabel ? 'perm' : 'hover'}`}
+                    permanent={showLabel}
+                    direction="top"
+                    offset={[0, isSelected ? -12 : -8]}
+                    className={clsx(
+                      'tactical-map-label font-sans',
+                      showLabel ? 'tactical-map-label--permanent' : 'tactical-map-label--hover',
+                      isSelected && 'ring-2 ring-accent !border-accent shadow-md !font-bold',
+                    )}
+                  >
+                    <span className="flex items-center gap-1.5 whitespace-nowrap">
+                      <span
+                        className="inline-block h-2 w-2 shrink-0 rounded-full shadow-xs"
+                        style={{ backgroundColor: risk(h.level).hex }}
+                      />
+                      <span className="max-w-[180px] truncate text-[11px] font-semibold leading-tight text-ink sm:max-w-[220px]">
+                        {h.name}
+                      </span>
+                    </span>
+                  </Tooltip>
                   <Popup>
                     <div className="text-xs">
                       <b>{h.name}</b>
                       <div>{h.kind} · mức {risk(h.level).name}</div>
                       {h.detail && <div>{h.detail}</div>}
-                      {h.to && <Link to={h.to} className="font-semibold">Mở Điều hành cứu hộ →</Link>}
+                      {h.to && <Link to={h.to} className="font-semibold text-accent hover:underline">Mở Điều hành cứu hộ →</Link>}
                     </div>
                   </Popup>
                 </CircleMarker>
