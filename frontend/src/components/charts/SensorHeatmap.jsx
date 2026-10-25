@@ -167,7 +167,7 @@ export default function SensorHeatmap() {
         </div>
         {sel.series.length ? (
           <ResponsiveContainer width="100%" height={170}>
-            <LineChart data={sel.series} margin={{ top: 6, right: 44, bottom: 0, left: -12 }}>
+            <LineChart data={sel.series} margin={{ top: 6, right: 44, bottom: 0, left: 0 }}>
               <CartesianGrid stroke={c.grid} vertical={false} />
               <XAxis dataKey="t" type="number" scale="time" domain={['dataMin', 'dataMax']} tickFormatter={hourLabel} minTickGap={40} {...axisProps(c)} />
               <YAxis width={48} tickFormatter={(v) => num(v, sel.s.type === 'do_nghieng' ? 1 : 0)} domain={['auto', 'auto']} {...axisProps(c)} />

@@ -230,7 +230,7 @@ export default function Hydrograph({ stationId, height = 260, hours = 48, compac
         </div>
       )}
       <ResponsiveContainer width="100%" height={height}>
-        <ComposedChart data={rows} syncId={syncId} syncMethod="value" margin={{ top: 8, right: compact ? 8 : 16, bottom: 0, left: -12 }}>
+        <ComposedChart data={rows} syncId={syncId} syncMethod="value" margin={{ top: 8, right: compact ? 8 : 16, bottom: 0, left: 0 }}>
           <CartesianGrid stroke={c.grid} vertical={false} />
           {/* Phần vượt báo động: thực đo tô đậm, dự báo tô nhạt — không hiện trong chú thích khi rê chuột */}
           {['o', 'f'].flatMap((sfx) => levels.map(({ lv }) => (

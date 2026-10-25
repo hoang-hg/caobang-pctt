@@ -53,13 +53,14 @@ export default function LandslideScatter({ height = 250 }) {
           { label: 'Ngưỡng Đỏ', color: c.danger, dashed: true },
         ]}
       />
+      <div className="mt-1 flex items-center justify-between text-[11px] font-medium text-muted">
+        <span>Trục đứng: Cường độ mưa (mm/giờ) · Trục ngang: Mưa 3 ngày qua (mm)</span>
+      </div>
       <ResponsiveContainer width="100%" height={height}>
-        <ComposedChart margin={{ top: 10, right: 12, bottom: 12, left: -8 }}>
+        <ComposedChart margin={{ top: 10, right: 12, bottom: 4, left: 0 }}>
           <CartesianGrid stroke={c.grid} />
-          <XAxis dataKey="rain_72h" type="number" domain={[0, 600]} ticks={[0, 150, 300, 450, 600]} {...axisProps(c)}
-            label={{ value: 'Mưa 3 ngày qua (mm)', position: 'insideBottom', offset: -6, fill: c.axis, fontSize: 10 }} />
-          <YAxis dataKey="intensity" type="number" domain={[0, yMax]} allowDataOverflow width={48} {...axisProps(c)}
-            label={{ value: 'mm/giờ', angle: -90, position: 'insideLeft', fill: c.axis, fontSize: 10, dx: 16 }} />
+          <XAxis dataKey="rain_72h" type="number" domain={[0, 600]} ticks={[0, 150, 300, 450, 600]} {...axisProps(c)} />
+          <YAxis dataKey="intensity" type="number" domain={[0, yMax]} allowDataOverflow width={38} {...axisProps(c)} />
           <Tooltip content={<Tip />} cursor={{ strokeDasharray: '3 3', stroke: c.axis }} />
           {data.thresholds?.vang && <Line data={data.thresholds.vang} dataKey="intensity" stroke={c.warn} strokeDasharray="4 3" strokeWidth={1.5} dot={false} isAnimationActive={false} legendType="none" tooltipType="none" />}
           {data.thresholds?.cam && <Line data={data.thresholds.cam} dataKey="intensity" stroke={c.serious} strokeDasharray="5 4" strokeWidth={1.6} dot={false} isAnimationActive={false} legendType="none" tooltipType="none" />}

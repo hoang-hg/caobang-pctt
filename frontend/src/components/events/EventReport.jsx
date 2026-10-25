@@ -96,10 +96,10 @@ function SosPerDay({ days }) {
       {days.length ? (
         <div role="img" aria-label={label}>
           <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={days} margin={{ top: 12, right: 4, bottom: 0, left: -18 }} barCategoryGap="22%" maxBarSize={56}>
+            <BarChart data={days} margin={{ top: 12, right: 8, bottom: 0, left: 0 }} barCategoryGap="22%" maxBarSize={56}>
               <CartesianGrid stroke={c.grid} vertical={false} />
               <XAxis dataKey="day" tickFormatter={dm} interval="preserveStartEnd" {...axisProps(c)} />
-              <YAxis allowDecimals={false} width={40} {...axisProps(c)} />
+              <YAxis allowDecimals={false} width={38} {...axisProps(c)} />
               <Tooltip
                 cursor={{ fill: c.grid, opacity: 0.35 }}
                 labelFormatter={(d) => `Ngày ${dm(d)}`}
@@ -143,10 +143,10 @@ function EvacuationTimeline({ points }) {
       {any ? (
         <div role="img" aria-label={label}>
           <ResponsiveContainer width="100%" height={200}>
-            <ComposedChart data={data} margin={{ top: 12, right: 8, bottom: 0, left: -12 }}>
+            <ComposedChart data={data} margin={{ top: 12, right: 12, bottom: 0, left: 4 }}>
               <CartesianGrid stroke={c.grid} vertical={false} />
               <XAxis dataKey="ts" type="number" scale="time" domain={['dataMin', 'dataMax']} tickFormatter={tick} minTickGap={32} {...axisProps(c)} />
-              <YAxis allowDecimals={false} width={44} {...axisProps(c)} />
+              <YAxis allowDecimals={false} width={48} tickFormatter={(v) => typeof v === 'number' && v >= 1000 ? `${(v / 1000).toLocaleString('vi-VN')}k` : v} {...axisProps(c)} />
               <Tooltip
                 cursor={{ stroke: c.axis, strokeDasharray: '3 3' }}
                 content={(
