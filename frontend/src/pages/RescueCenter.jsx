@@ -392,9 +392,9 @@ export default function RescueCenter() {
         exporting={pdf}
       />
 
-      <div className={clsx('grid gap-3', sideOpen ? '2xl:grid-cols-[minmax(0,1fr)_370px]' : 'grid-cols-1')}>
-        <div ref={boardRef} className="flex min-w-0 scroll-mt-20 flex-col gap-2.5">
-          <div className="flex flex-wrap items-center justify-between gap-2 no-print">
+      <div className={clsx('grid gap-3 flex-1', sideOpen ? '2xl:grid-cols-[minmax(0,1fr)_370px]' : 'grid-cols-1')}>
+        <div ref={boardRef} className="flex min-w-0 scroll-mt-20 flex-col gap-2.5 h-full flex-1">
+          <div className="flex flex-wrap items-center justify-between gap-2 no-print shrink-0">
             <div className="flex flex-wrap items-center gap-2">
               <Segmented
                 label="Cách xem phiếu"
@@ -436,7 +436,7 @@ export default function RescueCenter() {
               </div>
             )}
           </div>
-          <div ref={contentRef} className="bg-bg">{body}</div>
+          <div ref={contentRef} className="bg-bg flex-1 flex flex-col h-full">{body}</div>
         </div>
         {/* Điện thoại: giám sát sơ tán trước, tiếp nhận tin (việc của trực ban ở bàn) sau; màn rộng: cột phải */}
         {sideOpen && (
