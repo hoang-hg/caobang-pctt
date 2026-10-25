@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Moon, Sun, Volume2, VolumeX, ShieldAlert, Globe, Menu, X } from 'lucide-react';
+import { Moon, Sun, ShieldAlert, Globe, Menu, X } from 'lucide-react';
 import clsx from 'clsx';
 import { useStore } from '../../app/store';
 import { usePermission } from '../../rbac/usePermission';
@@ -33,7 +33,7 @@ function Clock() {
 }
 
 export default function Header() {
-  const { theme, toggleTheme, wsStatus, soundOn, toggleSound, mobileMenuOpen, setMobileMenuOpen, audioReady, sidebarCollapsed } = useStore();
+  const { theme, toggleTheme, wsStatus, mobileMenuOpen, setMobileMenuOpen, sidebarCollapsed } = useStore();
   // Điện thoại: menu thu vào nút ☰ — SOS chờ xử lý / lệnh cảnh báo chờ bạn duyệt hiện số đỏ ngay trên nút
   const badges = useNavBadges();
   const urgent = badges.sos + badges.alerts;
@@ -113,57 +113,36 @@ export default function Header() {
           </Suspense>
         )}
 
-        {/* Nút xem Cổng công khai cho người dân */}
+        {/* Nút xem Cổng công khai cho người dân (chỉ hiện icon) */}
         <Link
           to="/cong-khai"
           target="_blank"
           rel="noopener noreferrer"
-          className="btn-ghost touch-hit hidden md:inline-flex lg:tall:hidden text-xs px-2.5 py-1.5 text-accent border-accent/30 bg-accent/5 hover:bg-accent/10"
+          className="btn-ghost touch-hit hidden md:inline-flex lg:tall:hidden p-2 text-accent border border-accent/30 bg-accent/5 hover:bg-accent/10 rounded-lg"
           title="Mở Cổng thông tin công khai dành cho người dân"
           aria-label="Cổng người dân"
         >
-          <Globe size={14} className="shrink-0" />
-          <span className="hidden font-semibold 2xl:inline">Cổng người dân</span>
+          <Globe size={16} className="shrink-0" />
         </Link>
 
-        {/* Trạng thái kết nối WebSocket Realtime. Điện thoại (dưới 640 px): chỉ hiện khi đang nối lại / mất kết nối — lúc bình
-            thường nhường chỗ cho bộ lọc địa phương (tình trạng vẫn xem được trong menu tài khoản) */}
+        {/* Trạng thái kết nối WebSocket Realtime: bỏ chữ Trực tuyến khi đang hoạt động, chỉ giữ chấm trạng thái */}
         <span
           className={clsx(
-            'chip text-[11px] font-medium py-1 px-2.5 transition-colors',
+            'chip text-[11px] font-medium py-1 transition-colors',
+            wsStatus === 'online' ? 'px-2' : 'px-2.5',
             wsStatus === 'online' && 'max-sm:hidden',
             'lg:tall:hidden',
-            wsStatus === 'online' ? 'bg-good/15 text-good border-good/30' : wsStatus === 'connecting' ? 'bg-warn/15 text-warn border-warn/30' : 'bg-danger/15 text-danger border-danger/30'
+            wsStatus === 'online' ? 'bg-good/15 text-good border-good/30' : wsStatus === 'connecting' ? 'bg-warn/15 text-warn border-warn/30' : 'bg-danger/15 text-danger border-danger/30',
           )}
-          title={`Kết nối thời gian thực: ${wsStatus === 'online' ? 'Đang hoạt động' : wsStatus === 'connecting' ? 'Đang kết nối lại' : 'Mất kết nối'}`}
+          title={`Kết nối thời gian thực: ${wsStatus === 'online' ? 'Trực tuyến (đang hoạt động)' : wsStatus === 'connecting' ? 'Đang kết nối lại' : 'Mất kết nối'}`}
         >
           <span className={clsx('h-2 w-2 rounded-full shrink-0', wsStatus === 'online' ? 'bg-good animate-pulse' : wsStatus === 'connecting' ? 'bg-warn animate-ping' : 'bg-danger')} />
-          {/* Trực tuyến: chấm xanh là đủ (chữ từ 2xl). Mất kết nối / đang nối: hiện chữ từ sm — trực ban phải thấy ngay */}
-          <span className={clsx('hidden font-mono', wsStatus === 'online' ? '2xl:inline' : 'sm:inline')}>
-            {wsStatus === 'online' ? 'Trực tuyến' : wsStatus === 'connecting' ? 'Đang nối…' : 'Mất kết nối'}
-          </span>
+          {wsStatus !== 'online' && (
+            <span className="hidden font-mono sm:inline">
+              {wsStatus === 'connecting' ? 'Đang nối…' : 'Mất kết nối'}
+            </span>
+          )}
         </span>
-
-        {/* Trình duyệt đang chặn âm thanh (trang mở lại, chưa ai bấm) → chuông SOS sẽ im: nhắc bấm để mở khoá */}
-        {soundOn && !audioReady && (
-          <button
-            type="button"
-            className="chip touch-hit border border-warn bg-warn/15 px-2.5 py-1 text-[11px] font-semibold text-ink lg:tall:hidden"
-            title="Trình duyệt chặn âm thanh tới khi bấm vào trang — bấm để chuông SOS kêu được"
-          >
-            <VolumeX size={13} className="text-warn" /> <span className="hidden 2xl:inline">Bấm để bật chuông SOS</span>
-          </button>
-        )}
-
-        {/* Nút bật/tắt âm báo SOS — điện thoại: trong menu tài khoản (nhường chỗ cho bộ lọc địa phương) */}
-        <button
-          className={clsx('btn-ghost touch-hit p-2 transition-colors max-sm:hidden lg:tall:hidden', soundOn ? 'text-accent' : 'text-muted')}
-          onClick={toggleSound}
-          title={soundOn ? 'Âm báo SOS: BẬT (bấm để tắt)' : 'Âm báo SOS: TẮT (bấm để bật)'}
-          aria-label="Bật tắt âm báo SOS"
-        >
-          {soundOn ? <Volume2 size={16} /> : <VolumeX size={16} />}
-        </button>
 
         {/* Nút đổi giao diện Sáng / Tối — điện thoại: chỉ trong menu tài khoản (Theo máy / Sáng / Tối), nhường chỗ cho tên địa bàn */}
         <button
