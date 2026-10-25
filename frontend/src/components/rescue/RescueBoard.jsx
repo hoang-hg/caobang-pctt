@@ -53,7 +53,7 @@ export default function RescueBoard({ tickets, factsOf, wide, column, onColumn, 
   }
 
   return (
-    <div className="grid min-w-0 grid-cols-4 gap-3 flex-1 h-full items-stretch">
+    <div className="grid min-w-0 grid-cols-4 gap-3">
       {COLUMNS.map((c) => {
         const late = overdueIn(c.key);
         return (
@@ -65,8 +65,8 @@ export default function RescueBoard({ tickets, factsOf, wide, column, onColumn, 
             onDrop={(e) => { e.preventDefault(); setOver(null); onDrop(e.dataTransfer.getData('text/plain'), c.key); }}
             className={clsx(
               // Kiểu bảng Kanban: thân cột lõm (màu nền trang) — thẻ phiếu trắng nổi lên; đầu cột trắng có vạch màu nhấn phía
-              // trên (cột đã xong: xanh lá như biểu tượng). Không dùng màu Đỏ / Cam / Vàng (dành cho mức ưu tiên của phiếu)
-              'card flex h-full min-h-[calc(100vh-6rem)] min-w-0 flex-col overflow-hidden border-t-[3px] shadow-none transition-all print:h-auto print:max-h-none print:min-h-0',
+              // trên (cột đã xong: xanh lá như biểu tượng). Giới hạn chiều cao tối đa đúng 5 ô thẻ phiếu (~895px), vượt quá sẽ cuộn nội bộ
+              'card flex max-h-[895px] min-h-[360px] min-w-0 flex-col overflow-hidden border-t-[3px] shadow-none transition-all print:max-h-none print:min-h-0',
               c.key === 'hoan_thanh' ? 'border-t-good' : 'border-t-accent',
               over === c.key ? 'border-dashed bg-accent/5 ring-2 ring-accent' : 'bg-bg',
             )}
