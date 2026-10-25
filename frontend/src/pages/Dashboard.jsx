@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import {
-  AlertTriangle, ChevronDown, ChevronUp, Compass, Droplets, FileDown, FileSpreadsheet, FileText, Home, LayoutDashboard, LifeBuoy,
+  AlertTriangle, CheckSquare, ChevronDown, ChevronUp, Columns2, Compass, Droplets, FileDown, FileSpreadsheet, FileText, Home, LayoutDashboard, LifeBuoy,
   Minimize2, Monitor, Mountain, Pause, Play, Send, Server, Waves, X,
 } from 'lucide-react';
 import { useAreaQuery, useUnits } from '../api/hooks';
@@ -124,10 +124,22 @@ export default function Dashboard() {
   const isPhone = !useMediaQuery('(min-width: 640px)');
   const [params, setParams] = useSearchParams();
   const { filter, setFilter, clearFilter, toast, auth, wsStatus, setFocus, presentation, setPresentation } = useStore();
-  // Màn lớn của lãnh đạo (≥ 1680 px — màn rời, TV phòng điều hành; cả chế độ trình chiếu): 2 cột — việc chờ + 6 ô số bên
-  // trái (trình chiếu: chỉ 6 ô số chữ to), bản đồ điểm nóng lớn bên phải (docs/ke-hoach-lam-moi-giao-dien.md mục 6.3).
-  // Laptop 1366–1600 px giữ bố cục cũ: cột trái hẹp làm chữ trong 6 ô số bị cắt
-  const bigScreen = useMediaQuery('(min-width: 1680px)');
+  // Bố cục 2 cột màn hình lớn (≥ 1440 px): việc chờ + 6 ô số bên trái, bản đồ điểm nóng lớn bên phải.
+  // Hỗ trợ thu gọn/bung full linh hoạt giữa 2 bên theo lựa chọn của người dùng (lưu localStorage).
+  const bigScreen = useMediaQuery('(min-width: 1440px)');
+  const [heroLayout, setHeroLayoutState] = useState(() => {
+    try {
+      const saved = localStorage.getItem('pctt_dashboard_hero_layout');
+      if (saved === 'left_full' || saved === 'right_full' || saved === 'split') return saved;
+    } catch { /* bỏ qua */ }
+    return 'split';
+  });
+  const setHeroLayout = (layout) => {
+    setHeroLayoutState(layout);
+    try {
+      localStorage.setItem('pctt_dashboard_hero_layout', layout);
+    } catch { /* bỏ qua */ }
+  };
   const isFiltered = filter.codes.length > 0;
 
   // Quyền: nút / thẻ / khối chỉ hiện khi tài khoản mở được — backend vẫn kiểm tra lại mọi thao tác
@@ -661,23 +673,129 @@ export default function Dashboard() {
         <>
           {/* Vùng chụp PDF: chỉ số + bản đồ + biểu đồ + nhật ký ("Việc chờ quyết định", gợi ý không in — việc riêng của người xem) */}
           <div ref={ref} className="flex flex-col gap-2.5 bg-bg sm:gap-3.5">
-            {/* 1. Việc chờ quyết định — khối nổi bật đầu tiên (hàng thẻ ngang từ 640 px), rồi 6 ô chỉ số. Điện thoại: 6 ô
-                trước (thấy trọn cùng dải khẩn, không cuộn), Việc chờ ngay sau. Trình chiếu: chỉ 6 ô, chữ to */}
-            <div className={clsx(bigScreen ? 'grid grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-3.5' : 'flex flex-col gap-2.5 sm:gap-3.5')}>
-              <div className={clsx(bigScreen ? 'flex min-w-0 flex-col gap-3.5' : 'contents')}>
-                {!presentation && <DecisionPanel k={k} kState={kState} className="max-sm:order-last" stacked={bigScreen} />}
-                <KpiStrip
-                  {...kpiProps}
-                  onRiver={(id) => {
-                    setChartSegment('thuy_van');
-                    focusStation(id);
-                  }}
-                  large={presentation}
-                  stacked={bigScreen}
-                />
+            {/* 1. Việc chờ quyết định + 6 ô chỉ số & Bản đồ điểm nóng:
+                Hỗ trợ chế độ 2 cột (split), bung full bên trái (left_full) hoặc bung full bản đồ (right_full). */}
+            {bigScreen ? (
+              <div className="flex flex-col gap-3.5">
+                {heroLayout === 'split' && (
+                  <div className="grid grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-3.5 items-start">
+                    <div className="flex min-w-0 flex-col gap-3.5">
+                      {!presentation && (
+                        <DecisionPanel
+                          k={k}
+                          kState={kState}
+                          className="max-sm:order-last"
+                          stacked
+                          heroLayout={heroLayout}
+                          onSetHeroLayout={setHeroLayout}
+                        />
+                      )}
+                      <KpiStrip
+                        {...kpiProps}
+                        onRiver={(id) => {
+                          setChartSegment('thuy_van');
+                          focusStation(id);
+                        }}
+                        large={presentation}
+                        stacked
+                      />
+                    </div>
+                    <TacticalMiniMap
+                      k={k}
+                      className="min-w-0"
+                      focus={mapFocus}
+                      tall
+                      heroLayout={heroLayout}
+                      onSetHeroLayout={setHeroLayout}
+                    />
+                  </div>
+                )}
+
+                {heroLayout === 'left_full' && (
+                  <div className="flex min-w-0 flex-col gap-3.5">
+                    {!presentation && (
+                      <DecisionPanel
+                        k={k}
+                        kState={kState}
+                        className="max-sm:order-last"
+                        stacked={false}
+                        heroLayout={heroLayout}
+                        onSetHeroLayout={setHeroLayout}
+                      />
+                    )}
+                    <KpiStrip
+                      {...kpiProps}
+                      onRiver={(id) => {
+                        setChartSegment('thuy_van');
+                        focusStation(id);
+                      }}
+                      large={presentation}
+                      stacked={false}
+                    />
+                    <div className="flex items-center justify-between rounded-lg border border-dashed border-accent/40 bg-accent/5 px-4 py-2.5 text-xs text-ink/80 transition-all hover:bg-accent/10">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent/15 text-accent font-semibold">
+                          <Compass size={14} />
+                        </span>
+                        <span>Bản đồ điểm nóng đang được thu gọn. Khối việc chờ & 6 chỉ số đang hiển thị toàn bộ chiều rộng màn hình.</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setHeroLayout('split')}
+                        className="btn-ghost flex items-center gap-1.5 border border-accent/40 bg-card px-3 py-1 font-semibold text-accent shadow-xs hover:bg-accent hover:text-white rounded-md"
+                      >
+                        <Columns2 size={13} />
+                        <span>Hiện lại bản đồ (chia 2 cột)</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {heroLayout === 'right_full' && (
+                  <div className="flex min-w-0 flex-col gap-3.5">
+                    <div className="flex items-center justify-between rounded-lg border border-dashed border-accent/40 bg-accent/5 px-4 py-2.5 text-xs text-ink/80 transition-all hover:bg-accent/10">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent/15 text-accent font-semibold">
+                          <CheckSquare size={14} />
+                        </span>
+                        <span>Đang thu gọn khối việc chờ & 6 chỉ số để bản đồ điểm nóng hiển thị toàn bộ chiều rộng màn hình.</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setHeroLayout('split')}
+                        className="btn-ghost flex items-center gap-1.5 border border-accent/40 bg-card px-3 py-1 font-semibold text-accent shadow-xs hover:bg-accent hover:text-white rounded-md"
+                      >
+                        <Columns2 size={13} />
+                        <span>Hiện lại việc chờ & 6 chỉ số (chia 2 cột)</span>
+                      </button>
+                    </div>
+                    <TacticalMiniMap
+                      k={k}
+                      className="min-w-0"
+                      focus={mapFocus}
+                      tall
+                      heroLayout={heroLayout}
+                      onSetHeroLayout={setHeroLayout}
+                    />
+                  </div>
+                )}
               </div>
-              {bigScreen && <TacticalMiniMap k={k} className="min-w-0" focus={mapFocus} tall />}
-            </div>
+            ) : (
+              <div className="flex flex-col gap-2.5 sm:gap-3.5">
+                <div className="contents">
+                  {!presentation && <DecisionPanel k={k} kState={kState} className="max-sm:order-last" stacked={false} />}
+                  <KpiStrip
+                    {...kpiProps}
+                    onRiver={(id) => {
+                      setChartSegment('thuy_van');
+                      focusStation(id);
+                    }}
+                    large={presentation}
+                    stacked={false}
+                  />
+                </div>
+              </div>
+            )}
 
             {/* 2. Khối chiến thuật: bản đồ + chuyên đề (trái), nhật ký sự kiện (phải) */}
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_420px] [&>*]:min-w-0">

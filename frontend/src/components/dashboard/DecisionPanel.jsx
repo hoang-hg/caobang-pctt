@@ -1,6 +1,6 @@
 import clsx from 'clsx';
 import { Link } from 'react-router-dom';
-import { Camera, ChevronRight, CircleCheckBig, FileUp, HandHelping, Megaphone, Siren } from 'lucide-react';
+import { Camera, ChevronRight, CircleCheckBig, FileUp, HandHelping, Maximize2, Megaphone, Minimize2, Siren } from 'lucide-react';
 import { useNavBadges } from '../layout/Sidebar';
 import { useAreaQuery } from '../../api/hooks';
 import { isCommuneSupport } from '../rescue/rescueFacts';
@@ -20,7 +20,7 @@ import { ErrorState, Hint, Skeleton } from '../common/ui';
  * Chưa tải được KPI (máy chủ lỗi / đang tải) → KHÔNG nói "không có việc nào" khi thực ra chưa biết.
  * `stacked`: danh sách dọc ở mọi cỡ màn (cột trái của Tổng quan màn lớn ≥ 1680 px — cạnh bản đồ lớn).
  */
-export default function DecisionPanel({ k, kState, className, stacked = false }) {
+export default function DecisionPanel({ k, kState, className, stacked = false, heroLayout, onSetHeroLayout }) {
   // Lớp chỉ áp từ 640 px khi xếp ngang; `stacked` giữ kiểu danh sách dọc của điện thoại
   const row = (cls) => (stacked ? null : cls);
   const badges = useNavBadges();
@@ -55,14 +55,54 @@ export default function DecisionPanel({ k, kState, className, stacked = false })
             Những việc đang chờ chính bạn xử lý. Bấm vào từng việc để mở đúng nơi làm việc đó; xong việc thì việc tự mất khỏi đây.
           </Hint>
         </div>
-        {rows.length > 0 && (
-          <span className={clsx(
-            'chip shrink-0 px-2 py-0.5 text-xs',
-            rows.some((r) => r.level === 3) ? 'bg-danger/15 font-bold text-danger' : 'bg-accent/10 font-semibold text-accent',
-          )}>
-            {int(total)} việc cần xử lý
-          </span>
-        )}
+        <div className="flex items-center gap-1.5">
+          {rows.length > 0 && (
+            <span className={clsx(
+              'chip shrink-0 px-2 py-0.5 text-xs',
+              rows.some((r) => r.level === 3) ? 'bg-danger/15 font-bold text-danger' : 'bg-accent/10 font-semibold text-accent',
+            )}>
+              {int(total)} việc cần xử lý
+            </span>
+          )}
+          {heroLayout && onSetHeroLayout && (
+            <div className="hidden sm:flex items-center gap-1 shrink-0">
+              {heroLayout === 'split' ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => onSetHeroLayout('left_full')}
+                    title="Bung full việc chờ & 6 chỉ số (thu gọn bản đồ)"
+                    className="btn-ghost tap p-1 text-muted hover:text-accent rounded-md"
+                    aria-label="Bung full việc chờ và 6 chỉ số"
+                  >
+                    <Maximize2 size={13} />
+                    <span className="text-[11px] font-semibold hidden 2xl:inline ml-0.5">Bung full</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onSetHeroLayout('right_full')}
+                    title="Thu gọn việc chờ & 6 chỉ số (bản đồ bung full)"
+                    className="btn-ghost tap p-1 text-muted hover:text-accent rounded-md"
+                    aria-label="Thu gọn việc chờ và 6 chỉ số"
+                  >
+                    <Minimize2 size={13} />
+                    <span className="text-[11px] font-semibold hidden 2xl:inline ml-0.5">Thu gọn</span>
+                  </button>
+                </>
+              ) : heroLayout === 'left_full' ? (
+                <button
+                  type="button"
+                  onClick={() => onSetHeroLayout('split')}
+                  title="Khôi phục hiển thị bản đồ điểm nóng bên cạnh"
+                  className="btn-ghost tap flex items-center gap-1 border border-accent/40 bg-accent/10 px-2 py-0.5 text-xs font-semibold text-accent hover:bg-accent/20 rounded-md"
+                >
+                  <Minimize2 size={12} />
+                  <span>Hiện lại bản đồ</span>
+                </button>
+              ) : null}
+            </div>
+          )}
+        </div>
       </div>
       <div className="min-w-0 flex-1">
         {!rows.length && !k ? (

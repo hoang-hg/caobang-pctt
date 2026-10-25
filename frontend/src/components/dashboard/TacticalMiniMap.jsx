@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CircleMarker, MapContainer, Pane, Popup, Tooltip, ZoomControl, useMap } from 'react-leaflet';
 import clsx from 'clsx';
-import { Crosshair, Maximize2 } from 'lucide-react';
+import { Crosshair, Maximize2, Minimize2 } from 'lucide-react';
 import { useAreaQuery } from '../../api/hooks';
 import { useStore } from '../../app/store';
 import { useChartTheme } from '../charts/chartTheme';
@@ -99,7 +99,7 @@ function FlyTo({ target }) {
  * `focus` ({ id, at }): yêu cầu từ ngoài (câu "Nguy hiểm nhất") — cuộn tới bản đồ và bay tới điểm đó.
  * `tall`: cột phải của Tổng quan màn lớn ≥ 1680 px — cao ít nhất 420 px và giãn bằng cột trái (việc chờ + 6 ô số); danh
  * sách điểm nóng cuộn trong chiều cao đó, không đẩy hàng cao thêm. */
-export default function TacticalMiniMap({ k, className, focus, tall = false }) {
+export default function TacticalMiniMap({ k, className, focus, tall = false, heroLayout, onSetHeroLayout }) {
   const { data: layers, isError: layersError, refetch } = useAreaQuery('map-layers', '/map/layers', {}, { refetchInterval: 30_000 });
   const { data: area } = useAreaQuery('area', '/admin-units/area', {}, { staleTime: Infinity });
   const filtered = useStore((s) => s.filter.codes.length > 0);
@@ -146,6 +146,40 @@ export default function TacticalMiniMap({ k, className, focus, tall = false }) {
           <Link to="/ban-do" className="btn-ghost px-2 py-0.5 text-[11px] [@media(pointer:coarse)]:min-h-[44px]">
             <Maximize2 size={12} /> Bản đồ đầy đủ
           </Link>
+          {heroLayout && onSetHeroLayout && (
+            <div className="hidden sm:flex items-center gap-1 shrink-0">
+              {heroLayout === 'split' ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => onSetHeroLayout('right_full')}
+                    title="Bung bản đồ điểm nóng toàn màn hình (thu gọn việc chờ & 6 chỉ số)"
+                    className="btn-ghost px-2 py-0.5 text-[11px] rounded-md [@media(pointer:coarse)]:min-h-[44px] hover:text-accent"
+                  >
+                    <Maximize2 size={12} /> <span className="hidden xl:inline">Bung full</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onSetHeroLayout('left_full')}
+                    title="Thu gọn bản đồ điểm nóng (việc chờ & 6 chỉ số bung full)"
+                    className="btn-ghost px-2 py-0.5 text-[11px] rounded-md [@media(pointer:coarse)]:min-h-[44px] hover:text-accent"
+                  >
+                    <Minimize2 size={12} /> <span className="hidden xl:inline">Thu gọn</span>
+                  </button>
+                </>
+              ) : heroLayout === 'right_full' ? (
+                <button
+                  type="button"
+                  onClick={() => onSetHeroLayout('split')}
+                  title="Khôi phục hiển thị việc chờ & 6 chỉ số bên cạnh"
+                  className="btn-ghost tap flex items-center gap-1 border border-accent/40 bg-accent/10 px-2 py-0.5 text-[11px] font-semibold text-accent hover:bg-accent/20 rounded-md"
+                >
+                  <Minimize2 size={12} />
+                  <span>Hiện lại việc chờ & 6 chỉ số</span>
+                </button>
+              ) : null}
+            </div>
+          )}
         </div>
       </div>
 
