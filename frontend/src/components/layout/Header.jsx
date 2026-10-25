@@ -125,24 +125,21 @@ export default function Header() {
           <Globe size={16} className="shrink-0" />
         </Link>
 
-        {/* Trạng thái kết nối WebSocket Realtime: bỏ chữ Trực tuyến khi đang hoạt động, chỉ giữ chấm trạng thái */}
-        <span
-          className={clsx(
-            'chip text-[11px] font-medium py-1 transition-colors',
-            wsStatus === 'online' ? 'px-2' : 'px-2.5',
-            wsStatus === 'online' && 'max-sm:hidden',
-            'lg:tall:hidden',
-            wsStatus === 'online' ? 'bg-good/15 text-good border-good/30' : wsStatus === 'connecting' ? 'bg-warn/15 text-warn border-warn/30' : 'bg-danger/15 text-danger border-danger/30',
-          )}
-          title={`Kết nối thời gian thực: ${wsStatus === 'online' ? 'Trực tuyến (đang hoạt động)' : wsStatus === 'connecting' ? 'Đang kết nối lại' : 'Mất kết nối'}`}
-        >
-          <span className={clsx('h-2 w-2 rounded-full shrink-0', wsStatus === 'online' ? 'bg-good animate-pulse' : wsStatus === 'connecting' ? 'bg-warn animate-ping' : 'bg-danger')} />
-          {wsStatus !== 'online' && (
+        {/* Cảnh báo kết nối: chỉ hiện khi mất kết nối hoặc đang kết nối lại (ẩn hoàn toàn khi trực tuyến bình thường) */}
+        {wsStatus !== 'online' && (
+          <span
+            className={clsx(
+              'chip text-[11px] font-medium py-1 px-2.5 transition-colors lg:tall:hidden',
+              wsStatus === 'connecting' ? 'bg-warn/15 text-warn border-warn/30' : 'bg-danger/15 text-danger border-danger/30',
+            )}
+            title={`Kết nối thời gian thực: ${wsStatus === 'connecting' ? 'Đang kết nối lại' : 'Mất kết nối'}`}
+          >
+            <span className={clsx('h-2 w-2 rounded-full shrink-0', wsStatus === 'connecting' ? 'bg-warn animate-ping' : 'bg-danger')} />
             <span className="hidden font-mono sm:inline">
               {wsStatus === 'connecting' ? 'Đang nối…' : 'Mất kết nối'}
             </span>
-          )}
-        </span>
+          </span>
+        )}
 
         {/* Nút đổi giao diện Sáng / Tối — điện thoại: chỉ trong menu tài khoản (Theo máy / Sáng / Tối), nhường chỗ cho tên địa bàn */}
         <button
