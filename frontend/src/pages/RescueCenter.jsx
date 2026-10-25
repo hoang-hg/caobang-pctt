@@ -96,8 +96,29 @@ export default function RescueCenter() {
   const [overviewOpen, setOverviewOpen] = useState(false);
   // Cột Tiếp nhận SOS & Giám sát sơ tán bên phải: có thể thu gọn để bảng điều phối chiếm 100% không gian
   const [sideOpen, setSideOpen] = useState(true);
+  const asideRef = useRef(null);
+  const [asideHeight, setAsideHeight] = useState(1200);
   const contentRef = useRef(null);
   const boardRef = useRef(null);
+
+  // Tự động đồng bộ chiều cao bảng Kanban với cột Tiếp nhận & Sơ tán bên phải để bố cục luôn cân đối hoàn hảo
+  useEffect(() => {
+    if (!asideRef.current) return;
+    const update = () => {
+      if (asideRef.current) {
+        const h = asideRef.current.offsetHeight;
+        if (h > 400) setAsideHeight(h);
+      }
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(asideRef.current);
+    return () => ro.disconnect();
+  }, [sideOpen]);
+
+  // Chiều cao cột Kanban đồng bộ hoàn hảo với cột Tiếp nhận & Sơ tán bên phải:
+  // asideHeight (tổng chiều cao cột phải) trừ đi toolbar (46px) và gap (10px) = asideHeight - 56px (~1144px)
+  const boardHeight = wide ? Math.max(1050, (asideHeight || 1200) - 56) : null;
 
   // Tài khoản xã chưa lọc: tiêu đề là xã của mình, không ghi "Toàn tỉnh" (như Tổng quan)
   const scope = useAllowedCodes('sos', 'view');
@@ -320,6 +341,7 @@ export default function RescueCenter() {
         filtered={activeFilters}
         cardProps={cardProps}
         onDrop={(id, status) => move(id, status)}
+        height={boardHeight}
       />
     );
   }
@@ -392,7 +414,7 @@ export default function RescueCenter() {
         exporting={pdf}
       />
 
-      <div className={clsx('grid gap-3', sideOpen ? '2xl:grid-cols-[minmax(0,1fr)_370px]' : 'grid-cols-1')}>
+      <div className={clsx('grid gap-3 items-stretch', sideOpen ? '2xl:grid-cols-[minmax(0,1fr)_370px]' : 'grid-cols-1')}>
         <div ref={boardRef} className="flex min-w-0 scroll-mt-20 flex-col gap-2.5">
           <div className="flex flex-wrap items-center justify-between gap-2 no-print shrink-0">
             <div className="flex flex-wrap items-center gap-2">
@@ -436,11 +458,11 @@ export default function RescueCenter() {
               </div>
             )}
           </div>
-          <div ref={contentRef} className="bg-bg">{body}</div>
+          <div ref={contentRef} className="bg-bg flex-1 flex flex-col h-full min-h-0">{body}</div>
         </div>
         {/* Điện thoại: giám sát sơ tán trước, tiếp nhận tin (việc của trực ban ở bàn) sau; màn rộng: cột phải */}
         {sideOpen && (
-          <aside className="flex min-w-0 flex-col gap-3">
+          <aside ref={asideRef} className="flex min-w-0 flex-col gap-3 self-start">
             <Can I="sos" a="create"><div className="order-2 2xl:order-1"><Intake online={online} /></div></Can>
             <Evacuation query={evacQ} online={online} className="order-1 2xl:order-2" />
           </aside>
