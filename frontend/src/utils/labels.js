@@ -62,7 +62,7 @@ export const BROADCAST_STATUS = {
 // Phản ánh của người dân (community.citizen_reports)
 export const REPORT_STATUS = {
   cho_duyet: { label: 'Chờ duyệt', cls: 'bg-warn text-black' },
-  da_duyet: { label: 'Đã duyệt', cls: 'bg-good text-white' },
+  da_duyet: { label: 'Đã duyệt', cls: 'bg-good text-black font-semibold' },
   da_xu_ly: { label: 'Đã xử lý', cls: 'bg-panel2 text-ink' },
   tu_choi: { label: 'Từ chối', cls: 'bg-danger text-white' },
 };

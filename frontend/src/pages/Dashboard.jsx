@@ -540,7 +540,7 @@ export default function Dashboard() {
         onRefresh={presentation ? undefined : refresh}
         refreshing={refreshing}
       >
-        <ProvinceArt className="pointer-events-none absolute -right-8 top-1/2 -z-10 h-[230%] w-auto -translate-y-1/2 text-sky-200 opacity-25 max-md:hidden" />
+        <ProvinceArt className="pointer-events-none absolute -right-8 top-1/2 -z-10 h-[230%] w-auto -translate-y-1/2 text-accent/15 opacity-30 max-md:hidden" />
         {/* Câu tóm tắt tình hình bằng lời + chỗ nguy hiểm nhất (thẻ Cấp xã có phần riêng của xã) */}
         {tab !== 'cap_xa' && (
           <div className="mt-1.5">

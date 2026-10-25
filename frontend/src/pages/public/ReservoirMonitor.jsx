@@ -268,15 +268,15 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap, areaScope
         </div>
 
         {/* Card 4: Tổng lưu lượng xả về hạ du */}
-        <div className="card p-4 flex flex-col justify-between border-l-4 border-l-indigo-500">
+        <div className="card p-4 flex flex-col justify-between border-l-4 border-l-accent">
           <div className="flex items-center justify-between text-muted text-xs">
             <span>Tổng lưu lượng xả về hạ du</span>
-            <div className="h-8 w-8 rounded-lg bg-indigo-500/10 text-indigo-600 flex items-center justify-center font-bold">
+            <div className="h-8 w-8 rounded-lg bg-accent/10 text-accent flex items-center justify-center font-bold">
               <Droplets size={16} />
             </div>
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-black font-mono text-indigo-600">
+            <span className="text-2xl font-black font-mono text-ink">
               {noOperatingData ? '–' : Math.round(totalOutflow).toLocaleString('vi-VN')}
             </span>
             <span className="text-xs text-muted">m³/s</span>
@@ -421,11 +421,11 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap, areaScope
                         {r.id}
                       </span>
                       {r.capacity_mw > 0 ? (
-                        <span className="chip bg-sky-500/10 text-sky-600 text-[10px] font-bold">
+                        <span className="chip bg-accent/10 text-accent text-[10px] font-bold">
                           <Zap size={10} /> {r.capacity_mw} MW
                         </span>
                       ) : (
-                        <span className="chip bg-teal-500/10 text-teal-600 text-[10px] font-bold">
+                        <span className="chip bg-good/10 text-good text-[10px] font-bold">
                           Hồ Thủy Lợi
                         </span>
                       )}
@@ -546,7 +546,7 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap, areaScope
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="p-2.5 rounded-xl bg-panel2/50 border border-line/60">
                     <div className="text-[11px] text-muted flex items-center gap-1">
-                      <ArrowDownRight size={13} className="text-sky-600" /> Nước về hồ (Inflow)
+                      <ArrowDownRight size={13} className="text-accent" /> Nước về hồ (Inflow)
                     </div>
                     <div className="mt-1 flex items-baseline gap-1 font-mono">
                       <span className="text-base font-bold text-ink">{r.inflow_m3s}</span>

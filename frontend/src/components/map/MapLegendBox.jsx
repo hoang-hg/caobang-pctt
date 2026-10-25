@@ -39,7 +39,7 @@ export default function MapLegendBox({
       id: 'rain',
       title: 'Trạm đo lượng mưa',
       count: rainStations.length,
-      iconColor: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+      iconColor: 'bg-good/10 text-good border-good/20',
       badge: '🌧️',
       summary: 'Quan trắc lượng mưa tự động thời gian thực (mm)',
       desc: 'Màu sắc biểu tượng thay đổi theo cường độ: Xanh lá (<20mm - Mưa nhỏ) → Vàng (20-50mm - Mưa vừa) → Cam (50-100mm - Mưa to) → Đỏ (>100mm - Mưa rất to).',
@@ -63,7 +63,7 @@ export default function MapLegendBox({
       id: 'water',
       title: 'Trạm đo mực nước',
       count: waterStations.length,
-      iconColor: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
+      iconColor: 'bg-accent/10 text-accent border-accent/20',
       badge: '💧',
       summary: 'Cảm biến radar đo mực nước sông suối tự động',
       desc: 'Theo dõi mực nước sông Gâm, sông Bằng, sông Quây Sơn. Cảnh báo khi vượt mức Báo động I, Báo động II hoặc Báo động III.',
@@ -87,7 +87,7 @@ export default function MapLegendBox({
       id: 'reservoirs',
       title: 'Hồ chứa & Xả lũ',
       count: reservoirs.length,
-      iconColor: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20',
+      iconColor: 'bg-accent/10 text-accent border-accent/20',
       badge: '🏛️',
       summary: 'Dung tích, cao trình & trạng thái mở cửa xả hồ đập',
       desc: `Giám sát ${reservoirs.length} hồ chứa thuỷ điện, thuỷ lợi theo số liệu vận hành (mực nước, cửa xả). Cảnh báo sớm cho người dân vùng hạ du khi hồ vận hành xả tràn.`,
@@ -108,7 +108,7 @@ export default function MapLegendBox({
       id: 'landslides',
       title: 'Điểm đen sạt trượt & Đèo dốc',
       count: landslides.length,
-      iconColor: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+      iconColor: 'bg-warn/15 text-warn border-warn/30',
       badge: '⚠️',
       summary: 'Các vị trí sườn dốc đèo có nguy cơ sạt lở đất đá',
       desc: `Theo dõi ${landslides.length} điểm đèo dốc, taluy, ngầm tràn: trạng thái theo cảm biến và vùng cảnh báo sạt lở / lũ quét đang hiệu lực, kèm tuyến đường tránh.`,
@@ -129,7 +129,7 @@ export default function MapLegendBox({
       id: 'evac',
       title: 'Điểm sơ tán an toàn',
       count: evacSites.length,
-      iconColor: 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20',
+      iconColor: 'bg-good/10 text-good border-good/20',
       badge: '🏠',
       summary: 'Nhà văn hóa, trường học chỉ định tránh trú thiên tai',
       desc: 'Vị trí an toàn cao ráo phục vụ sơ tán dân khẩn cấp, hiển thị số chỗ còn trống và liên hệ ban quản lý.',
@@ -150,7 +150,7 @@ export default function MapLegendBox({
       id: 'reports',
       title: 'Phản ánh người dân',
       count: reports.length,
-      iconColor: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20',
+      iconColor: 'bg-accent/10 text-accent border-accent/20',
       badge: '📸',
       summary: 'Tin báo hiện trường có ảnh chụp đã xác minh',
       desc: 'Thông tin ngập úng, cây đổ, sạt taluy do người dân gửi qua Cổng thông tin đã được chính quyền địa phương xác thực.',
@@ -326,7 +326,7 @@ export default function MapLegendBox({
       {/* Hướng dẫn cụm số gom điểm */}
       <div className="flex items-center gap-2.5 p-2 rounded-xl bg-panel2/60 border border-line/60 text-[11px] text-muted leading-tight">
         <div className="relative flex h-6 w-6 shrink-0 items-center justify-center">
-          <span className="absolute inset-0 rounded-full bg-sky-400/35 animate-ping" />
+          <span className="absolute inset-0 rounded-full bg-accent/35 animate-ping" />
           <span className="relative flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-white text-xs font-bold border border-white">
             28
           </span>

@@ -1323,7 +1323,7 @@ export default function PublicPortal() {
                     className={clsx(
                       'flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer',
                       mapSidebarTab === 'rain'
-                        ? 'bg-panel text-sky-600 shadow-xs'
+                        ? 'bg-panel text-accent shadow-xs'
                         : 'text-muted hover:text-ink hover:bg-panel/50'
                     )}
                   >
@@ -1462,7 +1462,7 @@ export default function PublicPortal() {
                         <Waves size={24} />
                       </div>
                       <div>
-                        <span className="text-xs font-bold text-sky-600 dark:text-sky-400">
+                        <span className="text-xs font-bold text-accent">
                           Chuyên đề 1
                         </span>
                         <h3 className="text-base font-bold text-ink group-hover:text-accent transition-colors">
@@ -1470,7 +1470,7 @@ export default function PublicPortal() {
                         </h3>
                       </div>
                     </div>
-                    <span className="chip bg-sky-500/15 text-sky-600 text-xs font-bold shrink-0">
+                    <span className="chip bg-accent/10 text-accent text-xs font-bold shrink-0">
                       {overview?.reservoirs?.spill_count ?? '–'} hồ đang xả
                     </span>
                   </div>
@@ -1482,7 +1482,7 @@ export default function PublicPortal() {
                   <div className="mt-3.5 grid grid-cols-2 gap-2 text-xs border-t border-line/60 pt-3">
                     <div className="bg-panel2/60 p-2 rounded-lg border border-line/40">
                       <span className="text-[11px] text-muted">Tổng lưu lượng xả:</span>
-                      <div className="font-mono text-sm font-bold text-sky-600 mt-0.5">
+                      <div className="font-mono text-sm font-bold text-accent mt-0.5">
                         {overview ? Math.round(overview.reservoirs?.total_outflow ?? 0).toLocaleString('vi-VN') : '–'} m³/s
                       </div>
                     </div>
@@ -1494,7 +1494,7 @@ export default function PublicPortal() {
                     </div>
                   </div>
 
-                  <div className="mt-3 flex items-center justify-between text-xs text-sky-600 font-semibold group-hover:underline">
+                  <div className="mt-3 flex items-center justify-between text-xs text-accent font-semibold group-hover:underline">
                     <span>Xem chi tiết từng cửa xả & hạ du</span>
                     <span className="group-hover:translate-x-1 transition-transform">Xem bảng chuyên đề →</span>
                   </div>

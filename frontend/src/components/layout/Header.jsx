@@ -173,7 +173,7 @@ export default function Header() {
           aria-label="Nền tối"
           aria-pressed={theme === 'dark'}
         >
-          {theme === 'dark' ? <Sun size={16} className="text-amber-400" /> : <Moon size={16} className="text-indigo-500" />}
+          {theme === 'dark' ? <Sun size={16} className="text-amber-400" /> : <Moon size={16} className="text-muted" />}
         </button>
 
         <Clock />

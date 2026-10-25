@@ -370,7 +370,7 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScope
                       <span className="text-[11px] font-mono font-bold text-muted bg-panel2 px-1.5 py-0.5 rounded">
                         {p.code}
                       </span>
-                      <span className="chip bg-sky-500/10 text-sky-600 text-[10px] font-bold">
+                      <span className="chip bg-accent/10 text-accent text-[10px] font-bold">
                         {p.road_name.split('(')[0].trim()}
                       </span>
                       <span className="chip bg-panel2 text-muted text-[10px]">
