@@ -66,7 +66,7 @@ export default function RescueBoard({ tickets, factsOf, wide, column, onColumn, 
             className={clsx(
               // Kiểu bảng Kanban: thân cột lõm (màu nền trang) — thẻ phiếu trắng nổi lên; đầu cột trắng có vạch màu nhấn phía
               // trên (cột đã xong: xanh lá như biểu tượng). Không dùng màu Đỏ / Cam / Vàng (dành cho mức ưu tiên của phiếu)
-              'card flex max-h-[calc(100vh-12rem)] min-h-[360px] min-w-0 flex-col overflow-hidden border-t-[3px] shadow-none transition-all lg:tall:max-h-[calc(100vh-14rem)] print:max-h-none print:min-h-0',
+              'card flex min-h-[560px] max-h-[calc(100vh-5.5rem)] min-w-0 flex-col overflow-hidden border-t-[3px] shadow-none transition-all print:max-h-none print:min-h-0',
               c.key === 'hoan_thanh' ? 'border-t-good' : 'border-t-accent',
               over === c.key ? 'border-dashed bg-accent/5 ring-2 ring-accent' : 'bg-bg',
             )}
@@ -87,7 +87,7 @@ export default function RescueBoard({ tickets, factsOf, wide, column, onColumn, 
               </div>
               <div className="mt-0.5 text-[11px] text-muted">{c.hint}</div>
             </div>
-            <div className="scroll-thin flex flex-1 flex-col gap-2.5 overflow-y-auto p-2.5 print:overflow-visible">
+            <div className="scroll-thin flex flex-1 flex-col gap-2 overflow-y-auto p-2 print:overflow-visible">
               {byCol[c.key].length ? cards(c.key) : empty(c.key)}
             </div>
           </section>

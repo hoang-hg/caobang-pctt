@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Columns3, Home, Inbox, List, Navigation } from 'lucide-react';
+import clsx from 'clsx';
+import { Columns3, Home, Inbox, List, Maximize2, Minimize2, Navigation } from 'lucide-react';
 import { api } from '../api/client';
 import { useAreaQuery, useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
@@ -93,6 +94,8 @@ export default function RescueCenter() {
   const [evacOpen, setEvacOpen] = useState(false);
   // Bản đồ + diễn biến: mặc định thu gọn để bảng điều phối SOS lên ngay tầm mắt người trực ban
   const [overviewOpen, setOverviewOpen] = useState(false);
+  // Cột Tiếp nhận SOS & Giám sát sơ tán bên phải: có thể thu gọn để bảng điều phối chiếm 100% không gian
+  const [sideOpen, setSideOpen] = useState(true);
   const contentRef = useRef(null);
   const boardRef = useRef(null);
 
@@ -389,15 +392,37 @@ export default function RescueCenter() {
         exporting={pdf}
       />
 
-      <div className="grid gap-3 2xl:grid-cols-[minmax(0,1fr)_370px]">
+      <div className={clsx('grid gap-3', sideOpen ? '2xl:grid-cols-[minmax(0,1fr)_370px]' : 'grid-cols-1')}>
         <div ref={boardRef} className="flex min-w-0 scroll-mt-20 flex-col gap-2.5">
           <div className="flex flex-wrap items-center justify-between gap-2 no-print">
-            <Segmented
-              label="Cách xem phiếu"
-              value={view}
-              onChange={(v) => setParam({ xem: v === 'bang' ? '' : v })}
-              options={VIEWS.map(([v, label, icon]) => ({ value: v, label, icon }))}
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              <Segmented
+                label="Cách xem phiếu"
+                value={view}
+                onChange={(v) => setParam({ xem: v === 'bang' ? '' : v })}
+                options={VIEWS.map(([v, label, icon]) => ({ value: v, label, icon }))}
+              />
+              {/* Nút bật/tắt toàn màn hình cho bảng SOS trên màn hình rộng */}
+              <button
+                type="button"
+                onClick={() => setSideOpen((v) => !v)}
+                className="btn-ghost tap hidden 2xl:flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-accent hover:bg-accent/10 rounded-lg transition-colors border border-accent/25"
+                title={sideOpen ? 'Thu gọn cột Tiếp nhận & Sơ tán để mở rộng tối đa Bảng điều phối SOS' : 'Mở lại cột Tiếp nhận SOS & Giám sát sơ tán'}
+                aria-pressed={sideOpen}
+              >
+                {sideOpen ? (
+                  <>
+                    <Maximize2 size={13} aria-hidden="true" />
+                    <span>Toàn màn hình bảng SOS</span>
+                  </>
+                ) : (
+                  <>
+                    <Minimize2 size={13} aria-hidden="true" />
+                    <span>Hiện Tiếp nhận & Sơ tán</span>
+                  </>
+                )}
+              </button>
+            </div>
             {view === 'bang' && wide && <span className="text-xs text-muted">Kéo thẻ phiếu sang cột khác, hoặc chọn “Chuyển sang…” trên thẻ</span>}
             {view === 'danh_sach' && (
               <div className="flex flex-wrap items-center gap-1.5">
@@ -414,10 +439,12 @@ export default function RescueCenter() {
           <div ref={contentRef} className="bg-bg">{body}</div>
         </div>
         {/* Điện thoại: giám sát sơ tán trước, tiếp nhận tin (việc của trực ban ở bàn) sau; màn rộng: cột phải */}
-        <aside className="flex min-w-0 flex-col gap-3">
-          <Can I="sos" a="create"><div className="order-2 2xl:order-1"><Intake online={online} /></div></Can>
-          <Evacuation query={evacQ} online={online} className="order-1 2xl:order-2" />
-        </aside>
+        {sideOpen && (
+          <aside className="flex min-w-0 flex-col gap-3">
+            <Can I="sos" a="create"><div className="order-2 2xl:order-1"><Intake online={online} /></div></Can>
+            <Evacuation query={evacQ} online={online} className="order-1 2xl:order-2" />
+          </aside>
+        )}
       </div>
 
       {dispatch && <DispatchModal ticket={dispatch} onClose={() => setDispatch(null)} />}
