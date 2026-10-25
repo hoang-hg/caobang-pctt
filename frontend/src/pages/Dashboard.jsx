@@ -9,7 +9,6 @@ import {
 import { useAreaQuery, useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
 import { EmptyState, ErrorState, Hint, RiskLegend, Section, Segmented, Skeleton } from '../components/common/ui';
-import RoleTips from '../components/common/RoleTips';
 import EventLog from '../components/common/EventLog';
 import Hydrograph from '../components/charts/Hydrograph';
 import RainfallChart from '../components/charts/RainfallChart';
@@ -608,8 +607,6 @@ export default function Dashboard() {
       {tab === 'cap_xa' && (
         <div ref={ref} className="flex flex-col gap-3.5">
           <CommuneView code={communeCode} units={scopeUnits} onChange={(code) => enterCommune(code)} onSupport={() => setSupportOpen(true)}>
-            {/* Tài khoản xã: gợi ý lần đầu ngay dưới các ô chỉ số của xã (cấp tỉnh xem thẻ này đã có gợi ý ở thẻ Tổng hợp) */}
-            {isCommuneUser && <RoleTips page="tong-quan" />}
             <div className="grid gap-3.5 xl:grid-cols-[1fr_360px] [&>*]:min-w-0">
               <div className="grid gap-3.5 lg:grid-cols-2 [&>*]:min-w-0">
                 {/* Biểu đồ số đo trạm chỉ khi xã có trạm đo mưa — không thì 2 khung trống "chưa có số đo" chiếm nửa trang */}
@@ -682,15 +679,9 @@ export default function Dashboard() {
               {bigScreen && <TacticalMiniMap k={k} className="min-w-0" focus={mapFocus} tall />}
             </div>
 
-            {/* 2. Khối chiến thuật: bản đồ + chuyên đề (trái), gợi ý + nhật ký sự kiện (phải) */}
+            {/* 2. Khối chiến thuật: bản đồ + chuyên đề (trái), nhật ký sự kiện (phải) */}
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_420px] [&>*]:min-w-0">
-              {!presentation && (
-                <RoleTips
-                  page="tong-quan"
-                  className="md:col-start-2 md:row-start-1 md:!flex-col md:!items-stretch md:self-start [&_ol]:md:!grid-cols-1"
-                />
-              )}
-              <div className="flex min-w-0 flex-col gap-3 md:col-start-1 md:row-span-2 md:row-start-1">
+              <div className="flex min-w-0 flex-col gap-3">
                 {!bigScreen && <TacticalMiniMap k={k} className="min-w-0" focus={mapFocus} />}
 
                 {/* Biểu đồ theo chuyên đề — xem một chuyên đề một lúc (bớt rối cho lãnh đạo) hoặc "Tất cả" */}
@@ -770,7 +761,7 @@ export default function Dashboard() {
               {logSection({
                 title: 'Nhật ký sự kiện',
                 limit: 60,
-                className: 'min-w-0 md:col-start-2 lg:sticky lg:top-16 lg:h-[calc(100vh-8.5rem)] lg:self-start lg:overflow-hidden lg:tall:h-[calc(100vh-10.5rem)]', // màn đủ cao: trừ cả thanh trạng thái
+                className: 'min-w-0 lg:sticky lg:top-16 lg:h-[calc(100vh-8.5rem)] lg:self-start lg:overflow-hidden lg:tall:h-[calc(100vh-10.5rem)]', // màn đủ cao: trừ cả thanh trạng thái
               })}
             </div>
           </div>

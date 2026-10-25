@@ -8,7 +8,6 @@ import { api } from '../api/client';
 import { useStore } from '../app/store';
 import { Confirm, Empty, EmptyState, ErrorState, Modal, Skeleton, Tabs } from '../components/common/ui';
 import PageHeader from '../components/common/PageHeader';
-import RoleTips from '../components/common/RoleTips';
 import { PAGE } from '../components/layout/page';
 import { usePermission } from '../rbac/usePermission';
 import { STATION_TYPE } from '../utils/labels';
@@ -575,7 +574,6 @@ export default function DataSources() {
         timeNote={sourcesQ.isError ? 'Chưa tải được số liệu' : 'Đang tải số liệu…'}
         description="Số liệu dự báo và trạm đo hiện trường về hệ thống từ đâu, có đang về đều không."
       />
-      <RoleTips page="nguon-du-lieu" />
       <Tabs value={tab} onChange={setTab} tabs={[
         { value: 'sources', label: 'Nguồn số liệu', icon: CloudSun, alert: broken ? { level: 3, text: `${broken} nguồn đang lỗi` } : undefined },
         { value: 'devices', label: 'Thiết bị đo', icon: Cpu, alert: lost ? { level: 2, text: `${lost} thiết bị mất tín hiệu` } : undefined },

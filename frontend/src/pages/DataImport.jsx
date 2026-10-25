@@ -10,7 +10,6 @@ import { useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
 import { BackButton, Empty, ErrorState, Segmented, Skeleton, Tabs } from '../components/common/ui';
 import PageHeader from '../components/common/PageHeader';
-import RoleTips from '../components/common/RoleTips';
 import { PAGE } from '../components/layout/page';
 import { useAllowedCodes, usePermission } from '../rbac/usePermission';
 import RecordForm from './DataImportForm';
@@ -57,7 +56,6 @@ export default function DataImport() {
           ? 'Cập nhật danh sách điểm sơ tán, kho, danh bạ… cho cả tỉnh. Máy kiểm tra từng dòng, hết lỗi mới ghi.'
           : 'Gửi danh sách điểm sơ tán, kho, danh bạ… của xã. Cấp tỉnh duyệt xong mới hiện trên hệ thống.'}
       />
-      <RoleTips page="nhap-du-lieu" />
       <Tabs
         value={tab}
         onChange={setTab}
