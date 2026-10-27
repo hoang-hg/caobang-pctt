@@ -67,7 +67,7 @@ export default function DecisionPanel({ k, kState, className, stacked = false, h
             </span>
           )}
           {heroLayout && onSetHeroLayout && (
-            <div className="hidden sm:flex items-center gap-1 shrink-0">
+            <div className="-my-1 hidden shrink-0 items-center gap-1 sm:flex">
               {heroLayout === 'split' ? (
                 <>
                   <button

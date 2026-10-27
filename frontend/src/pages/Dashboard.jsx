@@ -687,7 +687,7 @@ export default function Dashboard() {
             {bigScreen ? (
               <div className="flex flex-col gap-3.5">
                 {layout === 'split' && (
-                  <div className="grid grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-3.5 items-start">
+                  <div className="grid grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-3.5">
                     <div className="flex min-w-0 flex-col gap-3.5">
                       {!presentation && (
                         <DecisionPanel
