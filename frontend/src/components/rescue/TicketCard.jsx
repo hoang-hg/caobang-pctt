@@ -226,7 +226,8 @@ export default function TicketCard({ t, x, now, online, compact = false, fresh =
 
       {/* Nút chính (bước kế tiếp) — điện thoại trọn hàng, vùng ngón cái; rồi các nút phụ */}
       <div className={clsx('no-print', compact ? 'mt-1.5 flex flex-col gap-1' : 'mt-2 flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-center')}>
-        <div className={clsx('flex items-center gap-1', compact ? 'w-full' : 'w-full sm:w-auto')}>
+        {/* Thẻ thường (điện thoại, danh sách): xuống dòng — nút chính trọn hàng, nút phụ hàng dưới; 360 px không tràn ngang */}
+        <div className={clsx('flex items-center', compact ? 'w-full gap-1' : 'w-full flex-wrap gap-1.5 sm:w-auto')}>
           {primary && <div className={clsx(compact ? 'min-w-0 flex-1' : 'w-full sm:w-auto')}>{primary}</div>}
           {enRoute && canResolve && <div className={clsx(compact ? 'min-w-0 flex-1' : 'w-full sm:w-auto')}>{confirm('btn-ghost')}</div>}
           {needSupport && canDispatch && (

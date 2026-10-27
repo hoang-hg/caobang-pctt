@@ -1283,6 +1283,11 @@ async function mapTools(ctx, phone) {
   const tap = ([x, y]) => (phone ? page.touchscreen.tap(x, y) : page.mouse.click(x, y));
   const pick = async (label) => {
     if (phone) await page.getByRole('button', { name: 'Công cụ', exact: true }).click();
+    else {
+      // Máy tính: thanh chọn nền & công cụ thu gọn sẵn (bản đồ rộng hơn) — mở ra trước
+      const open = page.getByRole('button', { name: 'Mở thanh chọn nền & công cụ vẽ' });
+      if (await open.count()) await open.click();
+    }
     await visible(page.locator(`button[title="${label}"]`)).click();
     await page.waitForTimeout(300);
     // Bản đồ đứng yên (bay tới vùng đang lọc xong) rồi mới chọn điểm bấm
