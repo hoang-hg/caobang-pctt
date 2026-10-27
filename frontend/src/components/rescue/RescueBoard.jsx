@@ -19,7 +19,7 @@ const EMPTY = {
  * phiếu quá hạn) rồi danh sách phiếu của cột — không cuộn lồng nhau, không phải lướt qua 3 cột mới tới cột cần xem. Cột
  * theo trạng thái, KHÔNG tô màu rủi ro (màu Đỏ / Cam / Vàng dành cho mức ưu tiên của từng phiếu).
  */
-export default function RescueBoard({ tickets, factsOf, wide, column, onColumn, filtered, cardProps, onDrop }) {
+export default function RescueBoard({ tickets, factsOf, wide, column, onColumn, filtered, cardProps, onDrop, height }) {
   const [over, setOver] = useState(null);
   const byCol = Object.fromEntries(COLUMNS.map((c) => [c.key, tickets.filter((t) => t.status === c.key)]));
   const overdueIn = (key) => byCol[key].filter((t) => factsOf(t).overdue).length;
@@ -53,12 +53,13 @@ export default function RescueBoard({ tickets, factsOf, wide, column, onColumn, 
   }
 
   return (
-    <div className="grid min-w-0 grid-cols-4 gap-3">
+    <div className="grid min-w-0 grid-cols-4 gap-3 flex-1 h-full min-h-0 items-stretch">
       {COLUMNS.map((c) => {
         const late = overdueIn(c.key);
         return (
           <section
             key={c.key}
+            style={{ height: height ? `${height}px` : undefined }}
             aria-label={`${c.title} — ${byCol[c.key].length} phiếu`}
             onDragOver={(e) => { e.preventDefault(); setOver(c.key); }}
             onDragLeave={() => setOver(null)}
@@ -66,7 +67,9 @@ export default function RescueBoard({ tickets, factsOf, wide, column, onColumn, 
             className={clsx(
               // Kiểu bảng Kanban: thân cột lõm (màu nền trang) — thẻ phiếu trắng nổi lên; đầu cột trắng có vạch màu nhấn phía
               // trên (cột đã xong: xanh lá như biểu tượng). Không dùng màu Đỏ / Cam / Vàng (dành cho mức ưu tiên của phiếu)
-              'card flex max-h-[calc(100vh-12rem)] min-h-[360px] min-w-0 flex-col overflow-hidden border-t-[3px] shadow-none transition-all lg:tall:max-h-[calc(100vh-14rem)] print:max-h-none print:min-h-0',
+              'card flex min-h-0 min-w-0 flex-col overflow-hidden border-t-[3px] shadow-none transition-all print:h-auto print:max-h-none print:min-h-0',
+              // Cao bằng cột Tiếp nhận & Sơ tán khi nằm cạnh (height); không thì kéo tới đáy màn hình, phiếu cuộn trong cột
+              height ? 'h-full' : 'h-[calc(100vh-12rem)] min-h-[360px] lg:tall:h-[calc(100vh-14rem)]',
               c.key === 'hoan_thanh' ? 'border-t-good' : 'border-t-accent',
               over === c.key ? 'border-dashed bg-accent/5 ring-2 ring-accent' : 'bg-bg',
             )}
@@ -77,12 +80,17 @@ export default function RescueBoard({ tickets, factsOf, wide, column, onColumn, 
                   <c.icon size={15} />
                 </span>
                 <span className="min-w-0 flex-1 leading-tight">{c.title}</span>
-                {late > 0 && <span className="chip bg-danger px-1.5 py-0 text-[11px] font-bold text-white" title={`${late} phiếu quá hạn phản hồi`}>{late} quá hạn</span>}
+                {late > 0 && (
+                  <span className="chip inline-flex items-center gap-1 bg-danger px-1.5 py-0 text-[11px] font-bold text-white" title={`${late} phiếu quá hạn phản hồi`}>
+                    <span className="inline-block h-1.5 w-1.5 animate-ping rounded-full bg-white" aria-hidden="true" />
+                    {late} quá hạn
+                  </span>
+                )}
                 <span className="chip bg-panel2 px-2 py-0.5 text-xs font-semibold">{byCol[c.key].length}</span>
               </div>
               <div className="mt-0.5 text-[11px] text-muted">{c.hint}</div>
             </div>
-            <div className="scroll-thin flex flex-1 flex-col gap-2.5 overflow-y-auto p-2.5 print:overflow-visible">
+            <div className="scroll-thin flex flex-1 min-h-0 flex-col gap-2 overflow-y-auto p-2 print:overflow-visible">
               {byCol[c.key].length ? cards(c.key) : empty(c.key)}
             </div>
           </section>

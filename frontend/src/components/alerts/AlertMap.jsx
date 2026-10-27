@@ -13,6 +13,7 @@ import { NO_DATA, RISK, risk } from '../../utils/risk';
 import { SEVERITY_LEVEL } from './alertFacts';
 
 const CENTER = [22.75, 106.05];
+const MAP_PAD = { topLeft: [14, 14], bottomRight: [14, 14] };
 
 /**
  * Bản đồ vùng đang có cảnh báo (thiết kế E.2 — khoanh vùng cảnh báo): xã / phường tô theo cảnh báo nặng nhất đang hiệu lực
@@ -49,11 +50,11 @@ export default function AlertMap({ broadcasts, factsOf }) {
         <Link to="/ban-do" className="btn-ghost tap min-h-[32px] px-2.5 py-0.5 text-xs"><Maximize2 size={12} aria-hidden="true" /> Bản đồ đầy đủ</Link>
       </div>
       <div className="relative isolate z-0 h-60 overflow-hidden rounded-lg border border-line sm:h-72 xl:h-80">
-        <MapContainer center={CENTER} zoom={8} zoomControl={false} scrollWheelZoom={false} dragging={!coarse} className="h-full w-full">
+        <MapContainer center={CENTER} zoom={8.8} zoomControl={false} zoomSnap={0.1} zoomDelta={0.5} scrollWheelZoom={false} dragging={!coarse} className="h-full w-full">
           <BaseLayer basemap="auto" />
           <ZoomControl position="bottomright" />
           <MapResize />
-          <AreaFocus area={area} filtered={filtered} />
+          <AreaFocus area={area} filtered={filtered} padding={MAP_PAD} />
           {geo && (
             <GeoJSON
               key={sig}

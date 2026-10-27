@@ -3,10 +3,10 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import {
-  AlertTriangle, ChevronDown, ChevronUp, Compass, Droplets, FileDown, FileSpreadsheet, FileText, Home, LayoutDashboard, LifeBuoy,
-  MapPin, Minimize2, Monitor, Mountain, Pause, Play, Send, Server, Waves, X,
+  AlertTriangle, CheckSquare, ChevronDown, ChevronUp, Columns2, Compass, Droplets, FileDown, FileSpreadsheet, FileText, Home, LayoutDashboard, LifeBuoy,
+  Minimize2, Monitor, Mountain, Pause, Play, Send, Server, Waves, X,
 } from 'lucide-react';
-import { useAreaQuery, usePresets, useUnits } from '../api/hooks';
+import { useAreaQuery, useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
 import { EmptyState, ErrorState, Hint, RiskLegend, Section, Segmented, Skeleton } from '../components/common/ui';
 import RoleTips from '../components/common/RoleTips';
@@ -126,9 +126,26 @@ export default function Dashboard() {
   const [params, setParams] = useSearchParams();
   const { filter, setFilter, clearFilter, toast, auth, wsStatus, setFocus, presentation, setPresentation } = useStore();
   // Màn lớn của lãnh đạo (≥ 1680 px — màn rời, TV phòng điều hành; cả chế độ trình chiếu): 2 cột — việc chờ + 6 ô số bên
-  // trái (trình chiếu: chỉ 6 ô số chữ to), bản đồ điểm nóng lớn bên phải (docs/ke-hoach-lam-moi-giao-dien.md mục 6.3).
-  // Laptop 1366–1600 px giữ bố cục cũ: cột trái hẹp làm chữ trong 6 ô số bị cắt
+  // trái, bản đồ điểm nóng lớn bên phải (docs/ke-hoach-lam-moi-giao-dien.md mục 6.3); mở rộng một bên / thu gọn bên kia theo
+  // lựa chọn của người xem (nhớ trên máy). Laptop 1366–1600 px giữ 1 cột: 2 cột đẩy 6 ô số ra khỏi màn hình đầu (1440 × 900:
+  // hàng ô cuối bị thanh trạng thái che)
   const bigScreen = useMediaQuery('(min-width: 1680px)');
+  const [heroLayout, setHeroLayoutState] = useState(() => {
+    try {
+      const saved = localStorage.getItem('pctt_dashboard_hero_layout');
+      if (saved === 'left_full' || saved === 'right_full' || saved === 'split') return saved;
+    } catch { /* bỏ qua */ }
+    return 'split';
+  });
+  const setHeroLayout = (layout) => {
+    setHeroLayoutState(layout);
+    try {
+      localStorage.setItem('pctt_dashboard_hero_layout', layout);
+    } catch { /* bỏ qua */ }
+  };
+  // Trình chiếu (TV phòng điều hành) luôn chia 2 cột, đủ 6 ô số — lựa chọn thu gọn của người xem trên máy không áp vào
+  const layout = presentation ? 'split' : heroLayout;
+  const layoutProps = presentation ? {} : { heroLayout: layout, onSetHeroLayout: setHeroLayout };
   const isFiltered = filter.codes.length > 0;
 
   // Quyền: nút / thẻ / khối chỉ hiện khi tài khoản mở được — backend vẫn kiểm tra lại mọi thao tác
@@ -167,7 +184,6 @@ export default function Dashboard() {
   const { data: layers } = useAreaQuery('map-layers', '/map/layers', {}, { refetchInterval: 30_000, enabled: tab !== 'cap_xa' });
   const hotspots = useMemo(() => buildHotspots(layers, k), [layers, k]);
   const [mapFocus, setMapFocus] = useState(null); // "Xem trên bản đồ" của câu "Nguy hiểm nhất" → bản đồ điểm nóng bay tới
-  const { data: presets = [] } = usePresets();
   const { data: units = [] } = useUnits();
 
   // Phạm vi được giao: tài khoản xã chưa lọc thì tiêu đề là xã đó, không ghi "Toàn tỉnh"
@@ -186,16 +202,6 @@ export default function Dashboard() {
   }, [tabs, isCommuneUser, scopeUnit]);
   const filterLabel = isFiltered || scope === null ? filter.label : scopeLabel;
   const role = auth?.user?.assignments?.[0]?.role_name;
-  // Lọc nhanh theo lưu vực (nhóm do BCH xác nhận — README 2.4) — ô chọn trong thanh lệnh (trước đây 1 hàng chip riêng)
-  const basinPresets = useMemo(() => presets.filter((p) => p.kind === 'luu_vuc'), [presets]);
-  const basinValue = filter.presetCode && basinPresets.some((p) => p.code === filter.presetCode)
-    ? filter.presetCode
-    : isFiltered ? 'khac' : '';
-  const pickBasin = (code) => {
-    const p = basinPresets.find((x) => x.code === code);
-    if (p) setFilter({ codes: p.unit_codes, label: p.name, presetCode: p.code });
-    else clearFilter();
-  };
 
   const waterStations = useMemo(() => allStations.filter((s) => s.type === 'muc_nuoc'), [allStations]);
   const rainStations = allStations.filter((s) => s.type === 'luong_mua').length;
@@ -423,8 +429,8 @@ export default function Dashboard() {
     const rows = [
       ['Phạm vi', filterLabel],
       ['Thời điểm', now.toLocaleString('vi-VN', VN_TIME)],
-      [k?.rain?.avg_method === 'thiessen' ? 'Mưa TB lưu vực 24h – theo diện tích, đa giác Thiessen (mm)' : 'Mưa TB 24h các trạm (mm)', k?.rain?.avg_24h],
-      ['Mưa 24h lớn nhất (mm)', k?.rain?.max_24h, k?.rain?.max_station],
+      [k?.rain?.avg_method === 'thiessen' ? 'Mưa trung bình lưu vực 24 giờ – theo diện tích, đa giác Thiessen (mm)' : 'Mưa trung bình 24 giờ các trạm (mm)', k?.rain?.avg_24h],
+      ['Mưa 24 giờ lớn nhất (mm)', k?.rain?.max_24h, k?.rain?.max_station],
       ...waterStations.map((s) => {
         const st = riverState(s);
         return [`Mực nước – ${s.name} (m)`, st.value, `${st.label} · ${risk(st.level).name}`];
@@ -538,19 +544,6 @@ export default function Dashboard() {
           </>
         ) : (
           <>
-            {/* Lọc nhanh theo lưu vực (nhóm do BCH xác nhận — README 2.4). Tài khoản xã chỉ có xã mình → không có lưu vực;
-                điện thoại: chọn lưu vực ở bộ lọc trong menu ☰ (cùng danh sách nhóm) */}
-            {tab === 'tong_hop' && scope === null && basinPresets.length > 0 && (
-              <label className="hidden items-center gap-1.5 text-xs text-muted sm:flex">
-                <MapPin size={13} aria-hidden="true" />
-                <span className="hidden 2xl:inline">Lưu vực</span>
-                <select className="input tap h-9 w-auto max-w-[12rem] py-0.5 text-xs" value={basinValue} onChange={(e) => pickBasin(e.target.value)} aria-label="Lọc theo lưu vực">
-                  <option value="">Toàn tỉnh</option>
-                  {basinValue === 'khac' && <option value="khac" disabled>{filter.label}</option>}
-                  {basinPresets.map((p) => <option key={p.code} value={p.code}>{p.name} ({p.unit_codes.length} xã)</option>)}
-                </select>
-              </label>
-            )}
             <button type="button" onClick={enterPresentation} className="btn-secondary tap-sq hidden h-9 px-2.5 lg:inline-flex" aria-label="Chế độ trình chiếu màn hình lớn" title="Trình chiếu trên màn hình lớn phòng điều hành: nền tối, chữ số to, tự chuyển chuyên đề">
               <Monitor size={15} aria-hidden="true" /> <span className="hidden xl:inline">Trình chiếu</span>
             </button>
@@ -564,7 +557,7 @@ export default function Dashboard() {
         onRefresh={presentation ? undefined : refresh}
         refreshing={refreshing}
       >
-        <ProvinceArt className="pointer-events-none absolute -right-8 top-1/2 -z-10 h-[230%] w-auto -translate-y-1/2 text-sky-200 opacity-25 max-md:hidden" />
+        <ProvinceArt className="pointer-events-none absolute -right-8 top-1/2 -z-10 h-[230%] w-auto -translate-y-1/2 text-accent/15 opacity-30 max-md:hidden" />
         {/* Câu tóm tắt tình hình bằng lời + chỗ nguy hiểm nhất (thẻ Cấp xã có phần riêng của xã) */}
         {tab !== 'cap_xa' && (
           <div className="mt-1.5">
@@ -576,6 +569,7 @@ export default function Dashboard() {
               large={presentation}
               onShowWorst={(h) => {
                 if (tab !== 'tong_hop') setTab('tong_hop');
+                if (bigScreen && heroLayout === 'left_full') setHeroLayout('split'); // bản đồ đang thu gọn → hiện lại để bay tới
                 setMapFocus({ id: h.id, at: Date.now() });
               }}
               link={canDataImport ? { to: '/nhap-du-lieu', text: 'Nhập danh mục trạm →' } : canSystem ? { to: '/nguon-du-lieu', text: 'Xem nguồn dữ liệu →' } : null}
@@ -688,26 +682,128 @@ export default function Dashboard() {
         <>
           {/* Vùng chụp PDF: chỉ số + bản đồ + biểu đồ + nhật ký ("Việc chờ quyết định", gợi ý không in — việc riêng của người xem) */}
           <div ref={ref} className="flex flex-col gap-2.5 bg-bg sm:gap-3.5">
-            {/* 1. Việc chờ quyết định — khối nổi bật đầu tiên (hàng thẻ ngang từ 640 px), rồi 6 ô chỉ số. Điện thoại: 6 ô
-                trước (thấy trọn cùng dải khẩn, không cuộn), Việc chờ ngay sau. Trình chiếu: chỉ 6 ô, chữ to */}
-            <div className={clsx(bigScreen ? 'grid grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-3.5' : 'flex flex-col gap-2.5 sm:gap-3.5')}>
-              <div className={clsx(bigScreen ? 'flex min-w-0 flex-col gap-3.5' : 'contents')}>
-                {!presentation && <DecisionPanel k={k} kState={kState} className="max-sm:order-last" stacked={bigScreen} />}
-                <KpiStrip
-                  {...kpiProps}
-                  onRiver={(id) => {
-                    setChartSegment('thuy_van');
-                    focusStation(id);
-                  }}
-                  large={presentation}
-                  stacked={bigScreen}
-                />
-              </div>
-              {bigScreen && <TacticalMiniMap k={k} className="min-w-0" focus={mapFocus} tall />}
-            </div>
+            {/* 1. Việc chờ quyết định + 6 ô chỉ số & Bản đồ điểm nóng:
+                Màn lớn: 2 cột (split), mở rộng bên trái (left_full) hoặc mở rộng bản đồ (right_full) — trình chiếu luôn 2 cột. */}
+            {bigScreen ? (
+              <div className="flex flex-col gap-3.5">
+                {layout === 'split' && (
+                  <div className="grid grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-3.5">
+                    <div className="flex min-w-0 flex-col gap-3.5">
+                      {!presentation && (
+                        <DecisionPanel
+                          k={k}
+                          kState={kState}
+                          className="max-sm:order-last"
+                          stacked
+                          {...layoutProps}
+                        />
+                      )}
+                      <KpiStrip
+                        {...kpiProps}
+                        onRiver={(id) => {
+                          setChartSegment('thuy_van');
+                          focusStation(id);
+                        }}
+                        large={presentation}
+                        stacked
+                      />
+                    </div>
+                    <TacticalMiniMap
+                      k={k}
+                      className="min-w-0"
+                      focus={mapFocus}
+                      tall
+                      {...layoutProps}
+                    />
+                  </div>
+                )}
 
-            {/* Gợi ý lần đầu: điện thoại ngay trước bản đồ; máy tính bảng / laptop đầu cột phải (trên nhật ký) — không đẩy bản
-                đồ xuống dưới màn hình đầu */}
+                {layout === 'left_full' && (
+                  <div className="flex min-w-0 flex-col gap-3.5">
+                    {!presentation && (
+                      <DecisionPanel
+                        k={k}
+                        kState={kState}
+                        className="max-sm:order-last"
+                        stacked={false}
+                        {...layoutProps}
+                      />
+                    )}
+                    <KpiStrip
+                      {...kpiProps}
+                      onRiver={(id) => {
+                        setChartSegment('thuy_van');
+                        focusStation(id);
+                      }}
+                      large={presentation}
+                      stacked={false}
+                    />
+                    <div className="flex items-center justify-between rounded-lg border border-dashed border-accent/40 bg-accent/5 px-4 py-2.5 text-xs text-ink/80 transition-all hover:bg-accent/10">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent/15 text-accent font-semibold">
+                          <Compass size={14} />
+                        </span>
+                        <span>Bản đồ điểm nóng đang được thu gọn. Khối việc chờ & 6 chỉ số đang hiển thị toàn bộ chiều rộng màn hình.</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setHeroLayout('split')}
+                        className="btn-ghost tap flex items-center gap-1.5 rounded-md border border-accent/40 bg-panel px-3 py-1 font-semibold text-accent shadow-xs hover:bg-accent hover:text-white"
+                      >
+                        <Columns2 size={13} />
+                        <span>Hiện lại bản đồ (chia 2 cột)</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {layout === 'right_full' && (
+                  <div className="flex min-w-0 flex-col gap-3.5">
+                    <div className="flex items-center justify-between rounded-lg border border-dashed border-accent/40 bg-accent/5 px-4 py-2.5 text-xs text-ink/80 transition-all hover:bg-accent/10">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent/15 text-accent font-semibold">
+                          <CheckSquare size={14} />
+                        </span>
+                        <span>Đang thu gọn khối việc chờ & 6 chỉ số để bản đồ điểm nóng hiển thị toàn bộ chiều rộng màn hình.</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setHeroLayout('split')}
+                        className="btn-ghost tap flex items-center gap-1.5 rounded-md border border-accent/40 bg-panel px-3 py-1 font-semibold text-accent shadow-xs hover:bg-accent hover:text-white"
+                      >
+                        <Columns2 size={13} />
+                        <span>Hiện lại việc chờ & 6 chỉ số (chia 2 cột)</span>
+                      </button>
+                    </div>
+                    <TacticalMiniMap
+                      k={k}
+                      className="min-w-0"
+                      focus={mapFocus}
+                      tall
+                      {...layoutProps}
+                    />
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2.5 sm:gap-3.5">
+                <div className="contents">
+                  {!presentation && <DecisionPanel k={k} kState={kState} className="max-sm:order-last" stacked={false} />}
+                  <KpiStrip
+                    {...kpiProps}
+                    onRiver={(id) => {
+                      setChartSegment('thuy_van');
+                      focusStation(id);
+                    }}
+                    large={presentation}
+                    stacked={false}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* 2. Khối chiến thuật: bản đồ + chuyên đề (trái), nhật ký sự kiện (phải). Gợi ý lần đầu: điện thoại ngay trước bản
+                đồ; máy tính bảng / laptop đầu cột phải (trên nhật ký) — không đẩy bản đồ xuống dưới màn hình đầu */}
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_420px] [&>*]:min-w-0">
               {!presentation && (
                 <RoleTips

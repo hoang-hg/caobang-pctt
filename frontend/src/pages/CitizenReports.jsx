@@ -17,7 +17,7 @@ import { INCIDENT, VULNERABLE } from '../utils/labels';
 
 const STATUS = {
   cho_duyet: { label: 'Chờ duyệt', cls: 'bg-warn text-black' },
-  da_duyet: { label: 'Đã duyệt (công khai)', cls: 'bg-good text-white' },
+  da_duyet: { label: 'Đã duyệt (công khai)', cls: 'bg-good text-black font-semibold' },
   da_xu_ly: { label: 'Đã xử lý', cls: 'bg-accent text-white' },
   tu_choi: { label: 'Từ chối', cls: 'bg-panel2 text-muted' },
 };

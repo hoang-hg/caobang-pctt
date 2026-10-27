@@ -90,7 +90,8 @@ export default function TicketCard({ t, x, now, online, compact = false, fresh =
       onDragStart={(e) => e.dataTransfer.setData('text/plain', t.id)}
       aria-label={`${t.code} — ${INCIDENT[t.incident_type] || t.incident_type}, ${pr.label}${overdue ? ', quá hạn phản hồi' : ''}`}
       className={clsx(
-        'card min-w-0 select-none border-l-4 p-3 shadow-sm transition-shadow hover:shadow-md',
+        'card min-w-0 select-none border-l-4 shadow-sm transition-shadow hover:shadow-md',
+        compact ? 'p-2.5' : 'p-3',
         canUpdate && t.status !== 'hoan_thanh' ? 'cursor-grab active:cursor-grabbing' : 'cursor-default',
         risk(sosLevel(t.priority)).edge,
         // Quá hạn: viền đỏ cố định, chỉ nhãn 'Quá hạn' nhấp nháy — cả thẻ nhấp nháy thì không đọc được chữ, không bấm chắc tay
@@ -100,7 +101,7 @@ export default function TicketCard({ t, x, now, online, compact = false, fresh =
     >
       {/* Xã xin chi viện: dải riêng trên đầu thẻ — trực ban thấy ngay giữa các phiếu người dân báo */}
       {isCommuneSupport(t) && (
-        <div className="-mx-3 -mt-3 mb-2 flex items-center gap-1.5 rounded-tr-[11px] bg-danger px-3 py-1.5 text-xs font-bold text-white">
+        <div className={clsx(compact ? '-mx-2.5 -mt-2.5 mb-1.5 px-2.5 py-1' : '-mx-3 -mt-3 mb-2 px-3 py-1.5', 'flex items-center gap-1.5 rounded-tr-[11px] bg-danger text-xs font-bold text-white')}>
           <HandHelping size={14} className="shrink-0" aria-hidden="true" />
           <span className="min-w-0 truncate">Xã xin chi viện{t.admin_name ? ` — ${t.admin_name}` : ''}</span>
         </div>
@@ -135,7 +136,7 @@ export default function TicketCard({ t, x, now, online, compact = false, fresh =
 
       <div className="mt-1 flex items-start gap-1 text-xs text-muted">
         <MapPin size={12} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
-        <span className="line-clamp-2">{t.address || t.admin_name}{t.admin_name && t.address !== t.admin_name ? ` (${t.admin_name})` : ''}</span>
+        <span className={clsx(compact ? 'line-clamp-1' : 'line-clamp-2')}>{t.address || t.admin_name}{t.admin_name && t.address !== t.admin_name ? ` (${t.admin_name})` : ''}</span>
       </div>
 
       {!!t.vulnerable?.length && (
@@ -145,7 +146,15 @@ export default function TicketCard({ t, x, now, online, compact = false, fresh =
       )}
 
       {t.raw_message && (
-        <p className="mt-1.5 line-clamp-2 rounded-lg border border-line/40 bg-panel2/60 p-1.5 text-xs italic text-ink-2">“{t.raw_message}”</p>
+        <p
+          className={clsx(
+            compact ? 'mt-1 line-clamp-1 px-2 py-1 text-[11px]' : 'mt-1.5 line-clamp-2 p-1.5 text-xs',
+            'rounded-lg border border-line/40 bg-panel2/60 italic text-ink-2',
+          )}
+          title={compact ? t.raw_message : undefined}
+        >
+          “{t.raw_message}”
+        </p>
       )}
 
       {/* Người dân gửi trên cổng: mã phiếu yêu cầu (người dân tra cứu bằng mã này) + ảnh kèm theo — bấm mở cỡ lớn */}
@@ -160,7 +169,7 @@ export default function TicketCard({ t, x, now, online, compact = false, fresh =
         </div>
       )}
 
-      <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-line/50 pt-2 text-xs">
+      <div className={clsx(compact ? 'mt-1.5 pt-1.5 text-[11px]' : 'mt-2 pt-2 text-xs', 'flex flex-wrap items-center gap-1.5 border-t border-line/50')}>
         {wait && (
           <span
             className={clsx('inline-flex items-center gap-1', overdue ? 'font-bold text-danger' : 'text-ink-2')}
@@ -216,39 +225,30 @@ export default function TicketCard({ t, x, now, online, compact = false, fresh =
       </div>
 
       {/* Nút chính (bước kế tiếp) — điện thoại trọn hàng, vùng ngón cái; rồi các nút phụ */}
-      <div className={clsx('mt-2 flex flex-col gap-1.5 no-print', !compact && 'sm:flex-row sm:flex-wrap sm:items-center')}>
-        {primary}
-        {enRoute && canResolve && confirm('btn-ghost')}
-        {needSupport && canDispatch && (
-          <button type="button" className={clsx('btn-danger', BTN, 'w-full sm:w-auto')} onClick={() => onDispatch(t)} disabled={!online} title={offline || 'Đội tại hiện trường xin thêm lực lượng'}>
-            <LifeBuoy size={13} aria-hidden="true" /> Điều thêm đội
-          </button>
-        )}
-        <div className={clsx('flex flex-wrap items-center gap-1.5', !compact && 'sm:contents')}>
+      <div className={clsx('no-print', compact ? 'mt-1.5 flex flex-col gap-1' : 'mt-2 flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-center')}>
+        {/* Thẻ thường (điện thoại, danh sách): xuống dòng — nút chính trọn hàng, nút phụ hàng dưới; 360 px không tràn ngang */}
+        <div className={clsx('flex items-center', compact ? 'w-full gap-1' : 'w-full flex-wrap gap-1.5 sm:w-auto')}>
+          {primary && <div className={clsx(compact ? 'min-w-0 flex-1' : 'w-full sm:w-auto')}>{primary}</div>}
+          {enRoute && canResolve && <div className={clsx(compact ? 'min-w-0 flex-1' : 'w-full sm:w-auto')}>{confirm('btn-ghost')}</div>}
+          {needSupport && canDispatch && (
+            <button type="button" className={clsx('btn-danger', BTN, compact ? 'min-w-0 flex-1' : 'w-full sm:w-auto')} onClick={() => onDispatch(t)} disabled={!online} title={offline || 'Đội tại hiện trường xin thêm lực lượng'}>
+              <LifeBuoy size={13} aria-hidden="true" /> Điều thêm đội
+            </button>
+          )}
           {t.lat != null && (
-            <button type="button" className={clsx('btn-ghost', BTN, compact && 'tap-sq px-2')} onClick={() => onFocus(t)} title="Xem vị trí cứu hộ trên bản đồ" aria-label={`Xem ${t.code} trên bản đồ`}>
+            <button type="button" className={clsx('btn-ghost', BTN, compact ? 'tap-sq h-8 w-8 shrink-0 p-0' : 'px-2')} onClick={() => onFocus(t)} title="Xem vị trí cứu hộ trên bản đồ" aria-label={`Xem ${t.code} trên bản đồ`}>
               <MapPin size={13} aria-hidden="true" /> {!compact && 'Bản đồ'}
             </button>
           )}
           {t.reporter_phone && (
-            <a className={clsx('btn-ghost text-accent', BTN, compact && 'tap-sq px-2')} href={`tel:${t.reporter_phone.replace(/\s/g, '')}`} title={`Gọi người báo tin — ${t.reporter_phone}`} aria-label={`Gọi người báo tin ${t.code}`}>
+            <a className={clsx('btn-ghost text-accent', BTN, compact ? 'tap-sq h-8 w-8 shrink-0 p-0' : 'px-2')} href={`tel:${t.reporter_phone.replace(/\s/g, '')}`} title={`Gọi người báo tin — ${t.reporter_phone}`} aria-label={`Gọi người báo tin ${t.code}`}>
               <Phone size={13} aria-hidden="true" /> {!compact && 'Gọi'}
             </a>
-          )}
-          {missionOpen && canDispatch && (
-            <>
-              <button type="button" className={clsx('btn-ghost', BTN)} onClick={() => onLink(t)} title="Cấp lại link nhiệm vụ cho trưởng nhóm">
-                <Link2 size={13} aria-hidden="true" /> Link nhiệm vụ
-              </button>
-              <button type="button" className={clsx('btn-ghost text-danger', BTN)} onClick={() => onCancel(t)} disabled={!online} title={offline || 'Huỷ lệnh điều động (nhầm đội, đội không tiếp cận được…)'}>
-                <Ban size={13} aria-hidden="true" /> Huỷ lệnh
-              </button>
-            </>
           )}
           {canUpdate && t.status !== 'hoan_thanh' && !hasActiveTeam(t) && onCloseTicket && (
             <button
               type="button"
-              className={clsx('btn-ghost text-muted', BTN, compact && 'tap-sq px-2')}
+              className={clsx('btn-ghost text-muted', BTN, compact ? 'tap-sq h-8 w-8 shrink-0 p-0' : 'px-2')}
               onClick={() => onCloseTicket(t)}
               disabled={!online}
               title={offline || 'Đóng phiếu không cần cứu: trùng phiếu khác, không xác minh được, người gặp nạn đã tự an toàn'}
@@ -257,20 +257,30 @@ export default function TicketCard({ t, x, now, online, compact = false, fresh =
               <XCircle size={13} aria-hidden="true" /> {!compact && 'Không cần cứu'}
             </button>
           )}
-          {canUpdate && t.status !== 'hoan_thanh' && targets.length > 0 && (
-            <select
-              className="input tap min-h-[32px] min-w-0 flex-1 py-1 pl-2 text-xs sm:w-auto sm:flex-none"
-              value=""
-              onChange={(e) => e.target.value && onMove(t, e.target.value)}
-              disabled={!online}
-              aria-label={`Chuyển phiếu ${t.code} sang bước khác`}
-              title={offline || 'Chuyển phiếu sang cột khác (thay cho kéo thả — dùng được trên điện thoại)'}
-            >
-              <option value="">Chuyển sang…</option>
-              {targets.map((c) => <option key={c.key} value={c.key}>{c.title}</option>)}
-            </select>
-          )}
         </div>
+        {missionOpen && canDispatch && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button type="button" className={clsx('btn-ghost', BTN, compact ? 'flex-1 text-[11px] min-h-[28px]' : '')} onClick={() => onLink(t)} title="Cấp lại link nhiệm vụ cho trưởng nhóm">
+              <Link2 size={13} aria-hidden="true" /> Link nhiệm vụ
+            </button>
+            <button type="button" className={clsx('btn-ghost text-danger', BTN, compact ? 'text-[11px] min-h-[28px]' : '')} onClick={() => onCancel(t)} disabled={!online} title={offline || 'Huỷ lệnh điều động (nhầm đội, đội không tiếp cận được…)'}>
+              <Ban size={13} aria-hidden="true" /> Huỷ lệnh
+            </button>
+          </div>
+        )}
+        {canUpdate && t.status !== 'hoan_thanh' && targets.length > 0 && (
+          <select
+            className={clsx('input tap min-w-0 pl-2 text-xs', compact ? 'h-7 min-h-0 w-full py-0.5 text-[11px]' : 'min-h-[32px] flex-1 py-1 sm:w-auto sm:flex-none')}
+            value=""
+            onChange={(e) => e.target.value && onMove(t, e.target.value)}
+            disabled={!online}
+            aria-label={`Chuyển phiếu ${t.code} sang bước khác`}
+            title={offline || 'Chuyển phiếu sang cột khác (thay cho kéo thả — dùng được trên điện thoại)'}
+          >
+            <option value="">Chuyển sang…</option>
+            {targets.map((c) => <option key={c.key} value={c.key}>{c.title}</option>)}
+          </select>
+        )}
       </div>
     </article>
   );

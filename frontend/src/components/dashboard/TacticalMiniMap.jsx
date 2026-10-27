@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CircleMarker, MapContainer, Pane, Popup, Tooltip, ZoomControl, useMap } from 'react-leaflet';
 import clsx from 'clsx';
-import { Crosshair, Maximize2 } from 'lucide-react';
+import { Crosshair, Maximize2, Minimize2, Tag } from 'lucide-react';
 import { useAreaQuery } from '../../api/hooks';
 import { useStore } from '../../app/store';
 import { useChartTheme } from '../charts/chartTheme';
@@ -13,6 +13,13 @@ import { stationView } from '../../utils/stations';
 import { num } from '../../utils/format';
 
 const CENTER = [22.75, 106.05];
+const MAP_PAD = { topLeft: [12, 12], bottomRight: [12, 12] };
+const LABEL_MODE = { auto: 'tự động', always: 'hiện hết', off: 'tắt' };
+const LABEL_HINT = {
+  auto: 'Tên điểm tự hiện khi phóng to (điểm Đỏ trước, rồi Cam, rồi tất cả). Bấm để luôn hiện hết',
+  always: 'Đang hiện tên mọi điểm. Bấm để tắt tên điểm',
+  off: 'Đang tắt tên điểm. Bấm để tên tự hiện khi phóng to',
+};
 const FILTERS = [
   { id: 'all', label: 'Tất cả', min: 1 },
   { id: 'serious', label: 'Cam trở lên', min: 2 },
@@ -93,18 +100,36 @@ function FlyTo({ target }) {
   return null;
 }
 
+/** Theo dõi mức thu phóng của bản đồ để hiển thị nhãn địa điểm tự động giống Google Maps khi zoom to. */
+function ZoomWatcher({ onChange }) {
+  const map = useMap();
+  useEffect(() => {
+    onChange(map.getZoom());
+    const onZoom = () => onChange(map.getZoom());
+    map.on('zoom', onZoom);
+    map.on('zoomend', onZoom);
+    return () => {
+      map.off('zoom', onZoom);
+      map.off('zoomend', onZoom);
+    };
+  }, [map, onChange]);
+  return null;
+}
+
 /** Bản đồ điểm nóng thu nhỏ cho lãnh đạo: nền bản đồ chung của hệ thống (BaseLayer — tự lưu trữ / có ghi công), vùng
  * đang lọc (AreaFocus), điểm nóng từ /map/layers + KPI. Không có điểm nóng → nói rõ, không vẽ điểm minh hoạ.
  * `focus` ({ id, at }): yêu cầu từ ngoài (câu "Nguy hiểm nhất") — cuộn tới bản đồ và bay tới điểm đó.
  * `tall`: cột phải của Tổng quan màn lớn ≥ 1680 px — cao ít nhất 420 px và giãn bằng cột trái (việc chờ + 6 ô số); danh
  * sách điểm nóng cuộn trong chiều cao đó, không đẩy hàng cao thêm. */
-export default function TacticalMiniMap({ k, className, focus, tall = false }) {
+export default function TacticalMiniMap({ k, className, focus, tall = false, heroLayout, onSetHeroLayout }) {
   const { data: layers, isError: layersError, refetch } = useAreaQuery('map-layers', '/map/layers', {}, { refetchInterval: 30_000 });
   const { data: area } = useAreaQuery('area', '/admin-units/area', {}, { staleTime: Infinity });
   const filtered = useStore((s) => s.filter.codes.length > 0);
   const c = useChartTheme(); // màu nhấn theo giao diện sáng / tối (Leaflet cần mã màu cụ thể, không đọc được biến CSS)
   const [level, setLevel] = useState('all');
   const [target, setTarget] = useState(null);
+  const [mapZoom, setMapZoom] = useState(8.8);
+  const [labelMode, setLabelMode] = useState('auto'); // 'auto' | 'always' | 'off'
 
   const hotspots = useMemo(() => buildHotspots(layers, k), [layers, k]);
   const box = useRef(null);
@@ -145,6 +170,42 @@ export default function TacticalMiniMap({ k, className, focus, tall = false }) {
           <Link to="/ban-do" className="btn-ghost px-2 py-0.5 text-[11px] [@media(pointer:coarse)]:min-h-[44px]">
             <Maximize2 size={12} /> Bản đồ đầy đủ
           </Link>
+          {heroLayout && onSetHeroLayout && (
+            <div className="hidden sm:flex items-center gap-1 shrink-0">
+              {heroLayout === 'split' ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => onSetHeroLayout('right_full')}
+                    title="Mở rộng bản đồ điểm nóng hết bề ngang (thu gọn việc chờ & 6 chỉ số)"
+                    aria-label="Mở rộng bản đồ điểm nóng"
+                    className="btn-ghost px-2 py-0.5 text-[11px] rounded-md [@media(pointer:coarse)]:min-h-[44px] hover:text-accent"
+                  >
+                    <Maximize2 size={12} aria-hidden="true" /> <span className="hidden xl:inline">Mở rộng</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onSetHeroLayout('left_full')}
+                    title="Thu gọn bản đồ điểm nóng (việc chờ & 6 chỉ số mở rộng hết bề ngang)"
+                    aria-label="Thu gọn bản đồ điểm nóng"
+                    className="btn-ghost px-2 py-0.5 text-[11px] rounded-md [@media(pointer:coarse)]:min-h-[44px] hover:text-accent"
+                  >
+                    <Minimize2 size={12} /> <span className="hidden xl:inline">Thu gọn</span>
+                  </button>
+                </>
+              ) : heroLayout === 'right_full' ? (
+                <button
+                  type="button"
+                  onClick={() => onSetHeroLayout('split')}
+                  title="Khôi phục hiển thị việc chờ & 6 chỉ số bên cạnh"
+                  className="btn-ghost tap flex items-center gap-1 border border-accent/40 bg-accent/10 px-2 py-0.5 text-[11px] font-semibold text-accent hover:bg-accent/20 rounded-md"
+                >
+                  <Minimize2 size={12} />
+                  <span>Hiện lại việc chờ & 6 chỉ số</span>
+                </button>
+              ) : null}
+            </div>
+          )}
         </div>
       </div>
 
@@ -152,14 +213,29 @@ export default function TacticalMiniMap({ k, className, focus, tall = false }) {
       <div className={clsx('grid gap-2 xl:grid-cols-[minmax(0,1fr)_240px] [&>*]:min-w-0', tall && 'flex-1')}>
         {/* isolate: các lớp Leaflet (z-index tới 1000) không đè dải báo động dính trên cùng khi cuộn */}
         <div className={clsx('relative isolate z-0 overflow-hidden rounded-lg border border-line', tall ? 'min-h-[420px]' : 'h-[220px] sm:h-[300px] xl:h-[320px]')}>
-          <MapContainer center={CENTER} zoom={8} zoomControl={false} scrollWheelZoom={false} className="h-full w-full">
+          {/* Không phóng bằng lăn chuột: trang Tổng quan cuộn được — lăn qua bản đồ phải cuộn trang (phóng bằng nút +/−) */}
+          <MapContainer center={CENTER} zoom={8.8} zoomSnap={0.1} zoomDelta={0.5} zoomControl={false} scrollWheelZoom={false} className="h-full w-full">
             <BaseLayer basemap="auto" />
             <MapResize />
+            <ZoomWatcher onChange={setMapZoom} />
             <ZoomControl position="bottomright" />
-            <AreaFocus area={area} filtered={filtered} />
+            <AreaFocus area={area} filtered={filtered} padding={MAP_PAD} />
             <FlyTo target={target} />
             {shown.map((h) => {
               const isSelected = target && target.lat === h.lat && target.lon === h.lon;
+              // Tự động hiện nhãn địa điểm như Google Maps khi zoom to:
+              // - Điểm đang chọn: luôn hiện nhãn
+              // - Chế độ 'always': luôn hiện nhãn mọi điểm
+              // - Chế độ 'auto': zoom >= 9.6 hiện điểm mức 3 (đỏ); zoom >= 10.4 hiện thêm mức 2 (cam); zoom >= 11.0 hiện tất cả
+              const showLabel =
+                isSelected ||
+                labelMode === 'always' ||
+                (labelMode === 'auto' && (
+                  mapZoom >= 11.0 ||
+                  (mapZoom >= 10.4 && h.level >= 2) ||
+                  (mapZoom >= 9.6 && h.level >= 3)
+                ));
+
               return (
                 <CircleMarker
                   key={h.id}
@@ -175,13 +251,33 @@ export default function TacticalMiniMap({ k, className, focus, tall = false }) {
                     click: () => setTarget({ lat: h.lat, lon: h.lon, at: Date.now() }),
                   }}
                 >
-                  <Tooltip direction="top">{h.kind}: {h.name}</Tooltip>
+                  <Tooltip
+                    key={`tt-${h.id}-${showLabel ? 'perm' : 'hover'}`}
+                    permanent={showLabel}
+                    direction="top"
+                    offset={[0, isSelected ? -12 : -8]}
+                    className={clsx(
+                      'tactical-map-label font-sans',
+                      showLabel ? 'tactical-map-label--permanent' : 'tactical-map-label--hover',
+                      isSelected && 'ring-2 ring-accent !border-accent shadow-md !font-bold',
+                    )}
+                  >
+                    <span className="flex items-center gap-1.5 whitespace-nowrap">
+                      <span
+                        className="inline-block h-2 w-2 shrink-0 rounded-full shadow-xs"
+                        style={{ backgroundColor: risk(h.level).hex }}
+                      />
+                      <span className="max-w-[180px] truncate text-[11px] font-semibold leading-tight text-ink sm:max-w-[220px]">
+                        {h.name}
+                      </span>
+                    </span>
+                  </Tooltip>
                   <Popup>
                     <div className="text-xs">
                       <b>{h.name}</b>
                       <div>{h.kind} · mức {risk(h.level).name}</div>
                       {h.detail && <div>{h.detail}</div>}
-                      {h.to && <Link to={h.to} className="font-semibold">Mở Điều hành cứu hộ →</Link>}
+                      {h.to && <Link to={h.to} className="font-semibold text-accent hover:underline">Mở Điều hành cứu hộ →</Link>}
                     </div>
                   </Popup>
                 </CircleMarker>
@@ -208,6 +304,21 @@ export default function TacticalMiniMap({ k, className, focus, tall = false }) {
               )}
             </Pane>
           </MapContainer>
+          {/* Tên điểm trên bản đồ (góc trái dưới, trong khung — hàng nút đầu thẻ không dài thêm, bản đồ không bị đẩy khỏi màn
+              hình đầu của laptop): tự động hiện khi phóng to → luôn hiện hết → tắt */}
+          {hotspots.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setLabelMode((m) => (m === 'auto' ? 'always' : m === 'always' ? 'off' : 'auto'))}
+              title={LABEL_HINT[labelMode]}
+              className={clsx(
+                'absolute bottom-2 left-2 z-[1000] flex min-h-[32px] items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold shadow-sm [@media(pointer:coarse)]:min-h-[44px] [@media(pointer:coarse)]:px-3',
+                labelMode === 'always' ? 'border-accent bg-accent text-white' : 'border-line bg-panel/95 text-ink-2 hover:text-ink',
+              )}
+            >
+              <Tag size={12} aria-hidden="true" /> Tên điểm: {LABEL_MODE[labelMode]}
+            </button>
+          )}
           {/* Chưa tải xong / lỗi tải lớp bản đồ: KHÔNG nói "chưa ghi nhận điểm nóng" khi thực ra chưa biết */}
           {!layers && layersError && (
             <div role="alert" className="absolute inset-x-2 top-2 z-[500] flex flex-wrap items-center justify-center gap-2 rounded-lg border border-danger/40 bg-panel/95 px-3 py-2 text-center text-xs text-danger shadow">

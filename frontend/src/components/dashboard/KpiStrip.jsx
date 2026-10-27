@@ -12,7 +12,7 @@ import StatCard from './StatCard';
 import { evacFacts, rainFacts, sosFacts } from './kpiFacts';
 import { riverName, riverSummary, ROMAN, shortName } from './RiverKpi';
 
-const GRID = 'grid grid-cols-2 gap-2 sm:gap-2.5 [&>*]:min-w-0';
+const GRID = 'grid grid-cols-2 gap-1.5 sm:gap-2.5 [&>*]:min-w-0';
 const WIDE = 980; // vùng chỉ số rộng từ ~980 px → 6 ô một hàng
 // Ô từ ~300 px (cột trái màn lớn ≥ 1680 px, 2 × 3: dòng ~310 px): dòng ý nghĩa ghi thêm tên trạm, tên sông, số hộ. Ô hẹp
 // hơn (6 ô một hàng trên laptop 1366 / 1440 / 1600, 3 cột iPad dọc, 2 cột điện thoại: dòng 145–230 px ≈ 19–30 chữ) chỉ ghi
@@ -21,6 +21,12 @@ const WIDE = 980; // vùng chỉ số rộng từ ~980 px → 6 ô một hàng
 const ROOMY = 300;
 const TILE_H = 92; // chiều cao khung tải — gần bằng ô thật để trang không nhảy
 const HOUR = 3_600_000;
+
+function formatWait(m) {
+  if (m == null) return '';
+  if (m >= 1440) return `${Math.floor(m / 1440)} ngày`;
+  return `${m} phút`;
+}
 
 /**
  * Mưa của giờ TRỌN gần nhất (bình quân lưu vực — cùng số liệu cột "Mưa giờ" của biểu đồ mưa) so với giờ trước đó. Giờ
@@ -171,7 +177,7 @@ export default function KpiStrip({
             alert={river.level === 3}
             trend={lead && <TrendTag {...trendProps(lead.trend, shortName(lead.s))} textClass="hidden 2xl:inline" />}
             value={river.rows.length ? `${river.above}/${river.rows.length}` : '–'}
-            unit={river.rows.length ? 'trạm báo động' : undefined}
+            unit={river.rows.length ? fit('báo động', 'trạm báo động') : undefined}
             onClick={river.rows.length && onRiver ? () => onRiver(riverTarget.id) : undefined}
             hint={riverTarget ? `${riverDetail ? `${riverDetail}. ` : ''}Bấm xem biểu đồ mực nước trạm ${shortName(riverTarget)}` : undefined}
             footerRows={river.rows.length > 0}
@@ -224,9 +230,9 @@ export default function KpiStrip({
         footerRows
         footer={
           <>
-            <span className={line}>
+            <span className={line} title={oldest != null ? `Chờ lâu nhất ${oldest} phút` : undefined}>
               {oldest != null && sos.waiting > 0
-                ? <>Chờ lâu nhất <b className={clsx('num', sos.overdue > 0 || oldest > 15 ? 'text-danger' : 'text-ink')}>{oldest} phút</b>{roomy && sos.critical > 0 && ` · ${sos.critical} cấp 1`}</>
+                ? <>Chờ lâu nhất <b className={clsx('num', sos.overdue > 0 || oldest > 15 ? 'text-danger' : 'text-ink')}>{formatWait(oldest)}</b>{roomy && sos.critical > 0 && ` · ${sos.critical} cấp 1`}</>
                 : fit('Không có phiếu chờ', 'Không có phiếu đang chờ')}
             </span>
             <span className={clsx(line, 'hidden 2xl:block')}>
@@ -246,7 +252,7 @@ export default function KpiStrip({
         title="Sơ tán"
         level={planned ? undefined : null}
         value={planned ? `${evPct}%` : '–'}
-        unit={planned ? 'hộ đã sơ tán' : undefined}
+        unit={planned ? fit('đã sơ tán', 'hộ đã sơ tán') : undefined}
         to={canSos ? '/cuu-ho' : undefined}
         hint={canEvacUpdate ? 'Cập nhật tiến độ sơ tán ở Điều hành cứu hộ' : 'Số hộ, số người đã sơ tán so với kế hoạch'}
         footerRows={planned > 0}
@@ -271,7 +277,7 @@ export default function KpiStrip({
       <StatCard
         compact
         icon={Users}
-        title="Quân số ứng trực"
+        title={fit('Quân số trực', 'Quân số ứng trực')}
         level={fo.units > 0 ? undefined : null}
         value={fo.units > 0 ? int(fo.ready) : '–'}
         unit={fo.units > 0 ? `/ ${int(fo.total)} người` : undefined}

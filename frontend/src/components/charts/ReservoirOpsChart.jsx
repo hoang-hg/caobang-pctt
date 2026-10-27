@@ -57,8 +57,9 @@ export default function ReservoirOpsChart({ river, xDomain, xTicks, syncId, heig
         />
       </div>
       {hasData ? (
+        // Lề trái 0, trục Y 52 px, lề phải 16 — trùng biểu đồ thủy văn phía trên (Hydrograph): vạch "Hiện tại" thẳng hàng
         <ResponsiveContainer width="100%" height={height}>
-          <LineChart data={rows} syncId={syncId} syncMethod="value" margin={{ top: 6, right: 16, bottom: 0, left: -12 }}>
+          <LineChart data={rows} syncId={syncId} syncMethod="value" margin={{ top: 6, right: 16, bottom: 0, left: 0 }}>
             <CartesianGrid stroke={c.grid} vertical={false} />
             <XAxis
               dataKey="t"
@@ -121,25 +122,25 @@ export function ReservoirHistory({ reservoir: r, compact = false }) {
   return (
     <div className="flex flex-col gap-1 text-[11px]">
       <div className="text-muted">Mực nước hồ (m) · MNDBT {num(r.normal_level, 2)} m</div>
-      <ResponsiveContainer width="100%" height={compact ? 64 : 90}>
-        <LineChart data={series} syncId={syncId} syncMethod="value" margin={{ top: 4, right: 8, bottom: 0, left: -12 }}>
+      <ResponsiveContainer width="100%" height={compact ? 36 : 90}>
+        <LineChart data={series} syncId={syncId} syncMethod="value" margin={{ top: 2, right: 6, bottom: 0, left: -14 }}>
           <CartesianGrid stroke={c.grid} vertical={false} />
           {x(true)}
-          <YAxis width={50} domain={['auto', 'auto']} tickFormatter={(v) => num(v, 1)} {...axisProps(c)} />
+          <YAxis width={46} domain={['auto', 'auto']} tickFormatter={(v) => num(v, 1)} {...axisProps(c)} />
           <Tooltip content={<ChartTooltip unit=" m" labelFormatter={tooltipTime} />} />
           {r.normal_level != null && <ReferenceLine y={r.normal_level} stroke={c.serious} strokeDasharray="4 3" ifOverflow="extendDomain" />}
           <Line dataKey="level" name="Mực nước" type="stepAfter" stroke={statusColor || c.s1} strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
         </LineChart>
       </ResponsiveContainer>
-      <div className="flex flex-wrap items-center justify-between gap-2 text-muted">
+      <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] text-muted">
         <span>Lưu lượng (m³/s)</span>
         <Legend items={[{ label: 'Về hồ', color: c.s3, line: true }, { label: 'Xả', color: c.s1, line: true }]} />
       </div>
-      <ResponsiveContainer width="100%" height={compact ? 76 : 100}>
-        <LineChart data={series} syncId={syncId} syncMethod="value" margin={{ top: 4, right: 8, bottom: 0, left: -12 }}>
+      <ResponsiveContainer width="100%" height={compact ? 42 : 100}>
+        <LineChart data={series} syncId={syncId} syncMethod="value" margin={{ top: 2, right: 6, bottom: 0, left: -14 }}>
           <CartesianGrid stroke={c.grid} vertical={false} />
           {x(false)}
-          <YAxis width={50} tickFormatter={(v) => num(v, 0)} {...axisProps(c)} />
+          <YAxis width={46} tickFormatter={(v) => num(v, 0)} {...axisProps(c)} />
           <Tooltip content={<ChartTooltip unit=" m³/s" labelFormatter={tooltipTime} />} />
           <Line dataKey="inflow" name="Về hồ" type="stepAfter" stroke={c.s3} strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
           <Line dataKey="outflow" name="Xả" type="stepAfter" stroke={c.s1} strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />

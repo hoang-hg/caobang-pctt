@@ -113,38 +113,36 @@ export default function Header() {
           </Suspense>
         )}
 
-        {/* Nút xem Cổng công khai cho người dân */}
+        {/* Nút xem Cổng công khai cho người dân (chỉ hiện icon) */}
         <Link
           to="/cong-khai"
           target="_blank"
           rel="noopener noreferrer"
-          className="btn-ghost touch-hit hidden md:inline-flex lg:tall:hidden text-xs px-2.5 py-1.5 text-accent border-accent/30 bg-accent/5 hover:bg-accent/10"
+          className="btn-ghost touch-hit hidden md:inline-flex lg:tall:hidden p-2 text-accent border border-accent/30 bg-accent/5 hover:bg-accent/10 rounded-lg"
           title="Mở Cổng thông tin công khai dành cho người dân"
           aria-label="Cổng người dân"
         >
-          <Globe size={14} className="shrink-0" />
-          <span className="hidden font-semibold 2xl:inline">Cổng người dân</span>
+          <Globe size={16} className="shrink-0" />
         </Link>
 
-        {/* Trạng thái kết nối WebSocket Realtime. Điện thoại (dưới 640 px): chỉ hiện khi đang nối lại / mất kết nối — lúc bình
-            thường nhường chỗ cho bộ lọc địa phương (tình trạng vẫn xem được trong menu tài khoản) */}
-        <span
-          className={clsx(
-            'chip text-[11px] font-medium py-1 px-2.5 transition-colors',
-            wsStatus === 'online' && 'max-sm:hidden',
-            'lg:tall:hidden',
-            wsStatus === 'online' ? 'bg-good/15 text-good border-good/30' : wsStatus === 'connecting' ? 'bg-warn/15 text-warn border-warn/30' : 'bg-danger/15 text-danger border-danger/30'
-          )}
-          title={`Kết nối thời gian thực: ${wsStatus === 'online' ? 'Đang hoạt động' : wsStatus === 'connecting' ? 'Đang kết nối lại' : 'Mất kết nối'}`}
-        >
-          <span className={clsx('h-2 w-2 rounded-full shrink-0', wsStatus === 'online' ? 'bg-good animate-pulse' : wsStatus === 'connecting' ? 'bg-warn animate-ping' : 'bg-danger')} />
-          {/* Trực tuyến: chấm xanh là đủ (chữ từ 2xl). Mất kết nối / đang nối: hiện chữ từ sm — trực ban phải thấy ngay */}
-          <span className={clsx('hidden font-mono', wsStatus === 'online' ? '2xl:inline' : 'sm:inline')}>
-            {wsStatus === 'online' ? 'Trực tuyến' : wsStatus === 'connecting' ? 'Đang nối…' : 'Mất kết nối'}
+        {/* Cảnh báo kết nối: chỉ hiện khi mất kết nối hoặc đang kết nối lại (ẩn hoàn toàn khi trực tuyến bình thường) */}
+        {wsStatus !== 'online' && (
+          <span
+            className={clsx(
+              'chip text-[11px] font-medium py-1 px-2.5 transition-colors lg:tall:hidden',
+              wsStatus === 'connecting' ? 'bg-warn/15 text-warn border-warn/30' : 'bg-danger/15 text-danger border-danger/30',
+            )}
+            title={`Kết nối thời gian thực: ${wsStatus === 'connecting' ? 'Đang kết nối lại' : 'Mất kết nối'}`}
+          >
+            <span className={clsx('h-2 w-2 rounded-full shrink-0', wsStatus === 'connecting' ? 'bg-warn animate-ping' : 'bg-danger')} />
+            <span className="hidden font-mono sm:inline">
+              {wsStatus === 'connecting' ? 'Đang nối…' : 'Mất kết nối'}
+            </span>
           </span>
-        </span>
+        )}
 
-        {/* Trình duyệt đang chặn âm thanh (trang mở lại, chưa ai bấm) → chuông SOS sẽ im: nhắc bấm để mở khoá */}
+        {/* Trình duyệt đang chặn âm thanh (trang mở lại, chưa ai bấm) → chuông SOS sẽ im: nhắc bấm để mở khoá. Màn không có
+            thanh trạng thái (laptop 1366 × 768, máy tính bảng) chỉ thấy lời nhắc này ở đây — không bỏ */}
         {soundOn && !audioReady && (
           <button
             type="button"
@@ -155,12 +153,13 @@ export default function Header() {
           </button>
         )}
 
-        {/* Nút bật/tắt âm báo SOS — điện thoại: trong menu tài khoản (nhường chỗ cho bộ lọc địa phương) */}
+        {/* Nút bật/tắt âm báo SOS — điện thoại: trong menu tài khoản (nhường chỗ cho bộ lọc địa phương); màn đủ cao: thanh trạng thái */}
         <button
           className={clsx('btn-ghost touch-hit p-2 transition-colors max-sm:hidden lg:tall:hidden', soundOn ? 'text-accent' : 'text-muted')}
           onClick={toggleSound}
           title={soundOn ? 'Âm báo SOS: BẬT (bấm để tắt)' : 'Âm báo SOS: TẮT (bấm để bật)'}
           aria-label="Bật tắt âm báo SOS"
+          aria-pressed={soundOn}
         >
           {soundOn ? <Volume2 size={16} /> : <VolumeX size={16} />}
         </button>
@@ -173,7 +172,7 @@ export default function Header() {
           aria-label="Nền tối"
           aria-pressed={theme === 'dark'}
         >
-          {theme === 'dark' ? <Sun size={16} className="text-amber-400" /> : <Moon size={16} className="text-indigo-500" />}
+          {theme === 'dark' ? <Sun size={16} className="text-amber-400" /> : <Moon size={16} className="text-muted" />}
         </button>
 
         <Clock />

@@ -42,6 +42,7 @@ export default function AlertKpis({ query, broadcasts, factsOf, onGo }) {
     <div className={GRID} role="group" aria-label="Chỉ số cảnh báo">
       <StatCard
         compact
+        footerRows
         icon={Megaphone}
         title="Đang hiệu lực"
         level={worst}
@@ -54,6 +55,7 @@ export default function AlertKpis({ query, broadcasts, factsOf, onGo }) {
       />
       <StatCard
         compact
+        footerRows
         icon={ShieldCheck}
         title="Chờ phê duyệt"
         level={pending.length ? (slow || pending.some((b) => b.severity === 'do') ? 3 : 2) : 0}
@@ -67,6 +69,7 @@ export default function AlertKpis({ query, broadcasts, factsOf, onGo }) {
       />
       <StatCard
         compact
+        footerRows
         icon={Users}
         title="Người nhận tin"
         value={int(sum('households'))}
@@ -78,6 +81,7 @@ export default function AlertKpis({ query, broadcasts, factsOf, onGo }) {
       {portal > 0 || !tot.target ? (
         <StatCard
           compact
+          footerRows
           icon={Send}
           title="Tới người dân"
           level={portal > 0 ? 1 : undefined}
@@ -91,6 +95,7 @@ export default function AlertKpis({ query, broadcasts, factsOf, onGo }) {
       ) : (
         <StatCard
           compact
+          footerRows
           icon={Send}
           title="Tới người dân"
           value={`${pct(tot.delivered, tot.target)}%`}

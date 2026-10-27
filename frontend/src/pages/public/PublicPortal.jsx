@@ -113,7 +113,7 @@ function PublicMap({ data, forecast, geo, me, route, target, layers, basemap = '
           })}
           onEachFeature={(f, l) => {
             const a = byCode[f.properties.code];
-            l.bindTooltip(`<b>${a.name}</b><br/>Mưa 24h tới: <b>${a.p50} mm</b> (có thể tới ${a.p90} mm)`, { sticky: true });
+            l.bindTooltip(`<b>${a.name}</b><br/>Mưa 24 giờ tới: <b>${a.p50} mm</b> (có thể tới ${a.p90} mm)`, { sticky: true });
           }}
         />
       )}
@@ -385,7 +385,8 @@ export default function PublicPortal() {
   const [params] = useSearchParams();
   const focusAlert = params.get('canh-bao');
   const trackParam = params.get('tra-cuu') || '';
-  const [activeTab, setActiveTab] = useState(trackParam ? 'tracuu' : 'bando'); // bando | tracuu | muanuoc | sotan | hotlines | huongdan
+  const tabParam = params.get('tab') || '';
+  const [activeTab, setActiveTab] = useState(tabParam || (trackParam ? 'tracuu' : 'bando')); // bando | tracuu | muanuoc | sotan | hotlines | huongdan
   const [mapSidebarTab, setMapSidebarTab] = useState(focusAlert ? 'alerts' : 'legend'); // legend | alerts | rain
   const scrolledToAlert = useRef(false);
   // Cuộn tới thanh tab (ngay trên bản đồ / nội dung tab) — theo phần tử, không theo số pixel cố định: khối phía trên
@@ -469,6 +470,11 @@ export default function PublicPortal() {
   };
 
   // Link chia sẻ ?canh-bao=MÃ: mở tab cảnh báo, rồi cuộn tới thẻ sau khi tab đã hiển thị (1 lần, không cuộn lại mỗi lần làm mới)
+  useEffect(() => {
+    if (tabParam) {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
   useEffect(() => {
     if (focusAlert && alerts.length) {
       setActiveTab('bando');
@@ -586,7 +592,7 @@ export default function PublicPortal() {
             {/* <a> chứ không phải <Link>: /ban-nhe là trang máy chủ dựng (nginx → backend), không phải route của ứng dụng */}
             <a
               href="/ban-nhe"
-              className="btn max-sm:hidden border border-amber-500/35 bg-amber-500/10 px-2.5 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-500/20 dark:text-amber-300"
+              className="btn max-sm:hidden border border-line bg-panel px-2.5 py-1.5 text-xs font-semibold text-ink-2 hover:bg-panel2 hover:text-ink"
               title="Chuyển sang bản chỉ có chữ (dưới 50 KB) khi mạng 2G/3G yếu"
             >
               <Zap size={14} className="shrink-0 text-amber-500" aria-hidden="true" />
@@ -604,7 +610,7 @@ export default function PublicPortal() {
 
             {/* Một chức năng gửi: cứu người / tiếp tế / báo tin hiện trường. Điện thoại: nút ở thanh đáy */}
             <button
-              className="btn-danger max-sm:hidden inline-flex text-xs px-2.5 sm:px-3 py-1.5 font-semibold"
+              className="btn-danger max-sm:hidden inline-flex text-xs px-2.5 sm:px-3 py-1.5 font-semibold shadow-xs"
               onClick={() => setReporting('')}
             >
               <Send size={14} />
@@ -612,11 +618,11 @@ export default function PublicPortal() {
             </button>
 
             <button
-              className="btn-ghost p-2"
+              className="btn-ghost p-2 text-ink-2 hover:text-ink"
               onClick={toggleTheme}
               aria-label="Đổi giao diện sáng/tối"
             >
-              {theme === 'dark' ? <Sun size={16} className="text-amber-400" /> : <Moon size={16} className="text-indigo-500" />}
+              {theme === 'dark' ? <Sun size={16} className="text-amber-400" /> : <Moon size={16} className="text-muted" />}
             </button>
 
             {/* Tài khoản người dân (Đ5) — tách nút "Cán bộ" (trang điều hành) */}
@@ -849,7 +855,7 @@ export default function PublicPortal() {
 
                     <div className="text-xs text-muted flex items-center gap-2">
                       <CloudRain size={14} className="text-accent" />
-                      <span>Mưa dự báo 24h tới: <b className="text-ink font-mono">{here.forecast_24h?.p50 ?? '–'} mm</b> (có thể lên tới {here.forecast_24h?.p90 ?? '–'} mm)</span>
+                      <span>Mưa dự báo 24 giờ tới: <b className="text-ink font-mono">{here.forecast_24h?.p50 ?? '–'} mm</b> (có thể lên tới {here.forecast_24h?.p90 ?? '–'} mm)</span>
                     </div>
 
                     {here.hazards.length > 0 && (
@@ -999,9 +1005,9 @@ export default function PublicPortal() {
             {GROUPS.map((g) => {
               const on = g.tabs.includes(activeTab);
               const badge = g.id === 'ho-song' && overview?.reservoirs?.spill_count
-                ? { text: `${overview.reservoirs.spill_count} hồ xả`, cls: overview.reservoirs.emergency_count > 0 ? 'bg-danger text-white' : 'bg-serious text-black' }
+                ? { text: `${overview.reservoirs.spill_count} hồ xả`, isEmergency: overview.reservoirs.emergency_count > 0, cls: overview.reservoirs.emergency_count > 0 ? 'bg-danger text-white' : 'bg-serious text-black' }
                 : g.id === 'deo-doc' && overview?.landslides?.blocked_count
-                  ? { text: `${overview.landslides.blocked_count} điểm cấm`, cls: 'bg-danger text-white' }
+                  ? { text: `${overview.landslides.blocked_count} điểm cấm`, isEmergency: true, cls: 'bg-danger text-white' }
                   : null;
               return (
                 <button
@@ -1013,7 +1019,18 @@ export default function PublicPortal() {
                 >
                   <g.icon size={15} aria-hidden="true" />
                   {g.label}
-                  {badge && <span className={clsx('rounded-full px-1.5 py-0.5 text-[10px] font-bold', badge.cls)}>{badge.text}</span>}
+                  {badge && (
+                    <span
+                      className={clsx(
+                        'rounded-full px-1.5 py-0.5 text-[10px] font-bold transition-colors',
+                        on
+                          ? (badge.isEmergency ? 'bg-white text-danger font-black shadow-xs' : 'bg-white text-serious font-black shadow-xs')
+                          : badge.cls,
+                      )}
+                    >
+                      {badge.text}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -1073,7 +1090,7 @@ export default function PublicPortal() {
                   <div className={clsx('flex flex-wrap items-center gap-x-3 gap-y-1', !wide && !layersOpen && 'hidden', !wide && 'order-last w-full')}>
                     <span className="font-semibold text-muted">Lớp hiển thị:</span>
                     {[
-                      ['forecast', 'Mưa 24h'],
+                      ['forecast', 'Mưa 24 giờ'],
                       ['hazard', 'Vùng ngập & sạt lở'],
                       ['stations', 'Trạm mực nước'],
                       ['reservoirs', 'Hồ chứa & Xả lũ'],
@@ -1123,7 +1140,7 @@ export default function PublicPortal() {
                 <div className="flex-1 w-full min-h-0 relative">
                   {/* Máy tính: "Bạn muốn làm gì?" nổi góc trái, dưới nút phóng to / thu nhỏ — thu gọn được */}
                   {wide && (quickOpen ? (
-                    <nav aria-label="Bạn muốn làm gì?" className="float-panel absolute left-3 top-24 z-[1000] w-72 p-2">
+                    <nav aria-label="Bạn muốn làm gì?" className="float-panel absolute left-3 top-24 z-[1000] w-72 p-2 shadow-lg">
                       <div className="flex items-center justify-between gap-2 px-2 pb-1">
                         <span className="text-sm font-bold text-ink">Bạn muốn làm gì?</span>
                         <button type="button" onClick={() => setQuickOpen(false)} className="rounded p-1 text-muted hover:bg-panel2 hover:text-ink" aria-label="Thu gọn bảng Bạn muốn làm gì" title="Thu gọn">
@@ -1133,8 +1150,14 @@ export default function PublicPortal() {
                       {quickList}
                     </nav>
                   ) : (
-                    <button type="button" onClick={() => setQuickOpen(true)} className="float-panel absolute left-3 top-24 z-[1000] px-3 py-2 text-xs font-semibold text-ink-2 hover:text-ink">
-                      Bạn muốn làm gì?
+                    <button
+                      type="button"
+                      onClick={() => setQuickOpen(true)}
+                      className="float-panel absolute left-3 top-24 z-[1000] inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-accent shadow-md hover:bg-panel2"
+                      title="Mở bảng tra cứu Bạn muốn làm gì"
+                    >
+                      <HelpCircle size={14} aria-hidden="true" />
+                      <span>Bạn muốn làm gì?</span>
                     </button>
                   ))}
                   {/* Thanh điều khiển lộ trình, vị trí & điểm chọn nổi trên bản đồ — left-14: bên phải nút phóng to / thu nhỏ của Leaflet */}
@@ -1296,12 +1319,12 @@ export default function PublicPortal() {
                     className={clsx(
                       'flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer',
                       mapSidebarTab === 'rain'
-                        ? 'bg-panel text-sky-600 shadow-xs'
+                        ? 'bg-panel text-accent shadow-xs'
                         : 'text-muted hover:text-ink hover:bg-panel/50'
                     )}
                   >
                     <CloudRain size={14} />
-                    <span className="truncate">Mưa 24h</span>
+                    <span className="truncate">Mưa 24 giờ</span>
                   </button>
                 </div>
 
@@ -1355,7 +1378,7 @@ export default function PublicPortal() {
                       <div className="flex items-center justify-between pb-2 border-b border-line/60">
                         <div className="text-xs font-bold text-muted flex items-center gap-1.5">
                           <CloudRain size={14} className="text-accent" />
-                          <span>Dự báo lượng mưa 24h tới</span>
+                          <span>Dự báo lượng mưa 24 giờ tới</span>
                         </div>
                         <span className="text-[11px] text-muted">Mô hình khí tượng</span>
                       </div>
@@ -1363,7 +1386,7 @@ export default function PublicPortal() {
                       {/* Tóm tắt nhanh */}
                       <div className="grid grid-cols-2 gap-2 text-xs">
                         <div className="bg-panel2/60 p-2.5 rounded-xl border border-line/50">
-                          <div className="text-[11px] text-muted">Mưa TB toàn tỉnh:</div>
+                          <div className="text-[11px] text-muted">Mưa trung bình toàn tỉnh:</div>
                           <div className="font-mono text-base font-bold text-accent mt-0.5">
                             {overview?.rain?.avg_24h ?? '–'} mm
                           </div>
@@ -1435,7 +1458,7 @@ export default function PublicPortal() {
                         <Waves size={24} />
                       </div>
                       <div>
-                        <span className="text-xs font-bold text-sky-600 dark:text-sky-400">
+                        <span className="text-xs font-bold text-accent">
                           Chuyên đề 1
                         </span>
                         <h3 className="text-base font-bold text-ink group-hover:text-accent transition-colors">
@@ -1443,7 +1466,7 @@ export default function PublicPortal() {
                         </h3>
                       </div>
                     </div>
-                    <span className="chip bg-sky-500/15 text-sky-600 text-xs font-bold shrink-0">
+                    <span className="chip bg-accent/10 text-accent text-xs font-bold shrink-0">
                       {overview?.reservoirs?.spill_count ?? '–'} hồ đang xả
                     </span>
                   </div>
@@ -1455,7 +1478,7 @@ export default function PublicPortal() {
                   <div className="mt-3.5 grid grid-cols-2 gap-2 text-xs border-t border-line/60 pt-3">
                     <div className="bg-panel2/60 p-2 rounded-lg border border-line/40">
                       <span className="text-[11px] text-muted">Tổng lưu lượng xả:</span>
-                      <div className="font-mono text-sm font-bold text-sky-600 mt-0.5">
+                      <div className="font-mono text-sm font-bold text-accent mt-0.5">
                         {overview ? Math.round(overview.reservoirs?.total_outflow ?? 0).toLocaleString('vi-VN') : '–'} m³/s
                       </div>
                     </div>
@@ -1467,7 +1490,7 @@ export default function PublicPortal() {
                     </div>
                   </div>
 
-                  <div className="mt-3 flex items-center justify-between text-xs text-sky-600 font-semibold group-hover:underline">
+                  <div className="mt-3 flex items-center justify-between text-xs text-accent font-semibold group-hover:underline">
                     <span>Xem chi tiết từng cửa xả & hạ du</span>
                     <span className="group-hover:translate-x-1 transition-transform">Xem bảng chuyên đề →</span>
                   </div>

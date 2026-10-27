@@ -1,6 +1,6 @@
 import clsx from 'clsx';
 import { Link } from 'react-router-dom';
-import { Camera, ChevronRight, CircleCheckBig, FileUp, HandHelping, Megaphone, Siren } from 'lucide-react';
+import { Camera, ChevronRight, CircleCheckBig, FileUp, HandHelping, Maximize2, Megaphone, Minimize2, Siren } from 'lucide-react';
 import { useNavBadges } from '../layout/Sidebar';
 import { useAreaQuery } from '../../api/hooks';
 import { isCommuneSupport } from '../rescue/rescueFacts';
@@ -18,9 +18,10 @@ import { ErrorState, Hint, Skeleton } from '../common/ui';
  * liệu xã chờ duyệt (data.import toàn tỉnh), phản ánh người dân chờ duyệt (report.view). Số Đỏ chỉ cho việc thật sự khẩn
  * (xã xin chi viện, phiếu quá hạn). Việc mới xuất hiện → dòng trượt vào (một lần). Không ghi vào báo cáo PDF.
  * Chưa tải được KPI (máy chủ lỗi / đang tải) → KHÔNG nói "không có việc nào" khi thực ra chưa biết.
- * `stacked`: danh sách dọc ở mọi cỡ màn (cột trái của Tổng quan màn lớn ≥ 1680 px — cạnh bản đồ lớn).
+ * `stacked`: danh sách dọc ở mọi cỡ màn (cột trái của Tổng quan màn lớn ≥ 1680 px — cạnh bản đồ lớn). `heroLayout`: nút mở
+ * rộng / thu gọn khối này so với bản đồ (màn lớn).
  */
-export default function DecisionPanel({ k, kState, className, stacked = false }) {
+export default function DecisionPanel({ k, kState, className, stacked = false, heroLayout, onSetHeroLayout }) {
   // Lớp chỉ áp từ 640 px khi xếp ngang; `stacked` giữ kiểu danh sách dọc của điện thoại
   const row = (cls) => (stacked ? null : cls);
   const badges = useNavBadges();
@@ -55,7 +56,55 @@ export default function DecisionPanel({ k, kState, className, stacked = false })
             Những việc đang chờ chính bạn xử lý. Bấm vào từng việc để mở đúng nơi làm việc đó; xong việc thì việc tự mất khỏi đây.
           </Hint>
         </div>
-        {rows.length > 0 && <span className="num shrink-0 text-xs text-muted">{int(total)} việc</span>}
+        <div className="flex items-center gap-1.5">
+          {rows.length > 0 && (
+            <span className={clsx(
+              'chip shrink-0 px-2 py-0.5 text-xs',
+              rows.some((r) => r.level === 3) ? 'bg-danger/15 font-bold text-danger' : 'bg-accent/10 font-semibold text-accent',
+            )}>
+              {/* Hàng thẻ ngang (từ 640 px): cột tiêu đề hẹp 128 px — chữ gọn để các thẻ việc không bị ép xuống 3 dòng */}
+              {int(total)} việc<span className={row('sm:hidden')}> cần xử lý</span>
+            </span>
+          )}
+          {heroLayout && onSetHeroLayout && (
+            <div className="-my-1 hidden shrink-0 items-center gap-1 sm:flex">
+              {heroLayout === 'split' ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => onSetHeroLayout('left_full')}
+                    title="Mở rộng việc chờ & 6 chỉ số hết bề ngang (thu gọn bản đồ)"
+                    className="btn-ghost tap p-1 text-muted hover:text-accent rounded-md"
+                    aria-label="Mở rộng việc chờ và 6 chỉ số"
+                  >
+                    <Maximize2 size={13} />
+                    <span className="text-[11px] font-semibold hidden 2xl:inline ml-0.5">Mở rộng</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onSetHeroLayout('right_full')}
+                    title="Thu gọn việc chờ & 6 chỉ số (bản đồ mở rộng hết bề ngang)"
+                    className="btn-ghost tap p-1 text-muted hover:text-accent rounded-md"
+                    aria-label="Thu gọn việc chờ và 6 chỉ số"
+                  >
+                    <Minimize2 size={13} />
+                    <span className="text-[11px] font-semibold hidden 2xl:inline ml-0.5">Thu gọn</span>
+                  </button>
+                </>
+              ) : heroLayout === 'left_full' ? (
+                <button
+                  type="button"
+                  onClick={() => onSetHeroLayout('split')}
+                  title="Khôi phục hiển thị bản đồ điểm nóng bên cạnh"
+                  className="btn-ghost tap flex items-center gap-1 border border-accent/40 bg-accent/10 px-2 py-0.5 text-xs font-semibold text-accent hover:bg-accent/20 rounded-md"
+                >
+                  <Minimize2 size={12} />
+                  <span>Hiện lại bản đồ</span>
+                </button>
+              ) : null}
+            </div>
+          )}
+        </div>
       </div>
       <div className="min-w-0 flex-1">
         {!rows.length && !k ? (
@@ -68,7 +117,11 @@ export default function DecisionPanel({ k, kState, className, stacked = false })
               <li key={r.key} className={clsx('min-w-0', fresh(r.key) && 'motion-safe:animate-enter')}>
                 <Link
                   to={r.to}
-                  className={clsx('group -mx-1 flex min-h-[46px] items-center gap-3 rounded-lg px-1 py-1 hover:bg-panel2', row('sm:mx-0 sm:h-full sm:gap-2.5 sm:border sm:border-line sm:px-2.5 sm:py-1.5 sm:hover:border-accent'))}
+                  className={clsx(
+                    'group -mx-1 flex min-h-[46px] items-center gap-3 rounded-xl px-1 py-1 transition-all duration-150 hover:bg-panel2',
+                    row('sm:mx-0 sm:h-full sm:gap-2.5 sm:border sm:border-line sm:bg-panel sm:px-2.5 sm:py-1.5 sm:shadow-sm sm:hover:-translate-y-0.5 sm:hover:border-accent sm:hover:shadow-md'),
+                    r.level === 3 && row('sm:border-danger/35 sm:bg-danger/[0.04] sm:hover:border-danger sm:hover:shadow-danger/10'),
+                  )}
                 >
                   {/* Ô biểu tượng loại việc (từ 640 px): việc khẩn — ô đỏ nhạt */}
                   <span className={clsx('icon-tile h-8 w-8 max-sm:hidden', r.level === 3 && 'bg-danger/10 text-danger ring-danger/20')} aria-hidden="true">
@@ -78,14 +131,21 @@ export default function DecisionPanel({ k, kState, className, stacked = false })
                     {int(r.n)}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className={clsx('block text-sm font-medium leading-snug text-ink', row('sm:text-[13px]'))}>{r.text}</span>
+                    <span className={clsx('block text-sm font-medium leading-snug text-ink', row('sm:text-[13px]'), r.level === 3 && 'font-semibold text-danger')}>{r.text}</span>
                     {!stacked && (
-                      <span className="hidden items-center text-xs font-semibold text-accent group-hover:underline sm:inline-flex">
-                        {r.action} <ChevronRight size={13} aria-hidden="true" />
+                      <span className={clsx(
+                        'hidden items-center gap-0.5 text-xs font-semibold sm:inline-flex',
+                        r.level === 3 ? 'text-danger group-hover:underline' : 'text-accent group-hover:underline',
+                      )}>
+                        {r.action} <ChevronRight size={13} className="transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
                       </span>
                     )}
                   </span>
-                  <span className={clsx('btn-secondary pointer-events-none shrink-0 px-2.5 py-1 text-xs font-semibold', row('sm:hidden'))}>
+                  <span className={clsx(
+                    'pointer-events-none shrink-0 px-2.5 py-1 text-xs font-semibold',
+                    r.level === 3 ? 'btn-danger' : 'btn-secondary',
+                    row('sm:hidden'),
+                  )}>
                     {r.action} <ChevronRight size={14} aria-hidden="true" />
                   </span>
                 </Link>

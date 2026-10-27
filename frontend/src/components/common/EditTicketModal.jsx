@@ -90,7 +90,7 @@ export default function EditTicketModal({ ticket, onClose }) {
                 title={PRIORITY[p].label}
               >
                 <span>Cấp {p} · {PRIORITY[p].short}</span>
-                <span className="text-[10px] font-normal opacity-90">SLA {SLA[p]}′</span>
+                <span className="text-[10px] font-normal opacity-90">hạn {SLA[p]} phút</span>
               </button>
             ))}
           </div>

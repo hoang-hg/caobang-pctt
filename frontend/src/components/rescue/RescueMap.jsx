@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { GeoJSON, MapContainer, Marker, Polyline, Popup, Tooltip, ZoomControl, useMap } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
@@ -16,9 +16,10 @@ import { HAZARD_LEVEL, levelOf, occupancyLevel, risk, RISK, sosLevel } from '../
 import { hasActiveTeam } from '../../utils/sla';
 import { int, time } from '../../utils/format';
 import { useShowMore } from '../../utils/useShowMore';
-import { durWords } from './rescueFacts';
+import { durWords, ticketFacts } from './rescueFacts';
 
 const CENTER = [22.75, 106.05];
+const MAP_PAD = { topLeft: [14, 14], bottomRight: [14, 14] };
 // Như Bản đồ giám sát: lộ trình an toàn xanh, qua vùng nguy hiểm cam; vùng ngập xanh dương, vùng sạt lở theo mức
 const ROUTE = { safe: RISK[0].hex, unsafe: RISK[2].hex };
 const FLOOD = '#2563eb';
@@ -97,6 +98,37 @@ function TeamRow({ t, now, onPick }) {
   );
 }
 
+const SosMarker = memo(function SosMarker({ t, now, onOpen }) {
+  const x = ticketFacts(t, now); // now: tính "chờ … phút", "Quá hạn" — thiếu thì ra NaN
+  return (
+    <Marker
+      position={[t.lat, t.lon]}
+      title={t.code}
+      priority={t.priority}
+      icon={cached(`sos-${t.priority}-${t.status === 'moi'}`, () => sosIcon(t.priority, t.status))}
+      zIndexOffset={1000}
+    >
+      <Popup autoPan={true}>
+        <div className="flex min-w-[200px] flex-col gap-1 text-xs">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <b className="text-sm">{t.code}</b>
+            <span className={clsx('chip', risk(sosLevel(t.priority)).chip)}>Cấp {t.priority}</span>
+            {x.overdue && <span className="chip bg-danger text-white">Quá hạn</span>}
+          </div>
+          <div>{INCIDENT[t.incident_type] || t.incident_type}{t.trapped_count ? ` · ${t.trapped_count} người` : ''}</div>
+          {t.address && <div className="text-muted line-clamp-1">{t.address}</div>}
+          <div>
+            {SOS_STATUS[t.status] || t.status}
+            {x.sla ? ` · chờ ${durWords(x.sla.waitedSec)}` : ''}
+            {t.force_name && hasActiveTeam(t) ? ` · ${t.force_name}` : ''}
+          </div>
+          <button type="button" className="btn-primary tap mt-1 min-h-[32px] justify-center text-xs" onClick={() => onOpen(t)}>Xem phiếu trên bảng</button>
+        </div>
+      </Popup>
+    </Marker>
+  );
+});
+
 /**
  * Bản đồ cứu hộ (thiết kế D.2 cột "Đội đang đến" + D.4): phiếu SOS đang mở (biểu tượng như Bản đồ giám sát, màu
  * theo mức), lộ trình đội đang đi tới phiếu (xanh; qua vùng nguy hiểm: cam), vùng nguy cơ đang hiệu lực (gồm vùng khoanh tự
@@ -104,7 +136,7 @@ function TeamRow({ t, now, onPick }) {
  * đầu, đã đến cuối) — chạm để bay tới. Vị trí đội là lộ trình đã giao từ nơi đóng quân, KHÔNG theo dõi GPS điện thoại. Màn cảm ứng: một
  * ngón tay cuộn trang, hai ngón kéo / phóng bản đồ (bản đồ không "nuốt" thao tác cuộn).
  */
-export default function RescueMap({ tickets, factsOf, now, onOpen }) {
+export default function RescueMap({ tickets, now, onOpen }) {
   const layersQ = useAreaQuery('map-layers', '/map/layers', {}, { refetchInterval: 30_000 });
   const { data: area } = useAreaQuery('area', '/admin-units/area', {}, { staleTime: Infinity });
   const filterCodes = useStore((s) => s.filter.codes);
@@ -112,7 +144,12 @@ export default function RescueMap({ tickets, factsOf, now, onOpen }) {
   const [coarse] = useState(() => window.matchMedia?.('(pointer: coarse)').matches ?? false);
   const [target, setTarget] = useState(null);
   const layers = layersQ.data;
-  const open = tickets.filter((t) => t.status !== 'hoan_thanh' && t.lat != null && t.lon != null);
+  const open = useMemo(() => tickets.filter((t) => t.status !== 'hoan_thanh' && t.lat != null && t.lon != null), [tickets]);
+  // Điểm SOS vẽ lại mỗi phút (không phải mỗi giây theo đồng hồ của trang): popup ghi "chờ … phút", "Quá hạn" theo phút
+  const minute = Math.floor(now / 60_000) * 60_000;
+  const markerElements = useMemo(() => open.map((t) => (
+    <SosMarker key={t.id} t={t} now={minute} onOpen={onOpen} />
+  )), [open, minute, onOpen]);
   const teams = tickets
     .filter((t) => t.status === 'thuc_thi' && hasActiveTeam(t))
     .sort((a, b) => teamRank(a, now) - teamRank(b, now) || new Date(a.eta || 0) - new Date(b.eta || 0));
@@ -121,7 +158,7 @@ export default function RescueMap({ tickets, factsOf, now, onOpen }) {
   const zones = layers?.hazard_zones?.features || [];
   const sites = (layers?.evacuation_sites?.features || []).filter((f) => f.geometry?.coordinates?.[1] != null);
   const pick = (t) => setTarget({ lat: t.lat, lon: t.lon, at: Date.now() });
-  const points = open.map((t) => [t.lat, t.lon]);
+  const points = useMemo(() => open.map((t) => [t.lat, t.lon]), [open]);
   // Đã lỗi rồi đang tự tải lại: vẫn báo lỗi — React Query v5 đưa truy vấn chưa có dữ liệu về "đang tải" mỗi lần tải lại
   const layersFailed = !layers && (layersQ.isError || (layersQ.errorUpdateCount > 0 && layersQ.isFetching));
 
@@ -134,12 +171,12 @@ export default function RescueMap({ tickets, factsOf, now, onOpen }) {
         <Link to="/ban-do" className="btn-ghost tap min-h-[32px] px-2.5 py-0.5 text-xs"><Maximize2 size={12} aria-hidden="true" /> Bản đồ đầy đủ</Link>
       </div>
       {/* isolate: lớp Leaflet (z-index tới 1000) không đè dải thông tin khẩn dính trên cùng khi cuộn */}
-      <div className="relative isolate z-0 h-60 overflow-hidden rounded-lg border border-line sm:h-72 xl:h-80">
-        <MapContainer center={CENTER} zoom={8} zoomControl={false} scrollWheelZoom={false} dragging={!coarse} className="h-full w-full">
+      <div className="relative isolate z-0 h-80 overflow-hidden rounded-lg border border-line xl:h-96">
+        <MapContainer center={CENTER} zoom={8.8} zoomControl={false} zoomSnap={0.1} zoomDelta={0.5} scrollWheelZoom={false} dragging={!coarse} className="h-full w-full">
           <BaseLayer basemap="auto" />
           <ZoomControl position="bottomright" />
           <MapResize />
-          <AreaFocus area={area} filtered={filtered} fly={!points.length} />
+          <AreaFocus area={area} filtered={filtered} fly={!points.length} padding={MAP_PAD} />
           <FitTickets points={points} areaKey={filterCodes.join(',') || 'tinh'} />
           <FlyTo target={target} />
           {zones.map((f) => {
@@ -180,31 +217,8 @@ export default function RescueMap({ tickets, factsOf, now, onOpen }) {
               </Marker>
             );
           })}
-          <MarkerClusterGroup chunkedLoading maxClusterRadius={40} spiderfyOnMaxZoom showCoverageOnHover={false} iconCreateFunction={clusterIcon}>
-            {open.map((t) => {
-              const x = factsOf(t);
-              return (
-                <Marker key={t.id} position={[t.lat, t.lon]} title={t.code} priority={t.priority} icon={cached(`sos-${t.priority}-${t.status === 'moi'}`, () => sosIcon(t.priority, t.status))} zIndexOffset={1000}>
-                  <Popup>
-                    <div className="flex min-w-[200px] flex-col gap-1 text-xs">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <b className="text-sm">{t.code}</b>
-                        <span className={clsx('chip', risk(sosLevel(t.priority)).chip)}>Cấp {t.priority}</span>
-                        {x.overdue && <span className="chip bg-danger text-white">Quá hạn</span>}
-                      </div>
-                      <div>{INCIDENT[t.incident_type] || t.incident_type}{t.trapped_count ? ` · ${t.trapped_count} người` : ''}</div>
-                      {t.address && <div className="text-muted">{t.address}</div>}
-                      <div>
-                        {SOS_STATUS[t.status] || t.status}
-                        {x.sla ? ` · chờ ${durWords(x.sla.waitedSec)}` : ''}
-                        {t.force_name && hasActiveTeam(t) ? ` · ${t.force_name}` : ''}
-                      </div>
-                      <button type="button" className="btn-primary tap mt-1 min-h-[32px] justify-center text-xs" onClick={() => onOpen(t)}>Xem phiếu trên bảng</button>
-                    </div>
-                  </Popup>
-                </Marker>
-              );
-            })}
+          <MarkerClusterGroup maxClusterRadius={40} spiderfyOnMaxZoom showCoverageOnHover={false} iconCreateFunction={clusterIcon}>
+            {markerElements}
           </MarkerClusterGroup>
         </MapContainer>
         {/* Lớp lộ trình / vùng nguy cơ / điểm sơ tán chưa tải được: nói rõ (điểm SOS vẫn hiện — từ danh sách phiếu) */}

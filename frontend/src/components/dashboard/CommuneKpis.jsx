@@ -41,6 +41,7 @@ export default function CommuneKpis({ code, sosQ, evacQ, canSos, onSos, onEvac }
       {canSos && (sosQ.isLoading ? <Skeleton height={112} /> : (
         <StatCard
           compact
+          footerRows
           icon={Siren}
           title="Phiếu SOS đang mở"
           value={sosQ.isError && !sosQ.data ? '–' : open.length}
@@ -71,6 +72,7 @@ export default function CommuneKpis({ code, sosQ, evacQ, canSos, onSos, onEvac }
       {canAlert && (alertsQ.isLoading ? <Skeleton height={112} /> : (
         <StatCard
           compact
+          footerRows
           icon={Megaphone}
           title="Cảnh báo đang hiệu lực"
           value={alertsQ.isError && !alertsQ.data ? '–' : active.length}

@@ -78,11 +78,14 @@ export default function RainfallChart({ height = 250 }) {
         </div>
       </div>
 
-      <ResponsiveContainer width="100%" height={height * 0.58}>
-        <BarChart data={rows} margin={{ top: 6, right: 8, bottom: 0, left: -12 }} barCategoryGap={2}>
+      <div className="flex items-center justify-between text-[11px] font-medium text-muted">
+        <span>Lượng mưa theo giờ (mm/giờ)</span>
+      </div>
+      <ResponsiveContainer width="100%" height={height * 0.52}>
+        <BarChart data={rows} margin={{ top: 6, right: 12, bottom: 0, left: 0 }} barCategoryGap={2}>
           <CartesianGrid stroke={c.grid} vertical={false} />
           <XAxis dataKey="t" tickFormatter={hourLabel} minTickGap={40} {...axisProps(c)} />
-          <YAxis width={44} {...axisProps(c)} label={{ value: 'mm/giờ', angle: -90, position: 'insideLeft', fill: c.axis, fontSize: 10, dx: 14 }} />
+          <YAxis width={38} {...axisProps(c)} />
           <Tooltip
             cursor={{ fill: c.grid, opacity: 0.4 }}
             content={<ChartTooltip labelFormatter={(l, p) => `${tooltipLabel(l)}${p?.[0]?.payload?.forecast ? ' · dự báo' : ' · đo được'}`} unit=" mm" />}
@@ -106,11 +109,14 @@ export default function RainfallChart({ height = 250 }) {
         </BarChart>
       </ResponsiveContainer>
 
+      <div className="mt-1 flex items-center justify-between text-[11px] font-medium text-muted">
+        <span>Mưa cộng dồn (mm)</span>
+      </div>
       <ResponsiveContainer width="100%" height={height * 0.36}>
-        <LineChart data={rows} margin={{ top: 4, right: 8, bottom: 0, left: -12 }}>
+        <LineChart data={rows} margin={{ top: 4, right: 12, bottom: 0, left: 0 }}>
           <CartesianGrid stroke={c.grid} vertical={false} />
           <XAxis dataKey="t" tickFormatter={hourLabel} minTickGap={40} {...axisProps(c)} hide />
-          <YAxis width={44} {...axisProps(c)} label={{ value: 'mm', angle: -90, position: 'insideLeft', fill: c.axis, fontSize: 10, dx: 14 }} />
+          <YAxis width={38} {...axisProps(c)} />
           <Tooltip content={<ChartTooltip labelFormatter={tooltipLabel} unit=" mm" />} cursor={{ stroke: c.axis, strokeDasharray: '3 3' }} />
           <Line dataKey="cum" name="Mưa cộng dồn" stroke={c.s1} strokeWidth={2} dot={false} isAnimationActive={false} />
           <Line dataKey="cumF" name="Cộng dồn theo dự báo" stroke={c.s2} strokeWidth={2} strokeDasharray="6 4" dot={false} isAnimationActive={false} />

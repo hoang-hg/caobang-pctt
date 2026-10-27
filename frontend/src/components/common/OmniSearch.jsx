@@ -168,7 +168,7 @@ export default function OmniSearch() {
       <input
         ref={input}
         className="input tap pl-9 pr-10"
-        placeholder={wide ? 'Gõ tên xóm, mã phiếu SOS hoặc toạ độ…' : 'Tên xóm, mã phiếu, toạ độ…'}
+        placeholder="Nhập địa điểm…"
         value={q}
         onChange={(e) => { setQ(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)}

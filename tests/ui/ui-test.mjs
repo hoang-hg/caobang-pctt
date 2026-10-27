@@ -343,9 +343,12 @@ async function staff(ctx, trackCode) {
   await step(ctx, 'Bản đồ giám sát: bảng nổi không che bản đồ; thanh ngón cái (điện thoại) / bảng cảnh báo, chú giải (máy tính)', async () => {
     await page.goto(`${ROOT}/ban-do`);
     await page.locator('.leaflet-container').waitFor({ timeout: 20_000 });
-    await page.waitForTimeout(1500);
+    await expectMapShown(page, '/ban-do');
+    await page.locator('[aria-label="Đang tải lớp dữ liệu bản đồ"]').waitFor({ state: 'detached', timeout: 20_000 }).catch(() => {});
+    await page.waitForTimeout(500);
     const free = await page.evaluate(() => {
-      const m = document.querySelector('.leaflet-container').getBoundingClientRect();
+      const m = document.querySelector('.leaflet-container')?.getBoundingClientRect();
+      if (!m || m.height < 100) return 0;
       let ok = 0;
       let all = 0;
       for (let i = 0; i < 12; i += 1) {
@@ -1129,11 +1132,16 @@ async function managerMap(ctx, layout) {
     return `${levels.length} điểm nóng đang hiện · ${before} → ${situation} → ${back} điểm trên bản đồ`;
   });
   if (layout === 'grid') {
-    await step(ctx, 'Thanh thời gian: mốc "12 giờ trước · Bây giờ · 24 giờ tới", nút Phát chạy từng giờ, chọn "Bây giờ" thì dừng', async () => {
+    // Thanh thu gọn sẵn (bản đồ rộng hơn) — mở ra; mặc định "Từ bây giờ" tới 24 giờ tới, nút "12 giờ trước" xem lại số đo đã qua
+    await step(ctx, 'Thanh thời gian: mở thanh, mốc "Bây giờ · 24 giờ tới", xem lại "12 giờ trước", nút Phát chạy từng giờ, chọn "Bây giờ" thì dừng', async () => {
       const now = page.getByRole('status', { name: 'Thời điểm đang xem' });
       if (!/Bây giờ/.test(await now.innerText())) throw new Error(`mở bản đồ không ở "Bây giờ": ${await now.innerText()}`);
-      await page.getByText('12 giờ trước', { exact: true }).first().waitFor({ timeout: 5_000 });
+      const open = page.getByRole('button', { name: 'Mở thanh dự báo' });
+      if (await open.count()) await open.click();
       await page.getByText('24 giờ tới', { exact: true }).first().waitFor({ timeout: 5_000 });
+      await page.getByRole('button', { name: '12 giờ trước', exact: true }).click();
+      await page.waitForFunction(() => /12 giờ trước/.test(document.querySelector('[aria-label="Thời điểm đang xem"]')?.innerText || ''), null, { timeout: 5_000 });
+      await page.getByRole('button', { name: 'Bây giờ', exact: true }).click();
       await page.getByRole('button', { name: /^Phát/ }).click();
       await page.waitForFunction(() => /\d+ giờ tới/.test(document.querySelector('[aria-label="Thời điểm đang xem"]')?.innerText || ''), null, { timeout: 6_000 });
       const playing = (await now.innerText()).replace(/\s+/g, ' ');
@@ -1275,6 +1283,11 @@ async function mapTools(ctx, phone) {
   const tap = ([x, y]) => (phone ? page.touchscreen.tap(x, y) : page.mouse.click(x, y));
   const pick = async (label) => {
     if (phone) await page.getByRole('button', { name: 'Công cụ', exact: true }).click();
+    else {
+      // Máy tính: thanh chọn nền & công cụ thu gọn sẵn (bản đồ rộng hơn) — mở ra trước
+      const open = page.getByRole('button', { name: 'Mở thanh chọn nền & công cụ vẽ' });
+      if (await open.count()) await open.click();
+    }
     await visible(page.locator(`button[title="${label}"]`)).click();
     await page.waitForTimeout(300);
     // Bản đồ đứng yên (bay tới vùng đang lọc xong) rồi mới chọn điểm bấm

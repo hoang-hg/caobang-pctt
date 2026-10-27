@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Columns3, Home, Inbox, List, Navigation } from 'lucide-react';
+import clsx from 'clsx';
+import { Columns3, Home, Inbox, List, Maximize2, Minimize2, Navigation } from 'lucide-react';
 import { api } from '../api/client';
 import { useAreaQuery, useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
@@ -94,8 +95,33 @@ export default function RescueCenter() {
   const [evacOpen, setEvacOpen] = useState(false);
   // Bản đồ + diễn biến: mặc định thu gọn để bảng điều phối SOS lên ngay tầm mắt người trực ban
   const [overviewOpen, setOverviewOpen] = useState(false);
+  // Cột Tiếp nhận SOS & Giám sát sơ tán bên phải: có thể thu gọn để bảng điều phối chiếm 100% không gian
+  const [sideOpen, setSideOpen] = useState(true);
+  const asideRef = useRef(null);
+  const [asideHeight, setAsideHeight] = useState(1200);
   const contentRef = useRef(null);
   const boardRef = useRef(null);
+
+  // Tự động đồng bộ chiều cao bảng Kanban với cột Tiếp nhận & Sơ tán bên phải để bố cục luôn cân đối hoàn hảo
+  useEffect(() => {
+    if (!asideRef.current) return;
+    const update = () => {
+      if (asideRef.current) {
+        const h = asideRef.current.offsetHeight;
+        setAsideHeight(h);
+      }
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(asideRef.current);
+    return () => ro.disconnect();
+  }, [sideOpen]);
+
+  // Chiều cao cột Kanban: chỉ khi cột Tiếp nhận & Sơ tán nằm CẠNH bảng (≥ 1536 px, đang mở) mới cao bằng cột đó (trừ hàng nút
+  // 46 px + khe 10 px). Còn lại (1280–1535 px cột phải nằm dưới bảng, hoặc đang thu gọn) cột kéo tới đáy màn hình, phiếu cuộn
+  // trong cột — laptop 1366 × 768 không phải cuộn cả trang mới thấy đáy cột (RescueBoard)
+  const sideBySide = useMediaQuery('(min-width: 1536px)') && sideOpen;
+  const boardHeight = wide && sideBySide ? Math.max(360, asideHeight - 56) : null;
 
   // Tài khoản xã chưa lọc: tiêu đề là xã của mình, không ghi "Toàn tỉnh" (như Tổng quan)
   const scope = useAllowedCodes('sos', 'view');
@@ -158,7 +184,7 @@ export default function RescueCenter() {
     scrollTo(boardRef.current);
   };
   // Bản đồ → phiếu trên bảng: tìm theo mã, mở đúng cột (một mục lịch sử)
-  const openTicket = (t) => {
+  const openTicket = useCallback((t) => {
     const next = new URLSearchParams();
     if (view !== 'bang') next.set('xem', view);
     if (period[0]) next.set('ky', period[0]);
@@ -166,7 +192,7 @@ export default function RescueCenter() {
     setParams(next);
     setQ(t.code);
     scrollTo(boardRef.current);
-  };
+  }, [view, period, setParams]);
   // Tìm kiếm toàn năng → /cuu-ho?phieu=SOS-1001: mở đúng phiếu (đúng cột của bảng, ô tìm điền sẵn mã). Không có trong danh
   // sách 48 giờ (phiếu đã xong lâu hơn) → tra cứu hồ sơ 30 ngày. Thay địa chỉ (replace): nút Quay lại không mở lại phiếu
   const wanted = params.get('phieu');
@@ -318,6 +344,7 @@ export default function RescueCenter() {
         filtered={activeFilters}
         cardProps={cardProps}
         onDrop={(id, status) => move(id, status)}
+        height={boardHeight}
       />
     );
   }
@@ -362,11 +389,11 @@ export default function RescueCenter() {
         collapsible
         open={overviewOpen}
         onToggle={() => setOverviewOpen((v) => !v)}
-        className="no-print"
+        className="no-print scroll-mt-28"
       >
         {overviewOpen && (
           <div className="grid gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-            <RescueMap tickets={tickets} factsOf={factsOf} now={now} onOpen={openTicket} />
+            <RescueMap tickets={tickets} now={now} onOpen={openTicket} />
             <SosTrend query={ticketsQ} tickets={tickets} now={now} />
           </div>
         )}
@@ -392,15 +419,37 @@ export default function RescueCenter() {
         exporting={pdf}
       />
 
-      <div className="grid gap-3 2xl:grid-cols-[minmax(0,1fr)_370px]">
+      <div className={clsx('grid gap-3 items-stretch', sideOpen ? '2xl:grid-cols-[minmax(0,1fr)_370px]' : 'grid-cols-1')}>
         <div ref={boardRef} className="flex min-w-0 scroll-mt-20 flex-col gap-2.5">
-          <div className="flex flex-wrap items-center justify-between gap-2 no-print">
-            <Segmented
-              label="Cách xem phiếu"
-              value={view}
-              onChange={(v) => setParam({ xem: v === 'bang' ? '' : v })}
-              options={VIEWS.map(([v, label, icon]) => ({ value: v, label, icon }))}
-            />
+          <div className="flex flex-wrap items-center justify-between gap-2 no-print shrink-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <Segmented
+                label="Cách xem phiếu"
+                value={view}
+                onChange={(v) => setParam({ xem: v === 'bang' ? '' : v })}
+                options={VIEWS.map(([v, label, icon]) => ({ value: v, label, icon }))}
+              />
+              {/* Nút bật/tắt toàn màn hình cho bảng SOS trên màn hình rộng */}
+              <button
+                type="button"
+                onClick={() => setSideOpen((v) => !v)}
+                className="btn-ghost tap hidden 2xl:flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-accent hover:bg-accent/10 rounded-lg transition-colors border border-accent/25"
+                title={sideOpen ? 'Thu gọn cột Tiếp nhận & Sơ tán để mở rộng tối đa Bảng điều phối SOS' : 'Mở lại cột Tiếp nhận SOS & Giám sát sơ tán'}
+                aria-pressed={sideOpen}
+              >
+                {sideOpen ? (
+                  <>
+                    <Maximize2 size={13} aria-hidden="true" />
+                    <span>Toàn màn hình bảng SOS</span>
+                  </>
+                ) : (
+                  <>
+                    <Minimize2 size={13} aria-hidden="true" />
+                    <span>Hiện Tiếp nhận & Sơ tán</span>
+                  </>
+                )}
+              </button>
+            </div>
             {view === 'bang' && wide && <span className="text-xs text-muted">Kéo thẻ phiếu sang cột khác, hoặc chọn “Chuyển sang…” trên thẻ</span>}
             {view === 'danh_sach' && (
               <div className="flex flex-wrap items-center gap-1.5">
@@ -414,13 +463,15 @@ export default function RescueCenter() {
               </div>
             )}
           </div>
-          <div ref={contentRef} className="bg-bg">{body}</div>
+          <div ref={contentRef} className="bg-bg flex-1 flex flex-col h-full min-h-0">{body}</div>
         </div>
         {/* Điện thoại: giám sát sơ tán trước, tiếp nhận tin (việc của trực ban ở bàn) sau; màn rộng: cột phải */}
-        <aside className="flex min-w-0 flex-col gap-3">
-          <Can I="sos" a="create"><div className="order-2 2xl:order-1"><Intake online={online} /></div></Can>
-          <Evacuation query={evacQ} online={online} className="order-1 2xl:order-2" />
-        </aside>
+        {sideOpen && (
+          <aside ref={asideRef} className="flex min-w-0 flex-col gap-3 self-start">
+            <Can I="sos" a="create"><div className="order-2 2xl:order-1"><Intake online={online} /></div></Can>
+            <Evacuation query={evacQ} online={online} className="order-1 2xl:order-2" />
+          </aside>
+        )}
       </div>
 
       {dispatch && <DispatchModal ticket={dispatch} onClose={() => setDispatch(null)} />}

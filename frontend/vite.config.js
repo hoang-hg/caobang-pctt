@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-const API = process.env.VITE_PROXY_TARGET || 'http://localhost:8000';
+const API = process.env.VITE_PROXY_TARGET || 'http://127.0.0.1:8000';
 
 /**
  * Xuất dist/sw.js từ src/sw.js (README 9.4): danh sách lưu sẵn = index.html + tệp tĩnh ở public/ + chunk cổng công

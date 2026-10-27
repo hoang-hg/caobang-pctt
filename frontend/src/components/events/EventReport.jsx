@@ -96,10 +96,10 @@ function SosPerDay({ days }) {
       {days.length ? (
         <div role="img" aria-label={label}>
           <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={days} margin={{ top: 12, right: 4, bottom: 0, left: -18 }} barCategoryGap="22%" maxBarSize={56}>
+            <BarChart data={days} margin={{ top: 12, right: 8, bottom: 0, left: 0 }} barCategoryGap="22%" maxBarSize={56}>
               <CartesianGrid stroke={c.grid} vertical={false} />
               <XAxis dataKey="day" tickFormatter={dm} interval="preserveStartEnd" {...axisProps(c)} />
-              <YAxis allowDecimals={false} width={40} {...axisProps(c)} />
+              <YAxis allowDecimals={false} width={38} {...axisProps(c)} />
               <Tooltip
                 cursor={{ fill: c.grid, opacity: 0.35 }}
                 labelFormatter={(d) => `Ngày ${dm(d)}`}
@@ -143,10 +143,10 @@ function EvacuationTimeline({ points }) {
       {any ? (
         <div role="img" aria-label={label}>
           <ResponsiveContainer width="100%" height={200}>
-            <ComposedChart data={data} margin={{ top: 12, right: 8, bottom: 0, left: -12 }}>
+            <ComposedChart data={data} margin={{ top: 12, right: 12, bottom: 0, left: 4 }}>
               <CartesianGrid stroke={c.grid} vertical={false} />
               <XAxis dataKey="ts" type="number" scale="time" domain={['dataMin', 'dataMax']} tickFormatter={tick} minTickGap={32} {...axisProps(c)} />
-              <YAxis allowDecimals={false} width={44} {...axisProps(c)} />
+              <YAxis allowDecimals={false} width={48} tickFormatter={(v) => typeof v === 'number' && v >= 1000 ? `${(v / 1000).toLocaleString('vi-VN')}k` : v} {...axisProps(c)} />
               <Tooltip
                 cursor={{ stroke: c.axis, strokeDasharray: '3 3' }}
                 content={(
@@ -325,12 +325,12 @@ export default function EventReport({ code, canManage, onEdit, onEnd }) {
 
       <div ref={ref} className="flex flex-col gap-3 bg-bg">
         <div className="grid grid-cols-2 gap-2 md:grid-cols-3 2xl:grid-cols-6" role="group" aria-label="Chỉ số của đợt">
-          <StatCard compact icon={Siren} title="Phiếu SOS" value={int(s.sos.total)} unit="phiếu" footer={[s.sos.open ? `${int(s.sos.open)} còn mở` : s.sos.total ? 'Đã xử lý hết' : 'Chưa có phiếu', s.sos.median_ack_min != null && `tiếp nhận ~${s.sos.median_ack_min}′`].filter(Boolean).join(' · ')} />
-          <StatCard compact icon={Users} title="Người được cứu" value={int(s.sos.rescued)} unit={`/ ${int(s.sos.trapped)}`} footer="đã cứu / mắc kẹt" />
-          <StatCard compact icon={Truck} title="Lệnh điều động" value={int(s.dispatch.orders - s.dispatch.cancelled)} unit="lệnh" footer={`${int(s.dispatch.personnel)} người${s.dispatch.cancelled ? ` · ${s.dispatch.cancelled} đã huỷ` : ''}`} />
-          <StatCard compact icon={Megaphone} title="Cảnh báo đã phát" value={int(sent)} unit="lệnh" footer={sent ? `Rất cao ${sev('do')} · Cao ${sev('cam')} · TB ${sev('vang')}` : 'Chưa phát lệnh nào'} />
-          <StatCard compact icon={House} title="Sơ tán cao nhất" value={int(peakHouseholds)} unit="hộ" footer={`${int(peakPersons)} người · ${s.evacuation.length} xã`} />
-          <StatCard compact icon={Package} title="Vật tư đã cấp" value={int(issuedTypes)} unit="mặt hàng" footer="theo sổ xuất – nhập kho" />
+          <StatCard compact footerRows icon={Siren} title="Phiếu SOS" value={int(s.sos.total)} unit="phiếu" footer={[s.sos.open ? `${int(s.sos.open)} còn mở` : s.sos.total ? 'Đã xử lý hết' : 'Chưa có phiếu', s.sos.median_ack_min != null && `tiếp nhận ~${s.sos.median_ack_min}′`].filter(Boolean).join(' · ')} />
+          <StatCard compact footerRows icon={Users} title="Người được cứu" value={int(s.sos.rescued)} unit={`/ ${int(s.sos.trapped)}`} footer="đã cứu / mắc kẹt" />
+          <StatCard compact footerRows icon={Truck} title="Lệnh điều động" value={int(s.dispatch.orders - s.dispatch.cancelled)} unit="lệnh" footer={`${int(s.dispatch.personnel)} người${s.dispatch.cancelled ? ` · ${s.dispatch.cancelled} đã huỷ` : ''}`} />
+          <StatCard compact footerRows icon={Megaphone} title="Cảnh báo đã phát" value={int(sent)} unit="lệnh" footer={sent ? `Rất cao ${sev('do')} · Cao ${sev('cam')} · Trung bình ${sev('vang')}` : 'Chưa phát lệnh nào'} />
+          <StatCard compact footerRows icon={House} title="Sơ tán cao nhất" value={int(peakHouseholds)} unit="hộ" footer={`${int(peakPersons)} người · ${s.evacuation.length} xã`} />
+          <StatCard compact footerRows icon={Package} title="Vật tư đã cấp" value={int(issuedTypes)} unit="mặt hàng" footer="theo sổ xuất – nhập kho" />
         </div>
 
         <div className={clsx('grid gap-3', asTable && 'xl:grid-cols-2')}>

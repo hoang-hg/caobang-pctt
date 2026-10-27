@@ -180,10 +180,10 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScope
       {/* 3. Thẻ thống kê tổng quan (4 Metric Cards) */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {/* Card 1: Tổng số điểm đen */}
-        <div className="card p-4 flex flex-col justify-between border-l-4 border-l-sky-500">
+        <div className="card p-4 flex flex-col justify-between border-l-4 border-l-accent">
           <div className="flex items-center justify-between text-muted text-xs">
             <span>Tổng điểm đen theo dõi</span>
-            <div className="h-8 w-8 rounded-lg bg-sky-500/10 text-sky-600 flex items-center justify-center font-bold">
+            <div className="h-8 w-8 rounded-lg bg-accent/10 text-accent flex items-center justify-center font-bold">
               <Milestone size={16} />
             </div>
           </div>
@@ -368,7 +368,7 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScope
                       <span className="text-[11px] font-mono font-bold text-muted bg-panel2 px-1.5 py-0.5 rounded">
                         {p.code}
                       </span>
-                      <span className="chip bg-sky-500/10 text-sky-600 text-[10px] font-bold">
+                      <span className="chip bg-accent/10 text-accent text-[10px] font-bold">
                         {p.road_name.split('(')[0].trim()}
                       </span>
                       <span className="chip bg-panel2 text-muted text-[10px]">

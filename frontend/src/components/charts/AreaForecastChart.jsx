@@ -108,12 +108,15 @@ export default function AreaForecastChart({ height = 250 }) {
         { label: 'Mô hình châu Âu', color: c.s2, dashed: true },
         { label: 'Mô hình Mỹ', color: c.s3, dashed: true },
       ]} />
+      <div className="mt-1 flex items-center justify-between text-[11px] font-medium text-muted">
+        <span>Lượng mưa dự báo theo giờ (mm/giờ)</span>
+      </div>
       {series || (
         <ResponsiveContainer width="100%" height={height}>
-          <ComposedChart data={rows} margin={{ top: 6, right: 8, bottom: 0, left: -12 }}>
+          <ComposedChart data={rows} margin={{ top: 6, right: 12, bottom: 0, left: 0 }}>
             <CartesianGrid stroke={c.grid} vertical={false} />
             <XAxis dataKey="t" type="number" scale="time" domain={['dataMin', 'dataMax']} tickFormatter={fmtTime} minTickGap={50} {...axisProps(c)} />
-            <YAxis width={44} {...axisProps(c)} label={{ value: 'mm/giờ', angle: -90, position: 'insideLeft', fill: c.axis, fontSize: 10, dx: 14 }} />
+            <YAxis width={38} {...axisProps(c)} />
             <Tooltip content={<Tip />} cursor={{ stroke: c.axis, strokeDasharray: '3 3' }} />
             <Area dataKey="band" stroke="none" fill={c.s1} fillOpacity={0.18} isAnimationActive={false} />
             <Line dataKey="p50" stroke={c.s1} strokeWidth={2} dot={false} isAnimationActive={false} />

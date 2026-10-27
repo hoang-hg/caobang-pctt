@@ -39,6 +39,7 @@ export default function RescueKpis({ ticketsQ, tickets, factsOf, evacQ, onGo, on
     <div className={GRID} role="group" aria-label="Chỉ số cứu hộ">
       <StatCard
         compact
+        footerRows
         icon={LifeBuoy}
         title="Phiếu đang mở"
         level={open.length ? (p1 ? 3 : p2 ? 2 : 1) : 0}
@@ -51,6 +52,7 @@ export default function RescueKpis({ ticketsQ, tickets, factsOf, evacQ, onGo, on
       />
       <StatCard
         compact
+        footerRows
         icon={Clock}
         title="Quá hạn phản hồi"
         level={overdue ? 3 : 0}
@@ -64,6 +66,7 @@ export default function RescueKpis({ ticketsQ, tickets, factsOf, evacQ, onGo, on
       />
       <StatCard
         compact
+        footerRows
         icon={Users}
         title="Người cần cứu"
         value={int(trapped)}
@@ -74,6 +77,7 @@ export default function RescueKpis({ ticketsQ, tickets, factsOf, evacQ, onGo, on
       />
       <StatCard
         compact
+        footerRows
         icon={Home}
         title="Sơ tán an toàn"
         level={!ev ? null : full ? 3 : near ? 2 : planned ? 0 : null}
