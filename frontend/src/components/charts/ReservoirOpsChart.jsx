@@ -57,8 +57,9 @@ export default function ReservoirOpsChart({ river, xDomain, xTicks, syncId, heig
         />
       </div>
       {hasData ? (
+        // Lề trái 0, trục Y 52 px, lề phải 16 — trùng biểu đồ thủy văn phía trên (Hydrograph): vạch "Hiện tại" thẳng hàng
         <ResponsiveContainer width="100%" height={height}>
-          <LineChart data={rows} syncId={syncId} syncMethod="value" margin={{ top: 6, right: 16, bottom: 0, left: -12 }}>
+          <LineChart data={rows} syncId={syncId} syncMethod="value" margin={{ top: 6, right: 16, bottom: 0, left: 0 }}>
             <CartesianGrid stroke={c.grid} vertical={false} />
             <XAxis
               dataKey="t"
