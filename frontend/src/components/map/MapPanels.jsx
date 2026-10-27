@@ -12,6 +12,7 @@ import { ALARM, alarmLevel, INCIDENT, PRIORITY, STATION_TYPE } from '../../utils
 import { ago, dateTime, int, time, vnFileStamp } from '../../utils/format';
 import { exportExcel } from '../../utils/exportExcel';
 import { fmtVn } from '../../utils/bulletin';
+import { SHOW_STORM } from '../../utils/hazardScope';
 import { risk } from '../../utils/risk';
 import { trendProps } from '../../utils/stations';
 import { useShowMore } from '../../utils/useShowMore';
@@ -36,7 +37,8 @@ export const LAYER_GROUPS = [
       { key: 'reservoirs', label: 'Hồ chứa, thủy điện', icon: Droplets },
       { key: 'forecast', label: 'Mưa dự báo theo xã', icon: CloudRain }, // ghi chú dưới tên: 24 giờ tới / 1 giờ theo thanh thời gian
       { key: 'radar', label: 'Mây mưa trên ảnh radar', icon: Radar },
-      { key: 'storm', label: 'Đường đi của bão, áp thấp', icon: Tornado },
+      // Bão, áp thấp: đang ẩn (ngoài phạm vi theo dõi — utils/hazardScope.js)
+      ...(SHOW_STORM ? [{ key: 'storm', label: 'Đường đi của bão, áp thấp', icon: Tornado }] : []),
     ],
   },
   {
@@ -588,6 +590,7 @@ export function ViewModeSwitch({ mode, onChange, touch, caption = false, canDisp
 const QUICK_FORECAST = [0, 1, 3, 6, 12, 24];
 const QUICK_ALL = [-12, -6, 0, 6, 12, 24];
 const PLAY_MS = 1200; // mỗi giờ trên thanh khi bấm "Phát"
+const PLAY_HINT = `Phát — xem mưa${SHOW_STORM ? ', bão' : ''} diễn biến từng giờ`;
 /** Nhãn giờ trên thanh: "Bây giờ", "6 giờ trước", "12 giờ tới". */
 export const hourText = (h) => (h === 0 ? 'Bây giờ' : h < 0 ? `${-h} giờ trước` : `${h} giờ tới`);
 
@@ -637,7 +640,7 @@ export function TimeControl({ offset, setOffset, touch }) {
             onClick={play}
             aria-pressed={playing}
             aria-label={playing ? 'Dừng chạy thời gian' : 'Phát: xem lần lượt từng giờ'}
-            title={playing ? 'Dừng' : 'Phát — xem mưa, bão diễn biến từng giờ'}
+            title={playing ? 'Dừng' : PLAY_HINT}
             className={clsx(
               'flex shrink-0 items-center justify-center rounded-full text-white shadow-sm transition-transform active:scale-95',
               touch ? 'h-11 w-11' : 'h-7 w-7',
@@ -732,7 +735,7 @@ export function TimeControl({ offset, setOffset, touch }) {
           onClick={play}
           aria-pressed={playing}
           aria-label={playing ? 'Dừng chạy thời gian' : 'Phát: xem lần lượt từng giờ'}
-          title={playing ? 'Dừng' : 'Phát — xem mưa, bão diễn biến từng giờ'}
+          title={playing ? 'Dừng' : PLAY_HINT}
           className={clsx(
             'flex shrink-0 items-center justify-center rounded-full text-white shadow-sm transition-transform active:scale-95',
             touch ? 'h-11 w-11' : 'h-9 w-9',
@@ -805,7 +808,7 @@ export function TimeControl({ offset, setOffset, touch }) {
       {/* Đang xem giờ khác: nói rõ lớp nào đổi theo giờ — đứng ở "Bây giờ" thì thanh gọn, không che thêm bản đồ */}
       {(offset !== 0 || playing) && (
         <p className="mt-1 text-[11px] leading-snug text-muted">
-          Đổi theo giờ: số đo trạm, mưa dự báo theo xã, ảnh radar, đường đi bão, vùng ngập theo mực nước. Không đổi: đội cứu hộ, kho,
+          Đổi theo giờ: số đo trạm, mưa dự báo theo xã, ảnh radar,{SHOW_STORM && ' đường đi bão,'} vùng ngập theo mực nước. Không đổi: đội cứu hộ, kho,
           điểm sơ tán, phiếu cứu hộ.
         </p>
       )}

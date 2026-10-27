@@ -38,6 +38,7 @@ import { tipsFor } from '../utils/guides';
 import { alarmLevel } from '../utils/labels';
 import { time } from '../utils/format';
 import { fmtVn } from '../utils/bulletin';
+import { SHOW_STORM } from '../utils/hazardScope';
 import { useDebounced } from '../utils/useDebounced';
 import { useMediaQuery } from '../utils/useMediaQuery';
 import { useOnline } from '../utils/useOnline';
@@ -192,7 +193,7 @@ export default function MonitoringMap() {
     enabled: offset !== 0,
   });
   // Lớp chưa có nguồn dữ liệu thật (API 404) → khoá nút và ghi rõ lý do: bật lên mà trống dễ bị hiểu là "không có bão"
-  const storm = useQuery(stormQuery);
+  const storm = useQuery({ ...stormQuery, enabled: SHOW_STORM }); // bão đang ẩn (utils/hazardScope.js) → không tải
   const scenarioStates = useMemo(() => floodScenarioStates(data, offset !== 0 ? timeline : null), [data, offset, timeline]);
   const unavailable = {
     storm: storm.isError ? storm.error?.message || 'Chưa có bản tin bão đang theo dõi' : null,
@@ -509,7 +510,7 @@ export default function MonitoringMap() {
           {layers.forecast && offset >= 0 && <ForecastChoropleth geo={unitsGeo} areas={fcAreas} />}
           {layers.admin && <AdminBoundaries geo={unitsGeo} basemap={basemap} />}
           <AreaFocus area={area} filtered={filter.codes.length > 0} padding={mapPad} basemap={basemap} />
-          {layers.storm && !unavailable.storm && <StormLayer offset={offset} />}
+          {SHOW_STORM && layers.storm && !unavailable.storm && <StormLayer offset={offset} />}
           <MapLayers
             data={data}
             layers={layers}

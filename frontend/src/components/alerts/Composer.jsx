@@ -13,6 +13,7 @@ import { FieldError, Section, ShowMore, Skeleton, StepChips } from '../common/ui
 import { ALERT_VALID_HOURS, CHANNEL, LEVEL } from '../../utils/labels';
 import { useAllowedCodes } from '../../rbac/usePermission';
 import { foldVi, int } from '../../utils/format';
+import { HIDDEN_TEMPLATE_CODES } from '../../utils/hazardScope';
 import { risk } from '../../utils/risk';
 import { useShowMore } from '../../utils/useShowMore';
 import { SEVERITY_LEVEL } from './alertFacts';
@@ -35,7 +36,7 @@ const PARAM_EXAMPLE = {
 const TEMPLATE_CARD = {
   XA_LU: { icon: Dam, when: 'Thủy điện, hồ chứa mở cửa xả', order: 1 },
   SAT_LO: { icon: Mountain, when: 'Di dời hộ dưới taluy, sườn đồi', order: 2 },
-  BAO_ATND: { icon: Tornado, when: 'Hoàn lưu bão gây mưa rất to', order: 3 },
+  BAO_ATND: { icon: Tornado, when: 'Hoàn lưu bão gây mưa rất to', order: 3 }, // đang ẩn — utils/hazardScope.js
   LU_QUET: { icon: CloudRainWind, when: 'Nguy cơ lũ quét trên suối', order: 4 },
   NGAP: { icon: Waves, when: 'Mực nước sông vượt báo động', order: 5 },
   CHUAN_BI_SO_TAN: { icon: House, when: 'Dự báo mưa lớn — sẵn sàng sơ tán', order: 6 },
@@ -220,7 +221,7 @@ export default function Composer({ online = true }) {
           <div className="mb-1 font-medium" id="mau-tin">Mẫu tin dựng sẵn</div>
           {tplLoading ? <Skeleton height={88} /> : (
             <div className="grid grid-cols-1 gap-1.5 min-[400px]:grid-cols-2" role="radiogroup" aria-labelledby="mau-tin">
-              {[...templates].sort((a, b) => (TEMPLATE_CARD[a.code]?.order ?? 99) - (TEMPLATE_CARD[b.code]?.order ?? 99)).map((t) => {
+              {templates.filter((t) => !HIDDEN_TEMPLATE_CODES.has(t.code)).sort((a, b) => (TEMPLATE_CARD[a.code]?.order ?? 99) - (TEMPLATE_CARD[b.code]?.order ?? 99)).map((t) => {
                 const Icon = TEMPLATE_CARD[t.code]?.icon || Megaphone;
                 return (
                   <button
