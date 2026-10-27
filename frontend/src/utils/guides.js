@@ -54,7 +54,7 @@ export const PAGE_TIPS = {
   'canh-bao': {
     tinh: [
       'Lãnh đạo có mã PIN: lệnh chờ bạn nằm ở khối "Chờ bạn duyệt" — đọc tin xem trước, bấm "Duyệt bằng PIN" hoặc "Trả lại".',
-      'Trực ban soạn lệnh 3 bước: chạm thẻ mẫu tin (xả lũ, sạt lở, bão…) và điền chỗ trống → chọn xã → kênh, rồi "Gửi lãnh đạo phê duyệt".',
+      'Trực ban soạn lệnh 3 bước: chạm thẻ mẫu tin (xả lũ, sạt lở, lũ quét…) và điền chỗ trống → chọn xã → kênh, rồi "Gửi lãnh đạo phê duyệt".',
       'Đã phát: thẻ lệnh ghi bằng lời tin đã tới bao nhiêu người theo từng kênh; kênh chưa nối ghi rõ "chưa gửi được".',
     ],
     xa: [
@@ -197,12 +197,12 @@ export const SCENARIOS = {
       art: 'canh-bao',
       icon: Megaphone,
       title: 'Soạn lệnh cảnh báo cho người dân',
-      when: 'Hồ chuẩn bị xả lũ, nguy cơ sạt lở, bão sắp đổ bộ',
+      when: 'Hồ chuẩn bị xả lũ, nguy cơ sạt lở, lũ quét, mưa lớn kéo dài',
       to: '/canh-bao',
       cta: 'Mở Cảnh báo & Hotline',
       steps: [
         'Mở "Cảnh báo & Hotline", thẻ "Phát cảnh báo", khối soạn lệnh.',
-        'Bước 1 — chạm thẻ mẫu tin (Hồ chứa xả lũ, Yêu cầu di dời do sạt lở, Bão…), điền chỗ trống theo ví dụ trong ô: giờ, lưu lượng, địa điểm.',
+        'Bước 1 — chạm thẻ mẫu tin (Hồ chứa xả lũ, Yêu cầu di dời do sạt lở, Cảnh báo lũ quét…), điền chỗ trống theo ví dụ trong ô: giờ, lưu lượng, địa điểm.',
         'Bước 2 — chọn xã nhận tin (hoặc khoanh vùng trên Bản đồ rồi chuyển sang).',
         'Bước 3 — chọn kênh gửi, xem tin trên khung điện thoại đúng như người dân nhận, bấm "Gửi lãnh đạo phê duyệt".',
       ],
@@ -332,7 +332,7 @@ export const SCENARIOS = {
       art: 'canh-bao',
       icon: Megaphone,
       title: 'Nhận lệnh cảnh báo của tỉnh',
-      when: 'Có lệnh xả lũ, di dời do sạt lở, bão đổ bộ cho xã mình',
+      when: 'Có lệnh xả lũ, di dời do sạt lở, lũ quét, ngập lụt cho xã mình',
       to: '/canh-bao',
       cta: 'Xem lệnh đang hiệu lực',
       steps: [
@@ -375,7 +375,7 @@ export const SCENARIOS = {
       art: 'du-lieu',
       icon: FileUp,
       title: 'Gửi danh sách điểm sơ tán, kho, danh bạ của xã',
-      when: 'Đầu mùa mưa bão, khi danh sách có thay đổi',
+      when: 'Đầu mùa mưa lũ, khi danh sách có thay đổi',
       to: '/nhap-du-lieu',
       cta: 'Mở Nhập dữ liệu',
       steps: [

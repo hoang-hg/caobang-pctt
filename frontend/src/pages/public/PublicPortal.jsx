@@ -1662,7 +1662,7 @@ export default function PublicPortal() {
             <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
                 <h2 className="text-base sm:text-lg font-bold flex items-center gap-2">
-                  <Home size={20} className="text-good" /> Danh sách điểm sơ tán tránh trú bão lũ
+                  <Home size={20} className="text-good" /> Danh sách điểm sơ tán tránh trú mưa lũ, sạt lở
                 </h2>
                 <p className="text-xs text-muted mt-0.5">Các địa điểm kiên cố (nhà văn hóa, trường học, trạm y tế) được chuẩn bị sẵn lương thực, nước sạch</p>
               </div>

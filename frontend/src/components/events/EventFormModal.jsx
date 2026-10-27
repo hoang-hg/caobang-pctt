@@ -8,7 +8,8 @@ import { useStore } from '../../app/store';
 import { FieldError, Modal, StepChips } from '../common/ui';
 import { foldVi } from '../../utils/format';
 import { useOnline } from '../../utils/useOnline';
-import { fromLocalInput, HAZARD, HAZARD_KEYS, MAX_BACKDATE_DAYS, toLocalInput, when } from './eventFacts';
+import { fromLocalInput, HAZARD, MAX_BACKDATE_DAYS, toLocalInput, when } from './eventFacts';
+import { EVENT_HAZARD_CHOICES } from '../../utils/hazardScope';
 
 const STEPS = ['Thông tin', 'Vùng ảnh hưởng'];
 const BIG = 'tap min-h-[44px] text-sm sm:min-h-0';
@@ -185,9 +186,10 @@ export default function EventFormModal({ event, onClose, onSaved }) {
             <FieldError id="loi-dot-ten">{err('name')}</FieldError>
           </div>
           <fieldset>
+            {/* 4 loại trong phạm vi theo dõi (utils/hazardScope.js); đợt cũ loại khác vẫn hiện đúng loại đã lưu */}
             <legend className="font-medium">Loại thiên tai *</legend>
             <div ref={refs.hazard} tabIndex={-1} className="mt-1 grid grid-cols-2 gap-1.5 sm:grid-cols-4" role="radiogroup" aria-label="Loại thiên tai" aria-describedby="loi-dot-loai">
-              {HAZARD_KEYS.map((k) => {
+              {(EVENT_HAZARD_CHOICES.includes(hazard) || !hazard ? EVENT_HAZARD_CHOICES : [...EVENT_HAZARD_CHOICES, hazard]).map((k) => {
                 const H = HAZARD[k];
                 const on = hazard === k;
                 return (
