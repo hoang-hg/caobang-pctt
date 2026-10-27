@@ -8,6 +8,7 @@ import { useAreaQuery } from '../api/hooks';
 import { useStore } from '../app/store';
 import { EmptyState, ErrorState, Modal, Skeleton, Tabs } from '../components/common/ui';
 import PageHeader from '../components/common/PageHeader';
+import RoleTips from '../components/common/RoleTips';
 import { PAGE } from '../components/layout/page';
 import { usePermission, useScopeLabel } from '../rbac/usePermission';
 import { ago, dateTime } from '../utils/format';
@@ -417,6 +418,8 @@ export default function CitizenReports() {
           </div>
         )}
       />
+
+      <RoleTips page="phan-anh" />
 
       <Tabs
         value={tab}

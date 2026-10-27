@@ -14,6 +14,12 @@ import { num } from '../../utils/format';
 
 const CENTER = [22.75, 106.05];
 const MAP_PAD = { topLeft: [12, 12], bottomRight: [12, 12] };
+const LABEL_MODE = { auto: 'tự động', always: 'hiện hết', off: 'tắt' };
+const LABEL_HINT = {
+  auto: 'Tên điểm tự hiện khi phóng to (điểm Đỏ trước, rồi Cam, rồi tất cả). Bấm để luôn hiện hết',
+  always: 'Đang hiện tên mọi điểm. Bấm để tắt tên điểm',
+  off: 'Đang tắt tên điểm. Bấm để tên tự hiện khi phóng to',
+};
 const FILTERS = [
   { id: 'all', label: 'Tất cả', min: 1 },
   { id: 'serious', label: 'Cam trở lên', min: 2 },
@@ -161,28 +167,6 @@ export default function TacticalMiniMap({ k, className, focus, tall = false, her
               {f.label} ({count(f.min)})
             </button>
           ))}
-          <button
-            type="button"
-            onClick={() => setLabelMode((m) => (m === 'auto' ? 'always' : m === 'always' ? 'off' : 'auto'))}
-            title={
-              labelMode === 'auto'
-                ? 'Nhãn địa điểm: Tự động hiển thị khi phóng to giống Google Maps. Bấm để luôn hiện hết'
-                : labelMode === 'always'
-                ? 'Nhãn địa điểm: Đang luôn hiện hết. Bấm để tắt nhãn'
-                : 'Nhãn địa điểm: Đang tắt. Bấm để chuyển sang chế độ tự động theo mức zoom'
-            }
-            className={clsx(
-              'min-h-[32px] rounded-full border px-2.5 py-0.5 text-[11px] font-semibold transition flex items-center gap-1 [@media(pointer:coarse)]:min-h-[44px] [@media(pointer:coarse)]:px-3',
-              labelMode === 'always'
-                ? 'border-accent bg-accent text-white shadow-xs'
-                : labelMode === 'auto'
-                ? 'border-accent/40 bg-accent/10 text-accent hover:bg-accent/20'
-                : 'border-line bg-panel2/60 text-muted hover:text-ink',
-            )}
-          >
-            <Tag size={12} />
-            <span>{labelMode === 'auto' ? 'Tên điểm: Auto' : labelMode === 'always' ? 'Tên điểm: Hiện hết' : 'Tên điểm: Tắt'}</span>
-          </button>
           <Link to="/ban-do" className="btn-ghost px-2 py-0.5 text-[11px] [@media(pointer:coarse)]:min-h-[44px]">
             <Maximize2 size={12} /> Bản đồ đầy đủ
           </Link>
@@ -193,15 +177,17 @@ export default function TacticalMiniMap({ k, className, focus, tall = false, her
                   <button
                     type="button"
                     onClick={() => onSetHeroLayout('right_full')}
-                    title="Bung bản đồ điểm nóng toàn màn hình (thu gọn việc chờ & 6 chỉ số)"
+                    title="Mở rộng bản đồ điểm nóng hết bề ngang (thu gọn việc chờ & 6 chỉ số)"
+                    aria-label="Mở rộng bản đồ điểm nóng"
                     className="btn-ghost px-2 py-0.5 text-[11px] rounded-md [@media(pointer:coarse)]:min-h-[44px] hover:text-accent"
                   >
-                    <Maximize2 size={12} /> <span className="hidden xl:inline">Bung full</span>
+                    <Maximize2 size={12} aria-hidden="true" /> <span className="hidden xl:inline">Mở rộng</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => onSetHeroLayout('left_full')}
-                    title="Thu gọn bản đồ điểm nóng (việc chờ & 6 chỉ số bung full)"
+                    title="Thu gọn bản đồ điểm nóng (việc chờ & 6 chỉ số mở rộng hết bề ngang)"
+                    aria-label="Thu gọn bản đồ điểm nóng"
                     className="btn-ghost px-2 py-0.5 text-[11px] rounded-md [@media(pointer:coarse)]:min-h-[44px] hover:text-accent"
                   >
                     <Minimize2 size={12} /> <span className="hidden xl:inline">Thu gọn</span>
@@ -227,7 +213,8 @@ export default function TacticalMiniMap({ k, className, focus, tall = false, her
       <div className={clsx('grid gap-2 xl:grid-cols-[minmax(0,1fr)_240px] [&>*]:min-w-0', tall && 'flex-1')}>
         {/* isolate: các lớp Leaflet (z-index tới 1000) không đè dải báo động dính trên cùng khi cuộn */}
         <div className={clsx('relative isolate z-0 overflow-hidden rounded-lg border border-line', tall ? 'min-h-[420px]' : 'h-[220px] sm:h-[300px] xl:h-[320px]')}>
-          <MapContainer center={CENTER} zoom={8.8} zoomSnap={0.1} zoomDelta={0.5} zoomControl={false} scrollWheelZoom className="h-full w-full">
+          {/* Không phóng bằng lăn chuột: trang Tổng quan cuộn được — lăn qua bản đồ phải cuộn trang (phóng bằng nút +/−) */}
+          <MapContainer center={CENTER} zoom={8.8} zoomSnap={0.1} zoomDelta={0.5} zoomControl={false} scrollWheelZoom={false} className="h-full w-full">
             <BaseLayer basemap="auto" />
             <MapResize />
             <ZoomWatcher onChange={setMapZoom} />
@@ -317,6 +304,21 @@ export default function TacticalMiniMap({ k, className, focus, tall = false, her
               )}
             </Pane>
           </MapContainer>
+          {/* Tên điểm trên bản đồ (góc trái dưới, trong khung — hàng nút đầu thẻ không dài thêm, bản đồ không bị đẩy khỏi màn
+              hình đầu của laptop): tự động hiện khi phóng to → luôn hiện hết → tắt */}
+          {hotspots.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setLabelMode((m) => (m === 'auto' ? 'always' : m === 'always' ? 'off' : 'auto'))}
+              title={LABEL_HINT[labelMode]}
+              className={clsx(
+                'absolute bottom-2 left-2 z-[1000] flex min-h-[32px] items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold shadow-sm [@media(pointer:coarse)]:min-h-[44px] [@media(pointer:coarse)]:px-3',
+                labelMode === 'always' ? 'border-accent bg-accent text-white' : 'border-line bg-panel/95 text-ink-2 hover:text-ink',
+              )}
+            >
+              <Tag size={12} aria-hidden="true" /> Tên điểm: {LABEL_MODE[labelMode]}
+            </button>
+          )}
           {/* Chưa tải xong / lỗi tải lớp bản đồ: KHÔNG nói "chưa ghi nhận điểm nóng" khi thực ra chưa biết */}
           {!layers && layersError && (
             <div role="alert" className="absolute inset-x-2 top-2 z-[500] flex flex-wrap items-center justify-center gap-2 rounded-lg border border-danger/40 bg-panel/95 px-3 py-2 text-center text-xs text-danger shadow">

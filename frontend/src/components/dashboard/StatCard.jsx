@@ -54,7 +54,8 @@ export default function StatCard({
               <Icon size={14} />
             </span>
           ) : Icon && <Icon size={15} className={clsx('shrink-0', scale ? scale.text : 'text-accent')} aria-hidden="true" />}
-          <span className="truncate tracking-tight text-xs sm:text-[13px]">{title}</span>
+          {/* Ô gọn: 12 / 13 px; trình chiếu (.kpi-lon) giữ chữ to như hàng tiêu đề */}
+          <span className={clsx('truncate tracking-tight', compact && 'text-xs sm:text-[13px] [.kpi-lon_&]:text-lg')}>{title}</span>
         </span>
         {!compact && badgeEl}
         {trend && <span className="min-w-0 shrink-0 text-[11px] [.kpi-lon_&]:text-sm">{trend}</span>}

@@ -98,8 +98,8 @@ function TeamRow({ t, now, onPick }) {
   );
 }
 
-const SosMarker = memo(function SosMarker({ t, onOpen }) {
-  const x = ticketFacts(t);
+const SosMarker = memo(function SosMarker({ t, now, onOpen }) {
+  const x = ticketFacts(t, now); // now: tính "chờ … phút", "Quá hạn" — thiếu thì ra NaN
   return (
     <Marker
       position={[t.lat, t.lon]}
@@ -145,9 +145,11 @@ export default function RescueMap({ tickets, now, onOpen }) {
   const [target, setTarget] = useState(null);
   const layers = layersQ.data;
   const open = useMemo(() => tickets.filter((t) => t.status !== 'hoan_thanh' && t.lat != null && t.lon != null), [tickets]);
+  // Điểm SOS vẽ lại mỗi phút (không phải mỗi giây theo đồng hồ của trang): popup ghi "chờ … phút", "Quá hạn" theo phút
+  const minute = Math.floor(now / 60_000) * 60_000;
   const markerElements = useMemo(() => open.map((t) => (
-    <SosMarker key={t.id} t={t} onOpen={onOpen} />
-  )), [open, onOpen]);
+    <SosMarker key={t.id} t={t} now={minute} onOpen={onOpen} />
+  )), [open, minute, onOpen]);
   const teams = tickets
     .filter((t) => t.status === 'thuc_thi' && hasActiveTeam(t))
     .sort((a, b) => teamRank(a, now) - teamRank(b, now) || new Date(a.eta || 0) - new Date(b.eta || 0));

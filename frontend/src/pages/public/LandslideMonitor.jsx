@@ -156,22 +156,20 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScope
 
       {/* 2. Cảnh báo cấm đường khẩn cấp (nếu có điểm tắc đường / cấm xe) */}
       {blockedCount > 0 && (
-        <div className="rounded-2xl p-4 sm:p-5 border border-danger/40 bg-danger/10 text-ink shadow-sm">
+        <div className="rounded-2xl p-4 sm:p-5 border border-danger/60 bg-danger text-white shadow-lg shadow-danger/20">
           <div className="flex items-start gap-3">
-            <div className="h-10 w-10 rounded-xl bg-danger text-white flex items-center justify-center shrink-0 shadow-xs">
-              <Ban size={22} aria-hidden="true" />
-            </div>
-            <div className="flex-1 min-w-0">
+            <Ban size={26} className="mt-0.5 shrink-0 text-white" aria-hidden="true" />
+            <div className="flex-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-bold text-xs bg-danger text-white px-2.5 py-0.5 rounded-md">
+                <span className="font-bold text-sm bg-white text-[rgb(var(--danger))] px-2.5 py-0.5 rounded-md">
                   Cấm lưu thông khẩn cấp
                 </span>
-                <span className="text-xs sm:text-sm font-bold text-danger">
+                <span className="text-xs font-semibold text-white/90">
                   Đang có {blockedCount} vị trí đường đèo / ngầm tràn bị chia cắt hoàn toàn!
                 </span>
               </div>
-              <p className="text-xs sm:text-sm text-ink-2 mt-1.5 leading-relaxed">
-                Bị chia cắt: <b className="text-danger font-bold">{points.filter((p) => p.traffic_status === 'cam_duong').map((p) => p.name).join(', ')}</b>.
+              <p className="text-xs sm:text-sm text-white/95 mt-1.5 leading-relaxed">
+                Bị chia cắt: <b>{points.filter((p) => p.traffic_status === 'cam_duong').map((p) => p.name).join(', ')}</b>.
                 Không cố vượt qua; tuân thủ biển báo, chốt chặn và hướng dẫn tuyến tránh của lực lượng chức năng.
               </p>
             </div>

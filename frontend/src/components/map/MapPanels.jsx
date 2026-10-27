@@ -355,7 +355,7 @@ export function AlertsList({
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="space-y-1.5 border-b border-line bg-panel2/40 px-3 py-2">
         <div className="flex items-center justify-between gap-1 pb-0.5">
-          <span className="text-[11px] font-bold text-muted uppercase tracking-wider">Danh mục cảnh báo</span>
+          <span className="text-xs font-semibold text-muted">Danh mục cảnh báo</span>
           <button
             type="button"
             onClick={() => setListOpen((o) => !o)}
@@ -416,7 +416,7 @@ export function AlertsList({
           <button
             type="button"
             onClick={() => setListOpen(true)}
-            className="font-semibold text-accent hover:underline"
+            className="tap font-semibold text-accent hover:underline"
           >
             Mở xem chi tiết
           </button>
@@ -595,15 +595,10 @@ export const hourText = (h) => (h === 0 ? 'Bây giờ' : h < 0 ? `${-h} giờ tr
  * Thanh thời gian (thiết kế B.1): Dự báo từ bây giờ → 24 giờ tới (mặc định), hoặc xem lại 12 giờ trước.
  * Có thể thu gọn linh hoạt để mở rộng không gian bản đồ.
  */
-export function TimeControl({ offset, setOffset, touch, onCollapseChange }) {
+export function TimeControl({ offset, setOffset, touch }) {
   const [playing, setPlaying] = useState(false);
   const [collapsed, setCollapsed] = useState(true);
   const [rangeMode, setRangeMode] = useState('forecast'); // 'forecast' (Từ bây giờ: 0 -> 24h) | 'all' (-12h -> 24h)
-
-  const toggleCollapsed = (val) => {
-    setCollapsed(val);
-    onCollapseChange?.(val);
-  };
 
   // Đang phát: mỗi PLAY_MS sang giờ kế tiếp; tới 24 giờ tới thì dừng
   useEffect(() => {
@@ -645,7 +640,7 @@ export function TimeControl({ offset, setOffset, touch, onCollapseChange }) {
             title={playing ? 'Dừng' : 'Phát — xem mưa, bão diễn biến từng giờ'}
             className={clsx(
               'flex shrink-0 items-center justify-center rounded-full text-white shadow-sm transition-transform active:scale-95',
-              touch ? 'h-9 w-9' : 'h-7 w-7',
+              touch ? 'h-11 w-11' : 'h-7 w-7',
               playing ? 'bg-serious' : 'bg-accent',
             )}
           >
@@ -653,7 +648,7 @@ export function TimeControl({ offset, setOffset, touch, onCollapseChange }) {
           </button>
           <div className="flex items-center gap-1.5 text-xs">
             <Clock size={13} className="text-accent" aria-hidden="true" />
-            <span className="text-muted font-medium">Dự báo:</span>
+            <span className="text-muted font-medium">Đang xem:</span>
             <span role="status" aria-label="Thời điểm đang xem">
               <b className={offset === 0 ? 'text-good font-bold' : 'text-accent font-bold'}>
                 {hourText(offset)}
@@ -664,7 +659,7 @@ export function TimeControl({ offset, setOffset, touch, onCollapseChange }) {
         </div>
         <button
           type="button"
-          onClick={() => toggleCollapsed(false)}
+          onClick={() => setCollapsed(false)}
           className="btn-ghost tap flex min-h-[30px] items-center gap-1 px-2.5 py-1 text-xs font-semibold text-accent hover:bg-accent/10 rounded-lg transition-colors whitespace-nowrap"
           title="Mở thanh dự báo"
           aria-label="Mở thanh dự báo"
@@ -680,7 +675,11 @@ export function TimeControl({ offset, setOffset, touch, onCollapseChange }) {
   const minVal = isForecast ? 0 : -12;
   const maxVal = 24;
   const quickList = isForecast ? QUICK_FORECAST : QUICK_ALL;
-  const barCount = isForecast ? 25 : 37;
+  const modeBtn = (on) => clsx(
+    'rounded-md px-2 py-0.5 text-[11px] font-semibold transition-all',
+    touch && 'min-h-[44px]',
+    on ? 'bg-accent text-white shadow-xs' : 'text-muted hover:text-ink',
+  );
 
   return (
     <div>
@@ -696,10 +695,8 @@ export function TimeControl({ offset, setOffset, touch, onCollapseChange }) {
                 setRangeMode('forecast');
                 if (offset < 0) pick(0);
               }}
-              className={clsx(
-                'rounded-md px-2 py-0.5 text-[11px] font-semibold transition-all',
-                isForecast ? 'bg-accent text-white shadow-xs' : 'text-muted hover:text-ink',
-              )}
+              className={modeBtn(isForecast)}
+              aria-pressed={isForecast}
             >
               Từ bây giờ (Dự báo)
             </button>
@@ -709,10 +706,8 @@ export function TimeControl({ offset, setOffset, touch, onCollapseChange }) {
                 setRangeMode('all');
                 pick(-12);
               }}
-              className={clsx(
-                'rounded-md px-2 py-0.5 text-[11px] font-semibold transition-all',
-                !isForecast ? 'bg-accent text-white shadow-xs' : 'text-muted hover:text-ink',
-              )}
+              className={modeBtn(!isForecast)}
+              aria-pressed={!isForecast}
             >
               12 giờ trước
             </button>
@@ -721,7 +716,7 @@ export function TimeControl({ offset, setOffset, touch, onCollapseChange }) {
 
         <button
           type="button"
-          onClick={() => toggleCollapsed(true)}
+          onClick={() => setCollapsed(true)}
           className="tap-sq -mr-1 flex h-7 items-center gap-1 px-2 text-xs font-medium text-muted hover:bg-panel2 hover:text-ink rounded-lg transition-colors"
           title="Thu gọn thanh thời gian"
           aria-label="Thu gọn thanh thời gian"
@@ -747,26 +742,6 @@ export function TimeControl({ offset, setOffset, touch, onCollapseChange }) {
           {playing ? <Pause size={16} aria-hidden="true" /> : <Play size={16} className="ml-0.5" aria-hidden="true" />}
         </button>
         <div className="min-w-0 flex-1">
-          {/* Biểu đồ mini diễn biến mưa tương đối qua các khung giờ */}
-          <div className="mb-1 flex h-3 items-end gap-[1px] px-0.5" aria-hidden="true" title="Diễn biến lượng mưa tương đối qua các khung giờ">
-            {Array.from({ length: barCount }).map((_, i) => {
-              const h = isForecast ? i : i - 12;
-              const intensity = h < 0 ? Math.max(2, 5 + Math.sin(h / 2) * 2.5) : Math.max(3, 7 + Math.sin(h / 4) * 4 + (h <= 8 ? 5 : 0));
-              const heightPct = Math.min(100, Math.round((intensity / 16) * 100));
-              const isCurrent = h === offset;
-              const isNow = h === 0;
-              return (
-                <div
-                  key={h}
-                  style={{ height: `${heightPct}%` }}
-                  className={clsx(
-                    'flex-1 rounded-t-sm',
-                    isCurrent ? 'bg-accent ring-1 ring-accent' : isNow ? 'bg-good' : h > 0 ? 'bg-accent/40' : 'bg-muted/30',
-                  )}
-                />
-              );
-            })}
-          </div>
           <input
             type="range"
             min={minVal}

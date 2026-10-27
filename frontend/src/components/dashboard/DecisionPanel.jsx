@@ -18,7 +18,8 @@ import { ErrorState, Hint, Skeleton } from '../common/ui';
  * liệu xã chờ duyệt (data.import toàn tỉnh), phản ánh người dân chờ duyệt (report.view). Số Đỏ chỉ cho việc thật sự khẩn
  * (xã xin chi viện, phiếu quá hạn). Việc mới xuất hiện → dòng trượt vào (một lần). Không ghi vào báo cáo PDF.
  * Chưa tải được KPI (máy chủ lỗi / đang tải) → KHÔNG nói "không có việc nào" khi thực ra chưa biết.
- * `stacked`: danh sách dọc ở mọi cỡ màn (cột trái của Tổng quan màn lớn ≥ 1680 px — cạnh bản đồ lớn).
+ * `stacked`: danh sách dọc ở mọi cỡ màn (cột trái của Tổng quan màn lớn ≥ 1680 px — cạnh bản đồ lớn). `heroLayout`: nút mở
+ * rộng / thu gọn khối này so với bản đồ (màn lớn).
  */
 export default function DecisionPanel({ k, kState, className, stacked = false, heroLayout, onSetHeroLayout }) {
   // Lớp chỉ áp từ 640 px khi xếp ngang; `stacked` giữ kiểu danh sách dọc của điện thoại
@@ -48,7 +49,7 @@ export default function DecisionPanel({ k, kState, className, stacked = false, h
     // Từ 640 px: tiêu đề bên trái, các việc thành MỘT hàng thẻ ngang bên phải — khối thấp, 6 ô chỉ số và bản đồ vẫn trong
     // màn hình đầu của laptop 1366 × 768. Điện thoại: danh sách dọc, mỗi dòng: số · việc · nút
     <section className={clsx('card flex flex-col gap-2 p-3 no-print', row('sm:flex-row sm:items-stretch sm:gap-3'), className)} aria-label="Việc chờ quyết định">
-      <div className={clsx('flex items-center justify-between gap-2', row('sm:w-36 sm:shrink-0 sm:flex-col sm:items-start sm:justify-center sm:gap-1.5'))}>
+      <div className={clsx('flex items-center justify-between gap-2', row('sm:w-32 sm:shrink-0 sm:flex-col sm:items-start sm:justify-center sm:gap-1'))}>
         <div className="flex min-w-0 items-center gap-2">
           <h2 className="text-base font-bold leading-tight text-ink">Việc chờ quyết định</h2>
           <Hint label="Việc chờ quyết định">
@@ -61,7 +62,8 @@ export default function DecisionPanel({ k, kState, className, stacked = false, h
               'chip shrink-0 px-2 py-0.5 text-xs',
               rows.some((r) => r.level === 3) ? 'bg-danger/15 font-bold text-danger' : 'bg-accent/10 font-semibold text-accent',
             )}>
-              {int(total)} việc cần xử lý
+              {/* Hàng thẻ ngang (từ 640 px): cột tiêu đề hẹp 128 px — chữ gọn để các thẻ việc không bị ép xuống 3 dòng */}
+              {int(total)} việc<span className={row('sm:hidden')}> cần xử lý</span>
             </span>
           )}
           {heroLayout && onSetHeroLayout && (
@@ -71,17 +73,17 @@ export default function DecisionPanel({ k, kState, className, stacked = false, h
                   <button
                     type="button"
                     onClick={() => onSetHeroLayout('left_full')}
-                    title="Bung full việc chờ & 6 chỉ số (thu gọn bản đồ)"
+                    title="Mở rộng việc chờ & 6 chỉ số hết bề ngang (thu gọn bản đồ)"
                     className="btn-ghost tap p-1 text-muted hover:text-accent rounded-md"
-                    aria-label="Bung full việc chờ và 6 chỉ số"
+                    aria-label="Mở rộng việc chờ và 6 chỉ số"
                   >
                     <Maximize2 size={13} />
-                    <span className="text-[11px] font-semibold hidden 2xl:inline ml-0.5">Bung full</span>
+                    <span className="text-[11px] font-semibold hidden 2xl:inline ml-0.5">Mở rộng</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => onSetHeroLayout('right_full')}
-                    title="Thu gọn việc chờ & 6 chỉ số (bản đồ bung full)"
+                    title="Thu gọn việc chờ & 6 chỉ số (bản đồ mở rộng hết bề ngang)"
                     className="btn-ghost tap p-1 text-muted hover:text-accent rounded-md"
                     aria-label="Thu gọn việc chờ và 6 chỉ số"
                   >
@@ -117,7 +119,7 @@ export default function DecisionPanel({ k, kState, className, stacked = false, h
                   to={r.to}
                   className={clsx(
                     'group -mx-1 flex min-h-[46px] items-center gap-3 rounded-xl px-1 py-1 transition-all duration-150 hover:bg-panel2',
-                    row('sm:mx-0 sm:h-full sm:gap-2.5 sm:border sm:border-line sm:bg-panel sm:p-2 sm:shadow-sm sm:hover:-translate-y-0.5 sm:hover:border-accent sm:hover:shadow-md'),
+                    row('sm:mx-0 sm:h-full sm:gap-2.5 sm:border sm:border-line sm:bg-panel sm:px-2.5 sm:py-1.5 sm:shadow-sm sm:hover:-translate-y-0.5 sm:hover:border-accent sm:hover:shadow-md'),
                     r.level === 3 && row('sm:border-danger/35 sm:bg-danger/[0.04] sm:hover:border-danger sm:hover:shadow-danger/10'),
                   )}
                 >

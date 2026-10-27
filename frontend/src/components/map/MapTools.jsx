@@ -329,6 +329,9 @@ export function AreaFocus({ area, filtered, padding = {}, fly = true, basemap })
 
   const provinceRings = useMemo(() => toRings(provinceArea?.geometry), [provinceArea]);
   const activeRings = useMemo(() => toRings(area?.geometry), [area]);
+  // Vùng đang xem hẹp hơn tỉnh — đang lọc, hoặc tài khoản xã chưa lọc (phạm vi được giao): làm nổi vùng đó (quyết định 21/10/2026
+  // "chỉ rõ tỉnh / vùng đang xem" — docs/ke-hoach-lam-moi-giao-dien.md mục 7.2)
+  const narrowed = !!activeRings && (filtered || (!!provinceArea?.bbox && area?.bbox?.join(',') !== provinceArea.bbox.join(',')));
 
   // Nếu chưa có ranh giới nào được nạp thì chưa vẽ
   if (!provinceRings && !activeRings) return null;
@@ -347,8 +350,8 @@ export function AreaFocus({ area, filtered, padding = {}, fly = true, basemap })
             interactive={false}
           />
         )}
-        {/* Khi người dùng lọc một xã/phường cụ thể: làm mờ nhẹ (30%) phần còn lại trong tỉnh để làm nổi bật xã đang chọn */}
-        {filtered && activeRings && provinceRings && (
+        {/* Vùng hẹp hơn tỉnh (xã đang lọc / phạm vi được giao): làm mờ nhẹ (30%) phần còn lại trong tỉnh */}
+        {narrowed && provinceRings && (
           <Polygon
             key={`mask-commune-${s.mask}`}
             positions={[provinceRings[0], ...activeRings]}
@@ -367,8 +370,8 @@ export function AreaFocus({ area, filtered, padding = {}, fly = true, basemap })
             interactive={false}
           />
         )}
-        {/* Viền nổi bật cho vùng/xã đang lọc */}
-        {filtered && activeRings && (
+        {/* Viền nổi bật cho vùng đang xem (xã đang lọc / phạm vi được giao) */}
+        {narrowed && (
           <>
             <Polygon key={`halo-${s.halo}`} positions={activeRings} pathOptions={{ color: s.halo, weight: 5, opacity: 0.7, fill: false }} interactive={false} />
             <Polygon key={`line-${s.line}`} positions={activeRings} pathOptions={{ color: s.line, weight: 2.5, fill: false }} interactive={false} />

@@ -682,23 +682,19 @@ export default function PublicPortal() {
         <section
           aria-label="Tình hình hiện tại"
           className={clsx(
-            'flex flex-col gap-2 rounded-xl border px-3 py-2.5 sm:px-4 shadow-xs',
-            active
-              ? (onRed
-                  ? 'border-danger/50 bg-danger/10 text-ink dark:bg-danger/15'
-                  : 'border-serious/50 bg-serious/10 text-ink dark:bg-serious/15')
-              : 'border-line bg-panel text-ink',
+            'flex flex-col gap-2 rounded-xl border px-3 py-2.5 sm:px-4',
+            active ? (onRed ? 'border-danger bg-danger text-white' : 'border-serious bg-serious text-black') : 'border-line bg-panel text-ink',
           )}
         >
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             {active
-              ? <AlertTriangle size={22} className={clsx('shrink-0', onRed ? 'text-danger' : 'text-serious-text')} aria-hidden="true" />
+              ? <AlertTriangle size={22} className="shrink-0" aria-hidden="true" />
               : <CheckCircle2 size={22} className="shrink-0 text-good" aria-hidden="true" />}
             <div className="min-w-0 flex-1">
-              <div className={clsx('text-sm font-bold sm:text-base', active ? (onRed ? 'text-danger dark:text-red-400' : 'text-serious-text dark:text-amber-400') : 'text-ink')}>
+              <div className="text-sm font-bold sm:text-base">
                 {active ? <>Đang có {active} cảnh báo thiên tai khẩn cấp<span className="max-sm:hidden"> trên địa bàn tỉnh</span></> : 'Hiện không có cảnh báo khẩn cấp'}
               </div>
-              <div className="text-xs leading-relaxed text-ink-2">
+              <div className={clsx('text-xs leading-relaxed', active ? (onRed ? 'text-white/90' : 'text-black/80') : 'text-muted')}>
                 {overview?.rain?.avg_24h != null ? (
                   <>Mưa 24 giờ qua: trung bình <b className="num">{num(overview.rain.avg_24h, 1)} mm</b><span className="max-sm:hidden">, cao nhất <b className="num">{num(overview.rain.max_24h, 1)} mm</b></span></>
                 ) : 'Chưa có số liệu mưa — đang cập nhật'}
@@ -715,7 +711,7 @@ export default function PublicPortal() {
                 <button
                   type="button"
                   onClick={() => { setActiveTab('bando'); setMapSidebarTab('alerts'); scrollToContent(); }}
-                  className={clsx('btn px-3 py-1.5 text-xs font-semibold border bg-panel hover:bg-panel2', onRed ? 'border-danger/30 text-danger' : 'border-serious/40 text-serious-text')}
+                  className={clsx('btn px-3 py-1.5 text-xs font-semibold', onRed ? 'border border-white/60 text-white hover:bg-white/10' : 'border border-black/40 text-black hover:bg-black/5')}
                 >
                   Xem cảnh báo <ChevronRight size={14} aria-hidden="true" />
                 </button>
@@ -723,7 +719,7 @@ export default function PublicPortal() {
               <button
                 type="button"
                 onClick={() => setShowSosModal(true)}
-                className="btn px-3 py-1.5 text-xs font-bold sm:text-sm bg-danger text-white hover:brightness-110 shadow-xs"
+                className={clsx('btn px-3 py-1.5 text-xs font-bold sm:text-sm', active ? 'bg-white text-[rgb(var(--danger))] hover:bg-white/90' : 'bg-danger text-white hover:brightness-110')}
               >
                 <PhoneCall size={15} aria-hidden="true" /> Cần cứu hộ khẩn cấp
               </button>
@@ -735,7 +731,7 @@ export default function PublicPortal() {
                 <button
                   type="button"
                   onClick={() => openTab('hochua')}
-                  className="chip tap shrink-0 gap-1.5 whitespace-nowrap border border-serious/40 bg-serious/15 text-serious-text hover:bg-serious/25 px-2.5 text-xs font-semibold"
+                  className={clsx('chip tap shrink-0 gap-1.5 whitespace-nowrap border px-2.5 text-xs font-semibold', active ? 'border-current/40 bg-black/10' : 'border-serious/50 bg-serious/10 text-ink')}
                 >
                   <Waves size={14} aria-hidden="true" />
                   <span>
@@ -750,7 +746,7 @@ export default function PublicPortal() {
                 <button
                   type="button"
                   onClick={() => openTab('satlo')}
-                  className="chip tap shrink-0 gap-1.5 whitespace-nowrap border border-danger/40 bg-danger/15 text-danger-text hover:bg-danger/25 px-2.5 text-xs font-semibold"
+                  className={clsx('chip tap shrink-0 gap-1.5 whitespace-nowrap border px-2.5 text-xs font-semibold', active ? 'border-current/40 bg-black/10' : 'border-danger/40 bg-danger/10 text-danger')}
                 >
                   <Mountain size={14} aria-hidden="true" />
                   <span>
@@ -1028,7 +1024,7 @@ export default function PublicPortal() {
                       className={clsx(
                         'rounded-full px-1.5 py-0.5 text-[10px] font-bold transition-colors',
                         on
-                          ? (badge.isEmergency ? 'bg-white text-danger font-black shadow-xs' : 'bg-white text-serious-text font-black shadow-xs')
+                          ? (badge.isEmergency ? 'bg-white text-danger font-black shadow-xs' : 'bg-white text-serious font-black shadow-xs')
                           : badge.cls,
                       )}
                     >

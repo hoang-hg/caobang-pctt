@@ -123,7 +123,17 @@ export default function MonitoringMap() {
   const [leftOpen, setLeftOpen] = useState(false); // bảng lớp thu gọn sẵn để bản đồ thoáng rộng
   const [rightOpen, setRightOpen] = useState(true); // bảng cảnh báo (Tình hình, Điểm nóng) mở sẵn — chỉ huy thấy ngay
   const [legendOpen, setLegendOpen] = useState(false);
-  const [timelineCollapsed, setTimelineCollapsed] = useState(true); // mặc định thu gọn thanh thời gian để phóng to bản đồ
+  // Chiều cao thật của thanh thời gian (thu gọn / mở rộng / có dòng giải thích / màn cảm ứng): cột phải và khung nhìn bản đồ
+  // chừa đúng chỗ này — chừa số cố định thì thanh đè lên bảng Cảnh báo
+  const timeBarRef = useRef(null);
+  const [timeBarH, setTimeBarH] = useState(64);
+  useEffect(() => {
+    const el = timeBarRef.current;
+    if (!el) return undefined;
+    const ro = new ResizeObserver(() => setTimeBarH(el.offsetHeight));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [wide]); // thanh nổi chỉ có ở màn rộng (≥ 1024 px)
   const [toolsOpen, setToolsOpen] = useState(false); // mặc định thu gọn thanh chọn nền / công cụ để phóng to bản đồ
   const [sheet, setSheet] = useState(null); // điện thoại / máy tính bảng: layers | alerts | time | tools | legend
   const [dispatch, setDispatch] = useState(null);
@@ -347,13 +357,13 @@ export default function MonitoringMap() {
     if (!wide) return { topLeft: [12, 12], bottomRight: [12, 12] };
     return {
       topLeft: [leftOpen ? 290 : 20, toolsOpen ? 60 : 16],
-      bottomRight: [rightOpen ? 350 : 20, timelineCollapsed ? 42 : 110],
+      bottomRight: [rightOpen ? 350 : 20, timeBarH + 24],
     };
-  }, [wide, leftOpen, rightOpen, toolsOpen, timelineCollapsed]);
+  }, [wide, leftOpen, rightOpen, toolsOpen, timeBarH]);
   // Popup tự kéo bản đồ cho lọt khung: chừa thanh công cụ / chế độ xem (trên), bảng lớp, bảng cảnh báo (hai bên), thanh thời
   // gian (dưới); điện thoại chừa cột nút Công cụ / Chú giải bên phải
   const popupPad = wide
-    ? { autoPanPaddingTopLeft: [leftOpen ? 300 : 16, toolsOpen ? 76 : 40], autoPanPaddingBottomRight: [rightOpen ? 350 : 16, timelineCollapsed ? 50 : 110] }
+    ? { autoPanPaddingTopLeft: [leftOpen ? 300 : 16, toolsOpen ? 76 : 40], autoPanPaddingBottomRight: [rightOpen ? 350 : 16, timeBarH + 24] }
     : { autoPanPaddingTopLeft: [12, 12], autoPanPaddingBottomRight: [76, 12] };
 
   const setAllLayers = (val) => {
@@ -593,13 +603,8 @@ export default function MonitoringMap() {
             </div>
 
             {/* Phải: công cụ bản đồ (góc phải trên) xếp ngay cạnh bảng Cảnh báo khẩn cấp — cùng một hàng, tự nhường chỗ */}
-            {/* Đáy chừa chỗ thanh thời gian — màn cảm ứng thanh cao hơn (nấc giờ 44 px) nên chừa nhiều hơn */}
-            <div
-              className={clsx(
-                'pointer-events-none absolute right-3 top-3 z-[1000] flex items-start gap-2',
-                timelineCollapsed ? 'bottom-12' : 'bottom-[7.5rem] [@media(pointer:coarse)]:bottom-[9rem]',
-              )}
-            >
+            {/* Đáy chừa đúng chiều cao thanh thời gian (đo thật — timeBarH) + khe 8 px: bảng Cảnh báo không bị thanh đè */}
+            <div className="pointer-events-none absolute right-3 top-3 z-[1000] flex items-start gap-2" style={{ bottom: timeBarH + 20 }}>
               <div className="pointer-events-auto flex flex-col items-end gap-2">
                 {!toolsOpen && !tool ? (
                   <button
@@ -665,7 +670,7 @@ export default function MonitoringMap() {
                   >
                     <Siren size={16} className="text-danger animate-pulse" aria-hidden="true" />
                     <span>Cảnh báo</span>
-                    {alertCount > 0 && <span className="chip bg-danger text-white text-[11px] font-bold px-1.5 py-0.2">{alertCount}</span>}
+                    {alertCount > 0 && <span className="chip bg-danger text-white text-[11px] font-bold px-1.5 py-px">{alertCount}</span>}
                     <ChevronLeft size={14} className="text-muted ml-0.5" />
                   </button>
                 ) : (
@@ -698,8 +703,8 @@ export default function MonitoringMap() {
             </div>
 
             {/* Thanh thời gian – Đáy, giữa; căn giữa và tự co giãn vừa vặn */}
-            <div className={clsx(floatCard, 'absolute bottom-3 left-1/2 -translate-x-1/2 z-[1000] w-fit max-w-[min(640px,calc(100%-25rem))] px-4 py-2 transition-all duration-200')}>
-              <TimeControl offset={offset} setOffset={setOffset} touch={coarse} onCollapseChange={setTimelineCollapsed} />
+            <div ref={timeBarRef} className={clsx(floatCard, 'absolute bottom-3 left-1/2 -translate-x-1/2 z-[1000] w-fit max-w-[min(640px,calc(100%-25rem))] px-4 py-2 transition-all duration-200')}>
+              <TimeControl offset={offset} setOffset={setOffset} touch={coarse} />
             </div>
           </>
         ) : (

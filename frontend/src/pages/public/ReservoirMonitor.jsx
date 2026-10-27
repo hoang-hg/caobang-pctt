@@ -174,22 +174,20 @@ export default function ReservoirMonitor({ onSelectOnMap, onBackToMap, areaScope
 
       {/* 2. Cảnh báo khẩn cấp hạ du (nếu có hồ xả lũ lớn hoặc đang xả lớn) */}
       {emergencyCount > 0 && (
-        <div className="rounded-2xl p-4 sm:p-5 border border-danger/40 bg-danger/10 text-ink shadow-sm">
+        <div className="rounded-2xl p-4 sm:p-5 border border-danger/60 bg-danger text-white shadow-lg shadow-danger/20">
           <div className="flex items-start gap-3">
-            <div className="h-10 w-10 rounded-xl bg-danger text-white flex items-center justify-center shrink-0 shadow-xs">
-              <Siren size={22} aria-hidden="true" />
-            </div>
-            <div className="flex-1 min-w-0">
+            <Siren size={26} className="mt-0.5 shrink-0 text-white" aria-hidden="true" />
+            <div className="flex-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-bold text-xs bg-danger text-white px-2.5 py-0.5 rounded-md">
+                <span className="font-bold text-sm bg-white text-[rgb(var(--danger))] px-2.5 py-0.5 rounded-md">
                   Cảnh báo xả lũ mức cao
                 </span>
-                <span className="text-xs sm:text-sm font-bold text-danger">
+                <span className="text-xs font-semibold text-white/90">
                   Phát hiện {emergencyCount} hồ chứa đang mở từ một nửa số cửa xả tràn trở lên (xả lũ lớn).
                 </span>
               </div>
-              <p className="text-xs sm:text-sm text-ink-2 mt-1.5 leading-relaxed">
-                Người dân các xã hạ du lưu vực <b className="text-danger font-bold">{riverList}</b> cần khẩn trương thu dọn máy móc,
+              <p className="text-xs sm:text-sm text-white/95 mt-1.5 leading-relaxed">
+                Người dân các xã hạ du lưu vực <b>{riverList}</b> cần khẩn trương thu dọn máy móc,
                 neo đậu tàu thuyền bè chắc chắn, di chuyển gia súc và nông sản khỏi các bãi soi, bãi bồi ven sông.
                 Tuyệt đối không đi thuyền vớt củi, không tắm lội và chú ý biển báo nguy hiểm tại các ngầm tràn!
               </p>

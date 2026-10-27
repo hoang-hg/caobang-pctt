@@ -9,6 +9,7 @@ import {
 import { useAreaQuery, useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
 import { EmptyState, ErrorState, Hint, RiskLegend, Section, Segmented, Skeleton } from '../components/common/ui';
+import RoleTips from '../components/common/RoleTips';
 import EventLog from '../components/common/EventLog';
 import Hydrograph from '../components/charts/Hydrograph';
 import RainfallChart from '../components/charts/RainfallChart';
@@ -124,9 +125,11 @@ export default function Dashboard() {
   const isPhone = !useMediaQuery('(min-width: 640px)');
   const [params, setParams] = useSearchParams();
   const { filter, setFilter, clearFilter, toast, auth, wsStatus, setFocus, presentation, setPresentation } = useStore();
-  // Bố cục 2 cột màn hình lớn (≥ 1440 px): việc chờ + 6 ô số bên trái, bản đồ điểm nóng lớn bên phải.
-  // Hỗ trợ thu gọn/bung full linh hoạt giữa 2 bên theo lựa chọn của người dùng (lưu localStorage).
-  const bigScreen = useMediaQuery('(min-width: 1440px)');
+  // Màn lớn của lãnh đạo (≥ 1680 px — màn rời, TV phòng điều hành; cả chế độ trình chiếu): 2 cột — việc chờ + 6 ô số bên
+  // trái, bản đồ điểm nóng lớn bên phải (docs/ke-hoach-lam-moi-giao-dien.md mục 6.3); mở rộng một bên / thu gọn bên kia theo
+  // lựa chọn của người xem (nhớ trên máy). Laptop 1366–1600 px giữ 1 cột: 2 cột đẩy 6 ô số ra khỏi màn hình đầu (1440 × 900:
+  // hàng ô cuối bị thanh trạng thái che)
+  const bigScreen = useMediaQuery('(min-width: 1680px)');
   const [heroLayout, setHeroLayoutState] = useState(() => {
     try {
       const saved = localStorage.getItem('pctt_dashboard_hero_layout');
@@ -140,6 +143,9 @@ export default function Dashboard() {
       localStorage.setItem('pctt_dashboard_hero_layout', layout);
     } catch { /* bỏ qua */ }
   };
+  // Trình chiếu (TV phòng điều hành) luôn chia 2 cột, đủ 6 ô số — lựa chọn thu gọn của người xem trên máy không áp vào
+  const layout = presentation ? 'split' : heroLayout;
+  const layoutProps = presentation ? {} : { heroLayout: layout, onSetHeroLayout: setHeroLayout };
   const isFiltered = filter.codes.length > 0;
 
   // Quyền: nút / thẻ / khối chỉ hiện khi tài khoản mở được — backend vẫn kiểm tra lại mọi thao tác
@@ -563,6 +569,7 @@ export default function Dashboard() {
               large={presentation}
               onShowWorst={(h) => {
                 if (tab !== 'tong_hop') setTab('tong_hop');
+                if (bigScreen && heroLayout === 'left_full') setHeroLayout('split'); // bản đồ đang thu gọn → hiện lại để bay tới
                 setMapFocus({ id: h.id, at: Date.now() });
               }}
               link={canDataImport ? { to: '/nhap-du-lieu', text: 'Nhập danh mục trạm →' } : canSystem ? { to: '/nguon-du-lieu', text: 'Xem nguồn dữ liệu →' } : null}
@@ -619,6 +626,8 @@ export default function Dashboard() {
       {tab === 'cap_xa' && (
         <div ref={ref} className="flex flex-col gap-3.5">
           <CommuneView code={communeCode} units={scopeUnits} onChange={(code) => enterCommune(code)} onSupport={() => setSupportOpen(true)}>
+            {/* Tài khoản xã: gợi ý lần đầu ngay dưới các ô chỉ số của xã (cấp tỉnh xem thẻ này đã có gợi ý ở thẻ Tổng hợp) */}
+            {isCommuneUser && <RoleTips page="tong-quan" />}
             <div className="grid gap-3.5 xl:grid-cols-[1fr_360px] [&>*]:min-w-0">
               <div className="grid gap-3.5 lg:grid-cols-2 [&>*]:min-w-0">
                 {/* Biểu đồ số đo trạm chỉ khi xã có trạm đo mưa — không thì 2 khung trống "chưa có số đo" chiếm nửa trang */}
@@ -674,10 +683,10 @@ export default function Dashboard() {
           {/* Vùng chụp PDF: chỉ số + bản đồ + biểu đồ + nhật ký ("Việc chờ quyết định", gợi ý không in — việc riêng của người xem) */}
           <div ref={ref} className="flex flex-col gap-2.5 bg-bg sm:gap-3.5">
             {/* 1. Việc chờ quyết định + 6 ô chỉ số & Bản đồ điểm nóng:
-                Hỗ trợ chế độ 2 cột (split), bung full bên trái (left_full) hoặc bung full bản đồ (right_full). */}
+                Màn lớn: 2 cột (split), mở rộng bên trái (left_full) hoặc mở rộng bản đồ (right_full) — trình chiếu luôn 2 cột. */}
             {bigScreen ? (
               <div className="flex flex-col gap-3.5">
-                {heroLayout === 'split' && (
+                {layout === 'split' && (
                   <div className="grid grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-3.5 items-start">
                     <div className="flex min-w-0 flex-col gap-3.5">
                       {!presentation && (
@@ -686,8 +695,7 @@ export default function Dashboard() {
                           kState={kState}
                           className="max-sm:order-last"
                           stacked
-                          heroLayout={heroLayout}
-                          onSetHeroLayout={setHeroLayout}
+                          {...layoutProps}
                         />
                       )}
                       <KpiStrip
@@ -705,13 +713,12 @@ export default function Dashboard() {
                       className="min-w-0"
                       focus={mapFocus}
                       tall
-                      heroLayout={heroLayout}
-                      onSetHeroLayout={setHeroLayout}
+                      {...layoutProps}
                     />
                   </div>
                 )}
 
-                {heroLayout === 'left_full' && (
+                {layout === 'left_full' && (
                   <div className="flex min-w-0 flex-col gap-3.5">
                     {!presentation && (
                       <DecisionPanel
@@ -719,8 +726,7 @@ export default function Dashboard() {
                         kState={kState}
                         className="max-sm:order-last"
                         stacked={false}
-                        heroLayout={heroLayout}
-                        onSetHeroLayout={setHeroLayout}
+                        {...layoutProps}
                       />
                     )}
                     <KpiStrip
@@ -742,7 +748,7 @@ export default function Dashboard() {
                       <button
                         type="button"
                         onClick={() => setHeroLayout('split')}
-                        className="btn-ghost flex items-center gap-1.5 border border-accent/40 bg-card px-3 py-1 font-semibold text-accent shadow-xs hover:bg-accent hover:text-white rounded-md"
+                        className="btn-ghost tap flex items-center gap-1.5 rounded-md border border-accent/40 bg-panel px-3 py-1 font-semibold text-accent shadow-xs hover:bg-accent hover:text-white"
                       >
                         <Columns2 size={13} />
                         <span>Hiện lại bản đồ (chia 2 cột)</span>
@@ -751,7 +757,7 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                {heroLayout === 'right_full' && (
+                {layout === 'right_full' && (
                   <div className="flex min-w-0 flex-col gap-3.5">
                     <div className="flex items-center justify-between rounded-lg border border-dashed border-accent/40 bg-accent/5 px-4 py-2.5 text-xs text-ink/80 transition-all hover:bg-accent/10">
                       <div className="flex items-center gap-2">
@@ -763,7 +769,7 @@ export default function Dashboard() {
                       <button
                         type="button"
                         onClick={() => setHeroLayout('split')}
-                        className="btn-ghost flex items-center gap-1.5 border border-accent/40 bg-card px-3 py-1 font-semibold text-accent shadow-xs hover:bg-accent hover:text-white rounded-md"
+                        className="btn-ghost tap flex items-center gap-1.5 rounded-md border border-accent/40 bg-panel px-3 py-1 font-semibold text-accent shadow-xs hover:bg-accent hover:text-white"
                       >
                         <Columns2 size={13} />
                         <span>Hiện lại việc chờ & 6 chỉ số (chia 2 cột)</span>
@@ -774,8 +780,7 @@ export default function Dashboard() {
                       className="min-w-0"
                       focus={mapFocus}
                       tall
-                      heroLayout={heroLayout}
-                      onSetHeroLayout={setHeroLayout}
+                      {...layoutProps}
                     />
                   </div>
                 )}
@@ -797,9 +802,16 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* 2. Khối chiến thuật: bản đồ + chuyên đề (trái), nhật ký sự kiện (phải) */}
+            {/* 2. Khối chiến thuật: bản đồ + chuyên đề (trái), nhật ký sự kiện (phải). Gợi ý lần đầu: điện thoại ngay trước bản
+                đồ; máy tính bảng / laptop đầu cột phải (trên nhật ký) — không đẩy bản đồ xuống dưới màn hình đầu */}
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_420px] [&>*]:min-w-0">
-              <div className="flex min-w-0 flex-col gap-3">
+              {!presentation && (
+                <RoleTips
+                  page="tong-quan"
+                  className="md:col-start-2 md:row-start-1 md:!flex-col md:!items-stretch md:self-start [&_ol]:md:!grid-cols-1"
+                />
+              )}
+              <div className="flex min-w-0 flex-col gap-3 md:col-start-1 md:row-span-2 md:row-start-1">
                 {!bigScreen && <TacticalMiniMap k={k} className="min-w-0" focus={mapFocus} />}
 
                 {/* Biểu đồ theo chuyên đề — xem một chuyên đề một lúc (bớt rối cho lãnh đạo) hoặc "Tất cả" */}
@@ -879,7 +891,7 @@ export default function Dashboard() {
               {logSection({
                 title: 'Nhật ký sự kiện',
                 limit: 60,
-                className: 'min-w-0 lg:sticky lg:top-16 lg:h-[calc(100vh-8.5rem)] lg:self-start lg:overflow-hidden lg:tall:h-[calc(100vh-10.5rem)]', // màn đủ cao: trừ cả thanh trạng thái
+                className: 'min-w-0 md:col-start-2 lg:sticky lg:top-16 lg:h-[calc(100vh-8.5rem)] lg:self-start lg:overflow-hidden lg:tall:h-[calc(100vh-10.5rem)]', // màn đủ cao: trừ cả thanh trạng thái
               })}
             </div>
           </div>

@@ -331,7 +331,7 @@ function ReservoirPopup({ p, lv, onOperate }) {
         </p>
       ) : (
         <>
-          <table className="mt-0.5 w-full text-[11px] leading-tight [&_td]:py-0.25">
+          <table className="mt-0.5 w-full text-[11px] leading-tight [&_td]:py-px">
             <tbody>
               <tr><td>Mực nước hồ</td><td className="num text-right">{num(p.current_level, 2)} m</td></tr>
               <tr><td>Mực nước dâng bình thường</td><td className="num text-right">{num(p.normal_level, 1)} m</td></tr>

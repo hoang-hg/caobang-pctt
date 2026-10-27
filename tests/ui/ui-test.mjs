@@ -1132,11 +1132,16 @@ async function managerMap(ctx, layout) {
     return `${levels.length} điểm nóng đang hiện · ${before} → ${situation} → ${back} điểm trên bản đồ`;
   });
   if (layout === 'grid') {
-    await step(ctx, 'Thanh thời gian: mốc "12 giờ trước · Bây giờ · 24 giờ tới", nút Phát chạy từng giờ, chọn "Bây giờ" thì dừng', async () => {
+    // Thanh thu gọn sẵn (bản đồ rộng hơn) — mở ra; mặc định "Từ bây giờ" tới 24 giờ tới, nút "12 giờ trước" xem lại số đo đã qua
+    await step(ctx, 'Thanh thời gian: mở thanh, mốc "Bây giờ · 24 giờ tới", xem lại "12 giờ trước", nút Phát chạy từng giờ, chọn "Bây giờ" thì dừng', async () => {
       const now = page.getByRole('status', { name: 'Thời điểm đang xem' });
       if (!/Bây giờ/.test(await now.innerText())) throw new Error(`mở bản đồ không ở "Bây giờ": ${await now.innerText()}`);
-      await page.getByText('12 giờ trước', { exact: true }).first().waitFor({ timeout: 5_000 });
+      const open = page.getByRole('button', { name: 'Mở thanh dự báo' });
+      if (await open.count()) await open.click();
       await page.getByText('24 giờ tới', { exact: true }).first().waitFor({ timeout: 5_000 });
+      await page.getByRole('button', { name: '12 giờ trước', exact: true }).click();
+      await page.waitForFunction(() => /12 giờ trước/.test(document.querySelector('[aria-label="Thời điểm đang xem"]')?.innerText || ''), null, { timeout: 5_000 });
+      await page.getByRole('button', { name: 'Bây giờ', exact: true }).click();
       await page.getByRole('button', { name: /^Phát/ }).click();
       await page.waitForFunction(() => /\d+ giờ tới/.test(document.querySelector('[aria-label="Thời điểm đang xem"]')?.innerText || ''), null, { timeout: 6_000 });
       const playing = (await now.innerText()).replace(/\s+/g, ' ');

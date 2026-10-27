@@ -5,6 +5,7 @@ import { Building2, Crown, History, KeyRound, Lock, MapPin, Pencil, Search, Shie
 import { api } from '../api/client';
 import { useStore } from '../app/store';
 import PageHeader from '../components/common/PageHeader';
+import RoleTips from '../components/common/RoleTips';
 import { PAGE } from '../components/layout/page';
 import { Confirm, Empty, ErrorState, Modal, Segmented, Skeleton, StepChips, Tabs } from '../components/common/ui';
 import { usePermission } from '../rbac/usePermission';
@@ -679,6 +680,8 @@ export default function AccessControl() {
         ]}
         description="Ai được làm gì trong hệ thống: 3 cấp, mỗi tài khoản một cấp. Chỉ cấp trên tạo và quản lý tài khoản cấp dưới."
       />
+
+      <RoleTips page="phan-quyen" />
 
       <Tabs
         value={tab}

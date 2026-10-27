@@ -10,6 +10,7 @@ import { ErrorState, Pager, Section, Segmented, Skeleton } from '../components/c
 import FilterToolbar from '../components/common/FilterToolbar';
 import UrgentStrip from '../components/common/UrgentStrip';
 import PageHeader from '../components/common/PageHeader';
+import RoleTips from '../components/common/RoleTips';
 import { PAGE } from '../components/layout/page';
 import DispatchModal from '../components/common/DispatchModal';
 import { MissionLinkModal } from '../components/common/MissionLink';
@@ -107,7 +108,7 @@ export default function RescueCenter() {
     const update = () => {
       if (asideRef.current) {
         const h = asideRef.current.offsetHeight;
-        if (h > 400) setAsideHeight(h);
+        setAsideHeight(h);
       }
     };
     update();
@@ -116,9 +117,11 @@ export default function RescueCenter() {
     return () => ro.disconnect();
   }, [sideOpen]);
 
-  // Chiều cao cột Kanban đồng bộ hoàn hảo với cột Tiếp nhận & Sơ tán bên phải:
-  // asideHeight (tổng chiều cao cột phải) trừ đi toolbar (46px) và gap (10px) = asideHeight - 56px (~1144px)
-  const boardHeight = wide ? Math.max(1050, (asideHeight || 1200) - 56) : null;
+  // Chiều cao cột Kanban: chỉ khi cột Tiếp nhận & Sơ tán nằm CẠNH bảng (≥ 1536 px, đang mở) mới cao bằng cột đó (trừ hàng nút
+  // 46 px + khe 10 px). Còn lại (1280–1535 px cột phải nằm dưới bảng, hoặc đang thu gọn) cột kéo tới đáy màn hình, phiếu cuộn
+  // trong cột — laptop 1366 × 768 không phải cuộn cả trang mới thấy đáy cột (RescueBoard)
+  const sideBySide = useMediaQuery('(min-width: 1536px)') && sideOpen;
+  const boardHeight = wide && sideBySide ? Math.max(360, asideHeight - 56) : null;
 
   // Tài khoản xã chưa lọc: tiêu đề là xã của mình, không ghi "Toàn tỉnh" (như Tổng quan)
   const scope = useAllowedCodes('sos', 'view');
@@ -376,6 +379,8 @@ export default function RescueCenter() {
       />
 
       <RescueKpis ticketsQ={ticketsQ} tickets={tickets} factsOf={factsOf} evacQ={evacQ} onGo={go} onEvac={() => scrollTo(document.getElementById('so-tan'))} />
+
+      <RoleTips page="cuu-ho" />
 
       {/* Lãnh đạo nắm tình hình: bản đồ cứu hộ (phiếu đang mở, lộ trình + giờ dự kiến tới của đội, vùng nguy cơ, điểm sơ tán) và diễn biến
           48 giờ (phiếu theo mức, thời gian xử lý) — cùng danh sách phiếu với bảng điều phối; thu gọn được */}

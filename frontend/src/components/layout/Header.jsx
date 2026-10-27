@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Moon, Sun, ShieldAlert, Globe, Menu, X } from 'lucide-react';
+import { Moon, Sun, Volume2, VolumeX, ShieldAlert, Globe, Menu, X } from 'lucide-react';
 import clsx from 'clsx';
 import { useStore } from '../../app/store';
 import { usePermission } from '../../rbac/usePermission';
@@ -33,7 +33,7 @@ function Clock() {
 }
 
 export default function Header() {
-  const { theme, toggleTheme, wsStatus, mobileMenuOpen, setMobileMenuOpen, sidebarCollapsed } = useStore();
+  const { theme, toggleTheme, wsStatus, soundOn, toggleSound, mobileMenuOpen, setMobileMenuOpen, audioReady, sidebarCollapsed } = useStore();
   // Điện thoại: menu thu vào nút ☰ — SOS chờ xử lý / lệnh cảnh báo chờ bạn duyệt hiện số đỏ ngay trên nút
   const badges = useNavBadges();
   const urgent = badges.sos + badges.alerts;
@@ -140,6 +140,29 @@ export default function Header() {
             </span>
           </span>
         )}
+
+        {/* Trình duyệt đang chặn âm thanh (trang mở lại, chưa ai bấm) → chuông SOS sẽ im: nhắc bấm để mở khoá. Màn không có
+            thanh trạng thái (laptop 1366 × 768, máy tính bảng) chỉ thấy lời nhắc này ở đây — không bỏ */}
+        {soundOn && !audioReady && (
+          <button
+            type="button"
+            className="chip touch-hit border border-warn bg-warn/15 px-2.5 py-1 text-[11px] font-semibold text-ink lg:tall:hidden"
+            title="Trình duyệt chặn âm thanh tới khi bấm vào trang — bấm để chuông SOS kêu được"
+          >
+            <VolumeX size={13} className="text-warn" /> <span className="hidden 2xl:inline">Bấm để bật chuông SOS</span>
+          </button>
+        )}
+
+        {/* Nút bật/tắt âm báo SOS — điện thoại: trong menu tài khoản (nhường chỗ cho bộ lọc địa phương); màn đủ cao: thanh trạng thái */}
+        <button
+          className={clsx('btn-ghost touch-hit p-2 transition-colors max-sm:hidden lg:tall:hidden', soundOn ? 'text-accent' : 'text-muted')}
+          onClick={toggleSound}
+          title={soundOn ? 'Âm báo SOS: BẬT (bấm để tắt)' : 'Âm báo SOS: TẮT (bấm để bật)'}
+          aria-label="Bật tắt âm báo SOS"
+          aria-pressed={soundOn}
+        >
+          {soundOn ? <Volume2 size={16} /> : <VolumeX size={16} />}
+        </button>
 
         {/* Nút đổi giao diện Sáng / Tối — điện thoại: chỉ trong menu tài khoản (Theo máy / Sáng / Tối), nhường chỗ cho tên địa bàn */}
         <button

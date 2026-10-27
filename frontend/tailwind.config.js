@@ -34,6 +34,10 @@ export default {
         warn: v('warn-text'),
         good: v('good-text'),
       },
+      // Bóng rất nhẹ cho nút / nhãn nổi trên thẻ (Tailwind 3 nhỏ nhất là shadow-sm) — trước đây `shadow-xs` không sinh CSS
+      boxShadow: {
+        xs: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+      },
       fontFamily: {
         sans: ['"Be Vietnam Pro"', 'Inter', 'system-ui', 'sans-serif'],
         mono: ['"JetBrains Mono"', 'Consolas', 'monospace'],
