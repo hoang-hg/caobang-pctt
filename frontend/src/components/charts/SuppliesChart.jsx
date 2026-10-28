@@ -73,7 +73,7 @@ export default function SuppliesChart({ height = 250 }) {
                 key={id}
                 onClick={() => setLevelFilter(id)}
                 className={clsx(
-                  'tap whitespace-nowrap rounded-md px-2 py-0.5 text-[11px] font-semibold transition-all',
+                  'tap whitespace-nowrap rounded-md px-2 py-0.5 text-[11px] font-semibold transition',
                   levelFilter === id ? 'bg-accent text-white shadow-sm' : 'bg-panel2/60 text-muted hover:bg-panel2 hover:text-ink',
                 )}
               >

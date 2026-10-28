@@ -128,7 +128,7 @@ export default function KpiStrip({
   const hasVehicles = hasBoats || ve.heavy_total > 0;
   const line = 'block truncate';
   const sosChip = (
-    <span className="chip whitespace-nowrap bg-danger px-1.5 py-0 text-[11px] font-bold text-white motion-safe:animate-blink">
+    <span className="chip whitespace-nowrap bg-danger px-1.5 py-0 text-[11px] font-bold text-white motion-safe:animate-blink-text">
       {sos.overdue > 0 ? `${sos.overdue} quá hạn` : `${sos.no_team_15m} chờ quá 15 phút`}
     </span>
   );

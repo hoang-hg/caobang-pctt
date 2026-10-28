@@ -118,7 +118,7 @@ export default function DecisionPanel({ k, kState, className, stacked = false, h
                 <Link
                   to={r.to}
                   className={clsx(
-                    'group -mx-1 flex min-h-[46px] items-center gap-3 rounded-xl px-1 py-1 transition-all duration-150 hover:bg-panel2',
+                    'group -mx-1 flex min-h-[46px] items-center gap-3 rounded-xl px-1 py-1 transition duration-150 hover:bg-panel2',
                     row('sm:mx-0 sm:h-full sm:gap-2.5 sm:border sm:border-line sm:bg-panel sm:px-2.5 sm:py-1.5 sm:shadow-sm sm:hover:-translate-y-0.5 sm:hover:border-accent sm:hover:shadow-md'),
                     r.level === 3 && row('sm:border-danger/35 sm:bg-danger/[0.04] sm:hover:border-danger sm:hover:shadow-danger/10'),
                   )}

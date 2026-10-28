@@ -80,7 +80,7 @@ export default function Sidebar() {
                     className={({ isActive }) =>
                       clsx(
                         // Nền xanh đêm: mục đang mở nền sáng nhẹ + chữ trắng + vạch xanh; mục khác chữ xám xanh, rê chuột sáng lên
-                        'group relative flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-medium transition-all duration-150 [@media(pointer:coarse)]:min-h-[44px]',
+                        'group relative flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-medium transition duration-150 [@media(pointer:coarse)]:min-h-[44px]',
                         isActive
                           ? 'bg-white/[0.09] text-white shadow-sm ring-1 ring-inset ring-white/10'
                           : 'text-nav-ink hover:bg-white/[0.06] hover:text-white',
@@ -124,7 +124,7 @@ export default function Sidebar() {
       <nav
         className={clsx(
           // Xanh đêm ở cả hai nền, liền với góc thương hiệu của thanh trên (Header) thành một khung chữ L
-          'no-print hidden lg:flex min-h-0 shrink-0 flex-col justify-between gap-2 border-r border-black/20 bg-nav py-3 transition-all duration-200 select-none',
+          'no-print hidden lg:flex min-h-0 shrink-0 flex-col justify-between gap-2 border-r border-black/20 bg-nav py-3 transition-[width] duration-200 select-none',
           sidebarCollapsed ? 'w-16' : 'w-60'
         )}
       >

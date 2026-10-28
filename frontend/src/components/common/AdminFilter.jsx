@@ -125,7 +125,7 @@ export default function AdminFilter() {
         ref={trigger}
         type="button"
         className={clsx(
-          'btn-ghost touch-hit min-w-0 max-w-full gap-1.5 px-2.5 lg:max-w-[16rem]',
+          'btn-ghost touch-hit min-w-0 max-w-full gap-1.5 px-2.5 lg:max-w-[18rem] 2xl:max-w-[22rem]',
           filtered && 'border-accent bg-accent/10 text-accent',
         )}
         onClick={() => setOpen((o) => !o)}
@@ -136,7 +136,8 @@ export default function AdminFilter() {
       >
         <MapPin size={15} className="shrink-0" aria-hidden="true" />
         <span className="truncate lg:hidden">{short}</span>
-        <span className="hidden truncate lg:inline"><span className="font-normal text-muted">Đang xem: </span>{label}</span>
+        {/* Chữ "Đang xem:" chỉ từ 1536 px — màn nhỏ hơn nó ăn chỗ của tên địa bàn, ô tìm kiếm ("Toàn tỉnh Cao …" bị cắt) */}
+        <span className="hidden truncate lg:inline"><span className="hidden font-normal text-muted 2xl:inline">Đang xem: </span>{label}</span>
         {/* Điện thoại: bỏ mũi tên — nhường chỗ cho tên xã (nút vẫn báo là mở hộp chọn qua aria-haspopup) */}
         <ChevronDown size={14} className="shrink-0 max-sm:hidden" aria-hidden="true" />
       </button>

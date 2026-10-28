@@ -111,7 +111,7 @@ export default function TicketCard({ t, x, now, online, compact = false, fresh =
       <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
         <b className="whitespace-nowrap text-sm font-bold text-ink" title={compact ? `Kênh: ${sourceLabel(t)}` : undefined}>{t.code}</b>
         <span className={clsx('chip whitespace-nowrap py-0.5 text-[11px] font-bold', pr.cls)} title={pr.label}>Cấp {t.priority} · {pr.short}</span>
-        {overdue && <span className="chip whitespace-nowrap bg-danger py-0.5 text-[11px] font-bold text-white motion-safe:animate-blink">Quá hạn</span>}
+        {overdue && <span className="chip whitespace-nowrap bg-danger py-0.5 text-[11px] font-bold text-white motion-safe:animate-blink-text">Quá hạn</span>}
         {/* Cột hẹp của bảng 4 cột: bỏ tên kênh (rê lên mã phiếu để xem) — mã, mức, nhãn quá hạn nằm một dòng */}
         <span className={clsx('ml-auto truncate text-[11px] font-medium text-muted', compact && 'hidden')}>{sourceLabel(t)}</span>
         {compact && <span className="ml-auto" />}

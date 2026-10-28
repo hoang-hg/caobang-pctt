@@ -20,7 +20,7 @@ import { useMediaQuery } from '../../utils/useMediaQuery';
 import { stationView } from '../../utils/stations';
 import L from 'leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
-import MapLegendBox, { POINT_EMOJI } from '../../components/map/MapLegendBox';
+import MapLegendBox, { PointIcon } from '../../components/map/MapLegendBox';
 import { RainBar } from '../../components/map/MapLegend';
 import { BackButton, useEscapeToClose } from '../../components/common/ui';
 import ReportForm from './ReportForm';
@@ -307,7 +307,7 @@ function AlertCard({ a, highlight }) {
     } catch { /* người dùng huỷ */ }
   };
   return (
-    <div id={`canh-bao-${a.code}`} className={clsx('card p-3.5 border-l-4 transition-all hover:shadow-md', a.active === false ? 'border-l-line opacity-75' : SEV[a.severity] || SEV.vang, highlight && 'ring-2 ring-accent')}>
+    <div id={`canh-bao-${a.code}`} className={clsx('card p-3.5 border-l-4 transition hover:shadow-md', a.active === false ? 'border-l-line opacity-75' : SEV[a.severity] || SEV.vang, highlight && 'ring-2 ring-accent')}>
       <div className="flex items-start gap-2.5">
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-panel2 text-danger">
           <Megaphone size={16} />
@@ -540,10 +540,10 @@ export default function PublicPortal() {
               <ShieldAlert size={22} />
             </div>
             <div className="min-w-0 leading-tight">
-              <div className="truncate text-sm sm:text-base font-bold text-ink">
+              <h1 className="truncate text-sm sm:text-base font-bold text-ink">
                 <span className="sm:hidden">Cảnh báo thiên tai</span>
                 <span className="max-sm:hidden">Cảnh báo thiên tai tỉnh Cao Bằng</span>
-              </div>
+              </h1>
               <div className="truncate text-[11px] text-muted hidden sm:block">
                 Ban Chỉ huy Phòng chống thiên tai & Tìm kiếm cứu nạn tỉnh Cao Bằng
               </div>
@@ -1089,7 +1089,7 @@ export default function PublicPortal() {
                           type="button"
                           onClick={() => setBasemap(key)}
                           className={clsx(
-                            'px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer',
+                            'px-2.5 py-1 rounded-md text-[11px] font-bold transition cursor-pointer',
                             basemap === key
                               ? 'bg-accent text-white shadow-sm'
                               : 'text-muted hover:text-ink hover:bg-panel2'
@@ -1168,7 +1168,7 @@ export default function PublicPortal() {
                       ) : (
                         <>
                           <div className="flex items-center gap-1.5 font-semibold text-ink truncate">
-                            <span className="text-sm shrink-0">{POINT_EMOJI[selectedPoint.type] || '📍'}</span>
+                            <PointIcon type={selectedPoint.type} size={15} className="text-accent" />
                             <span className="truncate">Đang xem: <b>{selectedPoint.name}</b></span>
                           </div>
                           <div className="flex items-center gap-1 shrink-0 ml-auto">
@@ -1245,7 +1245,7 @@ export default function PublicPortal() {
                     type="button"
                     onClick={() => setMapSidebarTab('legend')}
                     className={clsx(
-                      'flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer',
+                      'flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-bold transition cursor-pointer',
                       mapSidebarTab === 'legend'
                         ? 'bg-panel text-accent shadow-xs'
                         : 'text-muted hover:text-ink hover:bg-panel/50'
@@ -1262,16 +1262,16 @@ export default function PublicPortal() {
                     type="button"
                     onClick={() => setMapSidebarTab('alerts')}
                     className={clsx(
-                      'flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer relative',
+                      'flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-bold transition cursor-pointer relative',
                       mapSidebarTab === 'alerts'
                         ? 'bg-panel text-danger shadow-xs'
                         : 'text-muted hover:text-ink hover:bg-panel/50'
                     )}
                   >
-                    <Megaphone size={14} className={activeAlerts.length > 0 ? 'text-danger animate-pulse' : ''} />
+                    <Megaphone size={14} className={activeAlerts.length > 0 ? 'text-danger motion-safe:animate-pulse' : ''} />
                     <span className="truncate">Cảnh báo</span>
                     {activeAlerts.length > 0 ? (
-                      <span className="chip text-[10px] py-0 px-1.5 bg-danger text-white font-mono font-bold animate-pulse">
+                      <span className="chip text-[10px] py-0 px-1.5 bg-danger text-white font-mono font-bold motion-safe:animate-pulse">
                         {activeAlerts.length}
                       </span>
                     ) : (
@@ -1283,7 +1283,7 @@ export default function PublicPortal() {
                     type="button"
                     onClick={() => setMapSidebarTab('rain')}
                     className={clsx(
-                      'flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer',
+                      'flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-bold transition cursor-pointer',
                       mapSidebarTab === 'rain'
                         ? 'bg-panel text-accent shadow-xs'
                         : 'text-muted hover:text-ink hover:bg-panel/50'
@@ -1402,7 +1402,7 @@ export default function PublicPortal() {
                               </div>
                               <div className="h-1.5 w-full bg-panel rounded-full overflow-hidden">
                                 <div
-                                  className="h-full rounded-full bg-accent transition-all"
+                                  className="h-full rounded-full bg-accent transition"
                                   style={{ width: `${Math.max(5, pctWidth)}%` }}
                                 />
                               </div>
@@ -1503,7 +1503,7 @@ export default function PublicPortal() {
                         </h3>
                       </div>
                     </div>
-                    <span className="chip bg-danger/15 text-danger text-xs font-bold shrink-0 animate-pulse">
+                    <span className="chip bg-danger/15 text-danger text-xs font-bold shrink-0 motion-safe:animate-pulse">
                       {overview?.landslides?.blocked_count ?? '–'} điểm chia cắt
                     </span>
                   </div>
@@ -1647,7 +1647,7 @@ export default function PublicPortal() {
                 // level null = chưa có số liệu / mất tín hiệu (máy chủ tính) → xám, không "Dưới báo động"
                 const badgeCls = riskStyle(r.level).chip; // thang màu chung (utils/risk.js), null → xám
                 return (
-                  <div key={r.name} className="card p-4 border border-line hover:shadow-md transition-all">
+                  <div key={r.name} className="card p-4 border border-line hover:shadow-md transition">
                     <div className="flex items-center justify-between mb-2">
                       <span className="font-bold text-sm text-ink">Sông {r.river}</span>
                       <span className={clsx('chip text-xs font-bold', badgeCls)}>{r.level_label}</span>
@@ -1690,7 +1690,7 @@ export default function PublicPortal() {
                 const free = Math.max(0, site.capacity - site.current_occupancy);
                 const pct = Math.round((site.current_occupancy / site.capacity) * 100);
                 return (
-                  <div key={site.id} className="card p-4 flex flex-col justify-between border hover:shadow-md transition-all">
+                  <div key={site.id} className="card p-4 flex flex-col justify-between border hover:shadow-md transition">
                     <div>
                       <div className="flex items-start justify-between gap-2">
                         <b className="text-sm text-ink leading-snug">{site.name}</b>
@@ -1780,7 +1780,7 @@ export default function PublicPortal() {
                   <a
                     key={h.number}
                     href={`tel:${h.number}`}
-                    className="card p-4 flex items-center gap-4 hover:border-danger hover:shadow-md transition-all group"
+                    className="card p-4 flex items-center gap-4 hover:border-danger hover:shadow-md transition group"
                   >
                     <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-danger/10 text-danger group-hover:bg-danger group-hover:text-white transition-colors">
                       <PhoneCall size={22} />
@@ -1892,7 +1892,7 @@ export default function PublicPortal() {
                   setActiveTab('bando');
                   scrollToContent();
                 }}
-                className="card p-2.5 cursor-pointer hover:border-accent hover:shadow transition-all flex flex-col justify-between"
+                className="card p-2.5 cursor-pointer hover:border-accent hover:shadow transition flex flex-col justify-between"
               >
                 {r.photos[0] ? (
                   <img src={r.photos[0].thumb} alt="" className="h-32 w-full rounded-lg object-cover mb-2" loading="lazy" />

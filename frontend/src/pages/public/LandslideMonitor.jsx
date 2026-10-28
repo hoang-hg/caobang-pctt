@@ -273,7 +273,7 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScope
           <button
             onClick={() => setCorridorFilter('all')}
             className={clsx(
-              'tap px-3 py-1.5 rounded-lg text-xs font-medium transition-all shrink-0',
+              'tap px-3 py-1.5 rounded-lg text-xs font-medium transition shrink-0',
               corridorFilter === 'all'
                 ? 'bg-accent text-white shadow-sm font-bold'
                 : 'bg-panel text-ink hover:bg-panel2 border border-line'
@@ -286,7 +286,7 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScope
               key={c.name}
               onClick={() => setCorridorFilter(c.name)}
               className={clsx(
-                'tap px-3 py-1.5 rounded-lg text-xs font-medium transition-all shrink-0',
+                'tap px-3 py-1.5 rounded-lg text-xs font-medium transition shrink-0',
                 corridorFilter === c.name
                   ? 'bg-accent text-white shadow-sm font-bold'
                   : 'bg-panel text-ink hover:bg-panel2 border border-line'
@@ -351,7 +351,7 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScope
             <div
               key={p.code}
               className={clsx(
-                'card flex flex-col justify-between overflow-hidden transition-all duration-200 hover:shadow-lg',
+                'card flex flex-col justify-between overflow-hidden transition duration-200 hover:shadow-lg',
                 isBlocked
                   ? 'border-danger/80 bg-danger/5 ring-1 ring-danger/40'
                   : isWarning

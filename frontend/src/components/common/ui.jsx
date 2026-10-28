@@ -15,7 +15,7 @@ export function KpiCard({ label, value, unit, sub, tone, icon: Icon, blink, chil
     warn: 'border-l-4 border-l-warn',
   }[tone];
   return (
-    <div className={clsx('card flex flex-col gap-1 p-3', toneCls, blink && 'animate-blink')}>
+    <div className={clsx('card flex flex-col gap-1 p-3', toneCls, blink && 'motion-safe:animate-blink-text')}>
       <div className="flex items-center gap-1.5 text-xs font-semibold text-ink-2">
         {/* Ô biểu tượng như ô chỉ số của Tổng quan (StatCard); lề âm — ô không cao thêm */}
         {Icon && (
@@ -264,7 +264,7 @@ export const Empty = ({ art, children = 'Không có dữ liệu trong vùng đan
 
 /** Đang tải: khung xám nhấp nháy đúng chiều cao nội dung sắp hiện. */
 export const Skeleton = ({ height, className }) => (
-  <div style={height ? { height } : undefined} className={clsx('animate-pulse rounded-lg bg-panel2', className)} role="status" aria-label="Đang tải" />
+  <div style={height ? { height } : undefined} className={clsx('motion-safe:animate-pulse rounded-lg bg-panel2', className)} role="status" aria-label="Đang tải" />
 );
 
 /** Lỗi tải: nói rõ KHÔNG tải được (không giả "chưa có dữ liệu"), có nút thử lại. */
