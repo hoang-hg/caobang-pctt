@@ -10,6 +10,7 @@
 
 import asyncio
 import json
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse, Response
@@ -19,6 +20,7 @@ from sqlalchemy import text
 from app.auth import audit, current_user
 from app.config import settings
 from app.db import engine, fetch_all, fetch_one
+from app.infra.cache import invalidate
 from app.infra.mailer import send_mail
 from app.rbac import domains
 from app.rbac.authz import (
@@ -30,6 +32,7 @@ from app.rbac.authz import (
     require_permission,
     usernames_with,
 )
+from app.services import thresholds
 from app.services.data_import import engine as importer
 from app.services.data_import.parsing import ImportFileError
 from app.services.data_import.service import after_import
@@ -509,3 +512,37 @@ async def withdraw(sub_id: str, user: dict = Depends(current_user)):
     await audit(user, "data.submission.withdraw", "data_submission", s["code"])
     await _notify("da_rut", s)
     return _out(s, user, full=True)
+
+
+# ------------------------------------------------------------------ ngưỡng cảnh báo mưa lớn & sạt lở (toàn tỉnh)
+
+
+@router.get("/thresholds")
+async def get_alert_thresholds(_: dict = Depends(require_any("monitoring", "view"))):
+    """Ngưỡng đang dùng + giá trị mặc định (minh hoạ) để so — services/thresholds.py."""
+    return {**await thresholds.get_thresholds(), "mac_dinh": thresholds.DEFAULTS}
+
+
+@router.put("/thresholds")
+async def put_alert_thresholds(body: dict, user: dict = Depends(IMPORT)):
+    values, errors = thresholds.validate(body)
+    if errors:  # một chuỗi "lỗi 1; lỗi 2" — api() phía giao diện chỉ giữ `detail`
+        raise HTTPException(422, "; ".join(errors))
+    before = await thresholds.get_thresholds()
+    saved = await thresholds.save_thresholds(values, user, datetime.now(UTC).isoformat())
+    await audit(
+        user,
+        "thresholds.update",
+        "system_settings",
+        thresholds.KEY,
+        {"truoc": {k: before[k] for k in ("mua_24h", "sat_lo", "nguon")}, "sau": values},
+    )
+    await invalidate("public:")  # cổng công khai tô màu mưa theo ngưỡng (GET /public/config)
+    # hub.publish tăng phiên bản dữ liệu → cached_view (KPI, sạt lở…) tính lại theo ngưỡng mới; màn hình đang mở tải lại
+    await hub.publish("thresholds.updated", {"by": user["full_name"]})
+    await log_event(
+        f"{user['full_name']} cập nhật ngưỡng cảnh báo mưa lớn, sạt lở — căn cứ: {values['nguon']}",
+        "he_thong",
+        "info",
+    )
+    return saved

@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect } from 'react';
 import { Navigate, Route, Routes, useLocation, useSearchParams } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Header from './components/layout/Header';
 import StatusBar from './components/layout/StatusBar';
 import Sidebar from './components/layout/Sidebar';
@@ -11,6 +11,7 @@ import { api } from './api/client';
 import { useStore } from './app/store';
 import { usePermission } from './rbac/usePermission';
 import { watchAudioUnlock } from './utils/audio';
+import { setRainThresholds } from './utils/risk';
 import { FirstPasswordChange, ForgotPassword, ResetPassword } from './pages/AccountPages'; // nhỏ, UserMenu cũng dùng → import tĩnh
 // Mỗi trang một chunk tải khi cần: người dân mở cổng công khai không phải tải giao diện điều hành
 const Login = lazy(() => import('./pages/Login'));
@@ -131,6 +132,10 @@ function RequireLogin() {
 export default function App() {
   const auth = useStore((s) => s.auth);
   const loggedIn = !!auth?.token;
+  // Ngưỡng màu mưa 24 giờ do cán bộ khai báo (một thang cho cổng công khai và trang điều hành). Gán ngay khi vẽ App:
+  // App vẽ lại → cả cây vẽ lại với thang mới. Lỗi / chưa tải → thang mặc định trong utils/risk.js
+  const { data: pubConfig } = useQuery({ queryKey: ['pub-config'], queryFn: () => api('/public/config'), staleTime: 5 * 60_000 });
+  setRainThresholds(pubConfig?.rain_24h);
   return (
     <>
       <Suspense fallback={<PageLoading />}>

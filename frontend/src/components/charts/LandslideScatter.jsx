@@ -24,8 +24,8 @@ function Tip({ active, payload }) {
 }
 
 /** Ngưỡng kích hoạt sạt lở: mưa tích lũy 3 ngày (x) vs cường độ mưa hiện tại (y), phân loại Đỏ/Cam/Vàng.
- * Mỗi chấm là một TRẠM ĐO MƯA (không phải điểm sạt lở); đường ngưỡng là đường cong minh hoạ của backend
- * (api/v1/dashboard.py THRESHOLD_A) — chưa hiệu chỉnh theo số liệu sạt lở của tỉnh, nên ghi rõ dưới biểu đồ. */
+ * Mỗi chấm là một TRẠM ĐO MƯA (không phải điểm sạt lở); đường ngưỡng do cán bộ khai báo (Nhập dữ liệu → Ngưỡng cảnh báo,
+ * backend services/thresholds.py) — chưa khai báo thì là đường minh hoạ, ghi rõ dưới biểu đồ; đã khai báo thì ghi căn cứ. */
 export default function LandslideScatter({ height = 250 }) {
   const c = useChartTheme();
   const { data, isError, refetch } = useAreaQuery('landslide', '/dashboard/landslide-risk', {}, { refetchInterval: 60_000 });
@@ -73,7 +73,10 @@ export default function LandslideScatter({ height = 250 }) {
         </ComposedChart>
       </ResponsiveContainer>
       <p className="text-xs text-muted">
-        Mỗi chấm là một trạm đo mưa. Đường ngưỡng là đường minh hoạ, chưa hiệu chỉnh theo số liệu sạt lở của tỉnh.
+        Mỗi chấm là một trạm đo mưa.{' '}
+        {data.illustrative === false && data.source
+          ? `Đường ngưỡng theo: ${data.source}.`
+          : 'Đường ngưỡng là đường minh hoạ, chưa hiệu chỉnh theo số liệu sạt lở của tỉnh.'}
       </p>
     </div>
   );

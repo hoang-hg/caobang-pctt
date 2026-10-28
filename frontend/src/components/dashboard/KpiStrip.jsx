@@ -4,7 +4,7 @@ import { CloudRain, Home, Ship, Siren, Users, Waves } from 'lucide-react';
 import { useAreaQuery } from '../../api/hooks';
 import { ALARM } from '../../utils/labels';
 import { int, minutesSince, num } from '../../utils/format';
-import { RAIN_LABEL, risk } from '../../utils/risk';
+import { rainLabel, risk } from '../../utils/risk';
 import { trendProps } from '../../utils/stations';
 import { useMediaQuery } from '../../utils/useMediaQuery';
 import { ErrorState, Skeleton, TrendTag } from '../common/ui';
@@ -151,7 +151,7 @@ export default function KpiStrip({
           rainKnown ? (
             <>
               {/* Mưa cực đại cục bộ: số trước, tên trạm sau (ô hẹp: tên trạm ở chú thích) */}
-              <span className={line} title={`Lớn nhất ${num(rain.max_24h, 1)} mm/24 giờ${maxAt}${rainLv >= 1 ? ` — ${RAIN_LABEL[rainLv]}` : ''}`}>
+              <span className={line} title={`Lớn nhất ${num(rain.max_24h, 1)} mm/24 giờ${maxAt}${rainLv >= 1 ? ` — ${rainLabel(rainLv)}` : ''}`}>
                 Lớn nhất <b className={clsx('num', rainLv >= 1 ? risk(rainLv).text : 'text-ink')}>{num(rain.max_24h, 1)} mm</b>{roomy && maxAt}
               </span>
               {hourRain && <span className={clsx(line, 'hidden 2xl:block')}>Mưa {hourRain.span}: <b className="num text-ink">{num(hourRain.mm, 1)} mm</b></span>}

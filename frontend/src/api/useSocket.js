@@ -152,6 +152,7 @@ export function useSocket() {
           toast({ tone: 'danger', title: 'Cảm biến vượt ngưỡng', body: data.name });
           break;
         case 'data.imported': // nhập dữ liệu chính thức → mọi màn hình tải lại
+        case 'thresholds.updated': // ngưỡng cảnh báo mưa / sạt lở đổi → màu mưa, mức sạt lở tính lại ở mọi màn
           qc.invalidateQueries();
           break;
         case 'submission.updated': // hồ sơ dữ liệu xã gửi (chỉ người có quyền duyệt nhận)

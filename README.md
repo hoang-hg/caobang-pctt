@@ -188,7 +188,15 @@ graph LR
 | Phương tiện (`phuong_tien`) | `vehicles` | CSV / Excel | `ma` (+ `ma_luc_luong`; `trang_thai`, `nhien_lieu` **chỉ khi thêm mới** — nhập lại không đổi trạng thái / nhiên liệu đang có) | — |
 | Điểm cấp nhiên liệu (`cay_xang`) | `fuel_depots` | CSV / Excel / GeoJSON điểm | `ma` | ✓ |
 
-🌐 = hiện trên cổng công khai. Quy tắc:
+🌐 = hiện trên cổng công khai.
+
+**Ngưỡng cảnh báo mưa lớn & sạt lở** (tab "Ngưỡng cảnh báo" của trang Nhập dữ liệu, chỉ quyền `data.import`; API
+`GET / PUT /api/v1/data-import/thresholds`): mưa 24 giờ Vàng / Cam / Đỏ (một thang cho mọi màn, cả cổng công khai — `GET
+/public/config`), đường ngưỡng sạt lở `I = a · (R/100)^-b`, mưa 72 giờ, độ nghiêng taluy. Bắt buộc ghi căn cứ, giá trị tăng
+dần; lưu ở `operations.system_settings` (`nguong_canh_bao`), nhật ký pháp lý ghi trước / sau. Chưa khai báo → giá trị minh
+hoạ (`backend/app/services/thresholds.py`), biểu đồ sạt lở ghi "đường minh hoạ".
+
+Quy tắc nhập tệp:
 
 - **Mã (`ma`)** là định danh ổn định: nhập lại tệp đã sửa → **cập nhật** đúng bản ghi, không nhân đôi. Ô trống ghi
   đè thành trống (tệp là nguồn chính), trừ cột ghi "trống = giữ nguyên".

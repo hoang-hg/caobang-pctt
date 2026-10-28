@@ -61,7 +61,7 @@ lần rà cuối (10/10/2026) sửa thêm 3 ô KPI trên điện thoại và nh�
 | 8 | **Dự báo mưa 1–3 giờ từ radar (QPF)** | Tích hợp | Đài KTTV (sản phẩm radar) | Trung bình |
 | 9 | **Dự báo mực nước từ mô hình thủy văn (HEC-HMS…)** | Tích hợp | Đài KTTV / đơn vị chạy mô hình | Trung bình |
 | 10 | **Báo cáo thiệt hại của người dân qua Zalo OA / ứng dụng** vào nhật ký | Tích hợp | Tài khoản Zalo OA của tỉnh, bên phát triển ứng dụng | Thấp – trung bình |
-| 11 | **Ngưỡng sạt lở hiệu chỉnh** (ngưỡng mưa I–D, ngưỡng cảm biến nghiêng / độ ẩm đất) | Dữ liệu | Viện / đơn vị nghiên cứu sạt lở, Sở NN&MT | Trung bình |
+| 11 | **Ngưỡng sạt lở hiệu chỉnh** (ngưỡng mưa I–D, ngưỡng cảm biến nghiêng / độ ẩm đất) — đã sửa được trên giao diện (tab Ngưỡng cảnh báo), chờ số liệu hiệu chỉnh | Dữ liệu | Viện / đơn vị nghiên cứu sạt lở, Sở NN&MT | Trung bình |
 | G1 | Thẻ **Hồ chứa** trong bảng tác chiến (tìm, lọc, phân trang, xuất Excel / PDF) | Chỉ giao diện | — | **Đã làm** (PR #50) |
 | G2 | **"Xem thêm" / phân trang** cho danh sách thẻ ở tab Hồ chứa và tab Sạt lở | Chỉ giao diện | — | **Đã làm** (PR #50) |
 
@@ -136,8 +136,9 @@ như lần nhập gần nhất.
 ### D6 — Cấp độ rủi ro thiên tai chính thức
 
 - **Hiện trạng:** màu ô Mưa và chip mưa ở dải tình huống dùng ngưỡng theo dõi tự tính: mưa 24 giờ ≥ 50 mm Vàng, ≥ 100 mm Cam,
-  ≥ 200 mm Đỏ (`rainLevel` trong `frontend/src/utils/risk.js`, theo thuật ngữ mưa to / mưa rất to của KTTV). Giao diện ghi rõ
-  đây **không phải** cấp độ rủi ro thiên tai chính thức.
+  ≥ 200 mm Đỏ (`rainLevel` trong `frontend/src/utils/risk.js`, theo thuật ngữ mưa to / mưa rất to của KTTV). Từ 28/10/2026 cấp
+  tỉnh sửa được ba mốc này kèm căn cứ (Nhập dữ liệu → Ngưỡng cảnh báo, điểm 11). Giao diện ghi rõ đây **không phải** cấp độ
+  rủi ro thiên tai chính thức.
 - **Cần:** cấp độ rủi ro thiên tai do cơ quan KTTV công bố trong bản tin (Quyết định 18/2021/QĐ-TTg) theo loại thiên tai và khu
   vực; nếu tỉnh có ngưỡng mưa riêng cho vùng núi thì kèm văn bản.
 - **Việc lập trình khi có:** nhập (hoặc bộ nối D5 đọc) cấp độ rủi ro trong bản tin → chip riêng ở đầu dải tình huống, ghi số
@@ -194,14 +195,16 @@ Thiết kế A.3: phần 1–3 giờ tới của biểu đồ mưa dùng dự b�
 
 ## 10. Điểm 11 — Ngưỡng sạt lở hiệu chỉnh
 
-- **Hiện trạng:**
-  - Biểu đồ "Ngưỡng kích hoạt sạt lở" (mưa tích luỹ 72 giờ – cường độ mưa) dùng đường ngưỡng **minh hoạ**
-    `I = a · (R/100)^-0,6`, hệ số `a` trong `THRESHOLD_A` (`backend/app/api/v1/dashboard.py`); giao diện đã ghi chú là minh hoạ.
-  - Ngưỡng của cảm biến nghiêng / độ ẩm đất là thuộc tính `alarm_thresholds` của từng trạm (nhập qua `tram_quan_trac`).
-- **Cần:** ngưỡng I–D hiệu chỉnh cho Cao Bằng (hệ số theo cấp Vàng / Cam / Đỏ) từ nghiên cứu sạt lở của tỉnh; ngưỡng BĐ I/II/III
-  cho từng cảm biến.
-- **Việc lập trình khi có:** đưa hệ số ngưỡng I–D ra cấu hình / dữ liệu (không sửa mã mỗi lần đổi), bỏ chữ "minh hoạ"; cập nhật
-  ngưỡng cảm biến bằng nhập lại `tram_quan_trac`.
+- **Đã làm phần lập trình (28/10/2026):** ngưỡng nằm trong CSDL (`operations.system_settings`, khoá `nguong_canh_bao` —
+  `backend/app/services/thresholds.py`), cấp tỉnh (quyền `data.import`) sửa ở **Nhập dữ liệu → tab "Ngưỡng cảnh báo"**:
+  hệ số `a` theo Vàng / Cam / Đỏ và số mũ `b` của đường `I = a · (R/100)^-b`, mưa tích luỹ 72 giờ, độ nghiêng taluy cảm biến
+  gần trạm, kèm mưa 24 giờ (D6). Bắt buộc ghi **căn cứ**; giá trị phải tăng dần; lưu → mọi màn tính lại ngay (sự kiện
+  `thresholds.updated`), nhật ký pháp lý ghi giá trị trước / sau. Biểu đồ "Ngưỡng kích hoạt sạt lở" ghi "đường minh hoạ" khi
+  chưa khai báo, đã khai báo thì ghi căn cứ.
+  - Ngưỡng của cảm biến nghiêng / độ ẩm đất từng trạm vẫn là `alarm_thresholds` của trạm (nhập qua `tram_quan_trac`).
+- **Còn chờ dữ liệu:** ngưỡng I–D hiệu chỉnh cho Cao Bằng (hệ số theo cấp Vàng / Cam / Đỏ) từ nghiên cứu sạt lở của tỉnh;
+  ngưỡng BĐ I/II/III cho từng cảm biến. Ngưỡng hiện áp dụng **toàn tỉnh** — ngưỡng riêng từng vùng / xã làm cùng điểm 7 khi
+  có số liệu.
 
 ## 11. Việc giao diện G1, G2 (đã làm — PR #50)
 

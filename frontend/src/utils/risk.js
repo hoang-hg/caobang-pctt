@@ -47,11 +47,21 @@ export const TILT_LEVEL = { binh_thuong: 0, canh_bao: 2, nguy_hiem: 3 }; // cả
 export const levelOf = (table, code) => (code in table ? table[code] : null);
 
 /**
- * Mưa 24 giờ (mm) → mức. Thuật ngữ KTTV: mưa to 51–100 mm, mưa rất to > 100 mm / 24 giờ; ≥ 200 mm ở vùng núi Cao
- * Bằng thường kéo theo lũ quét, sạt lở → Đỏ. Đây là màu báo để theo dõi, KHÔNG phải cấp độ rủi ro thiên tai chính thức.
+ * Mưa 24 giờ (mm) → mức. MỘT thang cho mọi màn (ô chỉ số, trạm trên bản đồ, cổng công khai). Ngưỡng do cán bộ khai báo
+ * (Nhập dữ liệu → Ngưỡng cảnh báo, máy chủ trả ở GET /public/config — App gọi `setRainThresholds`); chưa khai báo → mặc
+ * định theo thuật ngữ KTTV: ≥ 50 mm mưa to (Vàng), ≥ 100 mm mưa rất to (Cam), ≥ 200 mm ở vùng núi Cao Bằng thường kéo theo
+ * lũ quét, sạt lở (Đỏ). Đây là màu báo để theo dõi, KHÔNG phải cấp độ rủi ro thiên tai chính thức.
  */
-export const rainLevel = (mm) => (mm == null ? null : mm >= 200 ? 3 : mm >= 100 ? 2 : mm >= 50 ? 1 : 0);
-export const RAIN_LABEL = ['Chưa tới mưa to', 'Mưa to', 'Mưa rất to', 'Mưa ≥ 200 mm']; // nhãn ngắn — vừa góc thẻ KPI
+let RAIN_T = { vang: 50, cam: 100, do: 200 };
+export const rainThresholds = () => RAIN_T;
+export function setRainThresholds(t) {
+  if (t && [t.vang, t.cam, t.do].every(Number.isFinite) && (t.vang !== RAIN_T.vang || t.cam !== RAIN_T.cam || t.do !== RAIN_T.do)) {
+    RAIN_T = { vang: t.vang, cam: t.cam, do: t.do };
+  }
+}
+export const rainLevel = (mm) => (mm == null ? null : mm >= RAIN_T.do ? 3 : mm >= RAIN_T.cam ? 2 : mm >= RAIN_T.vang ? 1 : 0);
+// Nhãn ngắn theo mức — vừa góc thẻ KPI
+export const rainLabel = (lv) => ['Chưa tới mưa to', 'Mưa to', 'Mưa rất to', `Mưa ≥ ${RAIN_T.do} mm`][lv] ?? '';
 
 /**
  * Dự trữ (%) so với định mức an toàn của kho, sức chứa điểm nhiên liệu, bình nhiên liệu phương tiện → mức (thiết kế C.2):
