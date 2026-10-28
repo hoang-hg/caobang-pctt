@@ -48,6 +48,14 @@ check('Điểm sơ tán công khai chỉ gồm trường cho phép (có số tr�
     && map.evacuation_sites.some((e) => e.hotline));
 const ov = (await call('GET', '/public/overview')).data;
 check('Tổng quan công khai: SOS chỉ là số liệu tổng hợp theo xã', ov.sos_by_commune.every((s) => Object.keys(s).sort().join() === 'code,da_xu_ly_24h,dang_xu_ly,name'));
+// Trạm mưa trên bản đồ công khai tô theo tổng mưa 24 giờ (rain_24h), cùng cách tính với ô Mưa của tổng quan — không theo
+// số đo mới nhất (cường độ một giờ). Hai bản cache tính lệch nhau tối đa 30 giây → cho sai số nhỏ
+const rainSt = map.stations.filter((s) => s.type === 'luong_mua');
+const maxRain = Math.max(0, ...rainSt.map((s) => s.rain_24h ?? 0));
+check('Bản đồ công khai: trạm mưa có tổng mưa 24 giờ, lớn nhất khớp ô Mưa của tổng quan',
+  rainSt.length > 0 && rainSt.every((s) => 'rain_24h' in s) && map.stations.filter((s) => s.type !== 'luong_mua').every((s) => s.rain_24h == null)
+    && (ov.rain?.max_24h == null || Math.abs(maxRain - ov.rain.max_24h) <= Math.max(2, ov.rain.max_24h * 0.05)),
+  `bản đồ ${maxRain} mm · tổng quan ${ov.rain?.max_24h} mm`);
 const loc = await call('GET', `/public/locate?lat=${TP.lat}&lon=${TP.lon}`);
 check('“Tôi đang ở đâu”: xã, mức nguy cơ, điểm sơ tán gần nhất', loc.status === 200 && loc.data.commune.name && loc.data.evacuation_sites.length > 0,
   `${loc.data?.commune?.name} · nguy cơ ${loc.data?.risk} · ${loc.data?.evacuation_sites?.[0]?.name}`);

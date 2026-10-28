@@ -1,6 +1,6 @@
 import { alarmLevel } from './labels';
 import { dateTime, num, time } from './format';
-import { RISK } from './risk';
+import { RISK, rainLabel, rainLevel } from './risk';
 
 export const STALE_MS = 60 * 60 * 1000; // như STALE_MINUTES ở backend (app/services/readings.py)
 // Chữ màu theo thang rủi ro chung — trước đây BĐ I tô cam, BĐ II tô đỏ: lệch với biểu tượng trên bản đồ và chip ALARM
@@ -18,18 +18,21 @@ export function stationView(s) {
   if (s.value == null) {
     return { level: null, value: 'Chưa có số liệu', status: 'Chưa có số liệu', statusColor: 'text-muted', marker: undefined };
   }
-  const v = Number(s.value);
+  // Trạm mưa: TỔNG MƯA 24 GIỜ (`rain_24h` máy chủ tính, như ô Mưa của tổng quan) theo thang mưa 24 giờ chung (rainLevel —
+  // cán bộ khai báo ở Nhập dữ liệu → Ngưỡng cảnh báo). Trước đây tô số đo mới nhất (cường độ một giờ) bằng mốc 50 / 100 mm
+  // của tổng 24 giờ → mưa rất to 40 mm/giờ vẫn hiện "Mưa nhỏ"
+  const v = rain ? Number(s.rain_24h ?? 0) : Number(s.value);
   const stale = s.stale ?? (s.time ? Date.now() - new Date(s.time).getTime() > STALE_MS : false);
   let level;
   let status;
   if (rain) {
-    level = v >= 100 ? 3 : v >= 50 ? 2 : 0;
-    status = v >= 100 ? 'Mưa rất to' : v >= 50 ? 'Mưa to' : 'Mưa nhỏ / không mưa';
+    level = rainLevel(v);
+    status = rainLabel(level);
   } else {
     level = alarmLevel(v, s.thresholds || {});
     status = ['Dưới báo động I', 'Báo động I', 'Báo động II', 'Báo động III (nguy hiểm)'][level];
   }
-  const value = rain ? `${Math.round(v)} mm` : `${v.toFixed(2)} ${s.unit || 'm'}`;
+  const value = rain ? `${Math.round(v)} mm / 24 giờ` : `${v.toFixed(2)} ${s.unit || 'm'}`;
   if (stale) {
     const since = `mất tín hiệu từ ${dateTime(s.time)}`;
     return level
