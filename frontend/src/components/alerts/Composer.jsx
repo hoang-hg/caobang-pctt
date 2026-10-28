@@ -32,13 +32,14 @@ const PARAM_EXAMPLE = {
   so_gio: 'VD: 6', tram: 'VD: Bằng Giang', muc_nuoc: 'VD: 182,5', cap_bao_dong: 'VD: II', nguy_co: 'VD: lũ quét, sạt lở',
   ten_bao: 'VD: bão số 3',
 };
-// Thẻ mẫu tin (thiết kế E.1): hình + tên việc + dùng khi nào; xếp việc hay gặp lên trước, "Tự soạn" cuối
+// Thẻ mẫu tin (thiết kế E.1): hình + tên việc + dùng khi nào; xếp theo 3 nhóm thiên tai (Mưa lớn · Sạt lở, lũ quét · Ngập lụt —
+// docs/pham-vi-thien-tai.md), tên nhóm đứng đầu dòng 'dùng khi nào'; "Tự soạn" cuối
 const TEMPLATE_CARD = {
-  SAT_LO: { icon: Mountain, when: 'Di dời hộ dưới taluy, sườn đồi', order: 2 },
-  BAO_ATND: { icon: Tornado, when: 'Hoàn lưu bão gây mưa rất to', order: 3 }, // đang ẩn — utils/hazardScope.js
-  LU_QUET: { icon: CloudRainWind, when: 'Nguy cơ lũ quét trên suối', order: 4 },
-  NGAP: { icon: Waves, when: 'Mực nước sông vượt báo động', order: 5 },
-  CHUAN_BI_SO_TAN: { icon: House, when: 'Dự báo mưa lớn — sẵn sàng sơ tán', order: 6 },
+  CHUAN_BI_SO_TAN: { icon: House, when: 'Mưa lớn — dự báo mưa to, sẵn sàng sơ tán', order: 1 },
+  SAT_LO: { icon: Mountain, when: 'Sạt lở — di dời hộ dưới taluy, sườn đồi', order: 2 },
+  LU_QUET: { icon: CloudRainWind, when: 'Lũ quét — nguy cơ lũ quét trên suối', order: 3 },
+  NGAP: { icon: Waves, when: 'Ngập lụt — mực nước sông vượt báo động', order: 4 },
+  BAO_ATND: { icon: Tornado, when: 'Hoàn lưu bão gây mưa rất to', order: 9 }, // đang ẩn — utils/hazardScope.js
 };
 // Người nhận theo kênh — như channel_target (backend services/broadcast.py)
 const REACH = {

@@ -52,7 +52,7 @@ export default function StyleGuide() {
         </div>
         <div className="mt-3 flex flex-col gap-3">
           <Segmented label="Chế độ mẫu" value={seg} onChange={setSeg} options={[{ value: 'a', label: 'Xem tình hình', icon: Layers }, { value: 'b', label: 'Điều hành' }]} />
-          <Tabs value={tab} onChange={setTab} tabs={[{ value: 'a', label: 'Tổng hợp', icon: Home }, { value: 'b', label: 'Sạt lở & đường đèo', icon: Droplets, count: 3 }]} />
+          <Tabs value={tab} onChange={setTab} tabs={[{ value: 'a', label: 'Tổng hợp', icon: Home }, { value: 'b', label: 'Sạt lở, lũ quét', icon: Droplets, count: 3 }]} />
         </div>
       </Section>
 

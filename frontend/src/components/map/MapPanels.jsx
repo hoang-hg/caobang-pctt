@@ -25,15 +25,15 @@ const HOT_STEP = 10;
 const PRIO_CHIPS = [[1, 'Đỏ'], [2, 'Cam'], [3, 'Vàng']];
 
 /**
- * Các lớp của bản đồ giám sát (thiết kế B.2, 4 nhóm — tên đời thường: Mưa & mực nước · Vùng nguy hiểm · Lực lượng & kho ·
- * Người dân cầu cứu). `icon`: biểu tượng mẫu cạnh tên lớp. `perm`: quyền xem cần có — API trả lớp rỗng khi thiếu quyền
+ * Các lớp của bản đồ giám sát, xếp theo 3 nhóm thiên tai (Mưa lớn · Sạt lở, lũ quét · Ngập lụt — docs/pham-vi-thien-tai.md) rồi
+ * trạm đo, sự cố · lực lượng & kho · người dân cầu cứu · ranh giới (tên đời thường). `icon`: biểu tượng mẫu cạnh tên lớp. `perm`: quyền xem cần có — API trả lớp rỗng khi thiếu quyền
  * (map_layers.py), giao diện ẩn hẳn lớp đó thay vì hiện "0 SOS" như thể không có sự cố.
  */
 export const LAYER_GROUPS = [
+  // 3 nhóm thiên tai hệ thống nhấn mạnh (docs/pham-vi-thien-tai.md): Mưa lớn · Sạt lở, lũ quét · Ngập lụt
   {
-    title: 'Mưa & mực nước',
+    title: 'Mưa lớn',
     items: [
-      { key: 'stations', label: 'Trạm đo mưa, mực nước, cảm biến sạt lở', icon: Activity },
       { key: 'forecast', label: 'Mưa dự báo theo xã', icon: CloudRain }, // ghi chú dưới tên: 24 giờ tới / 1 giờ theo thanh thời gian
       { key: 'radar', label: 'Mây mưa trên ảnh radar', icon: Radar },
       // Bão, áp thấp: đang ẩn (ngoài phạm vi theo dõi — utils/hazardScope.js)
@@ -41,12 +41,23 @@ export const LAYER_GROUPS = [
     ],
   },
   {
-    title: 'Vùng nguy hiểm',
+    title: 'Sạt lở, lũ quét',
+    items: [
+      { key: 'landslide', label: 'Vùng sạt lở, lũ quét', icon: Mountain },
+      { key: 'blackspots', label: 'Điểm đen sạt lở, đèo dốc', icon: TriangleAlert }, // danh mục + trạng thái giám sát — /dashboard/kpis
+    ],
+  },
+  {
+    title: 'Ngập lụt',
     items: [
       { key: 'flood', label: 'Vùng ngập', icon: Waves },
       { key: 'floodScenario', label: 'Vùng sẽ ngập khi lên báo động I–III', icon: Waves },
-      { key: 'landslide', label: 'Vùng sạt lở, lũ quét', icon: Mountain },
-      { key: 'blackspots', label: 'Điểm đen sạt lở, đèo dốc', icon: TriangleAlert }, // danh mục + trạng thái giám sát — /dashboard/kpis
+    ],
+  },
+  {
+    title: 'Trạm đo, sự cố, phản ánh',
+    items: [
+      { key: 'stations', label: 'Trạm đo mưa, mực nước, cảm biến sạt lở', icon: Activity },
       { key: 'hazardPoints', label: 'Điểm nguy hiểm: cây đổ, đứt điện, sập cầu', icon: TrafficCone },
       { key: 'reports', label: 'Phản ánh của người dân (3 ngày)', icon: MessageCircle, perm: 'report' },
       { key: 'roads', label: 'Đường giao thông, đoạn bị chặn', icon: Construction },

@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import {
-  AlertTriangle, CheckSquare, ChevronDown, ChevronUp, Columns2, Compass, Droplets, FileDown, FileSpreadsheet, FileText, Home, LayoutDashboard, LifeBuoy,
+  AlertTriangle, CheckSquare, ChevronDown, ChevronUp, CloudRain, Columns2, Compass, FileDown, FileSpreadsheet, FileText, Home, LayoutDashboard, LifeBuoy,
   Minimize2, Monitor, Mountain, Pause, Play, Send, Server, Waves, X,
 } from 'lucide-react';
 import { useAreaQuery, useUnits } from '../api/hooks';
@@ -36,8 +36,8 @@ import { PAGE } from '../components/layout/page';
 import ReportDocModal from '../components/dashboard/ReportDocModal';
 import QuickActionBar from '../components/common/QuickActionBar';
 import { useAllowedCodes, useIsCommuneUser, usePermission } from '../rbac/usePermission';
-import { vnFileStamp } from '../utils/format';
-import { risk } from '../utils/risk';
+import { num, vnFileStamp } from '../utils/format';
+import { rainLevel, risk } from '../utils/risk';
 import { captureSnapshot, exportSnapshotPdf } from '../utils/exportPdf';
 import { exportExcel } from '../utils/exportExcel';
 import { useMediaQuery } from '../utils/useMediaQuery';
@@ -48,7 +48,10 @@ const VN_TIME = { timeZone: 'Asia/Ho_Chi_Minh' };
 // Một hàng thẻ duy nhất (trước đây 2 hàng: góc nhìn + chuyên đề, trùng chữ "Tổng hợp"); ?tab= để gửi link / tải lại
 const TABS = [
   { id: 'tong_hop', label: 'Tổng hợp', icon: LayoutDashboard },
-  { id: 'sat_lo', label: 'Sạt lở & đường đèo', icon: Mountain },
+  // 3 nhóm thiên tai hệ thống nhấn mạnh (docs/pham-vi-thien-tai.md): Mưa lớn · Sạt lở, lũ quét · Ngập lụt
+  { id: 'mua_lon', label: 'Mưa lớn', icon: CloudRain },
+  { id: 'sat_lo', label: 'Sạt lở, lũ quét', icon: Mountain },
+  { id: 'ngap_lut', label: 'Ngập lụt', icon: Waves },
   { id: 'cap_xa', label: 'Cấp xã / phường', icon: Home },
   { id: 'he_thong', label: 'Hệ thống & dữ liệu', icon: Server },
 ];
@@ -91,7 +94,7 @@ const SUPPLIES_HINT = (
 );
 
 // Chế độ trình chiếu: xoay vòng các chuyên đề lãnh đạo hay xem trên màn hình lớn (mặc định 60 giây, ?xoay=giây, tối thiểu 15)
-const ROTATION = ['tong_hop', 'sat_lo'];
+const ROTATION = ['tong_hop', 'mua_lon', 'sat_lo', 'ngap_lut'];
 
 /** Đồng hồ lớn của chế độ trình chiếu (thanh trên có đồng hồ — trình chiếu ẩn thanh trên). */
 function LiveClock() {
@@ -169,14 +172,14 @@ export default function Dashboard() {
   const allStations = useMemo(() => stationsQ.data || [], [stationsQ.data]);
   const stationsState = { loading: stationsQ.isLoading, error: stationsQ.isError && !stationsQ.data, refetch: stationsQ.refetch };
   const evacQ = useAreaQuery('evacuation', '/evacuation', {}, { refetchInterval: 30_000 });
-  const [chartSegment, setChartSegment] = useState('thuy_van'); // 'thuy_van' | 'mua' | 'sat_lo' | 'vat_tu' | 'tat_ca'
+  const [chartSegment, setChartSegment] = useState('mua'); // 'mua' | 'sat_lo' | 'thuy_van' | 'vat_tu' | 'tat_ca' — theo 3 nhóm thiên tai
   const [forceOpen, setForceOpen] = useState(false); // đang chụp PDF: mở mọi biểu đồ đang thu gọn, hiện đủ thẻ tab Sạt lở
   const showSeg = (id) => tab === 'tong_hop' && (chartSegment === id || chartSegment === 'tat_ca' || forceOpen);
   const { data: supplies } = useAreaQuery('supplies', '/dashboard/supplies', {}, { enabled: (tab === 'he_thong' || showSeg('vat_tu')) && canResource });
   // Tiêu đề kết luận của biểu đồ + "Nguy hiểm nhất": CÙNG khoá / tuỳ chọn truy vấn với biểu đồ, bản đồ điểm nóng (TanStack
   // gộp — không thêm lượt gọi); chỉ tải khi chuyên đề đang hiện
-  const { data: rainfall } = useAreaQuery('rainfall', '/dashboard/rainfall', {}, { refetchInterval: 60_000, enabled: tab === 'tong_hop' });
-  const { data: fcAreas } = useAreaQuery('forecast-areas', '/forecast/areas', { hours: 72 }, { refetchInterval: 10 * 60_000, enabled: showSeg('mua') });
+  const { data: rainfall } = useAreaQuery('rainfall', '/dashboard/rainfall', {}, { refetchInterval: 60_000, enabled: tab === 'tong_hop' || tab === 'mua_lon' });
+  const { data: fcAreas } = useAreaQuery('forecast-areas', '/forecast/areas', { hours: 72 }, { refetchInterval: 10 * 60_000, enabled: showSeg('mua') || tab === 'mua_lon' });
   const { data: lsRisk } = useAreaQuery('landslide', '/dashboard/landslide-risk', {}, { refetchInterval: 60_000, enabled: showSeg('sat_lo') });
   const { data: layers } = useAreaQuery('map-layers', '/map/layers', {}, { refetchInterval: 30_000, enabled: tab !== 'cap_xa' });
   const hotspots = useMemo(() => buildHotspots(layers, k), [layers, k]);
@@ -277,7 +280,7 @@ export default function Dashboard() {
   };
 
   // ---- Chế độ trình chiếu (thiết kế A.1 — màn hình lớn phòng điều hành): nền tối, chỉ còn nội dung, chữ số to, tự xoay
-  // vòng Tổng hợp → Sạt lở, giữ màn hình sáng. Bật bằng nút "Trình chiếu" hoặc link /dashboard?trinh-chieu=1
+  // vòng Tổng hợp → Mưa lớn → Sạt lở, lũ quét → Ngập lụt, giữ màn hình sáng. Bật bằng nút "Trình chiếu" hoặc link /dashboard?trinh-chieu=1
   // (máy phòng điều hành tự mở). Thoát: nút "Thoát", phím Esc hoặc rời trang. Không ghi đè lựa chọn sáng / tối đã lưu.
   const [rotatePaused, setRotatePaused] = useState(false);
   const rotateSec = Math.max(15, Number(params.get('xoay')) || 60);
@@ -476,9 +479,38 @@ export default function Dashboard() {
     </Section>
   );
   const ls = k?.landslides;
+  // Huy hiệu trên tab 3 nhóm: mưa 24 giờ lớn nhất (từ Mưa to), số trạm mực nước vượt báo động, điểm sạt lở cấm đường / cảnh báo
+  const rainLv = rainLevel(k?.rain?.max_24h);
+  const riverLv = waterStations.map((s) => riverState(s).level ?? 0);
+  const riversAbove = riverLv.filter((lv) => lv >= 1).length;
   const tabBadge = {
+    mua_lon: rainLv >= 1 ? { text: `${num(k.rain.max_24h, 0)} mm`, level: rainLv } : null,
+    ngap_lut: riversAbove ? { text: `${riversAbove} trạm vượt`, level: Math.max(...riverLv) } : null, // gọn: hàng 6 tab vừa laptop 1366
     sat_lo: ls?.blocked_count ? { text: `${ls.blocked_count} cấm đường`, level: 3 } : ls?.warning_count ? { text: `${ls.warning_count} cảnh báo`, level: 2 } : null,
   };
+  // Biểu đồ mực nước (thực đo + bản tin dự báo, vạch Báo động I–III) và chọn trạm — chuyên đề "Ngập lụt" của Tổng hợp, tab Ngập lụt
+  const hydroBody = (height) => (
+    <>
+      <StationPicker stations={waterStations} selectedId={activeStation} onSelect={setStationId} />
+      {stationsState.error ? (
+        <ErrorState height={height} onRetry={stationsState.refetch}>Không tải được danh sách trạm mực nước</ErrorState>
+      ) : stationsState.loading ? (
+        <Skeleton height={height} />
+      ) : activeStation ? (
+        <Hydrograph stationId={activeStation} station={activeRow} height={height} syncId="thuy-van" />
+      ) : (
+        <EmptyState height={height} icon={Waves}>Chưa có trạm mực nước trong vùng đang xem</EmptyState>
+      )}
+      {canForecast && !presentation && waterStations.length > 0 && (
+        <div className="mt-2 flex justify-end no-print">
+          <button type="button" className="btn-ghost tap min-h-[34px] px-2.5 py-1 text-xs" onClick={() => setBulletinOpen(true)}>
+            Nhập bản tin dự báo thủy văn
+          </button>
+        </div>
+      )}
+      {bulletinOpen && <ForecastBulletinModal stations={waterStations} stationId={activeStation} onClose={() => setBulletinOpen(false)} />}
+    </>
+  );
   const dataTime = kQ.dataUpdatedAt ? new Date(kQ.dataUpdatedAt).toLocaleTimeString('vi-VN', { ...VN_TIME, hour12: false }) : null;
 
   return (
@@ -654,6 +686,31 @@ export default function Dashboard() {
         </div>
       )}
 
+      {tab === 'mua_lon' && (
+        // Mưa lớn: mưa từng giờ bình quân lưu vực + cộng dồn + 3 giờ tới; dự báo mưa 3 ngày theo xã (khoảng có thể xảy ra)
+        <div ref={ref} className="grid grid-cols-1 gap-2.5 bg-bg sm:gap-3.5 xl:grid-cols-2 [&>*]:min-w-0">
+          <Section id="bieu-do-mua" title={rainTitle(k, rainfall)} hint={RAIN_HINT}>
+            <RainfallChart height={300} />
+          </Section>
+          <Section id="du-bao-72h" title={forecastTitle(fcAreas)} hint={FORECAST_HINT}>
+            <AreaForecastChart height={300} />
+          </Section>
+        </div>
+      )}
+
+      {tab === 'ngap_lut' && (
+        // Ngập lụt: mực nước các trạm thủy văn so với Báo động I–III; vùng ngập, vùng sẽ ngập theo báo động ở Bản đồ giám sát
+        <div ref={ref} className="flex flex-col gap-2.5 bg-bg sm:gap-3.5">
+          <Section title={hydroTitle(activeRow)} hint={HYDRO_HINT}>
+            {hydroBody(320)}
+          </Section>
+          <p className="px-1 text-[13px] text-muted no-print">
+            Vùng đang ngập và vùng sẽ ngập khi sông lên Báo động I – III:{' '}
+            <button type="button" className="tap inline-flex items-center font-semibold text-accent hover:underline" onClick={() => navigate('/ban-do')}>xem trên Bản đồ giám sát</button>
+          </p>
+        </div>
+      )}
+
       {tab === 'sat_lo' && (
         // Cảm biến cảnh báo sớm lên đầu (thiết kế A: heatmap chuỗi thời gian độ nghiêng / độ ẩm đất), rồi điểm đen & đường đèo
         <div ref={ref} className="flex flex-col gap-2.5 bg-bg sm:gap-3.5">
@@ -809,9 +866,9 @@ export default function Dashboard() {
                     value={chartSegment}
                     onChange={setChartSegment}
                     options={[
-                      { value: 'thuy_van', label: 'Mực nước sông', short: 'Mực nước', icon: Waves },
-                      { value: 'mua', label: 'Mưa & dự báo', short: 'Mưa', icon: Droplets },
-                      { value: 'sat_lo', label: 'Sạt lở', short: 'Sạt lở', icon: Mountain },
+                      { value: 'mua', label: 'Mưa lớn', short: 'Mưa lớn', icon: CloudRain },
+                      { value: 'sat_lo', label: 'Sạt lở, lũ quét', short: 'Sạt lở', icon: Mountain },
+                      { value: 'thuy_van', label: 'Ngập lụt (mực nước sông)', short: 'Ngập lụt', icon: Waves },
                       canResource && { value: 'vat_tu', label: 'Kho vật tư', short: 'Kho', icon: Server },
                       { value: 'tat_ca', label: 'Tất cả', hint: 'Xem mọi biểu đồ cùng lúc' },
                     ].filter(Boolean)}
@@ -821,24 +878,7 @@ export default function Dashboard() {
                     {showSeg('thuy_van') && (
                       <div ref={hydroRef} className="min-w-0 scroll-mt-20">
                         <Section title={hydroTitle(activeRow)} hint={HYDRO_HINT} {...fold('thuy_van')}>
-                          <StationPicker stations={waterStations} selectedId={activeStation} onSelect={setStationId} />
-                          {stationsState.error ? (
-                            <ErrorState height={250} onRetry={stationsState.refetch}>Không tải được danh sách trạm mực nước</ErrorState>
-                          ) : stationsState.loading ? (
-                            <Skeleton height={250} />
-                          ) : activeStation ? (
-                            <Hydrograph stationId={activeStation} station={activeRow} height={250} syncId="thuy-van" />
-                          ) : (
-                            <EmptyState height={250} icon={Waves}>Chưa có trạm mực nước trong vùng đang xem</EmptyState>
-                          )}
-                          {canForecast && !presentation && waterStations.length > 0 && (
-                            <div className="mt-2 flex justify-end no-print">
-                              <button type="button" className="btn-ghost tap min-h-[34px] px-2.5 py-1 text-xs" onClick={() => setBulletinOpen(true)}>
-                                Nhập bản tin dự báo thủy văn
-                              </button>
-                            </div>
-                          )}
-                          {bulletinOpen && <ForecastBulletinModal stations={waterStations} stationId={activeStation} onClose={() => setBulletinOpen(false)} />}
+                          {hydroBody(250)}
                         </Section>
                       </div>
                     )}

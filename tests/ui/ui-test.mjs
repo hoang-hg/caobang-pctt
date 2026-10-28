@@ -30,7 +30,9 @@ const VIEWPORTS = [
 ];
 const STAFF_PAGES = [
   ['/dashboard', 'Tổng quan'],
-  ['/dashboard?tab=sat_lo', 'Tổng quan · sạt lở & đường đèo'],
+  ['/dashboard?tab=mua_lon', 'Tổng quan · mưa lớn'],
+  ['/dashboard?tab=sat_lo', 'Tổng quan · sạt lở, lũ quét'],
+  ['/dashboard?tab=ngap_lut', 'Tổng quan · ngập lụt'],
   ['/dashboard?tab=cap_xa', 'Tổng quan · cấp xã/phường'],
   ['/dashboard?tab=he_thong', 'Tổng quan · hệ thống & dữ liệu'],
   ['/ban-do', 'Bản đồ giám sát'],
@@ -46,11 +48,11 @@ const STAFF_PAGES = [
 // Cổng người dân: menu 5 nhóm (docs/ke-hoach-lam-moi-giao-dien.md 6.1) — [nhóm, trang con]; 7 màn (bỏ Hồ chứa —
 // docs/pham-vi-thien-tai.md)
 const PUBLIC_TABS = [
-  ['Bản đồ cảnh báo'], ['Mực nước sông suối'], ['Đèo dốc & sạt lở'],
+  ['Bản đồ cảnh báo'], ['Sạt lở, lũ quét'], ['Ngập lụt'],
   ['Sơ tán & đường dây nóng', 'Điểm sơ tán an toàn'], ['Sơ tán & đường dây nóng', 'Đường dây nóng'], ['Tra cứu phiếu'], ['Cẩm nang an toàn'],
 ];
 // Mở một màn của cổng: điện thoại mở menu ≡ trước; nhóm có 2 màn thì chọn tiếp trang con (hàng dưới menu). Tên nhóm đứng
-// đầu, sau có thể là số đếm ("Đèo dốc & sạt lở 3 điểm cấm") — không khớp nhầm nút "Tra cứu phiếu đã gửi"
+// đầu, sau có thể là số đếm ("Sạt lở, lũ quét 3 điểm cấm") — không khớp nhầm nút "Tra cứu phiếu đã gửi"
 async function openPublic(page, [group, sub]) {
   const menu = page.getByRole('button', { name: 'Mở menu cổng người dân' });
   if (await menu.isVisible()) await menu.click();
@@ -962,10 +964,10 @@ async function firstScreen(ctx) {
     await page.locator('[aria-label="Chỉ số nhanh"] > *').nth(5).waitFor();
     if (await page.locator('header').count()) throw new Error('vẫn còn thanh trên');
     if (!(await page.evaluate(() => document.documentElement.classList.contains('dark')))) throw new Error('chưa chuyển nền tối');
-    await page.waitForURL(/tab=sat_lo/, { timeout: 25_000 });
+    await page.waitForURL(/tab=mua_lon/, { timeout: 25_000 });
     await page.keyboard.press('Escape');
     await page.locator('header').waitFor({ timeout: 5_000 });
-    return 'tự sang Sạt lở sau 15 giây';
+    return 'tự sang Mưa lớn sau 15 giây';
   });
 }
 
@@ -1105,16 +1107,16 @@ const smallTargets = (page, { onScreen = false } = {}) => page.evaluate((only) =
 }, onScreen);
 
 // ================================================================ Tổng quan trên màn cảm ứng (iPad, điện thoại)
-// Mọi vùng chạm của 5 tab ≥ 44 px (thanh công cụ, tab, bảng tác chiến, lọc, nhật ký, Sạt lở, Cấp xã, Hệ thống);
+// Mọi vùng chạm của 6 tab ≥ 44 px (thanh công cụ, tab, bảng tác chiến, lọc, nhật ký, Mưa lớn, Sạt lở, Ngập lụt, Cấp xã, Hệ thống);
 // điện thoại cảm ứng 360×740: vẫn thấy trọn 6 ô KPI dù nút cao hơn (phép đo "Màn hình đầu" chạy không cảm ứng). Chỉ xem.
 const DASH_TOUCH = [
   ['iPad ngang', devices['iPad Pro 11 landscape']],
   ['Điện thoại 360', devices['Galaxy S8']],
 ];
-const DASH_TABS = [['', 'Tổng hợp'], ['sat_lo', 'Sạt lở'], ['cap_xa', 'Cấp xã'], ['he_thong', 'Hệ thống']];
+const DASH_TABS = [['', 'Tổng hợp'], ['mua_lon', 'Mưa lớn'], ['sat_lo', 'Sạt lở, lũ quét'], ['ngap_lut', 'Ngập lụt'], ['cap_xa', 'Cấp xã'], ['he_thong', 'Hệ thống']];
 async function dashTouch(ctx) {
   const { page } = ctx;
-  await step(ctx, 'Tổng quan: mọi vùng chạm của 5 tab ≥ 44 px', async () => {
+  await step(ctx, 'Tổng quan: mọi vùng chạm của 6 tab ≥ 44 px', async () => {
     await page.goto(`${ROOT}/dang-nhap`);
     await page.getByPlaceholder('Nhập tên đăng nhập hoặc email...').fill(STAFF.user);
     await page.getByPlaceholder('••••••••').fill(STAFF.pass);
