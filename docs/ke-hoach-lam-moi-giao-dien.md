@@ -285,9 +285,11 @@ hành **chỉ rõ tỉnh Cao Bằng, phần xung quanh làm mờ**.
 
 **7.2. Làm mờ ngoài tỉnh** — mọi bản đồ (cổng người dân, Tổng quan, Bản đồ giám sát, Cứu hộ, Cảnh báo…):
 
-- Phủ KÍN (100 %) mọi thứ ngoài ranh giới tỉnh — chỉ hiện tỉnh Cao Bằng (quyết định của chủ dự án 28/10/2026; trước đó
-  85 %): nền Sáng phủ trắng, nền Tối / Vệ tinh phủ tối. Ranh giới tỉnh **nét đen đậm** trên viền nền tương phản (nền tối:
-  viền sáng bên dưới để nét đen không chìm). Đang lọc một xã thì phần ngoài xã trong tỉnh mờ nhẹ 30 %, xã đang xem viền màu
+- Phủ NHẸ (40 %) ngoài ranh giới tỉnh — tỉnh nổi, vẫn thấy địa hình xung quanh như trang tham khảo của Viện ĐCN&MT
+  (quyết định của chủ dự án 28/10/2026, lần 2: 100 % làm tỉnh như mẩu giấy cắt dán; trước đó 85 %): nền Sáng phủ trắng,
+  nền Tối / Vệ tinh phủ tối. Ranh giới tỉnh **nét đen đậm** trên viền nền tương phản (nền tối: viền sáng bên dưới để nét
+  đen không chìm). Ranh giới **xã** nét xám mảnh 1 px trên viền nền mỏng (trước nét gần đen 1,5 px trên viền trắng 3,5 px —
+  56 xã như kính ghép chì, lấn ô nền và điểm số liệu). Đang lọc một xã thì phần ngoài xã trong tỉnh mờ nhẹ 30 %, xã đang xem viền màu
   nhấn (không dùng đỏ — đỏ chỉ cho mức Khẩn cấp).
 - Lớp mờ nằm trên ô nền, dưới mọi lớp số liệu: điểm, đường quỹ đạo bão, cảnh báo vẫn rõ dù ở ngoài tỉnh.
 - **Không khoá** kéo bản đồ ra ngoài tỉnh: bão, mưa lớn từ ngoài vào vẫn phải xem được.
