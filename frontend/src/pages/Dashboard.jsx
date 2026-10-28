@@ -15,7 +15,6 @@ import Hydrograph from '../components/charts/Hydrograph';
 import RainfallChart from '../components/charts/RainfallChart';
 import LandslideScatter from '../components/charts/LandslideScatter';
 import SensorHeatmap from '../components/charts/SensorHeatmap';
-import ReservoirOpsChart from '../components/charts/ReservoirOpsChart';
 import SuppliesChart from '../components/charts/SuppliesChart';
 import AreaForecastChart from '../components/charts/AreaForecastChart';
 import ForecastBulletinModal from '../components/charts/ForecastBulletinModal';
@@ -43,14 +42,12 @@ import { captureSnapshot, exportSnapshotPdf } from '../utils/exportPdf';
 import { exportExcel } from '../utils/exportExcel';
 import { useMediaQuery } from '../utils/useMediaQuery';
 import { useOnline } from '../utils/useOnline';
-import ReservoirMonitor from './public/ReservoirMonitor';
 import LandslideMonitor from './public/LandslideMonitor';
 
 const VN_TIME = { timeZone: 'Asia/Ho_Chi_Minh' };
 // Một hàng thẻ duy nhất (trước đây 2 hàng: góc nhìn + chuyên đề, trùng chữ "Tổng hợp"); ?tab= để gửi link / tải lại
 const TABS = [
   { id: 'tong_hop', label: 'Tổng hợp', icon: LayoutDashboard },
-  { id: 'ho_chua', label: 'Hồ chứa & xả lũ', icon: Droplets },
   { id: 'sat_lo', label: 'Sạt lở & đường đèo', icon: Mountain },
   { id: 'cap_xa', label: 'Cấp xã / phường', icon: Home },
   { id: 'he_thong', label: 'Hệ thống & dữ liệu', icon: Server },
@@ -94,7 +91,7 @@ const SUPPLIES_HINT = (
 );
 
 // Chế độ trình chiếu: xoay vòng các chuyên đề lãnh đạo hay xem trên màn hình lớn (mặc định 60 giây, ?xoay=giây, tối thiểu 15)
-const ROTATION = ['tong_hop', 'ho_chua', 'sat_lo'];
+const ROTATION = ['tong_hop', 'sat_lo'];
 
 /** Đồng hồ lớn của chế độ trình chiếu (thanh trên có đồng hồ — trình chiếu ẩn thanh trên). */
 function LiveClock() {
@@ -173,7 +170,7 @@ export default function Dashboard() {
   const stationsState = { loading: stationsQ.isLoading, error: stationsQ.isError && !stationsQ.data, refetch: stationsQ.refetch };
   const evacQ = useAreaQuery('evacuation', '/evacuation', {}, { refetchInterval: 30_000 });
   const [chartSegment, setChartSegment] = useState('thuy_van'); // 'thuy_van' | 'mua' | 'sat_lo' | 'vat_tu' | 'tat_ca'
-  const [forceOpen, setForceOpen] = useState(false); // đang chụp PDF: mở mọi biểu đồ đang thu gọn, hiện đủ thẻ tab Hồ chứa / Sạt lở
+  const [forceOpen, setForceOpen] = useState(false); // đang chụp PDF: mở mọi biểu đồ đang thu gọn, hiện đủ thẻ tab Sạt lở
   const showSeg = (id) => tab === 'tong_hop' && (chartSegment === id || chartSegment === 'tat_ca' || forceOpen);
   const { data: supplies } = useAreaQuery('supplies', '/dashboard/supplies', {}, { enabled: (tab === 'he_thong' || showSeg('vat_tu')) && canResource });
   // Tiêu đề kết luận của biểu đồ + "Nguy hiểm nhất": CÙNG khoá / tuỳ chọn truy vấn với biểu đồ, bản đồ điểm nóng (TanStack
@@ -280,7 +277,7 @@ export default function Dashboard() {
   };
 
   // ---- Chế độ trình chiếu (thiết kế A.1 — màn hình lớn phòng điều hành): nền tối, chỉ còn nội dung, chữ số to, tự xoay
-  // vòng Tổng hợp → Hồ chứa → Sạt lở, giữ màn hình sáng. Bật bằng nút "Trình chiếu" hoặc link /dashboard?trinh-chieu=1
+  // vòng Tổng hợp → Sạt lở, giữ màn hình sáng. Bật bằng nút "Trình chiếu" hoặc link /dashboard?trinh-chieu=1
   // (máy phòng điều hành tự mở). Thoát: nút "Thoát", phím Esc hoặc rời trang. Không ghi đè lựa chọn sáng / tối đã lưu.
   const [rotatePaused, setRotatePaused] = useState(false);
   const rotateSec = Math.max(15, Number(params.get('xoay')) || 60);
@@ -364,10 +361,10 @@ export default function Dashboard() {
     }
   };
 
-  // Trước khi chụp phải mở ra hết, nếu không PDF thiếu nội dung: biểu đồ đang thu gọn (điện thoại), thẻ hồ / điểm sạt lở đang
-  // ẩn sau "Xem thêm" (tab Hồ chứa / Sạt lở)
+  // Trước khi chụp phải mở ra hết, nếu không PDF thiếu nội dung: biểu đồ đang thu gọn (điện thoại), thẻ điểm sạt lở đang
+  // ẩn sau "Xem thêm" (tab Sạt lở)
   const withChartsOpen = async (run) => {
-    const folded = (isPhone && Object.values(chartsOpen).some((v) => !v)) || tab === 'ho_chua' || tab === 'sat_lo';
+    const folded = (isPhone && Object.values(chartsOpen).some((v) => !v)) || tab === 'sat_lo';
     try {
       if (folded) {
         setForceOpen(true);
@@ -446,7 +443,6 @@ export default function Dashboard() {
       ['Quân số đang làm nhiệm vụ', fo.units ? fo.on_mission : null],
       ['Xuồng, xe lội nước hoạt động / tổng', ve.special_total ? `${ve.special_active}/${ve.special_total}` : null],
       ['Máy xúc, máy ủi hoạt động / tổng', ve.heavy_total ? `${ve.heavy_active}/${ve.heavy_total}` : null],
-      ['Hồ đang xả / tổng', k?.reservoirs?.total ? `${k.reservoirs.spill_count}/${k.reservoirs.total}` : null],
       ['Điểm sạt lở cấm đường / tổng', k?.landslides?.total ? `${k.landslides.blocked_count}/${k.landslides.total}` : null],
     ].map(([label, value, note]) => ({ 'Chỉ tiêu': label, 'Giá trị': value ?? 'Chưa có số liệu', 'Ghi chú': note || '' }));
     try {
@@ -479,10 +475,8 @@ export default function Dashboard() {
       <EventLog className={listClass} limit={limit} preview={isLg ? undefined : 5} />
     </Section>
   );
-  const rs = k?.reservoirs;
   const ls = k?.landslides;
   const tabBadge = {
-    ho_chua: rs?.spill_count ? { text: `${rs.spill_count} hồ xả`, level: rs.emergency_count ? 3 : 2 } : null,
     sat_lo: ls?.blocked_count ? { text: `${ls.blocked_count} cấm đường`, level: 3 } : ls?.warning_count ? { text: `${ls.warning_count} cảnh báo`, level: 2 } : null,
   };
   const dataTime = kQ.dataUpdatedAt ? new Date(kQ.dataUpdatedAt).toLocaleTimeString('vi-VN', { ...VN_TIME, hour12: false }) : null;
@@ -552,7 +546,7 @@ export default function Dashboard() {
         exports={presentation ? undefined : [
           { key: 'anh', label: 'Ảnh chụp tình hình (PDF)', hint: 'Chỉ số, bản đồ, biểu đồ của thẻ đang xem — gửi nhanh qua Zalo, email', icon: FileDown, onClick: doExport, busy: exporting },
           { key: 'van-ban', label: 'Báo cáo văn bản (PDF)', hint: 'Quốc hiệu, số liệu, đánh giá – kiến nghị, chỗ ký — gửi UBND tỉnh / Ban Chỉ đạo', icon: FileText, onClick: () => setDocOpen(true), disabled: !k },
-          { key: 'excel', label: 'Bảng số liệu (Excel)', hint: 'Chỉ số, trạm, hồ chứa, sạt lở trong vùng đang xem', icon: FileSpreadsheet, onClick: doExcel, disabled: !k },
+          { key: 'excel', label: 'Bảng số liệu (Excel)', hint: 'Chỉ số, trạm, sạt lở trong vùng đang xem', icon: FileSpreadsheet, onClick: doExcel, disabled: !k },
         ]}
         onRefresh={presentation ? undefined : refresh}
         refreshing={refreshing}
@@ -657,12 +651,6 @@ export default function Dashboard() {
               })}
             </div>
           </CommuneView>
-        </div>
-      )}
-
-      {tab === 'ho_chua' && (
-        <div ref={ref} className="card p-3 sm:p-5">
-          <ReservoirMonitor areaScoped showAll={forceOpen} onSelectOnMap={openOnMap} />
         </div>
       )}
 
@@ -821,7 +809,7 @@ export default function Dashboard() {
                     value={chartSegment}
                     onChange={setChartSegment}
                     options={[
-                      { value: 'thuy_van', label: 'Mực nước & hồ chứa', short: 'Mực nước', icon: Waves },
+                      { value: 'thuy_van', label: 'Mực nước sông', short: 'Mực nước', icon: Waves },
                       { value: 'mua', label: 'Mưa & dự báo', short: 'Mưa', icon: Droplets },
                       { value: 'sat_lo', label: 'Sạt lở', short: 'Sạt lở', icon: Mountain },
                       canResource && { value: 'vat_tu', label: 'Kho vật tư', short: 'Kho', icon: Server },
@@ -839,9 +827,7 @@ export default function Dashboard() {
                           ) : stationsState.loading ? (
                             <Skeleton height={250} />
                           ) : activeStation ? (
-                            <Hydrograph stationId={activeStation} station={activeRow} height={250} syncId="thuy-van">
-                              {(xDomain, xTicks) => <ReservoirOpsChart river={activeRow?.river} xDomain={xDomain} xTicks={xTicks} syncId="thuy-van" />}
-                            </Hydrograph>
+                            <Hydrograph stationId={activeStation} station={activeRow} height={250} syncId="thuy-van" />
                           ) : (
                             <EmptyState height={250} icon={Waves}>Chưa có trạm mực nước trong vùng đang xem</EmptyState>
                           )}
@@ -918,7 +904,7 @@ export default function Dashboard() {
                   <FileSpreadsheet size={15} className="text-accent" aria-hidden="true" /> Bảng số liệu chi tiết
                 </h2>
                 <p className="num mt-0.5 text-[13px] text-muted">
-                  {waterStations.length} trạm mực nước · {k?.reservoirs?.total || 0} hồ chứa · {k?.landslides?.total || 0} điểm sạt lở{canSos ? ` · ${k?.sos?.waiting || 0} phiếu SOS chờ` : ''}
+                  {waterStations.length} trạm mực nước · {k?.landslides?.total || 0} điểm sạt lở{canSos ? ` · ${k?.sos?.waiting || 0} phiếu SOS chờ` : ''}
                 </p>
               </div>
               <button type="button" onClick={() => setOpsTableOpen(true)} aria-expanded="false" aria-controls="bang-so-lieu" className="btn-secondary tap h-9 px-3">
@@ -956,7 +942,6 @@ export default function Dashboard() {
           scope: filterLabel,
           tabLabel: TABS.find((t) => t.id === tab)?.label || 'Tổng quan',
           stations: waterStations.length,
-          reservoirs: k?.reservoirs?.total || 0,
           landslides: (k?.landslides?.blocked_count || 0) + (k?.landslides?.warning_count || 0),
         }}
       />

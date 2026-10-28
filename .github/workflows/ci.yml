@@ -154,9 +154,8 @@ jobs:
           name: ui-shots
           path: tests/ui/shots
           if-no-files-found: ignore
-      - name: Kiểm thử hồ chứa & điểm đen sạt lở
+      - name: Kiểm thử điểm đen sạt lở
         run: |
-          node tests/e2e/reservoir-test.mjs
           node tests/e2e/landslide-test.mjs
       - name: Kiểm thử nhập dữ liệu (có bước thay toàn bộ — chạy sau các bộ dùng dữ liệu mẫu)
         run: node tests/e2e/import-test.mjs

@@ -13,7 +13,7 @@ const NOTE = 'Tổng hợp tự động từ số liệu hệ thống — không
 /**
  * Các tình huống đáng chú ý lấy từ số liệu thật (KPI + trạm mực nước). Mức theo thang màu rủi ro chung (utils/risk.js),
  * khớp màu backend trả cho từng đối tượng: trạm vượt BĐ I / II / III → Vàng / Cam / Đỏ; SOS quá hạn hoặc cấp 1 → Đỏ;
- * sạt lở cấm đường → Đỏ, cảnh báo → Cam; hồ xả khẩn cấp → Đỏ, xả điều tiết → Cam; mưa 24 giờ theo rainLevel.
+ * sạt lở cấm đường → Đỏ, cảnh báo → Cam; mưa 24 giờ theo rainLevel.
  */
 export function situationItems(k, waterStations) {
   const items = [];
@@ -29,8 +29,6 @@ export function situationItems(k, waterStations) {
   const sos = k?.sos || {};
   if (sos.overdue > 0) items.push({ level: 3, text: `${sos.overdue} phiếu SOS quá hạn phản hồi` });
   if (sos.critical > 0) items.push({ level: 3, text: `${sos.critical} phiếu SOS cấp 1 chưa xong` });
-  const rs = k?.reservoirs || {};
-  if (rs.emergency_count > 0) items.push({ level: 3, text: `${rs.emergency_count} hồ xả khẩn cấp` });
   const ls = k?.landslides || {};
   if (ls.blocked_count > 0) items.push({ level: 3, text: `${ls.blocked_count} điểm sạt lở cấm đường` });
   const rainLv = rainLevel(k?.rain?.max_24h);
@@ -39,8 +37,6 @@ export function situationItems(k, waterStations) {
     items.push({ level: rainLv, text: `${rainLv >= 2 ? 'Mưa rất to' : 'Mưa to'} ${num(k.rain.max_24h, 1)} mm/24 giờ${at}` });
   }
   if (ls.warning_count > 0) items.push({ level: 2, text: `${ls.warning_count} điểm sạt lở cảnh báo` });
-  const spilling = (rs.spill_count || 0) - (rs.emergency_count || 0);
-  if (spilling > 0) items.push({ level: 2, text: `${spilling} hồ đang xả điều tiết` });
   return items.sort((a, b) => b.level - a.level);
 }
 
@@ -214,7 +210,7 @@ export default function SituationBar({
     >
       <Info size={15} className="mt-0.5 shrink-0 text-muted" aria-hidden="true" />
       <span>
-        Chưa ghi nhận trạm vượt báo động, SOS quá hạn, sạt lở cấm đường, hồ xả hay mưa ≥ 50 mm/24 giờ trong vùng đang xem
+        Chưa ghi nhận trạm vượt báo động, SOS quá hạn, sạt lở cấm đường hay mưa ≥ 50 mm/24 giờ trong vùng đang xem
         {waterStations.length > 0 && ` · ${fresh}/${waterStations.length} trạm mực nước có số đo trong 60 phút qua`}.
       </span>
     </div>
@@ -225,7 +221,7 @@ const lower = (t) => t.charAt(0).toLowerCase() + t.slice(1);
 
 /**
  * MỘT câu tóm tắt tình hình bằng lời (thiết kế A — trả lời "đang có chuyện gì" trong 5 giây), ghép từ số liệu thật của
- * KPI + trạm mực nước: "2 trạm ở Báo động II, 12 phiếu SOS chờ (3 quá hạn), 2 hồ đang xả lũ." Không có tình huống
+ * KPI + trạm mực nước: "2 trạm ở Báo động II, 12 phiếu SOS chờ (3 quá hạn), 1 điểm sạt lở cấm đường." Không có tình huống
  * → "chưa ghi nhận …" kèm độ phủ số đo; chưa có số đo → "chưa có số liệu …, chưa đánh giá được" — KHÔNG BAO GIỜ "an toàn".
  * → { level (mức nặng nhất, null = chưa có số liệu), text, noData }
  */
@@ -244,10 +240,6 @@ export function situationSentence(k, waterStations, { stationsError = false } = 
     const late = sos.overdue > 0 ? `${sos.overdue} quá hạn` : sos.no_team_15m > 0 ? `${sos.no_team_15m} chờ quá 15 phút` : '';
     parts.push({ level: late ? 3 : 1, text: `${sos.waiting} phiếu SOS chờ${late ? ` (${late})` : ''}` });
   }
-  const rs = k?.reservoirs || {};
-  if (rs.spill_count > 0) {
-    parts.push({ level: rs.emergency_count ? 3 : 2, text: `${rs.spill_count} hồ đang xả lũ${rs.emergency_count ? ` (${rs.emergency_count} xả khẩn cấp)` : ''}` });
-  }
   const ls = k?.landslides || {};
   if (ls.blocked_count > 0) parts.push({ level: 3, text: `${ls.blocked_count} điểm sạt lở cấm đường` });
   else if (ls.warning_count > 0) parts.push({ level: 2, text: `${ls.warning_count} điểm sạt lở cần cảnh báo` });
@@ -263,7 +255,7 @@ export function situationSentence(k, waterStations, { stationsError = false } = 
   if (noData) return { level: null, text: `${gap.charAt(0).toUpperCase()}${gap.slice(1)} — chưa đánh giá được tình hình mưa, lũ.`, noData };
   return {
     level: 0,
-    text: `Chưa ghi nhận trạm vượt báo động, phiếu SOS chờ, hồ xả lũ hay sạt lở cấm đường trong vùng đang xem${waterStations.length ? ` · ${fresh}/${waterStations.length} trạm mực nước có số đo trong 60 phút qua` : ''}.`,
+    text: `Chưa ghi nhận trạm vượt báo động, phiếu SOS chờ hay sạt lở cấm đường trong vùng đang xem${waterStations.length ? ` · ${fresh}/${waterStations.length} trạm mực nước có số đo trong 60 phút qua` : ''}.`,
     noData,
   };
 }

@@ -48,7 +48,6 @@ EVENT_SCOPE = {
     "broadcast.expiring": "alert",  # cảnh báo sắp hết hiệu lực (app/services/alert_watch.py)
     "reading.new": "monitoring",
     "hazard.new": "monitoring",
-    "reservoir.updated": "monitoring",
     "dispatch.updated": "sos",
     "source.updated": "integration",
     "ingest.log": "integration",

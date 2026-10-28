@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
 import {
-  Activity, AlertTriangle, ArrowUp, Cctv, ChevronDown, ChevronUp, Circle as CircleIcon, Clock, CloudRain, Compass, Construction, Droplets, FileSpreadsheet, House,
+  Activity, AlertTriangle, ArrowUp, Cctv, ChevronDown, ChevronUp, Circle as CircleIcon, Clock, CloudRain, Compass, Construction, FileSpreadsheet, House,
   LifeBuoy, Map as MapIcon, MapPin, Megaphone, MessageCircle, Mountain, Pause, PenTool, Play, Radar, Route, Ruler, Search, RotateCcw, Send,
   Settings2, Siren, Tornado, TrafficCone, TriangleAlert, Truck, Users, Warehouse, Waves, X,
 } from 'lucide-react';
@@ -18,7 +18,7 @@ import { trendProps } from '../../utils/stations';
 import { useShowMore } from '../../utils/useShowMore';
 
 // Biểu tượng từng loại điểm nóng (hotspots.js)
-const HOT_ICON = { sos: Siren, river: Waves, reservoir: Droplets, landslide: Mountain, rain: CloudRain, sensor: Activity, hazard: AlertTriangle };
+const HOT_ICON = { sos: Siren, river: Waves, landslide: Mountain, rain: CloudRain, sensor: Activity, hazard: AlertTriangle };
 const HOT_STEP = 10;
 
 // Cấp ưu tiên phiếu SOS → tên màu (cấp 1 Đỏ, 2 Cam, 3 Vàng — mức thang màu = 4 − cấp)
@@ -34,7 +34,6 @@ export const LAYER_GROUPS = [
     title: 'Mưa & mực nước',
     items: [
       { key: 'stations', label: 'Trạm đo mưa, mực nước, cảm biến sạt lở', icon: Activity },
-      { key: 'reservoirs', label: 'Hồ chứa, thủy điện', icon: Droplets },
       { key: 'forecast', label: 'Mưa dự báo theo xã', icon: CloudRain }, // ghi chú dưới tên: 24 giờ tới / 1 giờ theo thanh thời gian
       { key: 'radar', label: 'Mây mưa trên ảnh radar', icon: Radar },
       // Bão, áp thấp: đang ẩn (ngoài phạm vi theo dõi — utils/hazardScope.js)
@@ -70,7 +69,7 @@ export const LAYER_GROUPS = [
 export const LAYER_ORDER = LAYER_GROUPS.flatMap((g) => g.items.map((it) => it.key));
 
 export const DEFAULT_LAYERS = {
-  stations: true, reservoirs: true, forecast: false, radar: false, storm: false, flood: true, floodScenario: true, landslide: true, blackspots: true, hazardPoints: true,
+  stations: true, forecast: false, radar: false, storm: false, flood: true, floodScenario: true, landslide: true, blackspots: true, hazardPoints: true,
   reports: true, roads: false,
   forces: true, vehicles: false, routes: true, warehouses: true, evac: false, cameras: true, sos: true, admin: true,
 };
@@ -78,7 +77,6 @@ export const DEFAULT_LAYERS = {
 /** Ghi chú khi lớp danh mục đang trống — chạy thật chưa nhập thì nói rõ, không để bản đồ im lặng như "không có gì". */
 const EMPTY_NOTE = {
   stations: 'Chưa có trạm trong vùng đang xem (nhập loại "Trạm quan trắc")',
-  reservoirs: 'Chưa có hồ chứa (nhập loại "Hồ chứa")',
   forces: 'Chưa có lực lượng (nhập loại "Lực lượng")',
   vehicles: 'Chưa có phương tiện (nhập loại "Phương tiện")',
   warehouses: 'Chưa có kho (nhập loại "Kho vật tư")',
@@ -95,7 +93,6 @@ export function layerCounts(data) {
   const zones = data.hazard_zones.features;
   return {
     stations: data.stations.features.length,
-    reservoirs: data.reservoirs.features.length,
     flood: zones.filter((f) => f.properties.type === 'ngap').length,
     landslide: zones.filter((f) => f.properties.type !== 'ngap').length,
     hazardPoints: data.hazard_points.features.length,
@@ -456,7 +453,7 @@ export function AlertsList({
               <div className="px-2 py-8 text-center text-xs text-muted">
                 Không có điểm nóng trong vùng đang xem
                 <span className="mt-1 block">
-                  Chưa ghi nhận {canSos ? 'SOS cấp 1, ' : ''}trạm trên báo động, hồ xả, sạt lở cấm đường, mưa từ 50 mm/24 giờ hay sự cố mức Cam / Đỏ.
+                  Chưa ghi nhận {canSos ? 'SOS cấp 1, ' : ''}trạm trên báo động, sạt lở cấm đường, mưa từ 50 mm/24 giờ hay sự cố mức Cam / Đỏ.
                 </span>
               </div>
             )}
@@ -555,13 +552,13 @@ export function AlertsList({
 }
 
 /**
- * Chế độ xem bản đồ: "Xem tình hình" — chỉ giữ lớp rủi ro (phiếu cứu hộ, trạm, hồ, vùng nguy hiểm, sạt lở, sự cố) cho lãnh
+ * Chế độ xem bản đồ: "Xem tình hình" — chỉ giữ lớp rủi ro (phiếu cứu hộ, trạm, vùng nguy hiểm, sạt lở, sự cố) cho lãnh
  * đạo nắm tình hình (mặc định); "Điều hành" — thêm đội cứu hộ, xuồng – xe, kho, đường đi, điểm sơ tán, phản ánh, camera để
  * điều đội. Chỉ đổi lớp đang bật — không đổi số liệu. `touch`: nút cao 44 px. `caption`: câu giải thích chế độ đang chọn
  * ngay dưới nút (Điều hành: kèm mẹo kéo – thả đội vào điểm cầu cứu khi `canDispatch`).
  */
 export const VIEW_MODES = [
-  ['tinh_hinh', 'Xem tình hình', 'Chỉ lớp rủi ro: phiếu cứu hộ, trạm đo, hồ, vùng nguy hiểm — để nắm tình hình.'],
+  ['tinh_hinh', 'Xem tình hình', 'Chỉ lớp rủi ro: phiếu cứu hộ, trạm đo, vùng nguy hiểm — để nắm tình hình.'],
   ['tac_nghiep', 'Điều hành', 'Thêm đội cứu hộ, xuồng – xe, kho, điểm sơ tán, đường đi của đội — để điều đội.'],
 ];
 export function ViewModeSwitch({ mode, onChange, touch, caption = false, canDispatch = false, help, className, captionClass }) {

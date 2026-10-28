@@ -1,23 +1,17 @@
 import { useMemo, useState } from 'react';
 import clsx from 'clsx';
-import { Activity, AlertTriangle, Droplets, LifeBuoy, MessageCircle, Search, Settings2, X } from 'lucide-react';
+import { Activity, AlertTriangle, LifeBuoy, MessageCircle, Search, Settings2, X } from 'lucide-react';
 import { useAreaQuery } from '../../api/hooks';
 import { time } from '../../utils/format';
 import { risk } from '../../utils/risk';
 import { useNewKeys } from '../../utils/useNewKeys';
 import { EmptyState, ErrorState, Skeleton } from './ui';
 
-// Sự kiện vận hành hồ chứa: nhóm van_hanh gồm cả xuất / nhập kho, phương tiện, kết thúc sự cố, bản tin dự báo — lọc
-// "Hồ chứa" theo nội dung (hồ, thủy điện, cửa xả, xả lũ)
-const RESERVOIR = /(^|\s)hồ\s|thủy điện|thuỷ điện|cửa xả|xả lũ/i;
-const isReservoir = (l) => l.category === 'van_hanh' && RESERVOIR.test(l.message || '');
-
-// Nút lọc (chữ, không đếm) — thiết kế A: Tất cả / Cứu hộ / Hồ chứa / Cảnh báo / Người dân; "Khẩn" giữ bộ lọc chỉ sự kiện
+// Nút lọc (chữ, không đếm) — thiết kế A: Tất cả / Cứu hộ / Cảnh báo / Người dân (hệ thống không còn theo dõi hồ chứa); "Khẩn" giữ bộ lọc chỉ sự kiện
 // khẩn cấp của bản trước
 const FILTERS = [
   { id: 'tat_ca', label: 'Tất cả', match: () => true },
   { id: 'cuu_ho', label: 'Cứu hộ', match: (l) => l.category === 'cuu_ho' },
-  { id: 'ho_chua', label: 'Hồ chứa', match: isReservoir },
   { id: 'canh_bao', label: 'Cảnh báo', match: (l) => l.category === 'canh_bao' },
   { id: 'nguoi_dan', label: 'Người dân', match: (l) => l.category === 'nguoi_dan' },
   { id: 'khan', label: 'Khẩn', match: (l) => l.severity === 'danger' },
@@ -31,7 +25,7 @@ const KIND = {
   van_hanh: { icon: Settings2, label: 'Vận hành' },
   he_thong: { icon: Activity, label: 'Hệ thống' },
 };
-const kindOf = (l) => (isReservoir(l) ? { icon: Droplets, label: 'Hồ chứa' } : KIND[l.category] || KIND.he_thong);
+const kindOf = (l) => KIND[l.category] || KIND.he_thong;
 // Mức của sự kiện theo thang màu chung: khẩn → Đỏ, cảnh báo → Cam; tin thường không tô màu
 const SEV_LEVEL = { danger: 3, warning: 2 };
 // Câu do máy chủ ghi có thể viết tắt "BĐ II" — hiện đủ chữ cho người đọc (không sửa dữ liệu gốc)
@@ -40,7 +34,7 @@ const plain = (m) => (m || '').replace(/\bBĐ\s+(I{1,3})\b/g, 'Báo động $1')
 /**
  * Nhật ký sự kiện dạng dòng thời gian: mỗi dòng = giờ · biểu tượng loại (kèm chữ) · một câu. Sự kiện khẩn: chấm Đỏ + chữ
  * đậm; cảnh báo: chấm Cam — không tô nền, không nhấp nháy. Sự kiện mới tới khi đang xem trượt vào đầu danh sách (một lần).
- * Lọc bằng nút chữ (Tất cả / Cứu hộ / Hồ chứa / Cảnh báo / Người dân), tìm nhanh theo chữ. `preview` (số mục): chỉ HIỆN N
+ * Lọc bằng nút chữ (Tất cả / Cứu hộ / Cảnh báo / Người dân), tìm nhanh theo chữ. `preview` (số mục): chỉ HIỆN N
  * sự kiện mới nhất + nút "Xem tất cả" (iPad dọc / điện thoại) — chỉ cắt phần hiển thị, truy vấn (`limit`) giữ nguyên.
  */
 export default function EventLog({ limit = 50, className, preview }) {
@@ -83,7 +77,7 @@ export default function EventLog({ limit = 50, className, preview }) {
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Tìm trong nhật ký (tên xã, hồ, phiếu…)"
+          placeholder="Tìm trong nhật ký (tên xã, trạm, phiếu…)"
           aria-label="Tìm trong nhật ký"
           className="input tap min-h-[36px] py-1 pl-8 pr-8 text-[13px]"
         />

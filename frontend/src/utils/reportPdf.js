@@ -79,7 +79,6 @@ export function reportContent({ k, stations = [], evacSites, assessment }) {
   const ev = k?.evacuation || {};
   const fo = k?.forces || {};
   const ve = k?.vehicles || {};
-  const rs = k?.reservoirs || {};
   const ls = k?.landslides || {};
 
   const rainText = rain.avg_24h != null
@@ -105,24 +104,6 @@ export function reportContent({ k, stations = [], evacSites, assessment }) {
       r.st.label,
       r.st.stale ? 'số đo cũ' : r.trend ? trendWords(r.trend) : '–',
       r.eta ? `Báo động ${ROMAN[r.eta.level]} lúc ${r.eta.when} (${r.eta.kttv ? 'bản tin thủy văn' : 'dự báo mô phỏng'})` : '–',
-    ]),
-  } : null;
-
-  const reservoirs = rs.reservoirs || [];
-  const resShown = reservoirs.length <= 15 ? reservoirs : reservoirs.filter((r) => r.status_code !== 'binh_thuong');
-  const resText = rs.total
-    ? `${int(rs.spill_count)}/${int(rs.total)} hồ đang xả${rs.emergency_count ? ` (${int(rs.emergency_count)} hồ xả khẩn cấp)` : ''}${
-      rs.no_data_count ? `; ${int(rs.no_data_count)} hồ chưa có số liệu vận hành` : ''}.`
-    : 'Chưa có số liệu vận hành hồ chứa trong phạm vi báo cáo.';
-  const resTable = resShown.length ? {
-    cols: [['TT', 9, 'center'], ['Hồ chứa', 42], ['Mực nước / mức dâng bình thường (m)', 30, 'right'], ['Lưu lượng về / xả (m³/s)', 30, 'right'], ['Cửa xả mở', 17, 'center'], ['Trạng thái', 37]],
-    rows: resShown.map((r, i) => [
-      String(i + 1),
-      r.name,
-      r.current_level == null ? '–' : `${num(r.current_level, 2)} / ${num(r.normal_level, 2)}`,
-      r.inflow_m3s == null ? '–' : `${int(r.inflow_m3s)} / ${int(r.outflow_m3s)}`,
-      r.spill_gates ? `${int(r.spill_gates_open)}/${int(r.spill_gates)}` : '–',
-      `${r.status_label || '–'}${r.stale ? ' (số liệu cũ)' : ''}`,
     ]),
   } : null;
 
@@ -155,8 +136,7 @@ export function reportContent({ k, stations = [], evacSites, assessment }) {
     { heading: 'I. TÌNH HÌNH THIÊN TAI' },
     { sub: '1. Mưa', text: rainText },
     { sub: '2. Mực nước sông', text: riverText, table: riverTable },
-    { sub: '3. Hồ chứa', text: resText, table: resTable },
-    { sub: '4. Sạt lở, giao thông', text: lsText, table: lsTable },
+    { sub: '3. Sạt lở, giao thông', text: lsText, table: lsTable },
     { heading: 'II. CÔNG TÁC ỨNG PHÓ' },
     { sub: '1. Tìm kiếm cứu nạn (phiếu SOS)', text: sosText },
     { sub: '2. Sơ tán dân', text: evacText },

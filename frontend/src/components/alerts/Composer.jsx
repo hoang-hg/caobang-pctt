@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import {
-  Check, ChevronLeft, ChevronRight, CloudRainWind, Dam, House, Loader2, MapPinned, Megaphone, Mountain, Pencil, Search, Send, Smartphone, Tornado,
+  Check, ChevronLeft, ChevronRight, CloudRainWind, House, Loader2, MapPinned, Megaphone, Mountain, Pencil, Search, Send, Smartphone, Tornado,
   Waves, X,
 } from 'lucide-react';
 import { api } from '../../api/client';
@@ -20,21 +20,20 @@ import { SEVERITY_LEVEL } from './alertFacts';
 
 const STEPS = ['Nội dung', 'Vùng nhận', 'Kênh & gửi'];
 const PARAM_LABEL = {
-  ten_ho: 'Tên hồ chứa', luu_luong: 'Lưu lượng xả (m³/s)', thoi_gian: 'Thời gian', song: 'Sông', dia_diem: 'Địa điểm',
+  luu_luong: 'Lưu lượng xả (m³/s)', thoi_gian: 'Thời gian', song: 'Sông', dia_diem: 'Địa điểm',
   luong_mua: 'Lượng mưa (mm)', diem_so_tan: 'Điểm sơ tán', ten_suoi: 'Tên suối', so_gio: 'Số giờ', tram: 'Trạm đo',
   muc_nuoc: 'Mực nước (m)', cap_bao_dong: 'Cấp báo động', nguy_co: 'Nguy cơ', ten_bao: 'Tên bão/ATNĐ',
 };
 const NUMERIC = new Set(['luu_luong', 'luong_mua', 'so_gio', 'muc_nuoc']);
 // Ví dụ trong ô điền — người mới thấy ngay phải ghi gì, ghi kiểu nào
 const PARAM_EXAMPLE = {
-  ten_ho: 'VD: Thủy điện Bảo Lâm 1', luu_luong: 'VD: 1200', thoi_gian: 'VD: 14 giờ ngày 21/10', song: 'VD: Gâm',
+  luu_luong: 'VD: 1200', thoi_gian: 'VD: 14 giờ ngày 21/10', song: 'VD: Gâm',
   dia_diem: 'VD: xã Bảo Lâm, xã Lý Bôn', luong_mua: 'VD: 215', diem_so_tan: 'VD: Trường THCS Nà Pồng', ten_suoi: 'VD: Nà Ngần',
   so_gio: 'VD: 6', tram: 'VD: Bằng Giang', muc_nuoc: 'VD: 182,5', cap_bao_dong: 'VD: II', nguy_co: 'VD: lũ quét, sạt lở',
   ten_bao: 'VD: bão số 3',
 };
 // Thẻ mẫu tin (thiết kế E.1): hình + tên việc + dùng khi nào; xếp việc hay gặp lên trước, "Tự soạn" cuối
 const TEMPLATE_CARD = {
-  XA_LU: { icon: Dam, when: 'Thủy điện, hồ chứa mở cửa xả', order: 1 },
   SAT_LO: { icon: Mountain, when: 'Di dời hộ dưới taluy, sườn đồi', order: 2 },
   BAO_ATND: { icon: Tornado, when: 'Hoàn lưu bão gây mưa rất to', order: 3 }, // đang ẩn — utils/hazardScope.js
   LU_QUET: { icon: CloudRainWind, when: 'Nguy cơ lũ quét trên suối', order: 4 },
@@ -53,7 +52,7 @@ const big = 'tap min-h-[44px] text-sm sm:min-h-0';
 
 /**
  * Soạn lệnh cảnh báo (người soạn — thiết kế E.1–E.2) — 3 bước, lỗi hiện ngay dưới ô:
- * (1) Nội dung: chạm thẻ mẫu tin có hình (xả lũ, sạt lở, bão…; ô điền có ví dụ, số phải là số), tiêu đề, nội dung (đếm ký tự / SMS), mức
+ * (1) Nội dung: chạm thẻ mẫu tin có hình (sạt lở, lũ quét, ngập…; ô điền có ví dụ, số phải là số), tiêu đề, nội dung (đếm ký tự / SMS), mức
  *     Rất cao / Cao / Trung bình theo thang màu chung;
  * (2) Vùng nhận: lưu vực chọn nhanh, chạm chọn xã (tìm không dấu, chọn cả nhóm đang lọc) hoặc vùng vẽ trên Bản đồ giám sát;
  *     số hộ / thuê bao / loa ước tính ngay;

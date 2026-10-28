@@ -10,4 +10,5 @@ export const SHOW_STORM = false;
 export const EVENT_HAZARD_CHOICES = ['mua_lon', 'sat_lo', 'lu_quet', 'lu_lut'];
 
 /** Mẫu tin cảnh báo không hiện trong bước soạn lệnh (bảng mẫu tin trên máy chủ giữ nguyên). */
-export const HIDDEN_TEMPLATE_CODES = new Set(SHOW_STORM ? [] : ['BAO_ATND']);
+// XA_LU (Hồ chứa xả lũ): hệ thống không còn hồ chứa — máy chủ cũ vẫn có mẫu này trong CSDL
+export const HIDDEN_TEMPLATE_CODES = new Set(['XA_LU', ...(SHOW_STORM ? [] : ['BAO_ATND'])]);

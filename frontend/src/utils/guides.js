@@ -54,7 +54,7 @@ export const PAGE_TIPS = {
   'canh-bao': {
     tinh: [
       'Lãnh đạo có mã PIN: lệnh chờ bạn nằm ở khối "Chờ bạn duyệt" — đọc tin xem trước, bấm "Duyệt bằng PIN" hoặc "Trả lại".',
-      'Trực ban soạn lệnh 3 bước: chạm thẻ mẫu tin (xả lũ, sạt lở, lũ quét…) và điền chỗ trống → chọn xã → kênh, rồi "Gửi lãnh đạo phê duyệt".',
+      'Trực ban soạn lệnh 3 bước: chạm thẻ mẫu tin (sạt lở, lũ quét, ngập lụt…) và điền chỗ trống → chọn xã → kênh, rồi "Gửi lãnh đạo phê duyệt".',
       'Đã phát: thẻ lệnh ghi bằng lời tin đã tới bao nhiêu người theo từng kênh; kênh chưa nối ghi rõ "chưa gửi được".',
     ],
     xa: [
@@ -106,7 +106,7 @@ export const PAGE_TIPS = {
       'Hết lỗi bấm "Gửi tỉnh duyệt". Theo dõi ở thẻ "Hồ sơ đã gửi": tỉnh duyệt xong mới hiện trên hệ thống.',
     ],
     quan_tri: [
-      'Danh mục gốc của tỉnh (ranh giới xã, trạm đo, hồ chứa, kho…): chọn thẻ loại dữ liệu.',
+      'Danh mục gốc của tỉnh (ranh giới xã, trạm đo, kho…): chọn thẻ loại dữ liệu.',
       'Bấm "Tải mẫu Excel", điền rồi chọn tệp — máy kiểm tra ngay; chỉ ghi khi không còn dòng lỗi.',
       'Hồ sơ xã gửi lên: thẻ "Hồ sơ xã/phường gửi" — xem hiện tại và sau khi duyệt, rồi Duyệt hoặc Trả lại kèm lý do.',
     ],
@@ -151,13 +151,13 @@ export const SCENARIOS = {
       art: 'dau-ca', // hình nét đơn (EmptyArt) trên thẻ tình huống
       icon: Sunrise,
       title: 'Nắm tình hình đầu ca trực',
-      when: 'Đầu ca, khi có tin mưa lớn, hồ xả lũ',
+      when: 'Đầu ca, khi có tin mưa lớn, lũ, sạt lở',
       to: '/dashboard',
       cta: 'Mở Tổng quan',
       steps: [
-        'Đọc câu tóm tắt trên cùng trang Tổng quan: trạm nào vượt báo động, bao nhiêu phiếu cứu hộ chờ, hồ nào đang xả.',
+        'Đọc câu tóm tắt trên cùng trang Tổng quan: trạm nào vượt báo động, bao nhiêu phiếu cứu hộ chờ, điểm sạt lở nào cấm đường.',
         'Làm hết "Việc chờ quyết định" — mỗi dòng có nút đi thẳng tới chỗ xử lý.',
-        'Cần chi tiết: xem "Điểm nóng trên bản đồ", các thẻ "Hồ chứa & xả lũ", "Sạt lở & đường đèo".',
+        'Cần chi tiết: xem "Điểm nóng trên bản đồ", thẻ "Sạt lở & đường đèo".',
         'Báo cáo nhanh UBND tỉnh: nút "Xuất" → "Ảnh chụp tình hình (PDF)".',
       ],
     },
@@ -197,12 +197,12 @@ export const SCENARIOS = {
       art: 'canh-bao',
       icon: Megaphone,
       title: 'Soạn lệnh cảnh báo cho người dân',
-      when: 'Hồ chuẩn bị xả lũ, nguy cơ sạt lở, lũ quét, mưa lớn kéo dài',
+      when: 'Nguy cơ sạt lở, lũ quét, ngập lụt, mưa lớn kéo dài',
       to: '/canh-bao',
       cta: 'Mở Cảnh báo & Hotline',
       steps: [
         'Mở "Cảnh báo & Hotline", thẻ "Phát cảnh báo", khối soạn lệnh.',
-        'Bước 1 — chạm thẻ mẫu tin (Hồ chứa xả lũ, Yêu cầu di dời do sạt lở, Cảnh báo lũ quét…), điền chỗ trống theo ví dụ trong ô: giờ, lưu lượng, địa điểm.',
+        'Bước 1 — chạm thẻ mẫu tin (Yêu cầu di dời do sạt lở, Cảnh báo lũ quét, Cảnh báo lũ, ngập lụt…), điền chỗ trống theo ví dụ trong ô: giờ, lượng mưa, địa điểm.',
         'Bước 2 — chọn xã nhận tin (hoặc khoanh vùng trên Bản đồ rồi chuyển sang).',
         'Bước 3 — chọn kênh gửi, xem tin trên khung điện thoại đúng như người dân nhận, bấm "Gửi lãnh đạo phê duyệt".',
       ],
@@ -332,7 +332,7 @@ export const SCENARIOS = {
       art: 'canh-bao',
       icon: Megaphone,
       title: 'Nhận lệnh cảnh báo của tỉnh',
-      when: 'Có lệnh xả lũ, di dời do sạt lở, lũ quét, ngập lụt cho xã mình',
+      when: 'Có lệnh di dời do sạt lở, lũ quét, ngập lụt cho xã mình',
       to: '/canh-bao',
       cta: 'Xem lệnh đang hiệu lực',
       steps: [
@@ -436,7 +436,7 @@ export const SCENARIOS = {
       art: 'du-lieu',
       icon: FileUp,
       title: 'Cập nhật danh mục gốc của tỉnh',
-      when: 'Có ranh giới xã mới, trạm đo, hồ chứa, kho mới',
+      when: 'Có ranh giới xã mới, trạm đo, kho mới',
       to: '/nhap-du-lieu',
       cta: 'Mở Nhập dữ liệu',
       steps: [

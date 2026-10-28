@@ -4,11 +4,10 @@ Mỗi nhịp (tick):
   1. Sinh số đo cho mọi trạm theo kịch bản → reading.new
   2. Kiểm tra ngưỡng: cảm biến nghiêng/độ ẩm đất vượt BĐ II → tự khoanh vùng nguy hiểm, tạo phiếu SENSOR
      và bản nháp cảnh báo chờ Lãnh đạo phê duyệt; dự báo mực nước 3h tới vượt BĐ III → nháp "Chuẩn bị sơ tán"
-  3. Vận hành hồ chứa theo lưu lượng về
-  4. Di chuyển lực lượng theo lộ trình lệnh điều động → gps.update
-  5. Thỉnh thoảng sinh SOS từ người dân (Zalo/App/Hotline) → sos.new
-  6. Mô phỏng giao nhận tin cảnh báo đang phát → broadcast.updated
-  7. Tiêu hao vật tư, tiến độ sơ tán → inventory.changed
+  3. Di chuyển lực lượng theo lộ trình lệnh điều động → gps.update
+  4. Thỉnh thoảng sinh SOS từ người dân (Zalo/App/Hotline) → sos.new
+  5. Mô phỏng giao nhận tin cảnh báo đang phát → broadcast.updated
+  6. Tiêu hao vật tư, tiến độ sơ tán → inventory.changed
 """
 
 import asyncio
@@ -115,8 +114,6 @@ class Simulator:
         await self._anchor()
         readings = await self.readings(now)
         await self.check_triggers(readings, now)
-        if self.tick % 5 == 1:
-            await self.reservoirs(readings)
         await self.move_dispatches()
         if self.tick % settings.simulator_sos_every_ticks == 0:
             await self.random_sos()
@@ -128,10 +125,6 @@ class Simulator:
         if self.tick % 225 == 0:  # ~15 phút: làm mới dự báo & dọn dữ liệu cũ
             await self.refresh_forecasts(now)
             await execute("DELETE FROM iot_telemetry.sensor_readings WHERE time < now() - interval '10 days'")
-            # lịch sử vận hành hồ: bộ mô phỏng ghi mỗi 20 giây (trigger trên reservoirs) → giữ 10 ngày như số đo
-            await execute(
-                "DELETE FROM iot_telemetry.reservoir_operations WHERE time < now() - interval '10 days'"
-            )
 
     # 1 ---------------------------------------------------------------
     async def readings(self, now: datetime) -> list[dict]:
@@ -427,43 +420,6 @@ class Simulator:
                     )
 
     # 3 ---------------------------------------------------------------
-    async def reservoirs(self, readings: list[dict]) -> None:
-        rain = {r["station_id"]: r["value"] for r in readings if r["type"] == "luong_mua"}
-        res = await fetch_all(
-            "SELECT *, ST_Y(location) AS lat, ST_X(location) AS lon FROM iot_telemetry.reservoirs"
-        )
-        for r in res:
-            if r["normal_level"] is None:
-                continue  # hồ nhập từ tệp chưa có mực nước dâng bình thường → không có gì để mô phỏng
-            stations = scenario.RESERVOIR_RAIN_STATIONS.get(r["river"], ["CB-RN-01"])
-            intensity = sum(rain.get(s, 0) for s in stations) / len(stations)
-            # hồ mới nhập (chưa có mực nước / lưu lượng vận hành) → reservoir_tick bắt đầu dưới MNDBT
-            nxt = scenario.reservoir_tick(
-                r, intensity, rng.uniform(-25, 25), may_change_gates=rng.random() < 0.25
-            )
-            inflow, outflow, level, gates = (
-                nxt["inflow_m3s"],
-                nxt["outflow_m3s"],
-                nxt["current_level"],
-                nxt["spill_gates_open"],
-            )
-            await execute(
-                """UPDATE iot_telemetry.reservoirs SET inflow_m3s = :i, outflow_m3s = :o, current_level = :l, spill_gates_open = :g,
-                          updated_at = now(), operating_at = now() WHERE id = :id""",
-                {"i": inflow, "o": outflow, "l": level, "g": gates, "id": r["id"]},
-            )
-            if gates != r["spill_gates_open"]:
-                verb = "mở thêm" if gates > r["spill_gates_open"] else "đóng bớt"
-                await log_event(
-                    f"{r['name']} {verb} cửa xả: {gates}/{r['spill_gates']} cửa, lưu lượng xả {outflow} m³/s",
-                    "van_hanh",
-                    "warning" if gates > r["spill_gates_open"] else "info",
-                    r["admin_unit_id"],
-                    r["lat"],
-                    r["lon"],
-                )
-
-    # 4 ---------------------------------------------------------------
     async def move_dispatches(self) -> None:
         orders = await fetch_all(
             """SELECT o.id, o.ticket_id, o.force_id, o.vehicle_ids, o.progress, o.distance_km, t.code AS ticket_code, f.name AS force_name
@@ -526,7 +482,7 @@ class Simulator:
         if updates:
             await hub.publish("gps.update", updates)
 
-    # 5 ---------------------------------------------------------------
+    # 4 ---------------------------------------------------------------
     async def random_sos(self) -> None:
         source, msg = rng.choice(D.SOS_MESSAGES)
         await create_ticket(
@@ -536,7 +492,7 @@ class Simulator:
             reporter_phone=f"{D.DEMO_PHONE_PREFIX} {rng.randint(100, 999)} {rng.randint(100, 999)}",
         )
 
-    # 6 ---------------------------------------------------------------
+    # 5 ---------------------------------------------------------------
     async def deliveries(self) -> None:
         rows = await fetch_all(
             "SELECT id, code, metrics FROM communications.alert_broadcasts WHERE status = 'sending'"
@@ -561,7 +517,7 @@ class Simulator:
             if done:
                 await log_event(f"Hoàn tất phát tin {r['code']} trên {len(metrics)} kênh", "canh_bao", "info")
 
-    # 7 ---------------------------------------------------------------
+    # 6 ---------------------------------------------------------------
     async def consume_inventory(self) -> None:
         async with transaction() as conn:
             await ledger_context(conn, reason="mo_phong")  # sổ kho / lịch sử sơ tán ghi "bộ mô phỏng"

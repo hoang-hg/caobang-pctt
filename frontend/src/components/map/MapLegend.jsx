@@ -3,7 +3,7 @@ import clsx from 'clsx';
 import { RiskLegend } from '../common/ui';
 import { RADAR_BINS } from './MapTools';
 import {
-  blackspotIcon, cameraIcon, COLORS, evacIcon, forceIcon, hazardIcon, reportIcon, reservoirIcon, sosIcon, stationIcon, stormIcon, vehicleIcon,
+  blackspotIcon, cameraIcon, COLORS, evacIcon, forceIcon, hazardIcon, reportIcon, sosIcon, stationIcon, stormIcon, vehicleIcon,
   warehouseIcon,
 } from './icons';
 
@@ -86,14 +86,6 @@ const ROWS = {
       </Row>
       <Row sym={<Ico icon={stationIcon('luong_mua', 0, '12')} />}><b>Trạm đo mưa</b> — số = cường độ mưa đo mới nhất (mm/giờ)</Row>
       <Row sym={<Ico icon={stationIcon('muc_nuoc', null, undefined, true)} />}>Xám, nét đứt: mất tín hiệu / chưa có số đo</Row>
-    </>
-  ),
-  reservoirs: () => (
-    <>
-      <Row sym={<Ico icon={reservoirIcon(3, 3)} />}><b>Hồ chứa</b> xả lũ lớn (Đỏ) — nhãn dưới biểu tượng: số cửa đang mở · lưu lượng xả (m³/s)</Row>
-      <Row sym={<Ico icon={reservoirIcon(1, 2)} />}>Hồ đang xả điều tiết (Cam)</Row>
-      <Row sym={<Ico icon={reservoirIcon(0, 0)} />}>Hồ chưa xả tràn (Xanh)</Row>
-      <Row sym={<Ico icon={reservoirIcon(0, null)} />}>Xám, nét đứt: chưa có số liệu vận hành</Row>
     </>
   ),
   storm: () => <Row sym={<Ico icon={stormIcon()} />}><b>Tâm bão</b> — nét liền: đã qua, nét đứt: dự báo; vòng tròn: gió mạnh</Row>,

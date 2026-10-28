@@ -31,7 +31,6 @@ PUBLIC_MAP_KEYS = {
     "hazard_zones",
     "landslides",
     "reports",
-    "reservoirs",
     "stations",
 }
 REPORT_PRIVATE = re.compile(r"reporter|phone|ip_hash|email|moderated_by|track_key|reject_reason")

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { Check, ChevronDown, Droplets, FlaskConical, Mountain, Power, UserCheck, Waves } from 'lucide-react';
+import { Check, ChevronDown, FlaskConical, Mountain, Power, UserCheck, Waves } from 'lucide-react';
 import { useStore } from '../../app/store';
 import { simulationEngine } from '../../api/simulationEngine';
 import { DEMO_ROLES, demoAuth } from '../../api/demoUsers';
@@ -10,7 +10,6 @@ const SCENARIOS = [
   { id: 'normal', label: 'Như dữ liệu đã ghi', desc: 'Đợt mưa lũ dựng sẵn, chưa thêm diễn biến', icon: Check },
   { id: 'lu_quet', label: 'Lũ sông Bằng Giang vượt Báo động III', desc: 'Trạm thủy văn Cao Bằng vượt báo động III', icon: Waves },
   { id: 'sat_lo', label: 'Sạt lở mới tại Tĩnh Túc', desc: 'Thêm phiếu SOS khẩn cấp sinh tử: 8 người mắc kẹt', icon: Mountain },
-  { id: 'xa_lu', label: 'Thủy điện Bạch Đằng xả lũ lớn', desc: 'Mở hết cửa xả, hạ du sông Bằng Giang báo động', icon: Droplets },
 ];
 
 /**

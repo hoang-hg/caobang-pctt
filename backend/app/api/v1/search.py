@@ -60,10 +60,6 @@ async def search(q: str, limit: int = 12, user: dict = Depends(require_any("moni
                  greatest(similarity(spatial_admin.norm(s.name), (SELECT n FROM q)), similarity(lower(s.id), lower(:q)))
             FROM iot_telemetry.monitoring_stations s
           UNION ALL
-          SELECT 'ho_chua', r.name, 'Sông ' || r.river, ST_Y(r.location), ST_X(r.location), NULL, r.id,
-                 similarity(spatial_admin.norm(r.name), (SELECT n FROM q))
-            FROM iot_telemetry.reservoirs r
-          UNION ALL
           SELECT 'luc_luong', f.name, f.commander, ST_Y(f.location), ST_X(f.location), NULL, f.id::text,
                  similarity(spatial_admin.norm(f.name), (SELECT n FROM q))
             FROM resources.forces f

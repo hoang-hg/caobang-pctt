@@ -179,7 +179,7 @@ export function alertAlerts({ broadcasts = [], factsOf, me, now }) {
 export const AUDIT_GROUPS = [
   ['canh_bao', 'Cảnh báo & bản tin'],
   ['cuu_ho', 'Cứu hộ & phản ánh'],
-  ['nguon_luc', 'Nguồn lực & hồ chứa'],
+  ['nguon_luc', 'Nguồn lực'],
   ['du_lieu', 'Dữ liệu & tích hợp'],
   ['tai_khoan', 'Tài khoản & bảo mật'],
 ];
@@ -221,7 +221,7 @@ const AUDIT_ACTION = {
   'vehicle.update': ['nguon_luc', 'Cập nhật phương tiện'],
   'vehicle.status': ['nguon_luc', 'Đổi trạng thái phương tiện'],
   'fuel_depot.update': ['nguon_luc', 'Cập nhật nhiên liệu dự trữ'],
-  'reservoir.operation': ['nguon_luc', 'Cập nhật vận hành hồ chứa'],
+  'reservoir.operation': ['nguon_luc', 'Cập nhật vận hành hồ chứa'], // dòng cũ — hệ thống không còn hồ chứa
   'data.import': ['du_lieu', 'Nhập dữ liệu từ tệp'],
   'data.submit': ['du_lieu', 'Xã gửi dữ liệu chờ duyệt'],
   'data.submission.reject': ['du_lieu', 'Từ chối hồ sơ dữ liệu của xã'],

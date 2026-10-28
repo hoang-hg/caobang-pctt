@@ -9,7 +9,7 @@ import { landslideStatus } from '../../utils/labels';
 import { levelOf, risk, TILT_LEVEL } from '../../utils/risk';
 
 /** Biểu tượng theo loại điểm đang chọn — dùng chung cho thẻ chi tiết (chú giải) và thanh nổi trên bản đồ công khai. */
-export const POINT_EMOJI = { rain: '🌧️', water: '💧', reservoir: '🏛️', landslide: '⚠️', evac: '🏠', report: '📸' };
+export const POINT_EMOJI = { rain: '🌧️', water: '💧', landslide: '⚠️', evac: '🏠', report: '📸' };
 
 /** Ô Chú thích các biểu tượng trên bản đồ & Tra cứu thông tin chi tiết */
 export default function MapLegendBox({
@@ -29,7 +29,6 @@ export default function MapLegendBox({
 
   const rainStations = (data?.stations || []).filter((s) => s.type === 'luong_mua');
   const waterStations = (data?.stations || []).filter((s) => s.type === 'muc_nuoc');
-  const reservoirs = data?.reservoirs || [];
   const landslides = data?.landslides || [];
   const evacSites = data?.evacuation_sites || [];
   const reports = data?.reports || [];
@@ -82,27 +81,6 @@ export default function MapLegendBox({
           raw: s,
         };
       }),
-    },
-    {
-      id: 'reservoirs',
-      title: 'Hồ chứa & Xả lũ',
-      count: reservoirs.length,
-      iconColor: 'bg-accent/10 text-accent border-accent/20',
-      badge: '🏛️',
-      summary: 'Dung tích, cao trình & trạng thái mở cửa xả hồ đập',
-      desc: `Giám sát ${reservoirs.length} hồ chứa thuỷ điện, thuỷ lợi theo số liệu vận hành (mực nước, cửa xả). Cảnh báo sớm cho người dân vùng hạ du khi hồ vận hành xả tràn.`,
-      items: reservoirs.map((r) => ({
-        id: r.id,
-        name: r.name,
-        sub: `${r.river ? `Sông ${r.river} · ` : ''}${r.admin_name}`,
-        value: r.status_code === 'chua_co_so_lieu' ? 'Chưa có số liệu' : r.spill_gates_open > 0 ? `Mở ${r.spill_gates_open} cửa xả` : 'Đóng cửa xả',
-        status: r.status_label,
-        statusColor: r.status_code === 'xa_khan_cap' ? 'text-danger' : r.status_code === 'xa_dieu_tiet' ? 'text-serious' : r.status_code === 'chua_co_so_lieu' ? 'text-muted' : 'text-good',
-        lat: r.lat,
-        lon: r.lon,
-        type: 'reservoir',
-        raw: r,
-      })),
     },
     {
       id: 'landslides',
@@ -215,34 +193,6 @@ export default function MapLegendBox({
           </div>
 
           <div className="mt-2.5 pt-2 border-t border-line/60 space-y-1.5 text-xs">
-            {selectedPoint.type === 'reservoir' && selectedPoint.raw && selectedPoint.raw.status_code === 'chua_co_so_lieu' && (
-              <p className="text-[11px] bg-panel2 p-2 rounded text-ink-2 leading-relaxed">
-                Chưa có số liệu vận hành (mực nước, cửa xả) từ đơn vị quản lý hồ. MNDBT {selectedPoint.raw.normal_level ?? '–'} m ·{' '}
-                {selectedPoint.raw.spill_gates || 0} cửa xả tràn.
-              </p>
-            )}
-            {selectedPoint.type === 'reservoir' && selectedPoint.raw && selectedPoint.raw.status_code !== 'chua_co_so_lieu' && (
-              <>
-                <div className="flex justify-between">
-                  <span className="text-muted">Mực nước hiện tại:</span>
-                  <span className="font-bold text-ink">{selectedPoint.raw.current_level} m (MNDBT {selectedPoint.raw.normal_level} m)</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted">Lưu lượng xả:</span>
-                  <span className="font-bold text-danger">{selectedPoint.raw.outflow_m3s} m³/s</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted">Trạng thái xả:</span>
-                  <span className="font-bold text-ink">{selectedPoint.raw.spill_gates_open > 0 ? `Đang mở ${selectedPoint.raw.spill_gates_open}/${selectedPoint.raw.spill_gates} cửa xả` : 'Đang đóng cửa xả'}</span>
-                </div>
-                {selectedPoint.raw.downstream_warning && (
-                  <p className="text-[11px] bg-panel2 p-2 rounded text-ink-2 mt-1 leading-relaxed">
-                    ⚠️ {selectedPoint.raw.downstream_warning}
-                  </p>
-                )}
-              </>
-            )}
-
             {selectedPoint.type === 'landslide' && selectedPoint.raw && (
               <>
                 <div className="flex justify-between">

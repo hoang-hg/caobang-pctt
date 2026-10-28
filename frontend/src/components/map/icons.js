@@ -17,7 +17,6 @@ const P = {
   drop: '<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>',
   rain: '<path d="M4 14.9A7 7 0 1 1 15.7 8h1.8a4.5 4.5 0 0 1 2.5 8.2"/><path d="M16 14v6M8 14v6M12 16v6"/>',
   tilt: '<path d="m8 3 4 8 5-5 5 15H2L8 3z"/>',
-  dam: '<path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-4h6v4"/><path d="M9 9h6M9 13h6"/>',
   box: '<path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>',
   home: '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
   cam: '<path d="M16.5 7.5 22 5v14l-5.5-2.5"/><rect x="2" y="6" width="14" height="12" rx="2"/>',
@@ -72,20 +71,6 @@ export const reportIcon = (status) =>
     : badge(P.msg, { bg: '#7c3aed', stroke: '#fff', ring: '#fff', size: 24 });
 
 export const stormIcon = () => badge(P.storm, { bg: '#a855f7', stroke: '#fff', ring: '#fff', size: 26 });
-
-/** Hồ chứa: viền theo thang màu chung (`level` = RESERVOIR_LEVEL của trạng thái máy chủ) — 3 xả lũ lớn Đỏ, 2 xả điều tiết
- * Cam, 0 chưa xả Xanh; null = chưa có số liệu vận hành → xám nét đứt (không vẽ như hồ bình thường). Hồ đang mở cửa xả: nhãn
- * dưới biểu tượng = số cửa · lưu lượng xả (thiết kế B.2 "hiển thị lưu lượng nước đang xả") — chữ đen trên Cam / Vàng (tương
- * phản như chip), trắng trên Đỏ. */
-export const reservoirIcon = (gatesOpen, level, outflow) => {
-  const ring = level == null ? COLORS.gray : ALARM_COLOR[level];
-  const flow = outflow != null ? ` · ${Math.round(outflow).toLocaleString('vi-VN')} m³/s` : '';
-  return badge(P.dam, {
-    bg: '#e0f2fe', stroke: '#075985', ring, size: 28, shape: 'square', dashed: level == null,
-    sub: level != null && gatesOpen ? `${gatesOpen} cửa${flow}` : undefined,
-    subInk: level === 3 ? '#fff' : '#111',
-  });
-};
 
 /** Kho: viền theo mặt hàng thiếu nhất (thang chung stockLevel — như trang Vật tư & Lực lượng): dưới 20% định mức Đỏ, dưới
  * 50% Vàng; đủ hoặc chưa có số liệu tồn kho (null) giữ viền tím nhận diện. */

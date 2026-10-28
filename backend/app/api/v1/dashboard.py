@@ -1,7 +1,5 @@
 """Dashboard tổng quan: KPI thời gian thực và dữ liệu biểu đồ (Phân hệ A)."""
 
-import re
-import unicodedata
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -10,13 +8,12 @@ from pydantic import BaseModel, Field
 from app.area import area_clause, thiessen_ctes, unit_clause
 from app.auth import audit
 from app.db import execute, fetch_all, fetch_all_no_jit, fetch_one, transaction
-from app.infra.cache import cached_view, invalidate
+from app.infra.cache import cached_view
 from app.rbac.authz import area_scope, require_any, require_permission
 from app.services.broadcast import active_alert_sql
 from app.services.events import log_event, station_place
 from app.services.landslides import get_landslides_overview
 from app.services.lite import VN_TZ
-from app.services.reservoirs import get_reservoirs_overview
 from app.services.simulator import alarm_level
 from app.services.sos import NO_TEAM_15M_SQL, OVERDUE_SQL
 from app.ws.hub import hub
@@ -99,9 +96,8 @@ async def _kpis(codes: list[str]) -> dict:
               FROM resources.vehicles v WHERE {area_clause('v.current_location', codes)}""",
         p,
     )
-    # Lọc theo vùng đang xem / phạm vi được giao (codes rỗng = toàn tỉnh) — cùng hàm với tab Hồ chứa / Sạt lở
-    # (/dashboard/reservoirs, /dashboard/landslides) nên ô KPI và tab luôn cùng số
-    res = await get_reservoirs_overview(codes)
+    # Lọc theo vùng đang xem / phạm vi được giao (codes rỗng = toàn tỉnh) — cùng hàm với tab Sạt lở (/dashboard/landslides)
+    # nên ô KPI và tab luôn cùng số. Hệ thống không còn theo dõi hồ chứa (docs/pham-vi-thien-tai.md)
     ls = await get_landslides_overview(codes)
     return {
         "rain": rain,
@@ -110,15 +106,6 @@ async def _kpis(codes: list[str]) -> dict:
         "sos": sos,
         "forces": forces,
         "vehicles": vehicles,
-        "reservoirs": {
-            "total": res["total_reservoirs"],
-            "spill_count": res["spill_count"],
-            "emergency_count": res["emergency_count"],
-            "no_data_count": res["no_data_count"],  # hồ chưa có số liệu vận hành
-            "total_inflow": res["total_inflow_m3s"],
-            "total_outflow": res["total_outflow_m3s"],
-            "reservoirs": res["reservoirs"],
-        },
         "landslides": {
             "total": ls["total_points"],
             "blocked_count": ls["blocked_count"],
@@ -192,82 +179,6 @@ async def _communes(codes: list[str]) -> list[dict]:
         r["stations_alarm"] = len(levels)
         r["station_level"] = max(levels, default=None)
     return rows
-
-
-@router.get("/dashboard/reservoirs")
-async def reservoirs_in_area(codes: list[str] = Depends(MON)):
-    """Hồ chứa trong vùng đang xem / phạm vi được giao — cùng dạng /public/reservoirs (tab Hồ chứa của Tổng quan theo bộ
-    lọc địa phương, thiết kế mục F.1; cổng công khai vẫn toàn tỉnh)."""
-    return await cached_view("reservoirs", {"codes": codes}, lambda: get_reservoirs_overview(codes))
-
-
-def _river_key(name: str | None) -> str:
-    """Tên sông để so khớp: "sông Bằng Giang" / "Bằng Giang" → "bằng giang" — trạm và hồ nhập từ nguồn khác nhau vẫn khớp
-    (bỏ chữ "sông" / "suối" ở đầu, chữ thường, dấu tiếng Việt chuẩn NFC)."""
-    key = unicodedata.normalize("NFC", (name or "").strip().lower())
-    return re.sub(r"^(sông|suối)\s+", "", key)
-
-
-@router.get("/dashboard/reservoir-operations")
-async def reservoir_operations(
-    codes: list[str] = Depends(MON),
-    hours: int = Query(48, ge=6, le=168),
-    river: str | None = Query(None, max_length=80),
-):
-    """Diễn biến vận hành hồ chứa trong vùng đang xem (thiết kế A.3 "Hydrograph & Vận hành hồ chứa"): mực nước, cửa xả,
-    Q đến / Q xả — giá trị cuối của mỗi khoảng 30 phút. `river` → chỉ hồ trên sông đó (vẽ cạnh biểu đồ thủy văn của trạm
-    cùng sông). Lịch sử có từ khi bật bảng reservoir_operations (migration 0020); hồ chưa có số liệu → chuỗi rỗng."""
-    return await cached_view(
-        "reservoir-operations",
-        {"codes": codes, "hours": hours, "river": river},
-        lambda: _reservoir_operations(codes, hours, river),
-    )
-
-
-async def _reservoir_operations(codes: list[str], hours: int, river: str | None) -> dict:
-    res = [
-        r
-        for r in (await get_reservoirs_overview(codes))["reservoirs"]
-        if not river or _river_key(r["river"]) == _river_key(river)
-    ]
-    rows = (
-        await fetch_all(
-            """SELECT reservoir_id, time_bucket('30 minutes', time) AS t,
-                      last(current_level, time) AS level, last(spill_gates_open, time) AS gates,
-                      last(inflow_m3s, time) AS inflow, last(outflow_m3s, time) AS outflow
-                 FROM iot_telemetry.reservoir_operations
-                WHERE reservoir_id = ANY(:ids) AND time > now() - make_interval(hours => :h)
-                GROUP BY 1, 2 ORDER BY 1, 2""",
-            {"ids": [r["id"] for r in res], "h": hours},
-        )
-        if res
-        else []
-    )
-    series: dict[str, list[dict]] = {}
-    for x in rows:
-        series.setdefault(x["reservoir_id"], []).append(
-            {
-                "time": x["t"],
-                "level": x["level"],
-                "gates": x["gates"],
-                "inflow": x["inflow"],
-                "outflow": x["outflow"],
-            }
-        )
-    keep = (
-        "id",
-        "name",
-        "river",
-        "normal_level",
-        "spill_gates",
-        "spill_gates_open",
-        "status_code",
-        "status_label",
-    )
-    return {
-        "hours": hours,
-        "reservoirs": [{**{k: r[k] for k in keep}, "series": series.get(r["id"], [])} for r in res],
-    }
 
 
 @router.get("/dashboard/landslides")
@@ -521,85 +432,6 @@ async def logs(limit: int = 40, codes: list[str] = Depends(MON)):
 
 
 MAX_LEVEL_DEVIATION_M = 50  # mực nước báo lệch MNDBT quá chừng này → gần như chắc chắn gõ nhầm
-
-
-class ReservoirOperationIn(BaseModel):
-    current_level: float = Field(ge=-50, le=3000, description="Mực nước hồ (m)")
-    spill_gates_open: int = Field(ge=0, le=50, description="Số cửa xả tràn đang mở")
-    inflow_m3s: float | None = Field(None, ge=0, le=100_000, description="Lưu lượng về hồ (m³/s)")
-    outflow_m3s: float | None = Field(None, ge=0, le=100_000, description="Tổng lưu lượng xả (m³/s)")
-    reported_at: datetime | None = Field(None, description="Thời điểm đơn vị vận hành báo — trống = bây giờ")
-    source: str | None = Field(
-        None, max_length=200, description="Nguồn báo cáo, VD: điện thoại Nhà máy TĐ Bằng Giang"
-    )
-
-
-@router.patch("/reservoirs/{reservoir_id}/operation")
-async def update_reservoir_operation(
-    reservoir_id: str,
-    body: ReservoirOperationIn,
-    user: dict = Depends(require_permission("monitoring", "update")),
-):
-    """Trực ban nhập số liệu vận hành hồ khi đơn vị quản lý hồ báo về (chưa có kết nối tự động) — cổng công khai và
-    trang bản nhẹ hiện ngay; hồ chưa có số liệu hiện "Chưa có số liệu vận hành" thay vì "Chưa xả tràn"."""
-    res = await fetch_one(
-        """SELECT id, name, spill_gates, normal_level, admin_unit_id, ST_Y(location) AS lat, ST_X(location) AS lon
-             FROM iot_telemetry.reservoirs WHERE id = :id""",
-        {"id": reservoir_id},
-    )
-    if not res:
-        raise HTTPException(404, "Không tìm thấy hồ chứa")
-    if res["spill_gates"] and body.spill_gates_open > res["spill_gates"]:
-        raise HTTPException(422, f"Hồ chỉ có {res['spill_gates']} cửa xả")
-    # Gõ thừa / thiếu chữ số (1900 thay vì 190) → cổng công khai báo "xả lũ lớn" giả hoặc bỏ sót — chặn trước khi ghi
-    if (
-        res["normal_level"] is not None
-        and abs(body.current_level - res["normal_level"]) > MAX_LEVEL_DEVIATION_M
-    ):
-        raise HTTPException(
-            422,
-            f"Mực nước {body.current_level:g} m lệch mực nước dâng bình thường ({res['normal_level']:g} m) quá "
-            f"{MAX_LEVEL_DEVIATION_M} m — kiểm tra lại số liệu (gõ thừa / thiếu chữ số?)",
-        )
-    now = datetime.now(UTC)
-    reported = body.reported_at or now
-    if reported.tzinfo is None:
-        raise HTTPException(422, "Thời điểm báo cáo phải kèm múi giờ")
-    if reported > now + timedelta(minutes=5) or reported < now - timedelta(days=2):
-        raise HTTPException(422, "Thời điểm báo cáo không hợp lệ (tương lai hoặc quá 2 ngày)")
-    await fetch_one(
-        """UPDATE iot_telemetry.reservoirs SET current_level = :l, spill_gates_open = :g, inflow_m3s = :i,
-                  outflow_m3s = :o, operating_at = :t, updated_at = now() WHERE id = :id RETURNING id""",
-        {
-            "l": body.current_level,
-            "g": body.spill_gates_open,
-            "i": body.inflow_m3s,
-            "o": body.outflow_m3s,
-            "t": reported,
-            "id": reservoir_id,
-        },
-    )
-    await audit(user, "reservoir.operation", "reservoir", reservoir_id, body.model_dump(mode="json"))
-    await invalidate("public:")  # cổng công khai, bản nhẹ hiện ngay (còn cache nginx ≤ 10 giây)
-    await hub.publish("reservoir.updated", {"id": reservoir_id})
-    gates = (
-        f"mở {body.spill_gates_open}/{res['spill_gates']} cửa xả"
-        if body.spill_gates_open
-        else "chưa mở cửa xả"
-    )
-    # Thiết kế A.4: nhật ký vận hành ghi cả lưu lượng xả (VD "Hồ … xả tràn lưu lượng 500 m³/s"), như bộ mô phỏng
-    flow = f", lưu lượng xả {body.outflow_m3s:g} m³/s" if body.outflow_m3s is not None else ""
-    await log_event(
-        f"Cập nhật vận hành {res['name']}: mực nước {body.current_level:.2f} m, {gates}{flow}"
-        + (f" — nguồn: {body.source}" if body.source else "")
-        + f" ({user['full_name']})",
-        "canh_bao" if body.spill_gates_open else "van_hanh",
-        "warning" if body.spill_gates_open else "info",
-        admin_unit_id=res["admin_unit_id"],
-        lat=res["lat"],
-        lon=res["lon"],
-    )
-    return next(r for r in (await get_reservoirs_overview())["reservoirs"] if r["id"] == reservoir_id)
 
 
 # ------------------------------------------------------------------ bản tin dự báo mực nước (KTTV)

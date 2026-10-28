@@ -209,7 +209,7 @@ export default function ReportDocModal({ open, onClose, onExport, summary }) {
             <dt className="text-muted">Số liệu</dt>
             <dd className="text-ink">Lấy đúng số đang hiện trên Tổng quan tại lúc bấm Xuất</dd>
             <dt className="text-muted">I. Thiên tai</dt>
-            <dd className="text-ink">Mưa · {summary.stations} trạm mực nước · {summary.reservoirs} hồ chứa · {summary.landslides} điểm sạt lở cấm đường / cảnh báo</dd>
+            <dd className="text-ink">Mưa · {summary.stations} trạm mực nước · {summary.landslides} điểm sạt lở cấm đường / cảnh báo</dd>
             <dt className="text-muted">II. Ứng phó</dt>
             <dd className="text-ink">Phiếu SOS · sơ tán dân · lực lượng, phương tiện</dd>
             <dt className="text-muted">III. Đánh giá</dt>

@@ -1,11 +1,11 @@
 import { num } from '../../utils/format';
 import { ALARM, alarmLevel, INCIDENT, STATION_TYPE } from '../../utils/labels';
-import { HAZARD_LEVEL, LANDSLIDE_LEVEL, levelOf, RESERVOIR_LEVEL, rainLevel } from '../../utils/risk';
+import { HAZARD_LEVEL, LANDSLIDE_LEVEL, levelOf, rainLevel } from '../../utils/risk';
 import { riverName, riverSummary } from '../dashboard/RiverKpi';
 import { INCIDENT_TYPE } from './MapLayers';
 
-// Cùng mức thì theo loại: cứu người trước, rồi nước lên, hồ xả, đường cấm, mưa, cảm biến khác, sự cố
-const KIND_ORDER = { sos: 0, river: 1, reservoir: 2, landslide: 3, rain: 4, sensor: 5, hazard: 6 };
+// Cùng mức thì theo loại: cứu người trước, rồi nước lên, đường cấm, mưa, cảm biến khác, sự cố
+const KIND_ORDER = { sos: 0, river: 1, landslide: 2, rain: 3, sensor: 4, hazard: 5 };
 
 /**
  * "Điểm nóng" của Bản đồ giám sát (lãnh đạo): gộp các điểm đang ở mức rủi ro từ số liệu trang ĐÃ tải — chỉ sắp xếp lại,
@@ -13,7 +13,7 @@ const KIND_ORDER = { sos: 0, river: 1, reservoir: 2, landslide: 3, rain: 4, sens
  * - SOS cấp 1 chưa xong (Đỏ) — gộp một dòng, chỉ khi tài khoản xem được SOS;
  * - trạm mực nước trên báo động — cùng cách tính với ô "Mực nước sông" (riverSummary, /stations);
  * - cảm biến khác vượt ngưỡng của trạm (độ nghiêng, độ ẩm đất…) — như tab Cảm biến, bỏ trạm mất tín hiệu;
- * - hồ đang xả, điểm sạt lở cấm đường / cảnh báo — /dashboard/kpis (RESERVOIR_LEVEL, LANDSLIDE_LEVEL);
+ * - điểm sạt lở cấm đường / cảnh báo — /dashboard/kpis (LANDSLIDE_LEVEL);
  * - trạm có mưa 24 giờ lớn nhất khi từ 50 mm (rainLevel) — số trên điểm trạm là cường độ mưa, không so với ngưỡng 24 giờ;
  * - sự cố cán bộ đánh dấu mức Cam, Đỏ (HAZARD_LEVEL).
  * Mỗi mục: { id, kind, level 1–3, name, detail, lat, lon, trend?, bounds? (dòng gộp nhiều điểm) }. Xếp Đỏ → Cam → Vàng,
@@ -25,7 +25,7 @@ export function buildHotspots({ sos = [], canSos = false, waterStations = [], da
 
   if (canSos) {
     // SOS cấp 1 gộp MỘT dòng (từng phiếu ở tab Phiếu SOS) — nhiều phiếu không chiếm hết các dòng đầu, điểm nóng loại khác
-    // (hồ xả, đường cấm, trạm BĐ III…) vẫn lên được; chạm dòng → bản đồ bao trọn các phiếu
+    // (đường cấm, trạm BĐ III…) vẫn lên được; chạm dòng → bản đồ bao trọn các phiếu
     const crit = sos.filter((s) => s.priority === 1 && s.lat != null && s.lon != null);
     if (crit.length) {
       const byType = {};
@@ -48,16 +48,6 @@ export function buildHotspots({ sos = [], canSos = false, waterStations = [], da
     const lv = alarmLevel(p.value, p.thresholds);
     if (lv >= 1) {
       add({ id: `sensor-${p.id}`, kind: 'sensor', level: lv, name: p.name, detail: `${STATION_TYPE[p.type] || 'Cảm biến'} ${num(p.value, 2)} ${p.unit || ''} · ${ALARM[lv].label}`, lat: p.lat, lon: p.lon });
-    }
-  });
-  (k?.reservoirs?.reservoirs || []).forEach((r) => {
-    const lv = levelOf(RESERVOIR_LEVEL, r.status_code);
-    if (lv >= 2) {
-      add({
-        id: `res-${r.id}`, kind: 'reservoir', level: lv, name: r.name,
-        detail: `${r.status_label}${r.outflow_m3s != null ? ` · xả ${num(r.outflow_m3s, 0)} m³/s` : ''}${r.stale ? ' · số liệu cũ' : ''}`,
-        lat: r.lat, lon: r.lon,
-      });
     }
   });
   (k?.landslides?.points || []).forEach((p) => {

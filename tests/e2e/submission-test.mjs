@@ -48,12 +48,12 @@ const [tpLat, tpLon] = at('CB-THUCPHAN');
 
 // ---- Quyền & danh mục của xã
 const list = (await call('GET', '/data-import/datasets', null, xa)).data || [];
-check('Xã chỉ thấy loại dữ liệu được gửi (không có hồ chứa, trạm, ranh giới)',
-  list.length === 9 && !list.some((d) => ['ho_chua', 'tram_quan_trac', 'ranh_gioi_xa', 'cay_xang'].includes(d.name)), list.map((d) => d.name).join(','));
+check('Xã chỉ thấy loại dữ liệu được gửi (không có trạm, ranh giới, cây xăng)',
+  list.length === 9 && !list.some((d) => ['tram_quan_trac', 'ranh_gioi_xa', 'cay_xang'].includes(d.name)), list.map((d) => d.name).join(','));
 check('Form của xã: kho chỉ chọn được cấp "xa"', JSON.stringify(list.find((d) => d.name === 'kho')?.fields.find((f) => f.name === 'cap')?.choices) === '["xa"]');
 const tpl = await call('GET', '/data-import/datasets/diem_so_tan/template', null, xa);
 check('Tệp mẫu của xã điền sẵn mã xã mình', tpl.status === 200 && String(tpl.data).includes('CB-COBA'));
-check('Xã không kiểm tra / gửi được hồ chứa → 403', (await validate('ho_chua', 'ma,ten\nHO-X,Hồ\n', xa)).status === 403);
+check('Xã không kiểm tra / gửi được trạm quan trắc → 403', (await validate('tram_quan_trac', 'ma,ten\nCB-X,Trạm\n', xa)).status === 403);
 check('Xã không nhập thẳng được → 403',
   (await call('POST', '/data-import/datasets/diem_so_tan/apply', form({ mode: 'upsert' }, 'a.csv', 'ma\n'), xa)).status === 403);
 

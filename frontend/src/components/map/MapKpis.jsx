@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import clsx from 'clsx';
-import { ChevronDown, CloudRain, Droplets, Home, RefreshCw, Siren, Users, Waves } from 'lucide-react';
+import { ChevronDown, CloudRain, Home, Mountain, RefreshCw, Siren, Users, Waves } from 'lucide-react';
 import { int, num } from '../../utils/format';
 import { ALARM } from '../../utils/labels';
 import { risk } from '../../utils/risk';
@@ -28,7 +28,6 @@ export function kpiTiles(k, stations) {
   const { planned, pct: evPct } = evacFacts(ev);
   const fo = k.forces || {};
   const hasRes = resourceFacts(fo, k.vehicles).has;
-  const rs = k.reservoirs || {};
   const ls = k.landslides || {};
   const riverFailed = stations.error && !n;
   // Thứ tự trên bản đồ: chỉ số mang mức rủi ro lên trước (điện thoại chỉ thấy ~3 ô đầu, mắt lãnh đạo gặp điểm nóng trước)
@@ -47,9 +46,9 @@ export function kpiTiles(k, stations) {
         : river.level == null ? 'Chưa đánh giá được' : river.level >= 1 ? `Nặng nhất báo động ${ROMAN[river.level]}` : ALARM[0].label,
     },
     {
-      key: 'topic', icon: Droplets, title: 'Hồ chứa · Sạt lở', short: 'Hồ · Sạt lở', level: topicFacts(rs, ls).level,
-      value: rs.total ? `${rs.spill_count}/${rs.total}` : '–', unit: rs.total ? 'hồ đang xả' : '',
-      sub: ls.total ? `${ls.blocked_count} điểm cấm đường` : 'Chưa có điểm sạt lở',
+      key: 'topic', icon: Mountain, title: 'Sạt lở, đèo dốc', short: 'Sạt lở', level: topicFacts(ls).level,
+      value: ls.total ? `${ls.blocked_count}/${ls.total}` : '–', unit: ls.total ? 'điểm cấm đường' : '', unitShort: ls.total ? 'cấm đường' : '',
+      sub: !ls.total ? 'Chưa có điểm sạt lở' : ls.warning_count ? `${ls.warning_count} điểm cảnh báo` : 'Không có điểm cảnh báo',
     },
     {
       key: 'rain', icon: CloudRain, title: 'Mưa 24 giờ', short: 'Mưa 24 giờ', level: rainLv,

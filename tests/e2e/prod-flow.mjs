@@ -114,14 +114,12 @@ check('/health qua nginx', health.status === 200 && !!(await health.json().catch
 
 // ================================================================ 2. Cổng công khai trên CSDL trống
 for (const p of ['/public/overview', '/public/map', '/public/alerts', '/public/forecast/areas?hours=24', '/public/hotlines',
-  '/public/reports', '/public/reservoirs', '/public/landslides', '/public/config', '/public/report-categories']) {
+  '/public/reports', '/public/landslides', '/public/config', '/public/report-categories']) {
   const r = await call('GET', p);
   check(`Công khai ${p} (CSDL trống) → 200 JSON`, r.status === 200 && typeof r.data === 'object', `HTTP ${r.status}`);
 }
 const lite = await fetch(ROOT + '/ban-nhe');
 check('Bản nhẹ /ban-nhe (CSDL trống)', lite.status === 200 && (await lite.text()).includes('</html>'));
-const emptyRes = (await call('GET', '/public/reservoirs')).data;
-check('Chưa nhập hồ chứa: 0 hồ, không báo "đang xả"', emptyRes?.total_reservoirs === 0 && emptyRes?.spill_count === 0);
 const emptyLs = (await call('GET', '/public/landslides')).data;
 check('Chưa có cảm biến / vùng nguy hiểm: mọi điểm đen "Chưa có dữ liệu giám sát" (xám), không "Chưa ghi nhận nguy cơ"',
   emptyLs?.total_points > 0 && emptyLs.no_data_count === emptyLs.total_points && emptyLs.safe_count === 0 && emptyLs.monitored_count === 0,
@@ -217,28 +215,9 @@ const hasOcc = (d) => (d?.evacuation_sites || []).some((x) => x.id === site?.id 
 check('Cập nhật số người ở điểm sơ tán → cổng công khai', occ?.status === 200 && hasOcc(await until('/public/map', hasOcc)),
   `HTTP ${occ?.status}`);
 
-// ================================================================ 5. Hồ chứa: chưa có số liệu → trực ban cập nhật vận hành
-const HO = 'HO-BANGGIANG';
-let res = await until('/public/reservoirs', (d) => d?.reservoirs?.some((r) => r.id === HO));
-let ho = res?.reservoirs?.find((r) => r.id === HO);
-check('Hồ mới nhập: "Chưa có số liệu vận hành" (không khẳng định chưa xả)', ho?.status_code === 'chua_co_so_lieu' &&
-  ho?.updated_at === null && res.no_data_count === 1 && res.spill_count === 0, `${ho?.status_code} ${ho?.status_label}`);
-// Bản đồ điều hành dùng cùng cách tính trạng thái hồ (map_layers.py → services/reservoirs.py) → biểu tượng cùng thang màu:
-// chưa có số liệu = Xám, không vẽ như hồ bình thường
-const mapHo = async (want) => {
-  let p;
-  for (let i = 0; i < 16; i++) {
-    p = (await call('GET', '/map/layers', null, admin)).data?.reservoirs?.features?.find((f) => f.properties.id === HO)?.properties;
-    if (p?.status_code === want) return p;
-    await sleep(1000);
-  }
-  return p;
-};
-const hoMap0 = await mapHo('chua_co_so_lieu');
-check('Bản đồ điều hành: hồ mới nhập "Chưa có số liệu vận hành"', hoMap0?.status_code === 'chua_co_so_lieu' && hoMap0?.operating_at === null,
-  `${hoMap0?.status_code} ${hoMap0?.status_label}`);
-const ov = await until('/public/overview', (d) => d?.reservoirs?.no_data_count === 1);
-check('Tổng quan công khai đếm hồ chưa có số liệu', ov?.reservoirs?.no_data_count === 1 && ov?.reservoirs?.spill_count === 0);
+// ================================================================ 5. Trạm mực nước mới nhập, chưa có thiết bị
+// (hệ thống không còn theo dõi hồ chứa — docs/pham-vi-thien-tai.md)
+const ov = await until('/public/overview', (d) => d?.rivers?.some((r) => r.name === 'Trạm thuỷ văn Cao Bằng'));
 // Trạm vừa nhập, chưa có thiết bị: không được báo "dưới báo động" / "an toàn"
 const river = ov?.rivers?.find((r) => r.name === 'Trạm thuỷ văn Cao Bằng');
 check('Trạm chưa có số liệu: "Chưa có số liệu" (không báo dưới báo động)', river?.level === null && river?.level_label === 'Chưa có số liệu' &&
@@ -246,37 +225,6 @@ check('Trạm chưa có số liệu: "Chưa có số liệu" (không báo dướ
 const st0 = ((await until('/public/map', (d) => d?.stations?.some((x) => x.id === 'CB-WL-BANGGIANG')))?.stations || []).find((x) => x.id === 'CB-WL-BANGGIANG');
 check('Bản đồ công khai: trạm chưa có số đo trả value = null, kèm thời điểm / cờ mất tín hiệu', st0 && st0.value === null &&
   'time' in st0 && st0.stale === false, JSON.stringify(st0));
-check('Số cửa mở vượt số cửa của hồ → 422',
-  (await call('PATCH', `/reservoirs/${HO}/operation`, { current_level: 189, spill_gates_open: 9 }, admin)).status === 422);
-check('Gõ nhầm mực nước (1900 m, MNDBT 190 m) → 422, không báo "xả lũ lớn" giả',
-  (await call('PATCH', `/reservoirs/${HO}/operation`, { current_level: 1900, spill_gates_open: 1 }, admin)).status === 422);
-check('Hồ không tồn tại → 404',
-  (await call('PATCH', '/reservoirs/HO-KHONG-CO/operation', { current_level: 189, spill_gates_open: 0 }, admin)).status === 404);
-const op = await call('PATCH', `/reservoirs/${HO}/operation`, {
-  current_level: 189.4, spill_gates_open: 1, inflow_m3s: 120, outflow_m3s: 150, source: 'Điện thoại trưởng ca nhà máy (kiểm thử)',
-}, admin);
-check('Cập nhật vận hành: mở 1/3 cửa → "Đang xả điều tiết"', op.status === 200 && op.data?.status_code === 'xa_dieu_tiet' && !!op.data?.updated_at,
-  `HTTP ${op.status} ${op.data?.status_code || JSON.stringify(op.data).slice(0, 100)}`);
-// Thiết kế A.4: nhật ký vận hành ghi cả lưu lượng xả (VD "Hồ … xả tràn lưu lượng 500 m³/s")
-const opLogs = await call('GET', '/dashboard/logs?limit=20', null, admin);
-const opLog = (Array.isArray(opLogs.data) ? opLogs.data : []).find((l) => l.message?.startsWith('Cập nhật vận hành'));
-check('Nhật ký vận hành ghi lưu lượng xả trực ban nhập', opLogs.status === 200 && !!opLog?.message.includes('lưu lượng xả 150 m³/s'),
-  opLog?.message || `HTTP ${opLogs.status}`);
-// Tab "Diễn biến" của bản đồ giám sát (trang B — G4): dòng nhật ký kèm toạ độ để bấm tới chỗ xảy ra
-check('Nhật ký vận hành hồ kèm toạ độ hồ (dòng Diễn biến bấm tới được)', typeof opLog?.lat === 'number' && typeof opLog?.lon === 'number',
-  `lat=${opLog?.lat} lon=${opLog?.lon}`);
-res = await until('/public/reservoirs', (d) => d?.reservoirs?.find((r) => r.id === HO)?.status_code === 'xa_dieu_tiet');
-ho = res?.reservoirs?.find((r) => r.id === HO);
-check('Cổng công khai hiện ngay số liệu mới', ho?.status_code === 'xa_dieu_tiet' && res.spill_count === 1 && res.no_data_count === 0 &&
-  ho?.stale === false);
-const hoMap1 = await mapHo('xa_dieu_tiet');
-check('Bản đồ điều hành: hồ vừa cập nhật → "Đang xả điều tiết", số liệu mới', hoMap1?.status_code === 'xa_dieu_tiet' && hoMap1?.stale === false &&
-  !!hoMap1?.operating_at, `${hoMap1?.status_code} stale=${hoMap1?.stale}`);
-// Lịch sử vận hành (migration 0020): trigger ghi một dòng mỗi khi có số liệu vận hành mới — chạy thật, không bộ mô phỏng
-const hist = await call('GET', '/dashboard/reservoir-operations?hours=6', null, admin);
-const last = (hist.data?.reservoirs?.find((r) => r.id === HO)?.series || []).at(-1);
-check('Lịch sử vận hành: lần cập nhật vừa rồi có trong diễn biến của hồ', hist.status === 200 && last?.level === 189.4 &&
-  last?.gates === 1 && last?.inflow === 120 && last?.outflow === 150, JSON.stringify(last));
 
 // ================================================================ 6. Tài khoản: cán bộ xã, lãnh đạo phê duyệt
 const stamp = Date.now().toString(36);
@@ -290,8 +238,6 @@ check('Tạo tài khoản Cấp 3 xã Cô Ba (có email)', (await mk(xaUser, 'ad
 check('Tạo tài khoản Cấp 2 (lãnh đạo, có PIN)', (await mk(chkUser, 'admin_tinh', '*', { pin: CHECKER_PIN })).status === 201);
 const { token: xa, mfa: xaMfa } = await loginWithSetup(xaUser, PW, 'Cán bộ xã');
 check('Cán bộ xã đăng nhập 1 bước (vai trò không bắt buộc 2 lớp)', !!xa && xaMfa === false);
-check('Cán bộ xã không cập nhật được vận hành hồ → 403',
-  (await call('PATCH', `/reservoirs/${HO}/operation`, { current_level: 180, spill_gates_open: 0 }, xa)).status === 403);
 const { token: checker, mfa: chkMfa, secret: chkSecret, password: chkPw } = await loginWithSetup(chkUser, PW, 'Lãnh đạo');
 check('Cấp 2: bắt buộc cài 2 lớp khi đăng nhập lần đầu', !!checker && chkMfa === true);
 check('Cấp 2: /auth/me ghi rõ bắt buộc 2 lớp', (await call('GET', '/auth/me', null, checker)).data?.mfa?.required === true);

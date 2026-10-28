@@ -7,7 +7,7 @@
  * đổi theo giao diện sáng – tối). Chữ màu trạng thái: text-good / -warn / -serious / -danger dùng --*-text (đủ tương
  * phản trên cả nền sáng lẫn nền tối). Chip (nhãn đặc): chữ ĐEN trên xanh lá / vàng / cam, chữ TRẮNG trên đỏ — tương phản
  * ≥ 4,5 : 1, đọc được ngoài nắng (chữ trắng trên cam chỉ 2,6 : 1, trên xanh lá 3,3 : 1).
- * Mức của từng loại đối tượng lấy theo màu backend trả (services/reservoirs.py, services/landslides.py…) — đổi ở đây,
+ * Mức của từng loại đối tượng lấy theo màu backend trả (services/landslides.py…) — đổi ở đây,
  * không viết màu / ngưỡng riêng trong từng trang.
  *
  * Vàng là vàng chanh #F7C800 (từ 15/10/2026): #FAB219 cũ ngả hổ phách, cách Cam chỉ ΔE 13,6 (OKLab ×100, dưới ngưỡng 15)
@@ -41,7 +41,6 @@ export const NO_DATA = {
 export const risk = (level) => (Number.isInteger(level) && level >= 0 && level <= 3 ? RISK[level] : NO_DATA);
 
 // Mức theo trạng thái backend trả (khớp màu green / orange / red / gray của máy chủ); mã không có trong bảng → null
-export const RESERVOIR_LEVEL = { binh_thuong: 0, phat_dien: 0, xa_dieu_tiet: 2, xa_khan_cap: 3 }; // services/reservoirs.py
 export const LANDSLIDE_LEVEL = { thong_suot: 0, canh_bao: 2, cam_duong: 3 }; // services/landslides.py TRAFFIC
 export const HAZARD_LEVEL = { an_toan: 0, binh_thuong: 0, vang: 1, cam: 2, do: 3 }; // LEVEL (do/cam/vang), hazard_points
 export const TILT_LEVEL = { binh_thuong: 0, canh_bao: 2, nguy_hiem: 3 }; // cảm biến nghiêng taluy — tilt_info.tilt_level

@@ -20,7 +20,6 @@ import { buildHotspots } from '../components/map/hotspots';
 import IncidentModal from '../components/map/IncidentModal';
 import StormBulletinModal from '../components/map/StormBulletinModal';
 import OccupancyModal from '../components/common/OccupancyModal';
-import ReservoirOperationModal from '../components/common/ReservoirOperationModal';
 import {
   AdminBoundaries, AreaFocus, BASEMAPS, BaseLayer, CursorToStatus, DrawTool, FocusHandler, ForecastChoropleth, MapResize, MeasureTool, RadarLayer, radarFrameAt,
   rainScale, RouteTool, toolError, useRadarFrames,
@@ -83,9 +82,9 @@ const readMode = (leader) => {
   return leader ? 'tinh_hinh' : 'tac_nghiep';
 };
 const OPS_LAYERS = ['forces', 'vehicles', 'warehouses', 'routes', 'evac', 'reports', 'cameras'];
-const RISK_LAYERS = ['sos', 'stations', 'reservoirs', 'flood', 'floodScenario', 'landslide', 'blackspots', 'hazardPoints'];
+const RISK_LAYERS = ['sos', 'stations', 'flood', 'floodScenario', 'landslide', 'blackspots', 'hazardPoints'];
 // Chạm một điểm nóng → bật lớp chứa điểm đó (đang tắt thì bay tới chỗ trống)
-const HOT_LAYER = { sos: 'sos', river: 'stations', rain: 'stations', sensor: 'stations', reservoir: 'reservoirs', landslide: 'blackspots', hazard: 'hazardPoints' };
+const HOT_LAYER = { sos: 'sos', river: 'stations', rain: 'stations', sensor: 'stations', landslide: 'blackspots', hazard: 'hazardPoints' };
 const situationLayers = (l) => ({
   ...l, ...Object.fromEntries(OPS_LAYERS.map((x) => [x, false])), ...Object.fromEntries(RISK_LAYERS.map((x) => [x, true])),
 });
@@ -145,7 +144,6 @@ export default function MonitoringMap() {
   const [incident, setIncident] = useState(null); // { lat, lon, report? } → form đánh dấu sự cố
   const [stormForm, setStormForm] = useState(false);
   const [occupancy, setOccupancy] = useState(null); // điểm sơ tán đang cập nhật số người
-  const [reservoirOp, setReservoirOp] = useState(null); // hồ đang nhập số liệu vận hành (popup hồ → form dùng chung Tổng quan)
   const [rightTab, setRightTab] = useState(mode === 'tinh_hinh' ? 'diem_nong' : 'sos'); // diem_nong | sos | sensors
   const [reportOpen, setReportOpen] = useState(false);
 
@@ -284,7 +282,7 @@ export default function MonitoringMap() {
     [sos, canSos, waterStations, data, kQ.data],
   );
   const hotNote = !kQ.data
-    ? (kQ.isError ? 'Không tải được số liệu hồ chứa, sạt lở, mưa — danh sách điểm nóng có thể thiếu' : 'Đang tải số liệu hồ chứa, sạt lở, mưa…')
+    ? (kQ.isError ? 'Không tải được số liệu sạt lở, mưa — danh sách điểm nóng có thể thiếu' : 'Đang tải số liệu sạt lở, mưa…')
     : stationsQ.isError && !stationsQ.data ? 'Không tải được trạm mực nước — danh sách có thể thiếu trạm trên báo động'
       : !data ? (layersQ.isError ? 'Không tải được các lớp bản đồ — danh sách có thể thiếu SOS, sự cố' : 'Đang tải các lớp bản đồ…') : null;
 
@@ -336,13 +334,11 @@ export default function MonitoringMap() {
       show('forces');
       fly(pts(data?.forces), 'Lực lượng');
     } else if (key === 'topic') {
-      show('reservoirs', 'landslide', 'blackspots', 'hazardPoints');
-      // Hồ đang xả + điểm sạt lở cấm đường / cảnh báo; không có thì mọi hồ chứa
-      const hot = [
-        ...pts(data?.reservoirs, (p) => p.status_code === 'xa_dieu_tiet' || p.status_code === 'xa_khan_cap'),
-        ...at((k.landslides?.points || []).filter((p) => p.traffic_status === 'cam_duong' || p.traffic_status === 'canh_bao')),
-      ];
-      fly(hot.length ? hot : pts(data?.reservoirs), 'Hồ chứa · Sạt lở');
+      show('landslide', 'blackspots', 'hazardPoints');
+      // Điểm sạt lở cấm đường / cảnh báo; không có thì mọi điểm đen sạt lở
+      const all = k.landslides?.points || [];
+      const hot = at(all.filter((p) => p.traffic_status === 'cam_duong' || p.traffic_status === 'canh_bao'));
+      fly(hot.length ? hot : at(all), 'Sạt lở');
     }
   };
   const kpiProps = {
@@ -522,7 +518,6 @@ export default function MonitoringMap() {
             onIssue={setIssue}
             onIncident={setIncident}
             onOccupancy={setOccupancy}
-            onReservoirOp={setReservoirOp}
           />
           <PickPoint active={tool === 'incident'} onPick={(pt) => { setTool(null); setIncident(pt); }} />
           <FocusHandler padding={mapPad} />
@@ -858,7 +853,6 @@ export default function MonitoringMap() {
       {incident && <IncidentModal at={incident} onClose={() => setIncident(null)} />}
       {stormForm && <StormBulletinModal onClose={() => setStormForm(false)} />}
       {occupancy && <OccupancyModal site={occupancy} onClose={() => setOccupancy(null)} />}
-      {reservoirOp && <ReservoirOperationModal reservoir={reservoirOp} onClose={() => setReservoirOp(null)} />}
       {canReport && <QuickIncidentModal open={reportOpen} onClose={() => setReportOpen(false)} />}
     </div>
   );
