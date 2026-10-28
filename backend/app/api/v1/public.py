@@ -39,7 +39,6 @@ from app.services.reports import (
     redact_public_text,
     verify_turnstile,
 )
-from app.services.reservoirs import get_reservoirs_overview
 from app.services.safe_routing import haversine_km, plan_route
 from app.services.simulator import alarm_level
 from app.services.tracking import mask_phone, normalize_code, track_ticket
@@ -107,7 +106,6 @@ async def overview():
                         WHERE a.model = 'BLEND' AND a.time > now() AND a.time <= now() + interval '24 hours'
                         GROUP BY u.name) t"""
         )
-        res_overview = await get_reservoirs_overview()
         ls_overview = await get_landslides_overview()
         return {
             "rain": rain,
@@ -116,13 +114,6 @@ async def overview():
             "evacuation": evac,
             "alerts": {"active": alerts["active"], "has_red": bool(alerts["has_red"])},
             "forecast_24h": forecast,
-            "reservoirs": {
-                "total": res_overview["total_reservoirs"],
-                "spill_count": res_overview["spill_count"],
-                "no_data_count": res_overview["no_data_count"],
-                "emergency_count": res_overview["emergency_count"],
-                "total_outflow": res_overview["total_outflow_m3s"],
-            },
             "landslides": {
                 "total": ls_overview["total_points"],
                 "blocked_count": ls_overview["blocked_count"],
@@ -163,7 +154,6 @@ async def public_map():
                 WHERE EXISTS (SELECT 1 FROM iot_telemetry.hazard_zones z WHERE z.valid_until > now()
                                AND (z.type <> 'ngap' OR z.level = 'do') AND ST_Intersects(z.geom, s.geom))"""
         )
-        res_overview = await get_reservoirs_overview()
         ls_overview = await get_landslides_overview()
         return {
             "stations": stations,
@@ -172,7 +162,6 @@ async def public_map():
             "evacuation_sites": evac,
             "blocked_roads": roads,
             "reports": await _approved_reports(72),
-            "reservoirs": res_overview["reservoirs"],
             "landslides": ls_overview["points"],
         }
 
@@ -581,12 +570,6 @@ async def track_public(body: TrackIn):
         if code:
             await ratelimit.count_hit("track_code", code, TRACK_WINDOW_S)
     return result
-
-
-@router.get("/reservoirs")
-async def public_reservoirs():
-    """Giám sát tình hình vận hành các hồ chứa thủy điện, hồ thủy lợi & cảnh báo xả lũ."""
-    return await cached("public:reservoirs", 20, get_reservoirs_overview)
 
 
 @router.get("/landslides")

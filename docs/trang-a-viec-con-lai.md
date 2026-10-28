@@ -306,7 +306,7 @@ Thiết kế A.3: phần 1–3 giờ tới của biểu đồ mưa dùng dự b�
 | Mưa bình quân lưu vực (Thiessen) | `backend/app/area.py` (`thiessen_ctes`), `backend/app/db.py` (`fetch_all_no_jit`) |
 | Hạn phản hồi SOS, quy tắc 15 phút | `backend/app/services/sos.py` (`OVERDUE_SQL`, `NO_TEAM_15M_SQL`) |
 | Mô hình hồ của bộ mô phỏng (chỉ bản trình diễn) | `backend/app/services/scenario.py` (`reservoir_tick`) |
-| Kiểm thử | `tests/ui/ui-test.mjs`, `tests/e2e/smoke.mjs`, `reservoir-test.mjs`, `landslide-test.mjs`, `iot-test.mjs`, `prod-flow.mjs`; thử tải `tests/load/load.js` (README 12.2, V2) |
+| Kiểm thử | `tests/ui/ui-test.mjs`, `tests/e2e/smoke.mjs`, `landslide-test.mjs`, `iot-test.mjs`, `prod-flow.mjs`; thử tải `tests/load/load.js` (README 12.2, V2) |
 
 ## 15. Các thay đổi đã làm cho trang A (để tra cứu)
 

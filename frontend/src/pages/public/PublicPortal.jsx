@@ -6,15 +6,15 @@ import clsx from 'clsx';
 import {
   ShieldAlert, LocateFixed, Megaphone, Phone, Home, CloudRain, Waves, Camera, LogIn, Moon, Sun, Navigation, AlertTriangle,
   CheckCircle2, Loader2, Share2, BookOpen, HelpCircle, MapPin, ChevronRight, PhoneCall, Compass, Search,
-  Droplets, Mountain, X, Zap, ArrowLeft, Layers, Menu, Send, Siren, Package
+  Mountain, X, Zap, ArrowLeft, Layers, Menu, Send, Siren, Package
 } from 'lucide-react';
 import { api } from '../../api/client';
 import { useUnitsGeo, useUnits, useProvinceArea } from '../../api/hooks';
 import { useStore } from '../../app/store';
 import { AdminBoundaries, AreaFocus, BaseLayer, RAIN_BINS } from '../../components/map/MapTools';
-import { evacIcon, hazardIcon, pinIcon, stationIcon, reservoirIcon } from '../../components/map/icons';
+import { evacIcon, hazardIcon, pinIcon, stationIcon } from '../../components/map/icons';
 import { LEVEL, landslideStatus } from '../../utils/labels';
-import { levelOf, RESERVOIR_LEVEL, RISK as RISK_SCALE, risk as riskStyle, TILT_LEVEL } from '../../utils/risk';
+import { levelOf, RISK as RISK_SCALE, risk as riskStyle, TILT_LEVEL } from '../../utils/risk';
 import { ago, dateTime, num, time } from '../../utils/format';
 import { useMediaQuery } from '../../utils/useMediaQuery';
 import { stationView } from '../../utils/stations';
@@ -25,7 +25,6 @@ import { RainBar } from '../../components/map/MapLegend';
 import { BackButton, useEscapeToClose } from '../../components/common/ui';
 import ReportForm from './ReportForm';
 import TicketTracker from './TicketTracker';
-import ReservoirMonitor from './ReservoirMonitor';
 import LandslideMonitor, { maxTiltText } from './LandslideMonitor';
 import NetworkBanner from './NetworkBanner';
 import CitizenMenu from './CitizenMenu';
@@ -35,13 +34,13 @@ import MyReports from './MyReports';
 // chuyển đúng màn); nhóm có 2 màn thì hiện hàng trang con. Cẩm nang an toàn ở cuối hàng nhóm, menu điện thoại, chân trang
 const GROUPS = [
   { id: 'ban-do', label: 'Bản đồ cảnh báo', icon: Compass, tabs: ['bando'] },
-  { id: 'ho-song', label: 'Hồ chứa & sông', icon: Droplets, tabs: ['hochua', 'muanuoc'] },
+  { id: 'song-suoi', label: 'Mực nước sông suối', icon: Waves, tabs: ['muanuoc'] },
   { id: 'deo-doc', label: 'Đèo dốc & sạt lở', icon: Mountain, tabs: ['satlo'] },
   { id: 'so-tan', label: 'Sơ tán & đường dây nóng', icon: Home, tabs: ['sotan', 'hotlines'] },
   { id: 'tra-cuu', label: 'Tra cứu phiếu', icon: Search, tabs: ['tracuu'] },
 ];
-const SUB_LABEL = { hochua: 'Hồ chứa & xả lũ', muanuoc: 'Mực nước sông suối', sotan: 'Điểm sơ tán an toàn', hotlines: 'Đường dây nóng' };
-const SOURCE_TAB_LABEL = { hochua: 'Quay lại Hồ chứa', satlo: 'Quay lại Sạt trượt', sotan: 'Quay lại Điểm sơ tán' };
+const SUB_LABEL = { muanuoc: 'Mực nước sông suối', sotan: 'Điểm sơ tán an toàn', hotlines: 'Đường dây nóng' };
+const SOURCE_TAB_LABEL = { satlo: 'Quay lại Sạt trượt', sotan: 'Quay lại Điểm sơ tán' };
 const REFRESH = 60_000;
 const pub = (path, params) => api(`/public${path}`, { params });
 const RISK = {
@@ -199,53 +198,6 @@ function PublicMap({ data, forecast, geo, me, route, target, layers, basemap = '
             <Popup><b>{e.name}</b><div className="text-sm">Còn trống: <b>{Math.max(0, e.capacity - e.current_occupancy)}</b>/{e.capacity} chỗ</div><div className="text-xs text-muted">{e.admin_name}</div></Popup>
           </Marker>
         ))}
-        {layers.reservoirs && data?.reservoirs?.map((r) => (
-          <Marker
-            key={r.id}
-            position={[r.lat, r.lon]}
-            icon={reservoirIcon(r.spill_gates_open, levelOf(RESERVOIR_LEVEL, r.status_code))}
-            eventHandlers={{
-              click: () => onSelectPoint?.({
-                id: r.id,
-                name: r.name,
-                sub: `${r.river ? `Sông ${r.river} · ` : ''}${r.admin_name}`,
-                type: 'reservoir',
-                raw: r,
-              }),
-            }}
-          >
-            <Popup>
-              <div className="space-y-1">
-                <div className="font-bold text-sm text-ink">{r.name}</div>
-                <div className="text-xs text-muted">Sông {r.river} · {r.admin_name}</div>
-                <div className="text-xs pt-1 border-t border-line/60">
-                  Trạng thái:{' '}
-                  <b className={r.status_code === 'xa_khan_cap' ? 'text-danger font-bold' : r.status_code === 'xa_dieu_tiet' ? 'text-serious font-bold' : r.status_code === 'chua_co_so_lieu' ? 'text-muted font-bold' : 'text-good font-bold'}>
-                    {r.status_label}
-                  </b>
-                </div>
-                {r.status_code === 'chua_co_so_lieu' ? (
-                  <div className="text-xs text-muted">Chưa có số liệu vận hành từ đơn vị quản lý hồ.</div>
-                ) : (
-                  <>
-                    <div className="text-xs">
-                      Mực nước: <b>{r.current_level} m</b> (MNDBT {r.normal_level} m, {r.level_diff >= 0 ? '+' : ''}{r.level_diff} m)
-                    </div>
-                    <div className="text-xs">
-                      Lưu lượng xả: <b className="font-mono text-danger font-bold">{r.outflow_m3s} m³/s</b> (Nước về: {r.inflow_m3s} m³/s)
-                    </div>
-                  </>
-                )}
-                {r.spill_gates_open > 0 && (
-                  <div className="text-xs text-serious font-semibold">
-                    Mở {r.spill_gates_open}/{r.spill_gates} cửa xả tràn
-                  </div>
-                )}
-                <p className="text-[11px] text-ink-2 bg-panel2 p-1.5 rounded mt-1 leading-snug">{r.downstream_warning}</p>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
         {layers.landslides && data?.landslides?.map((p) => {
           const tone = landslideStatus(p.traffic_status).cls;
           return (
@@ -385,7 +337,8 @@ export default function PublicPortal() {
   const [params] = useSearchParams();
   const focusAlert = params.get('canh-bao');
   const trackParam = params.get('tra-cuu') || '';
-  const tabParam = params.get('tab') || '';
+  // Link cũ ?tab=hochua (tab Hồ chứa đã bỏ — docs/pham-vi-thien-tai.md) → mực nước sông suối
+  const tabParam = ({ hochua: 'muanuoc' })[params.get('tab')] || params.get('tab') || '';
   const [activeTab, setActiveTab] = useState(tabParam || (trackParam ? 'tracuu' : 'bando')); // bando | tracuu | muanuoc | sotan | hotlines | huongdan
   const [mapSidebarTab, setMapSidebarTab] = useState(focusAlert ? 'alerts' : 'legend'); // legend | alerts | rain
   const scrolledToAlert = useRef(false);
@@ -399,7 +352,7 @@ export default function PublicPortal() {
   };
   // SĐT chỉ giữ trong state (không đưa lên URL)
   const [track, setTrack] = useState({ code: trackParam, phone: '' });
-  const [layers, setLayers] = useState({ forecast: true, hazard: true, stations: true, reservoirs: true, landslides: true, evac: true, reports: true });
+  const [layers, setLayers] = useState({ forecast: true, hazard: true, stations: true, landslides: true, evac: true, reports: true });
   const [basemap, setBasemap] = useState('street');
   const [selectedPoint, setSelectedPoint] = useState(null);
   const [me, setMe] = useState(null);
@@ -454,11 +407,10 @@ export default function PublicPortal() {
   const totalPoints = useMemo(() => {
     if (!map) return 0;
     const rain = (map.stations || []).length;
-    const res = (map.reservoirs || []).length;
     const ls = (map.landslides || []).length;
     const evac = (map.evacuation_sites || []).length;
     const rep = (map.reports || []).length;
-    return rain + res + ls + evac + rep;
+    return rain + ls + evac + rep;
   }, [map]);
 
   const handleSelectPoint = (pt) => {
@@ -566,6 +518,7 @@ export default function PublicPortal() {
   // Dải cảnh báo: có cảnh báo Đỏ → nền đỏ chữ trắng; còn lại → Cam, chữ ĐEN (chữ trắng trên cam chỉ 2,6 : 1)
   const onRed = !!overview?.alerts?.has_red;
   const worstRiver = overview?.rivers?.reduce((m, r) => Math.max(m, r.level), 0) || 0;
+  const riversAbove = (overview?.rivers || []).filter((r) => r.level >= 1).length;
 
   return (
     <div className="min-h-full bg-bg text-ink pb-20 sm:pb-8">
@@ -678,7 +631,7 @@ export default function PublicPortal() {
       <main className="mx-auto flex max-w-7xl flex-col gap-4 p-3 sm:p-5">
         {/* Dải tình hình (docs/ke-hoach-lam-moi-giao-dien.md 6.1): một dòng — có cảnh báo đã duyệt → Đỏ / Cam, "Xem cảnh báo"
             mở danh sách cảnh báo cạnh bản đồ; không có → câu bình tĩnh kèm mưa 24 giờ (chưa có số thì nói rõ, không ghi "–").
-            Hồ đang xả lũ, đường đèo cấm → chip ngay dưới, chạm mở chuyên đề. "Cần cứu hộ khẩn cấp" luôn có */}
+            Đường đèo cấm → chip ngay dưới, chạm mở chuyên đề. "Cần cứu hộ khẩn cấp" luôn có */}
         <section
           aria-label="Tình hình hiện tại"
           className={clsx(
@@ -725,23 +678,8 @@ export default function PublicPortal() {
               </button>
             </div>
           </div>
-          {(overview?.reservoirs?.spill_count > 0 || overview?.landslides?.blocked_count > 0) && (
+          {overview?.landslides?.blocked_count > 0 && (
             <div className="scroll-thin -mx-1 flex gap-2 overflow-x-auto px-1 pb-0.5 sm:flex-wrap sm:overflow-visible">
-              {overview?.reservoirs?.spill_count > 0 && (
-                <button
-                  type="button"
-                  onClick={() => openTab('hochua')}
-                  className={clsx('chip tap shrink-0 gap-1.5 whitespace-nowrap border px-2.5 text-xs font-semibold', active ? 'border-current/40 bg-black/10' : 'border-serious/50 bg-serious/10 text-ink')}
-                >
-                  <Waves size={14} aria-hidden="true" />
-                  <span>
-                    {overview.reservoirs.spill_count} hồ đang xả lũ
-                    <span className="max-sm:hidden"> (tổng <span className="num">{Math.round(overview.reservoirs.total_outflow)} m³/s</span>)</span>
-                    {overview.reservoirs.emergency_count > 0 && <> · {overview.reservoirs.emergency_count} hồ xả lớn</>}
-                  </span>
-                  <ChevronRight size={13} aria-hidden="true" />
-                </button>
-              )}
               {overview?.landslides?.blocked_count > 0 && (
                 <button
                   type="button"
@@ -1004,9 +942,7 @@ export default function PublicPortal() {
           <nav aria-label="Các mục của cổng người dân" className="scroll-thin flex gap-1.5 overflow-x-auto border-b border-line pb-2 pt-1 max-sm:hidden">
             {GROUPS.map((g) => {
               const on = g.tabs.includes(activeTab);
-              const badge = g.id === 'ho-song' && overview?.reservoirs?.spill_count
-                ? { text: `${overview.reservoirs.spill_count} hồ xả`, isEmergency: overview.reservoirs.emergency_count > 0, cls: overview.reservoirs.emergency_count > 0 ? 'bg-danger text-white' : 'bg-serious text-black' }
-                : g.id === 'deo-doc' && overview?.landslides?.blocked_count
+              const badge = g.id === 'deo-doc' && overview?.landslides?.blocked_count
                   ? { text: `${overview.landslides.blocked_count} điểm cấm`, isEmergency: true, cls: 'bg-danger text-white' }
                   : null;
               return (
@@ -1093,7 +1029,6 @@ export default function PublicPortal() {
                       ['forecast', 'Mưa 24 giờ'],
                       ['hazard', 'Vùng ngập & sạt lở'],
                       ['stations', 'Trạm mực nước'],
-                      ['reservoirs', 'Hồ chứa & Xả lũ'],
                       ['landslides', 'Điểm sạt trượt & Đèo'],
                       ['evac', 'Điểm sơ tán'],
                       ['reports', 'Phản ánh dân'],
@@ -1432,7 +1367,7 @@ export default function PublicPortal() {
               </section>
             </div>
 
-            {/* 2 Bảng Chuyên Đề Nổi Bật: Lũ/Hồ Chứa & Sạt Lở/Đường Đèo */}
+            {/* 2 Bảng Chuyên Đề Nổi Bật: Mực nước sông (ngập lụt) & Sạt Lở/Đường Đèo */}
             <section className="space-y-2.5 pt-2">
               <div className="flex items-center justify-between">
                 <h2 className="text-xs font-bold text-muted flex items-center gap-1.5">
@@ -1444,10 +1379,10 @@ export default function PublicPortal() {
               </div>
 
               <div className="grid gap-3.5 md:grid-cols-2">
-                {/* Bảng Chuyên Đề 1: Lũ lụt & Xả lũ Hồ chứa */}
+                {/* Bảng Chuyên Đề 1: Mực nước sông & nguy cơ ngập lụt (trạm thủy văn) */}
                 <div
                   onClick={() => {
-                    setActiveTab('hochua');
+                    setActiveTab('muanuoc');
                     scrollToContent();
                   }}
                   className="card p-4 sm:p-5 hover:border-accent cursor-pointer group"
@@ -1462,36 +1397,36 @@ export default function PublicPortal() {
                           Chuyên đề 1
                         </span>
                         <h3 className="text-base font-bold text-ink group-hover:text-accent transition-colors">
-                          Hồ Chứa Thủy Điện & Cảnh Báo Xả Lũ
+                          Mực Nước Sông & Nguy Cơ Ngập Lụt
                         </h3>
                       </div>
                     </div>
                     <span className="chip bg-accent/10 text-accent text-xs font-bold shrink-0">
-                      {overview?.reservoirs?.spill_count ?? '–'} hồ đang xả
+                      {overview?.rivers ? `${riversAbove}/${overview.rivers.length}` : '–'} trạm trên báo động
                     </span>
                   </div>
 
                   <p className="mt-2.5 text-xs text-ink-2 leading-relaxed">
-                    Theo dõi mực nước, lưu lượng về hồ và tổng xả về hạ du sông Bằng Giang và sông Gâm (Thủy điện Hòa Thuận, Bảo Lạc B, Bảo Lâm 1, Bạch Đằng...).
+                    Theo dõi mực nước các trạm thủy văn trên sông Bằng Giang, sông Gâm, sông Hiến… so với các mức Báo động I – III để chủ động phòng tránh ngập lụt.
                   </p>
 
                   <div className="mt-3.5 grid grid-cols-2 gap-2 text-xs border-t border-line/60 pt-3">
                     <div className="bg-panel2/60 p-2 rounded-lg border border-line/40">
-                      <span className="text-[11px] text-muted">Tổng lưu lượng xả:</span>
+                      <span className="text-[11px] text-muted">Trạm cao nhất:</span>
                       <div className="font-mono text-sm font-bold text-accent mt-0.5">
-                        {overview ? Math.round(overview.reservoirs?.total_outflow ?? 0).toLocaleString('vi-VN') : '–'} m³/s
+                        {['Dưới báo động', 'Báo động I', 'Báo động II', 'Báo động III'][worstRiver]}
                       </div>
                     </div>
                     <div className="bg-panel2/60 p-2 rounded-lg border border-line/40">
-                      <span className="text-[11px] text-muted">Xả lũ lớn:</span>
-                      <div className="font-mono text-sm font-bold text-danger mt-0.5">
-                        {overview?.reservoirs?.emergency_count ?? '–'} hồ xả lũ lớn
+                      <span className="text-[11px] text-muted">Mưa 24 giờ lớn nhất:</span>
+                      <div className="font-mono text-sm font-bold text-ink mt-0.5">
+                        {overview?.rain?.max_24h != null ? `${num(overview.rain.max_24h, 1)} mm` : '–'}
                       </div>
                     </div>
                   </div>
 
                   <div className="mt-3 flex items-center justify-between text-xs text-accent font-semibold group-hover:underline">
-                    <span>Xem chi tiết từng cửa xả & hạ du</span>
+                    <span>Xem mực nước từng trạm</span>
                     <span className="group-hover:translate-x-1 transition-transform">Xem bảng chuyên đề →</span>
                   </div>
                 </div>
@@ -1550,32 +1485,6 @@ export default function PublicPortal() {
               </div>
             </section>
           </div>
-        )}
-
-        {/* TAB GIÁM SÁT HỒ CHỨA & CẢNH BÁO XẢ LŨ */}
-        {activeTab === 'hochua' && (
-          <ReservoirMonitor
-            onBackToMap={goToMap}
-            onSelectOnMap={(res) => {
-              setSelectedPoint({
-                id: res.id,
-                name: res.name,
-                sub: `${res.river ? `Sông ${res.river} · ` : ''}${res.admin_name}`,
-                value: res.status_code === 'chua_co_so_lieu' ? 'Chưa có số liệu vận hành' : res.spill_gates_open > 0 ? `Mở ${res.spill_gates_open} cửa xả` : 'Đóng cửa xả',
-                status: res.status_label,
-                statusColor: res.status_code === 'xa_khan_cap' ? 'text-danger' : res.status_code === 'xa_dieu_tiet' ? 'text-serious' : res.status_code === 'chua_co_so_lieu' ? 'text-muted' : 'text-good',
-                lat: res.lat,
-                lon: res.lon,
-                type: 'reservoir',
-                raw: res,
-                sourceTab: 'hochua',
-              });
-              setMapSidebarTab('legend');
-              setTarget({ lat: res.lat, lon: res.lon, zoom: 13.5 });
-              setActiveTab('bando');
-              scrollToContent();
-            }}
-          />
         )}
 
         {/* TAB GIÁM SÁT ĐIỂM ĐEN SẠT TRƯỢT & ĐƯỜNG ĐÈO */}

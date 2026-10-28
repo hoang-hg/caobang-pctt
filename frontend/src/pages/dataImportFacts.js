@@ -1,5 +1,5 @@
 import {
-  Boxes, Contact, Droplets, FileSpreadsheet, Fuel, House, Layers, Map as MapIcon, Mountain, Package, Radio, School, ShieldHalf,
+  Boxes, Contact, FileSpreadsheet, Fuel, House, Layers, Map as MapIcon, Mountain, Package, Radio, School, ShieldHalf,
   TriangleAlert, Truck, Warehouse, Waves,
 } from 'lucide-react';
 
@@ -23,14 +23,13 @@ export const DATASET_CARD = {
   ranh_gioi_xa: { icon: MapIcon, noun: 'xã', hint: 'Ranh giới chính thức, dân số, số hộ của 56 xã, phường.' },
   nhom_loc_nhanh: { icon: Layers, noun: 'nhóm', hint: 'Nhóm xã theo vùng thiên tai — dùng khi lọc địa bàn, chọn vùng nhận cảnh báo.' },
   tram_quan_trac: { icon: Radio, noun: 'trạm', hint: 'Trạm đo mưa, mực nước, cảm biến sạt lở và ngưỡng báo động.' },
-  ho_chua: { icon: Droplets, noun: 'hồ', hint: 'Hồ thuỷ điện, thuỷ lợi: thông số cố định (mực nước hằng ngày cập nhật ở Tổng quan).' },
 };
 
 export const DATASET_GROUPS = [
   { key: 'nguon_luc', title: 'Sơ tán, kho & lực lượng', names: ['diem_so_tan', 'kho', 'ton_kho', 'luc_luong', 'phuong_tien', 'cay_xang'] },
   { key: 'lien_lac', title: 'Danh bạ', names: ['danh_ba'] },
   { key: 'dia_ban', title: 'Địa bàn & vùng nguy hiểm', names: ['xom', 'diem_nguy_hiem', 'vung_nguy_hiem', 'ngap_kich_ban', 'ranh_gioi_xa', 'nhom_loc_nhanh'] },
-  { key: 'quan_trac', title: 'Trạm đo & hồ chứa', names: ['tram_quan_trac', 'ho_chua'] },
+  { key: 'quan_trac', title: 'Trạm đo', names: ['tram_quan_trac'] },
 ];
 
 /** Thẻ của một loại dữ liệu; loại máy chủ mới thêm (chưa có thẻ) → câu đầu của mô tả máy chủ. */

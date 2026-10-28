@@ -66,7 +66,6 @@ export default function SystemView({ k, stations, supplies, evac, unitsCount, ca
     ['Trạm mực nước', water.length, water.length ? `${withThr}/${water.length} trạm đủ ngưỡng Báo động I–III` : 'Loại "Trạm quan trắc"'],
     ['Trạm đo mưa', byType.find((t) => t.type === 'luong_mua').total, 'Loại "Trạm quan trắc"'],
     ['Cảm biến sạt lở (nghiêng, độ ẩm đất)', byType.filter((t) => t.type === 'do_nghieng' || t.type === 'do_am_dat').reduce((n, t) => n + t.total, 0), 'Loại "Trạm quan trắc"'],
-    ['Hồ chứa', k?.reservoirs?.total, k?.reservoirs?.no_data_count ? `${k.reservoirs.no_data_count} hồ chưa có số liệu vận hành` : 'Loại "Hồ chứa"'],
     ['Lực lượng', k?.forces?.units, 'Loại "Lực lượng"'],
     ['Phương tiện', vehicles, 'Loại "Phương tiện"'],
     ['Kho có định mức dự trữ', supplies?.length, 'Loại "Kho vật tư" + "Tồn kho"'],

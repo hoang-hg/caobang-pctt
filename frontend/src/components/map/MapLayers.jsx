@@ -1,25 +1,23 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Circle, CircleMarker, GeoJSON, Marker, Polyline, Popup, Tooltip, useMap } from 'react-leaflet';
 import { Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, YAxis } from 'recharts';
-import { Phone, Send, Video, PackageMinus, PencilLine, Users } from 'lucide-react';
+import { Phone, Send, Video, PackageMinus, Users } from 'lucide-react';
 import clsx from 'clsx';
 import { api } from '../../api/client';
 import { useStore } from '../../app/store';
 import Hydrograph from '../charts/Hydrograph';
-import { ReservoirHistory } from '../charts/ReservoirOpsChart';
 import { useChartTheme } from '../charts/chartTheme';
 import { Can, usePermission } from '../../rbac/usePermission';
 import {
-  blackspotIcon, cameraIcon, evacIcon, forceIcon, hazardIcon, reportIcon, reservoirIcon, sosIcon, stationIcon, stormIcon, vehicleIcon, warehouseIcon,
+  blackspotIcon, cameraIcon, evacIcon, forceIcon, hazardIcon, reportIcon, sosIcon, stationIcon, stormIcon, vehicleIcon, warehouseIcon,
 } from './icons';
 import { ALARM, alarmLevel, CATEGORY, FORCE_TYPE, INCIDENT, LEVEL, PRIORITY, REPORT_STATUS, RES_STATUS, SKILL, SOS_STATUS, SOURCE, STATION_TYPE, VEHICLE } from '../../utils/labels';
 import { ago, num } from '../../utils/format';
 import { fmtVn } from '../../utils/bulletin';
-import { HAZARD_LEVEL, LANDSLIDE_LEVEL, levelOf, RESERVOIR_LEVEL, risk, STOCK_LOW, stockLevel } from '../../utils/risk';
+import { HAZARD_LEVEL, LANDSLIDE_LEVEL, levelOf, risk, STOCK_LOW, stockLevel } from '../../utils/risk';
 import { distanceKm } from '../../utils/geo';
-import { useMediaQuery } from '../../utils/useMediaQuery';
 
 const ll = (f) => [f.geometry.coordinates[1], f.geometry.coordinates[0]];
 // Bề rộng popup: như trước trên máy tính, co theo màn hình điện thoại (chừa cột nút Công cụ / Chú giải bên phải) — 360 px còn 240 px
@@ -271,105 +269,6 @@ function ReportPopup({ p, onIncident }) {
 }
 
 /**
- * Popup hồ chứa (thiết kế B.3 "popup: chi tiết, biểu đồ mini, nút hành động nhanh"): trạng thái, số liệu vận hành, diễn biến
- * 48 giờ (mực nước so MNDBT, Q đến / Q xả — chỉ tải khi mở popup, dùng chung truy vấn với tab Hồ chứa của Tổng quan), nút
- * "Cập nhật vận hành" (trực ban có quyền monitoring.update, như tab Hồ chứa) và mở tab Hồ chứa.
- */
-function ReservoirPopup({ p, lv, onOperate }) {
-  const navigate = useNavigate();
-  const canUpdate = usePermission('monitoring', 'update', '*');
-  const noData = p.status_code === 'chua_co_so_lieu';
-  // Điện thoại: biểu đồ thu gọn sau nút (popup cao quá vùng bản đồ còn trống); máy tính, iPad: hiện sẵn
-  const roomy = useMediaQuery('(min-width: 768px)');
-  const [chart, setChart] = useState(roomy);
-  const map = useMap();
-  const ref = useRef(null);
-
-  // Mở biểu đồ bằng nút làm popup cao lên → canh lại cho lọt khung (Leaflet chỉ tự kéo bản đồ lúc mở popup)
-  useEffect(() => {
-    if (roomy) return undefined;
-    const adjust = () => {
-      const popup = map._popup;
-      const popEl = popup?.getElement() || document.querySelector('.leaflet-popup');
-      const mapEl = map.getContainer();
-      if (popEl && mapEl) {
-        if (popup) popup.update();
-        const pRect = popEl.getBoundingClientRect();
-        const mRect = mapEl.getBoundingClientRect();
-        const dy = pRect.bottom > mRect.bottom - 12
-          ? pRect.bottom - (mRect.bottom - 12)
-          : pRect.top < mRect.top + 12
-            ? pRect.top - (mRect.top + 12)
-            : 0;
-        if (dy) map.panBy([0, dy], { animate: false });
-      }
-    };
-    const ro = ref.current ? new ResizeObserver(adjust) : null;
-    if (ref.current && ro) ro.observe(ref.current);
-    const id = setTimeout(adjust, 120);
-    return () => {
-      if (ro) ro.disconnect();
-      clearTimeout(id);
-    };
-  }, [chart, roomy, map]);
-
-  return (
-    <div ref={ref} className={POP_W}>
-      <b>{p.name}</b>
-      <div className="text-[11px] text-muted">Sông {p.river}{p.capacity_mw ? ` · ${p.capacity_mw} MW` : ''}</div>
-      <div className="mt-0.5 flex flex-wrap items-center gap-1">
-        {p.status_label && <span className={clsx('chip text-[11px]', risk(lv).chip)}>{p.status_label}</span>}
-        {p.operating_at && (
-          <span className={clsx('text-[11px]', p.stale ? 'font-semibold text-warn' : 'text-muted')}>
-            Số liệu lúc {fmtVn(p.operating_at)}{p.stale ? ' — đã cũ' : ''}
-          </span>
-        )}
-      </div>
-      {noData ? (
-        <p className="mt-1 text-xs text-muted">
-          Chưa có số liệu vận hành (mực nước, cửa xả, lưu lượng){canUpdate ? ' — nhập khi đơn vị quản lý hồ báo về' : ''}. MNDBT {num(p.normal_level, 1)} m.
-        </p>
-      ) : (
-        <>
-          <table className="mt-0.5 w-full text-[11px] leading-tight [&_td]:py-px">
-            <tbody>
-              <tr><td>Mực nước hồ</td><td className="num text-right">{num(p.current_level, 2)} m</td></tr>
-              <tr><td>Mực nước dâng bình thường</td><td className="num text-right">{num(p.normal_level, 1)} m</td></tr>
-              <tr><td>Nước về hồ</td><td className="num text-right">{num(p.inflow_m3s)} m³/s</td></tr>
-              <tr><td>Đang xả</td><td className="num text-right font-semibold">{num(p.outflow_m3s)} m³/s</td></tr>
-              <tr><td>Cửa xả đang mở</td><td className="num text-right">{p.spill_gates_open}/{p.spill_gates}</td></tr>
-            </tbody>
-          </table>
-          <div className="mt-1 border-t border-line pt-1">
-            {/* Nút giữ nguyên trong DOM (chỉ đổi chữ): React gỡ phần tử vừa bấm trước khi sự kiện lan tới bản đồ → Leaflet
-                thấy cú bấm "ngoài popup" và đóng popup */}
-            {!roomy && (
-              <button
-                type="button"
-                className="btn-ghost tap w-full justify-center px-1.5 py-0.5 text-[11px]"
-                aria-expanded={chart}
-                onClick={() => setChart((v) => !v)}
-              >
-                {chart ? 'Thu gọn diễn biến 48 giờ' : 'Xem diễn biến 48 giờ (mực nước, lưu lượng)'}
-              </button>
-            )}
-            {chart && <ReservoirHistory reservoir={p} compact />}
-          </div>
-        </>
-      )}
-      <div className="mt-1 flex flex-wrap gap-1">
-        {canUpdate && (
-          <button type="button" className="btn-primary px-2 py-0.5 text-xs" onClick={() => onOperate(p)}>
-            <PencilLine size={12} aria-hidden="true" /> Cập nhật vận hành
-          </button>
-        )}
-        <button type="button" className="btn-ghost px-2 py-0.5 text-xs" onClick={() => navigate('/dashboard?tab=ho_chua')}>Mở tab Hồ chứa</button>
-      </div>
-    </div>
-  );
-}
-
-/**
  * Popup xuồng, xe, thiết bị (thiết kế B.3 "nút hành động nhanh — VD gọi điện cho tài xế"): chưa có số người lái (BD9) → gọi
  * chỉ huy đơn vị quản lý phương tiện (số trên lớp Lực lượng, API /map/layers trả kèm).
  */
@@ -422,7 +321,7 @@ const ROMAN = { 1: 'I', 2: 'II', 3: 'III' };
  * cụ, bảng cảnh báo, thanh thời gian, nút góc phải), không để đầu popup bị che.
  */
 export default function MapLayers({
-  data, layers, timeline, blackspots, popupPad, onDispatch, onCamera, onIssue, onIncident, onOccupancy, onReservoirOp,
+  data, layers, timeline, blackspots, popupPad, onDispatch, onCamera, onIssue, onIncident, onOccupancy,
 }) {
   const pad = popupPad || {};
   const map = useMap();
@@ -542,18 +441,6 @@ export default function MapLayers({
           return (
             <Marker key={p.id} position={ll(f)} icon={stationIcon(p.type, stale && !lv ? null : lv, label, stale)}>
               <Popup {...pad}><StationPopup p={{ ...p, value, stale, at: timeline?.time }} /></Popup>
-            </Marker>
-          );
-        })}
-
-      {layers.reservoirs &&
-        data.reservoirs.features.map((f) => {
-          const p = f.properties;
-          // Trạng thái theo cách tính của Dashboard (map_layers.py → services/reservoirs.py); chưa có số liệu → Xám
-          const lv = levelOf(RESERVOIR_LEVEL, p.status_code);
-          return (
-            <Marker key={p.id} position={ll(f)} icon={reservoirIcon(p.spill_gates_open, lv, p.outflow_m3s)}>
-              <Popup {...pad}><ReservoirPopup p={p} lv={lv} onOperate={onReservoirOp} /></Popup>
             </Marker>
           );
         })}

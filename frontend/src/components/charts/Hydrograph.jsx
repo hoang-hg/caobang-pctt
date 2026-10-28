@@ -65,7 +65,7 @@ function forecastNext(value, thr, ahead) {
  * (chỉ có khi bật bộ mô phỏng), không có cả hai → chỉ vẽ thực đo và ghi rõ chưa có bản tin.
  * `station` (tuỳ chọn): dòng /stations của trạm — đầu biểu đồ dùng SỐ ĐO MỚI NHẤT thay cho TB giờ, để mức báo động, xu hướng
  * và dự báo khớp với ô KPI / bộ chọn trạm cùng trang (TB giờ trễ hơn: trạm đã qua BĐ II mà TB giờ còn dưới).
- * `children(xDomain, xTicks)`: vẽ thêm bên dưới, cùng trục thời gian và mốc giờ (VD vận hành hồ chứa cùng sông); `syncId`: đồng bộ con trỏ. */
+ * `children(xDomain, xTicks)`: vẽ thêm bên dưới, cùng trục thời gian và mốc giờ (VD bản tin dự báo); `syncId`: đồng bộ con trỏ. */
 export default function Hydrograph({ stationId, height = 260, hours = 48, compact = false, station, syncId, children }) {
   const c = useChartTheme();
   const { data, isError, refetch } = useQuery({

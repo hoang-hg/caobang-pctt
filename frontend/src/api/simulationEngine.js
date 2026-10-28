@@ -254,7 +254,6 @@ function adjustSosKpi(sos, scope, codes) {
 
 // ---- Kịch bản thiên tai (SimulationBar) -------------------------------------------------------------------------
 const FLOOD_STATION = 'CB-WL-01'; // Trạm thủy văn Cao Bằng (sông Bằng Giang)
-const SPILL_RESERVOIR = 'HC-BD'; // Thủy điện Bạch Đằng (sông Bằng Giang)
 function floodValue() {
   const st = (recordedBody('tinh', '/stations') || []).find((s) => s.id === FLOOD_STATION);
   return st?.thresholds?.bd3 != null ? Math.round((st.thresholds.bd3 + 0.45) * 100) / 100 : null;
@@ -267,31 +266,6 @@ function floodStation(o) {
   if ('prev_value' in o) Object.assign(o, { prev_value: o.value, prev_time: o.time, next_level: null, next_threshold: null, eta_time: null });
   Object.assign(o, { value: v, time: state.since });
 }
-// Hồ mở hết cửa xả: trạng thái, lưu lượng, khuyến cáo hạ du theo đúng quy tắc backend services/reservoirs.py
-function spillReservoir(r) {
-  if (state.scenario !== 'xa_lu' || r?.id !== SPILL_RESERVOIR || !('spill_gates' in r)) return;
-  const outflow = Math.round(Math.max(r.outflow_m3s || 0, r.inflow_m3s || 0) * 1.6);
-  Object.assign(r, {
-    spill_gates_open: r.spill_gates,
-    status_code: 'xa_khan_cap',
-    status_label: 'Xả lũ lớn',
-    ...('status_color' in r ? { status_color: 'red' } : {}),
-    ...('outflow_m3s' in r ? { outflow_m3s: outflow } : {}),
-    ...('downstream_warning' in r ? {
-      downstream_warning: `Hồ đang mở ${r.spill_gates}/${r.spill_gates} cửa xả tràn, tổng xả khoảng ${outflow} m³/s về hạ du sông ${r.river}. `
-        + 'Người dân vùng hạ du tránh xa mép nước, bãi bồi; neo đậu thuyền bè, di chuyển gia súc lên cao và theo dõi cảnh báo chính thức của chính quyền.',
-    } : {}),
-    ...('updated_at' in r ? { updated_at: state.since } : {}),
-    ...('operating_at' in r ? { operating_at: state.since } : {}),
-  });
-}
-function recountReservoirs(summary, list, totals) {
-  if (!summary || !Array.isArray(list)) return;
-  summary.spill_count = list.filter((r) => r.spill_gates_open > 0).length;
-  summary.emergency_count = list.filter((r) => r.status_code === 'xa_khan_cap').length;
-  if (totals) summary[totals] = list.reduce((s, r) => s + (r.outflow_m3s || 0), 0);
-}
-
 function triggerScenario(name) {
   if (name === state.scenario) return;
   state.scenario = name;
@@ -316,9 +290,6 @@ function triggerScenario(name) {
       vulnerable: ['tre_em'],
       address: 'Tổ dân phố ven đồi, xã Tĩnh Túc',
     }, name);
-  } else if (name === 'xa_lu') {
-    const r = (recordedBody('tinh', '/dashboard/reservoirs')?.reservoirs || []).find((x) => x.id === SPILL_RESERVOIR);
-    if (r) log(`${r.name} mở ${r.spill_gates}/${r.spill_gates} cửa xả lũ (kịch bản giả lập)`, 'van_hanh', 'danger', { lat: r.lat, lon: r.lon, code: r.admin_code, scenario: name });
   }
   save();
 }
@@ -342,8 +313,7 @@ function overlay(pathname, body, scope, codes, sp) {
   }
   if (pathname === '/dashboard/kpis') {
     body.rivers?.forEach(floodStation);
-    body.reservoirs?.reservoirs?.forEach(spillReservoir);
-    if (state.scenario === 'xa_lu') recountReservoirs(body.reservoirs, body.reservoirs?.reservoirs, 'total_outflow');
+    delete body.reservoirs; // dữ liệu ghi trước khi bỏ hồ chứa (docs/pham-vi-thien-tai.md)
     adjustSosKpi(body.sos, scope, codes);
     if (body.forces) {
       body.forces.on_mission = body.forces.on_mission || 55;
@@ -354,21 +324,9 @@ function overlay(pathname, body, scope, codes, sp) {
       body.vehicles.active = (body.vehicles.special_active || 4) + (body.vehicles.heavy_active || 2);
     }
   }
-  if (pathname === '/dashboard/reservoirs') {
-    body.reservoirs?.forEach(spillReservoir);
-    if (state.scenario === 'xa_lu') recountReservoirs(body, body.reservoirs, 'total_outflow_m3s');
-  }
-  if (pathname === '/dashboard/reservoir-operations') {
-    body.reservoirs?.forEach((r) => {
-      spillReservoir(r);
-      if (state.scenario === 'xa_lu' && r.id === SPILL_RESERVOIR && r.series?.length) {
-        r.series.push({ ...r.series.at(-1), time: state.since, gates: r.spill_gates });
-      }
-    });
-  }
   if (pathname === '/map/layers') {
     body.stations?.features?.forEach((f) => floodStation(f.properties));
-    body.reservoirs?.features?.forEach((f) => spillReservoir(f.properties));
+    delete body.reservoirs;
     if (body.sos?.features && (state.tickets.length || state.patches.size)) {
       const keys = Object.keys(body.sos.features[0]?.properties || { id: 0, code: 0, incident_type: 0, priority: 0, status: 0, lat: 0, lon: 0 });
       const shown = new Set(body.sos.features.map((f) => f.properties.id));

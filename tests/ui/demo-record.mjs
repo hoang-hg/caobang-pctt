@@ -32,14 +32,14 @@ const COMMUNE = 'CB-COBA';
 // Trang + thẻ trên địa chỉ trang; thẻ không nằm trên địa chỉ (Nguồn dữ liệu, Phân quyền…) được bấm lần lượt
 const PAGES = {
   tinh: [
-    '/dashboard', '/dashboard?tab=ho_chua', '/dashboard?tab=sat_lo', '/dashboard?tab=cap_xa', '/dashboard?tab=he_thong',
+    '/dashboard', '/dashboard?tab=sat_lo', '/dashboard?tab=cap_xa', '/dashboard?tab=he_thong',
     '/ban-do', '/cuu-ho', '/cuu-ho?xem=danh_sach', '/cuu-ho?ky=7n', '/cuu-ho?ky=30n',
     '/canh-bao', '/canh-bao?tab=lich_su', '/canh-bao?tab=danh_ba', '/canh-bao?tab=nhat_ky',
     '/nguon-luc', '/nguon-luc?tab=vat_tu', '/nguon-luc?tab=phuong_tien',
     '/dot-thien-tai', '/phan-anh', '/nhap-du-lieu', '/nguon-du-lieu', '/phan-quyen',
   ],
   xa: [
-    '/dashboard', '/dashboard?tab=tong_hop', '/dashboard?tab=ho_chua', '/dashboard?tab=sat_lo', '/ban-do', '/cuu-ho', '/cuu-ho?xem=danh_sach',
+    '/dashboard', '/dashboard?tab=tong_hop', '/dashboard?tab=sat_lo', '/ban-do', '/cuu-ho', '/cuu-ho?xem=danh_sach',
     '/canh-bao', '/canh-bao?tab=lich_su', '/canh-bao?tab=danh_ba',
     '/nguon-luc', '/nguon-luc?tab=vat_tu', '/nguon-luc?tab=phuong_tien',
     '/dot-thien-tai', '/phan-anh', '/nhap-du-lieu',

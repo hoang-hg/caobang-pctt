@@ -13,7 +13,7 @@ const PRECACHE = __PRECACHE__;
 const SHELL = `pctt-shell-${VERSION}`;
 const DATA = 'pctt-data-v1'; // dữ liệu công khai, giữ qua các bản build
 const PUBLIC_API =
-  /^\/api\/v1\/public\/(overview|map|alerts|hotlines|forecast\/areas|reservoirs|landslides|config|report-categories)(\/[\w-]*)?$/;
+  /^\/api\/v1\/public\/(overview|map|alerts|hotlines|forecast\/areas|landslides|config|report-categories)(\/[\w-]*)?$/;
 // Danh sách xã, ranh giới xã / tỉnh (không cần đăng nhập) — cổng dùng cho chọn xã, lớp mưa, viền tỉnh
 const PUBLIC_UNITS = /^\/api\/v1\/admin-units(\/(geojson|area))?$/;
 const TIMEOUT = 6000;

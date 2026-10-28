@@ -2,7 +2,7 @@
 
 - 56 xã/phường theo Nghị quyết 1657/NQ-UBTVQH15 (hiệu lực 01/07/2025). Ranh giới, dân số, tâm xã lấy từ
   seed/caobang_communes.geojson; toạ độ tâm dưới đây chỉ dùng khi thiếu tệp đó (ranh giới Voronoi xấp xỉ).
-- Trạm quan trắc, hồ chứa, lực lượng, kho, danh bạ, số điện thoại… là DỮ LIỆU MINH HOẠ,
+- Trạm quan trắc, lực lượng, kho, danh bạ, số điện thoại… là DỮ LIỆU MINH HOẠ,
   cần thay bằng dữ liệu chính thức của Sở NN&MT / BCH PCTT & TKCN tỉnh khi triển khai thật.
 """
 
@@ -400,22 +400,11 @@ STATIONS = [
     ),
 ]
 
-# Trạm mưa đại diện cho từng lưu vực trạm mực nước (dùng cho kịch bản & dự báo)
-RESERVOIRS = [
-    # id, tên, sông, xã, MW, MNDBT, mực hiện tại, số cửa xả, lat, lon
-    ("HC-BLB", "Thủy điện Bảo Lạc B", "Gâm", "Bảo Lạc", 150, 162.0, 160.8, 5, 22.965, 105.640),
-    ("HC-BL1", "Thủy điện Bảo Lâm 1", "Gâm", "Lý Bôn", 30, 215.0, 213.9, 4, 22.760, 105.455),
-    ("HC-BR", "Thủy điện Bản Rạ", "Neo", "Cô Ba", 18, 395.0, 393.6, 3, 22.915, 105.740),
-    ("HC-HT", "Thủy điện Hòa Thuận", "Bằng Giang", "Phục Hòa", 38, 262.0, 261.2, 4, 22.535, 106.530),
-    ("HC-BD", "Thủy điện Bạch Đằng", "Bằng Giang", "Bạch Đằng", 12, 196.0, 195.1, 3, 22.735, 106.245),
-    ("HC-KL", "Hồ thủy lợi Khuổi Lái", "Suối Khuổi Lái", "Tam Kim", 0, 250.0, 249.2, 2, 22.640, 106.090),
-]
-
 CAMERAS = [
     ("CAM-01", "Cầu Bằng Giang – TP. Cao Bằng", "Thục Phán", 22.667, 106.259),
     ("CAM-02", "Cầu Hoàng Ngà – sông Hiến", "Nùng Trí Cao", 22.672, 106.268),
     ("CAM-03", "Đèo Khau Cốc Chà – QL34", "Khánh Xuân", 22.803, 105.724),
-    ("CAM-04", "Đập tràn Thủy điện Bảo Lạc B", "Bảo Lạc", 22.966, 105.642),
+    ("CAM-04", "Cầu Bảo Lạc – sông Gâm", "Bảo Lạc", 22.966, 105.642),
     ("CAM-05", "Thác Bản Giốc – sông Quây Sơn", "Đàm Thủy", 22.855, 106.722),
     ("CAM-06", "Ngã ba Đông Khê – QL4A", "Đông Khê", 22.434, 106.436),
 ]
@@ -1001,14 +990,6 @@ USERS = [
 ]
 
 TEMPLATES = [
-    (
-        "XA_LU",
-        "Hồ chứa xả lũ",
-        "cam",
-        "[BCH PCTT Cao Bằng] {ten_ho} xả lũ lưu lượng {luu_luong} m3/s từ {thoi_gian}. Người dân ven sông {song} thuộc {dia_diem} "
-        "tuyệt đối không qua ngầm tràn, không vớt củi, đánh bắt cá; di chuyển tài sản lên cao. Hotline: 112.",
-        ["ten_ho", "luu_luong", "thoi_gian", "song", "dia_diem"],
-    ),
     (
         "SAT_LO",
         "Yêu cầu di dời do sạt lở",

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 import {
-  Clock3, Crosshair, Droplets, Landmark, Loader2, MapPin, Radio, Search, Siren, Users, Warehouse, WifiOff,
+  Clock3, Crosshair, Landmark, Loader2, MapPin, Radio, Search, Siren, Users, Warehouse, WifiOff,
 } from 'lucide-react';
 import { api } from '../../api/client';
 import { useStore } from '../../app/store';
@@ -17,13 +17,12 @@ const KIND = {
   hanh_chinh: { icon: Landmark, label: 'Xã / phường' },
   dia_danh: { icon: MapPin, label: 'Địa danh' },
   tram: { icon: Radio, label: 'Trạm quan trắc' },
-  ho_chua: { icon: Droplets, label: 'Hồ chứa' },
   luc_luong: { icon: Users, label: 'Lực lượng' },
   kho: { icon: Warehouse, label: 'Kho' },
   sos: { icon: Siren, label: 'Phiếu cứu hộ' },
   toa_do: { icon: Crosshair, label: 'Toạ độ' },
 };
-const HINT = 'tên xóm, xã, địa danh, trạm, hồ, mã phiếu cứu hộ (VD SOS-1001), toạ độ (VD 22.66, 106.25) hoặc dán link Google Maps';
+const HINT = 'tên xóm, xã, địa danh, trạm, mã phiếu cứu hộ (VD SOS-1001), toạ độ (VD 22.66, 106.25) hoặc dán link Google Maps';
 
 // Tìm gần đây (5 mục, máy này): chỉ giữ tên / toạ độ / mã — không giữ địa chỉ người báo SOS
 const RECENT_KEY = 'pctt_search_recent';
@@ -66,7 +65,7 @@ function useSearch(q, online) {
 }
 
 /**
- * Thanh tìm kiếm toàn năng (thiết kế F.1): địa danh, đơn vị hành chính, xóm, trạm, hồ, lực lượng, kho, mã SOS, toạ độ GPS (thập
+ * Thanh tìm kiếm toàn năng (thiết kế F.1): địa danh, đơn vị hành chính, xóm, trạm, lực lượng, kho, mã SOS, toạ độ GPS (thập
  * phân, độ-phút-giây, link Google Maps).
  * - Chọn xã / phường → lọc cả hệ thống theo xã đó + Bản đồ; mã SOS → mở đúng phiếu ở Điều hành cứu hộ (bỏ lọc địa bàn nếu phiếu
  *   ở xã khác); còn lại → bay tới vị trí trên Bản đồ.

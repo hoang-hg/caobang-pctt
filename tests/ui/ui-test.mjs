@@ -30,7 +30,6 @@ const VIEWPORTS = [
 ];
 const STAFF_PAGES = [
   ['/dashboard', 'Tổng quan'],
-  ['/dashboard?tab=ho_chua', 'Tổng quan · hồ chứa & xả lũ'],
   ['/dashboard?tab=sat_lo', 'Tổng quan · sạt lở & đường đèo'],
   ['/dashboard?tab=cap_xa', 'Tổng quan · cấp xã/phường'],
   ['/dashboard?tab=he_thong', 'Tổng quan · hệ thống & dữ liệu'],
@@ -44,13 +43,14 @@ const STAFF_PAGES = [
   ['/phan-quyen', 'Phân quyền'],
   ['/huong-dan', 'Hướng dẫn xử lý'],
 ];
-// Cổng người dân: menu 5 nhóm (docs/ke-hoach-lam-moi-giao-dien.md 6.1) — [nhóm, trang con]; đủ 8 màn như trước
+// Cổng người dân: menu 5 nhóm (docs/ke-hoach-lam-moi-giao-dien.md 6.1) — [nhóm, trang con]; 7 màn (bỏ Hồ chứa —
+// docs/pham-vi-thien-tai.md)
 const PUBLIC_TABS = [
-  ['Bản đồ cảnh báo'], ['Hồ chứa & sông', 'Hồ chứa & xả lũ'], ['Hồ chứa & sông', 'Mực nước sông suối'], ['Đèo dốc & sạt lở'],
+  ['Bản đồ cảnh báo'], ['Mực nước sông suối'], ['Đèo dốc & sạt lở'],
   ['Sơ tán & đường dây nóng', 'Điểm sơ tán an toàn'], ['Sơ tán & đường dây nóng', 'Đường dây nóng'], ['Tra cứu phiếu'], ['Cẩm nang an toàn'],
 ];
 // Mở một màn của cổng: điện thoại mở menu ≡ trước; nhóm có 2 màn thì chọn tiếp trang con (hàng dưới menu). Tên nhóm đứng
-// đầu, sau có thể là số đếm ("Hồ chứa & sông 6 hồ xả") — không khớp nhầm nút "Tra cứu phiếu đã gửi"
+// đầu, sau có thể là số đếm ("Đèo dốc & sạt lở 3 điểm cấm") — không khớp nhầm nút "Tra cứu phiếu đã gửi"
 async function openPublic(page, [group, sub]) {
   const menu = page.getByRole('button', { name: 'Mở menu cổng người dân' });
   if (await menu.isVisible()) await menu.click();
@@ -438,77 +438,18 @@ async function staff(ctx, trackCode) {
     return `${pages} trang · ${Math.round(buf.length / 1024)} KB · ${dl.suggestedFilename()}`;
   });
 
-  // Tab Hồ chứa / Sạt lở không tải được (giả lập mất kết nối tới 2 API này) → báo rõ, KHÔNG hiện "TRỰC TIẾP", "0 hồ xả",
-  // "Không có hồ xả lũ lớn" hay "Không tìm thấy điểm nguy cơ…" (khẳng định sai là an toàn)
-  await step(ctx, 'Tổng quan: tab Hồ chứa / Sạt lở không tải được → báo rõ, không khẳng định "an toàn"', async () => {
-    const apis = ['**/api/v1/dashboard/reservoirs**', '**/api/v1/dashboard/landslides**'];
+  // Tab Sạt lở không tải được (giả lập mất kết nối tới API) → báo rõ, KHÔNG hiện "Không tìm thấy điểm nguy cơ…" (khẳng định
+  // sai là an toàn)
+  await step(ctx, 'Tổng quan: tab Sạt lở không tải được → báo rõ, không khẳng định "an toàn"', async () => {
+    const apis = ['**/api/v1/dashboard/landslides**'];
     for (const a of apis) await page.route(a, safeRoute((r) => r.abort('failed')));
     try {
-      await page.goto(`${ROOT}/dashboard?tab=ho_chua`);
-      await page.getByText('Không tải được số liệu hồ chứa').waitFor({ timeout: 25_000 });
-      let text = await page.locator('main').innerText();
-      if (/trực tiếp|Không có hồ xả lũ lớn/i.test(text)) throw new Error('tab Hồ chứa vẫn khẳng định "an toàn" khi không tải được');
-      await expectNoOverflow(ctx, 'tab Hồ chứa (lỗi)');
       await page.goto(`${ROOT}/dashboard?tab=sat_lo`);
       await page.getByText('Không tải được danh sách điểm đen sạt lở').waitFor({ timeout: 25_000 });
-      text = await page.locator('main').innerText();
+      const text = await page.locator('main').innerText();
       if (/Không tìm thấy điểm nguy cơ/.test(text)) throw new Error('tab Sạt lở báo "không tìm thấy" khi không tải được');
     } finally {
       for (const a of apis) await page.unroute(a);
-    }
-  });
-
-  // Bảng số liệu chi tiết có thẻ Hồ chứa (tìm / lọc / phân trang / xuất Excel như các thẻ khác); tab Hồ chứa hiện 9 thẻ rồi "Xem
-  // thêm", hồ khẩn luôn ở đầu. Nhân bản danh sách hồ ngay trong trình duyệt (không ghi gì lên máy chủ) để luôn có > 9 thẻ
-  await step(ctx, 'Tổng quan: bảng số liệu chi tiết có thẻ Hồ chứa; tab Hồ chứa hiện 9 thẻ + "Xem thêm", hồ khẩn lên đầu', async () => {
-    await page.goto(`${ROOT}/dashboard`);
-    await waitMain(page);
-    // Bảng số liệu thu gọn sẵn dưới Tổng quan — mở ra trước
-    const opener = page.getByRole('button', { name: 'Mở bảng số liệu' });
-    if (await opener.count()) await opener.click();
-    const table = page.locator('section', { hasText: 'Bảng số liệu chi tiết' }).first();
-    await table.getByRole('tablist', { name: 'Chuyên đề của bảng' }).getByRole('tab', { name: /Hồ chứa/ }).click();
-    const rows = table.locator(vp.mobile ? 'ul[aria-label="Hồ chứa & xả lũ"] > li' : 'tbody tr');
-    await rows.first().or(table.getByText('Chưa có hồ chứa trong vùng đang xem')).waitFor({ timeout: 20_000 });
-    const inTable = await rows.count();
-    if (!inTable) return 'bỏ qua: chưa có hồ chứa';
-    if (!(await table.getByText(/Mực nước \/ mức bình thường/i).count())) throw new Error('thẻ Hồ chứa thiếu cột Mực nước / mức bình thường');
-    const [xl] = await Promise.all([
-      page.waitForEvent('download', { timeout: 30_000 }),
-      table.getByRole('button', { name: 'Excel', exact: true }).click(),
-    ]);
-    if (!/^bang-so-lieu-reservoirs-.*\.xlsx$/.test(xl.suggestedFilename())) throw new Error(`tệp Excel lạ: ${xl.suggestedFilename()}`);
-
-    const RANK = { xa_khan_cap: 0, xa_dieu_tiet: 1, chua_co_so_lieu: 2, binh_thuong: 3 };
-    const status = {};
-    const api = '**/api/v1/dashboard/reservoirs**';
-    await page.route(api, safeRoute(async (route) => {
-      const res = await route.fetch();
-      const json = await res.json();
-      const base = json.reservoirs || [];
-      const times = Math.ceil(10 / Math.max(base.length, 1));
-      json.reservoirs = Array.from({ length: times }, (_, i) => base.map((r) => ({ ...r, id: `${r.id}-${i}`, name: `${r.name} · ${i + 1}` }))).flat();
-      for (const r of json.reservoirs) status[r.name] = r.status_code;
-      await route.fulfill({ response: res, json });
-    }));
-    try {
-      await page.goto(`${ROOT}/dashboard?tab=ho_chua`);
-      await page.getByText(/Đang hiện 9\/\d+ hồ/).waitFor({ timeout: 20_000 });
-      const titles = (await page.locator('main h3').allInnerTexts()).map((t) => t.trim()).filter((t) => t in status);
-      const rank = (n) => RANK[status[n]] ?? 2;
-      const shown = titles.slice(0, 9).map(rank);
-      const want = Object.keys(status).map(rank).sort((a, b) => a - b).slice(0, 9);
-      if (shown.join() !== want.join()) throw new Error(`9 thẻ đầu chưa xếp hồ khẩn lên đầu: ${shown.join(',')} (cần ${want.join(',')})`);
-      const more = page.getByRole('button', { name: /^Xem thêm \d+ hồ$/ });
-      if (vp.mobile && (await more.evaluate((el) => el.getBoundingClientRect().height)) < 44) throw new Error('nút "Xem thêm" thấp hơn 44 px');
-      await more.click();
-      const total = Object.keys(status).length;
-      await page.waitForFunction(([n, names]) => [...document.querySelectorAll('main h3')].filter((h) => names.includes(h.textContent.trim())).length >= Math.min(n, 18),
-        [total, Object.keys(status)], { timeout: 10_000 });
-      await expectNoOverflow(ctx, 'tab Hồ chứa (Xem thêm)');
-      return `${inTable} hồ trong bảng · tab: 9/${total} → Xem thêm`;
-    } finally {
-      await page.unroute(api);
     }
   });
 
@@ -578,17 +519,17 @@ async function staff(ctx, trackCode) {
     await page.keyboard.press('Escape');
     await note.waitFor({ state: 'detached', timeout: 5_000 });
 
-    // Nhật ký: nút chữ "Hồ chứa" → chỉ còn sự kiện hồ chứa (hoặc câu "không có sự kiện")
+    // Nhật ký: nút chữ "Cảnh báo" → chỉ còn sự kiện cảnh báo (hoặc câu "không có sự kiện")
     const filters = page.getByRole('group', { name: 'Lọc nhật ký theo loại' });
     const names = (await filters.getByRole('button').allInnerTexts()).map((t) => t.trim());
-    for (const want of ['Tất cả', 'Cứu hộ', 'Hồ chứa', 'Cảnh báo', 'Người dân']) {
+    for (const want of ['Tất cả', 'Cứu hộ', 'Cảnh báo', 'Người dân']) {
       if (!names.includes(want)) throw new Error(`nhật ký thiếu nút lọc "${want}" (có: ${names.join(', ')})`);
     }
-    await filters.getByRole('button', { name: 'Hồ chứa', exact: true }).click();
+    await filters.getByRole('button', { name: 'Cảnh báo', exact: true }).click();
     const log = page.locator('ol[aria-label="Các sự kiện, mới nhất trên cùng"]');
     const kinds = await log.locator('> li').evaluateAll((lis) => lis.map((li) => li.innerText.split('\n').slice(0, 3).join(' ')));
-    const off = kinds.filter((t) => !/Hồ chứa|Không có sự kiện/.test(t));
-    if (off.length) throw new Error(`lọc "Hồ chứa" còn sự kiện loại khác: ${off[0]}`);
+    const off = kinds.filter((t) => !/Cảnh báo|Không có sự kiện/.test(t));
+    if (off.length) throw new Error(`lọc "Cảnh báo" còn sự kiện loại khác: ${off[0]}`);
     await filters.getByRole('button', { name: 'Tất cả', exact: true }).click();
 
     // Mọi biểu đồ (chuyên đề "Tất cả"): tiêu đề là câu kết luận; không còn tiếng Anh / viết tắt trên màn (bỏ nội dung nhật
@@ -605,30 +546,6 @@ async function staff(ctx, trackCode) {
     if (jargon.length) throw new Error(`còn thuật ngữ tiếng Anh / viết tắt trên màn: ${jargon.join(', ')}`);
     await expectNoOverflow(ctx, 'Tổng quan — mọi biểu đồ');
     return sentence.slice(0, 120);
-  });
-
-  // Thiết kế A.3 "Hydrograph & Vận hành hồ chứa": dưới biểu đồ thủy văn của trạm có hồ trên cùng sông (bản trình diễn: trạm
-  // Cao Bằng – sông Bằng Giang) có biểu đồ lưu lượng xả của các hồ đó, cùng trục thời gian (vạch "Hiện tại" thẳng hàng)
-  await step(ctx, 'Tổng quan: biểu đồ thủy văn kèm vận hành hồ chứa cùng sông, cùng trục thời gian', async () => {
-    await page.goto(`${ROOT}/dashboard`);
-    await waitMain(page);
-    if (!(await page.locator('[aria-label="Chọn trạm mực nước"]').count())) return 'bỏ qua: chưa có trạm mực nước';
-    // Tiêu đề khối là câu kết luận (đổi theo trạm) — tìm khối theo bộ chọn trạm bên trong
-    const sec = page.locator('section', { has: page.locator('[aria-label="Chọn trạm mực nước"]') }).first();
-    const title = sec.getByText(/Vận hành hồ chứa trên sông/);
-    try {
-      await title.waitFor({ timeout: 20_000 });
-    } catch (e) {
-      if (READONLY) return 'bỏ qua: trạm đầu không có hồ trên cùng sông';
-      throw e;
-    }
-    const nowX = await sec.evaluate((el) => [...el.querySelectorAll('.recharts-wrapper')].map((wr) => {
-      const line = [...wr.querySelectorAll('.recharts-reference-line line')].find((l) => l.getAttribute('x1') === l.getAttribute('x2'));
-      return line ? Math.round(+line.getAttribute('x1') + wr.getBoundingClientRect().left) : null;
-    }));
-    if (nowX.length < 2 || nowX[0] == null || nowX[0] !== nowX[1]) throw new Error(`vạch "Hiện tại" lệch giữa 2 biểu đồ: ${nowX.join(' / ')}`);
-    await expectNoOverflow(ctx, 'khối Thủy văn');
-    return await title.innerText();
   });
 
   // Phân quyền 3 cấp (thiết kế G): mỗi cấp giải thích bằng lời; tạo tài khoản từng bước — Cấp 3 chọn đúng 1 xã, không có ô
@@ -1045,10 +962,10 @@ async function firstScreen(ctx) {
     await page.locator('[aria-label="Chỉ số nhanh"] > *').nth(5).waitFor();
     if (await page.locator('header').count()) throw new Error('vẫn còn thanh trên');
     if (!(await page.evaluate(() => document.documentElement.classList.contains('dark')))) throw new Error('chưa chuyển nền tối');
-    await page.waitForURL(/tab=ho_chua/, { timeout: 25_000 });
+    await page.waitForURL(/tab=sat_lo/, { timeout: 25_000 });
     await page.keyboard.press('Escape');
     await page.locator('header').waitFor({ timeout: 5_000 });
-    return 'tự sang Hồ chứa sau 15 giây';
+    return 'tự sang Sạt lở sau 15 giây';
   });
 }
 
@@ -1188,13 +1105,13 @@ const smallTargets = (page, { onScreen = false } = {}) => page.evaluate((only) =
 }, onScreen);
 
 // ================================================================ Tổng quan trên màn cảm ứng (iPad, điện thoại)
-// Mọi vùng chạm của 5 tab ≥ 44 px (thanh công cụ, tab, bảng tác chiến, lọc, nhật ký, Hồ chứa, Sạt lở, Cấp xã, Hệ thống);
+// Mọi vùng chạm của 5 tab ≥ 44 px (thanh công cụ, tab, bảng tác chiến, lọc, nhật ký, Sạt lở, Cấp xã, Hệ thống);
 // điện thoại cảm ứng 360×740: vẫn thấy trọn 6 ô KPI dù nút cao hơn (phép đo "Màn hình đầu" chạy không cảm ứng). Chỉ xem.
 const DASH_TOUCH = [
   ['iPad ngang', devices['iPad Pro 11 landscape']],
   ['Điện thoại 360', devices['Galaxy S8']],
 ];
-const DASH_TABS = [['', 'Tổng hợp'], ['ho_chua', 'Hồ chứa'], ['sat_lo', 'Sạt lở'], ['cap_xa', 'Cấp xã'], ['he_thong', 'Hệ thống']];
+const DASH_TABS = [['', 'Tổng hợp'], ['sat_lo', 'Sạt lở'], ['cap_xa', 'Cấp xã'], ['he_thong', 'Hệ thống']];
 async function dashTouch(ctx) {
   const { page } = ctx;
   await step(ctx, 'Tổng quan: mọi vùng chạm của 5 tab ≥ 44 px', async () => {
@@ -1557,59 +1474,16 @@ async function mapLayers(ctx, phone) {
     return `${times.length} mục · lọc "Cảnh báo" ${nWarn} · cuộn ${scrolled}px`;
   });
 
-  // Thiết kế B.3 "popup: chi tiết, biểu đồ mini, nút hành động nhanh (VD gọi điện cho tài xế)"; B.2 "hồ chứa: hiển thị lưu
-  // lượng nước đang xả (m³/s)"
-  await step(ctx, 'Hồ chứa: nhãn lưu lượng xả trên biểu tượng; popup có biểu đồ 48 giờ, nút "Cập nhật vận hành" mở form, lọt khung bản đồ; xuồng – xe: nút gọi chỉ huy đơn vị', async () => {
+  // Thiết kế B.3 "popup: chi tiết, biểu đồ mini, nút hành động nhanh (VD gọi điện cho tài xế)"
+  await step(ctx, 'Xuồng – xe: popup có nút gọi chỉ huy đơn vị', async () => {
     // Bước trước vừa bay tới một điểm (thu phóng 14) — tải lại để bắt đầu từ khung nhìn cả vùng, bản đồ đứng yên
     await page.reload();
     await page.locator('.leaflet-marker-pane .leaflet-marker-icon').first().waitFor({ timeout: 20_000 });
     await page.waitForTimeout(500);
     await mapIdle(page);
-    // Nhãn dưới biểu tượng hồ đang mở cửa xả: "N cửa · X m³/s" — so với chính popup của hồ đó (cùng một bản số liệu; bộ
-    // mô phỏng đổi cửa xả theo phút nên không so với lượt gọi API khác)
-    const labels = await page.locator('.leaflet-marker-icon span').filter({ hasText: / cửa( · [\d.]+ m³\/s)?$/ }).allInnerTexts();
-    const DAM = 'svg path[d="M5 21V7l7-4 7 4v14"]';
-    const icon = labels.length
-      ? page.locator('.leaflet-marker-icon', { has: page.locator('span', { hasText: / cửa/ }) }).first()
-      : page.locator('.leaflet-marker-icon', { has: page.locator(DAM) }).first();
-    if (!(await icon.count())) return 'vùng đang xem không có hồ chứa';
-    const label = labels.length ? (await icon.locator('span', { hasText: / cửa/ }).innerText()).trim() : null;
-    await icon.dispatchEvent('click');
-    const pop = visible(page.locator('.leaflet-popup-content'));
-    await pop.getByRole('button', { name: 'Mở tab Hồ chứa' }).waitFor({ timeout: 5_000 });
-    if (label) {
-      const t = (await pop.innerText()).replace(/\s+/g, ' ');
-      const gates = t.match(/Cửa xả đang mở (\d+)\/\d+/)?.[1];
-      const flow = t.match(/Đang xả ([\d.,]+) m³\/s/)?.[1];
-      const [, lg, lf] = label.match(/^(\d+) cửa(?: · ([\d.]+) m³\/s)?$/) || [];
-      const num = (x) => (x == null ? null : Math.round(Number(String(x).replace(/\./g, '').replace(',', '.'))));
-      if (lg !== gates || (lf != null && num(lf) !== num(flow))) throw new Error(`nhãn "${label}" khác popup (cửa ${gates}, xả ${flow} m³/s)`);
-    }
-    const hasOps = !(await pop.getByText(/^Chưa có số liệu vận hành/).count());
-    if (hasOps) {
-      const more = pop.getByRole('button', { name: /^Xem diễn biến 48 giờ/ });
-      if (await more.count()) await more.click(); // điện thoại: biểu đồ thu gọn sau nút
-      await pop.getByText(/Mực nước hồ \(m\)|Chưa có số liệu vận hành trong 48 giờ qua/).first().waitFor({ timeout: 10_000 });
-    }
-    await mapIdle(page); // bản đồ tự kéo cho popup lọt khung
-    const fit = await pop.evaluate((el) => {
-      const p = el.closest('.leaflet-popup').getBoundingClientRect();
-      const m = el.closest('.leaflet-container').getBoundingClientRect();
-      return { top: Math.round(p.top - m.top), bottom: Math.round(m.bottom - p.bottom), left: Math.round(p.left - m.left), right: Math.round(m.right - p.right) };
-    });
-    if (Object.values(fit).some((v) => v < 0)) throw new Error(`popup hồ tràn ra ngoài bản đồ: ${JSON.stringify(fit)}`);
-    const update = pop.getByRole('button', { name: 'Cập nhật vận hành' });
-    await mapIdle(page);
-    if (await update.count()) {
-      await update.click();
-      const dlg = page.getByRole('dialog').filter({ hasText: 'Cập nhật vận hành –' });
-      await dlg.waitFor({ timeout: 5_000 });
-      await dlg.getByRole('button', { name: 'Huỷ' }).click(); // chỉ mở form, không lưu
-    }
-    await page.locator('.leaflet-popup-close-button').first().dispatchEvent('click');
     // Xuồng – xe: bật lớp (tắt sẵn) → popup có nút gọi chỉ huy đơn vị quản lý phương tiện
     const vehicles = (layers0?.vehicles?.features || []).map((f) => f.properties);
-    if (!vehicles.length) return `${labels.length} nhãn xả · popup hồ ${hasOps ? 'có' : 'chưa có'} số liệu · không có phương tiện`;
+    if (!vehicles.length) return 'không có phương tiện';
     if (phone) await page.getByRole('navigation', { name: 'Thao tác nhanh' }).getByRole('button', { name: /^Lớp/ }).click();
     else if (!(await page.getByRole('checkbox', { name: /Xuồng, xe, máy xúc/ }).count())) {
       await visible(page.getByRole('button', { name: /Lớp dữ liệu/ })).click();
@@ -1642,8 +1516,8 @@ async function mapLayers(ctx, phone) {
       }
     }
     if (!found) throw new Error(`không mở được popup phương tiện ${target.code}`);
-    if (phone) await expectNoOverflow(ctx, 'Bản đồ (popup hồ, xe)');
-    return `${labels.length} nhãn xả (${labels.slice(0, 2).join('; ')}) · popup hồ lọt khung ${JSON.stringify(fit)} · xe ${target.code}`;
+    if (phone) await expectNoOverflow(ctx, 'Bản đồ (popup xe)');
+    return `xe ${target.code}`;
   });
 }
 

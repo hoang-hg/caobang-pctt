@@ -294,70 +294,6 @@ async def seed_telemetry(conn: AsyncConnection, units: dict[str, dict], now: dat
                     },
                 )
 
-    for rid, name, river, commune, mw, normal, current, gates, lat, lon in D.RESERVOIRS:
-        inflow = rng.randint(180, 900)
-        await ex(
-            conn,
-            """INSERT INTO iot_telemetry.reservoirs (id, name, river, admin_unit_id, capacity_mw, normal_level, current_level,
-                               inflow_m3s, outflow_m3s, spill_gates_open, spill_gates, location, operating_at)
-                          VALUES (:id,:n,:r,:a,:mw,:nl,:cl,:inf,:out,:go,:g, ST_SetSRID(ST_MakePoint(:lon,:lat),4326), now())""",
-            {
-                "id": rid,
-                "n": name,
-                "r": river,
-                "a": units[commune]["id"],
-                "mw": mw,
-                "nl": normal,
-                "cl": current,
-                "inf": inflow,
-                "out": round(inflow * 0.7),
-                "go": 1 if current > normal - 1 else 0,
-                "g": gates,
-                "lat": lat,
-                "lon": lon,
-            },
-        )
-
-    # Lịch sử vận hành 48 giờ (dữ liệu MẪU, chỉ khi DEMO_MODE) cho biểu đồ "Vận hành hồ chứa": chạy ĐÚNG mô hình hồ của bộ
-    # mô phỏng (scenario.reservoir_tick, mỗi 20 giây) theo mưa kịch bản của các trạm trong lưu vực, ghi một dòng mỗi 30 phút;
-    # trạng thái cuối thành số liệu hiện tại của hồ → bộ mô phỏng chạy tiếp nối liền, không có bước nhảy
-    rain_params = {st[0]: st[-1] for st in D.STATIONS if st[2] == "luong_mua"}
-    res_rows = await fetch_all(
-        "SELECT id, river, normal_level, spill_gates FROM iot_telemetry.reservoirs WHERE normal_level IS NOT NULL",
-        None,
-        conn,
-    )
-    history = []
-    for r in res_rows:
-        stations = scenario.RESERVOIR_RAIN_STATIONS.get(r["river"], ["CB-RN-01"])
-        state = {**r, "current_level": None, "outflow_m3s": 0, "spill_gates_open": 0}
-        for k in range(48 * 180, 0, -1):  # 48 giờ × 180 bước 20 giây, tới hiện tại
-            t_rel = -k / 180
-            intensity = sum(scenario.value_for("luong_mua", rain_params[s], t_rel) for s in stations) / len(
-                stations
-            )
-            state.update(
-                scenario.reservoir_tick(
-                    state, intensity, rng.uniform(-25, 25), may_change_gates=rng.random() < 0.25
-                )
-            )
-            if k % 90 == 1:  # mỗi 30 phút
-                history.append({"id": r["id"], "t": now + timedelta(hours=t_rel), **state})
-        await ex(
-            conn,
-            """UPDATE iot_telemetry.reservoirs SET current_level = :current_level, spill_gates_open = :spill_gates_open,
-                      inflow_m3s = :inflow_m3s, outflow_m3s = :outflow_m3s, operating_at = :t WHERE id = :id""",
-            {**state, "t": now, "id": r["id"]},
-        )
-    if history:
-        await conn.exec_driver_sql(
-            """INSERT INTO iot_telemetry.reservoir_operations
-                      (reservoir_id, time, current_level, spill_gates_open, inflow_m3s, outflow_m3s)
-               VALUES (%(id)s, %(t)s, %(current_level)s, %(spill_gates_open)s, %(inflow_m3s)s, %(outflow_m3s)s)
-               ON CONFLICT DO NOTHING""",
-            history,
-        )
-
     for cid, name, commune, lat, lon in D.CAMERAS:
         await ex(
             conn,
@@ -829,7 +765,6 @@ async def seed_operations(conn: AsyncConnection, units: dict[str, dict], users: 
         )
 
     logs = [
-        (-190, "van_hanh", "info", "Thủy điện Bảo Lạc B mở 1 cửa xả, lưu lượng xả 420 m³/s", "Bảo Lạc"),
         (
             -160,
             "canh_bao",
@@ -844,7 +779,6 @@ async def seed_operations(conn: AsyncConnection, units: dict[str, dict], users: 
             "Đại đội TKCN – Bộ CHQS tỉnh triển khai 2 xuồng trực tại cầu Bằng Giang",
             "Thục Phán",
         ),
-        (-120, "van_hanh", "warning", "Thủy điện Bảo Lạc B nâng lên 2 cửa xả, lưu lượng 860 m³/s", "Bảo Lạc"),
         (
             -95,
             "nguoi_dan",
@@ -886,15 +820,6 @@ async def seed_operations(conn: AsyncConnection, units: dict[str, dict], users: 
     # Lịch sử phát tin
     maker, checker = users["trucban"]["id"], users["chihuy"]["id"]
     history = [
-        (
-            "Cảnh báo xả lũ Thủy điện Bảo Lạc B",
-            "XA_LU",
-            "cam",
-            ["Bảo Lạc", "Hưng Đạo", "Cô Ba"],
-            ["SMS", "ZALO_OA", "LOA"],
-            -170,
-            "sent",
-        ),
         (
             "Chuẩn bị sơ tán vùng ven sông Bằng Giang",
             "CHUAN_BI_SO_TAN",
@@ -958,10 +883,7 @@ async def seed_operations(conn: AsyncConnection, units: dict[str, dict], users: 
             metrics = {k: v for k, v in metrics.items() if k in channels}
         filled = body
         for key, val in {
-            "ten_ho": "Thủy điện Bảo Lạc B",
-            "luu_luong": "860",
             "thoi_gian": "14h00",
-            "song": "Gâm",
             "dia_diem": ", ".join(communes),
             "so_gio": "6",
             "nguy_co": "ngập lụt ven sông",
@@ -1031,7 +953,6 @@ RECONCILE = [
     ("spatial_admin.place_names", "geom"),
     ("iot_telemetry.monitoring_stations", "location"),
     ("iot_telemetry.hazard_points", "location"),
-    ("iot_telemetry.reservoirs", "location"),
     ("iot_telemetry.cameras", "location"),
     ("resources.forces", "home_location"),
     ("resources.warehouses", "location"),

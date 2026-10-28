@@ -16,7 +16,7 @@ const PIN_RE = /^\d{4,8}$/;
 const OFFLINE = 'Mất mạng — chưa thực hiện được';
 // Lý do hay gặp — chạm để điền (sửa / ghi thêm được)
 const REJECT_REASONS = ['Sai vùng nhận tin', 'Nội dung chưa rõ, thiếu hướng dẫn', 'Mức cảnh báo chưa phù hợp', 'Trùng lệnh đã phát', 'Chưa đến mức phải cảnh báo'];
-const END_NOTES = ['Nước đã rút, dỡ bỏ lệnh sơ tán', 'Hết nguy cơ sạt lở', ...(SHOW_STORM ? ['Bão / áp thấp đã suy yếu'] : []), 'Hồ đã ngừng xả lũ'];
+const END_NOTES = ['Nước đã rút, dỡ bỏ lệnh sơ tán', 'Hết nguy cơ sạt lở', ...(SHOW_STORM ? ['Bão / áp thấp đã suy yếu'] : [])];
 
 /** Ô PIN dùng chung: to, chỉ số, lỗi ngay dưới ô (sai định dạng khi bấm; sai PIN / tạm khoá / chưa cấp PIN từ máy chủ). */
 function PinField({ value, onChange, error, inputRef }) {

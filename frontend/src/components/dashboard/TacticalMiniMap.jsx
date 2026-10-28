@@ -8,9 +8,8 @@ import { useStore } from '../../app/store';
 import { useChartTheme } from '../charts/chartTheme';
 import { AreaFocus, BaseLayer, MapResize } from '../map/MapTools';
 import { INCIDENT, SOS_STATUS } from '../../utils/labels';
-import { HAZARD_LEVEL, LANDSLIDE_LEVEL, levelOf, RESERVOIR_LEVEL, risk, sosLevel } from '../../utils/risk';
+import { HAZARD_LEVEL, LANDSLIDE_LEVEL, levelOf, risk, sosLevel } from '../../utils/risk';
 import { stationView } from '../../utils/stations';
-import { num } from '../../utils/format';
 
 const CENTER = [22.75, 106.05];
 const MAP_PAD = { topLeft: [12, 12], bottomRight: [12, 12] };
@@ -32,14 +31,14 @@ const coords = (f) => {
   return { ...p, lat: p.lat ?? lat, lon: p.lon ?? lon };
 };
 
-// Cùng mức thì xếp theo loại: chỗ nguy hiểm trên diện rộng (mực nước, hồ xả, đường cấm, sự cố) trước từng phiếu SOS —
+// Cùng mức thì xếp theo loại: chỗ nguy hiểm trên diện rộng (mực nước, đường cấm, sự cố) trước từng phiếu SOS —
 // câu "Nguy hiểm nhất" của Tổng quan chỉ một nơi; phiếu SOS đã có ở "Việc chờ quyết định"
-const KIND_ORDER = { 'Mực nước': 0, 'Hồ chứa': 1, 'Sạt lở': 2, 'Sự cố': 3, SOS: 4 };
+const KIND_ORDER = { 'Mực nước': 0, 'Sạt lở': 1, 'Sự cố': 2, SOS: 3 };
 
 /**
  * Điểm nóng lấy từ dữ liệu thật: trạm mực nước vượt báo động (số đo cũ vẫn giữ cấp đã vượt), phiếu SOS đang mở, điểm
- * sạt lở cấm đường / cảnh báo, hồ đang xả, điểm sự cố cán bộ đánh dấu. Mức theo thang màu rủi ro chung (utils/risk.js),
- * khớp màu backend: hồ xả điều tiết = Cam, xả khẩn cấp = Đỏ; sạt lở cảnh báo = Cam, cấm đường = Đỏ. Dùng chung cho câu
+ * sạt lở cấm đường / cảnh báo, điểm sự cố cán bộ đánh dấu. Mức theo thang màu rủi ro chung (utils/risk.js),
+ * khớp màu backend: sạt lở cảnh báo = Cam, cấm đường = Đỏ. Dùng chung cho câu
  * "Nguy hiểm nhất" đầu Tổng quan (cùng truy vấn 'map-layers' — không gọi thêm).
  */
 export function buildHotspots(layers, k) {
@@ -67,19 +66,6 @@ export function buildHotspots(layers, k) {
     const level = levelOf(LANDSLIDE_LEVEL, p.traffic_status);
     if (!(level >= 1)) continue;
     out.push({ id: `ls-${p.code}`, kind: 'Sạt lở', name: p.name, lat: p.lat, lon: p.lon, level, detail: `${p.traffic_label} · ${p.road_name}` });
-  }
-  for (const r of k?.reservoirs?.reservoirs || []) {
-    const level = levelOf(RESERVOIR_LEVEL, r.status_code);
-    if (!(level >= 1)) continue;
-    out.push({
-      id: `hc-${r.id}`,
-      kind: 'Hồ chứa',
-      name: r.name,
-      lat: r.lat,
-      lon: r.lon,
-      level,
-      detail: `${r.status_label}${r.outflow_m3s != null ? ` · xả ${num(r.outflow_m3s)} m³/s` : ''}`,
-    });
   }
   for (const f of layers?.hazard_points?.features || []) {
     const h = coords(f);
@@ -331,7 +317,7 @@ export default function TacticalMiniMap({ k, className, focus, tall = false, her
           )}
           {layers && !hotspots.length && (
             <div className="pointer-events-none absolute inset-x-2 top-2 z-[500] rounded-lg bg-panel/90 px-3 py-2 text-center text-xs text-ink-2 shadow">
-              Chưa ghi nhận điểm nóng (trạm vượt báo động, SOS đang mở, sạt lở cấm đường, hồ xả, sự cố) trong vùng đang xem
+              Chưa ghi nhận điểm nóng (trạm vượt báo động, SOS đang mở, sạt lở cấm đường, sự cố) trong vùng đang xem
             </div>
           )}
         </div>

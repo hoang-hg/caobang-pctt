@@ -414,30 +414,6 @@ DATASETS: dict[str, Dataset] = {
             replaceable=True,
         ),
         Dataset(
-            "ho_chua",
-            "Hồ chứa",
-            "Hồ thuỷ điện / thuỷ lợi (thông số tĩnh). Mực nước, cửa xả, lưu lượng vận hành: trực ban cập nhật ở Dashboard → "
-            "chuyên đề Hồ chứa & Xả lũ (nút “Cập nhật vận hành”), không nhập ở đây.",
-            "iot_telemetry.reservoirs",
-            ("id",),
-            (
-                Field("ma", "Mã hồ", "id", "code", True, example="HO-BANGGIANG"),
-                Field("ten", "Tên hồ", "name", required=True, example="Thuỷ điện Bằng Giang"),
-                Field("song", "Sông", "river", example="Bằng Giang"),
-                Field("cong_suat_mw", "Công suất (MW)", "capacity_mw", "float", min=0, example="11"),
-                Field("mnbt_m", "Mực nước dâng bình thường (m)", "normal_level", "float", example="190"),
-                Field("so_cua_xa", "Số cửa xả", "spill_gates", "int", min=0, default=0, example="3"),
-                LAT,
-                LON,
-                MA_XA,
-            ),
-            geometry="point",
-            geometry_columns=("location",),
-            admin_unit=True,
-            touch=("updated_at",),
-            public=True,
-        ),
-        Dataset(
             "kho",
             "Kho vật tư",
             "Kho dự trữ vật tư cứu trợ các cấp.",
@@ -627,7 +603,7 @@ DATASETS: dict[str, Dataset] = {
 
 # Loại dữ liệu xã/phường được GỬI (quyền data.submit) → chờ cấp tỉnh (data.import) phê duyệt rồi mới ghi / hiển thị.
 # Giá trị: giới hạn cấp {trường: các giá trị được phép} — VD xã chỉ gửi danh bạ cấp xã / thôn, kho & lực lượng cấp xã.
-# Loại không có ở đây (ranh giới xã, trạm quan trắc, hồ chứa, cây xăng) chỉ cấp tỉnh nhập.
+# Loại không có ở đây (ranh giới xã, trạm quan trắc, cây xăng) chỉ cấp tỉnh nhập.
 SUBMITTABLE: dict[str, dict[str, tuple[str, ...]]] = {
     "xom": {},
     "diem_so_tan": {},

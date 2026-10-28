@@ -32,9 +32,8 @@ export function resourceFacts(fo = {}, ve = {}) {
   return { has: fo.units > 0 || ve.special_total > 0 || ve.heavy_total > 0 };
 }
 
-/** Hồ chứa (xả khẩn cấp Đỏ, đang xả Cam) và sạt lở (cấm đường, cảnh báo); mức chung = mức nặng hơn của hai bên. */
-export function topicFacts(rs = {}, ls = {}) {
-  const rsLv = !rs.total ? null : rs.emergency_count ? 3 : rs.spill_count ? 2 : 0;
-  const lsLv = !ls.total ? null : ls.blocked_count ? levelOf(LANDSLIDE_LEVEL, 'cam_duong') : ls.warning_count ? levelOf(LANDSLIDE_LEVEL, 'canh_bao') : 0;
-  return { rsLv, lsLv, level: rsLv == null && lsLv == null ? null : Math.max(rsLv ?? 0, lsLv ?? 0) };
+/** Sạt lở, đèo dốc: cấm đường Đỏ, cảnh báo Cam; chưa có điểm đen nào → không mức (Xám). */
+export function topicFacts(ls = {}) {
+  const level = !ls.total ? null : ls.blocked_count ? levelOf(LANDSLIDE_LEVEL, 'cam_duong') : ls.warning_count ? levelOf(LANDSLIDE_LEVEL, 'canh_bao') : 0;
+  return { lsLv: level, level };
 }

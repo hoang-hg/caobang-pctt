@@ -216,7 +216,7 @@ def test_every_dataset_is_consistent_and_template_is_valid(name):
 def test_submittable_datasets_and_level_rules_are_consistent():
     """Loại xã được gửi phải tồn tại; giới hạn cấp phải là tập con lựa chọn của trường; loại chỉ tỉnh nhập không có."""
     assert set(SUBMITTABLE) <= set(DATASETS)
-    assert not {"ranh_gioi_xa", "tram_quan_trac", "ho_chua", "cay_xang"} & set(SUBMITTABLE)
+    assert not {"ranh_gioi_xa", "tram_quan_trac", "cay_xang"} & set(SUBMITTABLE)
     for name, rules in SUBMITTABLE.items():
         for fld, ok in rules.items():
             field = DATASETS[name].get_field(fld)
