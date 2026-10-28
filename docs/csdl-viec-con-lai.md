@@ -414,6 +414,7 @@ SELECT add_continuous_aggregate_policy('iot_telemetry.readings_hourly',
 | Xếp xã vào nhóm lọc nhanh | 3 nhóm đề xuất, chờ BCH | CF2 trang F |
 | Địa danh cho tìm kiếm | Mẫu | CF3 trang F |
 | Mạng đường | Sơ đồ trục chính vẽ tay | D3 trang A |
+| Điểm đen sạt lở, đèo dốc | Đã vào CSDL (`landslide_blackspots`, migration 0028, nhập loại `diem_den_sat_lo`) — 12 điểm ban đầu, toạ độ / cảm biến xấp xỉ; chờ danh mục chính thức | D2 trang A |
 | Lực lượng, kho, điểm sơ tán, trạm, hồ | Mẫu / chưa đủ | D1 trang A, CD1 trang D, BC1 trang C |
 
 ## 6. Trình tự đề nghị

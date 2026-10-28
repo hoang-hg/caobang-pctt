@@ -1,12 +1,13 @@
 """Giám sát điểm đen sạt trượt, lũ quét & đường đèo tỉnh Cao Bằng.
 
-Danh mục điểm đen (tên, tuyến đường, toạ độ, cảm biến gắn kèm) là dữ liệu tham chiếu tĩnh.
+Danh mục điểm đen (tên, tuyến đường, toạ độ, cảm biến gắn kèm) nằm ở bảng `iot_telemetry.landslide_blackspots` — cán bộ
+nhập / sửa ở trang Nhập dữ liệu (loại "diem_den_sat_lo"; danh mục ban đầu: migration 0028).
 Mọi trạng thái động đều tính từ dữ liệu thật trong CSDL — KHÔNG ghi cứng tình trạng sự cố:
 - Mức nguy cơ: vùng nguy hiểm sạt lở / lũ quét đang hiệu lực trong bán kính 1 km
   (do cán bộ khoanh hoặc trigger cảm biến tạo) và cảm biến nghiêng / độ ẩm đất so ngưỡng BĐ I–III.
 - Chia cắt giao thông: đoạn đường giao với vùng nguy hiểm đang hiệu lực, cách điểm ≤ 2 km
   (cùng quy tắc với lớp "đường bị chia cắt" trên bản đồ công khai).
-- Xã/phường: tra theo toạ độ trên ranh giới hành chính 2 cấp hiện hành.
+- Xã/phường: `admin_unit_id` của điểm (bộ nhập gán theo tệp hoặc vị trí; đổi ranh giới xã → gán lại theo vị trí).
 - Không có bằng chứng nào (không vùng nguy hiểm gần, không đường bị cắt, cảm biến nghiêng / độ ẩm đất gắn kèm không
   có số đo 6 giờ qua — VD chưa lắp, mã cảm biến mẫu không tồn tại khi chạy thật) → "Chưa có dữ liệu giám sát" (xám),
   KHÔNG phải "Chưa ghi nhận nguy cơ" (xanh): không để người dân hiểu là có cảm biến đang theo dõi mà chưa báo gì.
@@ -16,154 +17,6 @@ Endpoint công khai → chỉ trả thông tin an toàn công khai, không có v
 from __future__ import annotations
 
 from app.db import fetch_all, fetch_one
-
-# Danh mục tham chiếu — chỉ mô tả địa hình / đặc điểm lâu dài, không mô tả sự cố cụ thể
-KNOWN_BLACKSPOTS = [
-    {
-        "code": "DD-KCC",
-        "name": "Đèo Khau Cốc Chà",
-        "road_name": "QL34 (Bảo Lạc – Xuân Trường)",
-        "category": "deo_doc",
-        "note": "Đèo nhiều tầng cua gấp, taluy dương cao, đất đá phong hoá dễ sạt khi mưa kéo dài.",
-        "lat": 22.806,
-        "lon": 105.720,
-        "tilt_sensor_id": "CB-TL-01",
-        "rain_station_id": "CB-RN-04",
-        "soil_moisture_id": "CB-SM-01",
-    },
-    {
-        "code": "DD-MEPIA",
-        "name": "Đèo Mẻ Pia",
-        "road_name": "ĐT Cô Ba – Thanh Long",
-        "category": "deo_doc",
-        "note": "Đèo dốc nhiều khúc cua tay áo, thường có đá lăn sau mưa lớn.",
-        "lat": 22.872,
-        "lon": 105.842,
-        "tilt_sensor_id": "CB-TL-02",
-        "rain_station_id": "CB-RN-04",
-        "soil_moisture_id": "CB-SM-01",
-    },
-    {
-        "code": "DD-CATHANH",
-        "name": "Khu vực Ca Thành",
-        "road_name": "ĐT Ca Thành",
-        "category": "khu_dan_cu",
-        "note": "Khu dân cư sườn đồi đất, có tiền sử sạt lở và lũ bùn đá.",
-        "lat": 22.685,
-        "lon": 105.820,
-        "tilt_sensor_id": "CB-TL-03",
-        "rain_station_id": "CB-RN-10",
-        "soil_moisture_id": "CB-SM-02",
-    },
-    {
-        "code": "DD-MAPHUC",
-        "name": "Đèo Mã Phục",
-        "road_name": "QL3 (Hòa An – Quảng Hòa)",
-        "category": "deo_doc",
-        "note": "Taluy đá vôi đã gia cố lưới thép; đường trơn, sương mù dày khi mưa.",
-        "lat": 22.768,
-        "lon": 106.287,
-        "tilt_sensor_id": "CB-TL-04",
-        "rain_station_id": "CB-RN-01",
-        "soil_moisture_id": None,
-    },
-    {
-        "code": "DD-QL34-PHANTHANH",
-        "name": "Taluy QL34 đoạn Phan Thanh",
-        "road_name": "QL34 (Phan Thanh – Tĩnh Túc)",
-        "category": "deo_doc",
-        "note": "Đoạn taluy dương cao sát mép đường, tuyến huyết mạch đi Bảo Lạc.",
-        "lat": 22.728,
-        "lon": 105.768,
-        "tilt_sensor_id": "CB-TL-03",
-        "rain_station_id": "CB-RN-02",
-        "soil_moisture_id": "CB-SM-02",
-    },
-    {
-        "code": "DD-NAPONG",
-        "name": "Cụm dân cư chân đồi Nà Pồng",
-        "road_name": "Đường liên xã Pác Miầu – Yên Thổ",
-        "category": "khu_dan_cu",
-        "note": "Khu dân cư sát chân đồi đất, nguy cơ trượt sườn khi đất bão hoà nước.",
-        "lat": 22.872,
-        "lon": 105.482,
-        "tilt_sensor_id": None,
-        "rain_station_id": "CB-RN-05",
-        "soil_moisture_id": "CB-SM-01",
-    },
-    {
-        "code": "DD-PHJADEN",
-        "name": "Sườn núi Phja Oắc – Phja Đén",
-        "road_name": "ĐT Thành Công – Phan Thanh",
-        "category": "deo_doc",
-        "note": "Vùng núi cao rừng đầu nguồn, suối dốc dễ lũ ống, lũ quét.",
-        "lat": 22.596,
-        "lon": 105.848,
-        "tilt_sensor_id": "CB-TL-03",
-        "rain_station_id": "CB-RN-03",
-        "soil_moisture_id": "CB-SM-02",
-    },
-    {
-        "code": "DD-NAMQUANG",
-        "name": "Khe suối Nậm Quang",
-        "road_name": "ĐT Bảo Lâm – Nam Quang",
-        "category": "ngam_tran",
-        "note": "Khe núi hẹp tụ thuỷ, nguy cơ lũ quét qua ngầm tràn.",
-        "lat": 22.790,
-        "lon": 105.540,
-        "tilt_sensor_id": None,
-        "rain_station_id": "CB-RN-05",
-        "soil_moisture_id": "CB-SM-01",
-    },
-    {
-        "code": "DD-BANNGAN",
-        "name": "Ngầm tràn Bản Ngắn (sông Hiến)",
-        "road_name": "Đường liên xã Hòa An",
-        "category": "ngam_tran",
-        "note": "Ngầm tràn thấp, nước sông lên nhanh khi mưa lớn thượng nguồn.",
-        "lat": 22.735,
-        "lon": 106.170,
-        "tilt_sensor_id": None,
-        "rain_station_id": "CB-RN-01",
-        "soil_moisture_id": None,
-    },
-    {
-        "code": "DD-KHAULIEU",
-        "name": "Đèo Khau Liêu",
-        "road_name": "QL3 (Quảng Uyên – Tà Lùng)",
-        "category": "deo_doc",
-        "note": "Cung đèo nhiều khúc cua gấp, sát vực; xe tải cửa khẩu lưu thông nhiều.",
-        "lat": 22.685,
-        "lon": 106.460,
-        "tilt_sensor_id": None,
-        "rain_station_id": "CB-RN-09",
-        "soil_moisture_id": None,
-    },
-    {
-        "code": "DD-TINHTUC",
-        "name": "Bãi thải mỏ Tĩnh Túc",
-        "road_name": "QL34 (đoạn qua Tĩnh Túc)",
-        "category": "khu_dan_cu",
-        "note": "Bãi thải trên sườn dốc, nguy cơ dòng bùn khi ngậm nước lâu ngày.",
-        "lat": 22.645,
-        "lon": 105.880,
-        "tilt_sensor_id": "CB-TL-03",
-        "rain_station_id": "CB-RN-03",
-        "soil_moisture_id": "CB-SM-02",
-    },
-    {
-        "code": "DD-DONGKHE",
-        "name": "Đèo Đông Khê",
-        "road_name": "QL4A (Thạch An – Lạng Sơn)",
-        "category": "deo_doc",
-        "note": "Taluy đất đỏ, mặt đường dễ trơn trượt khi mưa.",
-        "lat": 22.434,
-        "lon": 106.436,
-        "tilt_sensor_id": None,
-        "rain_station_id": "CB-RN-08",
-        "soil_moisture_id": None,
-    },
-]
 
 CATEGORY_LABEL = {
     "deo_doc": "Đường đèo, dốc",
@@ -197,22 +50,23 @@ GUIDANCE = {
     "đá lăn.",
 }
 
-DYNAMIC_SQL = """
-    WITH pt AS (
-        SELECT code, ST_SetSRID(ST_MakePoint(lon, lat), 4326) AS g
-          FROM unnest(CAST(:codes AS text[]), CAST(:lats AS float8[]), CAST(:lons AS float8[])) AS t(code, lat, lon)
-    )
-    SELECT pt.code, u.name AS admin_name, u.code AS admin_code,
+BLACKSPOT_SQL = """
+    SELECT b.code, b.name, b.road_name, b.category, b.note, b.bypass_route,
+           b.tilt_sensor_id, b.rain_station_id, b.soil_moisture_id,
+           ST_Y(b.location) AS lat, ST_X(b.location) AS lon,
+           u.name AS admin_name, u.code AS admin_code,
            (SELECT max(CASE z.level WHEN 'do' THEN 3 WHEN 'cam' THEN 2 WHEN 'vang' THEN 1 ELSE 0 END)
               FROM iot_telemetry.hazard_zones z
              WHERE z.valid_until > now() AND z.type IN ('sat_lo', 'lu_quet')
-               AND ST_DWithin(z.geom::geography, pt.g::geography, 1000)) AS zone_rank,
+               AND ST_DWithin(z.geom::geography, b.location::geography, 1000)) AS zone_rank,
            EXISTS (SELECT 1 FROM operations.road_segments s
                      JOIN iot_telemetry.hazard_zones z
                        ON z.valid_until > now() AND (z.type <> 'ngap' OR z.level = 'do') AND ST_Intersects(z.geom, s.geom)
-                    WHERE ST_DWithin(ST_Intersection(z.geom, s.geom)::geography, pt.g::geography, 2000)) AS road_cut
-      FROM pt
-      LEFT JOIN spatial_admin.administrative_units u ON u.level = 'xa' AND ST_Contains(u.geom, pt.g)
+                    WHERE ST_DWithin(ST_Intersection(z.geom, s.geom)::geography, b.location::geography, 2000)) AS road_cut
+      FROM iot_telemetry.landslide_blackspots b
+      LEFT JOIN spatial_admin.administrative_units u ON u.id = b.admin_unit_id
+     WHERE CAST(:codes AS text[]) IS NULL OR u.code = ANY(CAST(:codes AS text[]))
+     ORDER BY b.name
 """
 
 SENSOR_SQL = """
@@ -258,34 +112,17 @@ def traffic_status(road_cut: bool, risk: str, near_zone: bool = True, monitored:
 async def get_landslides_overview(codes: list[str] | None = None) -> dict:
     """Danh sách điểm đen sạt trượt kèm trạng thái tính từ vùng nguy hiểm, đường bị chia cắt và cảm biến. `codes`: chỉ điểm
     thuộc các xã này (vùng đang xem / phạm vi được giao) — số đếm, tuyến đường tính trên các điểm còn lại; None = toàn tỉnh."""
-    dyn = await fetch_all(
-        DYNAMIC_SQL,
-        {
-            "codes": [b["code"] for b in KNOWN_BLACKSPOTS],
-            "lats": [b["lat"] for b in KNOWN_BLACKSPOTS],
-            "lons": [b["lon"] for b in KNOWN_BLACKSPOTS],
-        },
-    )
-    dyn_by_code = {d["code"]: d for d in dyn}
+    spots = await fetch_all(BLACKSPOT_SQL, {"codes": codes or None})
     sensor_ids = sorted(
-        {
-            b[k]
-            for b in KNOWN_BLACKSPOTS
-            for k in ("tilt_sensor_id", "rain_station_id", "soil_moisture_id")
-            if b[k]
-        }
+        {b[k] for b in spots for k in ("tilt_sensor_id", "rain_station_id", "soil_moisture_id") if b[k]}
     )
-    sensors = {s["id"]: s for s in await fetch_all(SENSOR_SQL, {"ids": sensor_ids})}
+    sensors = {s["id"]: s for s in await fetch_all(SENSOR_SQL, {"ids": sensor_ids})} if sensor_ids else {}
 
     points = []
     corridors: dict[str, int] = {}
     counts = dict.fromkeys(TRAFFIC, 0)
     monitored_count = 0
-    for item in KNOWN_BLACKSPOTS:
-        d = dyn_by_code.get(item["code"], {})
-        if codes and d.get("admin_code") not in codes:
-            continue
-
+    for item in spots:
         rain_info = None
         if (rs := sensors.get(item["rain_station_id"])) and rs["rain_24h"] is not None:
             rain_info = {
@@ -322,11 +159,11 @@ async def get_landslides_overview(codes: list[str] | None = None) -> dict:
                 }.get(soil_lv, "Trong ngưỡng an toàn"),
             }
 
-        zone_lv = LEVELS[d.get("zone_rank") or 0]
+        zone_lv = LEVELS[item["zone_rank"] or 0]
         risk = max_level(zone_lv, tilt_lv, soil_lv)
         monitored = tilt_info is not None or soil_info is not None  # mưa một mình không đo được taluy
         monitored_count += monitored
-        status = traffic_status(bool(d.get("road_cut")), risk, d.get("zone_rank") is not None, monitored)
+        status = traffic_status(bool(item["road_cut"]), risk, item["zone_rank"] is not None, monitored)
         counts[status] += 1
         label, color = TRAFFIC[status]
 
@@ -339,8 +176,8 @@ async def get_landslides_overview(codes: list[str] | None = None) -> dict:
                 "name": item["name"],
                 "road_name": item["road_name"],
                 "corridor": corridor,
-                "admin_name": d.get("admin_name"),
-                "admin_code": d.get("admin_code"),
+                "admin_name": item["admin_name"],
+                "admin_code": item["admin_code"],
                 "category": item["category"],
                 "category_label": CATEGORY_LABEL[item["category"]],
                 "risk_level": risk,
@@ -351,7 +188,7 @@ async def get_landslides_overview(codes: list[str] | None = None) -> dict:
                 "traffic_color": color,
                 "description": item["note"],
                 "response_action": GUIDANCE[status],
-                "bypass_route": None,
+                "bypass_route": item["bypass_route"],
                 "rain_info": rain_info,
                 "tilt_info": tilt_info,
                 "soil_info": soil_info,

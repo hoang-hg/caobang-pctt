@@ -120,8 +120,23 @@ check('… và trên bản đồ (pct = null)', !!whMap && whMap.properties.pct 
 const noReplace = await upload('kho', 'validate', 'kho.csv', 'ma,ten,cap,vi_do,kinh_do\nK,Kho,tinh,22.66,106.25\n', admin, 'replace');
 check('Kho vật tư không cho thay toàn bộ (có dữ liệu tham chiếu) → 422', noReplace.status === 422);
 
+// ---- Điểm đen sạt lở, đèo dốc: danh mục nằm trong CSDL (migration 0028), nhập thêm điểm → cổng công khai thấy ngay
+const lsBefore = (await call('GET', '/public/landslides')).data;
+check('Danh mục điểm đen ban đầu có trong CSDL',
+  ['DD-KCC', 'DD-MEPIA', 'DD-DONGKHE'].every((c) => lsBefore?.points?.some((p) => p.code === c)), `${lsBefore?.total_points} điểm`);
+const spotCode = `TEST-DD-${stamp}`;
+const spotCsv = 'ma,ten,tuyen_duong,loai,dac_diem,duong_tranh,vi_do,kinh_do\n'
+  + `${spotCode},Đèo thử ${stamp},ĐT Thử (A – B),deo_doc,Taluy dương cao,Đi vòng qua ĐT 208,22.70,106.10\n`;
+const spot = await upload('diem_den_sat_lo', 'apply', 'diem_den.csv', spotCsv, admin);
+const lsAfter = (await call('GET', '/public/landslides')).data;
+const mine = lsAfter?.points?.find((p) => p.code === spotCode);
+check('Nhập điểm đen mới → hiện trên cổng: tuyến tránh, tự gán xã theo vị trí, tuyến = phần trước ngoặc',
+  spot.status === 200 && mine?.bypass_route === 'Đi vòng qua ĐT 208' && !!mine?.admin_code && mine?.corridor === 'ĐT Thử'
+    && lsAfter.total_points === lsBefore.total_points + 1,
+  JSON.stringify(spot.data?.report?.errors?.slice(0, 2) || { xa: mine?.admin_code, tong: lsAfter?.total_points }));
+
 // ---- Mọi loại dữ liệu: nhập tệp mẫu 2 lần (lần 1 thêm, lần 2 cập nhật) — theo thứ tự phụ thuộc
-const ORDER = ['kho', 'ton_kho', 'luc_luong', 'phuong_tien', 'diem_so_tan', 'vung_nguy_hiem', 'diem_nguy_hiem', 'danh_ba',
+const ORDER = ['kho', 'ton_kho', 'luc_luong', 'phuong_tien', 'diem_so_tan', 'vung_nguy_hiem', 'diem_nguy_hiem', 'diem_den_sat_lo', 'danh_ba',
   'tram_quan_trac', 'ngap_kich_ban', 'cay_xang', 'xom']; // ngap_kich_ban sau tram_quan_trac: tham chiếu trạm mẫu
 // Ranh giới xã, nhóm lọc nhanh (tệp mẫu điền sẵn nhiều nhóm đang dùng) kiểm riêng ở dưới
 check('Kiểm thử phủ mọi loại dữ liệu (trừ ranh giới xã, nhóm lọc nhanh — kiểm riêng)',

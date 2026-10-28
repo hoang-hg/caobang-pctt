@@ -1,6 +1,6 @@
 import {
-  Boxes, Contact, FileSpreadsheet, Fuel, House, Layers, Map as MapIcon, Mountain, Package, Radio, School, ShieldHalf,
-  TriangleAlert, Truck, Warehouse, Waves,
+  Boxes, Contact, FileSpreadsheet, Fuel, House, Layers, Map as MapIcon, Mountain, MountainSnow, Package, Radio, School,
+  ShieldHalf, TriangleAlert, Truck, Warehouse, Waves,
 } from 'lucide-react';
 
 /**
@@ -18,6 +18,7 @@ export const DATASET_CARD = {
   danh_ba: { icon: Contact, noun: 'người liên lạc', hint: 'Số điện thoại chỉ huy tỉnh → xã → thôn và đường dây nóng.' },
   xom: { icon: House, noun: 'xóm', hint: 'Tên xóm, tổ dân phố của từng xã — người dân chọn khi gửi phản ánh.' },
   diem_nguy_hiem: { icon: TriangleAlert, noun: 'điểm', hint: 'Điểm sạt lở, điểm đen giao thông, cầu đường hư hỏng.' },
+  diem_den_sat_lo: { icon: MountainSnow, noun: 'điểm đen', hint: 'Đèo dốc, khu dân cư sườn đồi, ngầm tràn cần theo dõi lâu dài khi mưa lớn.' },
   vung_nguy_hiem: { icon: Mountain, noun: 'vùng', hint: 'Vùng có nguy cơ sạt lở, ngập, lũ quét theo bản đồ chính thức.' },
   ngap_kich_ban: { icon: Waves, noun: 'vùng ngập', hint: 'Vùng sẽ ngập khi mực nước ở một trạm lên tới Báo động I, II, III.' },
   ranh_gioi_xa: { icon: MapIcon, noun: 'xã', hint: 'Ranh giới chính thức, dân số, số hộ của 56 xã, phường.' },
@@ -28,7 +29,7 @@ export const DATASET_CARD = {
 export const DATASET_GROUPS = [
   { key: 'nguon_luc', title: 'Sơ tán, kho & lực lượng', names: ['diem_so_tan', 'kho', 'ton_kho', 'luc_luong', 'phuong_tien', 'cay_xang'] },
   { key: 'lien_lac', title: 'Danh bạ', names: ['danh_ba'] },
-  { key: 'dia_ban', title: 'Địa bàn & vùng nguy hiểm', names: ['xom', 'diem_nguy_hiem', 'vung_nguy_hiem', 'ngap_kich_ban', 'ranh_gioi_xa', 'nhom_loc_nhanh'] },
+  { key: 'dia_ban', title: 'Địa bàn & vùng nguy hiểm', names: ['xom', 'diem_den_sat_lo', 'diem_nguy_hiem', 'vung_nguy_hiem', 'ngap_kich_ban', 'ranh_gioi_xa', 'nhom_loc_nhanh'] },
   { key: 'quan_trac', title: 'Trạm đo', names: ['tram_quan_trac'] },
 ];
 

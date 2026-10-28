@@ -49,7 +49,7 @@ const [tpLat, tpLon] = at('CB-THUCPHAN');
 // ---- Quyền & danh mục của xã
 const list = (await call('GET', '/data-import/datasets', null, xa)).data || [];
 check('Xã chỉ thấy loại dữ liệu được gửi (không có trạm, ranh giới, cây xăng)',
-  list.length === 9 && !list.some((d) => ['tram_quan_trac', 'ranh_gioi_xa', 'cay_xang'].includes(d.name)), list.map((d) => d.name).join(','));
+  list.length === 10 && list.some((d) => d.name === 'diem_den_sat_lo') && !list.some((d) => ['tram_quan_trac', 'ranh_gioi_xa', 'cay_xang'].includes(d.name)), list.map((d) => d.name).join(','));
 check('Form của xã: kho chỉ chọn được cấp "xa"', JSON.stringify(list.find((d) => d.name === 'kho')?.fields.find((f) => f.name === 'cap')?.choices) === '["xa"]');
 const tpl = await call('GET', '/data-import/datasets/diem_so_tan/template', null, xa);
 check('Tệp mẫu của xã điền sẵn mã xã mình', tpl.status === 200 && String(tpl.data).includes('CB-COBA'));

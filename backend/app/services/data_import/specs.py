@@ -294,6 +294,68 @@ DATASETS: dict[str, Dataset] = {
             public=True,
         ),
         Dataset(
+            "diem_den_sat_lo",
+            "Điểm đen sạt lở, đèo dốc",
+            "Danh mục lâu dài các đèo dốc, khu dân cư sườn đồi, ngầm tràn có nguy cơ sạt lở, lũ quét — hiện trên tab Sạt lở, "
+            "lũ quét của Tổng quan và cổng công khai. Mức nguy cơ, chia cắt giao thông tự tính từ vùng nguy hiểm và cảm "
+            "biến gắn kèm; chỉ ghi đặc điểm lâu dài, không ghi sự cố đang xảy ra (sự cố: “Điểm nguy hiểm”, “Vùng nguy "
+            "hiểm”). Mã trạm gắn kèm được để trống hoặc ghi trạm chưa nhập — điểm hiện “Chưa có dữ liệu giám sát”.",
+            "iot_telemetry.landslide_blackspots",
+            ("code",),
+            (
+                code_field("CB-DDSL-001"),
+                Field("ten", "Tên điểm", "name", required=True, example="Đèo Khau Cốc Chà"),
+                Field(
+                    "tuyen_duong",
+                    "Tuyến đường (phần trước dấu ngoặc là tên tuyến, VD QL34 (Bảo Lạc – Xuân Trường))",
+                    "road_name",
+                    required=True,
+                    example="QL34 (Bảo Lạc – Xuân Trường)",
+                ),
+                Field(
+                    "loai",
+                    "Loại",
+                    "category",
+                    "enum",
+                    True,
+                    choices=("deo_doc", "khu_dan_cu", "ngam_tran"),
+                    example="deo_doc",
+                ),
+                Field(
+                    "dac_diem",
+                    "Đặc điểm lâu dài (địa hình, tiền sử sạt lở)",
+                    "note",
+                    example="Taluy dương cao, đất đá phong hoá dễ sạt khi mưa kéo dài",
+                ),
+                Field(
+                    "duong_tranh",
+                    "Tuyến tránh chính thức — hiện CÔNG KHAI (trống = chưa có)",
+                    "bypass_route",
+                    example="",
+                ),
+                Field(
+                    "ma_cam_bien_nghieng", "Mã trạm đo nghiêng gắn kèm", "tilt_sensor_id", "code", example=""
+                ),
+                Field("ma_tram_mua", "Mã trạm đo mưa gần nhất", "rain_station_id", "code", example=""),
+                Field(
+                    "ma_cam_bien_do_am",
+                    "Mã trạm đo độ ẩm đất gắn kèm",
+                    "soil_moisture_id",
+                    "code",
+                    example="",
+                ),
+                LAT,
+                LON,
+                MA_XA,
+            ),
+            geometry="point",
+            geometry_columns=("location",),
+            admin_unit=True,
+            touch=("updated_at",),
+            replaceable=True,
+            public=True,
+        ),
+        Dataset(
             "danh_ba",
             "Danh bạ chỉ huy & đường dây nóng",
             "Danh bạ phân cấp tỉnh → xã → thôn. Đường dây nóng trên cổng công khai lấy các dòng cấp “tinh” có "
@@ -609,6 +671,7 @@ SUBMITTABLE: dict[str, dict[str, tuple[str, ...]]] = {
     "diem_so_tan": {},
     "vung_nguy_hiem": {},
     "diem_nguy_hiem": {},
+    "diem_den_sat_lo": {},
     "danh_ba": {"cap": ("xa", "thon")},
     "kho": {"cap": ("xa",)},
     "ton_kho": {},

@@ -34,6 +34,10 @@ PROVINCE_FILE = (
 )  # OSM relation 1844412
 # Ranh giới 56 xã/phường sau sắp xếp (nguồn ghi trong tệp; README 13). Cùng định dạng công cụ nhập "ranh_gioi_xa".
 COMMUNES_FILE = Path(__file__).resolve().parents[1] / "seed" / "caobang_communes.geojson"
+# Cùng tệp migration 0028 dùng — một nguồn cho danh mục điểm đen ban đầu
+BLACKSPOTS_SQL = (
+    Path(__file__).resolve().parents[1] / "alembic" / "sql" / "0028_landslide_blackspots_data.sql"
+)
 rng = random.Random(2025)
 PRESET_TAGS = {"LV_BANG_GIANG": "vung_trung", "VUNG_NUI_CAO": "vung_nui", "BIEN_GIOI": "bien_gioi"}
 
@@ -53,6 +57,11 @@ def jitter(lat: float, lon: float, km: float = 1.0) -> tuple[float, float]:
 
 async def ex(conn: AsyncConnection, sql: str, params=None):
     await execute(sql, params, conn)
+
+
+async def seed_blackspots(conn: AsyncConnection):
+    """Danh mục điểm đen sạt lở, đèo dốc ban đầu — dữ liệu nền (cả chạy thật), đã có mã thì giữ nguyên."""
+    await ex(conn, BLACKSPOTS_SQL.read_text(encoding="utf-8"))
 
 
 async def seed_admin(conn: AsyncConnection) -> dict[str, dict]:
@@ -953,6 +962,7 @@ RECONCILE = [
     ("spatial_admin.place_names", "geom"),
     ("iot_telemetry.monitoring_stations", "location"),
     ("iot_telemetry.hazard_points", "location"),
+    ("iot_telemetry.landslide_blackspots", "location"),
     ("iot_telemetry.cameras", "location"),
     ("resources.forces", "home_location"),
     ("resources.warehouses", "location"),
@@ -978,6 +988,7 @@ TRUNCATE communications.audit_logs, communications.rbac_audit_log, communication
          communications.message_templates, communications.users,
          iot_telemetry.sensor_readings, iot_telemetry.forecasts, iot_telemetry.hazard_zones, iot_telemetry.hazard_points,
          iot_telemetry.cameras, iot_telemetry.reservoirs, iot_telemetry.monitoring_stations,
+         iot_telemetry.landslide_blackspots,
          operations.dispatch_orders, operations.sos_tickets, operations.event_logs, operations.evacuation_progress,
          operations.disaster_events,
          operations.road_segments, operations.road_nodes, operations.system_settings, operations.data_submissions,
@@ -1051,6 +1062,7 @@ async def main(reset: bool = False):
             {"t": now.isoformat()},
         )
         units = await seed_admin(conn)
+        await seed_blackspots(conn)
         if settings.demo_mode:
             # Sơ đồ nối tâm các xã — chỉ để trình diễn định tuyến; chạy thật chờ mạng đường chính thức (README 2.2)
             await seed_roads(conn, units)
