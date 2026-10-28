@@ -290,17 +290,18 @@ export function CursorToStatus() {
   return null;
 }
 
-// Viền vùng đang xem: màu nhấn (xanh) của giao diện — KHÔNG dùng đỏ (Đỏ chỉ nghĩa là mức Khẩn cấp của thang rủi ro chung), viền
-// nền tương phản bên dưới để rõ trên nền sáng, tối, vệ tinh. Ngoài vùng làm mờ ĐẬM (quyết định 21/10/2026: bản đồ chỉ rõ tỉnh
-// Cao Bằng / vùng đang xem — docs/ke-hoach-lam-moi-giao-dien.md mục 7.2): nền sáng phủ trắng, nền tối và vệ tinh phủ tối.
+// Viền vùng đang xem (xã đang lọc): màu nhấn (xanh) của giao diện — KHÔNG dùng đỏ (Đỏ chỉ nghĩa là mức Khẩn cấp của thang rủi ro
+// chung), viền nền tương phản bên dưới để rõ trên nền sáng, tối, vệ tinh. Ngoài tỉnh phủ KÍN 100 % (quyết định 28/10/2026: chỉ
+// hiện tỉnh Cao Bằng — docs/ke-hoach-lam-moi-giao-dien.md mục 7.2): nền sáng phủ trắng, nền tối và vệ tinh phủ tối. Ranh giới
+// tỉnh: nét ĐEN đậm; nền tối thêm viền sáng bên dưới (nét đen trên nền xanh đêm không thấy).
 const AREA_STYLE = {
-  dark: { line: '#3987e5', halo: '#0b1220', mask: '#0b1220', maskOn: 0.85, maskOff: 0.85 },
-  light: { line: '#2a78d6', halo: '#ffffff', mask: '#ffffff', maskOn: 0.85, maskOff: 0.85 },
+  dark: { line: '#3987e5', halo: '#0b1220', mask: '#0b1220', maskOff: 1, provLine: '#000000', provHalo: '#e2e8f0' },
+  light: { line: '#2a78d6', halo: '#ffffff', mask: '#ffffff', maskOff: 1, provLine: '#000000', provHalo: '#ffffff' },
 };
 
 /**
  * Vùng đang xem (tỉnh, vùng lọc, phạm vi được giao): bay tới vùng + làm mờ đậm ngoài ranh giới + viền màu nhấn.
- * Luôn bảo đảm ngoài ranh giới tỉnh Cao Bằng được phủ mờ đậm (85%) để tỉnh Cao Bằng luôn hiển thị rõ ràng nhất.
+ * Ngoài ranh giới tỉnh Cao Bằng phủ kín 100 % — chỉ hiện tỉnh Cao Bằng; ranh giới tỉnh nét đen đậm.
  * Lớp mờ ở pane riêng (trên ô nền, dưới mọi lớp số liệu: điểm, vùng nguy hiểm, quỹ đạo bão vẫn rõ dù ở ngoài vùng);
  * không khoá kéo bản đồ ra ngoài. `fly` = false: không bay tới vùng. `basemap`: nền Vệ tinh → phủ tối.
  */
@@ -341,7 +342,7 @@ export function AreaFocus({ area, filtered, padding = {}, fly = true, basemap })
   return (
     <>
       <Pane name="mat-na-ngoai-vung" style={{ zIndex: 350 }}>
-        {/* Mặt nạ ngoài tỉnh Cao Bằng: luôn phủ mờ đậm 85% để chỉ làm nổi bật lãnh thổ tỉnh Cao Bằng */}
+        {/* Mặt nạ ngoài tỉnh Cao Bằng: phủ kín — chỉ hiện lãnh thổ tỉnh */}
         {provinceRings && (
           <Polygon
             key={`mask-prov-${s.mask}`}
@@ -361,14 +362,22 @@ export function AreaFocus({ area, filtered, padding = {}, fly = true, basemap })
         )}
       </Pane>
       <Pane name="vien-vung" style={{ zIndex: 425 }}>
-        {/* Viền ranh giới tỉnh Cao Bằng */}
+        {/* Ranh giới tỉnh Cao Bằng: nét đen đậm trên viền nền tương phản */}
         {provinceRings && (
-          <Polygon
-            key={`prov-line-${s.line}`}
-            positions={provinceRings}
-            pathOptions={{ color: s.line, weight: 2, opacity: 0.65, fill: false }}
-            interactive={false}
-          />
+          <>
+            <Polygon
+              key={`prov-halo-${s.provHalo}`}
+              positions={provinceRings}
+              pathOptions={{ color: s.provHalo, weight: 6, opacity: 0.9, fill: false }}
+              interactive={false}
+            />
+            <Polygon
+              key={`prov-line-${s.provLine}`}
+              positions={provinceRings}
+              pathOptions={{ color: s.provLine, weight: 3, opacity: 1, fill: false }}
+              interactive={false}
+            />
+          </>
         )}
         {/* Viền nổi bật cho vùng đang xem (xã đang lọc / phạm vi được giao) */}
         {narrowed && (
