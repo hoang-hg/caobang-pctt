@@ -131,10 +131,18 @@ async def overview():
 @router.get("/map")
 async def public_map():
     async def build():
-        # value / time / stale: trạm chưa có số đo hoặc mất tín hiệu → giao diện hiện xám, không "an toàn"
+        # value / time / stale: trạm chưa có số đo hoặc mất tín hiệu → giao diện hiện xám, không "an toàn".
+        # rain_24h (trạm mưa): tổng mưa 24 giờ qua — cách tính như ô Mưa của tổng quan (cộng trung bình từng giờ); cổng tô
+        # màu trạm mưa theo số này (thang mưa 24 giờ), không theo số đo mới nhất (cường độ một giờ)
         stations = await fetch_all(
             f"""SELECT s.id, s.name, s.type, s.river, s.unit, s.alarm_thresholds AS thresholds,
-                       ST_Y(s.location) AS lat, ST_X(s.location) AS lon, {LATEST_COLS}
+                       ST_Y(s.location) AS lat, ST_X(s.location) AS lon, {LATEST_COLS},
+                       CASE WHEN s.type = 'luong_mua' THEN
+                         (SELECT round(sum(h.v)::numeric, 1)::float FROM (
+                            SELECT avg(r.value) AS v FROM iot_telemetry.sensor_readings r
+                             WHERE r.station_id = s.id AND r.time > now() - interval '24 hours'
+                             GROUP BY time_bucket('1 hour', r.time)) h)
+                       END AS rain_24h
                   FROM iot_telemetry.monitoring_stations s {LATEST_JOIN}"""
         )
         zones = await fetch_all(

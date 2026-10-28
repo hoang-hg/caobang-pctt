@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { stationView } from '../../utils/stations';
 import { landslideStatus } from '../../utils/labels';
-import { levelOf, risk, TILT_LEVEL } from '../../utils/risk';
+import { levelOf, rainThresholds, risk, TILT_LEVEL } from '../../utils/risk';
 
 /** Biểu tượng theo loại điểm (lucide — emoji hiện khác nhau giữa các máy và bị trình đọc màn hình đọc lên) — dùng chung cho
  * thẻ chi tiết (chú giải) và thanh nổi trên bản đồ công khai. */
@@ -41,14 +41,15 @@ export default function MapLegendBox({
   const evacSites = data?.evacuation_sites || [];
   const reports = data?.reports || [];
 
+  const rt = rainThresholds();
   const CATEGORIES = [
     {
       id: 'rain',
       title: 'Trạm đo lượng mưa',
       count: rainStations.length,
       iconColor: 'bg-good/10 text-good border-good/20',
-      summary: 'Quan trắc lượng mưa tự động thời gian thực (mm)',
-      desc: 'Màu sắc biểu tượng thay đổi theo cường độ: Xanh lá (<20mm - Mưa nhỏ) → Vàng (20-50mm - Mưa vừa) → Cam (50-100mm - Mưa to) → Đỏ (>100mm - Mưa rất to).',
+      summary: 'Số trên biểu tượng: tổng mưa 24 giờ qua (mm)',
+      desc: `Màu theo tổng mưa 24 giờ qua: Xanh (dưới ${rt.vang} mm) → Vàng (từ ${rt.vang} mm, mưa to) → Cam (từ ${rt.cam} mm, mưa rất to) → Đỏ (từ ${rt.do} mm — vùng núi dễ lũ quét, sạt lở). Đây là màu theo dõi, không phải cấp độ rủi ro thiên tai chính thức.`,
       items: rainStations.map((s) => {
         const view = stationView(s); // chưa có số đo / mất tín hiệu → không "Bình thường"
         return {
@@ -221,7 +222,7 @@ export default function MapLegendBox({
             {selectedPoint.type === 'rain' && selectedPoint.raw && (
               <>
                 <div className="flex justify-between">
-                  <span className="text-muted">Lượng mưa đo được:</span>
+                  <span className="text-muted">Mưa 24 giờ qua:</span>
                   <span className="font-mono font-bold text-base text-ink">{selectedPoint.value}</span>
                 </div>
                 <div className="flex justify-between">
