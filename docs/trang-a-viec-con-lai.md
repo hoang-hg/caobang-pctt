@@ -31,7 +31,7 @@ lần rà cuối (10/10/2026) sửa thêm 3 ô KPI trên điện thoại và nh�
 | A.2 "Con số biết nói" đọc được trên mọi màn hình | Đạt (22/10/2026) — laptop 1366 / 1440 / 1600, iPad, điện thoại: không còn dòng nào bị cắt "…" mất số; điện thoại 360 × 740 vẫn thấy đủ 6 ô không cuộn |
 | A.3 Biểu đồ thủy văn: thực đo + dự báo, vạch BĐ I–III, tô phần vượt; vận hành hồ chứa | Đạt — dự báo lấy bản tin KTTV nhập tay (D5), chưa nối mô hình HEC-HMS (điểm 9); số liệu hồ nhập tay (D4) |
 | A.3 Mưa: cột theo giờ + đường tích luỹ, 1–3 giờ tới nét đứt (QPF) | Đạt — 1–3 giờ tới là dự báo mô hình số, chưa phải radar (điểm 8); chưa đánh giá ngập úng đô thị (điểm 7) |
-| A.3 Sạt lở: scatter / heatmap chuỗi thời gian, phân loại Đỏ / Cam / Vàng | Đạt — có cả hai; ngưỡng mưa còn minh hoạ (điểm 11); danh mục điểm đen viết cứng (D2) |
+| A.3 Sạt lở: scatter / heatmap chuỗi thời gian, phân loại Đỏ / Cam / Vàng | Đạt — có cả hai; ngưỡng mưa còn minh hoạ (điểm 11); danh mục điểm đen đã vào CSDL, chờ danh mục chính thức (D2) |
 | A.3 Vật tư: cột chồng theo kho, phần trống là thiếu so với định mức | Đạt. Cần tồn kho, định mức dự trữ (D1) |
 | A.4 Nhật ký cột phải, cập nhật tức thì: vận hành hồ (có lưu lượng xả), cứu hộ | Đạt |
 | A.4 Báo cáo thiệt hại của người dân qua Zalo OA / ứng dụng | Cổng tiếp nhận đã có, đang tắt — chờ bên gửi (điểm 10) |
@@ -52,7 +52,7 @@ lần rà cuối (10/10/2026) sửa thêm 3 ô KPI trên điện thoại và nh�
 | V2 | **Thử tải lại** (k6) với đủ API trang A đang gọi | Không cần dữ liệu (chạy lại khi có D1) | — | Cao — trước khi mở cổng |
 | V3 | **Dùng thử với lãnh đạo, trực ban** (máy tính, iPad, điện thoại, màn hình lớn) | Người dùng thật; tốt nhất sau D1 | BCH tỉnh (bố trí buổi dùng thử) | Cao |
 | D1 | Nhập dữ liệu nền cho các khối của trang A (trạm, ngưỡng BĐ, hồ chứa, kế hoạch sơ tán, lực lượng, kho…) | Dữ liệu | Đài KTTV, Sở Công Thương, các xã, BCH | **Cao nhất** — chưa có thì trang A chỉ hiện "chưa có" |
-| D2 | Danh mục chính thức **điểm đen sạt lở & đường đèo** (hiện viết cứng 12 điểm trong mã) | Dữ liệu + lập trình | Sở Xây dựng / đơn vị quản lý đường bộ, Sở NN&MT | Cao |
+| D2 | Danh mục chính thức **điểm đen sạt lở & đường đèo** (đã vào CSDL, nhập được — loại `diem_den_sat_lo`; chờ danh mục chính thức) | Dữ liệu | Sở Xây dựng / đơn vị quản lý đường bộ, Sở NN&MT | Cao |
 | D3 | **Mạng đường** (xác định đoạn bị chia cắt ở tab Sạt lở, chỉ đường an toàn) | Dữ liệu + lập trình | Sở Xây dựng / OSM đã hiệu chỉnh | Trung bình |
 | D4 | **Số liệu vận hành hồ chứa tự động** (mực nước, cửa xả, Q đến / Q xả) — hiện trực ban nhập tay | Thoả thuận + lập trình | Chủ đập, Sở Công Thương | Trung bình – cao (mùa lũ) |
 | D5 | **Bản tin dự báo của Đài KTTV dạng số** (mực nước, mưa) — hiện trực ban nhập tay | Thoả thuận + lập trình | Đài KTTV Cao Bằng / Cục KTTV | Trung bình |
@@ -91,15 +91,14 @@ Lưu ý:
 
 ## 3. D2 — Danh mục điểm đen sạt lở & đường đèo
 
-- **Hiện trạng:** 12 điểm (Đèo Khau Cốc Chà, Đèo Mẻ Pia, …) viết cứng trong `backend/app/services/landslides.py`
-  (`KNOWN_BLACKSPOTS`), kèm cảm biến / trạm mưa gắn với từng điểm (`tilt_sensor_id`, `rain_station_id`, `soil_moisture_id`).
-  Danh sách này được dùng **cả khi chạy thật**; trạng thái từng điểm tính từ số liệu thật (vùng nguy hiểm, đường bị chia cắt,
-  cảm biến), điểm chưa có bằng chứng giám sát hiện xám "chưa có dữ liệu".
-- **Cần:** danh mục chính thức — mã, tên, tuyến đường, xã, toạ độ, loại (đèo dốc / taluy / ngầm tràn…), mô tả, mã cảm biến và
-  trạm mưa gắn kèm (nếu có), tuyến tránh.
-- **Việc lập trình khi có:** thêm loại dữ liệu nhập (ví dụ `diem_den_sat_lo`) + bảng lưu, thay hằng `KNOWN_BLACKSPOTS` bằng dữ
-  liệu đã nhập; giữ nguyên cách tính trạng thái. Kiểm thử `tests/e2e/landslide-test.mjs` hiện dựa vào danh sách mẫu — cần sửa
-  theo.
+- **Đã làm phần lập trình (28/10/2026):** danh mục nằm ở bảng `iot_telemetry.landslide_blackspots` (migration 0028), nhập /
+  sửa ở trang **Nhập dữ liệu** — loại **"Điểm đen sạt lở, đèo dốc"** (`diem_den_sat_lo`): form, tệp CSV / Excel / GeoJSON
+  điểm, xã gửi hồ sơ chờ tỉnh duyệt, "Thay toàn bộ" khi có danh mục chính thức. Thêm cột **tuyến tránh** (hiện công khai).
+  12 điểm ban đầu (Đèo Khau Cốc Chà, Đèo Mẻ Pia, …) được chép vào bảng (cả máy đang chạy thật — không mất điểm nào); cách
+  tính trạng thái giữ nguyên (vùng nguy hiểm, đường bị chia cắt, cảm biến; chưa có bằng chứng → xám "chưa có dữ liệu").
+- **Còn chờ dữ liệu:** danh mục chính thức — mã, tên, tuyến đường, xã, toạ độ, loại (đèo dốc / khu dân cư sườn đồi / ngầm
+  tràn), đặc điểm, mã cảm biến và trạm mưa gắn kèm (nếu có), tuyến tránh. Toạ độ, mã cảm biến của 12 điểm ban đầu là xấp xỉ /
+  mẫu — có danh mục chính thức thì nhập bằng "Thay toàn bộ".
 
 ## 4. D3 — Mạng đường
 

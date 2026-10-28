@@ -178,6 +178,7 @@ graph LR
 | Điểm sơ tán (`diem_so_tan`) 🌐 | `evacuation_sites` | CSV / Excel / GeoJSON điểm | `ma` | ✓ |
 | Vùng nguy hiểm (`vung_nguy_hiem`) 🌐 | `hazard_zones` | GeoJSON vùng | `ma` | ✓ (không xoá vùng do cảm biến tạo) |
 | Điểm nguy hiểm (`diem_nguy_hiem`) 🌐 | `hazard_points` | CSV / Excel / GeoJSON điểm | `ma` | ✓ |
+| Điểm đen sạt lở, đèo dốc (`diem_den_sat_lo`) 🌐 | `landslide_blackspots` | CSV / Excel / GeoJSON điểm | `ma` (+ mã trạm nghiêng / mưa / độ ẩm đất gắn kèm, không bắt buộc có sẵn) | ✓ |
 | Danh bạ & đường dây nóng (`danh_ba`) 🌐 | `contacts` | CSV / Excel | `ma` (+ `ma_cap_tren`) | ✓ |
 | Trạm quan trắc (`tram_quan_trac`) 🌐 | `monitoring_stations` | CSV / Excel / GeoJSON điểm | `ma` | — |
 | Vùng ngập theo kịch bản (`ngap_kich_ban`) | `flood_scenarios` | GeoJSON vùng | `ma` (+ `ma_tram`; `cap_bao_dong` 1–3 **hoặc** `muc_nuoc_m`) | ✓ |
