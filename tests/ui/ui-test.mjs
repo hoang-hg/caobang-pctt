@@ -292,8 +292,19 @@ async function publicPortal(ctx) {
       await dialog.getByRole('button', { name: 'Sập nhà', exact: true }).click();
       await dialog.getByRole('button', { name: 'Trẻ em', exact: true }).click();
       await expectNoOverflow(ctx, 'form yêu cầu cứu người', dialog);
-      await dialog.getByRole('button', { name: 'Huỷ', exact: true }).click();
-      return 'mở được, không gửi';
+      // Đã chọn → "Huỷ" / Esc phải hỏi lại, không đóng mất biểu mẫu; "Tiếp tục soạn" giữ nguyên lựa chọn
+      const form = page.getByRole('dialog', { name: 'Yêu cầu cứu người' });
+      const ask = page.getByRole('dialog', { name: 'Bỏ yêu cầu đang soạn?' });
+      await form.getByRole('button', { name: 'Huỷ', exact: true }).click();
+      await ask.waitFor({ timeout: 5_000 });
+      await ask.getByRole('button', { name: 'Tiếp tục soạn' }).click();
+      if ((await form.getByRole('button', { name: 'Sập nhà', exact: true }).getAttribute('aria-pressed')) !== 'true') {
+        throw new Error('"Tiếp tục soạn" làm mất lựa chọn đã chọn');
+      }
+      await page.keyboard.press('Escape');
+      await ask.getByRole('button', { name: 'Bỏ yêu cầu' }).click();
+      await form.waitFor({ state: 'detached', timeout: 5_000 });
+      return 'mở được, hỏi lại trước khi bỏ, không gửi';
     });
   }
 
