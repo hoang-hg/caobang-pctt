@@ -31,7 +31,7 @@ const Tel = ({ phone, label = 'Gọi' }) =>
 function MiniSeries({ stationId, unit }) {
   const c = useChartTheme();
   const { data } = useQuery({ queryKey: ['series', stationId, 24], queryFn: () => api(`/stations/${stationId}/series`, { params: { hours: 24 } }) });
-  if (!data) return <div className="h-20 animate-pulse rounded bg-panel2" />;
+  if (!data) return <div className="h-20 motion-safe:animate-pulse rounded bg-panel2" />;
   return (
     <div>
       <ResponsiveContainer width="100%" height={80}>

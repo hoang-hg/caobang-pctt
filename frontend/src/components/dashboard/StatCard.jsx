@@ -30,14 +30,14 @@ export default function StatCard({
   const scale = level === undefined ? null : risk(level);
   const Tag = to ? Link : onClick ? 'button' : 'div';
   const tagProps = to ? { to } : onClick ? { type: 'button', onClick } : {};
-  const badgeEl = badge && <span className={clsx('shrink-0', alert && 'motion-safe:animate-blink')}>{badge}</span>;
+  const badgeEl = badge && <span className={clsx('shrink-0', alert && 'motion-safe:animate-blink-text')}>{badge}</span>;
   return (
     <Tag
       {...tagProps}
       title={hint}
       className={clsx(
         // w-full: ô là <button> / <a> (tự co theo nội dung) nằm trong lớp bọc vẫn phải giãn hết cột
-        'card flex w-full min-w-0 flex-col text-left transition-all duration-200',
+        'card flex w-full min-w-0 flex-col text-left transition duration-200',
         compact ? 'gap-0.5 sm:gap-1 p-1.5 sm:p-2.5 shadow-sm hover:shadow-md' : 'justify-between gap-1 p-3',
         (to || onClick) && 'hover:-translate-y-0.5 hover:border-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
         level >= 1 && clsx('border-l-4', scale.edge),

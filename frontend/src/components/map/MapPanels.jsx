@@ -296,7 +296,7 @@ function EventFeed({ feed, canSos, onFocus, touch }) {
               {at ? (
                 <button
                   type="button"
-                  className={clsx(cls, 'transition-all hover:border-accent hover:bg-panel2/80')}
+                  className={clsx(cls, 'transition hover:border-accent hover:bg-panel2/80')}
                   onClick={() => onFocus({ lat: l.lat, lon: l.lon, zoom: 14, label: l.message.slice(0, 60) })}
                   aria-label={`${time(l.time)}: ${l.message}. Xem trên bản đồ`}
                 >
@@ -346,7 +346,7 @@ export function AlertsList({
       key={id}
       type="button"
       className={clsx(
-        'shrink-0 rounded-lg text-xs font-semibold transition-all px-2.5 py-1 whitespace-nowrap text-center',
+        'shrink-0 rounded-lg text-xs font-semibold transition px-2.5 py-1 whitespace-nowrap text-center',
         touch ? 'min-h-[44px]' : 'min-h-[30px]',
         active === id ? 'bg-accent text-white shadow-xs' : 'text-muted hover:text-ink hover:bg-panel2',
       )}
@@ -360,7 +360,7 @@ export function AlertsList({
       {label}
     </button>
   );
-  const item = 'w-full rounded-xl border border-line text-left shadow-sm transition-all hover:border-accent';
+  const item = 'w-full rounded-xl border border-line text-left shadow-sm transition hover:border-accent';
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="space-y-1.5 border-b border-line bg-panel2/40 px-3 py-2">
@@ -479,7 +479,7 @@ export function AlertsList({
               <div key={s.id} className={item}>
                 <button type="button" className="w-full rounded-xl p-2.5 text-left hover:bg-panel2/80" onClick={() => onFocus({ lat: s.lat, lon: s.lon, zoom: 15, label: s.code })}>
                   <div className="flex items-center gap-2">
-                    <span className={clsx('h-2.5 w-2.5 shrink-0 rounded-full', s.status === 'moi' && 'animate-blink', risk(4 - s.priority).fill)} />
+                    <span className={clsx('h-2.5 w-2.5 shrink-0 rounded-full', s.status === 'moi' && 'motion-safe:animate-blink', risk(4 - s.priority).fill)} />
                     <b className="text-sm font-bold text-ink">{s.code}</b>
                     <span className="text-xs text-muted">{PRIORITY[s.priority]?.short || `Cấp ${s.priority}`}</span>
                     <span className="ml-auto text-[11px] text-muted">{ago(s.received_at)}</span>
@@ -533,7 +533,7 @@ export function AlertsList({
                 <button
                   key={p.id}
                   type="button"
-                  className="w-full rounded-xl border border-dashed border-line p-2.5 text-left transition-all hover:border-accent hover:bg-panel2/80"
+                  className="w-full rounded-xl border border-dashed border-line p-2.5 text-left transition hover:border-accent hover:bg-panel2/80"
                   onClick={() => onFocus({ lat: p.lat, lon: p.lon, zoom: 14, label: p.name })}
                 >
                   <div className="mb-1 flex items-center justify-between text-xs">
@@ -687,7 +687,7 @@ export function TimeControl({ offset, setOffset, touch }) {
   const maxVal = 24;
   const quickList = isForecast ? QUICK_FORECAST : QUICK_ALL;
   const modeBtn = (on) => clsx(
-    'rounded-md px-2 py-0.5 text-[11px] font-semibold transition-all',
+    'rounded-md px-2 py-0.5 text-[11px] font-semibold transition',
     touch && 'min-h-[44px]',
     on ? 'bg-accent text-white shadow-xs' : 'text-muted hover:text-ink',
   );
@@ -803,7 +803,7 @@ export function TimeControl({ offset, setOffset, touch }) {
             onClick={() => pick(h)}
             aria-pressed={offset === h}
             className={clsx(
-              'rounded-lg text-[11px] font-semibold transition-all',
+              'rounded-lg text-[11px] font-semibold transition',
               touch ? 'min-h-[44px]' : 'min-h-[26px]',
               offset === h ? 'bg-accent/15 text-accent' : 'text-muted hover:bg-panel2',
             )}

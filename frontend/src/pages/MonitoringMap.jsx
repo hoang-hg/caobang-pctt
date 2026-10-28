@@ -463,6 +463,8 @@ export default function MonitoringMap() {
         !wide && 'pb-[calc(4.3rem+env(safe-area-inset-bottom))]',
       )}
     >
+      {/* Trang bản đồ không có PageHeader (nhường chỗ cho bản đồ) — tiêu đề chỉ cho trình đọc màn hình */}
+      <h1 className="sr-only">Bản đồ giám sát</h1>
       {/* 0. Thông tin khẩn luôn trên cùng: dải tình huống (cùng số với Dashboard) + mất mạng / không cập nhật được */}
       <div className="shrink-0">
         {kQ.data && (
@@ -608,7 +610,7 @@ export default function MonitoringMap() {
                     onClick={() => setToolsOpen(true)}
                     className={clsx(
                       floatCard,
-                      'flex h-10 items-center justify-center gap-1.5 px-3 text-xs font-semibold text-ink-2 hover:bg-panel2 transition-all [@media(pointer:coarse)]:h-11 shadow-sm',
+                      'flex h-10 items-center justify-center gap-1.5 px-3 text-xs font-semibold text-ink-2 hover:bg-panel2 transition [@media(pointer:coarse)]:h-11 shadow-sm',
                     )}
                     title="Mở thanh chọn nền & công cụ vẽ"
                     aria-label="Mở thanh chọn nền & công cụ vẽ"
@@ -657,14 +659,14 @@ export default function MonitoringMap() {
                     type="button"
                     className={clsx(
                       floatCard,
-                      'flex h-10 items-center justify-center gap-2 rounded-xl px-3.5 text-xs font-bold text-danger shadow-md hover:bg-panel2 transition-all [@media(pointer:coarse)]:h-11',
+                      'flex h-10 items-center justify-center gap-2 rounded-xl px-3.5 text-xs font-bold text-danger shadow-md hover:bg-panel2 transition [@media(pointer:coarse)]:h-11',
                     )}
                     onClick={() => setRightOpen(true)}
                     aria-expanded={false}
                     aria-label="Mở bảng cảnh báo khẩn cấp"
                     title="Mở bảng cảnh báo khẩn cấp"
                   >
-                    <Siren size={16} className="text-danger animate-pulse" aria-hidden="true" />
+                    <Siren size={16} className="text-danger motion-safe:animate-pulse" aria-hidden="true" />
                     <span>Cảnh báo</span>
                     {alertCount > 0 && <span className="chip bg-danger text-white text-[11px] font-bold px-1.5 py-px">{alertCount}</span>}
                     <ChevronLeft size={14} className="text-muted ml-0.5" />
@@ -699,7 +701,7 @@ export default function MonitoringMap() {
             </div>
 
             {/* Thanh thời gian – Đáy, giữa; căn giữa và tự co giãn vừa vặn */}
-            <div ref={timeBarRef} className={clsx(floatCard, 'absolute bottom-3 left-1/2 -translate-x-1/2 z-[1000] w-fit max-w-[min(640px,calc(100%-25rem))] px-4 py-2 transition-all duration-200')}>
+            <div ref={timeBarRef} className={clsx(floatCard, 'absolute bottom-3 left-1/2 -translate-x-1/2 z-[1000] w-fit max-w-[min(640px,calc(100%-25rem))] px-4 py-2 transition duration-200')}>
               <TimeControl offset={offset} setOffset={setOffset} touch={coarse} />
             </div>
           </>
@@ -816,7 +818,7 @@ export default function MonitoringMap() {
         {/* Trạng thái: đang tải lần đầu / không tải được (bản đồ nền vẫn xem được) */}
         {!data && !layersQ.isError && (
           <div className="pointer-events-none absolute inset-0 z-[900] flex items-center justify-center bg-bg/40 backdrop-blur-sm" role="status" aria-label="Đang tải lớp dữ liệu bản đồ">
-            <MapIcon className="animate-bounce text-accent" size={32} />
+            <MapIcon className="motion-safe:animate-bounce text-accent" size={32} />
           </div>
         )}
         {!data && layersQ.isError && (

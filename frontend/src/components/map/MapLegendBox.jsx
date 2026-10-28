@@ -2,14 +2,22 @@ import { useState } from 'react';
 import clsx from 'clsx';
 import {
   HelpCircle, ChevronDown, ChevronRight,
-  X
+  X, CloudRain, Waves, Mountain, Home, Camera, MapPin, Route
 } from 'lucide-react';
 import { stationView } from '../../utils/stations';
 import { landslideStatus } from '../../utils/labels';
 import { levelOf, risk, TILT_LEVEL } from '../../utils/risk';
 
-/** Biểu tượng theo loại điểm đang chọn — dùng chung cho thẻ chi tiết (chú giải) và thanh nổi trên bản đồ công khai. */
-export const POINT_EMOJI = { rain: '🌧️', water: '💧', landslide: '⚠️', evac: '🏠', report: '📸' };
+/** Biểu tượng theo loại điểm (lucide — emoji hiện khác nhau giữa các máy và bị trình đọc màn hình đọc lên) — dùng chung cho
+ * thẻ chi tiết (chú giải) và thanh nổi trên bản đồ công khai. */
+// Khoá theo loại điểm (`type`) và theo mã nhóm chú giải (`landslides`, `reports` — số nhiều)
+const POINT_ICONS = {
+  rain: CloudRain, water: Waves, landslide: Mountain, landslides: Mountain, evac: Home, report: Camera, reports: Camera,
+};
+export function PointIcon({ type, size = 16, className }) {
+  const Icon = POINT_ICONS[type] || MapPin;
+  return <Icon size={size} className={clsx('shrink-0', className)} aria-hidden="true" />;
+}
 
 /** Ô Chú thích các biểu tượng trên bản đồ & Tra cứu thông tin chi tiết */
 export default function MapLegendBox({
@@ -39,7 +47,6 @@ export default function MapLegendBox({
       title: 'Trạm đo lượng mưa',
       count: rainStations.length,
       iconColor: 'bg-good/10 text-good border-good/20',
-      badge: '🌧️',
       summary: 'Quan trắc lượng mưa tự động thời gian thực (mm)',
       desc: 'Màu sắc biểu tượng thay đổi theo cường độ: Xanh lá (<20mm - Mưa nhỏ) → Vàng (20-50mm - Mưa vừa) → Cam (50-100mm - Mưa to) → Đỏ (>100mm - Mưa rất to).',
       items: rainStations.map((s) => {
@@ -63,7 +70,6 @@ export default function MapLegendBox({
       title: 'Trạm đo mực nước',
       count: waterStations.length,
       iconColor: 'bg-accent/10 text-accent border-accent/20',
-      badge: '💧',
       summary: 'Cảm biến radar đo mực nước sông suối tự động',
       desc: 'Theo dõi mực nước sông Gâm, sông Bằng, sông Quây Sơn. Cảnh báo khi vượt mức Báo động I, Báo động II hoặc Báo động III.',
       items: waterStations.map((s) => {
@@ -87,7 +93,6 @@ export default function MapLegendBox({
       title: 'Điểm đen sạt trượt & Đèo dốc',
       count: landslides.length,
       iconColor: 'bg-warn/15 text-warn border-warn/30',
-      badge: '⚠️',
       summary: 'Các vị trí sườn dốc đèo có nguy cơ sạt lở đất đá',
       desc: `Theo dõi ${landslides.length} điểm đèo dốc, taluy, ngầm tràn: trạng thái theo cảm biến và vùng cảnh báo sạt lở / lũ quét đang hiệu lực, kèm tuyến đường tránh.`,
       items: landslides.map((p) => ({
@@ -108,7 +113,6 @@ export default function MapLegendBox({
       title: 'Điểm sơ tán an toàn',
       count: evacSites.length,
       iconColor: 'bg-good/10 text-good border-good/20',
-      badge: '🏠',
       summary: 'Nhà văn hóa, trường học chỉ định tránh trú thiên tai',
       desc: 'Vị trí an toàn cao ráo phục vụ sơ tán dân khẩn cấp, hiển thị số chỗ còn trống và liên hệ ban quản lý.',
       items: evacSites.map((e) => ({
@@ -129,7 +133,6 @@ export default function MapLegendBox({
       title: 'Phản ánh người dân',
       count: reports.length,
       iconColor: 'bg-accent/10 text-accent border-accent/20',
-      badge: '📸',
       summary: 'Tin báo hiện trường có ảnh chụp đã xác minh',
       desc: 'Thông tin ngập úng, cây đổ, sạt taluy do người dân gửi qua Cổng thông tin đã được chính quyền địa phương xác thực.',
       items: reports.map((r) => ({
@@ -169,7 +172,7 @@ export default function MapLegendBox({
 
       {/* Thẻ Chi tiết điểm đang chọn (Nếu người dùng click vào 1 điểm trên bản đồ hoặc trong list) */}
       {selectedPoint && (
-        <div className="rounded-xl border-2 border-accent/40 bg-accent/5 p-3 relative transition-all animate-fadeIn">
+        <div className="rounded-xl border-2 border-accent/40 bg-accent/5 p-3 relative transition animate-fadeIn">
           <button
             type="button"
             onClick={onClosePoint}
@@ -180,9 +183,7 @@ export default function MapLegendBox({
           </button>
 
           <div className="flex items-start gap-2 pr-6">
-            <span className="text-xl shrink-0 mt-0.5">
-              {POINT_EMOJI[selectedPoint.type] || '📍'}
-            </span>
+            <PointIcon type={selectedPoint.type} size={20} className="mt-0.5 text-accent" />
             <div className="min-w-0 flex-1">
               <span className="text-xs font-bold text-accent">
                 Chi tiết điểm đang chọn
@@ -206,8 +207,9 @@ export default function MapLegendBox({
                   </div>
                 )}
                 {selectedPoint.raw.bypass_route && (
-                  <div className="text-[11px] text-danger font-medium mt-1">
-                    🛣️ Đường tránh đề xuất: {selectedPoint.raw.bypass_route}
+                  <div className="text-[11px] text-danger font-medium mt-1 flex items-start gap-1">
+                    <Route size={13} className="mt-px shrink-0" aria-hidden="true" />
+                    <span>Đường tránh đề xuất: {selectedPoint.raw.bypass_route}</span>
                   </div>
                 )}
                 <p className="text-[11px] bg-panel2 p-2 rounded text-ink-2 mt-1 leading-relaxed">
@@ -233,7 +235,7 @@ export default function MapLegendBox({
               <>
                 <div className="flex justify-between">
                   <span className="text-muted">Mực nước quan trắc:</span>
-                  <span className="font-mono font-bold text-base text-blue-600">{selectedPoint.value}</span>
+                  <span className="font-mono font-bold text-base text-ink">{selectedPoint.value}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted">Cấp báo động:</span>
@@ -276,7 +278,6 @@ export default function MapLegendBox({
       {/* Hướng dẫn cụm số gom điểm */}
       <div className="flex items-center gap-2.5 p-2 rounded-xl bg-panel2/60 border border-line/60 text-[11px] text-muted leading-tight">
         <div className="relative flex h-6 w-6 shrink-0 items-center justify-center">
-          <span className="absolute inset-0 rounded-full bg-accent/35 animate-ping" />
           <span className="relative flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-white text-xs font-bold border border-white">
             28
           </span>
@@ -295,7 +296,7 @@ export default function MapLegendBox({
             <div
               key={cat.id}
               className={clsx(
-                'rounded-xl border transition-all overflow-hidden',
+                'rounded-xl border transition overflow-hidden',
                 isExpanded ? 'border-accent/40 bg-panel shadow-sm' : 'border-line/70 bg-panel2/40 hover:bg-panel2/80'
               )}
             >
@@ -306,7 +307,9 @@ export default function MapLegendBox({
                 className="w-full flex items-center justify-between p-2.5 text-left cursor-pointer transition-colors"
               >
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <span className="text-lg shrink-0">{cat.badge}</span>
+                  <span className={clsx('inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border', cat.iconColor)}>
+                    <PointIcon type={cat.id} size={16} />
+                  </span>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-xs text-ink leading-tight truncate">{cat.title}</span>
@@ -342,7 +345,7 @@ export default function MapLegendBox({
                         type="button"
                         onClick={() => onSelectPoint(item)}
                         className={clsx(
-                          'w-full flex items-center justify-between p-1.5 rounded-lg text-left transition-all cursor-pointer',
+                          'w-full flex items-center justify-between p-1.5 rounded-lg text-left transition cursor-pointer',
                           selectedPoint?.id === item.id
                             ? 'bg-accent/10 border border-accent/30 text-accent font-bold'
                             : 'hover:bg-panel2/80 text-ink'

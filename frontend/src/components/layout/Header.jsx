@@ -134,7 +134,7 @@ export default function Header() {
             )}
             title={`Kết nối thời gian thực: ${wsStatus === 'connecting' ? 'Đang kết nối lại' : 'Mất kết nối'}`}
           >
-            <span className={clsx('h-2 w-2 rounded-full shrink-0', wsStatus === 'connecting' ? 'bg-warn animate-ping' : 'bg-danger')} />
+            <span className={clsx('h-2 w-2 rounded-full shrink-0', wsStatus === 'connecting' ? 'bg-warn motion-safe:animate-ping' : 'bg-danger')} />
             <span className="hidden font-mono sm:inline">
               {wsStatus === 'connecting' ? 'Đang nối…' : 'Mất kết nối'}
             </span>

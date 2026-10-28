@@ -783,7 +783,7 @@ export default function Dashboard() {
                       large={presentation}
                       stacked={false}
                     />
-                    <div className="flex items-center justify-between rounded-lg border border-dashed border-accent/40 bg-accent/5 px-4 py-2.5 text-xs text-ink/80 transition-all hover:bg-accent/10">
+                    <div className="flex items-center justify-between rounded-lg border border-dashed border-accent/40 bg-accent/5 px-4 py-2.5 text-xs text-ink/80 transition hover:bg-accent/10">
                       <div className="flex items-center gap-2">
                         <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent/15 text-accent font-semibold">
                           <Compass size={14} />
@@ -804,7 +804,7 @@ export default function Dashboard() {
 
                 {layout === 'right_full' && (
                   <div className="flex min-w-0 flex-col gap-3.5">
-                    <div className="flex items-center justify-between rounded-lg border border-dashed border-accent/40 bg-accent/5 px-4 py-2.5 text-xs text-ink/80 transition-all hover:bg-accent/10">
+                    <div className="flex items-center justify-between rounded-lg border border-dashed border-accent/40 bg-accent/5 px-4 py-2.5 text-xs text-ink/80 transition hover:bg-accent/10">
                       <div className="flex items-center gap-2">
                         <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent/15 text-accent font-semibold">
                           <CheckSquare size={14} />

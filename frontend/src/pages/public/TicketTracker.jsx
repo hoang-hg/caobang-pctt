@@ -246,7 +246,7 @@ export default function TicketTracker({ initialCode = '', initialPhone = '', onQ
                       key={it.code}
                       onClick={() => setSelectedIdx(idx)}
                       className={clsx(
-                        'flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all shrink-0',
+                        'flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold border transition shrink-0',
                         active
                           ? 'border-accent bg-accent/10 text-accent shadow-sm'
                           : 'border-line bg-panel hover:bg-panel2 text-ink-2'
@@ -357,7 +357,7 @@ export default function TicketTracker({ initialCode = '', initialPhone = '', onQ
                   <span>Tiến độ xử lý điều hành tác chiến</span>
                 </span>
                 <span className="text-[11px] flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-full bg-good animate-ping" />
+                  <span className="h-2 w-2 rounded-full bg-good motion-safe:animate-ping" />
                   <span>Tự động đồng bộ mỗi 15s</span>
                 </span>
               </div>
@@ -377,7 +377,7 @@ export default function TicketTracker({ initialCode = '', initialPhone = '', onQ
                       {/* Icon tròn đánh dấu mốc */}
                       <div
                         className={clsx(
-                          'absolute -left-6 sm:-left-8 top-0.5 flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full text-xs font-bold transition-all shadow-sm',
+                          'absolute -left-6 sm:-left-8 top-0.5 flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full text-xs font-bold transition shadow-sm',
                           isDone && col.badge,
                           isCurrent && clsx('ring-4', col.glow, col.badge),
                           isWaiting && 'bg-panel2 border border-line text-muted',
@@ -389,7 +389,7 @@ export default function TicketTracker({ initialCode = '', initialPhone = '', onQ
                           st.name === 'dang_den' ? (
                             <Navigation size={15} aria-hidden="true" />
                           ) : (
-                            <span className="h-2.5 w-2.5 rounded-full bg-white animate-ping" />
+                            <span className="h-2.5 w-2.5 rounded-full bg-white motion-safe:animate-ping" />
                           )
                         )}
                         {isWaiting && <span>{st.step}</span>}
@@ -399,7 +399,7 @@ export default function TicketTracker({ initialCode = '', initialPhone = '', onQ
                       {/* Thẻ nội dung mốc */}
                       <div
                         className={clsx(
-                          'rounded-2xl border p-3.5 sm:p-4 transition-all',
+                          'rounded-2xl border p-3.5 sm:p-4 transition',
                           isCurrent
                             ? 'border-accent/40 bg-accent/5 ring-1 ring-accent/20 shadow-sm'
                             : isDone

@@ -170,13 +170,13 @@ export default function Login() {
   const wide = useMediaQuery('(min-width: 1024px)');
 
   return (
-    <div className="flex min-h-screen flex-col bg-bg lg:flex-row">
+    <div className="flex min-h-screen supports-[height:100dvh]:min-h-dvh flex-col bg-bg lg:flex-row">
       {/* Cột trái (máy tính): ranh giới tỉnh và các xã từ dữ liệu của hệ thống — không dùng ảnh chụp ô bản đồ / ảnh trên mạng.
           Dính đỉnh, cao đúng 1 màn hình: cột phải dài (cài xác thực 2 lớp) vẫn thấy đủ cột trái. Nền xanh đêm như khối đầu
           trang Tổng quan; lưới chấm mờ dần + quầng sáng sau hình tỉnh tạo chiều sâu (màu chuyển chỉ trong khối có
           data-mau-chuyen — docs/ke-hoach-lam-moi-giao-dien.md mục 1.3) */}
       {wide ? (
-        <aside data-mau-chuyen="" className="hero-brand sticky top-0 isolate flex h-screen w-[46%] shrink-0 flex-col gap-7 overflow-hidden p-10 text-slate-200">
+        <aside data-mau-chuyen="" className="hero-brand sticky top-0 isolate flex h-screen supports-[height:100dvh]:h-dvh w-[46%] shrink-0 flex-col gap-7 overflow-hidden p-10 text-slate-200">
           <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(rgb(148_163_184/0.16)_1px,transparent_1px)] [background-size:22px_22px] [mask-image:radial-gradient(75%_60%_at_50%_42%,black,transparent)]" />
           <div aria-hidden="true" className="pointer-events-none absolute left-1/2 top-[42%] -z-10 aspect-square w-[90%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,rgb(37_99_235/0.35),transparent)]" />
           <BrandLockup />
@@ -250,7 +250,7 @@ export default function Login() {
                     placeholder="Nhập tên đăng nhập hoặc email..."
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    className="input pl-10 py-2.5 text-sm rounded-xl font-medium focus:ring-2 focus:ring-accent/30 transition-all"
+                    className="input pl-10 py-2.5 text-sm rounded-xl font-medium focus:ring-2 focus:ring-accent/30 transition"
                   />
                 </div>
               </div>
@@ -280,7 +280,7 @@ export default function Login() {
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="input pl-10 pr-10 py-2.5 text-sm rounded-xl font-medium focus:ring-2 focus:ring-accent/30 transition-all"
+                    className="input pl-10 pr-10 py-2.5 text-sm rounded-xl font-medium focus:ring-2 focus:ring-accent/30 transition"
                   />
                   <button
                     type="button"

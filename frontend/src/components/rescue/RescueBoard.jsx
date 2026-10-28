@@ -67,7 +67,7 @@ export default function RescueBoard({ tickets, factsOf, wide, column, onColumn, 
             className={clsx(
               // Kiểu bảng Kanban: thân cột lõm (màu nền trang) — thẻ phiếu trắng nổi lên; đầu cột trắng có vạch màu nhấn phía
               // trên (cột đã xong: xanh lá như biểu tượng). Không dùng màu Đỏ / Cam / Vàng (dành cho mức ưu tiên của phiếu)
-              'card flex min-h-0 min-w-0 flex-col overflow-hidden border-t-[3px] shadow-none transition-all print:h-auto print:max-h-none print:min-h-0',
+              'card flex min-h-0 min-w-0 flex-col overflow-hidden border-t-[3px] shadow-none transition print:h-auto print:max-h-none print:min-h-0',
               // Cao bằng cột Tiếp nhận & Sơ tán khi nằm cạnh (height); không thì kéo tới đáy màn hình, phiếu cuộn trong cột
               height ? 'h-full' : 'h-[calc(100vh-12rem)] min-h-[360px] lg:tall:h-[calc(100vh-14rem)]',
               c.key === 'hoan_thanh' ? 'border-t-good' : 'border-t-accent',
@@ -82,7 +82,7 @@ export default function RescueBoard({ tickets, factsOf, wide, column, onColumn, 
                 <span className="min-w-0 flex-1 leading-tight">{c.title}</span>
                 {late > 0 && (
                   <span className="chip inline-flex items-center gap-1 bg-danger px-1.5 py-0 text-[11px] font-bold text-white" title={`${late} phiếu quá hạn phản hồi`}>
-                    <span className="inline-block h-1.5 w-1.5 animate-ping rounded-full bg-white" aria-hidden="true" />
+                    <span className="inline-block h-1.5 w-1.5 motion-safe:animate-ping rounded-full bg-white" aria-hidden="true" />
                     {late} quá hạn
                   </span>
                 )}
