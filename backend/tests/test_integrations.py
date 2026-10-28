@@ -155,3 +155,28 @@ def test_sync_errors_do_not_leak_api_keys():
     out = redact_secrets(msg)
     assert "om-SECRET-123" not in out and "apikey=***" in out and "latitude=22.6" in out
     assert "ow-key" not in redact_secrets("…/onecall?lat=22&appid=ow-key&units=metric")
+
+
+def test_ige_rain_records_to_intensity():
+    """Trạm mưa của Viện: lượng mưa mỗi 10 phút → cường độ mm/giờ (×6); bỏ bản ghi lỗi, ở tương lai."""
+    from datetime import UTC, datetime
+
+    from app.integrations.adapters.ige_truotlo import to_intensity
+
+    now = datetime(2026, 10, 28, 14, 0, tzinfo=UTC)
+    recs = [
+        {"record_time": "2026-10-28T13:20:00+00:00", "rainfall": 2},
+        {"record_time": "2026-10-28T13:10:00+00:00", "rainfall": 0.5},
+        {"record_time": "2026-10-28T13:30:00Z", "rainfall": -1},  # âm → bỏ
+        {"record_time": "2026-10-28T13:40:00+00:00", "rainfall": None},  # thiếu → bỏ
+        {"record_time": "2026-10-28T13:50:00+00:00", "rainfall": 500},  # quá lớn → bỏ
+        {"record_time": "2026-10-28T15:00:00+00:00", "rainfall": 1},  # tương lai → bỏ
+        {"record_time": "không phải giờ", "rainfall": 1},
+    ]
+    pts, skipped = to_intensity(recs, now)
+    assert [(t.minute, v) for t, v in pts] == [(10, 3.0), (20, 12.0)]
+    assert skipped == 5
+    # Tổng theo cách hệ thống tính (trung bình cường độ từng giờ × 1 giờ) = tổng lượng mưa gốc khi đủ 6 khoảng / giờ
+    hourly = [{"record_time": f"2026-10-28T12:{m:02d}:00+00:00", "rainfall": 1.5} for m in range(0, 60, 10)]
+    pts, _ = to_intensity(hourly, now)
+    assert sum(v for _, v in pts) / len(pts) == 9.0  # 6 × 1,5 mm trong 1 giờ

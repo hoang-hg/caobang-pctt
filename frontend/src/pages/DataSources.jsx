@@ -21,13 +21,14 @@ import { ago, dateTime, int, time } from '../utils/format';
  * thử, cấu hình) giấu trong "Nâng cao". Thao tác khó quay lại (tắt nguồn, cấp khoá mới, xoá thiết bị) hỏi xác nhận nói rõ
  * hậu quả.
  */
-const PULL = ['open_meteo', 'openweather'];
+const PULL = ['open_meteo', 'openweather', 'ige_truotlo'];
 // Cổng đẩy ↔ giao thức của thiết bị gửi qua cổng đó
 const PUSH_PROTOCOL = { http_ingest: 'http', mqtt: 'mqtt', chirpstack: 'lorawan' };
 // Tên đời thường theo loại nguồn (tên trong hệ thống — thường có tên hãng, giao thức — nằm ở "Nâng cao")
 const TYPE = {
   open_meteo: { name: 'Dự báo mưa quốc tế', label: 'Nhiều mô hình dự báo, hệ thống tự lấy', tech: 'Open-Meteo (ECMWF IFS, NOAA GEFS) · kéo theo chu kỳ', icon: CloudSun },
   openweather: { name: 'Dự báo thời tiết quốc tế', label: 'Hệ thống tự lấy', tech: 'OpenWeather · kéo theo chu kỳ', icon: CloudSun },
+  ige_truotlo: { name: 'Trạm đo mưa của Viện Địa công nghệ và Môi trường', label: 'Mưa đo thật 10 phút / lần, hệ thống tự lấy', tech: 'API hệ thống Cảnh báo đa thiên tai (canhbaothientai.org.vn) · kéo theo chu kỳ', icon: CloudSun },
   http_ingest: { name: 'Cổng nhận số đo qua mạng di động', label: 'Thiết bị đo tự gửi lên qua 4G / NB-IoT', tech: 'HTTP · thiết bị đẩy lên', icon: Cpu },
   mqtt: { name: 'Cổng nhận số đo qua máy chủ tin nhắn', label: 'Thiết bị đo tự gửi lên qua máy chủ tin nhắn (MQTT)', tech: 'MQTT · thiết bị đẩy lên', icon: Radio },
   chirpstack: { name: 'Cổng nhận số đo từ thiết bị LoRa', label: 'Thiết bị đo gửi qua sóng vô tuyến tầm xa (LoRa)', tech: 'LoRaWAN webhook (ChirpStack / TTN) · đẩy lên', icon: Radio },
@@ -150,7 +151,8 @@ function SourceModal({ source, onClose }) {
             <input className="input mt-1" type="number" min={300} value={interval} onChange={(e) => setInterval(e.target.value)} />
           </label>
         )}
-        {pull && (
+        {/* API trạm mưa của Viện là API công khai — không có khoá */}
+        {pull && source.type !== 'ige_truotlo' && (
           <label>Khoá truy cập (API key) {source.has_secret && <span className="text-muted">(đang có: {source.secret_hint})</span>}
             <input className="input mt-1" type="password" placeholder={source.type === 'open_meteo' ? 'Tuỳ chọn — gói thương mại' : 'Bắt buộc'} value={secret} onChange={(e) => setSecret(e.target.value)} />
             {source.secret_from_env && (
