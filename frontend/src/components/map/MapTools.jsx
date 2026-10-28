@@ -291,17 +291,18 @@ export function CursorToStatus() {
 }
 
 // Viền vùng đang xem (xã đang lọc): màu nhấn (xanh) của giao diện — KHÔNG dùng đỏ (Đỏ chỉ nghĩa là mức Khẩn cấp của thang rủi ro
-// chung), viền nền tương phản bên dưới để rõ trên nền sáng, tối, vệ tinh. Ngoài tỉnh phủ KÍN 100 % (quyết định 28/10/2026: chỉ
-// hiện tỉnh Cao Bằng — docs/ke-hoach-lam-moi-giao-dien.md mục 7.2): nền sáng phủ trắng, nền tối và vệ tinh phủ tối. Ranh giới
-// tỉnh: nét ĐEN đậm; nền tối thêm viền sáng bên dưới (nét đen trên nền xanh đêm không thấy).
+// chung), viền nền tương phản bên dưới để rõ trên nền sáng, tối, vệ tinh. Ngoài tỉnh phủ NHẸ 40 % (quyết định 28/10/2026 lần 2,
+// theo trang tham khảo của Viện ĐCN&MT: vẫn thấy địa hình xung quanh, tỉnh nổi nhờ ranh giới — 100 % làm tỉnh như mẩu giấy cắt
+// dán; docs/ke-hoach-lam-moi-giao-dien.md mục 7.2): nền sáng phủ trắng, nền tối và vệ tinh phủ tối. Ranh giới tỉnh: nét ĐEN
+// đậm; nền tối thêm viền sáng bên dưới (nét đen trên nền xanh đêm không thấy).
 const AREA_STYLE = {
-  dark: { line: '#3987e5', halo: '#0b1220', mask: '#0b1220', maskOff: 1, provLine: '#000000', provHalo: '#e2e8f0' },
-  light: { line: '#2a78d6', halo: '#ffffff', mask: '#ffffff', maskOff: 1, provLine: '#000000', provHalo: '#ffffff' },
+  dark: { line: '#3987e5', halo: '#0b1220', mask: '#0b1220', maskOff: 0.4, provLine: '#000000', provHalo: '#e2e8f0' },
+  light: { line: '#2a78d6', halo: '#ffffff', mask: '#ffffff', maskOff: 0.4, provLine: '#000000', provHalo: '#ffffff' },
 };
 
 /**
  * Vùng đang xem (tỉnh, vùng lọc, phạm vi được giao): bay tới vùng + làm mờ đậm ngoài ranh giới + viền màu nhấn.
- * Ngoài ranh giới tỉnh Cao Bằng phủ kín 100 % — chỉ hiện tỉnh Cao Bằng; ranh giới tỉnh nét đen đậm.
+ * Ngoài ranh giới tỉnh Cao Bằng phủ nhẹ 40 % (vẫn thấy bối cảnh xung quanh); ranh giới tỉnh nét đen đậm.
  * Lớp mờ ở pane riêng (trên ô nền, dưới mọi lớp số liệu: điểm, vùng nguy hiểm, quỹ đạo bão vẫn rõ dù ở ngoài vùng);
  * không khoá kéo bản đồ ra ngoài. `fly` = false: không bay tới vùng. `basemap`: nền Vệ tinh → phủ tối.
  */
@@ -342,7 +343,7 @@ export function AreaFocus({ area, filtered, padding = {}, fly = true, basemap })
   return (
     <>
       <Pane name="mat-na-ngoai-vung" style={{ zIndex: 350 }}>
-        {/* Mặt nạ ngoài tỉnh Cao Bằng: phủ kín — chỉ hiện lãnh thổ tỉnh */}
+        {/* Mặt nạ ngoài tỉnh Cao Bằng: phủ nhẹ — tỉnh nổi, vẫn thấy bối cảnh xung quanh */}
         {provinceRings && (
           <Polygon
             key={`mask-prov-${s.mask}`}
@@ -432,7 +433,9 @@ export function FocusHandler({ padding } = {}) {
 }
 
 /**
- * Ranh giới xã/phường: nét liền + viền nền tương phản bên dưới → rõ trên nền sáng, tối, vệ tinh và trên lớp tô màu mưa.
+ * Ranh giới xã/phường: nét xám mảnh + viền nền mỏng bên dưới → vẫn rõ trên nền sáng, tối, vệ tinh và trên lớp tô màu mưa
+ * nhưng không lấn ô nền, điểm số liệu (28/10/2026: nét gần đen 1,5 px trên viền trắng 3,5 px làm 56 xã như kính ghép chì —
+ * trang tham khảo của Viện ĐCN&MT gần như không vẽ ranh giới xã). Ranh giới TỈNH vẫn nét đen đậm (AreaFocus).
  * Vẽ trong pane riêng (trên lớp tô màu, dưới điểm đánh dấu) nên không bị che dù dữ liệu tải về theo thứ tự nào.
  * `basemap` như BaseLayer ('auto' theo theme); `interactive` = tooltip tên xã khi rê chuột lên đường biên.
  */
@@ -447,13 +450,13 @@ export function AdminBoundaries({ geo, basemap = 'auto', interactive = true }) {
         key={`halo-${tone}`}
         data={geo}
         interactive={false}
-        style={{ color: dark ? '#0f172a' : '#ffffff', weight: 3.5, opacity: dark ? 0.55 : 0.8, fill: false }}
+        style={{ color: dark ? '#0f172a' : '#ffffff', weight: 2.5, opacity: dark ? 0.4 : 0.55, fill: false }}
       />
       <GeoJSON
         key={`line-${tone}-${interactive}`}
         data={geo}
         interactive={interactive}
-        style={{ color: dark ? '#f8fafc' : '#1e293b', weight: 1.5, opacity: 0.9, fill: false }}
+        style={{ color: dark ? '#cbd5e1' : '#64748b', weight: 1, opacity: 0.75, fill: false }}
         onEachFeature={
           interactive
             ? (f, layer) =>
