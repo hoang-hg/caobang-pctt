@@ -6,7 +6,7 @@ import clsx from 'clsx';
 import {
   ShieldAlert, LocateFixed, Megaphone, Phone, Home, CloudRain, Waves, Camera, LogIn, Moon, Sun, Navigation, AlertTriangle,
   CheckCircle2, Loader2, Share2, BookOpen, HelpCircle, MapPin, ChevronRight, PhoneCall, Compass, Search,
-  Mountain, X, Zap, ArrowLeft, Layers, Menu, Send, Siren, Package
+  Mountain, X, Zap, ArrowLeft, Layers, Menu, Send, Siren, Package, WifiOff, RotateCw
 } from 'lucide-react';
 import { api } from '../../api/client';
 import { useUnitsGeo, useUnits, useProvinceArea } from '../../api/hooks';
@@ -44,6 +44,7 @@ const GROUPS = [
 const SUB_LABEL = { muanuoc: 'Mực nước sông suối', sotan: 'Điểm sơ tán an toàn', hotlines: 'Đường dây nóng' };
 const SOURCE_TAB_LABEL = { satlo: 'Quay lại Sạt lở, lũ quét', sotan: 'Quay lại Điểm sơ tán' };
 const REFRESH = 60_000;
+const NO_ALERTS = []; // mặc định cố định: `= []` tại chỗ tạo mảng mới mỗi lần vẽ, các effect phụ thuộc chạy lại
 const pub = (path, params) => api(`/public${path}`, { params });
 const RISK = {
   cao: { label: 'Nguy cơ cao', cls: RISK_SCALE[3].chip, icon: AlertTriangle, tip: 'Bạn đang nằm trong vùng có nguy cơ ngập lụt hoặc sạt lở đất. Hãy chủ động di dời tới điểm an toàn!' },
@@ -375,9 +376,13 @@ export default function PublicPortal() {
   const [menuOpen, setMenuOpen] = useState(false); // điện thoại: menu ≡
   useEscapeToClose(menuOpen, () => setMenuOpen(false));
 
-  const { data: overview } = useQuery({ queryKey: ['pub-overview'], queryFn: () => pub('/overview'), refetchInterval: REFRESH });
+  const { data: overview, isError: overviewFailed, isFetching: overviewFetching, refetch: refetchOverview } = useQuery({
+    queryKey: ['pub-overview'], queryFn: () => pub('/overview'), refetchInterval: REFRESH,
+  });
   const { data: map, dataUpdatedAt: mapAt } = useQuery({ queryKey: ['pub-map'], queryFn: () => pub('/map'), refetchInterval: REFRESH });
-  const { data: alerts = [] } = useQuery({ queryKey: ['pub-alerts'], queryFn: () => pub('/alerts'), refetchInterval: REFRESH });
+  const { data: alerts = NO_ALERTS, isSuccess: alertsLoaded, isError: alertsFailed, refetch: refetchAlerts } = useQuery({
+    queryKey: ['pub-alerts'], queryFn: () => pub('/alerts'), refetchInterval: REFRESH,
+  });
   const activeAlerts = alerts.filter((a) => a.active !== false); // còn hiệu lực — đếm, nhấp nháy; lệnh đã kết thúc vẫn liệt kê bên dưới
   const { data: forecast } = useQuery({ queryKey: ['pub-forecast'], queryFn: () => pub('/forecast/areas', { hours: 24 }), refetchInterval: 10 * REFRESH });
   const { data: hotlines } = useQuery({ queryKey: ['pub-hotlines'], queryFn: () => pub('/hotlines'), staleTime: Infinity });
@@ -521,6 +526,8 @@ export default function PublicPortal() {
   const onRed = !!overview?.alerts?.has_red;
   const worstRiver = overview?.rivers?.reduce((m, r) => Math.max(m, r.level), 0) || 0;
   const riversAbove = (overview?.rivers || []).filter((r) => r.level >= 1).length;
+  // Chưa có số liệu tình hình (đang tải / máy chủ lỗi): KHÔNG được hiện "không có cảnh báo" — người dân đọc thành "an toàn"
+  const statusUnknown = !overview;
 
   return (
     <div className="min-h-full bg-bg text-ink pb-20 sm:pb-8">
@@ -644,24 +651,46 @@ export default function PublicPortal() {
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             {active
               ? <AlertTriangle size={22} className="shrink-0" aria-hidden="true" />
-              : <CheckCircle2 size={22} className="shrink-0 text-good" aria-hidden="true" />}
-            <div className="min-w-0 flex-1">
+              : statusUnknown
+                ? (overviewFailed
+                  ? <WifiOff size={22} className="shrink-0 text-muted" aria-hidden="true" />
+                  : <Loader2 size={22} className="shrink-0 text-muted motion-safe:animate-spin" aria-hidden="true" />)
+                : <CheckCircle2 size={22} className="shrink-0 text-good" aria-hidden="true" />}
+            <div className="min-w-0 flex-[1_1_12rem]" role={statusUnknown && overviewFailed ? 'alert' : undefined}>
               <div className="text-sm font-bold sm:text-base">
-                {active ? <>Đang có {active} cảnh báo thiên tai khẩn cấp<span className="max-sm:hidden"> trên địa bàn tỉnh</span></> : 'Hiện không có cảnh báo khẩn cấp'}
+                {active
+                  ? <>Đang có {active} cảnh báo thiên tai khẩn cấp<span className="max-sm:hidden"> trên địa bàn tỉnh</span></>
+                  : statusUnknown
+                    ? (overviewFailed ? 'Chưa tải được tình hình cảnh báo' : 'Đang tải tình hình cảnh báo…')
+                    : 'Hiện không có cảnh báo khẩn cấp'}
               </div>
               <div className={clsx('text-xs leading-relaxed', active ? (onRed ? 'text-white/90' : 'text-black/80') : 'text-muted')}>
-                {overview?.rain?.avg_24h != null ? (
+                {statusUnknown ? (
+                  overviewFailed
+                    ? 'Mạng hoặc máy chủ đang gián đoạn — không có nghĩa là an toàn. Theo dõi loa, đài địa phương; nguy hiểm đến tính mạng: gọi ngay 112.'
+                    : 'Vui lòng chờ trong giây lát.'
+                ) : overview?.rain?.avg_24h != null ? (
                   <>Mưa 24 giờ qua: trung bình <b className="num">{num(overview.rain.avg_24h, 1)} mm</b><span className="max-sm:hidden">, cao nhất <b className="num">{num(overview.rain.max_24h, 1)} mm</b></span></>
                 ) : 'Chưa có số liệu mưa — đang cập nhật'}
-                <span className="max-sm:hidden">
+                {!statusUnknown && <span className="max-sm:hidden">
                   {overview?.forecast_24h?.max_24h != null && (
                     <> · Dự báo 24 giờ tới cao nhất <b className="num">{num(overview.forecast_24h.max_24h, 1)} mm</b>{overview.forecast_24h.max_name ? ` tại ${overview.forecast_24h.max_name}` : ''}</>
                   )}
                   {' · '}Sông suối: <b>{['dưới báo động', 'trên Báo động I', 'trên Báo động II', 'trên Báo động III'][worstRiver]}</b>
-                </span>
+                </span>}
               </div>
             </div>
             <div className="flex shrink-0 flex-wrap items-center gap-2">
+              {statusUnknown && overviewFailed && (
+                <button
+                  type="button"
+                  onClick={() => refetchOverview()}
+                  disabled={overviewFetching}
+                  className="btn-ghost tap px-3 py-1.5 text-xs font-semibold"
+                >
+                  <RotateCw size={14} className={clsx(overviewFetching && 'motion-safe:animate-spin')} aria-hidden="true" /> Thử lại
+                </button>
+              )}
               {active > 0 && (
                 <button
                   type="button"
@@ -674,7 +703,7 @@ export default function PublicPortal() {
               <button
                 type="button"
                 onClick={() => setShowSosModal(true)}
-                className={clsx('btn px-3 py-1.5 text-xs font-bold sm:text-sm', active ? 'bg-white text-[rgb(var(--danger))] hover:bg-white/90' : 'bg-danger text-white hover:brightness-110')}
+                className={clsx('btn tap px-3 py-1.5 text-sm font-bold', active ? 'bg-white text-[rgb(var(--danger))] hover:bg-white/90' : 'bg-danger text-white hover:brightness-110')}
               >
                 <PhoneCall size={15} aria-hidden="true" /> Cần cứu hộ khẩn cấp
               </button>
@@ -1295,7 +1324,25 @@ export default function PublicPortal() {
                         <AlertCard key={a.code} a={a} highlight={a.code === focusAlert} />
                       ))}
 
-                      {!alerts.length && (
+                      {!alertsLoaded && (
+                        <div className="py-12 px-4 text-center" role={alertsFailed ? 'alert' : undefined}>
+                          {alertsFailed ? (
+                            <>
+                              <WifiOff size={24} className="mx-auto mb-3 text-muted" aria-hidden="true" />
+                              <div className="font-bold text-sm text-ink">Chưa tải được bản tin cảnh báo</div>
+                              <div className="text-xs text-muted mt-1 leading-relaxed max-w-xs mx-auto">
+                                Mạng hoặc máy chủ đang gián đoạn — không có nghĩa là an toàn. Nguy hiểm đến tính mạng: gọi ngay 112.
+                              </div>
+                              <button type="button" className="btn-ghost tap mt-3 text-xs font-semibold" onClick={() => refetchAlerts()}>
+                                <RotateCw size={14} aria-hidden="true" /> Thử lại
+                              </button>
+                            </>
+                          ) : (
+                            <Loader2 size={24} className="mx-auto text-muted motion-safe:animate-spin" aria-label="Đang tải bản tin cảnh báo" />
+                          )}
+                        </div>
+                      )}
+                      {alertsLoaded && !alerts.length && (
                         <div className="py-12 px-4 text-center">
                           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-good/15 text-good mx-auto mb-3">
                             <CheckCircle2 size={24} />
@@ -1520,7 +1567,7 @@ export default function PublicPortal() {
                     <div className="bg-panel2/60 p-2 rounded-lg border border-line/40">
                       <span className="text-[11px] text-muted">Trạm cao nhất:</span>
                       <div className="font-mono text-sm font-bold text-accent mt-0.5">
-                        {['Dưới báo động', 'Báo động I', 'Báo động II', 'Báo động III'][worstRiver]}
+                        {overview?.rivers ? ['Dưới báo động', 'Báo động I', 'Báo động II', 'Báo động III'][worstRiver] : '–'}
                       </div>
                     </div>
                     <div className="bg-panel2/60 p-2 rounded-lg border border-line/40">

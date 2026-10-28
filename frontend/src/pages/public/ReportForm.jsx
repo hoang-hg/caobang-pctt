@@ -5,7 +5,7 @@ import {
   CheckCircle2, LocateFixed, Loader2, Send, Trash2, MapPin, AlertCircle, ShieldCheck, ImagePlus, Search, Waves, AlertTriangle,
   Copy, Siren, Package, Camera, ChevronLeft, PhoneCall, Minus, Plus,
 } from 'lucide-react';
-import { Modal } from '../../components/common/ui';
+import { Confirm, Modal } from '../../components/common/ui';
 import Turnstile from '../../components/common/Turnstile';
 import { citizenApi } from '../../api/citizen';
 import { useCitizen } from '../../app/citizenSession';
@@ -150,6 +150,7 @@ export default function ReportForm({ onClose, myLocation, onTrack, initialKind =
   const [error, setError] = useState('');
   const [done, setDone] = useState(null);
   const [locating, setLocating] = useState(false);
+  const [askClose, setAskClose] = useState(false);
   // Chống bot (Cloudflare Turnstile) — chỉ khi backend bật TURNSTILE_SITE_KEY
   const { data: pubConfig } = useQuery({ queryKey: ['pub-config'], queryFn: () => api('/public/config'), staleTime: Infinity });
   const siteKey = pubConfig?.turnstile_site_key;
@@ -313,16 +314,37 @@ export default function ReportForm({ onClose, myLocation, onTrack, initialKind =
   // Cứu người / tiếp tế vào thẳng bảng cứu hộ → lực lượng phải gọi lại được (đã đăng nhập: số của tài khoản)
   const validPhone = !rescue || !!session || digits(f.reporter_phone).length >= 9;
   const valid = validDesc && validPos && validToken && validIncident && validPhone;
+  // Đã gõ / chọn gì đó → chạm nhầm ra ngoài, Esc, "Huỷ" phải hỏi lại: người đang gặp nạn mất cả biểu mẫu là nguy hiểm
+  const movedPos = !!pos && (!myLocation || pos.lat !== myLocation.lat || pos.lon !== myLocation.lon);
+  const dirty = !!(
+    f.description.trim() || f.address.trim() || f.reporter_name.trim() || f.reporter_phone.trim()
+    || files.length || incident || people || vulnerable.length || movedPos
+  );
+  const requestClose = () => (dirty ? setAskClose(true) : onClose());
+  const gpsQuick = (
+    <div className="flex flex-col gap-1 md:hidden">
+      <button type="button" className="btn-secondary tap w-full py-2.5 text-sm font-semibold" onClick={useGps} disabled={locating}>
+        {locating
+          ? <Loader2 size={16} className="motion-safe:animate-spin" aria-hidden="true" />
+          : <LocateFixed size={16} className="text-accent" aria-hidden="true" />}
+        <span>{pos ? 'Lấy lại vị trí của tôi' : 'Lấy vị trí của tôi'}</span>
+      </button>
+      <p className="text-[11px] text-muted">
+        {pos ? 'Đã có vị trí — kiểm tra, chỉnh lại trên bản đồ phía dưới nếu cần.' : 'Đang ở nơi cần giúp thì bấm nút trên; không thì chấm trên bản đồ phía dưới.'}
+      </p>
+    </div>
+  );
   const chip = (on) => clsx(
     'chip tap min-h-[36px] border px-3 text-xs font-semibold',
     on ? 'border-danger bg-danger text-white' : 'border-line bg-panel2/60 text-ink hover:bg-panel2',
   );
 
   return (
+    <>
     <Modal
       open
       wide
-      onClose={onClose}
+      onClose={requestClose}
       title={k.title}
       footer={
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between w-full gap-2">
@@ -330,13 +352,14 @@ export default function ReportForm({ onClose, myLocation, onTrack, initialKind =
             Nguy hiểm đến tính mạng? Gọi ngay <a href="tel:112" className="font-bold text-danger">112</a>
           </span>
           <div className="flex items-center justify-end gap-2">
-            <button className="btn-ghost" onClick={onClose}>Huỷ</button>
+            <button type="button" className="btn-ghost tap" onClick={requestClose}>Huỷ</button>
             <button
-              className="btn-danger px-5"
+              type="button"
+              className="btn-danger tap px-5 max-sm:flex-1"
               disabled={!valid || busy}
               onClick={submit}
             >
-              {busy ? <Loader2 size={16} className="animate-spin" /> : <Send size={15} />}
+              {busy ? <Loader2 size={16} className="motion-safe:animate-spin" aria-hidden="true" /> : <Send size={15} aria-hidden="true" />}
               <span>{busy ? 'Đang gửi…' : k.submit}</span>
             </button>
           </div>
@@ -346,7 +369,7 @@ export default function ReportForm({ onClose, myLocation, onTrack, initialKind =
       <div className="grid gap-4 md:grid-cols-2">
         {/* Cột 1: Thông tin mô tả & Ảnh */}
         <div className="flex flex-col gap-3 text-sm">
-          <button type="button" className="-mb-1 inline-flex w-fit items-center gap-1 text-xs font-semibold text-accent hover:underline" onClick={() => setKind('')}>
+          <button type="button" className="touch-hit -mb-1 inline-flex w-fit items-center gap-1 text-xs font-semibold text-accent hover:underline" onClick={() => setKind('')}>
             <ChevronLeft size={14} aria-hidden="true" /> Đổi loại yêu cầu
           </button>
 
@@ -356,6 +379,8 @@ export default function ReportForm({ onClose, myLocation, onTrack, initialKind =
               lượng. Đang nguy hiểm đến tính mạng: gọi ngay <a href="tel:112" className="font-bold text-danger">112</a>.
             </p>
           )}
+
+          {kind === 'tiep_te' && gpsQuick}
 
           {kind === 'cuu_nguoi' && (
             <>
@@ -371,6 +396,7 @@ export default function ReportForm({ onClose, myLocation, onTrack, initialKind =
                   ))}
                 </div>
               </fieldset>
+              {gpsQuick}
               <div>
                 <label htmlFor="so-nguoi" className="mb-1 block text-xs font-semibold text-muted">Số người cần cứu (nếu biết)</label>
                 <div className="flex items-center gap-1.5">
@@ -379,7 +405,7 @@ export default function ReportForm({ onClose, myLocation, onTrack, initialKind =
                   </button>
                   <input
                     id="so-nguoi"
-                    className="input num h-9 w-20 text-center"
+                    className="input tap tap-field num h-9 w-20 text-center"
                     inputMode="numeric"
                     value={people}
                     onChange={(e) => setPeople(digits(e.target.value).slice(0, 4))}
@@ -404,50 +430,53 @@ export default function ReportForm({ onClose, myLocation, onTrack, initialKind =
           )}
 
           {kind === 'bao_tin' && (
-            <div>
-              <label className="block text-xs font-semibold text-muted mb-1.5">
+            <fieldset>
+              <legend className="block text-xs font-semibold text-muted mb-1.5">
                 Loại sự việc trọng tâm <span className="text-danger">*</span>
-              </label>
+              </legend>
               <div className="grid grid-cols-2 gap-2 mb-2">
                 <button
                   type="button"
+                  aria-pressed={f.category === 'ngap'}
                   onClick={() => setF((x) => ({ ...x, category: 'ngap' }))}
                   className={clsx(
-                    'flex items-center gap-2 p-2.5 rounded-xl border text-xs font-bold transition-all text-left cursor-pointer',
+                    'tap flex items-center gap-2 p-2.5 rounded-xl border text-xs font-bold transition-colors text-left cursor-pointer',
                     f.category === 'ngap'
-                      ? 'border-blue-500 bg-blue-500/10 text-blue-600 ring-2 ring-blue-500/20 shadow-sm'
+                      ? 'border-accent bg-accent/10 text-accent ring-2 ring-accent/20'
                       : 'border-line bg-panel2/60 text-ink hover:bg-panel2'
                   )}
                 >
-                  <Waves size={18} className="text-blue-500 shrink-0" />
+                  <Waves size={18} className="text-accent shrink-0" aria-hidden="true" />
                   <div className="min-w-0">
-                    <div className="truncate">🌊 Lũ, Ngập lụt</div>
-                    <div className="text-[10px] text-muted font-normal truncate">Ngập đường, nước sông dâng</div>
+                    <div className="truncate">Lũ, Ngập lụt</div>
+                    <div className="text-[11px] text-muted font-normal truncate">Ngập đường, nước sông dâng</div>
                   </div>
                 </button>
 
                 <button
                   type="button"
+                  aria-pressed={f.category === 'sat_lo' || f.category === 'lu_quet'}
                   onClick={() => setF((x) => ({ ...x, category: 'sat_lo' }))}
                   className={clsx(
-                    'flex items-center gap-2 p-2.5 rounded-xl border text-xs font-bold transition-all text-left cursor-pointer',
+                    'tap flex items-center gap-2 p-2.5 rounded-xl border text-xs font-bold transition-colors text-left cursor-pointer',
                     f.category === 'sat_lo' || f.category === 'lu_quet'
-                      ? 'border-amber-500 bg-amber-500/10 text-amber-600 ring-2 ring-amber-500/20 shadow-sm'
+                      ? 'border-warn bg-warn/10 text-warn ring-2 ring-warn/20'
                       : 'border-line bg-panel2/60 text-ink hover:bg-panel2'
                   )}
                 >
-                  <AlertTriangle size={18} className="text-amber-500 shrink-0" />
+                  <AlertTriangle size={18} className="text-warn shrink-0" aria-hidden="true" />
                   <div className="min-w-0">
-                    <div className="truncate">⛰️ Sạt lở, Lũ quét</div>
-                    <div className="text-[10px] text-muted font-normal truncate">Sạt đèo, vách núi, lũ ống</div>
+                    <div className="truncate">Sạt lở, Lũ quét</div>
+                    <div className="text-[11px] text-muted font-normal truncate">Sạt đèo, vách núi, lũ ống</div>
                   </div>
                 </button>
               </div>
 
               <div className="flex items-center gap-2 text-xs">
-                <span className="text-muted shrink-0 text-[11px]">Hoặc chọn loại khác:</span>
+                <label htmlFor="loai-khac" className="text-muted shrink-0 text-[11px]">Hoặc chọn loại khác:</label>
                 <select
-                  className="input py-1 px-2 text-xs flex-1"
+                  id="loai-khac"
+                  className="input tap tap-field py-1 px-2 text-xs flex-1"
                   value={f.category}
                   onChange={set('category')}
                 >
@@ -456,7 +485,7 @@ export default function ReportForm({ onClose, myLocation, onTrack, initialKind =
                   ))}
                 </select>
               </div>
-            </div>
+            </fieldset>
           )}
 
           <div>
@@ -471,7 +500,7 @@ export default function ReportForm({ onClose, myLocation, onTrack, initialKind =
             </div>
             <textarea
               id="mo-ta-yeu-cau"
-              className="input min-h-[95px] leading-relaxed"
+              className="input tap-field min-h-[95px] leading-relaxed"
               maxLength={1000}
               placeholder={
                 kind === 'tiep_te'
@@ -486,11 +515,12 @@ export default function ReportForm({ onClose, myLocation, onTrack, initialKind =
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-muted mb-1">
+            <label htmlFor="diem-moc" className="block text-xs font-semibold text-muted mb-1">
               Địa chỉ / Điểm mốc nhận biết (tuỳ chọn)
             </label>
             <input
-              className="input"
+              id="diem-moc"
+              className="input tap tap-field"
               maxLength={200}
               value={f.address}
               onChange={set('address')}
@@ -508,14 +538,14 @@ export default function ReportForm({ onClose, myLocation, onTrack, initialKind =
           ) : (
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-xs font-semibold text-muted mb-1">Họ tên của bạn</label>
-                <input className="input" maxLength={100} value={f.reporter_name} onChange={set('reporter_name')} placeholder="Tuỳ chọn" />
+                <label htmlFor="ho-ten" className="block text-xs font-semibold text-muted mb-1">Họ tên của bạn</label>
+                <input id="ho-ten" className="input tap tap-field" autoComplete="name" maxLength={100} value={f.reporter_name} onChange={set('reporter_name')} placeholder="Tuỳ chọn" />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-muted mb-1">
+                <label htmlFor="so-dien-thoai" className="block text-xs font-semibold text-muted mb-1">
                   Số điện thoại {rescue && <span className="text-danger">*</span>}
                 </label>
-                <input className="input" inputMode="tel" maxLength={20} value={f.reporter_phone} onChange={set('reporter_phone')} placeholder={rescue ? 'Để lực lượng gọi lại' : 'Để cán bộ liên hệ'} />
+                <input id="so-dien-thoai" className="input tap tap-field" type="tel" inputMode="tel" autoComplete="tel" maxLength={20} value={f.reporter_phone} onChange={set('reporter_phone')} placeholder={rescue ? 'Để lực lượng gọi lại' : 'Để cán bộ liên hệ'} />
               </div>
             </div>
           )}
@@ -542,7 +572,8 @@ export default function ReportForm({ onClose, myLocation, onTrack, initialKind =
                 <div key={x.url} className="relative group">
                   <img src={x.url} alt={`Ảnh ${i + 1}`} className="h-20 w-20 rounded-xl object-cover border border-line shadow-sm" />
                   <button
-                    className="absolute -right-1.5 -top-1.5 rounded-full bg-danger p-1 text-white shadow hover:brightness-110"
+                    type="button"
+                    className="touch-hit absolute -right-1.5 -top-1.5 rounded-full bg-danger p-1 text-white shadow hover:brightness-110"
                     onClick={() => { URL.revokeObjectURL(x.url); setFiles(files.filter((_, j) => j !== i)); }}
                     aria-label="Xoá ảnh này"
                     title="Xoá ảnh"
@@ -552,15 +583,16 @@ export default function ReportForm({ onClose, myLocation, onTrack, initialKind =
                 </div>
               ))}
               {files.length < MAX_PHOTOS && (
-                <label className="flex h-20 w-24 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-line bg-panel2/50 text-xs text-muted hover:border-accent hover:text-accent hover:bg-accent/5 transition-all">
-                  <ImagePlus size={22} className="mb-0.5" />
+                <label className="flex h-20 w-24 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-line bg-panel2/50 text-xs text-muted hover:border-accent hover:text-accent hover:bg-accent/5 focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/25 transition-colors">
+                  <ImagePlus size={22} className="mb-0.5" aria-hidden="true" />
                   <span className="text-[11px] font-medium">+ Thêm ảnh</span>
+                  {/* sr-only chứ không `hidden`: ô ẩn hẳn thì không Tab tới được — người dùng bàn phím không thêm được ảnh */}
                   <input
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
                     capture="environment"
                     multiple
-                    className="hidden"
+                    className="sr-only"
                     onChange={(e) => { addFiles([...e.target.files]); e.target.value = ''; }}
                   />
                 </label>
@@ -577,12 +609,12 @@ export default function ReportForm({ onClose, myLocation, onTrack, initialKind =
               <span>Vị trí sự việc: {pos ? <b className="text-good font-mono">{pos.lat.toFixed(4)}, {pos.lon.toFixed(4)}</b> : <span className="text-danger">Chưa chọn</span>}</span>
             </span>
             <button
-              className="btn-ghost px-2.5 py-1 text-xs text-accent border-accent/30 bg-accent/5 hover:bg-accent/10"
+              className="btn-ghost tap px-2.5 py-1 text-xs text-accent border-accent/30 bg-accent/5 hover:bg-accent/10"
               onClick={useGps}
               disabled={locating}
               type="button"
             >
-              {locating ? <Loader2 size={13} className="animate-spin" /> : <LocateFixed size={13} />}
+              {locating ? <Loader2 size={13} className="motion-safe:animate-spin" aria-hidden="true" /> : <LocateFixed size={13} aria-hidden="true" />}
               <span>Lấy vị trí của tôi</span>
             </button>
           </div>
@@ -613,9 +645,10 @@ export default function ReportForm({ onClose, myLocation, onTrack, initialKind =
 
           <div className="grid gap-2 sm:grid-cols-2">
             <div>
-              <label className="block text-xs font-semibold text-muted mb-1">Xã / phường</label>
+              <label htmlFor="xa-phuong" className="block text-xs font-semibold text-muted mb-1">Xã / phường</label>
               <select
-                className="input"
+                id="xa-phuong"
+                className="input tap tap-field"
                 value={xa}
                 onChange={(e) => { setXa(e.target.value); setXaManual(true); }}
               >
@@ -627,8 +660,8 @@ export default function ReportForm({ onClose, myLocation, onTrack, initialKind =
               {xa && !xaManual && <div className="mt-1 text-[11px] text-muted">Tự xác định theo điểm đã chấm — sai thì chọn lại</div>}
             </div>
             <div>
-              <label className="block text-xs font-semibold text-muted mb-1">Xóm / tổ dân phố (tuỳ chọn)</label>
-              <select className="input" value={f.hamlet} onChange={set('hamlet')} disabled={!xa || !hamlets.length}>
+              <label htmlFor="xom" className="block text-xs font-semibold text-muted mb-1">Xóm / tổ dân phố (tuỳ chọn)</label>
+              <select id="xom" className="input tap tap-field" value={f.hamlet} onChange={set('hamlet')} disabled={!xa || !hamlets.length}>
                 <option value="">
                   {!xa ? '— Chọn xã / phường trước —' : hamlets.length ? '— Không rõ / không có trong danh sách —' : 'Xã chưa có danh sách xóm'}
                 </option>
@@ -639,22 +672,37 @@ export default function ReportForm({ onClose, myLocation, onTrack, initialKind =
             </div>
           </div>
 
-          {!valid && (
-            <div className="text-xs text-warn font-medium">
-              Vui lòng hoàn thành: {!validIncident && '• Chọn chuyện gì đang xảy ra '} {!validDesc && '• Nhập mô tả ít nhất 10 ký tự '}{' '}
-              {!validPos && '• Chấm vị trí sự việc trên bản đồ '} {!validPhone && '• Nhập số điện thoại để lực lượng gọi lại '}{' '}
-              {!validToken && '• Hoàn tất bước xác minh chống spam'}
-            </div>
-          )}
+          <div className="text-xs text-warn font-medium" aria-live="polite">
+            {!valid && (
+              <>
+                Vui lòng hoàn thành: {!validIncident && '• Chọn chuyện gì đang xảy ra '} {!validDesc && '• Nhập mô tả ít nhất 10 ký tự '}{' '}
+                {!validPos && '• Chấm vị trí sự việc trên bản đồ '} {!validPhone && '• Nhập số điện thoại để lực lượng gọi lại '}{' '}
+                {!validToken && '• Hoàn tất bước xác minh chống spam'}
+              </>
+            )}
+          </div>
         </div>
       </div>
 
       {error && (
-        <div className="mt-3 rounded-xl bg-danger/10 border border-danger/20 px-3 py-2 text-xs font-semibold text-danger flex items-center gap-2">
-          <AlertCircle size={15} />
+        <div role="alert" className="mt-3 rounded-xl bg-danger/10 border border-danger/20 px-3 py-2 text-xs font-semibold text-danger flex items-center gap-2">
+          <AlertCircle size={15} aria-hidden="true" />
           <span>{error}</span>
         </div>
       )}
     </Modal>
+    {askClose && (
+      <Confirm
+        title="Bỏ yêu cầu đang soạn?"
+        confirmLabel="Bỏ yêu cầu"
+        cancelLabel="Tiếp tục soạn"
+        danger
+        onConfirm={onClose}
+        onClose={() => setAskClose(false)}
+      >
+        Nội dung, ảnh và vị trí bạn đã nhập sẽ mất, yêu cầu chưa được gửi đi. Nguy hiểm đến tính mạng: gọi ngay 112.
+      </Confirm>
+    )}
+    </>
   );
 }

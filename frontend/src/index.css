@@ -186,6 +186,8 @@ body {
 @media (pointer: coarse) {
   .tap { min-height: 44px !important; }
   .tap-sq { min-height: 44px !important; min-width: 44px !important; }
+  /* Ô nhập của biểu mẫu người dân: chữ < 16 px thì iPhone tự phóng to cả trang khi chạm vào ô */
+  .tap-field { font-size: 16px !important; }
 }
 .leaflet-tooltip { background: rgb(var(--panel)); color: rgb(var(--ink)); border-color: rgb(var(--line)); border-radius: 0.375rem; font-size: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
 /* Nhãn địa điểm tự động trên bản đồ tác chiến (giống Google Maps khi zoom to) */
