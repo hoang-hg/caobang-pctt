@@ -70,6 +70,9 @@ class Settings(BaseSettings):
         ""  # gói thương mại (customer-*.open-meteo.com); trống = gói miễn phí phi thương mại
     )
     openweather_api_key: str = ""  # One Call 3.0; đặt key → tự bật nguồn OpenWeather
+    # Trạm đo mưa của hệ thống Cảnh báo đa thiên tai (Viện Địa công nghệ và Môi trường) — API công khai, cần Internet
+    ige_truotlo_enabled: bool = True
+    ige_truotlo_url: str = "https://apitruotlo.canhbaothientai.org.vn/api"
     mqtt_url: str = ""  # VD mqtt://user:pass@mqtt:1883 — trống = tắt cầu nối MQTT
     mqtt_topic: str = "caobang/pctt/+/readings"
     # Khoá cho cổng tiếp nhận SOS tự động POST /api/v1/sos/intake (webhook Zalo OA / app) — trống = tắt cổng

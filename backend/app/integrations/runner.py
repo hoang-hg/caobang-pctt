@@ -14,7 +14,7 @@ from datetime import UTC, datetime
 from app.config import settings
 from app.db import execute, fetch_all, fetch_one
 from app.integrations import crypto
-from app.integrations.adapters import open_meteo, openweather
+from app.integrations.adapters import ige_truotlo, open_meteo, openweather
 from app.integrations.ingest import ingest_log, mark_stale_devices
 from app.services import retention, sensor_zones
 from app.services.broadcast import fill_template
@@ -32,7 +32,7 @@ def redact_secrets(text: str) -> str:
     return _SECRET_PARAM_RE.sub(r"\1=***", text)
 
 
-ADAPTERS = {"open_meteo": open_meteo.run, "openweather": openweather.run}
+ADAPTERS = {"open_meteo": open_meteo.run, "openweather": openweather.run, "ige_truotlo": ige_truotlo.run}
 
 PURGE_EVERY_S = 3600  # dọn nhật ký cũ (retention) mỗi giờ
 _last_purge: float | None = None
@@ -53,6 +53,14 @@ DEFAULT_SOURCES = [
         "enabled": False,
         "config": openweather.DEFAULT_CONFIG,
         "poll_interval_s": 3600,
+    },
+    {
+        "code": "IGE_TRUOTLO",
+        "name": "Trạm đo mưa — hệ thống Cảnh báo đa thiên tai (Viện Địa công nghệ và Môi trường)",
+        "type": "ige_truotlo",
+        "enabled": None,  # theo cấu hình IGE_TRUOTLO_ENABLED
+        "config": ige_truotlo.DEFAULT_CONFIG,
+        "poll_interval_s": 600,  # trạm gửi 10 phút / lần
     },
     {
         "code": "IOT_HTTP",
@@ -109,7 +117,10 @@ async def ensure_default_sources() -> None:
     for s in DEFAULT_SOURCES:
         enabled = s["enabled"]
         if enabled is None:
-            enabled = settings.open_meteo_enabled if s["type"] == "open_meteo" else bool(settings.mqtt_url)
+            enabled = {
+                "open_meteo": settings.open_meteo_enabled,
+                "ige_truotlo": settings.ige_truotlo_enabled,
+            }.get(s["type"], bool(settings.mqtt_url))
         await execute(
             """INSERT INTO integrations.data_sources (code, name, type, enabled, config, poll_interval_s, status)
                VALUES (:c, :n, :t, :e, CAST(:cfg AS jsonb), :p, CASE WHEN :e THEN 'chua_chay' ELSE 'tat' END)
@@ -214,7 +225,7 @@ async def forecast_alerts(source: dict) -> None:
 async def tick() -> None:
     due = await fetch_all(
         """SELECT * FROM integrations.data_sources
-            WHERE enabled AND poll_interval_s IS NOT NULL AND type IN ('open_meteo', 'openweather')
+            WHERE enabled AND poll_interval_s IS NOT NULL AND type IN ('open_meteo', 'openweather', 'ige_truotlo')
               AND (last_run_at IS NULL OR last_run_at < now() - make_interval(secs => poll_interval_s))"""
     )
     for s in due:

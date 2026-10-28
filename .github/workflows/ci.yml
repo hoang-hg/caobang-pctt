@@ -70,6 +70,8 @@ jobs:
       JWT_SECRET: ci-jwt-secret-${{ github.run_id }}
       SECRET_KEY: ci-secret-key-${{ github.run_id }}
       OPEN_METEO_ENABLED: "true"
+      # Trạm mưa của Viện: tắt trong CI — số liệu mẫu ổn định, không phụ thuộc mạng ngoài (adapter có test đơn vị)
+      IGE_TRUOTLO_ENABLED: "false"
       # Kiểm thử API dùng tài khoản demo + dữ liệu mẫu + bộ mô phỏng
       DEMO_MODE: "true"
       SIMULATOR: "true"
@@ -94,6 +96,7 @@ jobs:
           cp .env.production.example ci.prod.env
           cat >> ci.prod.env <<EOF
           DOMAIN=pctt.ci.local
+          IGE_TRUOTLO_ENABLED=false
           ACME_EMAIL=ci@ci.local
           JWT_SECRET=$(openssl rand -hex 32)
           SECRET_KEY=$(openssl rand -hex 32)
@@ -194,6 +197,7 @@ jobs:
           cp .env.production.example ci.prod.env
           cat >> ci.prod.env <<EOF
           DOMAIN=pctt.ci.local
+          IGE_TRUOTLO_ENABLED=false
           ACME_EMAIL=ci@ci.local
           JWT_SECRET=$(openssl rand -hex 32)
           SECRET_KEY=$(openssl rand -hex 32)

@@ -520,6 +520,7 @@ Mọi biến của backend khai báo ở `backend/app/config.py`. Tệp mẫu: `
 |---|---|---|---|
 | `OPEN_METEO_ENABLED` | `true` | `true` | Dự báo tổ hợp ECMWF/GFS |
 | `OPEN_METEO_API_KEY` | trống | *khuyến nghị* | Gói thương mại Open-Meteo |
+| `IGE_TRUOTLO_ENABLED` | `true` | `true` | Trạm đo mưa của Viện Địa công nghệ và Môi trường (API công khai, cần Internet) |
 | `OPENWEATHER_API_KEY` | trống | tuỳ chọn | OpenWeather One Call 3.0 (đặt → tự bật nguồn) |
 | `MQTT_URL` / `MQTT_TOPIC` | `mqtt://mqtt:1883` / `caobang/pctt/+/readings` | trống = tắt | Cầu nối IoT MQTT |
 | `INTAKE_API_KEY` | trống (tắt) | tuỳ chọn, ≥ 32 ký tự | Cổng tiếp nhận SOS tự động |
@@ -550,12 +551,14 @@ Thêm biến mới: `config.py` + `docker-compose.yml` + `docker-compose.prod.ym
 
 ### 6.1. Danh mục kết nối
 
-Hiện chỉ **Open-Meteo** và **OpenWeather** là nguồn kéo có code sẵn và dùng API key. Các nguồn trong nước và kênh
-cảnh báo **chưa có code kết nối** — chưa có key nào dùng được cho tới khi ký thoả thuận và viết bộ nối.
+Nguồn kéo có code sẵn: **Open-Meteo**, **OpenWeather** (dùng API key) và **trạm đo mưa của hệ thống Cảnh báo đa thiên tai —
+Viện Địa công nghệ và Môi trường** (API công khai, không key). Các nguồn trong nước khác và kênh cảnh báo **chưa có code kết
+nối** — chưa có key nào dùng được cho tới khi ký thoả thuận và viết bộ nối.
 
 | Kết nối | Dùng để | Code | Cần gì | Đặt ở đâu |
 |---|---|---|---|---|
 | Open-Meteo (ECMWF IFS + NOAA GEFS) | Dự báo mưa 72 giờ theo 56 xã | ✅ chạy, không key | Gói thương mại: https://open-meteo.com/en/pricing | `OPEN_METEO_API_KEY` hoặc giao diện |
+| Cảnh báo đa thiên tai — Viện Địa công nghệ và Môi trường (`apitruotlo.canhbaothientai.org.vn`) | Mưa đo thật 10 phút / lần của trạm đo mưa **trong tỉnh** (trạm `IGE-<mã>`, 2 trạm Tĩnh Túc lúc nối 28/10/2026); còi hú / đèn cảnh báo và dự báo nguy cơ trượt lở theo xã chưa nhận (chưa có API công khai) | ✅ chạy, không key — kéo 10 phút / lần | — | `IGE_TRUOTLO_ENABLED` (mặc định bật; CI tắt) |
 | OpenWeatherMap One Call 3.0 | Dự báo mưa bổ sung tại xã có trạm | ✅ có, tắt tới khi có key | Đăng ký "One Call by Call": https://openweathermap.org/api/one-call-3 | `OPENWEATHER_API_KEY` hoặc giao diện |
 | Trạm IoT qua HTTP | Số đo mưa, mực nước, nghiêng, độ ẩm | ✅ | Khoá riêng từng thiết bị (`cbk_…`) | Sinh ở trang **Nguồn dữ liệu → Thiết bị IoT** |
 | Nền tảng IoT hãng (HTTP batch) | Nhiều thiết bị một lần | ✅ | Token nguồn `IOT_HTTP` (`cbs_…`) | Hiện / xoay vòng ở trang Nguồn dữ liệu |
