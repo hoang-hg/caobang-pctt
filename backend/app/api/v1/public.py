@@ -41,6 +41,7 @@ from app.services.reports import (
 )
 from app.services.safe_routing import haversine_km, plan_route
 from app.services.simulator import alarm_level
+from app.services.thresholds import get_thresholds
 from app.services.tracking import mask_phone, normalize_code, track_ticket
 
 router = APIRouter(prefix="/public", tags=["Công khai"])
@@ -410,10 +411,13 @@ async def public_report_photo(report_id: str, idx: int, thumb: int = 0):
 @router.get("/config")
 async def public_config():
     """Cấu hình công khai cho frontend (không bí mật): khoá site Cloudflare Turnstile nếu bật; có bắt buộc tài khoản người
-    dân mới gửi được phản ánh không (Đ5)."""
+    dân mới gửi được phản ánh không (Đ5); ngưỡng màu mưa 24 giờ (cả trang điều hành dùng — một thang cho mọi màn)."""
+    t = await get_thresholds()
     return {
         "turnstile_site_key": settings.turnstile_site_key or None,
         "citizen_account_required": settings.citizen_account_required,
+        "rain_24h": t["mua_24h"],
+        "rain_24h_illustrative": t["minh_hoa"],
     }
 
 

@@ -218,6 +218,32 @@ const unitsAfter = await call('GET', '/admin-units?level=xa', null, admin);
 check('Cập nhật ranh giới + dân số xã', ab.status === 200 && ab.data.result.updated === 1 &&
   unitsAfter.data.find((u) => u.code === 'CB-THUCPHAN')?.population === newPop, JSON.stringify(ab.data?.detail || ab.data?.result));
 
+// ---- Ngưỡng cảnh báo mưa lớn & sạt lở (services/thresholds.py): cấp tỉnh sửa, có căn cứ, mọi màn tính lại
+const thr0 = (await call('GET', '/data-import/thresholds', null, admin)).data;
+check('Ngưỡng cảnh báo: chưa khai báo → giá trị minh hoạ (mưa 24 giờ 50 / 100 / 200 mm)',
+  thr0?.minh_hoa === true && thr0.mua_24h?.vang === 50 && thr0.mua_24h?.do === 200, JSON.stringify(thr0?.mua_24h));
+const thrBody = (over = {}) => ({ ...thr0.mac_dinh, nguon: 'Kiểm thử tự động — ngưỡng thử', ...over });
+check('Ngưỡng cảnh báo: xã không sửa được → 403',
+  (await call('PUT', '/data-import/thresholds', thrBody(), xa)).status === 403);
+const badThr = await call('PUT', '/data-import/thresholds', thrBody({ mua_24h: { vang: 100, cam: 50, do: 200 }, nguon: '' }), admin);
+check('Ngưỡng cảnh báo: không tăng dần, thiếu căn cứ → 422, nói rõ lỗi',
+  badThr.status === 422 && /tăng dần/.test(badThr.data?.detail) && /căn cứ/.test(badThr.data?.detail), badThr.data?.detail);
+// Hạ ngưỡng mưa 72 giờ về rất thấp → mọi trạm có mưa 3 ngày qua lên Đỏ; cổng công khai nhận thang mưa 24 giờ mới
+const lowered = thrBody({
+  mua_24h: { vang: 40, cam: 90, do: 180 },
+  sat_lo: { ...thr0.mac_dinh.sat_lo, mua_72h: { vang: 1, cam: 2, do: 3 } },
+});
+const okThr = await call('PUT', '/data-import/thresholds', lowered, admin);
+const cfg = (await call('GET', '/public/config')).data;
+const ls = (await call('GET', '/dashboard/landslide-risk', null, admin)).data;
+const wet = (ls?.points || []).filter((p) => (p.rain_72h || 0) >= 3);
+check('Ngưỡng cảnh báo: lưu → cổng công khai, biểu đồ sạt lở dùng ngay ngưỡng mới, ghi căn cứ',
+  okThr.status === 200 && okThr.data?.minh_hoa === false && cfg?.rain_24h?.vang === 40 && cfg?.rain_24h_illustrative === false
+    && ls?.illustrative === false && ls?.source === lowered.nguon && wet.length > 0 && wet.every((p) => p.risk === 'do'),
+  JSON.stringify({ status: okThr.status, cfg: cfg?.rain_24h, wet: wet.length, risks: [...new Set(wet.map((p) => p.risk))] }));
+const restoreThr = await call('PUT', '/data-import/thresholds', thrBody(), admin); // trả về giá trị minh hoạ (đã có căn cứ)
+check('Ngưỡng cảnh báo: đặt lại giá trị ban đầu', restoreThr.status === 200 && restoreThr.data?.mua_24h?.vang === 50);
+
 // ---- Nhật ký
 const logs = await call('GET', '/dashboard/logs', null, admin);
 check('Ghi nhật ký điều hành', JSON.stringify(logs.data).includes('Điểm sơ tán'));

@@ -83,7 +83,8 @@ const FORECAST_HINT = (
 const LANDSLIDE_HINT = (
   <Hint label="Ngưỡng sạt lở theo mưa">
     Mỗi chấm là một trạm đo mưa: trục ngang là mưa 3 ngày qua, trục dọc là cường độ mưa hiện tại. Vượt đường nét đứt Vàng /
-    Cam / Đỏ là nguy cơ sạt lở tăng theo mức đó. Đường ngưỡng là đường minh hoạ, chưa hiệu chỉnh theo số liệu sạt lở của tỉnh.
+    Cam / Đỏ là nguy cơ sạt lở tăng theo mức đó. Căn cứ của đường ngưỡng ghi ngay dưới biểu đồ (chưa khai báo thì là đường
+    minh hoạ); cán bộ nhập dữ liệu sửa ngưỡng ở trang Nhập dữ liệu → Ngưỡng cảnh báo.
   </Hint>
 );
 const SUPPLIES_HINT = (

@@ -16,6 +16,7 @@ from app.services.landslides import get_landslides_overview
 from app.services.lite import VN_TZ
 from app.services.simulator import alarm_level
 from app.services.sos import NO_TEAM_15M_SQL, OVERDUE_SQL
+from app.services.thresholds import classify_landslide, get_thresholds, threshold_curves
 from app.ws.hub import hub
 
 router = APIRouter(tags=["Dashboard"])
@@ -327,39 +328,16 @@ async def _landslide_risk(codes: list[str]) -> dict:
         """,
         {"codes": codes},
     )
+    # Ngưỡng do cán bộ khai báo (trang Nhập dữ liệu → Ngưỡng cảnh báo); chưa khai báo → minh hoạ (services/thresholds.py)
+    t = await get_thresholds()
     for r in rows:
-        r["risk"] = classify_landslide(r["rain_72h"] or 0, r["intensity"] or 0, r["tilt_nearby"])
-    return {"points": rows, "thresholds": threshold_curves()}
-
-
-# Ngưỡng cường độ kích hoạt I = a · (R/100)^-0.6: đất càng bão hoà (R lớn) thì cường độ mưa cần để
-# gây sạt lở càng thấp. Hệ số a (mm/h tại R = 100 mm) là MINH HOẠ, cần hiệu chỉnh theo số liệu địa phương.
-THRESHOLD_A = {"vang": 14.0, "cam": 24.0, "do": 36.0}
-
-
-def threshold_intensity(level: str, rain_72h: float) -> float:
-    return THRESHOLD_A[level] * (max(rain_72h, 20) / 100) ** -0.6
-
-
-def threshold_curves() -> dict:
-    """Đường ngưỡng cường độ – lượng mưa tích lũy cho 3 cấp Vàng/Cam/Đỏ."""
+        r["risk"] = classify_landslide(t, r["rain_72h"] or 0, r["intensity"] or 0, r["tilt_nearby"])
     return {
-        name: [
-            {"rain_72h": r, "intensity": round(threshold_intensity(name, r), 1)} for r in range(60, 601, 20)
-        ]
-        for name in THRESHOLD_A
+        "points": rows,
+        "thresholds": threshold_curves(t),
+        "illustrative": t["minh_hoa"],
+        "source": t["nguon"],
     }
-
-
-def classify_landslide(rain_72h: float, intensity: float, tilt: float | None) -> str:
-    tilt = tilt or 0
-    if intensity >= threshold_intensity("do", rain_72h) or tilt >= 2 or rain_72h >= 450:
-        return "do"
-    if intensity >= threshold_intensity("cam", rain_72h) or tilt >= 1 or rain_72h >= 300:
-        return "cam"
-    if intensity >= threshold_intensity("vang", rain_72h) or rain_72h >= 180:
-        return "vang"
-    return "an_toan"
 
 
 @router.get("/dashboard/landslide-sensors")

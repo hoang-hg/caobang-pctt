@@ -3,7 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import {
-  AlertTriangle, Check, CheckCircle2, ChevronRight, Download, FileSpreadsheet, FileUp, Globe2, Inbox, Loader2, PencilLine, Send, Upload,
+  AlertTriangle, Check, CheckCircle2, ChevronRight, Download, FileSpreadsheet, FileUp, Gauge, Globe2, Inbox, Loader2, PencilLine, Send,
+  Upload,
 } from 'lucide-react';
 import { api, apiDownload, apiUpload } from '../api/client';
 import { useUnits } from '../api/hooks';
@@ -15,6 +16,7 @@ import { PAGE } from '../components/layout/page';
 import { useAllowedCodes, usePermission } from '../rbac/usePermission';
 import RecordForm from './DataImportForm';
 import Submissions, { IssueList, PreviewTable } from './DataSubmissions';
+import DataThresholds from './DataThresholds';
 import { cardOf, DATASET_GROUPS, exampleRows, fieldRule, rowLabel } from './dataImportFacts';
 
 /**
@@ -29,7 +31,9 @@ export default function DataImport() {
   const [params, setParams] = useSearchParams();
   const code = params.get('ho-so');
   // ?ho-so=<mã>: mở một hồ sơ; ?tab=ho-so: mở danh sách hồ sơ (liên kết từ trang Hướng dẫn xử lý)
-  const [tab, setTab] = useState(code || params.get('tab') === 'ho-so' ? 'ho-so' : 'nhap');
+  const [tab, setTab] = useState(
+    code || params.get('tab') === 'ho-so' ? 'ho-so' : params.get('tab') === 'nguong' && canImport ? 'nguong' : 'nhap',
+  );
   const { data: datasets = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['import-datasets'],
     queryFn: () => api('/data-import/datasets'),
@@ -61,12 +65,17 @@ export default function DataImport() {
       <Tabs
         value={tab}
         onChange={setTab}
+        fit={canImport}
         tabs={[
-          { value: 'nhap', label: canImport ? 'Nhập dữ liệu' : 'Gửi dữ liệu', icon: FileUp },
+          { value: 'nhap', label: canImport ? 'Nhập dữ liệu' : 'Gửi dữ liệu', short: canImport ? 'Nhập' : undefined, icon: FileUp },
           { value: 'ho-so', label: canImport ? 'Hồ sơ xã/phường gửi' : 'Hồ sơ đã gửi', short: canImport ? 'Hồ sơ xã gửi' : undefined, icon: Inbox, count: pending || null },
+          // Ngưỡng cảnh báo mưa / sạt lở toàn tỉnh: chỉ cấp tỉnh (data.import) — xã không sửa được
+          ...(canImport ? [{ value: 'nguong', label: 'Ngưỡng cảnh báo', short: 'Ngưỡng', icon: Gauge }] : []),
         ]}
       />
-      {tab === 'ho-so' ? (
+      {tab === 'nguong' ? (
+        <DataThresholds />
+      ) : tab === 'ho-so' ? (
         <Submissions canImport={canImport} code={code} onOpen={open} datasets={datasets} />
       ) : isLoading ? (
         <Skeleton height={320} />

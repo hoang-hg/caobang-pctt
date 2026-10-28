@@ -1,14 +1,17 @@
 """Kiểm thử đơn vị cho các thuật toán nghiệp vụ (không cần CSDL)."""
 
 import random
+from copy import deepcopy
 
-from app.api.v1.dashboard import classify_landslide, threshold_intensity
 from app.services import scenario
 from app.services.broadcast import advance_delivery, fill_template, init_metrics
 from app.services.dispatch_matching import score_force, suggest_needs
 from app.services.safe_routing import Edge, build_route, dijkstra, haversine_km
 from app.services.simulator import alarm_level
 from app.services.sos_nlp import norm, parse_rules
+from app.services.thresholds import DEFAULTS as DEFAULT_THRESHOLDS
+from app.services.thresholds import classify_landslide, threshold_intensity
+from app.services.thresholds import validate as validate_thresholds
 
 GAZ = [
     {"name": "Hòa An", "unit_code": "CB-HOAAN", "lat": 22.72, "lon": 106.18, "kind": "xa"},
@@ -129,10 +132,33 @@ def test_alarm_levels():
 
 
 def test_landslide_threshold_decreases_with_antecedent_rain():
-    assert threshold_intensity("do", 400) < threshold_intensity("do", 100)
-    assert classify_landslide(80, 3, None) == "an_toan"
-    assert classify_landslide(250, 30, None) == "do"
-    assert classify_landslide(100, 5, 2.1) == "do"
+    t = DEFAULT_THRESHOLDS
+    assert threshold_intensity(t, "do", 400) < threshold_intensity(t, "do", 100)
+    assert classify_landslide(t, 80, 3, None) == "an_toan"
+    assert classify_landslide(t, 250, 30, None) == "do"
+    assert classify_landslide(t, 100, 5, 2.1) == "do"
+
+
+def test_landslide_classification_follows_saved_thresholds():
+    """Ngưỡng cán bộ lưu thay giá trị mặc định: hạ ngưỡng mưa 72 giờ → cùng số đo lên mức cao hơn."""
+    t = deepcopy(DEFAULT_THRESHOLDS)
+    assert classify_landslide(t, 200, 1, None) == "vang"
+    t["sat_lo"]["mua_72h"] = {"vang": 100, "cam": 150, "do": 190}
+    assert classify_landslide(t, 200, 1, None) == "do"
+
+
+def test_threshold_validation():
+    good = {**deepcopy(DEFAULT_THRESHOLDS), "nguon": "Quyết định số 12/QĐ-UBND"}
+    values, errors = validate_thresholds(good)
+    assert not errors and values["mua_24h"]["do"] == 200 and values["nguon"] == "Quyết định số 12/QĐ-UBND"
+    bad = deepcopy(good)
+    bad["mua_24h"] = {"vang": 100, "cam": 50, "do": 200}  # không tăng dần
+    bad["sat_lo"]["so_mu_b"] = "abc"
+    bad["sat_lo"]["nghieng_do"] = {"cam": 1}  # thiếu mức Đỏ
+    bad["nguon"] = ""
+    _, errors = validate_thresholds(bad)
+    text = " | ".join(errors)
+    assert "tăng dần" in text and "Số mũ b" in text and "thiếu giá trị mức Đỏ" in text and "căn cứ" in text
 
 
 def test_delivery_simulation_converges_and_never_exceeds_target():
