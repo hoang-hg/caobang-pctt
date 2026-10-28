@@ -383,7 +383,7 @@ const tipsSeen = (id) => { try { return localStorage.getItem(tipsKey(id)) === '1
  */
 export function PageTips({ id, title = 'Bắt đầu từ đâu?', steps, more, className }) {
   const [open, setOpen] = useState(() => !tipsSeen(id));
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true); // gập sẵn một dòng — mở khi cần (bớt chữ thường trực trên mọi trang)
   if (!open) return null;
   const done = () => {
     try { localStorage.setItem(tipsKey(id), '1'); } catch { /* chế độ riêng tư: chỉ ẩn lần này */ }
