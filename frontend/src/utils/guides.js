@@ -157,7 +157,7 @@ export const SCENARIOS = {
       steps: [
         'Đọc câu tóm tắt trên cùng trang Tổng quan: trạm nào vượt báo động, bao nhiêu phiếu cứu hộ chờ, điểm sạt lở nào cấm đường.',
         'Làm hết "Việc chờ quyết định" — mỗi dòng có nút đi thẳng tới chỗ xử lý.',
-        'Cần chi tiết: xem "Điểm nóng trên bản đồ", thẻ "Sạt lở & đường đèo".',
+        'Cần chi tiết: xem "Điểm nóng trên bản đồ", các thẻ theo 3 nhóm thiên tai "Mưa lớn", "Sạt lở, lũ quét", "Ngập lụt".',
         'Báo cáo nhanh UBND tỉnh: nút "Xuất" → "Ảnh chụp tình hình (PDF)".',
       ],
     },

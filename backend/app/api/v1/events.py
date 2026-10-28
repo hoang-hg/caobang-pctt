@@ -27,7 +27,7 @@ MANAGE = require_permission("event", "manage")
 
 HAZARDS = {
     "mua_lon": "Mưa lớn",
-    "lu_lut": "Lũ, ngập lụt",
+    "lu_lut": "Ngập lụt",
     "lu_quet": "Lũ quét",
     "sat_lo": "Sạt lở đất",
     "bao": "Bão, áp thấp nhiệt đới",

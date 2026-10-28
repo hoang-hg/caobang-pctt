@@ -32,15 +32,17 @@ import MyReports from './MyReports';
 
 // Menu 5 nhóm (docs/ke-hoach-lam-moi-giao-dien.md 6.1) — đủ 8 màn như trước (`tabs` = mã màn, giữ nguyên để link / nút cũ
 // chuyển đúng màn); nhóm có 2 màn thì hiện hàng trang con. Cẩm nang an toàn ở cuối hàng nhóm, menu điện thoại, chân trang
+// Nhóm theo 3 loại thiên tai hệ thống nhấn mạnh (docs/pham-vi-thien-tai.md): Mưa lớn ở Bản đồ cảnh báo (lớp mưa dự báo theo
+// xã, thẻ "Mưa 24 giờ"), rồi Sạt lở, lũ quét · Ngập lụt
 const GROUPS = [
   { id: 'ban-do', label: 'Bản đồ cảnh báo', icon: Compass, tabs: ['bando'] },
-  { id: 'song-suoi', label: 'Mực nước sông suối', icon: Waves, tabs: ['muanuoc'] },
-  { id: 'deo-doc', label: 'Đèo dốc & sạt lở', icon: Mountain, tabs: ['satlo'] },
+  { id: 'deo-doc', label: 'Sạt lở, lũ quét', icon: Mountain, tabs: ['satlo'] },
+  { id: 'song-suoi', label: 'Ngập lụt', icon: Waves, tabs: ['muanuoc'] },
   { id: 'so-tan', label: 'Sơ tán & đường dây nóng', icon: Home, tabs: ['sotan', 'hotlines'] },
   { id: 'tra-cuu', label: 'Tra cứu phiếu', icon: Search, tabs: ['tracuu'] },
 ];
 const SUB_LABEL = { muanuoc: 'Mực nước sông suối', sotan: 'Điểm sơ tán an toàn', hotlines: 'Đường dây nóng' };
-const SOURCE_TAB_LABEL = { satlo: 'Quay lại Sạt trượt', sotan: 'Quay lại Điểm sơ tán' };
+const SOURCE_TAB_LABEL = { satlo: 'Quay lại Sạt lở, lũ quét', sotan: 'Quay lại Điểm sơ tán' };
 const REFRESH = 60_000;
 const pub = (path, params) => api(`/public${path}`, { params });
 const RISK = {
@@ -1367,19 +1369,123 @@ export default function PublicPortal() {
               </section>
             </div>
 
-            {/* 2 Bảng Chuyên Đề Nổi Bật: Mực nước sông (ngập lụt) & Sạt Lở/Đường Đèo */}
+            {/* 3 chuyên đề trọng tâm theo 3 nhóm thiên tai: Mưa lớn · Sạt lở, lũ quét · Ngập lụt */}
             <section className="space-y-2.5 pt-2">
               <div className="flex items-center justify-between">
                 <h2 className="text-xs font-bold text-muted flex items-center gap-1.5">
-                  <span>2 Chuyên đề trọng tâm tỉnh Cao Bằng</span>
+                  <span>3 chuyên đề trọng tâm: Mưa lớn · Sạt lở, lũ quét · Ngập lụt</span>
                 </h2>
                 <span className="text-[11px] text-muted font-medium hidden sm:inline">
                   Tính từ cảm biến IoT và vùng cảnh báo đang hiệu lực
                 </span>
               </div>
 
-              <div className="grid gap-3.5 md:grid-cols-2">
-                {/* Bảng Chuyên Đề 1: Mực nước sông & nguy cơ ngập lụt (trạm thủy văn) */}
+              <div className="grid gap-3.5 md:grid-cols-2 xl:grid-cols-3">
+                {/* Chuyên đề 1: Mưa lớn — mưa 24 giờ qua, dự báo 24 giờ tới theo xã; bấm mở bản đồ, thẻ "Mưa 24 giờ" */}
+                <div
+                  onClick={() => {
+                    setActiveTab('bando');
+                    setMapSidebarTab('rain');
+                    scrollToContent();
+                  }}
+                  className="card p-4 sm:p-5 hover:border-accent cursor-pointer group"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-accent text-white">
+                        <CloudRain size={24} />
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold text-accent">
+                          Chuyên đề 1
+                        </span>
+                        <h3 className="text-base font-bold text-ink group-hover:text-accent transition-colors">
+                          Mưa Lớn & Dự Báo Mưa
+                        </h3>
+                      </div>
+                    </div>
+                    <span className="chip bg-accent/10 text-accent text-xs font-bold shrink-0">
+                      {overview?.rain?.max_24h != null ? `${num(overview.rain.max_24h, 1)} mm` : '–'} lớn nhất
+                    </span>
+                  </div>
+
+                  <p className="mt-2.5 text-xs text-ink-2 leading-relaxed">
+                    Lượng mưa 24 giờ qua tại các trạm đo và dự báo mưa 24 giờ tới theo từng xã — mưa lớn kéo dài là nguyên nhân chính gây sạt lở, lũ quét và ngập lụt.
+                  </p>
+
+                  <div className="mt-3.5 grid grid-cols-2 gap-2 text-xs border-t border-line/60 pt-3">
+                    <div className="bg-panel2/60 p-2 rounded-lg border border-line/40">
+                      <span className="text-[11px] text-muted">Mưa 24 giờ qua (trung bình):</span>
+                      <div className="font-mono text-sm font-bold text-accent mt-0.5">
+                        {overview?.rain?.avg_24h != null ? `${num(overview.rain.avg_24h, 1)} mm` : '–'}
+                      </div>
+                    </div>
+                    <div className="bg-panel2/60 p-2 rounded-lg border border-line/40">
+                      <span className="text-[11px] text-muted">Dự báo 24 giờ tới cao nhất:</span>
+                      <div className="font-mono text-sm font-bold text-ink mt-0.5 truncate">
+                        {overview?.forecast_24h?.max_24h != null ? `${num(overview.forecast_24h.max_24h, 1)} mm` : '–'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between text-xs text-accent font-semibold group-hover:underline">
+                    <span>Xem bản đồ mưa dự báo theo xã</span>
+                    <span className="group-hover:translate-x-1 transition-transform">Mở bản đồ →</span>
+                  </div>
+                </div>
+
+                {/* Chuyên đề 2: Sạt lở, lũ quét — điểm đen, đường đèo */}
+                <div
+                  onClick={() => {
+                    setActiveTab('satlo');
+                    scrollToContent();
+                  }}
+                  className="card p-4 sm:p-5 border-l-4 border-l-danger hover:border-danger cursor-pointer group"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-danger text-white transition-transform">
+                        <Mountain size={24} />
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold text-danger">
+                          Chuyên đề 2
+                        </span>
+                        <h3 className="text-base font-bold text-ink group-hover:text-danger transition-colors">
+                          Sạt Lở, Lũ Quét & Đường Đèo
+                        </h3>
+                      </div>
+                    </div>
+                    <span className="chip bg-danger/15 text-danger text-xs font-bold shrink-0 animate-pulse">
+                      {overview?.landslides?.blocked_count ?? '–'} điểm chia cắt
+                    </span>
+                  </div>
+
+                  <p className="mt-2.5 text-xs text-ink-2 leading-relaxed">
+                    Theo dõi các điểm đen trên QL34, QL3, QL4A (Khau Cốc Chà, Mẻ Pia, Mã Phục, Ca Thành…) cùng cảm biến nghiêng taluy và độ ẩm đất.
+                  </p>
+
+                  <div className="mt-3.5 grid grid-cols-2 gap-2 text-xs border-t border-line/60 pt-3">
+                    <div className="bg-panel2/60 p-2 rounded-lg border border-line/40">
+                      <span className="text-[11px] text-muted">Cấm xe / Tắc nghẽn:</span>
+                      <div className="font-mono text-sm font-bold text-danger mt-0.5">
+                        {overview?.landslides?.blocked_count ?? '–'} vị trí chia cắt
+                      </div>
+                    </div>
+                    <div className="bg-panel2/60 p-2 rounded-lg border border-line/40">
+                      <span className="text-[11px] text-muted">Cảm biến nghiêng lớn nhất:</span>
+                      <div className="font-mono text-sm font-bold text-ink mt-0.5 truncate">
+                        {maxTiltText(map?.landslides)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between text-xs text-danger font-semibold group-hover:underline">
+                    <span>Xem vị trí điểm đen & lộ trình vòng tránh</span>
+                    <span className="group-hover:translate-x-1 transition-transform">Xem bảng chuyên đề →</span>
+                  </div>
+                </div>
+                {/* Chuyên đề 3: Ngập lụt — mực nước sông (trạm thủy văn) */}
                 <div
                   onClick={() => {
                     setActiveTab('muanuoc');
@@ -1394,10 +1500,10 @@ export default function PublicPortal() {
                       </div>
                       <div>
                         <span className="text-xs font-bold text-accent">
-                          Chuyên đề 1
+                          Chuyên đề 3
                         </span>
                         <h3 className="text-base font-bold text-ink group-hover:text-accent transition-colors">
-                          Mực Nước Sông & Nguy Cơ Ngập Lụt
+                          Ngập Lụt — Mực Nước Sông
                         </h3>
                       </div>
                     </div>
@@ -1431,57 +1537,6 @@ export default function PublicPortal() {
                   </div>
                 </div>
 
-                {/* Bảng Chuyên Đề 2: Sạt trượt & Đường đèo */}
-                <div
-                  onClick={() => {
-                    setActiveTab('satlo');
-                    scrollToContent();
-                  }}
-                  className="card p-4 sm:p-5 border-l-4 border-l-danger hover:border-danger cursor-pointer group"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-danger text-white transition-transform">
-                        <Mountain size={24} />
-                      </div>
-                      <div>
-                        <span className="text-xs font-bold text-danger">
-                          Chuyên đề 2
-                        </span>
-                        <h3 className="text-base font-bold text-ink group-hover:text-danger transition-colors">
-                          Điểm Đen Sạt Trượt & Đường Đèo
-                        </h3>
-                      </div>
-                    </div>
-                    <span className="chip bg-danger/15 text-danger text-xs font-bold shrink-0 animate-pulse">
-                      {overview?.landslides?.blocked_count ?? '–'} điểm chia cắt
-                    </span>
-                  </div>
-
-                  <p className="mt-2.5 text-xs text-ink-2 leading-relaxed">
-                    Theo dõi các điểm đen trên QL34, QL3, QL4A (Khau Cốc Chà, Mẻ Pia, Mã Phục, Ca Thành…) cùng cảm biến nghiêng taluy và độ ẩm đất.
-                  </p>
-
-                  <div className="mt-3.5 grid grid-cols-2 gap-2 text-xs border-t border-line/60 pt-3">
-                    <div className="bg-panel2/60 p-2 rounded-lg border border-line/40">
-                      <span className="text-[11px] text-muted">Cấm xe / Tắc nghẽn:</span>
-                      <div className="font-mono text-sm font-bold text-danger mt-0.5">
-                        {overview?.landslides?.blocked_count ?? '–'} vị trí chia cắt
-                      </div>
-                    </div>
-                    <div className="bg-panel2/60 p-2 rounded-lg border border-line/40">
-                      <span className="text-[11px] text-muted">Cảm biến nghiêng lớn nhất:</span>
-                      <div className="font-mono text-sm font-bold text-ink mt-0.5 truncate">
-                        {maxTiltText(map?.landslides)}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 flex items-center justify-between text-xs text-danger font-semibold group-hover:underline">
-                    <span>Xem vị trí điểm đen & lộ trình vòng tránh</span>
-                    <span className="group-hover:translate-x-1 transition-transform">Xem bảng chuyên đề →</span>
-                  </div>
-                </div>
               </div>
             </section>
           </div>

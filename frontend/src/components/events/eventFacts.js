@@ -3,7 +3,7 @@ import { Cloud, CloudLightning, Droplets, Mountain, Snowflake, TriangleAlert, Wa
 /** Loại thiên tai của đợt — khớp HAZARDS (backend/app/api/v1/events.py). */
 export const HAZARD = {
   mua_lon: { label: 'Mưa lớn', icon: Cloud },
-  lu_lut: { label: 'Lũ, ngập lụt', icon: Waves },
+  lu_lut: { label: 'Ngập lụt', icon: Waves },
   lu_quet: { label: 'Lũ quét', icon: Droplets },
   sat_lo: { label: 'Sạt lở đất', icon: Mountain },
   bao: { label: 'Bão, áp thấp nhiệt đới', icon: CloudLightning },
