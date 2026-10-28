@@ -555,8 +555,8 @@ export default function Dashboard() {
         timeNote={kState.error ? 'Chưa tải được số liệu' : 'Đang tải số liệu…'}
         meta={[
           role && <span key="role" className="hidden 2xl:inline">{role}</span>,
-          // Thang màu: từ md trên dòng ngữ cảnh; nút "?" giải thích mức báo động + màu (mọi cỡ màn hình) — không thêm một dòng
-          <RiskLegend key="thang-mau" className="hidden md:flex" meaningClass="hidden xl:inline" />,
+          // Thang màu chỉ hiện thường trực khi trình chiếu màn hình lớn; màn thường: nút "?" bên cạnh đã giải thích đủ
+          presentation && <RiskLegend key="thang-mau" className="hidden md:flex" meaningClass="hidden xl:inline" />,
           !presentation && <LevelHint key="giai-thich" />,
         ]}
         actions={presentation ? (
@@ -850,7 +850,8 @@ export default function Dashboard() {
 
             {/* 2. Khối chiến thuật: bản đồ + chuyên đề (trái), nhật ký sự kiện (phải). Gợi ý lần đầu: điện thoại ngay trước bản
                 đồ; máy tính bảng / laptop đầu cột phải (trên nhật ký) — không đẩy bản đồ xuống dưới màn hình đầu */}
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_420px] [&>*]:min-w-0">
+            {/* Hàng 1 cao vừa gợi ý (gập sẵn một dòng), phần cao dư của cột trái dồn cho hàng 2 — nhật ký nằm sát ngay dưới */}
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:grid-rows-[auto_1fr] lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_420px] [&>*]:min-w-0">
               {!presentation && (
                 <RoleTips
                   page="tong-quan"

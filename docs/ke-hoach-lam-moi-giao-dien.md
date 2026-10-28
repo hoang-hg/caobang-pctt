@@ -417,3 +417,21 @@ nền, vùng chạm 44 px, màn hình đầu theo thiết bị (mục 8), in ra 
 | 6 | Bản đồ giám sát: bảng nổi bo 14 px như thẻ (`.float-panel`), bảng "Cảnh báo khẩn cấp" có ô biểu tượng đỏ nhạt (trang đã theo kiểu bản đồ toàn màn + bảng nổi — chỉ chỉnh cho đồng bộ khung mới) | Xong — PR #132 |
 | 7 | Các trang còn lại: biểu tượng trơn bên trái thẻ thành ô biểu tượng (Nhập dữ liệu — thẻ loại dữ liệu, Nguồn dữ liệu, Hướng dẫn, Phân quyền), ô số dùng chung `KpiCard` (Đợt thiên tai…) có ô biểu tượng như ô chỉ số Tổng quan; Phản ánh dùng thẻ, tab chung (đợt 1) | Xong — PR #133 |
 | 8 | Đăng nhập: cột trái nền xanh đêm có chiều sâu (màu chuyển, lưới chấm mờ, quầng sáng sau hình tỉnh), thêm 3 việc chính của hệ thống, dính đỉnh cao đúng 1 màn hình; biểu mẫu trong thẻ; điện thoại: dải xanh đêm, thẻ đè mép dưới. Trang tài khoản (quên / đặt lại / đổi mật khẩu lần đầu) cùng khung, bỏ khiên đỏ; biểu trưng dùng chung `BrandMark` | Xong — PR #134 |
+
+## 13. Giảm rối các trang ban quản lý (28/10/2026)
+
+Người dùng thấy các trang điều hành "rối" so với trang Cảnh báo đa thiên tai của Viện Địa công nghệ và Môi trường (một bảng
+lọc, bản đồ, thanh thời gian, chú giải; một màu thương hiệu, không chữ giải thích thường trực). Áp dụng hướng dẫn `distill`
+và `mode-operate` của skill impeccable: mỗi màn một mục tiêu chính, ẩn bớt tới khi cần, không lặp thông tin, màu trạng thái
+chỉ ở chỗ mang nghĩa — **không** bỏ chức năng, không đổi quy ước an toàn (44 px, không báo "an toàn" khi thiếu số liệu,
+dải khẩn Đỏ / Cam, lối tắt SOS quá hạn ở mọi trang, 112 luôn thấy).
+
+Chụp 6 trang ở 1440 px: phần rối lớn nhất là thành phần **dùng chung** lặp ở mọi trang (gợi ý "Bắt đầu từ đâu?" mở sẵn 3
+cột chữ ở chỗ đẹp nhất — trang Cứu hộ đẩy bảng điều phối xuống; hàng chú giải màu thường trực ở Tổng quan lặp nút "?").
+
+| Đợt | Nội dung | Trạng thái |
+|---|---|---|
+| 1 | Gợi ý "Bắt đầu từ đâu?" gập sẵn một dòng (Mở rộng · Hướng dẫn đầy đủ · Đã hiểu); Tổng quan: thang màu thường trực chỉ khi trình chiếu (màn thường: nút "?"), lưới cột phải không còn khoảng trống dưới gợi ý; Bản đồ giám sát: bỏ chip "N SOS" lặp ô SOS, tiêu đề bảng chữ thường (biểu tượng giữ đỏ), bảng chừa chỗ nút phóng to / thu nhỏ (trước bị che nút "+") | Xong |
+| 2 | Bản đồ giám sát: câu giải thích chế độ xem gọn lại / gập được; bảng phải mở một khối mỗi lúc (Tình hình hoặc Danh mục) | Kế tiếp |
+| 3 | Tổng quan: bớt tầng (khối đầu trang, Việc chờ quyết định, 6 ô số, điểm nóng) — một khối dẫn đầu | Kế tiếp |
+| 4 | Cứu hộ, Cảnh báo, Vật tư: ô số chỉ viền màu khi ≥ Cam, bớt chip đỏ lặp (ô số + thẻ + dải khẩn) | Kế tiếp |

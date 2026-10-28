@@ -602,7 +602,8 @@ export default function MonitoringMap() {
 
             {/* Phải: công cụ bản đồ (góc phải trên) xếp ngay cạnh bảng Cảnh báo khẩn cấp — cùng một hàng, tự nhường chỗ */}
             {/* Đáy chừa đúng chiều cao thanh thời gian (đo thật — timeBarH) + khe 8 px: bảng Cảnh báo không bị thanh đè */}
-            <div className="pointer-events-none absolute right-3 top-3 z-[1000] flex items-start gap-2" style={{ bottom: timeBarH + 20 }}>
+            {/* …và chừa cả cụm nút phóng to / thu nhỏ góc phải dưới (trước đây bảng che mất nút "+") */}
+            <div className="pointer-events-none absolute right-3 top-3 z-[1000] flex items-start gap-2" style={{ bottom: Math.max(timeBarH + 20, coarse ? 136 : 104) }}>
               <div className="pointer-events-auto flex flex-col items-end gap-2">
                 {!toolsOpen && !tool ? (
                   <button
@@ -674,13 +675,12 @@ export default function MonitoringMap() {
                 ) : (
                   <div className={clsx(floatCard, 'flex h-full w-[22rem] flex-col overflow-hidden')}>
                     <div className="flex items-center justify-between border-b border-line px-3 py-2 bg-panel2/30">
-                      <div className="flex items-center gap-2 text-sm font-bold text-danger">
+                      <div className="flex items-center gap-2 text-sm font-bold text-ink">
                         {/* Ô biểu tượng đỏ nhạt như "Việc chờ quyết định" của Tổng quan (diện mạo phòng chỉ huy — đợt 6) */}
                         <span className="icon-tile h-7 w-7 bg-danger/10 text-danger ring-danger/20" aria-hidden="true"><Siren size={15} /></span>
                         <span>Cảnh báo khẩn cấp</span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        {canSos && <span className="chip bg-danger text-[11px] font-bold text-white">{sos.length} SOS</span>}
                         <button
                           type="button"
                           onClick={() => setRightOpen(false)}
