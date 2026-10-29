@@ -186,7 +186,8 @@ export default function MapKpis({ k, kState, stations, layout, onPick, pickable 
 /**
  * Chip chỉ số khẩn nổi giữa phía trên bản đồ (máy tính — DESIGN.md, phương án B): chỉ các chỉ số đang ở mức Vàng trở lên,
  * nặng nhất trước, tối đa 4 — cùng số, cùng mức với bảng "Tình hình" (kpiTiles). Chạm → như chạm ô ở bảng: bật lớp, mở đúng
- * danh sách, bay tới các điểm. Không có chỉ số nào từ mức Vàng → không hiện gì (bảng Tình hình vẫn đủ 6 chỉ số).
+ * danh sách, bay tới các điểm. Không có chỉ số nào từ mức Vàng → không hiện gì (bảng Tình hình vẫn đủ 6 chỉ số). Chỉ màn
+ * ≥ 1536 px (MonitoringMap): hẹp hơn thì chip đè nút Công cụ và điểm trên bản đồ.
  */
 export function MapStatusChips({ k, stations, onPick, pickable = {}, className }) {
   if (!k) return null;

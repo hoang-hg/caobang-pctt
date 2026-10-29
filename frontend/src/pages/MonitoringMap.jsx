@@ -706,8 +706,9 @@ export default function MonitoringMap() {
               </div>
             </div>
 
-            {/* Giữa phía trên: chip chỉ số khẩn (từ mức Vàng) — giữa bảng Bộ lọc và bảng Cảnh báo khẩn cấp; từ 1280 px */}
-            <div className="pointer-events-none absolute left-1/2 top-3 z-[1000] hidden w-[calc(100%-48rem)] -translate-x-1/2 justify-center xl:flex">
+            {/* Giữa phía trên: chip chỉ số khẩn (từ mức Vàng) — giữa bảng Bộ lọc và bảng Cảnh báo khẩn cấp; từ 1536 px (laptop:
+                chip tràn đè nút Công cụ và điểm trên bản đồ — CI 29/10/2026; 6 chỉ số đã có ở bảng bên phải) */}
+            <div className="pointer-events-none absolute left-1/2 top-3 z-[999] hidden w-[calc(100%-54rem)] -translate-x-1/2 justify-center 2xl:flex">
               <MapStatusChips {...kpiProps} />
             </div>
 
