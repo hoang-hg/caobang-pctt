@@ -10,7 +10,7 @@ import { usePageStatus } from '../app/pageStatus';
 import { useStore } from '../app/store';
 import MapLayers, { blackspotStates, floodScenarioStates, StormLayer, stormQuery } from '../components/map/MapLayers';
 import MapLegend, { RadarScale, RainBar } from '../components/map/MapLegend';
-import MapKpis from '../components/map/MapKpis';
+import MapKpis, { MapStatusChips } from '../components/map/MapKpis';
 import { riverSummary } from '../components/dashboard/RiverKpi';
 import {
   AlertsList, DEFAULT_LAYERS, DrawnStats, hourText, LAYER_GROUPS, LAYER_ORDER, LayerList, layerCounts, Sheet, TimeControl, ToolHint, toolList,
@@ -120,7 +120,8 @@ export default function MonitoringMap() {
   // ?cong-cu=khoanh (từ "Vẽ vùng trên bản đồ" của form soạn cảnh báo): mở sẵn công cụ khoanh đa giác
   const [tool, setTool] = useState(() => (new URLSearchParams(window.location.search).get('cong-cu') === 'khoanh' ? 'polygon' : null)); // measure | route | polygon | circle | incident
   const [offset, setOffset] = useState(0);
-  const [leftOpen, setLeftOpen] = useState(false); // bảng lớp thu gọn sẵn để bản đồ thoáng rộng
+  // Bảng "Bộ lọc" (chế độ xem, lớp, nền — DESIGN.md phương án B): mở sẵn từ 1536 px; laptop gập sẵn để bản đồ thoáng
+  const [leftOpen, setLeftOpen] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 1536);
   const [rightOpen, setRightOpen] = useState(true); // bảng cảnh báo (Tình hình, Điểm nóng) mở sẵn — chỉ huy thấy ngay
   const [legendOpen, setLegendOpen] = useState(false);
   // Chiều cao thật của thanh thời gian (thu gọn / mở rộng / có dòng giải thích / màn cảm ứng): cột phải và khung nhìn bản đồ
@@ -545,14 +546,21 @@ export default function MonitoringMap() {
               <div className="flex min-h-[7rem] flex-1 items-start">
                 {leftOpen && (
                   <div className={clsx(floatCard, 'pointer-events-auto flex max-h-full w-[18rem] flex-col overflow-hidden')}>
-                    <div className="flex items-center justify-between border-b border-line bg-panel2/40 px-3.5 py-2">
-                      <div className="flex items-center gap-2 text-sm font-bold text-ink">
+                    <div className="flex items-center justify-between border-b border-line px-3.5 py-2.5">
+                      <div className="flex items-center gap-2 text-[15px] font-bold text-ink">
                         <Layers size={16} className="text-accent" aria-hidden="true" />
-                        <span className="whitespace-nowrap">Lớp dữ liệu</span>
+                        <span className="whitespace-nowrap">Bộ lọc</span>
                       </div>
                       {layerActions}
                     </div>
-                    <div className="scroll-thin flex-1 overflow-y-auto p-3">{layerList}</div>
+                    <div className="scroll-thin flex flex-1 flex-col gap-3 overflow-y-auto p-3">
+                      {/* Nền bản đồ trong Bộ lọc (trước ở thanh "Nền & Công cụ") — như bảng lọc của trang tham khảo */}
+                      <label className="flex flex-col gap-1">
+                        <span className="text-[11px] font-semibold text-muted">Nền bản đồ</span>
+                        {basemapSelect('input tap py-1.5 text-sm')}
+                      </label>
+                      {layerList}
+                    </div>
                   </div>
                 )}
                 <button
@@ -560,10 +568,10 @@ export default function MonitoringMap() {
                   className={clsx(floatCard, 'pointer-events-auto flex h-10 items-center justify-center gap-1.5 text-xs font-semibold text-ink-2 hover:bg-panel2 [@media(pointer:coarse)]:h-11', leftOpen ? 'ml-1.5 w-8 [@media(pointer:coarse)]:w-11' : 'px-3')}
                   onClick={() => setLeftOpen((o) => !o)}
                   aria-expanded={leftOpen}
-                  aria-label={leftOpen ? 'Thu gọn Lớp dữ liệu' : 'Lớp dữ liệu'}
-                  title={leftOpen ? 'Thu gọn' : undefined}
+                  aria-label={leftOpen ? 'Thu gọn Bộ lọc' : 'Bộ lọc: lớp dữ liệu, nền bản đồ'}
+                  title={leftOpen ? 'Thu gọn' : 'Lớp dữ liệu, nền bản đồ'}
                 >
-                  {leftOpen ? <ChevronLeft size={16} /> : <><Layers size={16} className="text-accent" aria-hidden="true" /> Lớp dữ liệu</>}
+                  {leftOpen ? <ChevronLeft size={16} /> : <><Layers size={16} className="text-accent" aria-hidden="true" /> Bộ lọc</>}
                 </button>
               </div>
               {legendOpen && (
@@ -613,17 +621,15 @@ export default function MonitoringMap() {
                       floatCard,
                       'flex h-10 items-center justify-center gap-1.5 px-3 text-xs font-semibold text-ink-2 hover:bg-panel2 transition [@media(pointer:coarse)]:h-11 shadow-sm',
                     )}
-                    title="Mở thanh chọn nền & công cụ vẽ"
-                    aria-label="Mở thanh chọn nền & công cụ vẽ"
+                    title="Công cụ: đo khoảng cách, khoanh vùng, dò đường, đánh dấu sự cố"
+                    aria-label="Mở công cụ bản đồ"
                   >
-                    <Layers size={15} className="text-accent" aria-hidden="true" />
-                    <span>Nền & Công cụ</span>
+                    <Wrench size={15} className="text-accent" aria-hidden="true" />
+                    <span>Công cụ</span>
                     <ChevronDown size={14} className="text-muted" />
                   </button>
                 ) : (
                   <div className={clsx(floatCard, 'flex items-center gap-1 p-1.5 shadow-sm')}>
-                    {basemapSelect('input w-auto border-0 bg-transparent px-2 py-1 text-xs focus:ring-0 [@media(pointer:coarse)]:min-h-[44px]')}
-                    <div className="mx-0.5 h-4 w-px bg-line/80" aria-hidden="true" />
                     {tools.map(([t, Icon, label]) => (
                       <button
                         key={t}
@@ -644,8 +650,8 @@ export default function MonitoringMap() {
                       type="button"
                       onClick={() => { setToolsOpen(false); setTool(null); }}
                       className="tap-sq -mr-0.5 flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-panel2 hover:text-ink transition-colors"
-                      title="Thu gọn thanh nền & công cụ"
-                      aria-label="Thu gọn thanh nền & công cụ"
+                      title="Thu gọn công cụ"
+                      aria-label="Thu gọn công cụ bản đồ"
                     >
                       <ChevronUp size={15} />
                     </button>
@@ -698,6 +704,11 @@ export default function MonitoringMap() {
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Giữa phía trên: chip chỉ số khẩn (từ mức Vàng) — giữa bảng Bộ lọc và bảng Cảnh báo khẩn cấp; từ 1280 px */}
+            <div className="pointer-events-none absolute left-1/2 top-3 z-[1000] hidden w-[calc(100%-48rem)] -translate-x-1/2 justify-center xl:flex">
+              <MapStatusChips {...kpiProps} />
             </div>
 
             {/* Thanh thời gian – Đáy, giữa; căn giữa và tự co giãn vừa vặn */}

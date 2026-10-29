@@ -182,3 +182,45 @@ export default function MapKpis({ k, kState, stations, layout, onPick, pickable 
     </section>
   );
 }
+
+/**
+ * Chip chỉ số khẩn nổi giữa phía trên bản đồ (máy tính — DESIGN.md, phương án B): chỉ các chỉ số đang ở mức Vàng trở lên,
+ * nặng nhất trước, tối đa 4 — cùng số, cùng mức với bảng "Tình hình" (kpiTiles). Chạm → như chạm ô ở bảng: bật lớp, mở đúng
+ * danh sách, bay tới các điểm. Không có chỉ số nào từ mức Vàng → không hiện gì (bảng Tình hình vẫn đủ 6 chỉ số).
+ */
+export function MapStatusChips({ k, stations, onPick, pickable = {}, className }) {
+  if (!k) return null;
+  const hot = kpiTiles(k, stations)
+    .filter((t) => t.level >= 1)
+    .sort((a, b) => b.level - a.level)
+    .slice(0, 4);
+  if (!hot.length) return null;
+  return (
+    <ul aria-label="Chỉ số khẩn" className={clsx('flex flex-wrap justify-center gap-2', className)}>
+      {hot.map((t) => {
+        const scale = risk(t.level);
+        const text = `${t.title}: ${t.value}${t.unit ? ` ${t.unit}` : ''}${t.sub ? ` — ${t.sub}` : ''}`;
+        const body = (
+          <>
+            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: scale.hex }} aria-hidden="true" />
+            <span className="text-muted">{t.short}</span>
+            <b className="num text-ink">{t.value}</b>
+            {t.sub && <span className={clsx('max-w-[11rem] truncate', t.level >= 2 ? scale.text : 'text-ink-2', t.alert && 'font-semibold')}>{t.sub}</span>}
+          </>
+        );
+        const cls = 'float-panel pointer-events-auto flex min-h-[40px] items-center gap-1.5 rounded-full px-3.5 text-[13px] [@media(pointer:coarse)]:min-h-[44px]';
+        return (
+          <li key={t.key}>
+            {pickable[t.key] && onPick ? (
+              <button type="button" className={clsx(cls, 'transition-colors hover:border-accent')} onClick={() => onPick(t.key)} title={`${text} — bấm để xem trên bản đồ`} aria-label={`${text}. Xem trên bản đồ`}>
+                {body}
+              </button>
+            ) : (
+              <span className={cls} title={text}>{body}</span>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
