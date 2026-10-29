@@ -95,7 +95,7 @@ frontend/                  React 18, Vite 6, Tailwind 3, TanStack Query 5, Zusta
                            ReservoirMonitor, LandslideMonitor, NetworkBanner = báo mất mạng / gợi ý bản nhẹ,
                            MissionPage = /nhiem-vu link nhiệm vụ của trưởng nhóm, không đăng nhập)
   src/components/          common/ (ui.jsx: KpiCard Modal Confirm Tabs Section Empty…, PageHeader + ExportMenu, Turnstile, DispatchModal…) ·
-                           layout/ (Header, Sidebar, StatusBar = thanh trạng thái dưới cùng, màn ≥ 1024 px rộng + ≥ 860 px cao — `lg:tall:`, page.js: khung trang PAGE / EDGE) ·
+                           layout/ (Header + TopNav = menu ngang máy tính ≥ 1024 px, Sidebar = ngăn menu ☰ điện thoại / máy tính bảng + useNavBadges, nav.js = danh mục menu, StatusBar = thanh trạng thái dưới cùng, màn ≥ 1024 px rộng + ≥ 860 px cao — `lg:tall:`, page.js: khung trang PAGE / EDGE; chuẩn diện mạo: frontend/DESIGN.md) ·
                            map/ (MapLayers, MapTools = nền bản đồ + công cụ, icons, leafletGlobal) · charts/ (chartTheme) ·
                            account/Mfa.jsx (cài đặt / quản lý xác thực 2 lớp — Login import tĩnh, UserMenu lazy)
   src/index.css            biến màu CSS sáng/tối; tailwind.config.js ánh xạ token
@@ -446,7 +446,8 @@ chỉ khi `DEMO_MODE`; `DEMO_MODE=false` xoá đoạn `so_do` còn sót mỗi l�
   `area_clause`, `audit()` cho thao tác ghi, `hub.publish` nếu màn hình khác cần làm mới, `cached_view` nếu là truy vấn
   tổng hợp được nhiều màn hình gọi; frontend dùng `useAreaQuery` với khoá trùng sự kiện; thêm kịch bản vào tests/e2e.
 - **Trang frontend mới**: tệp trong `pages/`, `lazy()` + `<Route>` trong `App.jsx` bọc `<Guard>`, mục menu trong
-  `components/layout/Sidebar.jsx`; build rồi kiểm tra gói tải lần đầu của cổng công khai không tăng.
+  `components/layout/nav.js` (có `short` cho menu ngang nếu thuộc nhóm Điều hành); theo `frontend/DESIGN.md`; build rồi kiểm
+  tra gói tải lần đầu của cổng công khai không tăng.
 - **Quyền mới**: `permissions.py` (`ALL_PERMISSIONS`, vai trò) → README §8 → `<Can>` ở frontend → kiểm thử `rbac-test.mjs`.
 - **Dữ liệu công khai mới**: endpoint trong `public.py` bọc `cached`, chỉ trường an toàn → cập nhật `public-test.mjs` → README §9.1.
 - **Bảng / cột mới**: migration mới (§6) → seed nếu cần dữ liệu nền → README §2.2 nếu là dữ liệu phải nhập từ nguồn chính thức.

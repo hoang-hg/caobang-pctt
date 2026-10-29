@@ -2,20 +2,22 @@ import {
   LayoutDashboard, Map, Boxes, Siren, Megaphone, KeyRound, DatabaseZap, Camera, FileUp, CalendarRange, BookOpen,
 } from 'lucide-react';
 
-// Menu theo nhóm việc: Điều hành (tác nghiệp hằng ngày) · Dữ liệu & báo cáo · Quản trị. Menu rộng 240 px: nhãn chữ 14 px
-// (người lớn tuổi đọc rõ) kèm số đếm không bị cắt.
+// Menu theo nhóm việc: Điều hành (tác nghiệp hằng ngày) · Dữ liệu & báo cáo · Quản trị · Trợ giúp. Máy tính (≥ 1024 px): menu
+// ngang trên thanh trên cùng (TopNav — nhóm Điều hành hiện thẳng, mục không đủ chỗ và các nhóm khác trong "Thêm"); điện
+// thoại / máy tính bảng: ngăn menu (nút ☰) — nhãn chữ 14 px kèm số đếm không bị cắt.
 // Mục nào tài khoản không có quyền thì ẩn; nhóm hết mục thì ẩn cả nhóm. Mục không ghi `perm` (Hướng dẫn xử lý): mọi tài khoản.
 // Biểu tượng của mục cũng là biểu tượng ở đầu trang đó (PageHeader — navItemFor): chuyển trang vẫn thấy cùng một mốc.
 export const NAV_GROUPS = [
   {
     title: 'Điều hành',
     items: [
-      { to: '/dashboard', label: 'Tổng quan', icon: LayoutDashboard, perm: ['monitoring', 'view'] },
-      { to: '/ban-do', label: 'Bản đồ giám sát', icon: Map, perm: ['monitoring', 'view'] },
-      { to: '/cuu-ho', label: 'Điều hành cứu hộ', icon: Siren, badge: true, perm: ['sos', 'view'] },
-      { to: '/canh-bao', label: 'Cảnh báo & Hotline', icon: Megaphone, perm: ['alert', 'view'], badgeKey: 'alerts' },
-      { to: '/nguon-luc', label: 'Vật tư & Lực lượng', icon: Boxes, perm: ['resource', 'view'] },
-      { to: '/phan-anh', label: 'Phản ánh người dân', icon: Camera, perm: ['report', 'view'], badgeKey: 'reports' },
+      // `short`: nhãn trên menu ngang của thanh trên cùng (máy tính, DESIGN.md — phương án B)
+      { to: '/dashboard', label: 'Tổng quan', short: 'Tổng quan', icon: LayoutDashboard, perm: ['monitoring', 'view'] },
+      { to: '/ban-do', label: 'Bản đồ giám sát', short: 'Bản đồ', icon: Map, perm: ['monitoring', 'view'] },
+      { to: '/cuu-ho', label: 'Điều hành cứu hộ', short: 'Cứu hộ', icon: Siren, badge: true, perm: ['sos', 'view'] },
+      { to: '/canh-bao', label: 'Cảnh báo & Hotline', short: 'Cảnh báo', icon: Megaphone, perm: ['alert', 'view'], badgeKey: 'alerts' },
+      { to: '/nguon-luc', label: 'Vật tư & Lực lượng', short: 'Vật tư', icon: Boxes, perm: ['resource', 'view'] },
+      { to: '/phan-anh', label: 'Phản ánh người dân', short: 'Phản ánh', icon: Camera, perm: ['report', 'view'], badgeKey: 'reports' },
     ],
   },
   {
