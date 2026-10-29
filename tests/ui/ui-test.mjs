@@ -1216,8 +1216,8 @@ async function mapTools(ctx, phone) {
   const pick = async (label) => {
     if (phone) await page.getByRole('button', { name: 'Công cụ', exact: true }).click();
     else {
-      // Máy tính: thanh chọn nền & công cụ thu gọn sẵn (bản đồ rộng hơn) — mở ra trước
-      const open = page.getByRole('button', { name: 'Mở thanh chọn nền & công cụ vẽ' });
+      // Máy tính: cụm Công cụ thu gọn sẵn (bản đồ rộng hơn; nền bản đồ nay ở bảng Bộ lọc) — mở ra trước
+      const open = page.getByRole('button', { name: 'Mở công cụ bản đồ' });
       if (await open.count()) await open.click();
     }
     await visible(page.locator(`button[title="${label}"]`)).click();

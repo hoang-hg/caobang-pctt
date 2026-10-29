@@ -126,7 +126,7 @@ body {
     background: color-mix(in srgb, currentColor 12%, transparent);
   }
   /* Lớp nổi trên bản đồ (bảng lớp, chú giải, thanh thời gian…): một kiểu — nền ô hơi trong, làm mờ phía sau, một mức bóng */
-  .float-panel { @apply bg-panel/95 backdrop-blur-md border border-line/80 rounded-[14px]; box-shadow: var(--shadow-float); }
+  .float-panel { @apply bg-panel/95 backdrop-blur-md border border-line/80 rounded-[18px]; box-shadow: var(--shadow-float); }
   /* Tiêu đề khối: chữ thường có dấu, đậm vừa — chữ IN HOA dàn rộng khó đọc với dấu tiếng Việt */
   .card-title { @apply text-sm font-semibold text-ink flex items-center gap-1.5; }
   
