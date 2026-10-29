@@ -33,7 +33,7 @@ export default function UserMenu() {
     <div className="relative" ref={ref}>
       <button className="btn-ghost touch-hit max-sm:px-2" onClick={() => setOpen((o) => !o)} title={user.full_name} aria-label={`Tài khoản: ${user.full_name}`}>
         <UserCircle2 size={16} />
-        <span className="hidden max-w-[10rem] truncate xl:inline">{user.full_name}</span>
+        <span className="hidden max-w-[10rem] truncate 2xl:inline">{user.full_name}</span>
       </button>
       {open && (
         <div className="card scroll-thin absolute right-0 top-11 z-[1200] max-h-[calc(100vh-4rem)] w-80 overflow-y-auto p-3 shadow-2xl supports-[height:100dvh]:max-h-[calc(100dvh-4rem)]">
@@ -55,8 +55,9 @@ export default function UserMenu() {
             {user.mfa?.enabled ? <span className="font-semibold text-good">đang bật</span> : <span className="text-warn">chưa bật</span>}
           </div>
           {user.email && <div className="mt-1 text-[11px] text-muted">Email khôi phục: {user.email}</div>}
-          {/* Điện thoại: âm báo SOS và tình trạng kết nối nằm ở đây (thanh trên cùng nhường chỗ cho bộ lọc địa phương) */}
-          <div className="mt-3 flex flex-col gap-1 border-t border-line pt-2 sm:hidden">
+          {/* Điện thoại và máy tính ≥ 1024 px: âm báo SOS, tình trạng kết nối nằm ở đây (thanh trên cùng nhường chỗ cho bộ lọc
+              địa phương / menu ngang); máy tính bảng: nút trên thanh */}
+          <div className="mt-3 flex flex-col gap-1 border-t border-line pt-2 sm:hidden lg:flex">
             <button type="button" className="btn-ghost tap justify-between text-xs" onClick={toggleSound} aria-pressed={soundOn}>
               <span className="flex items-center gap-1.5">{soundOn ? <Volume2 size={14} className="text-accent" /> : <VolumeX size={14} />} Âm báo SOS</span>
               <span className={soundOn ? 'font-semibold text-accent' : 'text-muted'}>{soundOn ? 'Đang bật' : 'Đang tắt'}</span>

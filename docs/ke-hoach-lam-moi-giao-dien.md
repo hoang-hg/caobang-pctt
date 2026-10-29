@@ -437,3 +437,16 @@ cột chữ ở chỗ đẹp nhất — trang Cứu hộ đẩy bảng điều p
 | 2 | Bản đồ giám sát: câu giải thích chế độ xem gọn lại / gập được; bảng phải mở một khối mỗi lúc (Tình hình hoặc Danh mục) | Kế tiếp |
 | 3 | Tổng quan: bớt tầng (khối đầu trang, Việc chờ quyết định, 6 ô số, điểm nóng) — một khối dẫn đầu | Kế tiếp |
 | 4 | Cứu hộ, Cảnh báo, Vật tư: ô số chỉ viền màu khi ≥ Cam, bớt chip đỏ lặp (ô số + thẻ + dải khẩn) | Kế tiếp |
+
+## 14. Diện mạo "Sáng thoáng" — phương án B (29/10/2026)
+
+Chủ dự án xem 3 phương án cho Bản đồ giám sát (A phòng chỉ huy gọn · B sáng thoáng, bản đồ là chính · C tương phản cao cho
+phòng trực — artifact "Phương án diện mạo PCTT Cao Bằng") và **chọn B**, kèm yêu cầu: **vẫn thể hiện đủ mọi thông tin tài
+liệu thiết kế mô tả**. Chuẩn diện mạo: `frontend/DESIGN.md` (token màu, chữ, bo góc, khoảng cách; quy tắc dùng màu cảnh
+báo; bảng đối chiếu mục B ↔ bố cục B). Mục 13 (giảm rối) gộp vào lộ trình này.
+
+| Bước | Nội dung | Trạng thái |
+|---|---|---|
+| 1 | `frontend/DESIGN.md`; khung ứng dụng: máy tính **bỏ menu trái**, menu ngang trên thanh trên cùng (`TopNav`) — mục không đủ chỗ tự dồn vào "Thêm" (đo bề rộng thật: thanh không tràn ở 1024 / 1280 / 1440 px), "Thêm" có Dữ liệu & báo cáo, Quản trị, Trợ giúp, cổng người dân, 112; chuông SOS, Sáng / Tối trong menu tài khoản; tên cơ quan, tên tài khoản từ 1536 px. Điện thoại / máy tính bảng giữ ngăn menu ☰ và thanh đáy | Xong |
+| 2 | Bản đồ giám sát theo bố cục B: bảng Bộ lọc trái (chế độ xem, lớp theo 3 nhóm thiên tai, nền), chip chỉ số khẩn giữa trên, ngăn "Danh mục cảnh báo" phải, công cụ góc phải trên, thanh thời gian + chú giải mưa ở đáy | Kế tiếp |
+| 3 | Tổng quan, Cứu hộ, Cảnh báo, Vật tư, các trang còn lại theo DESIGN.md (một khối dẫn đầu, màu cảnh báo chỉ ở chỗ mang nghĩa) | Kế tiếp |

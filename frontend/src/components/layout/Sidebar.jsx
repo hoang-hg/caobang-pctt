@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Phone, X } from 'lucide-react';
+import { Phone, X } from 'lucide-react';
 import clsx from 'clsx';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api/client';
@@ -8,7 +8,8 @@ import { useStore } from '../../app/store';
 import { hasPermission } from '../../rbac/permissions';
 import { NAV_GROUPS } from './nav';
 
-/** Số đếm trên menu (dùng chung Sidebar và nút menu trên điện thoại ở Header — cùng khoá truy vấn, không gọi API 2 lần). */
+/** Số đếm trên menu (dùng chung menu ngang TopNav, ngăn menu điện thoại và nút ☰ ở Header — cùng khoá truy vấn, không gọi
+ * API 2 lần). */
 export function useNavBadges() {
   const perms = useStore((s) => s.auth?.user?.permissions);
   const hasPin = useStore((s) => !!s.auth?.user?.has_pin);
@@ -40,161 +41,73 @@ export function useNavBadges() {
   };
 }
 
+/**
+ * Ngăn menu của điện thoại / máy tính bảng (< 1024 px, mở bằng nút ☰ ở Header). Máy tính dùng menu ngang trên thanh trên
+ * cùng (TopNav) — không còn menu trái (DESIGN.md, phương án B).
+ */
 export default function Sidebar() {
   const perms = useStore((s) => s.auth?.user?.permissions);
-  const { sidebarCollapsed, toggleSidebarCollapse, mobileMenuOpen, setMobileMenuOpen } = useStore();
+  const { mobileMenuOpen, setMobileMenuOpen } = useStore();
   const badges = useNavBadges();
-
-  const renderNavLinks = (isMobile = false) => {
-    const isCollapsed = !isMobile && sidebarCollapsed;
-    return (
-      <div className="flex flex-col gap-2.5 px-2">
-        {NAV_GROUPS.map((group, gIdx) => {
-          const visibleItems = group.items.filter(
-            (n) => !n.perm || hasPermission(perms, ...n.perm) || (n.alt && hasPermission(perms, ...n.alt))
-          );
-          if (!visibleItems.length) return null;
-
-          return (
-            <div key={group.title} className="flex flex-col gap-0.5">
-              {isCollapsed ? (
-                gIdx > 0 && <div className="my-1 border-t border-white/10 mx-1.5" />
-              ) : (
-                <div className="px-3 pb-1 pt-1 text-xs font-semibold text-nav-muted">
-                  {group.title}
-                </div>
-              )}
-
-              {visibleItems.map(({ to, label, icon: Icon, badge, badgeKey }) => {
-                const count = badges[badgeKey || 'sos'] || 0;
-                const hasBadge = (badge || badgeKey) && count > 0;
-
-                return (
-                  <NavLink
-                    key={to}
-                    to={to}
-                    title={isCollapsed ? label : undefined}
-                    onClick={() => {
-                      if (isMobile) setMobileMenuOpen(false);
-                    }}
-                    className={({ isActive }) =>
-                      clsx(
-                        // Nền xanh đêm: mục đang mở nền sáng nhẹ + chữ trắng + vạch xanh; mục khác chữ xám xanh, rê chuột sáng lên
-                        'group relative flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-medium transition duration-150 [@media(pointer:coarse)]:min-h-[44px]',
-                        isActive
-                          ? 'bg-white/[0.09] text-white shadow-sm ring-1 ring-inset ring-white/10'
-                          : 'text-nav-ink hover:bg-white/[0.06] hover:text-white',
-                        isCollapsed && 'justify-center px-0'
-                      )
-                    }
-                  >
-                    {({ isActive }) => (
-                      <>
-                        {isActive && (
-                          <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r bg-nav-active" />
-                        )}
-                        <Icon size={18} className={clsx('shrink-0', isActive ? 'text-nav-active' : 'text-nav-muted group-hover:text-nav-ink')} />
-                        {!isCollapsed && <span className="flex-1 truncate">{label}</span>}
-                        {hasBadge && (
-                          <span
-                            className={clsx(
-                              'chip font-bold text-[10px] text-white',
-                              badgeKey === 'reports' || badgeKey === 'submissions' ? 'bg-amber-600' : 'bg-danger motion-safe:animate-pulse',
-                              isCollapsed ? 'absolute right-1 top-0.5 px-1 py-0 min-w-4 text-center' : 'ml-auto'
-                            )}
-                          >
-                            {count}
-                          </span>
-                        )}
-                      </>
-                    )}
-                  </NavLink>
-                );
-              })}
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
+  if (!mobileMenuOpen) return null;
 
   return (
-    <>
-      {/* Desktop Sidebar */}
-      <nav
-        className={clsx(
-          // Xanh đêm ở cả hai nền, liền với góc thương hiệu của thanh trên (Header) thành một khung chữ L
-          'no-print hidden lg:flex min-h-0 shrink-0 flex-col justify-between gap-2 border-r border-black/20 bg-nav py-3 transition-[width] duration-200 select-none',
-          sidebarCollapsed ? 'w-16' : 'w-60'
-        )}
-      >
-        {/* Màn thấp (laptop 768 px): danh sách mục tự cuộn bên trong — menu không bao giờ kéo dài cả trang ra ngoài khung */}
-        <div className="scroll-thin flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
-          {renderNavLinks(false)}
-        </div>
-
-        <div className="flex shrink-0 flex-col gap-2 px-2 pt-2 border-t border-white/10">
-          {!sidebarCollapsed && (
-            <div className="rounded-xl bg-white/[0.06] p-2.5 text-xs ring-1 ring-inset ring-white/[0.06]">
-              <div className="flex items-center gap-1.5 font-semibold text-red-300">
-                <Phone size={13} /> Khẩn cấp cứu nạn: 112
-              </div>
-              <div className="text-[11px] text-nav-muted mt-0.5">Trực ban 24/7</div>
-            </div>
-          )}
-
-          <button
-            onClick={toggleSidebarCollapse}
-            className="btn w-full justify-center border border-white/10 py-2 text-xs text-nav-muted hover:bg-white/10 hover:text-white [@media(pointer:coarse)]:min-h-[44px]"
-            title={sidebarCollapsed ? 'Mở rộng thanh menu' : 'Thu gọn thanh menu'}
-            aria-label="Thu gọn hoặc mở rộng thanh menu"
-          >
-            {sidebarCollapsed ? (
-              <ChevronRight size={16} />
-            ) : (
-              <div className="flex items-center gap-1.5">
-                <ChevronLeft size={16} />
-                <span>Thu gọn menu</span>
-              </div>
-            )}
-          </button>
-        </div>
-      </nav>
-
-      {/* Mobile Drawer Backdrop & Menu */}
-      {mobileMenuOpen && (
-        <div className="fixed inset-0 z-[1200] lg:hidden flex">
-          <div
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
-            onClick={() => setMobileMenuOpen(false)}
-            aria-hidden="true"
-          />
-          <div className="relative flex flex-col justify-between w-64 max-w-[80vw] h-full bg-nav border-r border-black/20 py-4 z-10 shadow-2xl animate-in slide-in-from-left duration-200">
-            <div className="min-h-0 overflow-y-auto">
-              <div className="flex items-center justify-between px-4 pb-3 border-b border-white/10 mb-3">
-                <span className="font-bold text-sm text-white">Danh mục điều hành</span>
-                <button
-                  className="touch-hit p-1 rounded-lg text-nav-muted hover:bg-white/10 hover:text-white"
-                  onClick={() => setMobileMenuOpen(false)}
-                  aria-label="Đóng menu"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-              {renderNavLinks(true)}
-            </div>
-
-            <div className="px-3 pt-3 border-t border-white/10">
-              <div className="rounded-xl bg-white/[0.06] p-3 text-xs ring-1 ring-inset ring-white/[0.06]">
-                <div className="flex items-center gap-1.5 font-bold text-red-300">
-                  <Phone size={14} /> Đường dây nóng: 112
+    <div className="fixed inset-0 z-[1200] flex lg:hidden">
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity" onClick={() => setMobileMenuOpen(false)} aria-hidden="true" />
+      <div className="relative z-10 flex h-full w-64 max-w-[80vw] flex-col justify-between border-r border-black/20 bg-nav py-4 shadow-2xl">
+        <div className="min-h-0 overflow-y-auto">
+          <div className="mb-3 flex items-center justify-between border-b border-white/10 px-4 pb-3">
+            <span className="text-sm font-bold text-white">Danh mục điều hành</span>
+            <button className="touch-hit rounded-lg p-1 text-nav-muted hover:bg-white/10 hover:text-white" onClick={() => setMobileMenuOpen(false)} aria-label="Đóng menu">
+              <X size={18} />
+            </button>
+          </div>
+          <div className="flex flex-col gap-2.5 px-2">
+            {NAV_GROUPS.map((group) => {
+              const items = group.items.filter((n) => !n.perm || hasPermission(perms, ...n.perm) || (n.alt && hasPermission(perms, ...n.alt)));
+              if (!items.length) return null;
+              return (
+                <div key={group.title} className="flex flex-col gap-0.5">
+                  <div className="px-3 pb-1 pt-1 text-xs font-semibold text-nav-muted">{group.title}</div>
+                  {items.map(({ to, label, icon: Icon, badge, badgeKey }) => {
+                    const count = badges[badgeKey || 'sos'] || 0;
+                    return (
+                      <NavLink
+                        key={to}
+                        to={to}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className={({ isActive }) => clsx(
+                          'group relative flex min-h-[44px] items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-medium transition duration-150',
+                          isActive ? 'bg-white/[0.09] text-white ring-1 ring-inset ring-white/10' : 'text-nav-ink hover:bg-white/[0.06] hover:text-white',
+                        )}
+                      >
+                        {({ isActive }) => (
+                          <>
+                            {isActive && <span className="absolute bottom-1.5 left-0 top-1.5 w-1 rounded-r bg-nav-active" />}
+                            <Icon size={18} className={clsx('shrink-0', isActive ? 'text-nav-active' : 'text-nav-muted group-hover:text-nav-ink')} />
+                            <span className="flex-1 truncate">{label}</span>
+                            {(badge || badgeKey) && count > 0 && (
+                              <span className={clsx('chip ml-auto text-[10px] font-bold text-white', badgeKey === 'reports' || badgeKey === 'submissions' ? 'bg-amber-700' : 'bg-danger')}>
+                                {count}
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </NavLink>
+                    );
+                  })}
                 </div>
-                <div className="text-[11px] text-nav-muted mt-1">Hỗ trợ tìm kiếm cứu nạn khẩn cấp trên địa bàn tỉnh</div>
-              </div>
-            </div>
+              );
+            })}
           </div>
         </div>
-      )}
-    </>
+        <div className="border-t border-white/10 px-3 pt-3">
+          <a href="tel:112" className="block rounded-xl bg-white/[0.06] p-3 text-xs ring-1 ring-inset ring-white/[0.06]">
+            <span className="flex items-center gap-1.5 font-bold text-red-300"><Phone size={14} /> Đường dây nóng: 112</span>
+            <span className="mt-1 block text-[11px] text-nav-muted">Hỗ trợ tìm kiếm cứu nạn khẩn cấp trên địa bàn tỉnh</span>
+          </a>
+        </div>
+      </div>
+    </div>
   );
 }

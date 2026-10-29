@@ -8,6 +8,7 @@ import AdminFilter from '../common/AdminFilter';
 import OmniSearch from '../common/OmniSearch';
 import UserMenu from '../common/UserMenu';
 import BrandMark from './BrandMark';
+import TopNav from './TopNav';
 import { useNavBadges } from './Sidebar';
 
 // Điều khiển chế độ giả lập: CHỈ máy dev (bản build chạy thật không có mã giả lập — app/store.js)
@@ -16,8 +17,8 @@ const SimulationBar = import.meta.env.DEV ? lazy(() => import('../common/Simulat
 // "Báo SOS" ở thanh thao tác dưới cùng. Hộp thoại chỉ tải khi bấm
 const QuickIncidentModal = lazy(() => import('../dashboard/QuickIncidentModal'));
 
-// Đồng hồ trên thanh trên: từ 1280 px khi KHÔNG có thanh trạng thái dưới cùng (laptop 1366×768); màn rộng + đủ cao thì đồng
-// hồ ở thanh trạng thái (StatusBar)
+// Đồng hồ trên thanh trên: từ 1536 px khi KHÔNG có thanh trạng thái dưới cùng (dưới đó nhường chỗ cho menu ngang); màn đủ cao
+// thì đồng hồ ở thanh trạng thái (StatusBar)
 function Clock() {
   const [now, setNow] = useState(new Date());
   useEffect(() => {
@@ -25,7 +26,7 @@ function Clock() {
     return () => clearInterval(id);
   }, []);
   return (
-    <div className="hidden border-l border-line/60 pl-2 text-right leading-tight xl:block xl:tall:hidden">
+    <div className="hidden border-l border-line/60 pl-2 text-right leading-tight 2xl:block 2xl:tall:hidden">
       <div className="num text-sm font-semibold text-ink">{now.toLocaleTimeString('vi-VN')}</div>
       <div className="text-[11px] text-muted">{now.toLocaleDateString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })}</div>
     </div>
@@ -33,7 +34,7 @@ function Clock() {
 }
 
 export default function Header() {
-  const { theme, toggleTheme, wsStatus, soundOn, toggleSound, mobileMenuOpen, setMobileMenuOpen, audioReady, sidebarCollapsed } = useStore();
+  const { theme, toggleTheme, wsStatus, soundOn, toggleSound, mobileMenuOpen, setMobileMenuOpen, audioReady } = useStore();
   // Điện thoại: menu thu vào nút ☰ — SOS chờ xử lý / lệnh cảnh báo chờ bạn duyệt hiện số đỏ ngay trên nút
   const badges = useNavBadges();
   const urgent = badges.sos + badges.alerts;
@@ -57,23 +58,17 @@ export default function Header() {
         )}
       </button>
 
-      {/* Logo & tên cơ quan. Màn ≥ 1024 px: khối xanh đêm rộng đúng bằng menu trái (thu gọn theo menu) — cùng menu thành khung
-          chữ L mang nhận diện; biểu tượng xanh (đỏ chỉ dành cho báo động) */}
-      <Link
-        to="/dashboard"
-        className={clsx(
-          'touch-hit flex items-center gap-2.5 pr-2 transition-opacity hover:opacity-90',
-          'lg:-my-px lg:-ml-3 lg:h-14 lg:shrink-0 lg:self-stretch lg:border-r lg:border-black/20 lg:bg-nav lg:pl-3',
-          sidebarCollapsed ? 'lg:w-16 lg:justify-center lg:pl-0 lg:pr-0' : 'lg:w-60',
-        )}
-      >
+      {/* Logo & tên cơ quan (khiên xanh — đỏ chỉ dành cho báo động). Máy tính: không còn menu trái (DESIGN.md, phương án B) —
+          tên cơ quan (như tên tài khoản) từ 1536 px, nhường chỗ cho menu ngang */}
+      <Link to="/dashboard" className="touch-hit flex shrink-0 items-center gap-2.5 pr-1 transition-opacity hover:opacity-90">
         <BrandMark size={36} />
-        <div className={clsx('hidden min-w-0 leading-tight lg:block', sidebarCollapsed && 'lg:hidden')}>
-          {/* Hai dòng ngắn vừa khối 240 px (một dòng "… Cao Bằng" bị cắt) */}
-          <div className="truncate text-sm font-bold tracking-tight text-ink lg:text-white">BCH PCTT & TKCN</div>
-          <div className="truncate text-[11px] text-muted lg:text-nav-muted">Tỉnh Cao Bằng · điều hành</div>
+        <div className="hidden min-w-0 leading-tight 2xl:block">
+          <div className="truncate text-sm font-bold tracking-tight text-ink">BCH PCTT & TKCN</div>
+          <div className="truncate text-[11px] text-muted">Tỉnh Cao Bằng · điều hành</div>
         </div>
       </Link>
+
+      <TopNav />
 
       {/* Bộ lọc địa phương: ở MỌI cỡ màn (trước đây dưới 1024 px nằm trong menu ☰ — chạm 2 lần mới đổi được địa bàn). Dưới
           1024 px nhãn gọn, co lại trước các nút khác; tên cơ quan chỉ hiện từ 1024 px để nhường chỗ */}
@@ -83,14 +78,13 @@ export default function Header() {
 
       {/* Tìm kiếm toàn năng: từ 768 px là ô tìm; điện thoại là nút kính lúp (mở hộp tìm toàn màn) đứng cạnh cụm nút bên phải —
           trước đây điện thoại không tìm được gì */}
-      <div className="ml-auto min-w-0 flex-none md:ml-0 md:max-w-sm md:flex-1">
+      <div className="ml-auto min-w-0 flex-none md:ml-0 md:max-w-sm md:flex-1 lg:w-44 lg:flex-none xl:w-52 2xl:w-72">
         <OmniSearch />
       </div>
 
-      {/* Cụm công cụ bên phải — không co (ô tìm kiếm co thay). Màn rộng ≥ 1024 px và cao ≥ 860 px (`lg:tall:`): thanh trên
-          chỉ còn địa bàn · tìm kiếm · Báo cáo nhanh · tài khoản — kết nối, chuông SOS, Sáng/Tối, cổng người dân, đồng hồ nằm ở
-          thanh trạng thái dưới cùng (StatusBar — docs/ke-hoach-lam-moi-giao-dien.md mục 5). Màn khác: các nút đó ở đây, chỉ
-          còn biểu tượng */}
+      {/* Cụm công cụ bên phải — không co (menu ngang tự dồn mục vào "Thêm" khi chật). Máy tính ≥ 1024 px: chuông SOS, Sáng/Tối
+          trong menu tài khoản, cổng người dân trong "Thêm" (nhường chỗ cho menu ngang); màn đủ cao còn có thanh trạng thái dưới
+          cùng (StatusBar). Máy tính bảng: các nút đó ở đây, chỉ còn biểu tượng */}
       <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
         {/* Điều khiển Giả lập tác chiến */}
         {SimulationBar && <Suspense fallback={null}><SimulationBar /></Suspense>}
@@ -104,7 +98,7 @@ export default function Header() {
             title="Báo cáo nhanh hiện trường → tạo phiếu SOS"
           >
             <ShieldAlert size={15} aria-hidden="true" />
-            <span className="hidden font-semibold lg:inline">Báo cáo nhanh</span>
+            <span className="hidden font-semibold xl:inline">Báo cáo nhanh</span>
           </button>
         )}
         {reportOpen && (
@@ -118,7 +112,7 @@ export default function Header() {
           to="/cong-khai"
           target="_blank"
           rel="noopener noreferrer"
-          className="btn-ghost touch-hit hidden md:inline-flex lg:tall:hidden p-2 text-accent border border-accent/30 bg-accent/5 hover:bg-accent/10 rounded-lg"
+          className="btn-ghost touch-hit hidden md:inline-flex lg:hidden p-2 text-accent border border-accent/30 bg-accent/5 hover:bg-accent/10 rounded-lg"
           title="Mở Cổng thông tin công khai dành cho người dân"
           aria-label="Cổng người dân"
         >
@@ -155,7 +149,7 @@ export default function Header() {
 
         {/* Nút bật/tắt âm báo SOS — điện thoại: trong menu tài khoản (nhường chỗ cho bộ lọc địa phương); màn đủ cao: thanh trạng thái */}
         <button
-          className={clsx('btn-ghost touch-hit p-2 transition-colors max-sm:hidden lg:tall:hidden', soundOn ? 'text-accent' : 'text-muted')}
+          className={clsx('btn-ghost touch-hit p-2 transition-colors max-sm:hidden lg:hidden', soundOn ? 'text-accent' : 'text-muted')}
           onClick={toggleSound}
           title={soundOn ? 'Âm báo SOS: BẬT (bấm để tắt)' : 'Âm báo SOS: TẮT (bấm để bật)'}
           aria-label="Bật tắt âm báo SOS"
@@ -166,7 +160,7 @@ export default function Header() {
 
         {/* Nút đổi giao diện Sáng / Tối — điện thoại: chỉ trong menu tài khoản (Theo máy / Sáng / Tối), nhường chỗ cho tên địa bàn */}
         <button
-          className="btn-ghost touch-hit p-2 transition-transform active:rotate-45 max-sm:hidden lg:tall:hidden"
+          className="btn-ghost touch-hit p-2 transition-transform active:rotate-45 max-sm:hidden lg:hidden"
           onClick={toggleTheme}
           title={theme === 'dark' ? 'Chuyển sang nền Sáng' : 'Chuyển sang nền Tối'}
           aria-label="Nền tối"
