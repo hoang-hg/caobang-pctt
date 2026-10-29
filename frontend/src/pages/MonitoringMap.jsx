@@ -568,7 +568,7 @@ export default function MonitoringMap() {
                   className={clsx(floatCard, 'pointer-events-auto flex h-10 items-center justify-center gap-1.5 text-xs font-semibold text-ink-2 hover:bg-panel2 [@media(pointer:coarse)]:h-11', leftOpen ? 'ml-1.5 w-8 [@media(pointer:coarse)]:w-11' : 'px-3')}
                   onClick={() => setLeftOpen((o) => !o)}
                   aria-expanded={leftOpen}
-                  aria-label={leftOpen ? 'Thu gọn Bộ lọc' : 'Bộ lọc: lớp dữ liệu, nền bản đồ'}
+                  aria-label={leftOpen ? 'Thu gọn Bộ lọc' : 'Bộ lọc — Lớp dữ liệu, nền bản đồ'}
                   title={leftOpen ? 'Thu gọn' : 'Lớp dữ liệu, nền bản đồ'}
                 >
                   {leftOpen ? <ChevronLeft size={16} /> : <><Layers size={16} className="text-accent" aria-hidden="true" /> Bộ lọc</>}
