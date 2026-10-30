@@ -399,6 +399,7 @@ export default function CitizenReports() {
   return (
     <div className={`${PAGE} pb-8`}>
       <PageHeader
+        tips={<RoleTips page="phan-anh" />}
         title="Phản ánh hiện trường của người dân"
         short="Phản ánh người dân"
         scope={scopeLabel}
@@ -418,8 +419,6 @@ export default function CitizenReports() {
           </div>
         )}
       />
-
-      <RoleTips page="phan-anh" />
 
       <Tabs
         value={tab}

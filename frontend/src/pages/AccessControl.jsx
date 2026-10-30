@@ -673,6 +673,7 @@ export default function AccessControl() {
   return (
     <div className={`${PAGE} pb-8`}>
       <PageHeader
+        tips={<RoleTips page="phan-quyen" />}
         title="Phân quyền & tài khoản"
         short="Phân quyền"
         meta={[
@@ -680,8 +681,6 @@ export default function AccessControl() {
         ]}
         description="Ai được làm gì trong hệ thống: 3 cấp, mỗi tài khoản một cấp. Chỉ cấp trên tạo và quản lý tài khoản cấp dưới."
       />
-
-      <RoleTips page="phan-quyen" />
 
       <Tabs
         value={tab}

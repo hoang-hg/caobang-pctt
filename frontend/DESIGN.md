@@ -138,6 +138,8 @@ Hai mức: **thẻ** (`--shadow-card`, viền 1 px) trên nền trang; **bảng 
   tô đỏ vì là hành động khẩn).
 - **Chip trạng thái (trên bản đồ):** nền trắng, chấm màu mức + số đậm + nhãn; bấm được (dẫn tới danh sách đã lọc).
 - **Mục menu trên cùng:** chữ Muted; đang mở: chữ Primary trên nền Primary soft; số đếm khẩn: chip đỏ nhỏ.
+- **Gợi ý người mới ("Bắt đầu từ đâu?"):** một nút phụ ở đầu trang (`PageHeader` `tips`), bấm mới mở khung 3 bước nổi —
+  không khung gợi ý thường trực giữa trang.
 - **Ô chỉ số (`StatCard`):** nền trắng; vạch màu trái CHỈ khi mức ≥ Vàng (quy ước cũ, giữ).
 - Thành phần dùng chung giữ nguyên tên, nằm ở `components/common/ui.jsx`.
 

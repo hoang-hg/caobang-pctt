@@ -511,14 +511,22 @@ async function staff(ctx, trackCode) {
       if (vp.mobile ? d.y < kpi.y : d.y > kpi.y) throw new Error(`"Việc chờ quyết định" ${vp.mobile ? 'phải ngay sau' : 'phải đứng trước'} 6 ô chỉ số`);
     }
 
-    // Gợi ý 3 bước: hiện lần đầu (gập sẵn một dòng — "Mở rộng" ra 3 bước), "Đã hiểu" → tải lại không hiện nữa
+    // Gợi ý 3 bước: hiện lần đầu — diện mạo B (DESIGN.md: không chữ hướng dẫn thường trực): một nút "Bắt đầu từ đâu?" ở đầu
+    // trang, bấm mới ra 3 bước; "Đã hiểu" → tải lại không hiện nữa
     const tips = page.getByRole('region', { name: 'Gợi ý cho người mới' });
     if (await tips.count()) {
-      if (await tips.locator('li').count()) throw new Error('gợi ý phải gập sẵn (chỉ một dòng)');
-      await visible(tips.getByRole('button', { name: /^Mở( rộng)?$/ })).click();
-      const n = await tips.locator('li').count();
+      const tipsPanel = page.getByRole('group', { name: 'Bắt đầu từ đâu?' }); // khung 3 bước nổi trên trang (portal)
+      if (await tipsPanel.count()) throw new Error('gợi ý phải gập sẵn (chỉ một nút)');
+      const head = await page.locator('main h1').first().boundingBox();
+      const tb = await tips.boundingBox();
+      if (Math.abs(tb.y - head.y) > 40) throw new Error('nút gợi ý phải nằm trên hàng tiêu đề trang');
+      await visible(tips.getByRole('button', { name: 'Bắt đầu từ đâu?' })).click();
+      await tipsPanel.locator('li').first().waitFor({ timeout: 5_000 }); // khung nổi vẽ sau khi đo vị trí nút
+      const n = await tipsPanel.locator('li').count();
       if (n !== 3) throw new Error(`gợi ý có ${n} bước (cần 3)`);
-      await tips.getByRole('button', { name: 'Đã hiểu' }).click();
+      const pb = await tipsPanel.boundingBox();
+      if (pb.x < 0 || pb.x + pb.width > page.viewportSize().width + 1) throw new Error('khung gợi ý tràn ra ngoài màn hình');
+      await tipsPanel.getByRole('button', { name: 'Đã hiểu' }).click();
       await page.reload();
       await waitMain(page);
       await summary.waitFor({ timeout: 20_000 });
@@ -3272,9 +3280,10 @@ async function guidePage(ctx) {
     await waitMain(page);
     const tips = page.getByRole('region', { name: 'Gợi ý cho người mới' });
     await tips.waitFor({ timeout: 15_000 });
-    await visible(tips.getByRole('button', { name: /^Mở( rộng)?$/ })).click(); // gợi ý gập sẵn một dòng
-    if (!/phiếu cứu hộ của xã mình/.test(await tips.innerText())) throw new Error('gợi ý ở trang Cứu hộ không phải câu của cấp xã');
-    await tips.getByRole('link', { name: 'Hướng dẫn đầy đủ' }).click();
+    await visible(tips.getByRole('button', { name: 'Bắt đầu từ đâu?' })).click(); // gợi ý gập sẵn: một nút ở đầu trang
+    const tipsPanel = page.getByRole('group', { name: 'Bắt đầu từ đâu?' });
+    if (!/phiếu cứu hộ của xã mình/.test(await tipsPanel.innerText())) throw new Error('gợi ý ở trang Cứu hộ không phải câu của cấp xã');
+    await tipsPanel.getByRole('link', { name: 'Hướng dẫn đầy đủ' }).click();
     await page.waitForURL(/\/huong-dan\?vai=xa/);
     await page.getByRole('heading', { name: 'Người dân báo gặp nạn' }).waitFor();
     const pressed = await page.getByRole('group', { name: 'Hướng dẫn cho' }).locator('[aria-pressed="true"]').innerText();

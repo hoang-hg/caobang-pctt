@@ -571,13 +571,13 @@ export default function DataSources() {
   return (
     <div className={`${PAGE} pb-8`}>
       <PageHeader
+        tips={<RoleTips page="nguon-du-lieu" />}
         title="Nguồn dữ liệu & thiết bị đo"
         short="Nguồn dữ liệu"
         time={dataTime}
         timeNote={sourcesQ.isError ? 'Chưa tải được số liệu' : 'Đang tải số liệu…'}
         description="Số liệu dự báo và trạm đo hiện trường về hệ thống từ đâu, có đang về đều không."
       />
-      <RoleTips page="nguon-du-lieu" />
       <Tabs value={tab} onChange={setTab} tabs={[
         { value: 'sources', label: 'Nguồn số liệu', icon: CloudSun, alert: broken ? { level: 3, text: `${broken} nguồn đang lỗi` } : undefined },
         { value: 'devices', label: 'Thiết bị đo', icon: Cpu, alert: lost ? { level: 2, text: `${lost} thiết bị mất tín hiệu` } : undefined },

@@ -8,7 +8,7 @@ import ExportMenu from './ExportMenu';
  * Đầu trang dùng chung các trang điều hành — cùng chỗ, cùng cỡ chữ trên mọi trang, chuyển trang không phải tìm lại nút:
  * - Hàng tiêu đề: tiêu đề (`title`; `short` = tiêu đề ngắn trên điện thoại; 17 / 20 / 24 px theo cỡ màn) bên trái; bên phải thao tác riêng của trang
  *   (`actions` — nhiều nhất MỘT nút chính tô màu), menu "Xuất" (`exports` — ExportMenu), nút "Làm mới" (`onRefresh`,
- *   `refreshing`). `before`: nút "Quay lại" phía trên tiêu đề.
+ *   `refreshing`). `tips`: nút gợi ý "Bắt đầu từ đâu?" (RoleTips) đứng đầu nhóm nút. `before`: nút "Quay lại" phía trên tiêu đề.
  * - Dòng ngữ cảnh trải hết bề ngang (điện thoại 360 px vẫn đủ một dòng): địa bàn đang xem (`scope` — chữ, hoặc nút có "Bỏ
  *   lọc"), giờ số liệu (`time`; chưa có giờ → `timeNote`, VD "Đang tải số liệu…"), thông tin riêng của trang (`meta` — mảng;
  *   mục nào chỉ hiện trên màn lớn thì tự bọc lớp ẩn). `description`: một câu giải thích dài hơn (điện thoại gọn 2 dòng).
@@ -18,7 +18,7 @@ import ExportMenu from './ExportMenu';
  * Thẻ gốc là <div>: <header> dành cho thanh trên cùng của ứng dụng (kiểm thử giao diện tìm thanh đó bằng thẻ header).
  */
 export default function PageHeader({
-  title, short, before, scope, time, timeNote, meta = [], description, actions, exports, onRefresh, refreshing, children, className,
+  title, short, before, scope, time, timeNote, meta = [], description, actions, tips, exports, onRefresh, refreshing, children, className,
   icon, ...rest // thuộc tính khác của thẻ gốc (VD data-mau-chuyen của khối nổi bật Tổng quan)
 }) {
   const { pathname } = useLocation();
@@ -63,8 +63,9 @@ export default function PageHeader({
             </>
           ) : title}
         </h1>
-        {(actions || exports?.length || onRefresh) && (
+        {(actions || tips || exports?.length || onRefresh) && (
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5 no-print">
+            {tips}
             {actions}
             {exports?.length > 0 && <ExportMenu items={exports} />}
             {onRefresh && (

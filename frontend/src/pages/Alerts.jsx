@@ -198,6 +198,7 @@ export default function Alerts() {
       <ConnectionBanner updatedAt={bq.dataUpdatedAt || null} />
 
       <PageHeader
+        tips={<RoleTips page="canh-bao" />}
         title="Cảnh báo khẩn cấp & Hotline"
         short="Cảnh báo & Hotline"
         scope={scopeLabel}
@@ -210,8 +211,6 @@ export default function Alerts() {
       />
 
       <AlertKpis query={bq} broadcasts={list} factsOf={factsOf} onGo={go} />
-
-      <RoleTips page="canh-bao" />
 
       <Tabs
         fit

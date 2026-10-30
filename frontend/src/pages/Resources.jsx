@@ -331,6 +331,7 @@ export default function Resources() {
       <ConnectionBanner updatedAt={summaryQ.dataUpdatedAt || null} />
 
       <PageHeader
+        tips={<RoleTips page="nguon-luc" />}
         title="Vật tư & Lực lượng"
         scope={scopeLabel}
         time={dataTime}
@@ -353,8 +354,6 @@ export default function Resources() {
         onVehicle={setVehicleEdit}
         onShow={(id, f) => go(id, f)}
       />
-
-      <RoleTips page="nguon-luc" />
 
       <div ref={tabsRef} className="scroll-mt-20">
         <Tabs

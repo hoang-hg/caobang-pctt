@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import clsx from 'clsx';
 import {
-  AlertTriangle, ArrowLeft, ArrowUpDown, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Lightbulb, Loader2, MoveRight, RefreshCw, TrendingDown, TrendingUp, X,
+  AlertTriangle, ArrowLeft, ArrowUpDown, Check, ChevronDown, ChevronLeft, ChevronRight, Lightbulb, Loader2, MoveRight, RefreshCw, TrendingDown, TrendingUp, X,
 } from 'lucide-react';
 import { NO_DATA, RISK, risk } from '../../utils/risk';
 import EmptyArt from './EmptyArt';
@@ -377,60 +377,86 @@ const tipsKey = (id) => `pctt_goi_y_${id}`;
 const tipsSeen = (id) => { try { return localStorage.getItem(tipsKey(id)) === '1'; } catch { return false; } };
 
 /**
- * Gợi ý 3 bước lần đầu mở một màn hình: "Bắt đầu từ đâu" cho người mới, không phải đọc hướng dẫn. Bấm "Đã hiểu" → không
- * hiện lại trên máy này (localStorage, khoá theo `id` của màn). `steps`: 2–4 câu ngắn, mỗi câu một việc; `more`: liên kết
- * đứng trước nút "Đã hiểu" (VD tới trang Hướng dẫn xử lý — RoleTips). Gợi ý theo vai trò: dùng RoleTips.
+ * Gợi ý 3 bước lần đầu mở một màn hình: "Bắt đầu từ đâu" cho người mới, không phải đọc hướng dẫn. Diện mạo B (DESIGN.md —
+ * không chữ hướng dẫn thường trực): một nút nhỏ trong đầu trang (PageHeader `tips`), bấm mới mở khung 3 bước; Esc / bấm ra
+ * ngoài đóng. Bấm "Đã hiểu" → không hiện lại trên máy này (localStorage, khoá theo `id` của màn). `steps`: 2–4 câu ngắn,
+ * mỗi câu một việc. Khung 3 bước nổi trên trang (portal — khối đầu trang Tổng quan cắt phần tràn), canh trong màn hình
+ * cả điện thoại 360 px. `more`: liên kết đứng trước nút "Đã hiểu" (VD tới trang Hướng dẫn xử lý — RoleTips). Gợi ý theo vai
+ * trò: dùng RoleTips.
  */
 export function PageTips({ id, title = 'Bắt đầu từ đâu?', steps, more, className }) {
   const [open, setOpen] = useState(() => !tipsSeen(id));
-  const [collapsed, setCollapsed] = useState(true); // gập sẵn một dòng — mở khi cần (bớt chữ thường trực trên mọi trang)
+  const [expanded, setExpanded] = useState(false);
+  const [pos, setPos] = useState(null);
+  const box = useRef(null);
+  const panel = useRef(null);
+  const panelId = useId();
+  useEscapeToClose(expanded, () => setExpanded(false));
+  useEffect(() => {
+    if (!expanded) return undefined;
+    const place = () => {
+      const r = box.current?.getBoundingClientRect();
+      if (!r) return;
+      const width = Math.min(416, window.innerWidth - 32);
+      const left = Math.min(Math.max(r.right - width, 16), window.innerWidth - 16 - width);
+      setPos({ top: r.bottom + 8, left, width });
+    };
+    place();
+    const onDown = (e) => { if (!box.current?.contains(e.target) && !panel.current?.contains(e.target)) setExpanded(false); };
+    document.addEventListener('pointerdown', onDown);
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+    };
+  }, [expanded]);
   if (!open) return null;
   const done = () => {
     try { localStorage.setItem(tipsKey(id), '1'); } catch { /* chế độ riêng tư: chỉ ẩn lần này */ }
     setOpen(false);
   };
   return (
-    <section aria-label="Gợi ý cho người mới" data-mau-chuyen="" className={clsx('card flex flex-col gap-2 border-accent/25 bg-gradient-to-r from-accent/[0.07] via-accent/[0.02] to-transparent px-3 py-2.5 no-print sm:flex-row sm:items-center sm:gap-4', className)}>
-      <div className="flex shrink-0 items-center justify-between gap-2">
-        <b className="flex items-center gap-2 text-sm font-semibold text-ink">
-          <span className="icon-tile h-8 w-8 max-sm:hidden" aria-hidden="true"><Lightbulb size={16} /></span>
-          {title}
-        </b>
-        <button
-          type="button"
-          onClick={() => setCollapsed((v) => !v)}
-          className="btn-ghost tap inline-flex items-center gap-1 px-2 py-0.5 text-xs text-muted hover:text-ink md:hidden"
-          title={collapsed ? 'Mở rộng hướng dẫn' : 'Thu gọn hướng dẫn'}
+    <section ref={box} aria-label="Gợi ý cho người mới" className={clsx('relative no-print', className)}>
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+        aria-controls={panelId}
+        title={expanded ? 'Thu gọn gợi ý' : 'Gợi ý 3 bước cho người mới'}
+        className="btn-secondary tap-sq h-9 min-w-[36px] px-2.5 text-accent"
+      >
+        <Lightbulb size={15} aria-hidden="true" />
+        <span className="max-sm:sr-only">{title}</span>
+      </button>
+      {expanded && pos && createPortal(
+        <div
+          ref={panel}
+          id={panelId}
+          role="group"
+          aria-label={title}
+          style={pos}
+          className="card fixed z-[1100] flex flex-col gap-2.5 p-3 text-left shadow-2xl no-print"
         >
-          {collapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-          <span className="text-[11px]">{collapsed ? 'Mở' : 'Gập'}</span>
-        </button>
-      </div>
-      {!collapsed && (
-        <ol className="grid min-w-0 flex-1 gap-1.5 text-[13px] leading-snug text-ink-2 md:grid-cols-3 md:gap-3">
-          {steps.map((s, i) => (
-            <li key={s} className="flex min-w-0 gap-2">
-              <span className="num w-4 shrink-0 font-bold text-accent">{i + 1}.</span>
-              <span className="min-w-0">{s}</span>
-            </li>
-          ))}
-        </ol>
+          <b className="text-sm font-semibold text-ink">{title}</b>
+          <ol className="flex flex-col gap-1.5 text-[13px] leading-snug text-ink-2">
+            {steps.map((s, i) => (
+              <li key={s} className="flex min-w-0 gap-2">
+                <span className="num w-4 shrink-0 font-bold text-accent">{i + 1}.</span>
+                <span className="min-w-0">{s}</span>
+              </li>
+            ))}
+          </ol>
+          <div className="flex flex-wrap items-center justify-end gap-1.5 border-t border-line/70 pt-2">
+            {more}
+            <button type="button" onClick={done} className="btn-secondary tap px-3 py-1 text-xs">
+              <Check size={14} aria-hidden="true" /> Đã hiểu
+            </button>
+          </div>
+        </div>,
+        document.body,
       )}
-      <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5 self-end sm:self-center">
-        <button
-          type="button"
-          onClick={() => setCollapsed((v) => !v)}
-          className="btn-ghost tap hidden items-center gap-1 px-2 py-1 text-xs text-muted hover:text-ink md:inline-flex"
-          title={collapsed ? 'Mở rộng hướng dẫn' : 'Thu gọn hướng dẫn'}
-        >
-          {collapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-          <span>{collapsed ? 'Mở rộng' : 'Thu gọn'}</span>
-        </button>
-        {more}
-        <button type="button" onClick={done} className="btn-secondary tap px-3 py-1 text-xs">
-          <Check size={14} aria-hidden="true" /> Đã hiểu
-        </button>
-      </div>
     </section>
   );
 }
