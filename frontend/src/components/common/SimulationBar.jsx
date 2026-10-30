@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { Check, ChevronDown, FlaskConical, Mountain, Power, UserCheck, Waves } from 'lucide-react';
+import { Check, ChevronDown, Eye, EyeOff, FlaskConical, Mountain, Power, UserCheck, Waves } from 'lucide-react';
 import { useStore } from '../../app/store';
 import { simulationEngine } from '../../api/simulationEngine';
 import { DEMO_ROLES, demoAuth } from '../../api/demoUsers';
@@ -14,14 +14,17 @@ const SCENARIOS = [
 
 /**
  * Điều khiển CHẾ ĐỘ GIẢ LẬP trên thanh trên cùng — CHỈ máy dev (Header nạp lười trong nhánh import.meta.env.DEV): chọn kịch
- * bản thiên tai, đổi vai trò (đúng 3 vai trò thật — api/demoUsers.js), tắt giả lập (thoát phiên giả lập, về đăng nhập thật).
+ * bản thiên tai, đổi vai trò (đúng 3 vai trò thật — api/demoUsers.js), hiện / ẩn dải giả lập, tắt giả lập (thoát phiên giả
+ * lập, về đăng nhập thật). Mặc định gọn: chỉ biểu tượng bình thí nghiệm (nhường chỗ menu ngang); "Hiện dải giả lập" → nút có
+ * chữ + dải vàng trên cùng.
  */
 export default function SimulationBar() {
   const qc = useQueryClient();
   const simulationMode = useStore((s) => s.simulationMode);
   const scenario = useStore((s) => s.simulationScenario);
+  const full = useStore((s) => s.simulationUiFull);
   const auth = useStore((s) => s.auth);
-  const { setSimulationMode, setSimulationScenario, setAuth, toast } = useStore.getState();
+  const { setSimulationMode, setSimulationScenario, setSimulationUiFull, setAuth, toast } = useStore.getState();
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -58,12 +61,16 @@ export default function SimulationBar() {
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="menu"
-        title="Chế độ giả lập (chỉ máy dev) — chọn kịch bản, đổi vai trò, tắt giả lập"
-        className="touch-hit flex items-center gap-1.5 rounded-lg border border-warn/50 bg-warn/15 px-2 py-1 text-xs font-bold text-warn"
+        title={`Chế độ giả lập (chỉ máy dev) · ${current.label} — chọn kịch bản, đổi vai trò, tắt giả lập`}
+        aria-label={full ? undefined : `Chế độ giả lập: ${current.label}`}
+        className={clsx(
+          'touch-hit flex items-center gap-1.5 text-xs font-bold',
+          full ? 'rounded-lg border border-warn/50 bg-warn/15 px-2 py-1 text-warn' : 'h-9 w-9 justify-center rounded-full text-muted hover:bg-panel2 hover:text-ink',
+        )}
       >
-        <FlaskConical size={14} aria-hidden="true" />
-        <span className="max-sm:hidden">Giả lập · {current.label}</span>
-        <ChevronDown size={12} className={clsx('transition-transform', open && 'rotate-180')} aria-hidden="true" />
+        <FlaskConical size={full ? 14 : 16} aria-hidden="true" />
+        {full && <span className="max-sm:hidden">Giả lập · {current.label}</span>}
+        {full && <ChevronDown size={12} className={clsx('transition-transform', open && 'rotate-180')} aria-hidden="true" />}
       </button>
       {open && (
         <div role="menu" className="card absolute right-0 top-full z-[1200] mt-2 w-80 p-2 shadow-2xl">
@@ -88,6 +95,11 @@ export default function SimulationBar() {
               <span className="text-[11px] text-muted">{r.hint}</span>
             </button>
           ))}
+          <button type="button" onClick={() => { setSimulationUiFull(!full); setOpen(false); }}
+            className="tap mt-1 flex w-full items-center gap-2 rounded-lg border-t border-line px-2 pt-2 text-left text-xs font-semibold text-ink-2 hover:bg-panel2">
+            {full ? <EyeOff size={14} aria-hidden="true" /> : <Eye size={14} aria-hidden="true" />}
+            {full ? 'Ẩn dải giả lập (vẫn dùng dữ liệu giả lập)' : 'Hiện dải giả lập (trước khi chụp ảnh gửi người khác)'}
+          </button>
           <button type="button" onClick={() => setSimulationMode(false)}
             className="tap mt-1 flex w-full items-center gap-2 rounded-lg border-t border-line px-2 pt-2 text-left text-xs font-semibold text-danger hover:bg-danger/10">
             <Power size={14} aria-hidden="true" /> Tắt giả lập (thoát phiên giả lập)

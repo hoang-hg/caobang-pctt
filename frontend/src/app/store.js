@@ -21,6 +21,9 @@ export const DEMO_TOKEN = 'demo-gia-lap';
 const SIM_KEY = 'pctt_sim_mode';
 const SIM_ALLOWED = import.meta.env.DEV;
 const savedSim = SIM_ALLOWED && safeGet(SIM_KEY) === 'true';
+// Giao diện giả lập gọn (mặc định): không dải vàng trên cùng, nút giả lập trên thanh chỉ còn biểu tượng — dữ liệu vẫn là giả
+// lập. Chọn "Hiện dải giả lập" trong menu nút đó (VD trước khi chụp ảnh gửi người khác) → nhớ trên máy (pctt_sim_ui = 'full').
+const SIM_UI_KEY = 'pctt_sim_ui';
 
 const savedAuth = (() => {
   try {
@@ -69,6 +72,11 @@ export const useStore = create((set, get) => ({
     safeSet(SIM_KEY, simulationMode ? 'true' : null);
     set({ simulationMode });
     if (!simulationMode && get().auth?.token === DEMO_TOKEN) get().setAuth(null); // tắt giả lập → thoát phiên giả lập
+  },
+  simulationUiFull: SIM_ALLOWED && safeGet(SIM_UI_KEY) === 'full',
+  setSimulationUiFull: (on) => {
+    safeSet(SIM_UI_KEY, on ? 'full' : null);
+    set({ simulationUiFull: Boolean(on) });
   },
   simulationScenario: 'normal',
   setSimulationScenario: (scenario) => set({ simulationScenario: scenario }),
