@@ -25,6 +25,7 @@ function Badge({ n, warm }) {
  * Menu ngang của thanh trên cùng (máy tính ≥ 1024 px — DESIGN.md, phương án B: không còn menu trái). Nhóm "Điều hành" hiện
  * thẳng; mục KHÔNG ĐỦ CHỖ tự dồn vào "Thêm" (đo bề rộng thật — thanh không bao giờ tràn ngang ở 1024 / 1280 / 1440 px), cùng
  * các nhóm Dữ liệu & báo cáo, Quản trị, Trợ giúp, cổng người dân, số 112. Số đếm khẩn (SOS chờ, lệnh chờ duyệt…) như menu cũ.
+ * Như bản mẫu B: mục trên thanh chỉ có chữ (biểu tượng chỉ trong "Thêm" — danh sách dọc dễ dò hơn).
  */
 export default function TopNav() {
   const perms = useStore((s) => s.auth?.user?.permissions);
@@ -76,12 +77,12 @@ export default function TopNav() {
       to={it.to}
       onClick={() => setOpen(false)}
       className={({ isActive }) => clsx(
-        'tap flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[10px] px-3 py-2 text-sm font-medium transition-colors',
-        isActive ? 'bg-accent/10 text-accent' : 'text-ink-2 hover:bg-panel2 hover:text-ink',
+        'tap flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[10px] px-3.5 py-2 text-sm font-medium transition-colors',
+        isActive ? 'bg-accent/10 font-semibold text-accent' : 'text-ink-2 hover:bg-panel2 hover:text-ink',
         inMenu && 'w-full',
       )}
     >
-      <it.icon size={16} className="shrink-0" aria-hidden="true" />
+      {inMenu && <it.icon size={16} className="shrink-0" aria-hidden="true" />}
       <span className={inMenu ? 'flex-1' : undefined}>{inMenu ? it.label : it.short || it.label}</span>
       <Badge n={count(it)} warm={warm(it)} />
     </NavLink>
@@ -97,8 +98,8 @@ export default function TopNav() {
       {/* Hàng đo (ẩn): bề rộng thật của từng mục để biết bao nhiêu mục vừa chỗ */}
       <div ref={measure} aria-hidden="true" className="pointer-events-none invisible absolute left-0 top-0 flex gap-1">
         {primary.map((it) => (
-          <span key={it.to} className="flex shrink-0 items-center gap-1.5 whitespace-nowrap px-3 py-2 text-sm font-medium">
-            <it.icon size={16} /> {it.short || it.label} {count(it) ? <span className="chip px-1.5 py-0 text-[10px] font-bold">{count(it)}</span> : null}
+          <span key={it.to} className="flex shrink-0 items-center gap-1.5 whitespace-nowrap px-3.5 py-2 text-sm font-semibold">
+            {it.short || it.label} {count(it) ? <span className="chip px-1.5 py-0 text-[10px] font-bold">{count(it)}</span> : null}
           </span>
         ))}
       </div>
@@ -111,7 +112,7 @@ export default function TopNav() {
             aria-expanded={open}
             aria-haspopup="true"
             className={clsx(
-              'tap flex items-center gap-1 whitespace-nowrap rounded-[10px] px-3 py-2 text-sm font-medium transition-colors',
+              'tap flex items-center gap-1 whitespace-nowrap rounded-[10px] px-3.5 py-2 text-sm font-medium transition-colors',
               moreActive ? 'bg-accent/10 text-accent' : 'text-ink-2 hover:bg-panel2 hover:text-ink',
             )}
           >

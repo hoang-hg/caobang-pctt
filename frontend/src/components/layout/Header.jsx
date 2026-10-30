@@ -59,12 +59,12 @@ export default function Header() {
       </button>
 
       {/* Logo & tên cơ quan (khiên xanh — đỏ chỉ dành cho báo động). Máy tính: không còn menu trái (DESIGN.md, phương án B) —
-          tên cơ quan (như tên tài khoản) từ 1536 px, nhường chỗ cho menu ngang */}
+          tên hệ thống 2 dòng như bản mẫu B từ 1440 px (menu ngang tự dồn mục thừa vào "Thêm") */}
       <Link to="/dashboard" className="touch-hit flex shrink-0 items-center gap-2.5 pr-1 transition-opacity hover:opacity-90">
         <BrandMark size={36} />
-        <div className="hidden min-w-0 leading-tight 2xl:block">
-          <div className="truncate text-sm font-bold tracking-tight text-ink">BCH PCTT & TKCN</div>
-          <div className="truncate text-[11px] text-muted">Tỉnh Cao Bằng · điều hành</div>
+        <div className="hidden min-w-0 leading-tight min-[1440px]:block">
+          <div className="truncate text-[15px] font-bold tracking-tight text-ink">ĐIỀU HÀNH PCTT</div>
+          <div className="truncate text-xs text-muted">Tỉnh Cao Bằng</div>
         </div>
       </Link>
 

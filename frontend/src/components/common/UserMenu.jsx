@@ -13,6 +13,12 @@ const MfaModal = lazy(() => import('../account/Mfa'));
 const THEMES = [['system', 'Theo máy', Monitor], ['light', 'Sáng', Sun], ['dark', 'Tối', Moon]];
 
 /** Thông tin tài khoản đang đăng nhập + vai trò/phạm vi được giao. */
+/** Chữ viết tắt của tên: chữ đầu của từ đầu + từ cuối, viết hoa ("Hoàng Văn Sạt" → HS). */
+const initials = (name = '') => {
+  const w = name.trim().split(/\s+/).filter(Boolean);
+  return w.length ? (w[0][0] + (w.length > 1 ? w[w.length - 1][0] : '')).toLocaleUpperCase('vi') : '';
+};
+
 export default function UserMenu() {
   const { auth, setAuth, soundOn, toggleSound, wsStatus, themePref, setThemePref } = useStore();
   const qc = useQueryClient();
@@ -31,8 +37,11 @@ export default function UserMenu() {
 
   return (
     <div className="relative" ref={ref}>
-      <button className="btn-ghost touch-hit max-sm:px-2" onClick={() => setOpen((o) => !o)} title={user.full_name} aria-label={`Tài khoản: ${user.full_name}`}>
-        <UserCircle2 size={16} />
+      {/* Như bản mẫu B: vòng tròn chữ viết tắt (chữ đầu của tên đầu + tên cuối: "Quản trị hệ thống" → QT); tên đầy đủ từ 1536 px */}
+      <button className="touch-hit flex items-center gap-2 rounded-full text-sm font-medium text-ink-2 hover:text-ink" onClick={() => setOpen((o) => !o)} title={user.full_name} aria-label={`Tài khoản: ${user.full_name}`}>
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line bg-panel text-[13px] font-bold text-accent" aria-hidden="true">
+          {initials(user.full_name) || <UserCircle2 size={16} />}
+        </span>
         <span className="hidden max-w-[10rem] truncate 2xl:inline">{user.full_name}</span>
       </button>
       {open && (
