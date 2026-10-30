@@ -19,11 +19,9 @@ import { ErrorState, Hint, Skeleton } from '../common/ui';
  * (xã xin chi viện, phiếu quá hạn). Việc mới xuất hiện → dòng trượt vào (một lần). Không ghi vào báo cáo PDF.
  * Chưa tải được KPI (máy chủ lỗi / đang tải) → KHÔNG nói "không có việc nào" khi thực ra chưa biết.
  * `stacked`: danh sách dọc ở mọi cỡ màn (cột trái của Tổng quan màn lớn ≥ 1680 px — cạnh bản đồ lớn). `heroLayout`: nút mở
- * rộng / thu gọn khối này so với bản đồ (màn lớn).
+ * rộng / thu gọn khối này so với bản đồ (màn lớn). Laptop / máy tính bảng (640 – 1679 px): DecisionStrip trong khối đầu trang.
  */
-export default function DecisionPanel({ k, kState, className, stacked = false, heroLayout, onSetHeroLayout }) {
-  // Lớp chỉ áp từ 640 px khi xếp ngang; `stacked` giữ kiểu danh sách dọc của điện thoại
-  const row = (cls) => (stacked ? null : cls);
+function useDecisionRows(k) {
   const badges = useNavBadges();
   const canSos = usePermission('sos', 'view');
   const { data: tickets = [] } = useAreaQuery('sos', '/sos', {}, { refetchInterval: 20_000, enabled: canSos });
@@ -44,6 +42,62 @@ export default function DecisionPanel({ k, kState, className, stacked = false, h
   // Dòng có từ lần vẽ đầu thì không trượt vào — chỉ việc MỚI phát sinh khi đang xem
   const fresh = useNewKeys(rows.map((r) => r.key), !!k);
   const total = rows.reduce((n, r) => n + r.n, 0);
+  return { rows, fresh, total };
+}
+
+const HINT = 'Những việc đang chờ chính bạn xử lý. Bấm vào từng việc để mở đúng nơi làm việc đó; xong việc thì việc tự mất khỏi đây.';
+
+/**
+ * "Việc chờ quyết định" nằm TRONG khối đầu trang Tổng quan (diện mạo B — một khối dẫn đầu; 640 – 1679 px): một hàng nút
+ * việc trên nền xanh đêm — số · việc · thao tác. Cùng dữ liệu, cùng quy tắc với DecisionPanel (chỉ Đỏ cho việc khẩn).
+ */
+export function DecisionStrip({ k, kState, className }) {
+  const { rows, fresh, total } = useDecisionRows(k);
+  return (
+    <section aria-label="Việc chờ quyết định" className={clsx('flex flex-wrap items-center gap-x-2 gap-y-1.5 border-t border-white/10 pt-2 no-print', className)}>
+      <span className="flex shrink-0 items-center gap-1.5 text-xs font-semibold text-ink-2">
+        <h2 className="text-xs font-semibold">Việc chờ quyết định</h2>
+        <Hint label="Việc chờ quyết định">{HINT}</Hint>
+        {rows.length > 0 && <span className="num text-muted">· {int(total)} việc</span>}
+      </span>
+      {!rows.length && !k ? (
+        kState?.error
+          ? <span className="text-xs text-muted">Không tải được — chưa biết việc nào đang chờ</span>
+          : <Skeleton height={32} className="w-64" />
+      ) : rows.length ? (
+        <ul className="flex min-w-0 flex-wrap gap-1.5">
+          {rows.map((r) => (
+            <li key={r.key} className={clsx('min-w-0', fresh(r.key) && 'motion-safe:animate-enter')}>
+              <Link
+                to={r.to}
+                className={clsx(
+                  'group tap flex items-center gap-2 rounded-full border px-3 py-1 text-[13px] transition-colors',
+                  r.level === 3 ? 'border-danger/60 bg-danger/15 hover:bg-danger/25' : 'border-white/15 bg-white/[0.06] hover:bg-white/[0.12]',
+                )}
+              >
+                <r.icon size={14} className={clsx('shrink-0', r.level === 3 ? 'text-danger' : 'text-accent')} aria-hidden="true" />
+                <b className={clsx('num font-extrabold', r.level != null ? risk(r.level).text : 'text-ink')}>{int(r.n)}</b>
+                <span className="text-ink">{r.text}</span>
+                <span className={clsx('inline-flex items-center gap-0.5 text-xs font-semibold group-hover:underline', r.level === 3 ? 'text-danger' : 'text-accent')}>
+                  {r.action} <ChevronRight size={13} aria-hidden="true" />
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <span className="flex items-center gap-1.5 text-xs text-ink-2">
+          <CircleCheckBig size={14} className="shrink-0 text-muted" aria-hidden="true" /> Không có việc nào đang chờ bạn quyết định.
+        </span>
+      )}
+    </section>
+  );
+}
+
+export default function DecisionPanel({ k, kState, className, stacked = false, heroLayout, onSetHeroLayout }) {
+  // Lớp chỉ áp từ 640 px khi xếp ngang; `stacked` giữ kiểu danh sách dọc của điện thoại
+  const row = (cls) => (stacked ? null : cls);
+  const { rows, fresh, total } = useDecisionRows(k);
 
   return (
     // Từ 640 px: tiêu đề bên trái, các việc thành MỘT hàng thẻ ngang bên phải — khối thấp, 6 ô chỉ số và bản đồ vẫn trong
@@ -52,9 +106,7 @@ export default function DecisionPanel({ k, kState, className, stacked = false, h
       <div className={clsx('flex items-center justify-between gap-2', row('sm:w-32 sm:shrink-0 sm:flex-col sm:items-start sm:justify-center sm:gap-1'))}>
         <div className="flex min-w-0 items-center gap-2">
           <h2 className="text-base font-bold leading-tight text-ink">Việc chờ quyết định</h2>
-          <Hint label="Việc chờ quyết định">
-            Những việc đang chờ chính bạn xử lý. Bấm vào từng việc để mở đúng nơi làm việc đó; xong việc thì việc tự mất khỏi đây.
-          </Hint>
+          <Hint label="Việc chờ quyết định">{HINT}</Hint>
         </div>
         <div className="flex items-center gap-1.5">
           {rows.length > 0 && (
