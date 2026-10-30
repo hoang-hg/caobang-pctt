@@ -115,11 +115,11 @@ function CopyBox({ label, value }) {
   );
 }
 
-/** Khối "Nâng cao" — chi tiết cho kỹ thuật viên, mặc định gập. */
+/** Khối "Nâng cao" — chi tiết cho kỹ thuật viên, mặc định gập: một dòng chữ nhỏ (không khung — thẻ nguồn không thêm hộp lồng). */
 function Advanced({ children, label = 'Nâng cao — dành cho kỹ thuật viên' }) {
   return (
-    <details className="rounded-lg border border-line text-sm">
-      <summary className="tap cursor-pointer px-3 py-2 font-medium text-ink-2">{label}</summary>
+    <details className="text-sm [&[open]]:rounded-lg [&[open]]:border [&[open]]:border-line">
+      <summary className="tap w-fit cursor-pointer px-1 py-1 text-xs font-medium text-muted hover:text-ink">{label}</summary>
       <div className="flex flex-col gap-2 px-3 pb-3">{children}</div>
     </details>
   );

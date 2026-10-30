@@ -6,7 +6,7 @@ import { BookUser, History, Megaphone, Radio, ScrollText, ShieldCheck, XCircle }
 import { api } from '../api/client';
 import { useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
-import { EmptyState, ErrorState, Section, ShowMore, Skeleton, Tabs } from '../components/common/ui';
+import { EmptyState, ErrorState, Hint, Section, ShowMore, Skeleton, Tabs } from '../components/common/ui';
 import QuickActionBar from '../components/common/QuickActionBar';
 import UrgentStrip from '../components/common/UrgentStrip';
 import PageHeader from '../components/common/PageHeader';
@@ -203,8 +203,15 @@ export default function Alerts() {
         short="Cảnh báo & Hotline"
         scope={scopeLabel}
         meta={[
-          role && <span key="role">{auth.user.full_name} — {role}</span>,
-          <span key="mc" className="hidden md:inline">Người soạn — người duyệt là hai người khác nhau; lãnh đạo ký bằng mã PIN · mọi thao tác ghi nhật ký pháp lý</span>,
+          // Tên trùng vai trò (VD tài khoản "Quản trị hệ thống") → ghi một lần
+          role && <span key="role">{auth.user.full_name === role ? role : `${auth.user.full_name} — ${role}`}</span>,
+          // Quy tắc hai người: một nút "?" thay câu chữ thường trực (DESIGN.md — không chữ hướng dẫn thường trực)
+          <span key="mc" className="inline-flex items-center gap-1">
+            Hai người: soạn · duyệt
+            <Hint label="Quy tắc soạn – duyệt lệnh cảnh báo">
+              Người soạn và người duyệt là hai người khác nhau; lãnh đạo ký bằng mã PIN. Mọi thao tác ghi nhật ký pháp lý.
+            </Hint>
+          </span>,
         ]}
         onRefresh={refresh}
         refreshing={refreshing}
