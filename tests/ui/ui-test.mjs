@@ -521,6 +521,7 @@ async function staff(ctx, trackCode) {
       const tb = await tips.boundingBox();
       if (Math.abs(tb.y - head.y) > 40) throw new Error('nút gợi ý phải nằm trên hàng tiêu đề trang');
       await visible(tips.getByRole('button', { name: 'Bắt đầu từ đâu?' })).click();
+      await tipsPanel.locator('li').first().waitFor({ timeout: 5_000 }); // khung nổi vẽ sau khi đo vị trí nút
       const n = await tipsPanel.locator('li').count();
       if (n !== 3) throw new Error(`gợi ý có ${n} bước (cần 3)`);
       const pb = await tipsPanel.boundingBox();
