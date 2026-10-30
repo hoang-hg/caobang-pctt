@@ -189,7 +189,7 @@ export function Confirm({ title, children, confirmLabel, cancelLabel = 'Huỷ', 
  */
 export function Tabs({ tabs, value, onChange, fit = false, label }) {
   return (
-    <div className="scroll-thin flex gap-1 overflow-x-auto border-b border-line" role={label ? 'group' : undefined} aria-label={label}>
+    <div className={clsx('tab-track scroll-thin self-start', fit && 'max-sm:flex max-sm:self-stretch')} role={label ? 'group' : undefined} aria-label={label}>
       {tabs.map((t) => (
         <button
           key={t.value}
@@ -197,9 +197,9 @@ export function Tabs({ tabs, value, onChange, fit = false, label }) {
           onClick={() => onChange(t.value)}
           aria-pressed={value === t.value}
           className={clsx(
-            'tap flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium',
+            'tab-item tap',
             fit && 'max-sm:min-w-0 max-sm:flex-1 max-sm:flex-col max-sm:gap-0.5 max-sm:px-1 max-sm:py-1.5',
-            value === t.value ? 'border-accent font-semibold text-accent' : 'border-transparent text-muted hover:text-ink',
+            value === t.value && 'tab-item-on',
           )}
         >
           {t.icon && <t.icon size={16} className={clsx('shrink-0', fit && 'max-sm:hidden')} aria-hidden="true" />}
@@ -211,7 +211,7 @@ export function Tabs({ tabs, value, onChange, fit = false, label }) {
           ) : t.label}
           {(t.count != null || t.alert) && (
             <span className="flex items-center gap-1.5">
-              {t.count != null && <span className="rounded-full bg-panel2 px-1.5 text-[11px]">{t.count}</span>}
+              {t.count != null && <span className="num rounded-full bg-panel2 px-1.5 text-[11px] text-ink-2">{t.count}</span>}
               {t.alert && (
                 <span role="img" className={clsx('h-2.5 w-2.5 shrink-0 rounded-full', risk(t.alert.level).fill)} title={t.alert.text} aria-label={t.alert.text} />
               )}

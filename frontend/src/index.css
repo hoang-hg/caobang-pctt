@@ -138,6 +138,10 @@ body {
   /* Nút phụ: nền trắng có viền — đứng cạnh nút chính mà không tranh chú ý */
   .btn-secondary { @apply btn border border-line bg-panel text-ink shadow-sm hover:bg-panel2 hover:border-muted/40; }
   .btn-soft { @apply btn bg-panel2 text-ink hover:bg-line/50; }
+  /* Thanh thẻ (diện mạo B — DESIGN.md): thanh trắng bo 14 px, thẻ đang mở chữ màu nhấn trên nền nhấn nhạt như menu trên cùng */
+  .tab-track { @apply inline-flex max-w-full gap-1 overflow-x-auto rounded-[14px] border border-line bg-panel p-1 shadow-sm; }
+  .tab-item { @apply flex shrink-0 items-center gap-2 whitespace-nowrap rounded-[10px] px-3.5 py-1.5 text-sm font-medium text-ink-2 transition-colors hover:bg-panel2 hover:text-ink; }
+  .tab-item-on { @apply bg-accent/10 font-semibold text-accent hover:bg-accent/10 hover:text-accent; }
   
   .input { @apply w-full rounded-lg border border-line bg-panel2 px-3 py-1.5 text-sm text-ink placeholder:text-muted transition-colors focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25; }
   /* Số liệu: chữ số đều bề ngang (cột số thẳng hàng, số đổi không làm chữ nhảy) — không dùng font mono cho số đếm */

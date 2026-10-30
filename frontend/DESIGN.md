@@ -137,6 +137,7 @@ Hai mức: **thẻ** (`--shadow-card`, viền 1 px) trên nền trang; **bảng 
 - **Nút chính:** nền Primary, chữ trắng; một nút chính tô màu mỗi khối. Nút Báo cáo nhanh / SOS: nền Đỏ (duy nhất được
   tô đỏ vì là hành động khẩn).
 - **Chip trạng thái (trên bản đồ):** nền trắng, chấm màu mức + số đậm + nhãn; bấm được (dẫn tới danh sách đã lọc).
+- **Thanh thẻ (`Tabs`, thẻ Tổng quan, bảng số liệu):** thanh trắng bo 14 px viền 1 px (lớp `tab-track`), thẻ bo 10 px; thẻ đang mở chữ Primary trên nền Primary soft (`tab-item-on`) — cùng kiểu mục menu trên cùng; không gạch chân.
 - **Mục menu trên cùng:** chữ Muted; đang mở: chữ Primary trên nền Primary soft; số đếm khẩn: chip đỏ nhỏ.
 - **Gợi ý người mới ("Bắt đầu từ đâu?"):** một nút phụ ở đầu trang (`PageHeader` `tips`), bấm mới mở khung 3 bước nổi —
   không khung gợi ý thường trực giữa trang.

@@ -622,7 +622,7 @@ export default function Dashboard() {
 
       {/* 2. Một hàng thẻ: tổng hợp · chuyên đề · cấp xã · hệ thống — cùng kiểu gạch chân với thẻ các trang khác (ui.jsx Tabs);
           điện thoại cuộn ngang trong hàng */}
-      <div className="scroll-thin -mx-1 flex items-end gap-1 overflow-x-auto border-b border-line px-1 no-print" role="tablist" aria-label="Nội dung tổng quan">
+      <div className="tab-track scroll-thin self-start no-print" role="tablist" aria-label="Nội dung tổng quan">
         {tabList.map((t) => {
           const badge = tabBadge[t.id];
           return (
@@ -633,8 +633,8 @@ export default function Dashboard() {
               aria-selected={tab === t.id}
               onClick={() => setTab(t.id)}
               className={clsx(
-                'tap -mb-px flex min-h-[44px] shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 text-sm font-medium transition-colors',
-                tab === t.id ? 'border-accent font-semibold text-accent' : 'border-transparent text-muted hover:text-ink',
+                'tab-item tap',
+                tab === t.id && 'tab-item-on',
               )}
             >
               <t.icon size={15} aria-hidden="true" /> {t.label}

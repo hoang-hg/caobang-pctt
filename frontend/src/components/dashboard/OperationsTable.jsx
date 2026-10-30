@@ -315,7 +315,7 @@ export default function OperationsTable({ k, kState, stations, stationsState, on
     <section className={clsx('card flex flex-col gap-3 p-3 sm:p-4', className)}>
       <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
         <h2 className="card-title">Bảng số liệu chi tiết</h2>
-        <div className="scroll-thin -mx-1 flex gap-1 overflow-x-auto px-1 pb-0.5" role="tablist" aria-label="Chuyên đề của bảng">
+        <div className="tab-track scroll-thin self-start shadow-none" role="tablist" aria-label="Chuyên đề của bảng">
           {tabs.map((t) => (
             <button
               key={t.id}
@@ -324,8 +324,8 @@ export default function OperationsTable({ k, kState, stations, stationsState, on
               aria-selected={tab === t.id}
               onClick={() => switchTab(t.id)}
               className={clsx(
-                'tap flex min-h-[36px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border px-2.5 py-1 text-xs font-semibold',
-                tab === t.id ? 'border-accent bg-accent text-white' : 'border-line bg-panel2/60 text-ink-2 hover:text-ink',
+                'tab-item tap gap-1.5 px-2.5 py-1 text-xs',
+                tab === t.id && 'tab-item-on',
               )}
             >
               <t.icon size={13} aria-hidden="true" /> <span className="sm:hidden">{t.short}</span><span className="hidden sm:inline">{t.label}</span>
