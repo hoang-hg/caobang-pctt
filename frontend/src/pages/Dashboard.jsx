@@ -19,7 +19,7 @@ import SuppliesChart from '../components/charts/SuppliesChart';
 import AreaForecastChart from '../components/charts/AreaForecastChart';
 import ForecastBulletinModal from '../components/charts/ForecastBulletinModal';
 import KpiStrip from '../components/dashboard/KpiStrip';
-import DecisionPanel from '../components/dashboard/DecisionPanel';
+import DecisionPanel, { DecisionStrip } from '../components/dashboard/DecisionPanel';
 import { riverState, StationPicker } from '../components/dashboard/RiverKpi';
 import SituationBar from '../components/dashboard/SituationBar';
 import SituationSummary, { LevelHint } from '../components/dashboard/SituationSummary';
@@ -165,6 +165,7 @@ export default function Dashboard() {
   const defaultTab = isCommuneUser ? 'cap_xa' : 'tong_hop';
   const wanted = params.get('tab') || LEGACY_LEVEL[params.get('level')] || defaultTab;
   const tab = tabs.some((t) => t.id === wanted) ? wanted : defaultTab;
+  const decisionInHero = tab === 'tong_hop' && !presentation && !isPhone && !bigScreen; // diện mạo B: việc chờ trong khối đầu trang
 
   const kQ = useAreaQuery('kpis', '/dashboard/kpis', {}, { refetchInterval: 30_000 });
   const k = kQ.data;
@@ -604,6 +605,9 @@ export default function Dashboard() {
             />
           </div>
         )}
+        {/* Diện mạo B — một khối dẫn đầu (640 – 1679 px): việc chờ quyết định nằm ngay trong khối đầu trang. Màn lớn: cột trái
+            cạnh bản đồ; điện thoại: khối riêng ngay sau 6 ô chỉ số (thiết kế A) */}
+        {decisionInHero && <DecisionStrip k={k} kState={kState} className="mt-2" />}
       </PageHeader>
 
       {k && kQ.isError && online && (
@@ -833,7 +837,7 @@ export default function Dashboard() {
             ) : (
               <div className="flex flex-col gap-2.5 sm:gap-3.5">
                 <div className="contents">
-                  {!presentation && <DecisionPanel k={k} kState={kState} className="max-sm:order-last" stacked={false} />}
+                  {!presentation && isPhone && <DecisionPanel k={k} kState={kState} className="order-last" stacked={false} />}
                   <KpiStrip
                     {...kpiProps}
                     onRiver={(id) => {
