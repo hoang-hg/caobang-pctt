@@ -56,12 +56,12 @@ export default function DataImport() {
   return (
     <div className={clsx(PAGE, 'pb-8')}>
       <PageHeader
+        tips={<RoleTips page="nhap-du-lieu" />}
         title={canImport ? 'Nhập dữ liệu' : 'Gửi dữ liệu của xã/phường'}
         description={canImport
           ? 'Cập nhật danh sách điểm sơ tán, kho, danh bạ… cho cả tỉnh. Máy kiểm tra từng dòng, hết lỗi mới ghi.'
           : 'Gửi danh sách điểm sơ tán, kho, danh bạ… của xã. Cấp tỉnh duyệt xong mới hiện trên hệ thống.'}
       />
-      <RoleTips page="nhap-du-lieu" />
       <Tabs
         value={tab}
         onChange={setTab}

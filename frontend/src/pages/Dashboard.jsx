@@ -541,6 +541,7 @@ export default function Dashboard() {
         data-mau-chuyen="" // màu chuyển đã duyệt (kế hoạch giao diện mục 12) — ui-test bỏ qua
         title="Tổng quan"
         short="Tổng quan"
+        tips={!presentation && <RoleTips page="tong-quan" />} // gợi ý theo vai trò (cấp tỉnh / cấp xã) — một nút ở đầu trang mọi thẻ
         scope={(
           <>
             <span className="truncate" title={filterLabel}>{filterLabel}</span>
@@ -653,8 +654,6 @@ export default function Dashboard() {
       {tab === 'cap_xa' && (
         <div ref={ref} className="flex flex-col gap-3.5">
           <CommuneView code={communeCode} units={scopeUnits} onChange={(code) => enterCommune(code)} onSupport={() => setSupportOpen(true)}>
-            {/* Tài khoản xã: gợi ý lần đầu ngay dưới các ô chỉ số của xã (cấp tỉnh xem thẻ này đã có gợi ý ở thẻ Tổng hợp) */}
-            {isCommuneUser && <RoleTips page="tong-quan" />}
             <div className="grid gap-3.5 xl:grid-cols-[1fr_360px] [&>*]:min-w-0">
               <div className="grid gap-3.5 lg:grid-cols-2 [&>*]:min-w-0">
                 {/* Biểu đồ số đo trạm chỉ khi xã có trạm đo mưa — không thì 2 khung trống "chưa có số đo" chiếm nửa trang */}
@@ -848,17 +847,9 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* 2. Khối chiến thuật: bản đồ + chuyên đề (trái), nhật ký sự kiện (phải). Gợi ý lần đầu: điện thoại ngay trước bản
-                đồ; máy tính bảng / laptop đầu cột phải (trên nhật ký) — không đẩy bản đồ xuống dưới màn hình đầu */}
-            {/* Hàng 1 cao vừa gợi ý (gập sẵn một dòng), phần cao dư của cột trái dồn cho hàng 2 — nhật ký nằm sát ngay dưới */}
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:grid-rows-[auto_1fr] lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_420px] [&>*]:min-w-0">
-              {!presentation && (
-                <RoleTips
-                  page="tong-quan"
-                  className="md:col-start-2 md:row-start-1 md:!flex-col md:!items-stretch md:self-start [&_ol]:md:!grid-cols-1"
-                />
-              )}
-              <div className="flex min-w-0 flex-col gap-3 md:col-start-1 md:row-span-2 md:row-start-1">
+            {/* 2. Khối chiến thuật: bản đồ + chuyên đề (trái), nhật ký sự kiện (phải). Gợi ý lần đầu là nút ở đầu trang */}
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_420px] [&>*]:min-w-0">
+              <div className="flex min-w-0 flex-col gap-3">
                 {!bigScreen && <TacticalMiniMap k={k} className="min-w-0" focus={mapFocus} />}
 
                 {/* Biểu đồ theo chuyên đề — xem một chuyên đề một lúc (bớt rối cho lãnh đạo) hoặc "Tất cả" */}
@@ -919,7 +910,7 @@ export default function Dashboard() {
               {logSection({
                 title: 'Nhật ký sự kiện',
                 limit: 60,
-                className: 'min-w-0 md:col-start-2 lg:sticky lg:top-16 lg:h-[calc(100vh-8.5rem)] lg:self-start lg:overflow-hidden lg:tall:h-[calc(100vh-10.5rem)]', // màn đủ cao: trừ cả thanh trạng thái
+                className: 'min-w-0 lg:sticky lg:top-16 lg:h-[calc(100vh-8.5rem)] lg:self-start lg:overflow-hidden lg:tall:h-[calc(100vh-10.5rem)]', // màn đủ cao: trừ cả thanh trạng thái
               })}
             </div>
           </div>

@@ -369,6 +369,7 @@ export default function RescueCenter() {
       <ConnectionBanner updatedAt={ticketsQ.dataUpdatedAt || null} />
 
       <PageHeader
+        tips={<RoleTips page="cuu-ho" />}
         title="Điều hành cứu hộ"
         scope={scopeLabel}
         time={dataTime}
@@ -379,8 +380,6 @@ export default function RescueCenter() {
       />
 
       <RescueKpis ticketsQ={ticketsQ} tickets={tickets} factsOf={factsOf} evacQ={evacQ} onGo={go} onEvac={() => scrollTo(document.getElementById('so-tan'))} />
-
-      <RoleTips page="cuu-ho" />
 
       {/* Lãnh đạo nắm tình hình: bản đồ cứu hộ (phiếu đang mở, lộ trình + giờ dự kiến tới của đội, vùng nguy cơ, điểm sơ tán) và diễn biến
           48 giờ (phiếu theo mức, thời gian xử lý) — cùng danh sách phiếu với bảng điều phối; thu gọn được */}
