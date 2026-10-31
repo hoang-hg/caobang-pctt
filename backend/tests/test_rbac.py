@@ -60,7 +60,8 @@ def test_one_role_per_level():
         for code in perms:
             assert code == "*.*" or get_permission(code), f"{name}: {code}"
     assert roles[COMMUNE_ROLE] <= roles[PROVINCE_ROLE], roles[COMMUNE_ROLE] - roles[PROVINCE_ROLE]
-    assert roles[PROVINCE_ROLE] == set(codes)  # mọi tài khoản cấp tỉnh làm được mọi việc cấp tỉnh
+    # mọi tài khoản cấp tỉnh làm được mọi việc cấp tỉnh — trừ nguồn dữ liệu / thiết bị đo (việc kỹ thuật của Cấp 1)
+    assert roles[PROVINCE_ROLE] == set(codes) - {"integration.view", "integration.manage"}
     # Cấp 3: không quản lý tài khoản, không duyệt / soạn cảnh báo, không điều động, không nhập thẳng dữ liệu
     for code in (
         "user.view",

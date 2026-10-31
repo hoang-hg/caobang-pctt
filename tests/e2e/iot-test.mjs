@@ -23,9 +23,13 @@ const auth = (t) => ({ Authorization: `Bearer ${t}` });
 
 const admin = (await call('POST', '/auth/login', { username: 'admin', password: 'admin123' })).data.token;
 const xa = (await call('POST', '/auth/login', { username: 'admin.coba', password: 'admincoba123' })).data.token; // Cấp 3
+const tinh = (await call('POST', '/auth/login', { username: 'trucban', password: 'trucban123' })).data.token; // Cấp 2
 const A = auth(admin);
 
 check('Quản trị xã không xem được nguồn dữ liệu → 403', (await call('GET', '/integrations/sources', null, auth(xa))).status === 403);
+// Nguồn dữ liệu / thiết bị đo chỉ Cấp 1 (Quản trị hệ thống) — cấp tỉnh không xem, không cấu hình
+check('Cán bộ cấp tỉnh không xem được nguồn dữ liệu → 403', (await call('GET', '/integrations/sources', null, auth(tinh))).status === 403);
+check('Cán bộ cấp tỉnh không đăng ký được thiết bị đo → 403', (await call('POST', '/integrations/devices', { id: 'KT-CAP2', name: 'x', protocol: 'http' }, auth(tinh))).status === 403);
 const sources = (await call('GET', '/integrations/sources', null, A)).data;
 const om = sources.find((s) => s.code === 'OPEN_METEO_ENS');
 check('Dự báo theo xã: khung giờ sai (hours=0, offset_h âm) → 422',
