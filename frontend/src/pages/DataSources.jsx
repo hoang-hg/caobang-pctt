@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import {
-  Activity, CircleDashed, CloudSun, Copy, Cpu, KeyRound, Play, Plus, Power, Radio, Settings2, Trash2, Wifi, WifiOff,
+  Activity, CircleDashed, CloudSun, Copy, Cpu, FlaskConical, KeyRound, Play, Plus, Power, Radio, Settings2, Trash2, Wifi, WifiOff,
 } from 'lucide-react';
 import { api } from '../api/client';
+import { startSimulation, stopSimulation } from '../api/simulationSwitch';
 import { useStore } from '../app/store';
 import { Confirm, Empty, EmptyState, ErrorState, Modal, Skeleton, Tabs } from '../components/common/ui';
 import PageHeader from '../components/common/PageHeader';
@@ -190,6 +191,59 @@ function PushInfo({ source }) {
     return <CopyBox label="ChirpStack v4: Integrations → HTTP (event up) · TTN v3: Webhooks — header Authorization" value={`${host}/api/v1/ingest/lorawan\nAuthorization: Bearer <token nguồn LORAWAN>`} />;
   }
   return null;
+}
+
+/**
+ * Bật / tắt DỮ LIỆU GIẢ LẬP để diễn tập, xem thử giao diện khi hệ thống đang vận hành — CHỈ trình duyệt này (api/simulationSwitch.js,
+ * app/store.js): số liệu giả tạo ngay trên trình duyệt, không gửi gì lên máy chủ, không ghi CSDL, người dùng khác và cổng người
+ * dân vẫn thấy số thật. Đang giả lập thì trình duyệt này không nhận SOS thật — hỏi xác nhận trước khi bật, dải vàng luôn hiện.
+ */
+function SimulationCard() {
+  const on = useStore((s) => s.simulationMode);
+  const [ask, setAsk] = useState(false);
+  const [busy, setBusy] = useState(false);
+  return (
+    <section aria-label="Dữ liệu giả lập" className="card flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+      <span className={clsx('icon-tile h-10 w-10', on && 'bg-warn/15 text-warn ring-warn/30')} aria-hidden="true"><FlaskConical size={18} /></span>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-[15px] font-semibold text-ink">Dữ liệu giả lập (diễn tập)</h2>
+          <span className={clsx('chip text-[11px] font-semibold', on ? 'bg-warn/20 text-ink' : 'bg-panel2 text-muted')}>
+            {on ? 'Đang bật trên trình duyệt này' : 'Đang tắt'}
+          </span>
+        </div>
+        <p data-trang-thai="" className="mt-0.5 text-sm text-ink-2">
+          {on
+            ? 'Trình duyệt này đang xem số liệu giả lập — không nhận SOS thật. Người dùng khác vẫn thấy số thật.'
+            : 'Xem thử hệ thống với một đợt mưa lũ dựng sẵn, chỉ trên trình duyệt này. Không ghi gì vào hệ thống, người dùng khác không bị ảnh hưởng.'}
+        </p>
+      </div>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => (on ? stopSimulation() : setAsk(true))}
+        className={clsx('tap shrink-0 self-start sm:self-center', on ? 'btn-primary' : 'btn-secondary')}
+      >
+        <Power size={15} aria-hidden="true" /> {on ? 'Tắt, về số liệu thật' : 'Bật dữ liệu giả lập'}
+      </button>
+      {ask && (
+        <Confirm
+          title="Bật dữ liệu giả lập trên trình duyệt này?"
+          confirmLabel="Bật dữ liệu giả lập"
+          busy={busy}
+          onClose={() => setAsk(false)}
+          onConfirm={async () => { setBusy(true); await startSimulation(); }}
+        >
+          <ul className="list-disc space-y-1 pl-5 text-sm text-ink-2">
+            <li>Trang tải lại, mọi số liệu trên trình duyệt này là <b>số giả</b> (dải vàng luôn hiện ở đầu trang).</li>
+            <li>Trình duyệt này <b>không nhận SOS, cảnh báo thật</b> cho tới khi tắt — máy trực ban không nên bật.</li>
+            <li>Thao tác trong lúc giả lập không lưu, không gửi tin cho ai. Người dùng khác và cổng người dân vẫn thấy số thật.</li>
+            <li>Tắt bằng nút "Tắt giả lập" ở dải vàng hoặc đóng thẻ trình duyệt — về lại tài khoản của bạn.</li>
+          </ul>
+        </Confirm>
+      )}
+    </section>
+  );
 }
 
 function SourcesTab({ sources, devices }) {
@@ -566,6 +620,7 @@ export default function DataSources() {
   const dataTime = sourcesQ.dataUpdatedAt
     ? new Date(sourcesQ.dataUpdatedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
     : null;
+  const canManage = usePermission('integration', 'manage', '*');
   const broken = sources.filter((s) => s.enabled && sourceState(s, devices).level === 3).length;
   const lost = devices.filter((d) => d.enabled && d.status === 'mat_tin_hieu').length;
   return (
@@ -583,6 +638,7 @@ export default function DataSources() {
         { value: 'devices', label: 'Thiết bị đo', icon: Cpu, alert: lost ? { level: 2, text: `${lost} thiết bị mất tín hiệu` } : undefined },
         { value: 'monitor', label: 'Tình trạng nhận số liệu', short: 'Tình trạng', icon: Activity },
       ]} />
+      {tab === 'sources' && canManage && <SimulationCard />}
       {tab === 'sources' && gate(sourcesQ, 'danh sách nguồn số liệu', <SourcesTab sources={sources} devices={devices} />)}
       {tab === 'devices' && gate(devicesQ, 'danh sách thiết bị đo', <DevicesTab devices={devices} />)}
       {tab === 'monitor' && <MonitorTab sources={sources} devices={devices} />}

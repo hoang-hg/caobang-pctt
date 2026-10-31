@@ -13,14 +13,21 @@ const savedTheme = () => {
 };
 const systemTheme = () => (window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
 
-// CHẾ ĐỘ GIẢ LẬP (dữ liệu giả trên trình duyệt — api/simulationEngine.js): CHỈ máy dev (vite dev server,
-// import.meta.env.DEV) và phải BẬT CHỦ ĐỘNG (nút trên trang đăng nhập / thanh trên) — mặc định tắt. Bản build chạy thật luôn
-// tắt và không chứa mã giả lập. Phiên giả lập dùng token DEMO_TOKEN: tắt giả lập (hoặc mở trên bản thật) thì phiên đó bị bỏ,
-// không bao giờ gửi lên máy chủ thật.
+// CHẾ ĐỘ GIẢ LẬP (dữ liệu giả trên trình duyệt — api/simulationEngine.js): mặc định tắt, phải BẬT CHỦ ĐỘNG. Mọi gọi API nội
+// bộ trả số liệu giả ngay trên trình duyệt — không gửi gì lên máy chủ, không ghi CSDL, người khác / cổng người dân không bị
+// ảnh hưởng. Máy dev: nút trên trang đăng nhập / thanh trên, nhớ trên máy (localStorage). Bản chạy thật: nút "Dữ liệu giả lập"
+// ở Nguồn dữ liệu (người quản lý nguồn — api/simulationSwitch.js), CHỈ thẻ trình duyệt đó (sessionStorage — đóng thẻ là hết),
+// dải vàng luôn hiện; mã giả lập chỉ tải khi bật. Phiên giả lập dùng token DEMO_TOKEN (không bao giờ gửi lên máy chủ); phiên
+// thật cất ở SIM_REAL_AUTH, tắt giả lập thì trả lại.
 export const DEMO_TOKEN = 'demo-gia-lap';
 const SIM_KEY = 'pctt_sim_mode';
-const SIM_ALLOWED = import.meta.env.DEV;
-const savedSim = SIM_ALLOWED && safeGet(SIM_KEY) === 'true';
+const SIM_REAL_AUTH = 'pctt_sim_phien_that';
+const simStore = () => (import.meta.env.DEV ? localStorage : sessionStorage);
+const simGet = (k) => { try { return simStore().getItem(k); } catch { return null; } };
+const simSet = (k, v) => { try { v == null ? simStore().removeItem(k) : simStore().setItem(k, v); } catch { /* bỏ qua */ } };
+const savedSim = simGet(SIM_KEY) === 'true';
+/** Cất phiên thật trước khi chuyển sang phiên giả lập (api/simulationSwitch.js). */
+export const stashRealAuth = (auth) => safeSet(SIM_REAL_AUTH, auth ? JSON.stringify(auth) : null);
 // Giao diện giả lập gọn (mặc định): không dải vàng trên cùng, nút giả lập trên thanh chỉ còn biểu tượng — dữ liệu vẫn là giả
 // lập. Chọn "Hiện dải giả lập" trong menu nút đó (VD trước khi chụp ảnh gửi người khác) → nhớ trên máy (pctt_sim_ui = 'full').
 const SIM_UI_KEY = 'pctt_sim_ui';
@@ -28,7 +35,14 @@ const SIM_UI_KEY = 'pctt_sim_ui';
 const savedAuth = (() => {
   try {
     const auth = JSON.parse(safeGet('pctt_auth') || 'null');
-    return auth?.token === DEMO_TOKEN && !savedSim ? null : auth;
+    if (auth?.token === DEMO_TOKEN && !savedSim) {
+      // giả lập đã hết (thẻ đã đóng / tắt) → trả lại phiên thật đã cất khi bật
+      const real = safeGet(SIM_REAL_AUTH);
+      safeSet('pctt_auth', real);
+      safeSet(SIM_REAL_AUTH, null);
+      return JSON.parse(real || 'null');
+    }
+    return auth;
   } catch {
     return null;
   }
@@ -65,15 +79,21 @@ function followSystemTheme() {
 }
 
 export const useStore = create((set, get) => ({
-  // ---- Chế độ giả lập (chỉ máy dev, bật chủ động — xem DEMO_TOKEN) ----
+  // ---- Chế độ giả lập (bật chủ động — xem DEMO_TOKEN) ----
   simulationMode: savedSim,
   setSimulationMode: (on) => {
-    const simulationMode = SIM_ALLOWED && Boolean(on);
-    safeSet(SIM_KEY, simulationMode ? 'true' : null);
+    const simulationMode = Boolean(on);
+    simSet(SIM_KEY, simulationMode ? 'true' : null);
     set({ simulationMode });
-    if (!simulationMode && get().auth?.token === DEMO_TOKEN) get().setAuth(null); // tắt giả lập → thoát phiên giả lập
+    if (!simulationMode && get().auth?.token === DEMO_TOKEN) {
+      // tắt giả lập → thoát phiên giả lập, trả lại phiên thật đã cất khi bật (nếu có; hết hạn thì máy chủ báo, về đăng nhập)
+      let real = null;
+      try { real = JSON.parse(safeGet(SIM_REAL_AUTH) || 'null'); } catch { /* giá trị hỏng */ }
+      safeSet(SIM_REAL_AUTH, null);
+      get().setAuth(real);
+    }
   },
-  simulationUiFull: SIM_ALLOWED && safeGet(SIM_UI_KEY) === 'full',
+  simulationUiFull: safeGet(SIM_UI_KEY) === 'full',
   setSimulationUiFull: (on) => {
     safeSet(SIM_UI_KEY, on ? 'full' : null);
     set({ simulationUiFull: Boolean(on) });

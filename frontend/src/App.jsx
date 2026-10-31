@@ -31,7 +31,7 @@ const CitizenResetPassword = lazy(() => import('./pages/public/ResetPassword'));
 const MissionPage = lazy(() => import('./pages/public/MissionPage'));
 
 // Dải CHẾ ĐỘ GIẢ LẬP: chỉ máy dev (app/store.js)
-const DemoBanner = import.meta.env.DEV ? lazy(() => import('./components/common/DemoBanner')) : null;
+const DemoBanner = lazy(() => import('./components/common/DemoBanner')); // chỉ tải khi bật giả lập
 // Trang mẫu giao diện — chỉ máy dev (rà thành phần dùng chung ở hai nền), bản chạy thật không có đường dẫn này
 const StyleGuide = import.meta.env.DEV ? lazy(() => import('./pages/StyleGuide')) : null;
 
@@ -59,6 +59,7 @@ function Shell() {
   const setAuth = useStore((s) => s.setAuth);
   // Chế độ trình chiếu của Dashboard (màn hình lớn phòng điều hành): chỉ còn nội dung, không thanh trên / menu trái
   const presentation = useStore((s) => s.presentation);
+  const simulationMode = useStore((s) => s.simulationMode);
   // Chuông SOS: mở khoá âm thanh ở lần bấm / gõ phím đầu tiên (trình duyệt chặn tới lúc đó)
   useEffect(() => (useStore.getState().audioReady ? undefined : watchAudioUnlock(useStore.getState().setAudioReady)), []);
   const qc = useQueryClient();
@@ -74,7 +75,7 @@ function Shell() {
 
   return (
     <div className="flex h-full flex-col print:block print:h-auto">
-      {DemoBanner && <Suspense fallback={null}><DemoBanner /></Suspense>}
+      {simulationMode && <Suspense fallback={null}><DemoBanner /></Suspense>}
       {!presentation && <Header />}
       <SessionKeeper />
       <div className="flex min-h-0 flex-1 print:block">

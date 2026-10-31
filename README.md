@@ -429,15 +429,19 @@ docker compose exec redis sh -c "redis-cli --scan --pattern 'rl:*' | xargs -r re
 | Đăng nhập tài khoản demo báo sai | CSDL được tạo với `DEMO_MODE=false` → đặt `true` rồi `python -m app.seed --reset` |
 | Không nghe âm báo SOS | Trình duyệt chặn âm thanh khi chưa tương tác → click vào trang một lần |
 
-### 4.7. Chế độ giả lập giao diện (máy dev, không cần backend)
+### 4.7. Chế độ giả lập giao diện (trên trình duyệt, không cần backend)
 
 Xem giao diện khi không chạy được backend (máy chưa cài Docker, trình diễn không có mạng): `cd frontend && npm run dev`,
 trang đăng nhập có khối **Chế độ giả lập — chỉ máy dev** → chọn 1 trong 4 tài khoản (cấp tỉnh có PIN, trực ban tỉnh, cấp xã
 Cô Ba, quản trị hệ thống — số liệu như cấp tỉnh, khác ở hướng dẫn xử lý và quản lý tài khoản).
 
-- Chỉ có trong Vite dev (`import.meta.env.DEV`): bản build chạy thật không chứa mã lẫn dữ liệu giả lập. Phải bấm bật; dải
-  vàng **CHẾ ĐỘ GIẢ LẬP** luôn hiện; cổng công khai `/public/*` luôn gọi máy chủ thật; lỗi của máy chủ thật không bao giờ bị
-  thay bằng số liệu giả.
+- Chỉ trên trình duyệt bật nó: số liệu giả tạo ngay trên trình duyệt, không gửi gì lên máy chủ, không ghi CSDL; người dùng
+  khác và cổng công khai `/public/*` luôn thấy số thật; lỗi của máy chủ thật không bao giờ bị thay bằng số liệu giả. Máy dev:
+  dải vàng ẩn cho gọn (nút bình thí nghiệm trên thanh trên → "Hiện dải giả lập").
+- **Hệ thống đang vận hành** (bản build): Nguồn dữ liệu → tab Nguồn số liệu → **Dữ liệu giả lập (diễn tập)** → "Bật dữ liệu
+  giả lập" (tài khoản quản lý nguồn dữ liệu; hỏi xác nhận). Chỉ thẻ trình duyệt đó, đóng thẻ là hết; dải vàng luôn hiện, không
+  ẩn được; trình duyệt đó **không nhận SOS thật** tới khi tắt — máy trực ban không bật. "Tắt giả lập" về lại tài khoản thật.
+  Mã + dữ liệu mẫu (~1 MB) là phần tải riêng, chỉ tải khi bật.
 - Dữ liệu: phản hồi API ghi từ backend seed demo (`frontend/src/api/demo/fixtures.json` — tên giả định, SĐT đầu số 0999),
   giờ dời về lúc mở. Tạo phiếu SOS, điều động, cập nhật, hoàn thành chạy trên trình duyệt (còn khi tải lại trang, mất khi
   tắt giả lập); thao tác khác báo "không thực hiện trong chế độ giả lập". Thanh trên cùng: đổi vai trò, chọn kịch bản (lũ

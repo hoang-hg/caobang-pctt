@@ -11,8 +11,8 @@ import BrandMark from './BrandMark';
 import TopNav from './TopNav';
 import { useNavBadges } from './Sidebar';
 
-// Điều khiển chế độ giả lập: CHỈ máy dev (bản build chạy thật không có mã giả lập — app/store.js)
-const SimulationBar = import.meta.env.DEV ? lazy(() => import('../common/SimulationBar')) : null;
+// Điều khiển chế độ giả lập (app/store.js): chunk riêng kèm dữ liệu mẫu — chỉ tải khi đang bật giả lập
+const SimulationBar = lazy(() => import('../common/SimulationBar'));
 // Báo cáo nhanh → tạo phiếu SOS: một nút cố định trên thanh trên cùng ở mọi trang (máy tính bảng, máy tính); điện thoại dùng
 // "Báo SOS" ở thanh thao tác dưới cùng. Hộp thoại chỉ tải khi bấm
 const QuickIncidentModal = lazy(() => import('../dashboard/QuickIncidentModal'));
@@ -34,7 +34,7 @@ function Clock() {
 }
 
 export default function Header() {
-  const { theme, toggleTheme, wsStatus, soundOn, toggleSound, mobileMenuOpen, setMobileMenuOpen, audioReady } = useStore();
+  const { theme, toggleTheme, wsStatus, soundOn, toggleSound, mobileMenuOpen, setMobileMenuOpen, audioReady, simulationMode } = useStore();
   // Điện thoại: menu thu vào nút ☰ — SOS chờ xử lý / lệnh cảnh báo chờ bạn duyệt hiện số đỏ ngay trên nút
   const badges = useNavBadges();
   const urgent = badges.sos + badges.alerts;
@@ -87,7 +87,7 @@ export default function Header() {
           cùng (StatusBar). Máy tính bảng: các nút đó ở đây, chỉ còn biểu tượng */}
       <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
         {/* Điều khiển Giả lập tác chiến */}
-        {SimulationBar && <Suspense fallback={null}><SimulationBar /></Suspense>}
+        {simulationMode && <Suspense fallback={null}><SimulationBar /></Suspense>}
 
         {canReport && (
           <button
