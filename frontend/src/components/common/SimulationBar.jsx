@@ -5,6 +5,7 @@ import { Check, ChevronDown, Eye, EyeOff, FlaskConical, Mountain, Power, UserChe
 import { useStore } from '../../app/store';
 import { simulationEngine } from '../../api/simulationEngine';
 import { DEMO_ROLES, demoAuth } from '../../api/demoUsers';
+import { stopSimulation } from '../../api/simulationSwitch';
 
 const SCENARIOS = [
   { id: 'normal', label: 'Như dữ liệu đã ghi', desc: 'Đợt mưa lũ dựng sẵn, chưa thêm diễn biến', icon: Check },
@@ -13,7 +14,7 @@ const SCENARIOS = [
 ];
 
 /**
- * Điều khiển CHẾ ĐỘ GIẢ LẬP trên thanh trên cùng — CHỈ máy dev (Header nạp lười trong nhánh import.meta.env.DEV): chọn kịch
+ * Điều khiển CHẾ ĐỘ GIẢ LẬP trên thanh trên cùng (Header nạp khi bật giả lập — app/store.js): chọn kịch
  * bản thiên tai, đổi vai trò (đúng 3 vai trò thật — api/demoUsers.js), hiện / ẩn dải giả lập, tắt giả lập (thoát phiên giả
  * lập, về đăng nhập thật). Mặc định gọn: chỉ biểu tượng bình thí nghiệm (nhường chỗ menu ngang); "Hiện dải giả lập" → nút có
  * chữ + dải vàng trên cùng.
@@ -24,7 +25,7 @@ export default function SimulationBar() {
   const scenario = useStore((s) => s.simulationScenario);
   const full = useStore((s) => s.simulationUiFull);
   const auth = useStore((s) => s.auth);
-  const { setSimulationMode, setSimulationScenario, setSimulationUiFull, setAuth, toast } = useStore.getState();
+  const { setSimulationScenario, setSimulationUiFull, setAuth, toast } = useStore.getState();
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -95,14 +96,17 @@ export default function SimulationBar() {
               <span className="text-[11px] text-muted">{r.hint}</span>
             </button>
           ))}
-          <button type="button" onClick={() => { setSimulationUiFull(!full); setOpen(false); }}
-            className="tap mt-1 flex w-full items-center gap-2 rounded-lg border-t border-line px-2 pt-2 text-left text-xs font-semibold text-ink-2 hover:bg-panel2">
-            {full ? <EyeOff size={14} aria-hidden="true" /> : <Eye size={14} aria-hidden="true" />}
-            {full ? 'Ẩn dải giả lập (vẫn dùng dữ liệu giả lập)' : 'Hiện dải giả lập (trước khi chụp ảnh gửi người khác)'}
-          </button>
-          <button type="button" onClick={() => setSimulationMode(false)}
+          {/* Bản chạy thật: dải giả lập luôn hiện — không có nút ẩn */}
+          {import.meta.env.DEV && (
+            <button type="button" onClick={() => { setSimulationUiFull(!full); setOpen(false); }}
+              className="tap mt-1 flex w-full items-center gap-2 rounded-lg border-t border-line px-2 pt-2 text-left text-xs font-semibold text-ink-2 hover:bg-panel2">
+              {full ? <EyeOff size={14} aria-hidden="true" /> : <Eye size={14} aria-hidden="true" />}
+              {full ? 'Ẩn dải giả lập (vẫn dùng dữ liệu giả lập)' : 'Hiện dải giả lập (trước khi chụp ảnh gửi người khác)'}
+            </button>
+          )}
+          <button type="button" onClick={stopSimulation}
             className="tap mt-1 flex w-full items-center gap-2 rounded-lg border-t border-line px-2 pt-2 text-left text-xs font-semibold text-danger hover:bg-danger/10">
-            <Power size={14} aria-hidden="true" /> Tắt giả lập (thoát phiên giả lập)
+            <Power size={14} aria-hidden="true" /> Tắt giả lập (về phiên đăng nhập thật)
           </button>
         </div>
       )}

@@ -21,11 +21,10 @@ function sessionEnded(detail) {
   toast({ tone: 'warn', title: 'Phiên đăng nhập đã kết thúc', body: detail, duration: 10000 });
 }
 
-/** Chế độ giả lập (app/store.js: chỉ máy dev, bật chủ động) cho API nội bộ. Cổng công khai /public/* luôn gọi máy chủ thật.
- * Bản build chạy thật: import.meta.env.DEV = false → cả nhánh và mã giả lập bị loại khỏi gói. KHÔNG có cơ chế "máy chủ lỗi
- * thì trả dữ liệu giả" — lỗi thật phải hiện ra là lỗi. */
+/** Chế độ giả lập (app/store.js: bật chủ động, chỉ trình duyệt này) cho API nội bộ. Cổng công khai /public/* luôn gọi máy
+ * chủ thật. Mã giả lập (simulationEngine + dữ liệu mẫu) là chunk riêng, chỉ tải khi bật. KHÔNG có cơ chế "máy chủ lỗi thì trả
+ * dữ liệu giả" — lỗi thật phải hiện ra là lỗi. */
 const simulating = (path) =>
-  import.meta.env.DEV &&
   useStore.getState().simulationMode &&
   !path.startsWith('/public/') &&
   !path.startsWith('/admin-units');

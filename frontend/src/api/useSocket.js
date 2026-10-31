@@ -25,8 +25,8 @@ export function useSocket() {
   const qc = useQueryClient();
   // Chỉ nối lại khi đăng nhập / đăng xuất — token gia hạn định kỳ (App.jsx) không làm đứt kết nối
   const loggedIn = useStore((s) => !!s.auth?.token);
-  // Chế độ giả lập (chỉ máy dev — app/store.js): không nối WebSocket thật, làm mới số liệu giả lập theo nhịp
-  const isSim = useStore((s) => import.meta.env.DEV && s.simulationMode);
+  // Chế độ giả lập (app/store.js): không nối WebSocket thật, làm mới số liệu giả lập theo nhịp
+  const isSim = useStore((s) => s.simulationMode);
 
   useEffect(() => {
     if (!loggedIn) return undefined;
