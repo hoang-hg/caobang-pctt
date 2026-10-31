@@ -1077,8 +1077,8 @@ tuỳ chỉnh. Casbin `rbac_with_domains`; danh mục quyền và 3 vai trò là
 
 | Cấp | Vai trò | Phạm vi | Làm được | Quản lý tài khoản |
 |---|---|---|---|---|
-| 1 | `super_admin` Quản trị hệ thống | toàn tỉnh `*` | Tất cả | Mọi cấp |
-| 2 | `admin_tinh` Quản trị tỉnh | toàn tỉnh `*` | Mọi quyền nghiệp vụ toàn tỉnh: SOS, **điều động**, **soạn và duyệt cảnh báo** (cần PIN, không tự duyệt lệnh mình soạn), tổng đài, kho, phương tiện, nhật ký pháp lý, nguồn dữ liệu / IoT, **nhập dữ liệu chính thức**, duyệt hồ sơ xã gửi | Cấp 3 |
+| 1 | `super_admin` Quản trị hệ thống | toàn tỉnh `*` | Tất cả — gồm **nguồn dữ liệu / thiết bị đo** (chỉ Cấp 1) | Mọi cấp |
+| 2 | `admin_tinh` Quản trị tỉnh | toàn tỉnh `*` | Mọi quyền nghiệp vụ toàn tỉnh: SOS, **điều động**, **soạn và duyệt cảnh báo** (cần PIN, không tự duyệt lệnh mình soạn), tổng đài, kho, phương tiện, nhật ký pháp lý, **nhập dữ liệu chính thức**, duyệt hồ sơ xã gửi. **Không** xem / cấu hình nguồn dữ liệu, thiết bị đo (từ 31/10/2026 — không còn mục Nguồn dữ liệu, thẻ Hệ thống & dữ liệu, dòng tình trạng nguồn ở thanh dưới) | Cấp 3 |
 | 3 | `admin_xa` Quản trị xã/phường | đúng 1 xã `<CUM>/<MA_XA>` | Trong xã: tiếp nhận – cập nhật – hoàn thành SOS, cập nhật tiến độ sơ tán, đánh dấu điểm sự cố, duyệt / chuyển SOS phản ánh, xuất / nhập kho của xã, báo tình trạng phương tiện của lực lượng xã, xem nguồn lực / cảnh báo / danh bạ, **gửi dữ liệu chờ tỉnh duyệt** | Không |
 
 ```
@@ -1113,7 +1113,7 @@ hành). Yêu cầu ở phạm vi toàn tỉnh không khớp quyền cấp xã.
 | `user.view` / `user.manage` | ✓ | Xem / tạo tài khoản cấp dưới, đổi cấp – phạm vi, đặt lại mật khẩu / PIN / 2 lớp, khoá |
 | `report.view` / `report.moderate` | ✓ | Xem (kể cả SĐT người gửi) / duyệt – từ chối – chuyển SOS phản ánh |
 | `citizen.view` / `citizen.manage` | — | Tài khoản người dân của cổng: tìm theo số điện thoại / khoá – mở khoá, đặt mật khẩu tạm khi người dân gọi đường dây nóng (`GET /citizens`, `PATCH /citizens/{id}`, `POST /citizens/{id}/reset-password`; ghi nhật ký pháp lý) |
-| `integration.view` / `integration.manage` | toàn tỉnh | Xem / cấu hình nguồn dữ liệu, thiết bị IoT, cấp khoá |
+| `integration.view` / `integration.manage` | toàn tỉnh | Xem / cấu hình nguồn dữ liệu, thiết bị IoT, cấp khoá, bật dữ liệu giả lập trên trình duyệt — **chỉ Cấp 1** |
 | `data.import` | toàn tỉnh | Nhập dữ liệu chính thức từ tệp; phê duyệt / từ chối hồ sơ xã gửi ([2.4](#nhap-du-lieu)) |
 | `data.submit` | ✓ | Gửi dữ liệu của xã mình chờ cấp tỉnh phê duyệt ([2.4](#nhap-du-lieu)) |
 | `event.manage` | toàn tỉnh | Mở / sửa / kết thúc đợt thiên tai (vùng ảnh hưởng là các xã bất kỳ). Xem đợt và báo cáo chỉ cần `monitoring.view`, số liệu theo phạm vi được giao |

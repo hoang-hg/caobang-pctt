@@ -12,13 +12,19 @@ import { DEMO_TOKEN } from '../app/store';
 
 const recordedMe = (scope) => fixtures.bodies[fixtures[scope]['/auth/me']];
 const user = (scope, fields) => ({ ...recordedMe(scope), email: null, must_change_password: false, ...fields });
+// Cấp tỉnh: không có quyền nguồn dữ liệu / thiết bị đo (chỉ Cấp 1 — backend rbac/permissions.py); tệp ghi có thể ghi từ lúc
+// cấp tỉnh còn quyền đó → bỏ ở đây cho đúng tài khoản thật
+const province = (fields) => {
+  const u = user('tinh', fields);
+  return { ...u, permissions: (u.permissions || []).filter((p) => p.obj !== 'integration') };
+};
 
 export const DEMO_ROLES = [
   {
     key: 'tinh_duyet',
     label: 'Cấp tỉnh — có PIN duyệt cảnh báo',
     hint: 'Điều hành toàn tỉnh, ký duyệt lệnh cảnh báo, điều động',
-    user: user('tinh', {
+    user: province({
       id: 'demo-tinh-duyet', username: 'demo.tinh', full_name: 'Lãnh đạo BCH tỉnh (giả lập)',
       position: 'Lãnh đạo Ban Chỉ huy PCTT & TKCN tỉnh (giả lập)', has_pin: true,
     }),
@@ -27,7 +33,7 @@ export const DEMO_ROLES = [
     key: 'tinh_truc',
     label: 'Cấp tỉnh — trực ban (chưa có PIN)',
     hint: 'Nhận tin báo cứu hộ, điều đội, soạn lệnh cảnh báo',
-    user: user('tinh', {
+    user: province({
       id: 'demo-tinh-truc', username: 'demo.trucban', full_name: 'Trực ban tỉnh (giả lập)',
       position: 'Cán bộ trực ban Văn phòng BCH tỉnh (giả lập)', has_pin: false,
     }),

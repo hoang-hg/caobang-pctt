@@ -176,7 +176,8 @@ SYSTEM_ROLES: Final[tuple[tuple[str, str, str, bool, list[tuple[str, str]]], ...
         "Điều hành toàn tỉnh: SOS, điều động, soạn và duyệt cảnh báo (cần PIN, không tự duyệt lệnh mình soạn), tổng đài, "
         "kho, nhập dữ liệu, duyệt hồ sơ xã gửi; tạo và quản lý tài khoản Cấp 3",
         False,
-        perms(*(p.code for p in ALL_PERMISSIONS)),
+        # Mọi quyền trừ nguồn dữ liệu / thiết bị đo (xem, cấu hình): việc kỹ thuật của Cấp 1 (Quản trị hệ thống)
+        perms(*(p.code for p in ALL_PERMISSIONS if p.resource != R.INTEGRATION)),
     ),
     (
         COMMUNE_ROLE,
