@@ -243,9 +243,12 @@ export default function Alerts() {
                 </button>
               ))}
             </div>
-            <button type="button" onClick={() => { setTab('phat'); setOverviewOpen((v) => !v); }} aria-expanded={overviewOpen} aria-label="Bản đồ vùng cảnh báo & chuyển giao" className="btn-secondary tap h-11 rounded-xl px-4">
-              Bản đồ vùng cảnh báo <ChevronRight size={15} className={clsx('transition-transform', overviewOpen && 'rotate-90')} aria-hidden="true" />
-            </button>
+{/* Chỉ ở phần Phát cảnh báo (như khối gập cũ) — Lịch sử / Danh bạ / Nhật ký là việc tra cứu */}
+            {tab === 'phat' && (
+                          <button type="button" onClick={() => setOverviewOpen((v) => !v)} aria-expanded={overviewOpen} aria-label="Bản đồ vùng cảnh báo & chuyển giao" className="btn-secondary tap h-11 rounded-xl px-4">
+                Bản đồ vùng cảnh báo <ChevronRight size={15} className={clsx('transition-transform', overviewOpen && 'rotate-90')} aria-hidden="true" />
+              </button>
+            )}
             <div className="text-[13px] leading-normal text-ink-2">
               <div className="mb-1 flex items-center gap-1 text-xs font-bold text-muted">Hai người: soạn · duyệt {twoPerson}</div>
               Người soạn không tự duyệt. Lãnh đạo duyệt bằng mã PIN, cần quyền trên mọi xã nhận tin.
