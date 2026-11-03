@@ -22,14 +22,15 @@ export default function BrandMark({ size = 40, className }) {
   );
 }
 
-/** Biểu trưng + tên đầy đủ hai dòng (Đăng nhập, trang tài khoản) — màu chữ theo khối cha. */
+/** Biểu trưng + tên hai dòng (Đăng nhập, trang tài khoản) — cùng chữ với thanh trên cùng (bản vẽ desktop khung L1); màu
+ * chữ theo khối cha. */
 export function BrandLockup({ className }) {
   return (
     <div className={clsx('flex items-center gap-3', className)}>
       <BrandMark />
       <div className="leading-tight">
-        <div className="font-bold">BCH PCTT & TKCN tỉnh Cao Bằng</div>
-        <div className="text-sm opacity-80">Hệ thống điều hành phòng chống thiên tai</div>
+        <div className="font-bold">ĐIỀU HÀNH PCTT</div>
+        <div className="text-sm opacity-80">Tỉnh Cao Bằng</div>
       </div>
     </div>
   );
