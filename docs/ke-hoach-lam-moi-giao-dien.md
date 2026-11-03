@@ -479,7 +479,8 @@ Mỗi nhóm một PR (lint + build + ảnh chụp đối chiếu bản vẽ ở 
 | D | Cảnh báo & Hotline (D–D10) | Kế tiếp |
 | E | Vật tư & Lực lượng (E–E8) | Kế tiếp |
 | F · G | Phản ánh người dân (F–F6) · Đợt thiên tai (G–G4) | Kế tiếp |
-| H · I | Nhập dữ liệu (H–H8) · Nguồn dữ liệu (I–I8) | Kế tiếp |
+| H1 | Nhập dữ liệu ≥ 1280 px (khung H): danh sách loại dữ liệu luôn ở cột trái (nhóm theo cụm, loại đang chọn tô nhấn, biểu tượng "hiện cho người dân"), quy trình nhập ở giữa; bỏ tiêu đề trang, gợi ý ở hàng thẻ | Xong (H1) |
+| H · I | Nhập dữ liệu: cột phải hồ sơ xã chờ duyệt (H), khung con H2–H8 · Nguồn dữ liệu (I–I8) | Kế tiếp |
 | J · K | Phân quyền (J–J12) · Hướng dẫn xử lý (K, K2) | Kế tiếp |
 | L · M | Đăng nhập & tài khoản (L1–L8b) · Trạng thái chung (M1–M5) | Kế tiếp |
 | N · O | Cổng người dân (N1–N19) · Nhiệm vụ trưởng nhóm (O1–O5) | Kế tiếp |
