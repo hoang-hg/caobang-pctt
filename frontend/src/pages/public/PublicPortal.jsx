@@ -368,6 +368,9 @@ export default function PublicPortal() {
   const [showSosModal, setShowSosModal] = useState(false);
   // Máy tính (≥ 1024 px): "Bạn muốn làm gì?" nổi trên bản đồ; điện thoại / máy tính bảng: ngay dưới bản đồ. Vẽ MỘT dạng
   const wide = useMediaQuery('(min-width: 1024px)');
+  // Máy tính ≥ 1280 px (bản vẽ desktop khung N1): trang trải hết bề ngang; chuyên mục nằm trên thanh trên cùng; trang Bản đồ
+  // cảnh báo 3 cột — "Bạn muốn làm gì?" + cứu nạn khẩn cấp · bản đồ · bảng cảnh báo / chú thích / mưa
+  const desk = useMediaQuery('(min-width: 1280px)');
   const [quickOpen, setQuickOpen] = useState(true);
   const [layersOpen, setLayersOpen] = useState(false); // điện thoại: danh sách lớp bản đồ mở khi bấm
   const resultsRef = useRef(null);
@@ -534,7 +537,7 @@ export default function PublicPortal() {
       <NetworkBanner />
       {/* Thanh Header chính */}
       <header className="sticky top-0 z-[1100] border-b border-line bg-panel/95 backdrop-blur-md px-3 sm:px-6 py-2.5">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
+        <div className={clsx('mx-auto flex items-center justify-between gap-3', desk ? 'max-w-none' : 'max-w-7xl')}>
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-danger text-white">
               <ShieldAlert size={22} />
@@ -542,28 +545,57 @@ export default function PublicPortal() {
             <div className="min-w-0 leading-tight">
               <h1 className="truncate text-sm sm:text-base font-bold text-ink">
                 <span className="sm:hidden">Cảnh báo thiên tai</span>
-                <span className="max-sm:hidden">Cảnh báo thiên tai tỉnh Cao Bằng</span>
+                <span className="max-sm:hidden">{desk ? 'Cảnh báo thiên tai' : 'Cảnh báo thiên tai tỉnh Cao Bằng'}</span>
               </h1>
               <div className="truncate text-[11px] text-muted hidden sm:block">
-                Ban Chỉ huy Phòng chống thiên tai & Tìm kiếm cứu nạn tỉnh Cao Bằng
+                {desk ? 'Tỉnh Cao Bằng' : 'Ban Chỉ huy Phòng chống thiên tai & Tìm kiếm cứu nạn tỉnh Cao Bằng'}
               </div>
             </div>
           </div>
+
+          {desk && (
+            <nav aria-label="Các mục của cổng người dân" className="scroll-thin flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto">
+              {GROUPS.map((g) => {
+                const on = g.tabs.includes(activeTab);
+                const blocked = g.id === 'deo-doc' && overview?.landslides?.blocked_count;
+                return (
+                  <button
+                    key={g.id}
+                    type="button"
+                    onClick={() => setActiveTab(g.tabs[0])}
+                    aria-current={on ? 'page' : undefined}
+                    className={clsx('tap flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[10px] px-3 py-2 text-sm', on ? 'bg-accent/10 font-semibold text-accent' : 'text-ink-2 hover:bg-panel2 hover:text-ink')}
+                  >
+                    {g.label}
+                    {blocked ? <span className="rounded-full bg-danger px-1.5 text-[10px] font-bold text-white">{blocked} điểm cấm</span> : null}
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                onClick={() => setActiveTab('huongdan')}
+                aria-current={activeTab === 'huongdan' ? 'page' : undefined}
+                className={clsx('tap shrink-0 whitespace-nowrap rounded-[10px] px-3 py-2 text-sm', activeTab === 'huongdan' ? 'bg-accent/10 font-semibold text-accent' : 'text-muted hover:bg-panel2 hover:text-ink')}
+              >
+                Cẩm nang an toàn
+              </button>
+            </nav>
+          )}
 
           <div className="flex items-center gap-1.5 sm:gap-2">
             {/* <a> chứ không phải <Link>: /ban-nhe là trang máy chủ dựng (nginx → backend), không phải route của ứng dụng */}
             <a
               href="/ban-nhe"
-              className="btn max-sm:hidden border border-line bg-panel px-2.5 py-1.5 text-xs font-semibold text-ink-2 hover:bg-panel2 hover:text-ink"
+              className={desk ? 'tap shrink-0 px-1 text-[13px] text-muted hover:text-ink hover:underline' : 'btn max-sm:hidden border border-line bg-panel px-2.5 py-1.5 text-xs font-semibold text-ink-2 hover:bg-panel2 hover:text-ink'}
               title="Chuyển sang bản chỉ có chữ (dưới 50 KB) khi mạng 2G/3G yếu"
             >
-              <Zap size={14} className="shrink-0 text-amber-500" aria-hidden="true" />
+              {!desk && <Zap size={14} className="shrink-0 text-amber-500" aria-hidden="true" />}
               <span>Bản nhẹ</span>
             </a>
 
             <a
               href="tel:112"
-              className="btn max-sm:hidden bg-danger/10 text-danger hover:bg-danger hover:text-white border border-danger/30 text-xs px-2.5 py-1.5 font-bold"
+              className={clsx('btn max-sm:hidden font-bold text-danger hover:bg-danger hover:text-white', desk ? 'h-11 rounded-xl border-2 border-danger bg-panel px-3.5 text-sm' : 'bg-danger/10 border border-danger/30 text-xs px-2.5 py-1.5')}
               title="Gọi cứu nạn khẩn cấp 112"
             >
               <PhoneCall size={14} />
@@ -572,7 +604,7 @@ export default function PublicPortal() {
 
             {/* Một chức năng gửi: cứu người / tiếp tế / báo tin hiện trường. Điện thoại: nút ở thanh đáy */}
             <button
-              className="btn-danger max-sm:hidden inline-flex text-xs px-2.5 sm:px-3 py-1.5 font-semibold shadow-xs"
+              className={clsx('btn-danger max-sm:hidden inline-flex font-semibold shadow-xs', desk ? 'h-11 rounded-xl px-4 text-sm' : 'text-xs px-2.5 sm:px-3 py-1.5')}
               onClick={() => setReporting('')}
             >
               <Send size={14} />
@@ -596,7 +628,7 @@ export default function PublicPortal() {
               title="Đăng nhập trang điều hành (cán bộ)"
             >
               <LogIn size={14} />
-              <span className="hidden md:inline">{auth?.token ? 'Vào Điều hành' : 'Cán bộ'}</span>
+              <span className={desk ? 'sr-only' : 'hidden md:inline'}>{auth?.token ? 'Vào Điều hành' : 'Cán bộ'}</span>
             </Link>
 
             <button
@@ -637,7 +669,7 @@ export default function PublicPortal() {
         )}
       </header>
 
-      <main className="mx-auto flex max-w-7xl flex-col gap-4 p-3 sm:p-5">
+      <main className={clsx('mx-auto flex flex-col gap-4 p-3 sm:p-5', desk ? 'max-w-none' : 'max-w-7xl')}>
         {/* Dải tình hình (docs/ke-hoach-lam-moi-giao-dien.md 6.1): một dòng — có cảnh báo đã duyệt → Đỏ / Cam, "Xem cảnh báo"
             mở danh sách cảnh báo cạnh bản đồ; không có → câu bình tĩnh kèm mưa 24 giờ (chưa có số thì nói rõ, không ghi "–").
             Đường đèo cấm → chip ngay dưới, chạm mở chuyên đề. "Cần cứu hộ khẩn cấp" luôn có */}
@@ -970,7 +1002,7 @@ export default function PublicPortal() {
         {/* Menu 5 nhóm (máy tính, máy tính bảng — điện thoại dùng menu ≡) + hàng trang con của nhóm có 2 màn. Neo cuộn tới
             nội dung (scrollToContent) */}
         <div ref={tabsRef} className="flex scroll-mt-20 flex-col gap-2">
-          <nav aria-label="Các mục của cổng người dân" className="scroll-thin flex gap-1.5 overflow-x-auto border-b border-line pb-2 pt-1 max-sm:hidden">
+          {!desk && <nav aria-label="Các mục của cổng người dân" className="scroll-thin flex gap-1.5 overflow-x-auto border-b border-line pb-2 pt-1 max-sm:hidden">
             {GROUPS.map((g) => {
               const on = g.tabs.includes(activeTab);
               const badge = g.id === 'deo-doc' && overview?.landslides?.blocked_count
@@ -1009,7 +1041,7 @@ export default function PublicPortal() {
             >
               <BookOpen size={15} aria-hidden="true" /> Cẩm nang an toàn
             </button>
-          </nav>
+          </nav>}
           {(() => {
             const g = GROUPS.find((x) => x.tabs.includes(activeTab));
             if (!g || g.tabs.length < 2) return null;
@@ -1038,7 +1070,24 @@ export default function PublicPortal() {
           <div className="space-y-4">
             {/* Khung Bản đồ & Bảng tác chiến. Điện thoại: 2 khung xếp chồng, mỗi khung cao riêng — chung 1 lưới cao cố định thì
                 bảng bên phải chiếm hết chiều cao, bản đồ còn 0px. Máy tính (lg): 2 cột cao 700px */}
-            <div className="grid grid-cols-1 items-stretch gap-4 lg:h-[calc(100vh-17rem)] lg:min-h-[520px] lg:grid-cols-[1fr_390px]">
+            <div className={clsx('grid grid-cols-1 items-stretch gap-4 lg:h-[calc(100vh-17rem)] lg:min-h-[520px]', desk ? 'grid-cols-[300px_minmax(0,1fr)_380px]' : 'lg:grid-cols-[1fr_390px]')}>
+              {/* Máy tính ≥ 1280 px: cột trái "Bạn muốn làm gì?" + cứu nạn khẩn cấp (bản vẽ khung N1) */}
+              {desk && (
+                <aside className="card flex min-h-0 flex-col gap-2 overflow-y-auto p-3">
+                  <nav aria-label="Bạn muốn làm gì?">
+                    <div className="px-2 pb-1 text-sm font-bold text-ink">Bạn muốn làm gì?</div>
+                    {quickList}
+                  </nav>
+                  <div className="mt-auto flex flex-col gap-2 rounded-[14px] bg-danger/10 p-3.5">
+                    <b className="text-sm text-danger">Yêu cầu cứu nạn khẩn cấp</b>
+                    <span className="text-[13px] leading-snug text-ink-2">Bạn đang gặp nguy hiểm cần hỗ trợ ngay? Gọi 112 hoặc gửi yêu cầu cứu người.</span>
+                    <div className="flex gap-2">
+                      <a href="tel:112" className="btn-danger tap h-11 flex-1 rounded-xl font-semibold"><PhoneCall size={15} aria-hidden="true" /> Gọi 112</a>
+                      <button type="button" onClick={() => setReporting('')} className="btn-secondary tap h-11 flex-1 rounded-xl">Gửi yêu cầu</button>
+                    </div>
+                  </div>
+                </aside>
+              )}
               {/* Cột Bản đồ: Chiếm trọn h-full flex flex-col */}
               <section className="card flex h-[520px] flex-col overflow-hidden sm:h-[620px] lg:h-full">
                 {/* Lớp dữ liệu bản đồ & Basemap switcher */}
@@ -1105,7 +1154,7 @@ export default function PublicPortal() {
                 {/* Khung bản đồ Leaflet: Chiếm 100% diện tích flex-1 min-h-0 */}
                 <div className="flex-1 w-full min-h-0 relative">
                   {/* Máy tính: "Bạn muốn làm gì?" nổi góc trái, dưới nút phóng to / thu nhỏ — thu gọn được */}
-                  {wide && (quickOpen ? (
+                  {wide && !desk && (quickOpen ? (
                     <nav aria-label="Bạn muốn làm gì?" className="float-panel absolute left-3 top-24 z-[1000] w-72 p-2 shadow-lg">
                       <div className="flex items-center justify-between gap-2 px-2 pb-1">
                         <span className="text-sm font-bold text-ink">Bạn muốn làm gì?</span>

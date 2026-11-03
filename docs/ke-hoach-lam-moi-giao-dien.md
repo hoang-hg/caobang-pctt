@@ -484,7 +484,8 @@ Mỗi nhóm một PR (lint + build + ảnh chụp đối chiếu bản vẽ ở 
 | E1 | Vật tư ≥ 1280 px (khung E): 2 cột — nội dung (4 ô chỉ số, thẻ Lực lượng / Kho / Phương tiện + gợi ý, làm mới, danh sách) · "Cần bổ sung / cần sửa" dính cột phải (xếp dọc từng việc); bỏ tiêu đề trang | Xong (E1) |
 | E (tiếp) | Bảng lọc dọc bên trái (khung E), điều động nhanh (E2), nhập / xuất kho (E3, E5, E5b), thẻ kho / phương tiện (E4, E6, E6b), nhiên liệu (E7), sổ kho (E8) | Kế tiếp |
 | G1 | Đợt thiên tai ≥ 1280 px (khung G): cột trái "Các đợt thiên tai" + nút "Mở đợt thiên tai" ở đáy cột, báo cáo đợt bên phải; bỏ tiêu đề trang và dải "Đang diễn ra" (đợt đang diễn ra đã đánh dấu trong danh sách) | Xong (G1) |
-| F · G (tiếp) | Phản ánh người dân dạng danh sách – chi tiết (F–F6) · Đợt thiên tai khung con (G2–G4) | Kế tiếp |
+| F1 | Phản ánh người dân ≥ 1280 px (khung F): danh sách – chi tiết — cột trái thẻ trạng thái (nhãn ngắn + số), tìm, danh sách gọn (ảnh nhỏ, mã, chấm khẩn, thời gian, nội dung một dòng, xã · số ảnh); bên phải chi tiết phản ánh đang chọn (ảnh lớn, nội dung gốc, người gửi, nút 44 px); bỏ tiêu đề trang | Xong (F1) |
+| F · G (tiếp) | Phản ánh: soạn phần công khai ngay trong chi tiết (F4–F5), từ chối / chuyển SOS / điểm sự cố (F2, F3, F6) · Đợt thiên tai khung con (G2–G4) | Kế tiếp |
 | H1 | Nhập dữ liệu ≥ 1280 px (khung H): danh sách loại dữ liệu luôn ở cột trái (nhóm theo cụm, loại đang chọn tô nhấn, biểu tượng "hiện cho người dân"), quy trình nhập ở giữa; bỏ tiêu đề trang, gợi ý ở hàng thẻ | Xong (H1) |
 | I1 | Nguồn dữ liệu ≥ 1280 px (khung I): bỏ tiêu đề trang — hàng thẻ + "Chỉ Cấp 1 — Quản trị hệ thống" + gợi ý; thẻ nguồn 3 cột | Xong (I1) |
 | H · I (tiếp) | Nhập dữ liệu: cột phải hồ sơ xã chờ duyệt (H), khung con H2–H8 · Nguồn dữ liệu: cột phải thiết bị đo (I), khung con I2–I8 | Kế tiếp |
@@ -492,5 +493,6 @@ Mỗi nhóm một PR (lint + build + ảnh chụp đối chiếu bản vẽ ở 
 | K1 | Hướng dẫn xử lý ≥ 1280 px (khung K): cột trái dính — vai trò + "Bạn đang gặp việc gì?" dạng danh sách; các bước từng việc ở cột phải (đủ mọi việc để in, chạm việc thì cuộn tới), nút In ở đầu cột phải; bỏ tiêu đề trang | Xong (K1) |
 | J · K (tiếp) | Phân quyền khung con (J2–J12) · Hướng dẫn cấp xã (K2) | Kế tiếp |
 | L · M | Đăng nhập & tài khoản (L1–L8b) · Trạng thái chung (M1–M5) | Kế tiếp |
+| N1 | Cổng người dân ≥ 1280 px (khung N1): trang trải hết bề ngang; chuyên mục lên thanh trên (tên cổng 2 dòng, Gọi 112 viền đỏ + Gửi yêu cầu 44 px, Bản nhẹ dạng chữ); Bản đồ cảnh báo 3 cột — "Bạn muốn làm gì?" + ô cứu nạn khẩn cấp · bản đồ · bảng chú thích / cảnh báo / mưa | Xong (N1) |
 | O1 | Nhiệm vụ trưởng nhóm ≥ 1280 px (khung O1): thanh trên tối (tên, hiệu lực tới, Gọi trực ban), 2 cột — lệnh, chỉ đường, liên lạc · lực lượng (trái) · Báo cáo về trung tâm, đã báo (phải, dính); điện thoại giữ một cột | Xong (O1) |
-| N · O | Cổng người dân (N1–N19) · Nhiệm vụ: đã cứu, chi viện, mất mạng, hết hiệu lực (O2–O5) | Kế tiếp |
+| N · O | Cổng người dân: lớp bản đồ dạng chip, bản tin + 3 chuyên đề cột phải, các màn N2–N19 · Nhiệm vụ: đã cứu, chi viện, mất mạng, hết hiệu lực (O2–O5) | Kế tiếp |
