@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import {
-  AlertTriangle, CheckSquare, ChevronDown, ChevronUp, CloudRain, Columns2, Compass, FileDown, FileSpreadsheet, FileText, Home, LayoutDashboard, LifeBuoy,
+  AlertTriangle, CheckSquare, ChevronDown, ChevronLeft, ChevronUp, CloudRain, Columns2, Compass, FileDown, FileSpreadsheet, FileText, Home, LayoutDashboard, LifeBuoy,
   Minimize2, Monitor, Mountain, Pause, Play, RefreshCw, Send, Server, Waves, X,
 } from 'lucide-react';
 import { useAreaQuery, useUnits } from '../api/hooks';
@@ -24,6 +24,8 @@ import { riverState, StationPicker } from '../components/dashboard/RiverKpi';
 import SituationBar from '../components/dashboard/SituationBar';
 import SituationSummary, { LevelHint } from '../components/dashboard/SituationSummary';
 import SituationPanel from '../components/dashboard/SituationPanel';
+import TopicKpis from '../components/dashboard/TopicKpis';
+import CommuneTable from '../components/dashboard/CommuneTable';
 import { forecastTitle, hydroTitle, landslideTitle, rainTitle, suppliesTitle } from '../components/dashboard/chartTitles';
 import ConnectionBanner from '../components/dashboard/ConnectionBanner';
 import TacticalMiniMap, { buildHotspots } from '../components/dashboard/TacticalMiniMap';
@@ -237,7 +239,8 @@ export default function Dashboard() {
     if (u) setFilter({ codes: [u.code], label: unitLabel(u), presetCode: null }, { remember });
   };
   const setTab = (id) => {
-    if (id === 'cap_xa' && !communeCode && scopeUnits.length) enterCommune(scopeUnits[0].code, false);
+    // Máy tính 3 cột (cấp tỉnh): thẻ Cấp xã mở bảng các xã (bấm dòng mới vào chi tiết) — không tự chọn xã đầu tiên
+    if (id === 'cap_xa' && !communeCode && scopeUnits.length && (!desk || isCommuneUser)) enterCommune(scopeUnits[0].code, false);
     if (tab === 'cap_xa' && id !== 'cap_xa') clearFilter();
     setParams((prev) => {
       const next = new URLSearchParams(prev);
@@ -253,7 +256,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (tab !== 'cap_xa' || communeInit.current || !scopeUnits.length) return;
     communeInit.current = true;
-    if (!communeCode) enterCommune(scopeUnits[0].code, false);
+    if (!communeCode && (!desk || isCommuneUser)) enterCommune(scopeUnits[0].code, false);
   }, [tab, scopeUnits.length]); // eslint-disable-line react-hooks/exhaustive-deps -- chỉ chọn sẵn 1 lần khi mở thẻ xã
 
   // Chọn trạm (ô KPI mực nước, bảng tác chiến) → mở & cuộn tới biểu đồ thủy văn của trạm đó
@@ -821,17 +824,29 @@ export default function Dashboard() {
                 </div>
               )}
             </div>
-          ) : otherTabs}
+          ) : tab === 'cap_xa' && !isCommuneUser && !communeCode ? (
+            <CommuneTable units={scopeUnits} onPick={(code) => enterCommune(code)} />
+          ) : (
+            <>
+              {tab === 'cap_xa' && !isCommuneUser && (
+                <button type="button" onClick={clearFilter} className="btn-ghost tap self-start px-3">
+                  <ChevronLeft size={15} aria-hidden="true" /> Tất cả xã / phường
+                </button>
+              )}
+              {(tab === 'mua_lon' || tab === 'sat_lo') && <TopicKpis tab={tab} k={k} />}
+              {otherTabs}
+            </>
+          )}
         </section>
 
         <aside aria-label="Nhật ký sự kiện" className={clsx('sheet flex min-h-0 flex-col gap-3 p-[18px]', sideW)}>
           <div className="flex items-center justify-between gap-2">
-            <h2 className="text-[15px] font-bold text-ink">{tab === 'cap_xa' ? 'Nhật ký sự kiện của xã' : 'Nhật ký sự kiện'}</h2>
+            <h2 className="text-[15px] font-bold text-ink">{tab === 'cap_xa' && communeCode ? 'Nhật ký sự kiện của xã' : 'Nhật ký sự kiện'}</h2>
             {wsStatus === 'online'
               ? <span className="shrink-0 whitespace-nowrap text-xs text-muted">Tự cập nhật</span>
               : <span className="shrink-0 whitespace-nowrap text-xs font-semibold text-warn">Mất kết nối — đang thử lại</span>}
           </div>
-          <EventLog className="min-h-0 flex-1" limit={tab === 'cap_xa' ? 40 : 60} />
+          <EventLog className="min-h-0 flex-1" limit={tab === 'cap_xa' && communeCode ? 40 : 60} />
         </aside>
         {modals}
       </div>
