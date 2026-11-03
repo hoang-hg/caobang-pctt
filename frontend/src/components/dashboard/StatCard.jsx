@@ -22,14 +22,37 @@ const TILE = {
  * `trend`: mũi tên xu hướng ở góc phải hàng tiêu đề (TrendTag) — ô gọn không cần thêm một hàng nhãn.
  * Số đổi (số liệu mới về) → số hiện lên nhẹ một lần (tắt khi hệ điều hành bật "giảm chuyển động").
  * `footerRows`: chân ô gọn là vài dòng ngắn, mỗi dòng tự cắt phần chữ thừa — bỏ giới hạn 1–2 dòng của câu ngữ cảnh thường.
+ * `chip` (máy tính ≥ 1280 px — bản vẽ desktop: hàng chip đầu trang Cảnh báo, Vật tư…): viên tròn "● số đơn vị · tên ô"; chấm
+ * màu chỉ khi mức ≥ Vàng; câu ngữ cảnh (footer) đọc qua title / tên đọc màn hình. Vẫn là nút / liên kết như ô thường.
  */
 export default function StatCard({
   icon: Icon, title, badge, aside, trend, value, unit, footer, footerRows = false, level, alert, className, children, compact = false,
-  onClick, to, hint,
+  onClick, to, hint, chip = false,
 }) {
   const scale = level === undefined ? null : risk(level);
   const Tag = to ? Link : onClick ? 'button' : 'div';
   const tagProps = to ? { to } : onClick ? { type: 'button', onClick } : {};
+  if (chip) {
+    const footerText = typeof footer === 'string' ? footer : '';
+    return (
+      <Tag
+        {...tagProps}
+        title={[footerText, hint].filter(Boolean).join(' — ') || undefined}
+        aria-label={`${title}: ${value}${unit ? ` ${unit}` : ''}${footerText ? ` — ${footerText}` : ''}`}
+        className={clsx(
+          'tap flex h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-transparent bg-panel px-4 text-sm text-ink-2 shadow-[0_6px_20px_rgb(15_23_42/0.08)] transition-colors dark:border-line',
+          (to || onClick) && 'hover:border-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
+          alert && 'ring-2 ring-danger',
+          className,
+        )}
+      >
+        {level >= 1 && <span className={clsx('h-2.5 w-2.5 shrink-0 rounded-full', scale.fill)} aria-hidden="true" />}
+        <b className={clsx('num font-bold', level >= 2 ? scale.text : 'text-ink')}>{value}</b>
+        {unit && <span>{unit}</span>}
+        <span className="text-muted">· {title}</span>
+      </Tag>
+    );
+  }
   const badgeEl = badge && <span className={clsx('shrink-0', alert && 'motion-safe:animate-blink-text')}>{badge}</span>;
   return (
     <Tag
