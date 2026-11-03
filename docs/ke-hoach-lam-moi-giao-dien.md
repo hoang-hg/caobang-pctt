@@ -493,4 +493,5 @@ Mỗi nhóm một PR (lint + build + ảnh chụp đối chiếu bản vẽ ở 
 | K1 | Hướng dẫn xử lý ≥ 1280 px (khung K): cột trái dính — vai trò + "Bạn đang gặp việc gì?" dạng danh sách; các bước từng việc ở cột phải (đủ mọi việc để in, chạm việc thì cuộn tới), nút In ở đầu cột phải; bỏ tiêu đề trang | Xong (K1) |
 | J · K (tiếp) | Phân quyền khung con (J2–J12) · Hướng dẫn cấp xã (K2) | Kế tiếp |
 | L · M | Đăng nhập & tài khoản (L1–L8b) · Trạng thái chung (M1–M5) | Kế tiếp |
-| N · O | Cổng người dân (N1–N19) · Nhiệm vụ trưởng nhóm (O1–O5) | Kế tiếp |
+| N1 | Cổng người dân ≥ 1280 px (khung N1): trang trải hết bề ngang; chuyên mục lên thanh trên (tên cổng 2 dòng, Gọi 112 viền đỏ + Gửi yêu cầu 44 px, Bản nhẹ dạng chữ); Bản đồ cảnh báo 3 cột — "Bạn muốn làm gì?" + ô cứu nạn khẩn cấp · bản đồ · bảng chú thích / cảnh báo / mưa | Xong (N1) |
+| N · O | Cổng người dân: lớp bản đồ dạng chip, bản tin + 3 chuyên đề cột phải, các màn N2–N19 · Nhiệm vụ trưởng nhóm (O1–O5) | Kế tiếp |
