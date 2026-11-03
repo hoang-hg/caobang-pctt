@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { Columns3, Home, Inbox, List, Maximize2, Minimize2, Navigation } from 'lucide-react';
+import { ChevronRight, Columns3, Home, Inbox, List, Maximize2, Minimize2, Navigation, RefreshCw } from 'lucide-react';
 import { api } from '../api/client';
 import { useAreaQuery, useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
@@ -368,6 +368,35 @@ export default function RescueCenter() {
       />
       <ConnectionBanner updatedAt={ticketsQ.dataUpdatedAt || null} />
 
+      {/* Máy tính ≥ 1280 px (bản vẽ desktop khung C): không tiêu đề trang / 4 ô lớn — hàng chip chỉ số + "Bản đồ cứu hộ ›",
+          gợi ý, làm mới; bảng điều phối chiếm phần còn lại */}
+      {wide ? (
+        <div className="flex flex-wrap items-center gap-2.5 no-print">
+          <h1 className="sr-only">Điều hành cứu hộ — {scopeLabel}</h1>
+          <RescueKpis chips ticketsQ={ticketsQ} tickets={tickets} factsOf={factsOf} evacQ={evacQ} onGo={go} onEvac={() => scrollTo(document.getElementById('so-tan'))} />
+          <span className="flex-1" />
+          <RoleTips page="cuu-ho" compact />
+          <button
+            type="button"
+            onClick={() => setOverviewOpen((v) => !v)}
+            aria-expanded={overviewOpen}
+            className="btn-secondary tap h-11 rounded-xl px-4"
+            title="Bản đồ cứu hộ (phiếu đang mở, lộ trình đội, vùng nguy cơ, điểm sơ tán) và diễn biến 48 giờ"
+          >
+            Bản đồ cứu hộ <ChevronRight size={15} className={clsx('transition-transform', overviewOpen && 'rotate-90')} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={refresh}
+            disabled={refreshing}
+            className="btn-secondary tap-sq h-11 w-11 rounded-xl p-0"
+            aria-label="Làm mới số liệu"
+            title={`Làm mới — số liệu lúc ${dataTime || '…'} · hạn phản hồi: cấp 1 Đỏ 3 phút · cấp 2 Cam 15 phút · cấp 3 Vàng 60 phút`}
+          >
+            <RefreshCw size={16} className={clsx(refreshing && 'animate-spin')} aria-hidden="true" />
+          </button>
+        </div>
+      ) : (
       <PageHeader
         tips={<RoleTips page="cuu-ho" />}
         title="Điều hành cứu hộ"
@@ -379,13 +408,17 @@ export default function RescueCenter() {
         refreshing={refreshing}
       />
 
-      <RescueKpis ticketsQ={ticketsQ} tickets={tickets} factsOf={factsOf} evacQ={evacQ} onGo={go} onEvac={() => scrollTo(document.getElementById('so-tan'))} />
+      )}
+
+      {!wide && <RescueKpis ticketsQ={ticketsQ} tickets={tickets} factsOf={factsOf} evacQ={evacQ} onGo={go} onEvac={() => scrollTo(document.getElementById('so-tan'))} />}
 
       {/* Lãnh đạo nắm tình hình: bản đồ cứu hộ (phiếu đang mở, lộ trình + giờ dự kiến tới của đội, vùng nguy cơ, điểm sơ tán) và diễn biến
           48 giờ (phiếu theo mức, thời gian xử lý) — cùng danh sách phiếu với bảng điều phối; thu gọn được */}
+      {/* Máy tính ≥ 1280 px: chỉ hiện khi bấm "Bản đồ cứu hộ" ở hàng chip (không còn thanh gập thường trực) */}
+      {(!wide || overviewOpen) && (
       <Section
         title="Bản đồ cứu hộ & diễn biến 48 giờ"
-        collapsible
+        collapsible={!wide}
         open={overviewOpen}
         onToggle={() => setOverviewOpen((v) => !v)}
         className="no-print scroll-mt-28"
@@ -397,6 +430,7 @@ export default function RescueCenter() {
           </div>
         )}
       </Section>
+      )}
 
       <FilterToolbar
         fields={FILTERS}

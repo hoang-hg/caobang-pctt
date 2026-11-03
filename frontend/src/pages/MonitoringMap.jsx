@@ -120,10 +120,24 @@ export default function MonitoringMap() {
   // ?cong-cu=khoanh (từ "Vẽ vùng trên bản đồ" của form soạn cảnh báo): mở sẵn công cụ khoanh đa giác
   const [tool, setTool] = useState(() => (new URLSearchParams(window.location.search).get('cong-cu') === 'khoanh' ? 'polygon' : null)); // measure | route | polygon | circle | incident
   const [offset, setOffset] = useState(0);
-  // Bảng "Bộ lọc" (chế độ xem, lớp, nền — DESIGN.md phương án B): mở sẵn từ 1536 px; laptop gập sẵn để bản đồ thoáng
-  const [leftOpen, setLeftOpen] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 1536);
-  const [rightOpen, setRightOpen] = useState(true); // bảng cảnh báo (Tình hình, Điểm nóng) mở sẵn — chỉ huy thấy ngay
+  // Máy tính ≥ 1280 px — bản vẽ desktop (khung B, B2, B6): bảng "Bộ lọc" mở sẵn bên trái (chế độ xem · thiên tai · nền ·
+  // lớp chi tiết gập sẵn), chip chỉ số khẩn giữa trên, bảng cảnh báo gập thành nút "Danh mục cảnh báo", thanh thời gian
+  // trái dưới, chú giải phải dưới. 1024 – 1279 px giữ bố cục cũ (bảng cảnh báo mở sẵn — chỗ cho chip không đủ)
+  const desk = useMediaQuery('(min-width: 1280px)');
+  const [leftOpen, setLeftOpen] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 1280);
+  const [rightOpen, setRightOpen] = useState(() => typeof window === 'undefined' || window.innerWidth < 1280);
+  const [layersOpen, setLayersOpen] = useState(false); // máy tính: danh sách lớp chi tiết trong bảng Bộ lọc
   const [legendOpen, setLegendOpen] = useState(false);
+  // Chiều cao thật của cụm chú giải góc phải dưới (máy tính ≥ 1280 px) — bảng cảnh báo chừa đúng chỗ này
+  const legendRef = useRef(null);
+  const [legendH, setLegendH] = useState(0);
+  useEffect(() => {
+    const el = legendRef.current;
+    if (!el) return undefined;
+    const ro = new ResizeObserver(() => setLegendH(el.offsetHeight));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [desk]);
   // Chiều cao thật của thanh thời gian (thu gọn / mở rộng / có dòng giải thích / màn cảm ứng): cột phải và khung nhìn bản đồ
   // chừa đúng chỗ này — chừa số cố định thì thanh đè lên bảng Cảnh báo
   const timeBarRef = useRef(null);
@@ -354,14 +368,14 @@ export default function MonitoringMap() {
   const mapPad = useMemo(() => {
     if (!wide) return { topLeft: [12, 12], bottomRight: [12, 12] };
     return {
-      topLeft: [leftOpen ? 290 : 20, toolsOpen ? 60 : 16],
-      bottomRight: [rightOpen ? 350 : 20, timeBarH + 24],
+      topLeft: [leftOpen ? 320 : 20, toolsOpen || desk ? 64 : 16],
+      bottomRight: [rightOpen ? 350 : 20, (desk ? Math.max(timeBarH, legendH) : timeBarH) + 24],
     };
-  }, [wide, leftOpen, rightOpen, toolsOpen, timeBarH]);
+  }, [wide, desk, leftOpen, rightOpen, toolsOpen, timeBarH, legendH]);
   // Popup tự kéo bản đồ cho lọt khung: chừa thanh công cụ / chế độ xem (trên), bảng lớp, bảng cảnh báo (hai bên), thanh thời
   // gian (dưới); điện thoại chừa cột nút Công cụ / Chú giải bên phải
   const popupPad = wide
-    ? { autoPanPaddingTopLeft: [leftOpen ? 300 : 16, toolsOpen ? 76 : 40], autoPanPaddingBottomRight: [rightOpen ? 350 : 16, timeBarH + 24] }
+    ? { autoPanPaddingTopLeft: [leftOpen ? 330 : 16, toolsOpen || desk ? 76 : 40], autoPanPaddingBottomRight: [rightOpen ? 350 : 16, (desk ? Math.max(timeBarH, legendH) : timeBarH) + 24] }
     : { autoPanPaddingTopLeft: [12, 12], autoPanPaddingBottomRight: [76, 12] };
 
   const setAllLayers = (val) => {
@@ -468,17 +482,21 @@ export default function MonitoringMap() {
       <h1 className="sr-only">Bản đồ giám sát</h1>
       {/* 0. Thông tin khẩn luôn trên cùng: dải tình huống (cùng số với Dashboard) + mất mạng / không cập nhật được */}
       <div className="shrink-0">
+        {/* Máy tính ≥ 1024 px không còn dải khẩn (quyết định của chủ dự án 03/11/2026): chỉ số khẩn ở chip giữa trên / bảng
+            cảnh báo; điện thoại, máy tính bảng giữ dải */}
         {kQ.data && (
-          <SituationBar
-            compact
-            k={kQ.data}
-            waterStations={waterStations}
-            stationsError={stationsQ.isError && !stationsQ.data}
-            rainKnown={kQ.data?.rain?.avg_24h != null}
-            canSos={canSos}
-            canImportStations={canImportStations}
-            canSystem={canSystem}
-          />
+          <div className="lg:hidden">
+            <SituationBar
+              compact
+              k={kQ.data}
+              waterStations={waterStations}
+              stationsError={stationsQ.isError && !stationsQ.data}
+              rainKnown={kQ.data?.rain?.avg_24h != null}
+              canSos={canSos}
+              canImportStations={canImportStations}
+              canSystem={canSystem}
+            />
+          </div>
         )}
         <div className="px-2 pt-2 empty:hidden">
           <ConnectionBanner updatedAt={dataTime} />
@@ -531,6 +549,118 @@ export default function MonitoringMap() {
 
         {wide ? (
           <>
+            {desk ? (
+              <>
+                {/* Máy tính ≥ 1280 px (bản vẽ khung B): bảng Bộ lọc mở sẵn — chế độ xem, 3 nhóm thiên tai (bật / tắt cả nhóm lớp),
+                    nền bản đồ, lớp chi tiết gập sẵn. Đáy chừa thanh thời gian (trái dưới) */}
+                <div className="pointer-events-none absolute left-3 top-3 z-[1000] flex flex-col items-start" style={{ bottom: timeBarH + 44 }}>
+                  {leftOpen ? (
+                    <aside aria-label="Bộ lọc" className={clsx(floatCard, 'pointer-events-auto flex max-h-full w-[19rem] flex-col overflow-hidden')}>
+                      <div className="flex items-center justify-between gap-2 px-4 pb-1 pt-3.5">
+                        <h2 className="text-[15px] font-bold text-ink">Bộ lọc</h2>
+                        <button type="button" onClick={() => setLeftOpen(false)} className="tap-sq flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-panel2 hover:text-ink" aria-label="Thu gọn Bộ lọc" title="Thu gọn">
+                          <ChevronLeft size={16} aria-hidden="true" />
+                        </button>
+                      </div>
+                      <div className="scroll-thin flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4 pt-2">
+                        <ViewModeSwitch mode={mode} onChange={switchMode} caption canDispatch={canDispatch} help={mapHelp} captionClass="text-xs leading-snug text-ink-2" />
+                        <section aria-label="Thiên tai">
+                          <h3 className="mb-2 text-xs font-bold text-muted">Thiên tai</h3>
+                          <div className="flex flex-col gap-2">
+                            {groups.slice(0, 3).map((g) => {
+                              const on = g.items.every((it) => layers[it.key]);
+                              return (
+                                <button
+                                  key={g.title}
+                                  type="button"
+                                  aria-pressed={on}
+                                  title={`${on ? 'Tắt' : 'Bật'} các lớp ${g.title}: ${g.items.map((it) => it.label).join(', ')}`}
+                                  onClick={() => setLayers((l) => {
+                                    const next = { ...l };
+                                    g.items.forEach((it) => { next[it.key] = !on; });
+                                    return next;
+                                  })}
+                                  className={clsx('tap flex h-11 items-center rounded-xl px-3.5 text-left text-sm transition-colors', on ? 'bg-accent font-semibold text-white' : 'border border-line bg-panel text-ink hover:bg-panel2')}
+                                >
+                                  {g.title}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </section>
+                        <label className="flex flex-col gap-2">
+                          <span className="text-xs font-bold text-muted">Bản đồ nền</span>
+                          {basemapSelect('input tap h-11 rounded-xl bg-panel text-sm')}
+                        </label>
+                        <section aria-label="Lớp dữ liệu chi tiết">
+                          <button
+                            type="button"
+                            onClick={() => setLayersOpen((o) => !o)}
+                            aria-expanded={layersOpen}
+                            className="tap flex h-11 w-full items-center justify-between rounded-xl border border-line px-3.5 text-sm font-semibold text-ink hover:bg-panel2"
+                          >
+                            <span className="flex items-center gap-2"><Layers size={16} className="text-accent" aria-hidden="true" /> Lớp dữ liệu chi tiết</span>
+                            <ChevronDown size={15} className={clsx('text-muted transition-transform', layersOpen && 'rotate-180')} aria-hidden="true" />
+                          </button>
+                          {layersOpen && (
+                            <div className="mt-2 flex flex-col gap-2">
+                              <div className="flex justify-end">{layerActions}</div>
+                              {layerList}
+                            </div>
+                          )}
+                        </section>
+                      </div>
+                    </aside>
+                  ) : (
+                    <button
+                      type="button"
+                      className={clsx(floatCard, 'pointer-events-auto flex h-11 items-center gap-1.5 px-3.5 text-sm font-semibold text-ink-2 hover:bg-panel2')}
+                      onClick={() => setLeftOpen(true)}
+                      aria-expanded={false}
+                      aria-label="Bộ lọc — Lớp dữ liệu, nền bản đồ"
+                    >
+                      <Layers size={16} className="text-accent" aria-hidden="true" /> Bộ lọc
+                    </button>
+                  )}
+                </div>
+                {/* Phải dưới: thang màu mưa dự báo / radar, chú giải (bản vẽ khung B) — nút phóng to / thu nhỏ ở mép phải */}
+                <div ref={legendRef} className="pointer-events-none absolute bottom-3 right-14 z-[1000] flex flex-col items-end gap-2">
+                  {legendOpen && (
+                    <div className={clsx(floatCard, 'scroll-thin pointer-events-auto max-h-[min(28rem,calc(100vh-14rem))] min-h-0 w-[19rem] overflow-y-auto p-3')}>
+                      <MapLegend layers={layers} order={LAYER_ORDER} rain={rain} rainNote={rainNote} radarNote={radarNote} />
+                    </div>
+                  )}
+                  {!legendOpen && layers.radar && (
+                    <div className={clsx(floatCard, 'pointer-events-auto w-[18rem] p-3 text-xs')}>
+                      <div className="font-bold text-ink">Radar mưa</div>
+                      <p className={clsx('mb-1', !radarFrame && 'text-muted')}>{radarNote}</p>
+                      {radarFrame && <RadarScale />}
+                    </div>
+                  )}
+                  {!legendOpen && layers.forecast && (
+                    <div className={clsx(floatCard, 'pointer-events-auto w-[18rem] p-3 text-xs')}>
+                      {rain ? (
+                        <>
+                          <div className="mb-1.5 font-bold text-ink">{rain.title}</div>
+                          <RainBar bins={rain.bins} unit={rain.hourly ? 'mm/giờ' : 'mm'} />
+                        </>
+                      ) : (
+                        <p className="text-muted">{rainNote}</p>
+                      )}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    className={clsx(floatCard, 'pointer-events-auto flex min-h-[36px] items-center gap-1.5 px-3 text-xs font-semibold text-ink-2 hover:bg-panel2 [@media(pointer:coarse)]:min-h-[44px]')}
+                    onClick={() => setLegendOpen((o) => !o)}
+                    aria-expanded={legendOpen}
+                  >
+                    <Info size={14} className="text-accent" aria-hidden="true" /> {legendOpen ? 'Ẩn chú giải' : 'Chú giải'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
             {/* Cột trái: bảng lớp dữ liệu (trên; thu gọn: chỉ còn nút có chữ) + thẻ thang màu radar / mưa dự báo, chú giải (dưới).
                 Chung một cột để bảng lớp tự co lại (cuộn) phía trên các thẻ — không để thẻ đè lên cuối danh sách lớp */}
             <div className="pointer-events-none absolute bottom-9 left-3 top-3 z-[1000] flex flex-col items-start gap-2">
@@ -607,11 +737,13 @@ export default function MonitoringMap() {
                 <Info size={14} className="text-accent" aria-hidden="true" /> {legendOpen ? 'Ẩn chú giải' : 'Chú giải'}
               </button>
             </div>
+              </>
+            )}
 
             {/* Phải: công cụ bản đồ (góc phải trên) xếp ngay cạnh bảng Cảnh báo khẩn cấp — cùng một hàng, tự nhường chỗ */}
             {/* Đáy chừa đúng chiều cao thanh thời gian (đo thật — timeBarH) + khe 8 px: bảng Cảnh báo không bị thanh đè */}
             {/* …và chừa cả cụm nút phóng to / thu nhỏ góc phải dưới (trước đây bảng che mất nút "+") */}
-            <div className="pointer-events-none absolute right-3 top-3 z-[1000] flex items-start gap-2" style={{ bottom: Math.max(timeBarH + 20, coarse ? 136 : 104) }}>
+            <div className="pointer-events-none absolute right-3 top-3 z-[1000] flex items-start gap-2" style={{ bottom: Math.max((desk ? legendH : timeBarH) + 20, coarse ? 136 : 104) }}>
               <div className="pointer-events-auto flex flex-col items-end gap-2">
                 {!toolsOpen && !tool ? (
                   <button
@@ -666,17 +798,25 @@ export default function MonitoringMap() {
                     type="button"
                     className={clsx(
                       floatCard,
-                      'flex h-10 items-center justify-center gap-2 rounded-xl px-3.5 text-xs font-bold text-danger shadow-md hover:bg-panel2 transition [@media(pointer:coarse)]:h-11',
+                      'flex items-center justify-center gap-2 rounded-xl px-3.5 text-xs font-bold text-danger shadow-md hover:bg-panel2 transition [@media(pointer:coarse)]:h-11',
+                      desk ? 'h-11 px-4' : 'h-10',
                     )}
                     onClick={() => setRightOpen(true)}
                     aria-expanded={false}
-                    aria-label="Mở bảng cảnh báo khẩn cấp"
-                    title="Mở bảng cảnh báo khẩn cấp"
+                    aria-label={desk ? 'Danh mục cảnh báo — mở bảng cảnh báo khẩn cấp' : 'Mở bảng cảnh báo khẩn cấp'}
+                    title="Mở bảng cảnh báo khẩn cấp: tình hình, điểm nóng, diễn biến, phiếu SOS, cảm biến"
                   >
-                    <Siren size={16} className="text-danger motion-safe:animate-pulse" aria-hidden="true" />
-                    <span>Cảnh báo</span>
+                    {/* Máy tính ≥ 1280 px (bản vẽ khung B): nút trắng "Danh mục cảnh báo ›" — số khẩn đã ở chip giữa trên */}
+                    {desk ? (
+                      <span className="text-sm font-semibold text-ink">Danh mục cảnh báo</span>
+                    ) : (
+                      <>
+                        <Siren size={16} className="text-danger motion-safe:animate-pulse" aria-hidden="true" />
+                        <span>Cảnh báo</span>
+                      </>
+                    )}
                     {alertCount > 0 && <span className="chip bg-danger text-white text-[11px] font-bold px-1.5 py-px">{alertCount}</span>}
-                    <ChevronLeft size={14} className="text-muted ml-0.5" />
+                    {desk ? <ChevronRight size={15} className="text-muted" aria-hidden="true" /> : <ChevronLeft size={14} className="text-muted ml-0.5" />}
                   </button>
                 ) : (
                   <div className={clsx(floatCard, 'flex h-full w-[22rem] flex-col overflow-hidden')}>
@@ -706,14 +846,14 @@ export default function MonitoringMap() {
               </div>
             </div>
 
-            {/* Giữa phía trên: chip chỉ số khẩn (từ mức Vàng) — giữa bảng Bộ lọc và bảng Cảnh báo khẩn cấp; từ 1536 px (laptop:
-                chip tràn đè nút Công cụ và điểm trên bản đồ — CI 29/10/2026; 6 chỉ số đã có ở bảng bên phải) */}
-            <div className="pointer-events-none absolute left-1/2 top-3 z-[999] hidden w-[calc(100%-54rem)] -translate-x-1/2 justify-center 2xl:flex">
-              <MapStatusChips {...kpiProps} />
+            {/* Giữa phía trên: chip chỉ số khẩn (từ mức Vàng) — giữa bảng Bộ lọc và bảng Cảnh báo khẩn cấp. Máy tính ≥ 1280 px khi
+                bảng cảnh báo đang gập (bản vẽ khung B); bảng mở thì từ 1536 px (laptop: chip tràn đè nút Công cụ — CI 29/10/2026) */}
+            <div className={clsx('pointer-events-none absolute left-1/2 top-3 z-[999] hidden -translate-x-1/2 justify-center 2xl:flex', rightOpen ? 'w-[calc(100%-54rem)]' : 'w-[calc(100%-46rem)] xl:flex')}>
+              <MapStatusChips {...kpiProps} compact={desk && !rightOpen} />
             </div>
 
-            {/* Thanh thời gian – Đáy, giữa; căn giữa và tự co giãn vừa vặn */}
-            <div ref={timeBarRef} className={clsx(floatCard, 'absolute bottom-3 left-1/2 -translate-x-1/2 z-[1000] w-fit max-w-[min(640px,calc(100%-25rem))] px-4 py-2 transition duration-200')}>
+            {/* Thanh thời gian: máy tính ≥ 1280 px ở góc trái dưới (bản vẽ khung B, chú giải ở góc phải dưới); 1024 – 1279 px giữa đáy */}
+            <div ref={timeBarRef} className={clsx(floatCard, 'absolute bottom-3 z-[1000] w-fit px-4 py-2 transition duration-200', desk ? 'left-3 !bottom-8 max-w-[min(640px,calc(100%-24rem))]' : 'left-1/2 max-w-[min(640px,calc(100%-25rem))] -translate-x-1/2')}>
               <TimeControl offset={offset} setOffset={setOffset} touch={coarse} />
             </div>
           </>

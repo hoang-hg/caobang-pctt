@@ -12,7 +12,8 @@ const GRID = 'grid grid-cols-2 gap-2 lg:grid-cols-4 [&>*]:min-w-0';
  * kênh — kênh chưa tích hợp thì nói thẳng "chỉ trên cổng công khai", không hiện tỉ lệ giả. Tính từ cùng danh sách lệnh của
  * dải khẩn. Chạm ô → cuộn tới khối tương ứng (`onGo`).
  */
-export default function AlertKpis({ query, broadcasts, factsOf, onGo }) {
+// `chips`: máy tính ≥ 1280 px (bản vẽ desktop khung D) — 4 chỉ số thành hàng chip tròn (StatCard chip), vẫn bấm được
+export default function AlertKpis({ query, broadcasts, factsOf, onGo, chips = false }) {
   if (!query.data) {
     return query.isError
       ? <ErrorState height={96} onRetry={query.refetch}>Không tải được danh sách lệnh cảnh báo</ErrorState>
@@ -39,8 +40,9 @@ export default function AlertKpis({ query, broadcasts, factsOf, onGo }) {
   const tot = Object.values(byCh).reduce((m, c) => ({ target: m.target + c.target, delivered: m.delivered + c.delivered }), { target: 0, delivered: 0 });
 
   return (
-    <div className={GRID} role="group" aria-label="Chỉ số cảnh báo">
+    <div className={chips ? 'flex min-w-0 flex-wrap items-center gap-2.5' : GRID} role="group" aria-label="Chỉ số cảnh báo">
       <StatCard
+        chip={chips}
         compact
         footerRows
         icon={Megaphone}
@@ -54,6 +56,7 @@ export default function AlertKpis({ query, broadcasts, factsOf, onGo }) {
         hint="Cảnh báo đã duyệt, còn hạn hiệu lực (đang hiện cho người dân), mức nặng nhất tô màu ô — chạm để xem"
       />
       <StatCard
+        chip={chips}
         compact
         footerRows
         icon={ShieldCheck}
@@ -68,6 +71,7 @@ export default function AlertKpis({ query, broadcasts, factsOf, onGo }) {
         hint={`Lệnh đã soạn, chờ lãnh đạo ký duyệt bằng PIN — tin chưa tới người dân; chờ quá ${LONG_WAIT_MIN} phút thì ô nhấp nháy`}
       />
       <StatCard
+        chip={chips}
         compact
         footerRows
         icon={Users}
@@ -80,6 +84,7 @@ export default function AlertKpis({ query, broadcasts, factsOf, onGo }) {
       />
       {portal > 0 || !tot.target ? (
         <StatCard
+        chip={chips}
           compact
           footerRows
           icon={Send}
@@ -94,6 +99,7 @@ export default function AlertKpis({ query, broadcasts, factsOf, onGo }) {
         />
       ) : (
         <StatCard
+        chip={chips}
           compact
           footerRows
           icon={Send}

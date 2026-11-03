@@ -383,6 +383,7 @@ async function staff(ctx, trackCode) {
       await page.getByRole('region', { name: 'Lớp dữ liệu bản đồ' }).waitFor({ timeout: 5_000 });
       await page.keyboard.press('Escape');
     } else {
+      await openAlertsPanel(page);
       await page.getByText('Cảnh báo khẩn cấp').first().waitFor({ timeout: 10_000 });
       await page.getByRole('button', { name: 'Chú giải' }).click();
       await page.getByText(/Thang màu rủi ro/).first().waitFor({ timeout: 5_000 });
@@ -1023,6 +1024,7 @@ async function managerMap(ctx, layout) {
     await page.locator('button[type="submit"]').click();
     await page.waitForURL(/\/dashboard/, { timeout: 20_000 });
     await page.goto(`${ROOT}/ban-do`);
+    if (!vp.mobile) await page.locator('.leaflet-container').waitFor({ timeout: 20_000 }).then(() => openAlertsPanel(page));
     await kpis.waitFor({ timeout: 20_000 });
     await page.locator('.leaflet-marker-pane .leaflet-marker-icon').first().waitFor({ timeout: 20_000 });
     await page.waitForTimeout(800);
@@ -1222,6 +1224,12 @@ const freeTriangle = (page, k) => page.evaluate((half) => {
   }
   throw new Error('bản đồ không còn chỗ trống để bấm');
 }, k);
+
+/** Máy tính ≥ 1280 px (bản vẽ desktop khung B): bảng Cảnh báo khẩn cấp gập sẵn thành nút "Danh mục cảnh báo" — mở ra. */
+async function openAlertsPanel(page) {
+  const btn = page.locator('button[aria-label^="Danh mục cảnh báo"]');
+  if (await btn.count()) await btn.first().click();
+}
 
 async function mapTools(ctx, phone) {
   const { page } = ctx;
@@ -1458,6 +1466,7 @@ async function mapLayers(ctx, phone) {
   // Thiết kế B.1 "Bảng cảnh báo khẩn cấp: dòng thời gian cuộn liên tục (feed) các tín hiệu SOS… cảnh báo từ cảm biến"
   await step(ctx, 'Diễn biến: mới nhất trên cùng, lọc theo loại; sự kiện mới đến khi đang cuộn → "N mục mới", không nhảy; chạm mục → bay tới', async () => {
     if (phone) await page.getByRole('navigation', { name: 'Thao tác nhanh' }).getByRole('button', { name: /^Cảnh báo/ }).click();
+    else await openAlertsPanel(page); // máy tính ≥ 1280 px: bảng cảnh báo gập sẵn
     await visible(page.getByRole('button', { name: 'Diễn biến', exact: true })).click();
     const log = visible(page.getByRole('log', { name: 'Diễn biến, mới nhất trên cùng' }));
     await log.locator('li').first().waitFor({ timeout: 15_000 });
@@ -1621,13 +1630,15 @@ async function resourcesPage(ctx) {
     await loginAs(page, STAFF);
     await page.goto(`${ROOT}/nguon-luc`);
     await kpis.getByRole('button').first().waitFor({ timeout: 20_000 });
-    await strip.waitFor({ timeout: 20_000 });
+    // Máy tính ≥ 1024 px không còn dải khẩn (quyết định của chủ dự án 03/11/2026 — bản vẽ desktop mọi trang)
+    const stripShown = await page.evaluate(() => innerWidth < 1024);
+    if (stripShown) await strip.waitFor({ timeout: 20_000 });
     await rows.first().waitFor({ timeout: 20_000 });
     const m = await page.evaluate(() => {
       const box = (sel) => document.querySelector(sel)?.getBoundingClientRect();
       const tabBtns = [...document.querySelectorAll('[aria-label="Danh mục nguồn lực"] > button')].map((b) => b.getBoundingClientRect());
       return {
-        stripAbove: box('[aria-label="Thông tin khẩn về nguồn lực"]').top < box('[aria-label="Chỉ số nguồn lực"]').top,
+        stripAbove: innerWidth >= 1024 || box('[aria-label="Thông tin khẩn về nguồn lực"]').top < box('[aria-label="Chỉ số nguồn lực"]').top,
         kpi: document.querySelectorAll('[aria-label="Chỉ số nguồn lực"] > button').length,
         tabs: tabBtns.length,
         tabsOut: tabBtns.filter((t) => t.right > innerWidth + 1 || t.left < -1).length,
@@ -1637,7 +1648,7 @@ async function resourcesPage(ctx) {
     if (m.kpi !== 4) throw new Error(`có ${m.kpi} ô chỉ số (cần 4, bấm được)`);
     if (m.tabs !== 3 || m.tabsOut) throw new Error(`${m.tabs} thẻ, ${m.tabsOut} thẻ tràn khỏi màn hình`);
     await expectNoOverflow(ctx, '/nguon-luc');
-    return (await strip.innerText()).replace(/\s+/g, ' ').slice(0, 80);
+    return stripShown ? (await strip.innerText()).replace(/\s+/g, ' ').slice(0, 80) : 'máy tính: không dải khẩn';
   });
 
   // Chỉnh giao diện cho người mới (thiết kế C): mở trang thấy ngay "Cần bổ sung / cần sửa" — mỗi kho thiếu một câu + một nút
@@ -1682,8 +1693,8 @@ async function resourcesPage(ctx) {
     await page.waitForURL((u) => u.toString() === before, { timeout: 5_000 });
     // Mục đầu của dải khẩn (nếu có): mở đúng thẻ
     const chip = strip.locator('button[title$="mở danh sách đã lọc"]').first();
-    let chipNote = 'dải khẩn không có mục';
-    if (await chip.count()) {
+    let chipNote = 'dải khẩn không có mục (hoặc máy tính — không dải khẩn)';
+    if (await chip.count() && await chip.isVisible()) {
       await chip.click();
       await page.waitForURL(/tab=/);
       chipNote = `mục khẩn → ${new URL(page.url()).search}`;
@@ -1950,12 +1961,12 @@ async function rescuePage(ctx) {
     await loginAs(page, STAFF);
     await page.goto(`${ROOT}/cuu-ho`);
     await kpis.getByRole('button').first().waitFor({ timeout: 20_000 });
-    await strip.waitFor({ timeout: 20_000 });
+    if (await page.evaluate(() => innerWidth < 1024)) await strip.waitFor({ timeout: 20_000 }); // máy tính: không dải khẩn
     const m = await page.evaluate(() => {
       const box = (sel) => document.querySelector(sel)?.getBoundingClientRect();
       const tabs = [...document.querySelectorAll('[aria-label="Cột của bảng điều phối"] > button')].map((b) => b.getBoundingClientRect());
       return {
-        stripAbove: box('[aria-label="Thông tin khẩn cứu hộ"]').top < box('[aria-label="Chỉ số cứu hộ"]').top,
+        stripAbove: innerWidth >= 1024 || box('[aria-label="Thông tin khẩn cứu hộ"]').top < box('[aria-label="Chỉ số cứu hộ"]').top,
         kpi: document.querySelectorAll('[aria-label="Chỉ số cứu hộ"] > button').length,
         columns: document.querySelectorAll('main section[aria-label*=" phiếu"]').length,
         tabs: tabs.length,
@@ -2402,6 +2413,8 @@ async function communeHome(ctx) {
   });
   await step(ctx, `Bản đồ — tài khoản phường ${WARD.name}: nhãn "Tình hình · Phường ${WARD.name}", không ghi Toàn tỉnh`, async () => {
     await page.goto(`${ROOT}/ban-do`);
+    await page.locator('.leaflet-container').waitFor({ timeout: 20_000 });
+    await openAlertsPanel(page); // máy tính ≥ 1280 px: bảng cảnh báo (6 chỉ số Tình hình) gập sẵn
     const box = page.locator('[aria-label^="Tình hình · "]').first();
     await box.waitFor({ state: 'attached', timeout: 20_000 });
     const label = await box.getAttribute('aria-label');
@@ -2435,7 +2448,7 @@ async function alertsPage(ctx) {
       const box = (sel) => document.querySelector(sel)?.getBoundingClientRect();
       const tabs = [...document.querySelectorAll('[aria-label="Phần của trang Cảnh báo"] > button')].map((b) => b.getBoundingClientRect());
       return {
-        stripAbove: (box('[aria-label="Thông tin khẩn cảnh báo"]')?.top ?? Infinity) < box('[aria-label="Chỉ số cảnh báo"]').top,
+        stripAbove: innerWidth >= 1024 || (box('[aria-label="Thông tin khẩn cảnh báo"]')?.top ?? Infinity) < box('[aria-label="Chỉ số cảnh báo"]').top,
         kpi: document.querySelectorAll('[aria-label="Chỉ số cảnh báo"] > button').length,
         tabs: tabs.length,
         tabsOut: tabs.filter((t) => t.right > innerWidth + 1 || t.left < -1).length,
