@@ -1630,13 +1630,15 @@ async function resourcesPage(ctx) {
     await loginAs(page, STAFF);
     await page.goto(`${ROOT}/nguon-luc`);
     await kpis.getByRole('button').first().waitFor({ timeout: 20_000 });
-    await strip.waitFor({ timeout: 20_000 });
+    // Máy tính ≥ 1024 px không còn dải khẩn (quyết định của chủ dự án 03/11/2026 — bản vẽ desktop mọi trang)
+    const stripShown = await page.evaluate(() => innerWidth < 1024);
+    if (stripShown) await strip.waitFor({ timeout: 20_000 });
     await rows.first().waitFor({ timeout: 20_000 });
     const m = await page.evaluate(() => {
       const box = (sel) => document.querySelector(sel)?.getBoundingClientRect();
       const tabBtns = [...document.querySelectorAll('[aria-label="Danh mục nguồn lực"] > button')].map((b) => b.getBoundingClientRect());
       return {
-        stripAbove: box('[aria-label="Thông tin khẩn về nguồn lực"]').top < box('[aria-label="Chỉ số nguồn lực"]').top,
+        stripAbove: innerWidth >= 1024 || box('[aria-label="Thông tin khẩn về nguồn lực"]').top < box('[aria-label="Chỉ số nguồn lực"]').top,
         kpi: document.querySelectorAll('[aria-label="Chỉ số nguồn lực"] > button').length,
         tabs: tabBtns.length,
         tabsOut: tabBtns.filter((t) => t.right > innerWidth + 1 || t.left < -1).length,
@@ -1646,7 +1648,7 @@ async function resourcesPage(ctx) {
     if (m.kpi !== 4) throw new Error(`có ${m.kpi} ô chỉ số (cần 4, bấm được)`);
     if (m.tabs !== 3 || m.tabsOut) throw new Error(`${m.tabs} thẻ, ${m.tabsOut} thẻ tràn khỏi màn hình`);
     await expectNoOverflow(ctx, '/nguon-luc');
-    return (await strip.innerText()).replace(/\s+/g, ' ').slice(0, 80);
+    return stripShown ? (await strip.innerText()).replace(/\s+/g, ' ').slice(0, 80) : 'máy tính: không dải khẩn';
   });
 
   // Chỉnh giao diện cho người mới (thiết kế C): mở trang thấy ngay "Cần bổ sung / cần sửa" — mỗi kho thiếu một câu + một nút
@@ -1691,8 +1693,8 @@ async function resourcesPage(ctx) {
     await page.waitForURL((u) => u.toString() === before, { timeout: 5_000 });
     // Mục đầu của dải khẩn (nếu có): mở đúng thẻ
     const chip = strip.locator('button[title$="mở danh sách đã lọc"]').first();
-    let chipNote = 'dải khẩn không có mục';
-    if (await chip.count()) {
+    let chipNote = 'dải khẩn không có mục (hoặc máy tính — không dải khẩn)';
+    if (await chip.count() && await chip.isVisible()) {
       await chip.click();
       await page.waitForURL(/tab=/);
       chipNote = `mục khẩn → ${new URL(page.url()).search}`;
@@ -1959,12 +1961,12 @@ async function rescuePage(ctx) {
     await loginAs(page, STAFF);
     await page.goto(`${ROOT}/cuu-ho`);
     await kpis.getByRole('button').first().waitFor({ timeout: 20_000 });
-    await strip.waitFor({ timeout: 20_000 });
+    if (await page.evaluate(() => innerWidth < 1024)) await strip.waitFor({ timeout: 20_000 }); // máy tính: không dải khẩn
     const m = await page.evaluate(() => {
       const box = (sel) => document.querySelector(sel)?.getBoundingClientRect();
       const tabs = [...document.querySelectorAll('[aria-label="Cột của bảng điều phối"] > button')].map((b) => b.getBoundingClientRect());
       return {
-        stripAbove: box('[aria-label="Thông tin khẩn cứu hộ"]').top < box('[aria-label="Chỉ số cứu hộ"]').top,
+        stripAbove: innerWidth >= 1024 || box('[aria-label="Thông tin khẩn cứu hộ"]').top < box('[aria-label="Chỉ số cứu hộ"]').top,
         kpi: document.querySelectorAll('[aria-label="Chỉ số cứu hộ"] > button').length,
         columns: document.querySelectorAll('main section[aria-label*=" phiếu"]').length,
         tabs: tabs.length,
@@ -2446,7 +2448,7 @@ async function alertsPage(ctx) {
       const box = (sel) => document.querySelector(sel)?.getBoundingClientRect();
       const tabs = [...document.querySelectorAll('[aria-label="Phần của trang Cảnh báo"] > button')].map((b) => b.getBoundingClientRect());
       return {
-        stripAbove: (box('[aria-label="Thông tin khẩn cảnh báo"]')?.top ?? Infinity) < box('[aria-label="Chỉ số cảnh báo"]').top,
+        stripAbove: innerWidth >= 1024 || (box('[aria-label="Thông tin khẩn cảnh báo"]')?.top ?? Infinity) < box('[aria-label="Chỉ số cảnh báo"]').top,
         kpi: document.querySelectorAll('[aria-label="Chỉ số cảnh báo"] > button').length,
         tabs: tabs.length,
         tabsOut: tabs.filter((t) => t.right > innerWidth + 1 || t.left < -1).length,

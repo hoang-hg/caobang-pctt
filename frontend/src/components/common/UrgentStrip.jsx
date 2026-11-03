@@ -6,6 +6,8 @@ import { risk } from '../../utils/risk';
 import { EDGE, EDGE_PAD } from '../layout/page';
 
 /**
+ * Máy tính ≥ 1024 px: ẨN (quyết định của chủ dự án 03/11/2026 — bản vẽ desktop mọi trang không còn dải khẩn; số SOS chờ ở nút
+ * đỏ thanh trên, chỉ số ở hàng ô / chip của trang). Điện thoại, máy tính bảng:
  * Dải thông tin khẩn đầu trang — dùng chung (Vật tư & Lực lượng, Điều hành cứu hộ…), cùng kiểu dải tình huống của Tổng
  * quan: luôn ở trên cùng; mức Cam / Đỏ là dải màu DÍNH trên cùng khi cuộn, điện thoại gọn 1 hàng (mục nặng nhất với nhãn
  * ngắn + "+N"), máy tính 3 mục; mức Vàng là khung vàng.
@@ -53,7 +55,7 @@ export default function UrgentStrip({ label, items, action, calm, gray, failed =
     return (
       <div
         className={clsx(
-          'sticky top-0 z-30 flex items-center gap-2 py-1.5 text-xs shadow-lg sm:justify-between sm:py-2 print:static',
+          'sticky top-0 z-30 flex items-center lg:hidden gap-2 py-1.5 text-xs shadow-lg sm:justify-between sm:py-2 print:static',
           bleed,
           EDGE_PAD,
           risk(worst).chip,
@@ -118,7 +120,7 @@ export default function UrgentStrip({ label, items, action, calm, gray, failed =
 
   if (worst === 1) {
     return (
-      <div className={clsx('card flex flex-wrap items-center gap-2 px-3 py-2 text-xs text-ink', risk(1).soft)} role="status" aria-label={label}>
+      <div className={clsx('card flex flex-wrap items-center gap-2 px-3 py-2 text-xs text-ink lg:hidden', risk(1).soft)} role="status" aria-label={label}>
         <AlertTriangle size={15} className="shrink-0 text-warn" aria-hidden="true" />
         <b className="text-warn">Theo dõi:</b>
         {items.map((it) => {
@@ -144,7 +146,7 @@ export default function UrgentStrip({ label, items, action, calm, gray, failed =
   const grayState = failed.length > 0 || !calm;
   return (
     <div
-      className={clsx('flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2 text-xs', grayState ? 'border-dashed border-line text-muted' : 'border-line bg-panel text-ink-2')}
+      className={clsx('flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2 text-xs lg:hidden', grayState ? 'border-dashed border-line text-muted' : 'border-line bg-panel text-ink-2')}
       role="status"
       aria-label={label}
     >
