@@ -172,7 +172,7 @@ export default function DisasterEvents() {
         <div className="grid items-start gap-5 grid-cols-[300px_minmax(0,1fr)]">
           <aside aria-label="Các đợt" className="sheet sticky top-0 flex flex-col gap-3 p-[18px]">
             <div className="flex items-center justify-between gap-2">
-              <h2 className="text-[15px] font-bold text-ink">Các đợt thiên tai</h2>
+              <div className="text-[15px] font-bold text-ink">Các đợt thiên tai</div>{/* không h2: tiêu đề h2 đầu tiên của trang là tên đợt trong báo cáo */}
               <button type="button" onClick={refresh} disabled={refreshing} className="btn-ghost tap-sq h-8 w-8 p-0" aria-label="Làm mới" title={area.admin_codes ? 'Làm mới — số liệu theo vùng đang lọc' : 'Làm mới'}>
                 <RefreshCw size={14} className={clsx(refreshing && 'animate-spin')} aria-hidden="true" />
               </button>
