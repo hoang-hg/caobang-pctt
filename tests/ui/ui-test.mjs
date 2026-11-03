@@ -686,6 +686,12 @@ async function staff(ctx, trackCode) {
     await waitMain(page);
     // Phản ánh vừa gửi ở bước cổng công khai (nếu có), không thì phản ánh chờ duyệt đầu tiên
     const code = trackCode?.replace(/-[A-Z]{6}$/, '');
+    // Máy tính ≥ 1280 px (bản vẽ khung F): danh sách – chi tiết — chọn phản ánh ở cột trái trước, chi tiết (thẻ) hiện bên phải
+    const rows = page.getByRole('list', { name: 'Các phản ánh' });
+    if (await rows.count()) {
+      const row = code ? rows.getByRole('button', { name: new RegExp(code) }).first() : rows.getByRole('button').first();
+      if (await row.count()) await row.click();
+    }
     const card = code ? page.locator('.card', { hasText: code }).first() : page.locator('.card', { hasText: 'Chờ duyệt' }).first();
     const approve = visible(card.getByRole('button', { name: 'Duyệt công khai' }));
     await approve.waitFor({ timeout: READONLY ? 5_000 : 15_000 }).catch((e) => { if (!READONLY) throw e; });
