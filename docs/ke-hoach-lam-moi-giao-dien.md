@@ -491,5 +491,6 @@ Mỗi nhóm một PR (lint + build + ảnh chụp đối chiếu bản vẽ ở 
 | J1 | Phân quyền ≥ 1280 px (khung J): 3 ô giải thích cấp xếp dọc ở cột trái ("Cấp N" + tên, ô cấp của bạn viền nhấn, câu "chỉ cấp trên…"), bảng tài khoản bên phải; bỏ tiêu đề trang — "Bạn: …" + gợi ý ở hàng thẻ | Xong (J1) |
 | K1 | Hướng dẫn xử lý ≥ 1280 px (khung K): cột trái dính — vai trò + "Bạn đang gặp việc gì?" dạng danh sách; các bước từng việc ở cột phải (đủ mọi việc để in, chạm việc thì cuộn tới), nút In ở đầu cột phải; bỏ tiêu đề trang | Xong (K1) |
 | J · K (tiếp) | Phân quyền khung con (J2–J12) · Hướng dẫn cấp xã (K2) | Kế tiếp |
-| L · M | Đăng nhập & tài khoản (L1–L8b) · Trạng thái chung (M1–M5) | Kế tiếp |
+| L1 | Đăng nhập ≥ 1280 px (khung L1): biểu trưng "ĐIỀU HÀNH PCTT / Tỉnh Cao Bằng" (cùng chữ thanh trên — mọi trang dùng BrandLockup), tiêu đề + việc chính ngay dưới, hình ranh giới tỉnh mờ phía dưới; bỏ "hồ" khỏi câu giới thiệu (ngoài phạm vi theo dõi) | Xong (L1) |
+| L · M | Đăng nhập: các bước 2 lớp, quên / đổi mật khẩu, menu tài khoản (L1b–L8b) · Trạng thái chung (M1–M5) | Kế tiếp |
 | N · O | Cổng người dân (N1–N19) · Nhiệm vụ trưởng nhóm (O1–O5) | Kế tiếp |
