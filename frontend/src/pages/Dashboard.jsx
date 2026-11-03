@@ -621,7 +621,7 @@ export default function Dashboard() {
             aria-selected={tab === t.id}
             onClick={() => setTab(t.id)}
             title={desk && badge ? `${t.label}: ${badge.text}` : undefined}
-            className={clsx('tab-item tap', desk && 'min-h-[44px]', tab === t.id && 'tab-item-on')}
+            className={clsx('tab-item tap', desk && 'min-h-[44px] px-3', tab === t.id && 'tab-item-on')}
           >
             {!desk && <t.icon size={15} aria-hidden="true" />} {t.label}
             {badge && (desk ? (
@@ -762,20 +762,20 @@ export default function Dashboard() {
           onShowWorst={showWorst}
           onPresent={enterPresentation}
           exports={exportItems}
+          hint={<LevelHint />}
         />
 
         <section aria-label="Nội dung tổng quan" className="scroll-thin -m-1 flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-1">
           <ConnectionBanner updatedAt={kQ.dataUpdatedAt || null} />
           {loadError}
-          <div className="flex flex-wrap items-center gap-2">
-            {tabsBar}
-            <span className="flex-1" />
+          {/* Một hàng: thanh thẻ co lại (cuộn ngang nếu thiếu chỗ — tài khoản quản trị có thêm thẻ Hệ thống), nút công cụ giữ nguyên */}
+          <div className="flex items-center gap-2 [&>*:not(:first-child)]:shrink-0">
+            <div className="min-w-0 flex-1">{tabsBar}</div>
             {isFiltered && tab !== 'cap_xa' && (
               <button type="button" onClick={clearFilter} className="btn-ghost tap h-9 px-2.5 text-xs" title={`Đang xem: ${filterLabel} — bấm để xem toàn bộ phạm vi`}>
                 <X size={13} aria-hidden="true" /> Bỏ lọc
               </button>
             )}
-            <LevelHint />
             <RoleTips page="tong-quan" compact />
             <button type="button" onClick={refresh} disabled={refreshing} className="btn-secondary tap-sq h-9 min-w-[36px] px-2.5" aria-label="Làm mới số liệu" title="Làm mới số liệu">
               <RefreshCw size={15} className={clsx(refreshing && 'animate-spin')} aria-hidden="true" />

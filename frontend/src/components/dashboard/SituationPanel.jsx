@@ -17,7 +17,7 @@ import { situationSentence } from './SituationBar';
  * Thay cho dải khẩn trên máy tính (chủ dự án bỏ dải khẩn ở ≥ 1024 px ngày 03/11/2026).
  */
 export default function SituationPanel({
-  k, kState, waterStations, stationsError, hotspots = [], time, link, onShowWorst, onPresent, exports, className,
+  k, kState, waterStations, stationsError, hotspots = [], time, link, onShowWorst, onPresent, exports, hint, className,
 }) {
   const s = k ? situationSentence(k, waterStations, { stationsError }) : null;
   const worst = hotspots[0]?.level >= 2 ? hotspots[0] : null;
@@ -27,8 +27,11 @@ export default function SituationPanel({
       aria-label="Tình hình"
       className={clsx('dark flex min-h-0 flex-col gap-4 overflow-y-auto rounded-[18px] bg-[#0B1A33] p-5 text-white shadow-[0_10px_30px_rgb(15_23_42/0.14)] scroll-thin', className)}
     >
-      <div className="text-[11px] font-bold uppercase tracking-[.04em] text-[#A9B6CC]">
-        Tình hình{time ? <> · số liệu lúc <span className="num">{time}</span></> : kState?.error ? ' · chưa tải được số liệu' : ' · đang tải…'}
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-[11px] font-bold uppercase tracking-[.04em] text-[#A9B6CC]">
+          Tình hình{time ? <> · số liệu lúc <span className="num">{time}</span></> : kState?.error ? ' · chưa tải được số liệu' : ' · đang tải…'}
+        </div>
+        {hint /* nút "?" giải thích mức báo động và thang màu */}
       </div>
       {s ? (
         <div role="status" aria-live="polite" aria-label="Tóm tắt tình hình">
