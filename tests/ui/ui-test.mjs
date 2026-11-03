@@ -2843,6 +2843,12 @@ async function areaFilter(ctx) {
   // một xã người dùng không chọn bám theo mọi trang
   await step(ctx, 'Bộ lọc địa phương: xã do thẻ "Cấp xã" tự chọn sẵn không được nhớ qua tải lại', async () => {
     await page.goto(`${ROOT}/dashboard?tab=cap_xa`);
+    // Máy tính ≥ 1280 px (bản vẽ desktop, khung A7): thẻ Cấp xã của cấp tỉnh là bảng các xã — không tự chọn xã nào
+    if (page.viewportSize().width >= 1280) {
+      await page.getByRole('region', { name: 'Các xã, phường' }).locator('tbody tr').first().waitFor({ timeout: 15_000 });
+      if (!/Toàn tỉnh/.test(await trig.innerText())) throw new Error(`mở thẻ Cấp xã đã tự lọc "${(await trig.innerText()).trim()}"`);
+      return 'máy tính: bảng các xã, không tự chọn xã';
+    }
     await page.waitForFunction(() => !/Toàn tỉnh/.test(document.querySelector('header button[title="Lọc dữ liệu theo địa phương"]')?.innerText || 'Toàn tỉnh'), null, { timeout: 15_000 });
     const auto = (await trig.innerText()).trim();
     await page.goto(`${ROOT}/cuu-ho`);
