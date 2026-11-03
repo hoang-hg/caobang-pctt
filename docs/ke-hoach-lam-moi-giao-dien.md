@@ -481,7 +481,8 @@ Mỗi nhóm một PR (lint + build + ảnh chụp đối chiếu bản vẽ ở 
 | C (tiếp) | Bảng điều phối cột nền xám + thẻ gọn, hàng lọc một dòng (C); điều đội 3 bước (C2–C2c), chi tiết / sửa / đóng / chuyển phiếu (C3, C5, C13), nhận tin (C6), đội đã đến · huỷ lệnh · chi viện · link nhiệm vụ (C7, C8, C11, C14), sơ tán (C9–C10, C15), nền tối | Kế tiếp |
 | D1 | Cảnh báo ≥ 1280 px (khung D): cột trái "Cảnh báo khẩn cấp & Hotline" — các phần (Phát cảnh báo · Lịch sử lệnh · Danh bạ & Tổng đài · Nhật ký pháp lý), "Bản đồ vùng cảnh báo", quy tắc hai người, gợi ý, làm mới; bên phải hàng chip 4 chỉ số (StatCard chip — dùng chung) rồi nội dung phần: soạn lệnh giữa, chờ duyệt / đang hiệu lực cột phải 380 px | Xong (D1) |
 | D (tiếp) | Soạn lệnh bước 2–3 (D2, D3), duyệt PIN / trả lại (D4, D4b), lịch sử, gia hạn, danh bạ, mẫu tin, nhật ký, bản đồ vùng (D5–D10) | Kế tiếp |
-| E | Vật tư & Lực lượng (E–E8) | Kế tiếp |
+| E1 | Vật tư ≥ 1280 px (khung E): 2 cột — nội dung (4 ô chỉ số, thẻ Lực lượng / Kho / Phương tiện + gợi ý, làm mới, danh sách) · "Cần bổ sung / cần sửa" dính cột phải (xếp dọc từng việc); bỏ tiêu đề trang | Xong (E1) |
+| E (tiếp) | Bảng lọc dọc bên trái (khung E), điều động nhanh (E2), nhập / xuất kho (E3, E5, E5b), thẻ kho / phương tiện (E4, E6, E6b), nhiên liệu (E7), sổ kho (E8) | Kế tiếp |
 | F · G | Phản ánh người dân (F–F6) · Đợt thiên tai (G–G4) | Kế tiếp |
 | H · I | Nhập dữ liệu (H–H8) · Nguồn dữ liệu (I–I8) | Kế tiếp |
 | J · K | Phân quyền (J–J12) · Hướng dẫn xử lý (K, K2) | Kế tiếp |

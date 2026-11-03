@@ -19,7 +19,8 @@ const lower = (s) => (s ? s.charAt(0).toLowerCase() + s.slice(1) : s);
  * sách đã lọc). Việc nặng lên đầu; không có việc → không hiện khối (dải khẩn trên cùng đã nói "chưa ghi nhận").
  * `scope`: { receive, issue, vehicle } — mã xã ghi được (null = toàn tỉnh).
  */
-export default function ResourceTodo({ warehouses, vehicles, factsOf, scope, online, onReceive, onIssue, onVehicle, onShow }) {
+// `narrow`: cột phải hẹp của máy tính ≥ 1280 px (bản vẽ desktop khung E) — mỗi việc xếp dọc: câu việc, rồi thanh mức + nút
+export default function ResourceTodo({ warehouses, vehicles, factsOf, scope, online, onReceive, onIssue, onVehicle, onShow, narrow = false }) {
   const [open, setOpen] = useState(false);
   const can = (codes, code) => codes === null || (codes || []).includes(code);
   const items = [];
@@ -81,14 +82,14 @@ export default function ResourceTodo({ warehouses, vehicles, factsOf, scope, onl
   const shown = open ? items : items.slice(0, HEAD);
 
   return (
-    <section className="card p-3 sm:p-4" aria-labelledby="can-bo-sung">
+    <section className={narrow ? 'sheet p-4' : 'card p-3 sm:p-4'} aria-labelledby="can-bo-sung">
       <h2 id="can-bo-sung" className="card-title">
         <ClipboardList size={16} className="shrink-0 text-accent" aria-hidden="true" />
         Cần bổ sung / cần sửa <span className="num font-normal text-muted">· {items.length} việc</span>
       </h2>
       <ul className="mt-2 flex flex-col divide-y divide-line/60" aria-label="Việc cần bổ sung, sửa chữa">
         {shown.map((it) => (
-          <li key={it.key} className="flex flex-col gap-2 py-2 sm:flex-row sm:items-center sm:gap-3">
+          <li key={it.key} className={narrow ? 'flex flex-col gap-2 py-2.5' : 'flex flex-col gap-2 py-2 sm:flex-row sm:items-center sm:gap-3'}>
             <span className="flex min-w-0 flex-1 items-start gap-3 text-sm text-ink">
               {/* Ô biểu tượng loại việc (kho thiếu, sắp hết hạn, xe hỏng, thiếu nhiên liệu), màu theo mức */}
               <span className={clsx('inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg', TILE[it.level])} title={risk(it.level).meaning} aria-hidden="true">
@@ -109,7 +110,7 @@ export default function ResourceTodo({ warehouses, vehicles, factsOf, scope, onl
             </span>
             <button
               type="button"
-              className={clsx(BTN, 'self-end sm:self-auto')}
+              className={clsx(BTN, narrow ? 'self-end' : 'self-end sm:self-auto')}
               onClick={it.action.onClick}
               disabled={!online && it.action.label !== 'Xem'}
               title={!online && it.action.label !== 'Xem' ? 'Mất mạng — chưa ghi được' : undefined}
