@@ -383,6 +383,7 @@ async function staff(ctx, trackCode) {
       await page.getByRole('region', { name: 'Lớp dữ liệu bản đồ' }).waitFor({ timeout: 5_000 });
       await page.keyboard.press('Escape');
     } else {
+      await openAlertsPanel(page);
       await page.getByText('Cảnh báo khẩn cấp').first().waitFor({ timeout: 10_000 });
       await page.getByRole('button', { name: 'Chú giải' }).click();
       await page.getByText(/Thang màu rủi ro/).first().waitFor({ timeout: 5_000 });
@@ -1023,6 +1024,7 @@ async function managerMap(ctx, layout) {
     await page.locator('button[type="submit"]').click();
     await page.waitForURL(/\/dashboard/, { timeout: 20_000 });
     await page.goto(`${ROOT}/ban-do`);
+    if (!vp.mobile) await page.locator('.leaflet-container').waitFor({ timeout: 20_000 }).then(() => openAlertsPanel(page));
     await kpis.waitFor({ timeout: 20_000 });
     await page.locator('.leaflet-marker-pane .leaflet-marker-icon').first().waitFor({ timeout: 20_000 });
     await page.waitForTimeout(800);
@@ -1222,6 +1224,12 @@ const freeTriangle = (page, k) => page.evaluate((half) => {
   }
   throw new Error('bản đồ không còn chỗ trống để bấm');
 }, k);
+
+/** Máy tính ≥ 1280 px (bản vẽ desktop khung B): bảng Cảnh báo khẩn cấp gập sẵn thành nút "Danh mục cảnh báo" — mở ra. */
+async function openAlertsPanel(page) {
+  const btn = page.locator('button[aria-label^="Danh mục cảnh báo"]');
+  if (await btn.count()) await btn.first().click();
+}
 
 async function mapTools(ctx, phone) {
   const { page } = ctx;

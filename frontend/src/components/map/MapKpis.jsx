@@ -189,7 +189,8 @@ export default function MapKpis({ k, kState, stations, layout, onPick, pickable 
  * danh sách, bay tới các điểm. Không có chỉ số nào từ mức Vàng → không hiện gì (bảng Tình hình vẫn đủ 6 chỉ số). Chỉ màn
  * ≥ 1536 px (MonitoringMap): hẹp hơn thì chip đè nút Công cụ và điểm trên bản đồ.
  */
-export function MapStatusChips({ k, stations, onPick, pickable = {}, className }) {
+// `compact` (máy tính ≥ 1280 px, bản vẽ khung B): chip gọn "● số · tên" — câu phụ (quá hạn, nặng nhất…) ở title / lời đọc
+export function MapStatusChips({ k, stations, onPick, pickable = {}, className, compact = false }) {
   if (!k) return null;
   const hot = kpiTiles(k, stations)
     .filter((t) => t.level >= 1)
@@ -206,7 +207,7 @@ export function MapStatusChips({ k, stations, onPick, pickable = {}, className }
             <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: scale.hex }} aria-hidden="true" />
             <span className="text-muted">{t.short}</span>
             <b className="num text-ink">{t.value}</b>
-            {t.sub && <span className={clsx('max-w-[11rem] truncate', t.level >= 2 ? scale.text : 'text-ink-2', t.alert && 'font-semibold')}>{t.sub}</span>}
+            {t.sub && !compact && <span className={clsx('max-w-[11rem] truncate', t.level >= 2 ? scale.text : 'text-ink-2', t.alert && 'font-semibold')}>{t.sub}</span>}
           </>
         );
         const cls = 'float-panel pointer-events-auto flex min-h-[40px] items-center gap-1.5 rounded-full px-3.5 text-[13px] [@media(pointer:coarse)]:min-h-[44px]';

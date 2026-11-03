@@ -474,7 +474,8 @@ Mỗi nhóm một PR (lint + build + ảnh chụp đối chiếu bản vẽ ở 
 | A | Tổng quan ≥ 1280 px: 3 cột vừa một màn hình — cột **Tình hình** xanh đêm (câu tóm tắt, Nguy hiểm nhất, Việc chờ quyết định, Trình chiếu · Xuất) · cột giữa (thẻ chỉ chữ + chấm mức, 6 ô số 3 × 2, khối **Điểm nóng · Biểu đồ · Bảng số liệu** với lọc Tất cả / Cam trở lên / Đỏ) · **Nhật ký sự kiện**; thẻ "Hệ thống & dữ liệu" → "Hệ thống" | Xong (A1) |
 | A2 | Hàng 3 ô số riêng thẻ Mưa lớn (mưa trung bình 24 giờ · xã có thể mưa rất to · dự báo 3 ngày) và Sạt lở, lũ quét (điểm cấm đường · cảm biến vượt ngưỡng · xã vượt ngưỡng mưa sạt lở) — A4, A5; thẻ Cấp xã của cấp tỉnh = bảng các xã nặng nhất lên đầu, tìm xã, bấm dòng vào chi tiết xã (A7) | Xong (A2) |
 | A (tiếp) | Tổng quan của cán bộ xã (A11); nhật ký đầy đủ dạng ngăn phải (A16); trình chiếu (A2); menu Xuất, báo cáo văn bản, báo cáo nhanh 3 bước, chọn địa bàn, kết quả tìm địa điểm | Kế tiếp |
-| B | Bản đồ giám sát (B–B10) | Kế tiếp |
+| B1 | Bản đồ ≥ 1280 px (khung B, B2, B6): bỏ dải khẩn; bảng **Bộ lọc** mở sẵn — chế độ xem, 3 nút thiên tai (bật / tắt cả nhóm lớp), nền bản đồ, "Lớp dữ liệu chi tiết" gập sẵn; chip chỉ số khẩn gọn giữa trên; bảng cảnh báo gập thành nút "Danh mục cảnh báo" (mở ra vẫn đủ 6 chỉ số Tình hình + Điểm nóng · Diễn biến · Phiếu SOS · Cảm biến); thanh thời gian trái dưới, chú giải phải dưới. 1024 – 1279 px giữ bố cục cũ | Xong (B1) |
+| B (tiếp) | Khung con: khoanh vùng → cảnh báo (B3), đánh dấu / kết thúc sự cố (B4, B10), bản tin bão (B5), tìm đường (B7), chi tiết trạm (B8), bấm điểm (B9), nền tối (B-tối) | Kế tiếp |
 | C | Điều hành cứu hộ (C–C15) | Kế tiếp |
 | D | Cảnh báo & Hotline (D–D10) | Kế tiếp |
 | E | Vật tư & Lực lượng (E–E8) | Kế tiếp |
