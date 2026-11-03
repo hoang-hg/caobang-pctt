@@ -224,7 +224,8 @@ export default function Alerts() {
       <ConnectionBanner updatedAt={bq.dataUpdatedAt || null} />
 
       {desk ? (
-        <div className="grid grid-cols-[260px_minmax(0,1fr)] items-start gap-5">
+        // Một khối (section): cột trái có nút "Bản đồ vùng cảnh báo", bản đồ mở ở cột phải — cùng khối với nút mở
+        <section aria-label="Cảnh báo khẩn cấp" className="grid grid-cols-[260px_minmax(0,1fr)] items-start gap-5">
           <aside aria-label="Cảnh báo khẩn cấp & Hotline" className="sheet sticky top-0 flex flex-col gap-4 p-5">
             <h1 className="text-[15px] font-bold text-ink">Cảnh báo khẩn cấp & Hotline</h1>
             <div role="tablist" aria-label="Phần của trang Cảnh báo" className="flex flex-col gap-1">
@@ -242,7 +243,7 @@ export default function Alerts() {
                 </button>
               ))}
             </div>
-            <button type="button" onClick={() => { setTab('phat'); setOverviewOpen((v) => !v); }} aria-expanded={overviewOpen} className="btn-secondary tap h-11 rounded-xl px-4">
+            <button type="button" onClick={() => { setTab('phat'); setOverviewOpen((v) => !v); }} aria-expanded={overviewOpen} aria-label="Bản đồ vùng cảnh báo & chuyển giao" className="btn-secondary tap h-11 rounded-xl px-4">
               Bản đồ vùng cảnh báo <ChevronRight size={15} className={clsx('transition-transform', overviewOpen && 'rotate-90')} aria-hidden="true" />
             </button>
             <div className="text-[13px] leading-normal text-ink-2">
@@ -275,7 +276,7 @@ export default function Alerts() {
             )}
             {tab === 'nhat_ky' && canAudit && <AuditLog />}
           </div>
-        </div>
+        </section>
       ) : (
       <PageHeader
         tips={<RoleTips page="canh-bao" />}
