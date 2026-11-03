@@ -487,6 +487,7 @@ Mỗi nhóm một PR (lint + build + ảnh chụp đối chiếu bản vẽ ở 
 | H1 | Nhập dữ liệu ≥ 1280 px (khung H): danh sách loại dữ liệu luôn ở cột trái (nhóm theo cụm, loại đang chọn tô nhấn, biểu tượng "hiện cho người dân"), quy trình nhập ở giữa; bỏ tiêu đề trang, gợi ý ở hàng thẻ | Xong (H1) |
 | I1 | Nguồn dữ liệu ≥ 1280 px (khung I): bỏ tiêu đề trang — hàng thẻ + "Chỉ Cấp 1 — Quản trị hệ thống" + gợi ý; thẻ nguồn 3 cột | Xong (I1) |
 | H · I (tiếp) | Nhập dữ liệu: cột phải hồ sơ xã chờ duyệt (H), khung con H2–H8 · Nguồn dữ liệu: cột phải thiết bị đo (I), khung con I2–I8 | Kế tiếp |
-| J · K | Phân quyền (J–J12) · Hướng dẫn xử lý (K, K2) | Kế tiếp |
+| J1 | Phân quyền ≥ 1280 px (khung J): 3 ô giải thích cấp xếp dọc ở cột trái ("Cấp N" + tên, ô cấp của bạn viền nhấn, câu "chỉ cấp trên…"), bảng tài khoản bên phải; bỏ tiêu đề trang — "Bạn: …" + gợi ý ở hàng thẻ | Xong (J1) |
+| J · K | Phân quyền khung con (J2–J12) · Hướng dẫn xử lý (K, K2) | Kế tiếp |
 | L · M | Đăng nhập & tài khoản (L1–L8b) · Trạng thái chung (M1–M5) | Kế tiếp |
 | N · O | Cổng người dân (N1–N19) · Nhiệm vụ trưởng nhóm (O1–O5) | Kế tiếp |

@@ -13,6 +13,7 @@ import { canManageAt, GLOBAL } from '../rbac/permissions';
 import { dateTime } from '../utils/format';
 import { PASSWORD_HINT, weakPassword } from './AccountPages';
 import CitizenAccountsTab from './CitizenAccountsTab';
+import { useMediaQuery } from '../utils/useMediaQuery';
 
 const AUDIT_LABEL = {
   'user.create': 'Tạo tài khoản',
@@ -407,6 +408,10 @@ function UsersTab() {
   const [levelFilter, setLevelFilter] = useState('all');
   const [modal, setModal] = useState(null);
   const [busy, setBusy] = useState(false);
+  // Máy tính ≥ 1280 px (bản vẽ desktop khung J): 3 ô giải thích cấp xếp dọc ở cột trái (ô cấp của bạn viền màu nhấn), bảng
+  // tài khoản bên phải
+  const desk = useMediaQuery('(min-width: 1280px)');
+  const myTier = me?.assignments?.[0] ? getTier(me.assignments[0].role)?.level : null;
 
   const shown = users.filter((u) => {
     const text = `${u.full_name} ${u.username} ${u.email || ''} ${u.position || ''} ${u.assignments
@@ -431,23 +436,37 @@ function UsersTab() {
   };
 
   return (
-    <div className="flex flex-col gap-4">
-      <section aria-label="3 cấp tài khoản" className="grid grid-cols-1 gap-3 md:grid-cols-3">
+    <div className={desk ? 'grid grid-cols-[280px_minmax(0,1fr)] items-start gap-5' : 'flex flex-col gap-4'}>
+      <section aria-label="3 cấp tài khoản" className={desk ? 'sheet sticky top-0 flex flex-col gap-3 p-5' : 'grid grid-cols-1 gap-3 md:grid-cols-3'}>
+        {desk && <h2 className="text-[15px] font-bold text-ink">3 cấp, mỗi tài khoản đúng một cấp</h2>}
         {Object.values(TIER_CONFIG).map((t) => (
-          <div key={t.level} className="card flex flex-col gap-1 p-3.5">
-            <h3 className="flex items-center gap-2 font-semibold">
-              <span className="icon-tile h-8 w-8" aria-hidden="true"><t.icon size={16} strokeWidth={1.75} /></span>
-              {t.name} <span className="text-sm font-normal text-muted">· Cấp {t.level}</span>
-            </h3>
+          <div key={t.level} className={desk ? clsx('flex flex-col gap-1 rounded-[14px] p-3.5', t.level === myTier ? 'border-2 border-accent bg-panel' : 'bg-panel2') : 'card flex flex-col gap-1 p-3.5'}>
+            {desk && <div className="text-xs font-bold text-muted">Cấp {t.level}</div>}
+            {desk ? (
+              <h3 className="font-semibold text-ink">{t.name}</h3>
+            ) : (
+              <h3 className="flex items-center gap-2 font-semibold">
+                <span className="icon-tile h-8 w-8" aria-hidden="true"><t.icon size={16} strokeWidth={1.75} /></span>
+                {t.name} <span className="text-sm font-normal text-muted">· Cấp {t.level}</span>
+              </h3>
+            )}
             <p className="text-sm text-ink-2"><b className="font-medium text-ink">Dành cho:</b> {t.who}</p>
             <p className="text-sm text-ink-2"><b className="font-medium text-ink">Làm được:</b> {t.can}</p>
             {t.cannot && <p className="text-sm text-ink-2"><b className="font-medium text-ink">Không:</b> {t.cannot}</p>}
           </div>
         ))}
+        {desk && (
+          <p className="rounded-[14px] border border-dashed border-line p-3 text-[13px] leading-normal text-ink-2">
+            Chỉ cấp trên đổi mật khẩu, mã PIN, xác thực 2 lớp, khoá hoặc đổi cấp của tài khoản cấp dưới — cùng cấp không quản lý nhau.
+          </p>
+        )}
       </section>
-      <p className="-mt-1 text-sm text-ink-2">
-        Mỗi tài khoản đúng một cấp. Chỉ cấp trên đổi mật khẩu, mã PIN, xác thực 2 lớp, khoá hoặc đổi cấp của tài khoản cấp dưới — cùng cấp không quản lý nhau.
-      </p>
+      {!desk && (
+        <p className="-mt-1 text-sm text-ink-2">
+          Mỗi tài khoản đúng một cấp. Chỉ cấp trên đổi mật khẩu, mã PIN, xác thực 2 lớp, khoá hoặc đổi cấp của tài khoản cấp dưới — cùng cấp không quản lý nhau.
+        </p>
+      )}
+      <div className={desk ? 'flex min-w-0 flex-col gap-4' : 'contents'}>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-1 flex-wrap items-center gap-2">
@@ -596,6 +615,7 @@ function UsersTab() {
           <p>{modal.user.full_name} bị đăng xuất trên mọi máy; lần đăng nhập tới dùng mật khẩu như cũ, cấp bắt buộc xác thực 2 lớp thì phải cài lại.</p>
         </Confirm>
       )}
+      </div>
     </div>
   );
 }
@@ -668,20 +688,24 @@ function AuditTab() {
 
 export default function AccessControl() {
   const [tab, setTab] = useState('users');
+  const desk = useMediaQuery('(min-width: 1280px)'); // bản vẽ desktop khung J: không tiêu đề trang
   const mine = useStore((s) => s.auth?.user?.assignments?.[0]);
   const canCitizens = usePermission('citizen', 'view');
   return (
     <div className={`${PAGE} pb-8`}>
-      <PageHeader
-        tips={<RoleTips page="phan-quyen" />}
-        title="Phân quyền & tài khoản"
-        short="Phân quyền"
-        meta={[
-          <span key="ban">Bạn: <b className="font-semibold text-ink-2">{getTier(mine?.role).name}</b>{mine && ` · ${mine.domain_label}`}</span>,
-        ]}
-        description="Ai được làm gì trong hệ thống: 3 cấp, mỗi tài khoản một cấp. Chỉ cấp trên tạo và quản lý tài khoản cấp dưới."
-      />
+      {desk ? <h1 className="sr-only">Phân quyền & tài khoản</h1> : (
+        <PageHeader
+          tips={<RoleTips page="phan-quyen" />}
+          title="Phân quyền & tài khoản"
+          short="Phân quyền"
+          meta={[
+            <span key="ban">Bạn: <b className="font-semibold text-ink-2">{getTier(mine?.role).name}</b>{mine && ` · ${mine.domain_label}`}</span>,
+          ]}
+          description="Ai được làm gì trong hệ thống: 3 cấp, mỗi tài khoản một cấp. Chỉ cấp trên tạo và quản lý tài khoản cấp dưới."
+        />
+      )}
 
+      <div className={desk ? 'flex items-center gap-2 [&>*:not(:first-child)]:shrink-0' : 'contents'}>
       <Tabs
         value={tab}
         onChange={setTab}
@@ -693,6 +717,14 @@ export default function AccessControl() {
           ...(canCitizens ? [{ value: 'citizens', label: 'Tài khoản người dân', short: 'Người dân', icon: UserRound }] : []),
         ]}
       />
+      {desk && (
+        <>
+          <span className="flex-1" />
+          <span className="text-[13px] text-muted">Bạn: <b className="font-semibold text-ink-2">{getTier(mine?.role).name}</b>{mine && ` · ${mine.domain_label}`}</span>
+          <RoleTips page="phan-quyen" compact />
+        </>
+      )}
+      </div>
 
       {tab === 'users' && <UsersTab />}
       {tab === 'roles' && <RolesTab />}
