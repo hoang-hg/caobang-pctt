@@ -1,7 +1,8 @@
-import { useRef, useState } from 'react';
+import { cloneElement, useRef, useState } from 'react';
+import clsx from 'clsx';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { PackageMinus, PackagePlus, Truck } from 'lucide-react';
+import { PackageMinus, PackagePlus, RefreshCw, Truck } from 'lucide-react';
 import { useAreaQuery, useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
 import { EmptyState, ErrorState, Pager, Section, Segmented, Skeleton, Tabs } from '../components/common/ui';
@@ -67,6 +68,7 @@ export default function Resources() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const online = useOnline();
+  const desk = useMediaQuery('(min-width: 1280px)'); // bản vẽ desktop khung E: 2 cột, "Cần bổ sung / cần sửa" bên phải
   const isLg = useMediaQuery('(min-width: 1024px)');
   const filter = useStore((s) => s.filter);
   const setFocus = useStore((s) => s.setFocus);
@@ -315,9 +317,28 @@ export default function Resources() {
   const pager = rows.length > 0 && !pdf && <Pager paged={paged} size={pageSize} onSize={setPageSize} noun={tabInfo.noun} />;
   const dataTime = summaryQ.dataUpdatedAt ? new Date(summaryQ.dataUpdatedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : null;
 
+  const todo = (
+    <ResourceTodo
+      warehouses={warehousesQ.data}
+      vehicles={vehiclesQ.data}
+      factsOf={factsOf}
+      scope={{ receive: receiveCodes, issue: issueCodes, vehicle: vehicleCodes }}
+      online={online}
+      onReceive={setReceive}
+      onIssue={setIssue}
+      onVehicle={setVehicleEdit}
+      onShow={(id, f) => go(id, f)}
+    />
+  );
+
   return (
     // Điện thoại: chừa chỗ cho thanh thao tác nhanh dưới đáy (không che dòng cuối, nút phân trang)
+    // Máy tính ≥ 1280 px (bản vẽ desktop khung E): 2 cột — nội dung (ô chỉ số, thẻ, danh sách) · "Cần bổ sung / cần sửa"
+    // dính bên phải; không tiêu đề trang (gợi ý, làm mới ở hàng thẻ)
     <div className={PAGE}>
+      <div className={desk ? 'grid grid-cols-[minmax(0,1fr)_320px] items-start gap-5' : 'contents'}>
+      {desk && <aside aria-label="Việc cần làm" className="sticky top-0 order-last flex min-w-0 flex-col">{cloneElement(todo, { narrow: true })}</aside>}
+      <div className={desk ? 'flex min-w-0 flex-col gap-4' : 'contents'}>
       {/* Thông tin khẩn luôn trên cùng (Cam / Đỏ dính khi cuộn) + mất mạng */}
       <ResourceAlerts
         items={alerts}
@@ -330,6 +351,7 @@ export default function Resources() {
       />
       <ConnectionBanner updatedAt={summaryQ.dataUpdatedAt || null} />
 
+      {desk ? <h1 className="sr-only">Vật tư & Lực lượng — {scopeLabel}</h1> : (
       <PageHeader
         tips={<RoleTips page="nguon-luc" />}
         title="Vật tư & Lực lượng"
@@ -340,22 +362,13 @@ export default function Resources() {
         onRefresh={refresh}
         refreshing={refreshing}
       />
+      )}
 
       <ResourceKpis summaryQ={summaryQ} warehouses={warehousesQ.data} onGo={(id, f) => go(id, f)} />
 
-      <ResourceTodo
-        warehouses={warehousesQ.data}
-        vehicles={vehiclesQ.data}
-        factsOf={factsOf}
-        scope={{ receive: receiveCodes, issue: issueCodes, vehicle: vehicleCodes }}
-        online={online}
-        onReceive={setReceive}
-        onIssue={setIssue}
-        onVehicle={setVehicleEdit}
-        onShow={(id, f) => go(id, f)}
-      />
+      {!desk && todo}
 
-      <div ref={tabsRef} className="scroll-mt-20">
+      <div ref={tabsRef} className={clsx('scroll-mt-20', desk && 'flex items-center gap-2 [&>*:not(:first-child)]:shrink-0')}>
         <Tabs
           fit
           label="Danh mục nguồn lực"
@@ -365,6 +378,15 @@ export default function Resources() {
             value: t.id, label: t.label, short: t.short, icon: t.icon, count: queries[t.id].data ? searched[t.id].length : undefined, alert: tabAlert(t.id),
           }))}
         />
+        {desk && (
+          <>
+            <span className="flex-1" />
+            <RoleTips page="nguon-luc" compact />
+            <button type="button" onClick={refresh} disabled={refreshing} className="btn-secondary tap-sq h-9 min-w-[36px] px-2.5" aria-label="Làm mới số liệu" title={`Làm mới — số liệu lúc ${dataTime || '…'}, tự cập nhật khi kho xuất, nhập, đội nhận lệnh`}>
+              <RefreshCw size={15} className={clsx(refreshing && 'animate-spin')} aria-hidden="true" />
+            </button>
+          </>
+        )}
       </div>
 
       <FilterToolbar
@@ -446,6 +468,9 @@ export default function Resources() {
           {ledgerOpen && <InventoryLedger warehouse={ledgerWh} onWarehouse={setLedgerWh} known={warehousesQ.data || []} />}
         </Section>
       )}
+
+      </div>
+      </div>
 
       {quick && <QuickDispatch force={quick} onClose={() => setQuick(null)} />}
       <IssueModal warehouse={issue} onClose={() => setIssue(null)} />
