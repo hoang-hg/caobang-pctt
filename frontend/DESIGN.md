@@ -101,12 +101,15 @@ trong bảng lọc là ngoại lệ, chỉ một từ).
 
 ## Layout
 
-- **Khung ứng dụng (máy tính ≥ 1024 px):** MỘT thanh trên cùng cao 56 px — biểu trưng · menu các trang (từ 1280 px đủ 6
-  mục điều hành; 1024–1279 px 4 mục, còn lại trong "Thêm") · "Thêm ▾" (Dữ liệu & báo cáo, Quản trị, Trợ giúp, 112) ·
-  bộ lọc địa bàn · tìm kiếm · Báo cáo nhanh · tài khoản. Không menu trái. Thanh không bao giờ tràn ngang; bộ lọc địa bàn
+- **Khung ứng dụng (máy tính ≥ 1024 px):** MỘT thanh trên cùng cao 68 px, nút / ô 44 px — biểu trưng · menu các trang
+  chỉ chữ, không số đếm (mục không đủ chỗ dồn vào "Thêm") · "Thêm ▾" (Dữ liệu & báo cáo, Quản trị, Trợ giúp, 112) · bộ lọc
+  địa bàn (nhãn gọn "Toàn tỉnh") · tìm kiếm · "Báo cáo nhanh" (viền đỏ) · "N SOS chờ xử lý" (nền đỏ) · tài khoản. Không menu trái. Thanh không bao giờ tràn ngang; bộ lọc địa bàn
   luôn trên thanh.
 - **Điện thoại / máy tính bảng (< 1024 px):** giữ nguyên — nút ☰ mở ngăn menu, thanh thao tác ở đáy (vùng ngón cái).
-- **Dải khẩn:** giữ (quy ước an toàn), một dòng.
+- **Dải khẩn:** máy tính ≥ 1024 px **bỏ** (quyết định của chủ dự án 03/11/2026, theo bản vẽ desktop mọi trang — kế hoạch
+  giao diện mục 15): số SOS chờ ở nút đỏ "N SOS chờ xử lý" trên thanh trên, việc khẩn ở "Việc chờ quyết định" (Tổng quan) và
+  chip trên Bản đồ. Điện thoại / máy tính bảng giữ dải một dòng.
+- **Tổng quan máy tính ≥ 1280 px:** 3 cột vừa một màn hình — Tình hình (xanh đêm) · nội dung thẻ · Nhật ký sự kiện.
 - **Trang có bản đồ:** bản đồ tràn hết phần dưới thanh trên cùng; mọi thứ khác là bảng nổi trắng bo 18 px cách mép 20 px.
 - **Trang dạng danh sách / biểu mẫu:** lề theo `PAGE` (`components/layout/page.js`), khoảng cách 12–16 px giữa khối.
 - Lưới khoảng cách: 4 · 8 · 12 · 16 · 20 · 24 px; vùng chạm cảm ứng ≥ 44 px (`tap`, `tap-sq`, `touch-hit`).

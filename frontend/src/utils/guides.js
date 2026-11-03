@@ -34,7 +34,7 @@ export const PAGE_TIPS = {
       'Người dân báo gặp nạn: bấm "Báo cáo nhanh" (điện thoại: nút đỏ "Báo SOS" ở dưới) để tạo phiếu.',
     ],
     quan_tri: [
-      'Thẻ "Hệ thống & dữ liệu": trạm, nguồn số liệu nào đang lỗi — xử lý ở "Nguồn dữ liệu".',
+      'Thẻ "Hệ thống": trạm, nguồn số liệu nào đang lỗi — xử lý ở "Nguồn dữ liệu".',
       '"Việc chờ quyết định" có hồ sơ xã gửi chờ duyệt: bấm để duyệt hoặc trả lại.',
       'Cán bộ mới, quên mật khẩu, mất máy: vào "Phân quyền" ở cuối menu.',
     ],
@@ -422,7 +422,7 @@ export const SCENARIOS = {
       art: 'mat-mang',
       icon: DatabaseZap,
       title: 'Trạm đo, nguồn dự báo không gửi số liệu',
-      when: 'Thẻ "Hệ thống & dữ liệu" báo lỗi, biểu đồ đứng yên',
+      when: 'Thẻ "Hệ thống" báo lỗi, biểu đồ đứng yên',
       to: '/nguon-du-lieu',
       cta: 'Mở Nguồn dữ liệu',
       steps: [

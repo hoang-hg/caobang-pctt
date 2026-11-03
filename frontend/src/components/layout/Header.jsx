@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Moon, Sun, Volume2, VolumeX, ShieldAlert, Globe, Menu, X } from 'lucide-react';
+import { Moon, Sun, Volume2, VolumeX, ShieldAlert, Globe, Menu, Plus, X } from 'lucide-react';
 import clsx from 'clsx';
 import { useStore } from '../../app/store';
 import { usePermission } from '../../rbac/usePermission';
@@ -39,10 +39,13 @@ export default function Header() {
   const badges = useNavBadges();
   const urgent = badges.sos + badges.alerts;
   const canReport = usePermission('sos', 'create');
+  const canSos = usePermission('sos', 'view');
+  const sosWaiting = badges.sos;
   const [reportOpen, setReportOpen] = useState(false);
 
   return (
-    <header className="no-print sticky top-0 z-[1100] flex h-14 shrink-0 items-center gap-2 border-b border-line bg-panel/95 px-3 backdrop-blur-md">
+    // Máy tính: thanh cao 68 px, nút / ô 44 px như bản vẽ desktop; điện thoại / máy tính bảng giữ 56 px
+    <header className="no-print sticky top-0 z-[1100] flex h-14 shrink-0 items-center gap-2 border-b border-line bg-panel/95 px-3 backdrop-blur-md lg:h-[68px] lg:gap-2.5 lg:px-5">
       {/* Nút mở menu trên Mobile */}
       <button
         className="btn-ghost touch-hit relative p-1.5 lg:hidden text-ink-2"
@@ -78,7 +81,7 @@ export default function Header() {
 
       {/* Tìm kiếm toàn năng: từ 768 px là ô tìm; điện thoại là nút kính lúp (mở hộp tìm toàn màn) đứng cạnh cụm nút bên phải —
           trước đây điện thoại không tìm được gì */}
-      <div className="ml-auto min-w-0 flex-none md:ml-0 md:max-w-sm md:flex-1 lg:w-44 lg:flex-none xl:w-52 2xl:w-72">
+      <div className="ml-auto min-w-0 flex-none md:ml-0 md:max-w-sm md:flex-1 lg:w-40 lg:flex-none xl:w-44 2xl:w-72">
         <OmniSearch />
       </div>
 
@@ -89,17 +92,35 @@ export default function Header() {
         {/* Điều khiển Giả lập tác chiến */}
         {simulationMode && <Suspense fallback={null}><SimulationBar /></Suspense>}
 
+        {/* Bản vẽ desktop (11/2026): "Báo cáo nhanh" là nút viền đỏ, cạnh nút đỏ đặc "N SOS chờ xử lý" — số SOS chờ không còn
+            ở mục menu / dải khẩn (máy tính đã bỏ dải khẩn theo quyết định của chủ dự án 03/11/2026) */}
         {canReport && (
           <button
             type="button"
             onClick={() => setReportOpen(true)}
-            className="btn-danger tap-sq hidden h-9 min-w-[36px] px-2.5 sm:inline-flex"
+            className="btn tap-sq hidden h-9 min-w-[36px] border border-danger bg-panel px-2.5 font-semibold text-danger hover:bg-danger/5 sm:inline-flex lg:h-11 lg:rounded-xl lg:px-3"
             aria-label="Báo cáo nhanh"
-            title="Báo cáo nhanh hiện trường → tạo phiếu SOS"
+            title="Tạo phiếu SOS khi nhận tin báo qua điện thoại, trực tiếp"
           >
-            <ShieldAlert size={15} aria-hidden="true" />
-            <span className="hidden font-semibold xl:inline">Báo cáo nhanh</span>
+            <Plus size={16} strokeWidth={2.4} aria-hidden="true" className="lg:hidden xl:block" />
+            <ShieldAlert size={15} aria-hidden="true" className="hidden lg:block xl:hidden" />
+            <span className="hidden xl:inline">Báo cáo nhanh</span>
           </button>
+        )}
+        {canSos && (
+          <Link
+            to="/cuu-ho"
+            className={clsx(
+              'tap hidden h-11 shrink-0 items-center gap-2 rounded-xl px-3 text-sm font-semibold lg:inline-flex xl:px-4',
+              sosWaiting > 0 ? 'bg-danger text-white shadow-sm hover:brightness-110' : 'border border-line bg-panel text-ink-2 hover:bg-panel2',
+            )}
+            aria-label={`${sosWaiting} phiếu SOS chờ xử lý — mở Điều hành cứu hộ`}
+          >
+            <span className={clsx('num rounded-full px-2 text-xs font-bold leading-5', sosWaiting > 0 ? 'bg-white text-danger' : 'bg-panel2 text-ink-2')}>
+              {sosWaiting > 99 ? '99+' : sosWaiting}
+            </span>
+            <span className="whitespace-nowrap">SOS<span className="hidden xl:inline"> chờ xử lý</span></span>
+          </Link>
         )}
         {reportOpen && (
           <Suspense fallback={null}>

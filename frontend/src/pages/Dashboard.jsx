@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import {
   AlertTriangle, CheckSquare, ChevronDown, ChevronUp, CloudRain, Columns2, Compass, FileDown, FileSpreadsheet, FileText, Home, LayoutDashboard, LifeBuoy,
-  Minimize2, Monitor, Mountain, Pause, Play, Send, Server, Waves, X,
+  Minimize2, Monitor, Mountain, Pause, Play, RefreshCw, Send, Server, Waves, X,
 } from 'lucide-react';
 import { useAreaQuery, useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
@@ -23,6 +23,7 @@ import DecisionPanel, { DecisionStrip } from '../components/dashboard/DecisionPa
 import { riverState, StationPicker } from '../components/dashboard/RiverKpi';
 import SituationBar from '../components/dashboard/SituationBar';
 import SituationSummary, { LevelHint } from '../components/dashboard/SituationSummary';
+import SituationPanel from '../components/dashboard/SituationPanel';
 import { forecastTitle, hydroTitle, landslideTitle, rainTitle, suppliesTitle } from '../components/dashboard/chartTitles';
 import ConnectionBanner from '../components/dashboard/ConnectionBanner';
 import TacticalMiniMap, { buildHotspots } from '../components/dashboard/TacticalMiniMap';
@@ -53,7 +54,7 @@ const TABS = [
   { id: 'sat_lo', label: 'Sạt lở, lũ quét', icon: Mountain },
   { id: 'ngap_lut', label: 'Ngập lụt', icon: Waves },
   { id: 'cap_xa', label: 'Cấp xã / phường', icon: Home },
-  { id: 'he_thong', label: 'Hệ thống & dữ liệu', icon: Server },
+  { id: 'he_thong', label: 'Hệ thống', icon: Server },
 ];
 const LEGACY_LEVEL = { tinh: 'tong_hop', xa: 'cap_xa', he_thong: 'he_thong' }; // link cũ ?level=… (trước 10/2026)
 // Điện thoại: biểu đồ thu gọn được (chỉ ẩn — số liệu vẫn tải như cũ); Thủy văn mở sẵn, còn lại đóng để lãnh đạo không phải
@@ -131,6 +132,11 @@ export default function Dashboard() {
   // lựa chọn của người xem (nhớ trên máy). Laptop 1366–1600 px giữ 1 cột: 2 cột đẩy 6 ô số ra khỏi màn hình đầu (1440 × 900:
   // hàng ô cuối bị thanh trạng thái che)
   const bigScreen = useMediaQuery('(min-width: 1680px)');
+  // Máy tính ≥ 1280 px (bản vẽ desktop 11/2026, khung A): 3 cột vừa một màn hình — cột Tình hình xanh đêm (câu tóm tắt, nguy
+  // hiểm nhất, việc chờ quyết định, Trình chiếu · Xuất) · cột giữa (thẻ, chỉ số, Điểm nóng | Biểu đồ | Bảng số liệu) · nhật
+  // ký sự kiện. Trình chiếu giữ bố cục riêng
+  const desk = useMediaQuery('(min-width: 1280px)') && !presentation;
+  const [centerView, setCenterView] = useState('diem_nong'); // khối lớn cột giữa thẻ Tổng hợp: 'diem_nong' | 'bieu_do' | 'bang'
   const [heroLayout, setHeroLayoutState] = useState(() => {
     try {
       const saved = localStorage.getItem('pctt_dashboard_hero_layout');
@@ -513,23 +519,345 @@ export default function Dashboard() {
       {bulletinOpen && <ForecastBulletinModal stations={waterStations} stationId={activeStation} onClose={() => setBulletinOpen(false)} />}
     </>
   );
+  // Nội dung các thẻ ngoài Tổng hợp — dùng chung cho bố cục máy tính 3 cột (cột giữa) và bố cục điện thoại / máy tính bảng
+  const otherTabs = (
+    <>
+      {tab === 'he_thong' && (
+        <div ref={ref}>
+          <SystemView k={k} stations={allStations} supplies={supplies} evac={evacQ.data} unitsCount={units.length} canImport={canDataImport || canDataSubmit} />
+        </div>
+      )}
+
+      {tab === 'cap_xa' && (
+        <div ref={ref} className="flex flex-col gap-3.5">
+          <CommuneView code={communeCode} units={scopeUnits} onChange={(code) => enterCommune(code)} onSupport={() => setSupportOpen(true)}>
+            <div className={clsx('grid gap-3.5 [&>*]:min-w-0', !desk && 'xl:grid-cols-[1fr_360px]')}>
+              <div className="grid gap-3.5 lg:grid-cols-2 [&>*]:min-w-0">
+                {/* Biểu đồ số đo trạm chỉ khi xã có trạm đo mưa — không thì 2 khung trống "chưa có số đo" chiếm nửa trang */}
+                {rainStations > 0 && (
+                  <>
+                    <Section id="bieu-do-mua" title="Mưa từng giờ & dự báo 3 giờ tới tại xã" className="scroll-mt-20">
+                      <RainfallChart height={250} />
+                    </Section>
+                    <Section title="Ngưỡng sạt lở theo mưa – trạm mưa trong xã" hint={LANDSLIDE_HINT}>
+                      <LandslideScatter height={250} />
+                    </Section>
+                  </>
+                )}
+                <Section id="du-bao-72h" title="Dự báo mưa 3 ngày tới" className="lg:col-span-2" hint={FORECAST_HINT}>
+                  <p className="mb-2 text-[13px] text-muted">
+                    {!stationsState.loading && rainStations === 0 && 'Xã chưa có trạm đo mưa — theo dõi bằng dự báo. '}
+                    Đường đậm: lượng mưa có khả năng nhất; vùng tô: khoảng có thể xảy ra.
+                  </p>
+                  <AreaForecastChart height={220} />
+                </Section>
+              </div>
+              {!desk && logSection({
+                title: 'Nhật ký sự kiện của xã',
+                limit: 40,
+                className: 'xl:sticky xl:top-16 xl:h-[calc(100vh-8.5rem)] xl:self-start xl:overflow-hidden xl:tall:h-[calc(100vh-10.5rem)]', // màn đủ cao: trừ cả thanh trạng thái
+                listClass: isLg ? 'h-[60vh] xl:h-full' : undefined,
+              })}
+            </div>
+          </CommuneView>
+        </div>
+      )}
+
+      {tab === 'mua_lon' && (
+        // Mưa lớn: mưa từng giờ bình quân lưu vực + cộng dồn + 3 giờ tới; dự báo mưa 3 ngày theo xã (khoảng có thể xảy ra)
+        <div ref={ref} className="grid grid-cols-1 gap-2.5 bg-bg sm:gap-3.5 xl:grid-cols-2 [&>*]:min-w-0">
+          <Section id="bieu-do-mua" title={rainTitle(k, rainfall)} hint={RAIN_HINT}>
+            <RainfallChart height={300} />
+          </Section>
+          <Section id="du-bao-72h" title={forecastTitle(fcAreas)} hint={FORECAST_HINT}>
+            <AreaForecastChart height={300} />
+          </Section>
+        </div>
+      )}
+
+      {tab === 'ngap_lut' && (
+        // Ngập lụt: mực nước các trạm thủy văn so với Báo động I–III; vùng ngập, vùng sẽ ngập theo báo động ở Bản đồ giám sát
+        <div ref={ref} className="flex flex-col gap-2.5 bg-bg sm:gap-3.5">
+          <Section title={hydroTitle(activeRow)} hint={HYDRO_HINT}>
+            {hydroBody(320)}
+          </Section>
+          <p className="px-1 text-[13px] text-muted no-print">
+            Vùng đang ngập và vùng sẽ ngập khi sông lên Báo động I – III:{' '}
+            <button type="button" className="tap inline-flex items-center font-semibold text-accent hover:underline" onClick={() => navigate('/ban-do')}>xem trên Bản đồ giám sát</button>
+          </p>
+        </div>
+      )}
+
+      {tab === 'sat_lo' && (
+        // Cảm biến cảnh báo sớm lên đầu (thiết kế A: heatmap chuỗi thời gian độ nghiêng / độ ẩm đất), rồi điểm đen & đường đèo
+        <div ref={ref} className="flex flex-col gap-2.5 bg-bg sm:gap-3.5">
+          <Section title="Cảm biến cảnh báo sớm sạt lở 48 giờ qua (độ nghiêng mái taluy, độ ẩm đất)">
+            <SensorHeatmap />
+          </Section>
+          <div className="card p-3 sm:p-5">
+            <LandslideMonitor areaScoped showAll={forceOpen} onSelectOnMap={openOnMap} />
+          </div>
+        </div>
+      )}
+
+    </>
+  );
+  const exportItems = [
+    { key: 'anh', label: 'Ảnh chụp tình hình (PDF)', hint: 'Chỉ số, bản đồ, biểu đồ của thẻ đang xem — gửi nhanh qua Zalo, email', icon: FileDown, onClick: doExport, busy: exporting },
+    { key: 'van-ban', label: 'Báo cáo văn bản (PDF)', hint: 'Quốc hiệu, số liệu, đánh giá – kiến nghị, chỗ ký — gửi UBND tỉnh / Ban Chỉ đạo', icon: FileText, onClick: () => setDocOpen(true), disabled: !k },
+    { key: 'excel', label: 'Bảng số liệu (Excel)', hint: 'Chỉ số, trạm, sạt lở trong vùng đang xem', icon: FileSpreadsheet, onClick: doExcel, disabled: !k },
+  ];
+  // Một hàng thẻ: tổng hợp · chuyên đề · cấp xã · hệ thống (lớp tab-track như menu trên cùng); điện thoại cuộn ngang trong
+  // hàng. Máy tính 3 cột (bản vẽ desktop): chỉ chữ + chấm màu mức — số cụ thể ở ô chỉ số ngay dưới (và trong title)
+  const tabsBar = (
+    <div className={clsx('tab-track scroll-thin self-start no-print', desk && 'border-transparent shadow-[0_6px_20px_rgb(15_23_42/0.08)] dark:border-line')} role="tablist" aria-label="Nội dung tổng quan">
+      {tabList.map((t) => {
+        const badge = tabBadge[t.id];
+        return (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.id}
+            onClick={() => setTab(t.id)}
+            title={desk && badge ? `${t.label}: ${badge.text}` : undefined}
+            className={clsx('tab-item tap', desk && 'min-h-[44px]', tab === t.id && 'tab-item-on')}
+          >
+            {!desk && <t.icon size={15} aria-hidden="true" />} {t.label}
+            {badge && (desk ? (
+              <span className={clsx('h-2 w-2 shrink-0 rounded-full', risk(badge.level).fill)} aria-label={badge.text} />
+            ) : (
+              <span className="flex items-center gap-1 text-xs font-semibold text-ink-2">
+                <span className={clsx('h-2 w-2 rounded-full', risk(badge.level).fill)} aria-hidden="true" />
+                {badge.text}
+              </span>
+            ))}
+          </button>
+        );
+      })}
+    </div>
+  );
+  // Biểu đồ theo chuyên đề — xem một chuyên đề một lúc (bớt rối cho lãnh đạo) hoặc "Tất cả"
+  const chartsInner = (
+    <>
+      <Segmented
+        label="Chuyên đề biểu đồ"
+        value={chartSegment}
+        onChange={setChartSegment}
+        options={[
+          { value: 'mua', label: 'Mưa lớn', short: 'Mưa lớn', icon: CloudRain },
+          { value: 'sat_lo', label: 'Sạt lở, lũ quét', short: 'Sạt lở', icon: Mountain },
+          { value: 'thuy_van', label: 'Ngập lụt (mực nước sông)', short: 'Ngập lụt', icon: Waves },
+          canResource && { value: 'vat_tu', label: 'Kho vật tư', short: 'Kho', icon: Server },
+          { value: 'tat_ca', label: 'Tất cả', hint: 'Xem mọi biểu đồ cùng lúc' },
+        ].filter(Boolean)}
+      />
+
+      <div className="mt-3 space-y-3">
+        {showSeg('thuy_van') && (
+          <div ref={hydroRef} className="min-w-0 scroll-mt-20">
+            <Section title={hydroTitle(activeRow)} hint={HYDRO_HINT} {...fold('thuy_van')}>
+              {hydroBody(250)}
+            </Section>
+          </div>
+        )}
+
+        {showSeg('mua') && (
+          <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+            <Section id="bieu-do-mua" title={rainTitle(k, rainfall)} hint={RAIN_HINT} className="scroll-mt-20" {...fold('mua')}>
+              <RainfallChart height={260} />
+            </Section>
+            <Section id="du-bao-72h" title={forecastTitle(fcAreas)} hint={FORECAST_HINT} className="scroll-mt-20" {...fold('du_bao')}>
+              <AreaForecastChart height={260} />
+            </Section>
+          </div>
+        )}
+
+        {showSeg('sat_lo') && (
+          <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+            <Section title={landslideTitle(lsRisk)} hint={LANDSLIDE_HINT} {...fold('sat_lo')}>
+              <LandslideScatter height={250} />
+            </Section>
+            <Section title="Cảm biến sạt lở 48 giờ qua (độ nghiêng mái taluy, độ ẩm đất)" {...fold('sat_lo')}>
+              <SensorHeatmap height={250} />
+            </Section>
+          </div>
+        )}
+
+        {canResource && showSeg('vat_tu') && (
+          <Section title={suppliesTitle(supplies)} hint={SUPPLIES_HINT} {...fold('vat_tu')}>
+            <SuppliesChart height={250} />
+          </Section>
+        )}
+      </div>
+    </>
+  );
   const dataTime = kQ.dataUpdatedAt ? new Date(kQ.dataUpdatedAt).toLocaleTimeString('vi-VN', { ...VN_TIME, hour12: false }) : null;
+
+  const noDataLink = canDataImport ? { to: '/nhap-du-lieu', text: 'Nhập danh mục trạm →' } : canSystem ? { to: '/nguon-du-lieu', text: 'Xem nguồn dữ liệu →' } : null;
+  // "Xem trên bản đồ" của "Nguy hiểm nhất" → về thẻ Tổng hợp, bản đồ điểm nóng bay tới điểm đó
+  const showWorst = (h) => {
+    if (tab !== 'tong_hop') setTab('tong_hop');
+    if (desk) setCenterView('diem_nong');
+    else if (bigScreen && heroLayout === 'left_full') setHeroLayout('split'); // bản đồ đang thu gọn → hiện lại để bay tới
+    setMapFocus({ id: h.id, at: Date.now() });
+  };
+  const loadError = k && kQ.isError && online && (
+    <div role="alert" className="card flex flex-wrap items-center justify-between gap-2 border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">
+      <span className="flex items-center gap-2">
+        <AlertTriangle size={15} className="shrink-0" aria-hidden="true" />
+        Không tải được chỉ số mới từ máy chủ — số trên màn hình là lần tải trước.
+      </span>
+      <button type="button" onClick={refresh} className="btn-danger min-h-[36px] px-2.5 py-1 text-xs">Thử lại</button>
+    </div>
+  );
+  const modals = (
+    <>
+      {canReport && <QuickIncidentModal open={reportOpen} onClose={() => setReportOpen(false)} />}
+      {/* Xã xin chi viện lên tỉnh: cùng hộp thoại báo cáo nhanh, chế độ support (phiếu SOS gắn thẻ — rescueFacts) */}
+      {supportOpen && <QuickIncidentModal open onClose={() => setSupportOpen(false)} support />}
+      <ReportDocModal
+        open={docOpen}
+        onClose={(pages) => {
+          setDocOpen(false);
+          if (pages) toast({ tone: 'good', title: `Đã xuất báo cáo văn bản (${pages} trang)`, duration: 3500 });
+        }}
+        onExport={exportDoc}
+        summary={{
+          ready: !!k,
+          scope: filterLabel,
+          tabLabel: TABS.find((t) => t.id === tab)?.label || 'Tổng quan',
+          stations: waterStations.length,
+          landslides: (k?.landslides?.blocked_count || 0) + (k?.landslides?.warning_count || 0),
+        }}
+      />
+    </>
+  );
+
+  // ---- Máy tính ≥ 1280 px: 3 cột vừa một màn hình (bản vẽ desktop, khung A) — mỗi cột tự cuộn, trang không cuộn
+  if (desk) {
+    const views = [['diem_nong', 'Điểm nóng'], ['bieu_do', 'Biểu đồ'], ['bang', 'Bảng số liệu']];
+    const viewTabs = (
+      <div className="seg-track" role="tablist" aria-label="Xem trong khối">
+        {views.map(([id, label]) => (
+          <button key={id} type="button" role="tab" aria-selected={centerView === id} onClick={() => setCenterView(id)} className={clsx('seg-item', centerView === id && 'seg-item-on')}>
+            {label}
+          </button>
+        ))}
+      </div>
+    );
+    const sideW = 'w-[264px] shrink-0 min-[1440px]:w-[300px] 2xl:w-[320px]'; // 1280 px: cột bên hẹp hơn — cột giữa đủ chỗ cho 3 ô số một hàng
+    return (
+      <div className="flex h-full min-h-[600px] gap-5 p-5">
+        <h1 className="sr-only">Tổng quan — {filterLabel}</h1>
+        <SituationPanel
+          className={sideW}
+          k={k}
+          kState={kState}
+          waterStations={waterStations}
+          stationsError={stationsState.error}
+          hotspots={tab === 'cap_xa' ? [] : hotspots}
+          time={dataTime}
+          link={noDataLink}
+          onShowWorst={showWorst}
+          onPresent={enterPresentation}
+          exports={exportItems}
+        />
+
+        <section aria-label="Nội dung tổng quan" className="scroll-thin -m-1 flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-1">
+          <ConnectionBanner updatedAt={kQ.dataUpdatedAt || null} />
+          {loadError}
+          <div className="flex flex-wrap items-center gap-2">
+            {tabsBar}
+            <span className="flex-1" />
+            {isFiltered && tab !== 'cap_xa' && (
+              <button type="button" onClick={clearFilter} className="btn-ghost tap h-9 px-2.5 text-xs" title={`Đang xem: ${filterLabel} — bấm để xem toàn bộ phạm vi`}>
+                <X size={13} aria-hidden="true" /> Bỏ lọc
+              </button>
+            )}
+            <LevelHint />
+            <RoleTips page="tong-quan" compact />
+            <button type="button" onClick={refresh} disabled={refreshing} className="btn-secondary tap-sq h-9 min-w-[36px] px-2.5" aria-label="Làm mới số liệu" title="Làm mới số liệu">
+              <RefreshCw size={15} className={clsx(refreshing && 'animate-spin')} aria-hidden="true" />
+            </button>
+          </div>
+
+          {tab === 'tong_hop' ? (
+            <div ref={ref} className="flex min-h-[620px] flex-1 flex-col gap-4 bg-bg">
+              <KpiStrip
+                {...kpiProps}
+                onRain={() => {
+                  setChartSegment('mua');
+                  setCenterView('bieu_do');
+                }}
+                onRiver={(id) => {
+                  setChartSegment('thuy_van');
+                  setCenterView('bieu_do');
+                  focusStation(id);
+                }}
+              />
+              {centerView === 'diem_nong' && <TacticalMiniMap k={k} fill lead={viewTabs} focus={mapFocus} className="flex-1" />}
+              {centerView === 'bieu_do' && (
+                <div className="sheet flex flex-col gap-3 p-4">
+                  {viewTabs}
+                  <div>{chartsInner}</div>
+                </div>
+              )}
+              {centerView === 'bang' && (
+                <div className="flex flex-col gap-3">
+                  {viewTabs}
+                  <OperationsTable
+                    k={k}
+                    kState={kState}
+                    stations={waterStations}
+                    stationsState={stationsState}
+                    onSelectStation={(id) => {
+                      setChartSegment('thuy_van');
+                      setCenterView('bieu_do');
+                      focusStation(id);
+                    }}
+                    scopeLabel={filterLabel}
+                  />
+                </div>
+              )}
+            </div>
+          ) : otherTabs}
+        </section>
+
+        <aside aria-label="Nhật ký sự kiện" className={clsx('sheet flex min-h-0 flex-col gap-3 p-[18px]', sideW)}>
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-[15px] font-bold text-ink">{tab === 'cap_xa' ? 'Nhật ký sự kiện của xã' : 'Nhật ký sự kiện'}</h2>
+            {wsStatus === 'online'
+              ? <span className="shrink-0 whitespace-nowrap text-xs text-muted">Tự cập nhật</span>
+              : <span className="shrink-0 whitespace-nowrap text-xs font-semibold text-warn">Mất kết nối — đang thử lại</span>}
+          </div>
+          <EventLog className="min-h-0 flex-1" limit={tab === 'cap_xa' ? 40 : 60} />
+        </aside>
+        {modals}
+      </div>
+    );
+  }
+
 
   return (
     <div className={PAGE}>
       {/* 0. Thông tin khẩn luôn trên cùng: dải tình huống (Cam / Đỏ dính khi cuộn) + mất mạng */}
+      {/* Máy tính ≥ 1024 px không còn dải khẩn (quyết định của chủ dự án 03/11/2026 — số SOS chờ ở nút đỏ thanh trên, việc
+          khẩn ở "Việc chờ quyết định"); `contents`: dải vẫn dính khi cuộn trên điện thoại / máy tính bảng. Trình chiếu giữ dải */}
       {k && (
-        <SituationBar
-          k={k}
-          waterStations={waterStations}
-          stationsError={stationsState.error}
-          rainKnown={rainKnown}
-          canSos={canSos}
-          canImportStations={canDataImport}
-          canSystem={canSystem}
-          presentation={presentation}
-          quiet
-        />
+        <div className={presentation ? 'contents' : 'contents lg:hidden'}>
+          <SituationBar
+            k={k}
+            waterStations={waterStations}
+            stationsError={stationsState.error}
+            rainKnown={rainKnown}
+            canSos={canSos}
+            canImportStations={canDataImport}
+            canSystem={canSystem}
+            presentation={presentation}
+            quiet
+          />
+        </div>
       )}
       <ConnectionBanner updatedAt={kQ.dataUpdatedAt || null} />
 
@@ -578,11 +906,7 @@ export default function Dashboard() {
             </button>
           </>
         )}
-        exports={presentation ? undefined : [
-          { key: 'anh', label: 'Ảnh chụp tình hình (PDF)', hint: 'Chỉ số, bản đồ, biểu đồ của thẻ đang xem — gửi nhanh qua Zalo, email', icon: FileDown, onClick: doExport, busy: exporting },
-          { key: 'van-ban', label: 'Báo cáo văn bản (PDF)', hint: 'Quốc hiệu, số liệu, đánh giá – kiến nghị, chỗ ký — gửi UBND tỉnh / Ban Chỉ đạo', icon: FileText, onClick: () => setDocOpen(true), disabled: !k },
-          { key: 'excel', label: 'Bảng số liệu (Excel)', hint: 'Chỉ số, trạm, sạt lở trong vùng đang xem', icon: FileSpreadsheet, onClick: doExcel, disabled: !k },
-        ]}
+        exports={presentation ? undefined : exportItems}
         onRefresh={presentation ? undefined : refresh}
         refreshing={refreshing}
       >
@@ -596,12 +920,8 @@ export default function Dashboard() {
               stationsError={stationsState.error}
               hotspots={hotspots}
               large={presentation}
-              onShowWorst={(h) => {
-                if (tab !== 'tong_hop') setTab('tong_hop');
-                if (bigScreen && heroLayout === 'left_full') setHeroLayout('split'); // bản đồ đang thu gọn → hiện lại để bay tới
-                setMapFocus({ id: h.id, at: Date.now() });
-              }}
-              link={canDataImport ? { to: '/nhap-du-lieu', text: 'Nhập danh mục trạm →' } : canSystem ? { to: '/nguon-du-lieu', text: 'Xem nguồn dữ liệu →' } : null}
+              onShowWorst={showWorst}
+              link={noDataLink}
             />
           </div>
         )}
@@ -610,122 +930,13 @@ export default function Dashboard() {
         {decisionInHero && <DecisionStrip k={k} kState={kState} className="mt-2" />}
       </PageHeader>
 
-      {k && kQ.isError && online && (
-        <div role="alert" className="card flex flex-wrap items-center justify-between gap-2 border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">
-          <span className="flex items-center gap-2">
-            <AlertTriangle size={15} className="shrink-0" aria-hidden="true" />
-            Không tải được chỉ số mới từ máy chủ — số trên màn hình là lần tải trước.
-          </span>
-          <button type="button" onClick={refresh} className="btn-danger min-h-[36px] px-2.5 py-1 text-xs">Thử lại</button>
-        </div>
-      )}
+      {loadError}
 
       {/* 2. Một hàng thẻ: tổng hợp · chuyên đề · cấp xã · hệ thống — cùng kiểu gạch chân với thẻ các trang khác (ui.jsx Tabs);
           điện thoại cuộn ngang trong hàng */}
-      <div className="tab-track scroll-thin self-start no-print" role="tablist" aria-label="Nội dung tổng quan">
-        {tabList.map((t) => {
-          const badge = tabBadge[t.id];
-          return (
-            <button
-              key={t.id}
-              type="button"
-              role="tab"
-              aria-selected={tab === t.id}
-              onClick={() => setTab(t.id)}
-              className={clsx(
-                'tab-item tap',
-                tab === t.id && 'tab-item-on',
-              )}
-            >
-              <t.icon size={15} aria-hidden="true" /> {t.label}
-              {badge && (
-                <span className="flex items-center gap-1 text-xs font-semibold text-ink-2">
-                  <span className={clsx('h-2 w-2 rounded-full', risk(badge.level).fill)} aria-hidden="true" />
-                  {badge.text}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+      {tabsBar}
 
-      {tab === 'he_thong' && (
-        <div ref={ref}>
-          <SystemView k={k} stations={allStations} supplies={supplies} evac={evacQ.data} unitsCount={units.length} canImport={canDataImport || canDataSubmit} />
-        </div>
-      )}
-
-      {tab === 'cap_xa' && (
-        <div ref={ref} className="flex flex-col gap-3.5">
-          <CommuneView code={communeCode} units={scopeUnits} onChange={(code) => enterCommune(code)} onSupport={() => setSupportOpen(true)}>
-            <div className="grid gap-3.5 xl:grid-cols-[1fr_360px] [&>*]:min-w-0">
-              <div className="grid gap-3.5 lg:grid-cols-2 [&>*]:min-w-0">
-                {/* Biểu đồ số đo trạm chỉ khi xã có trạm đo mưa — không thì 2 khung trống "chưa có số đo" chiếm nửa trang */}
-                {rainStations > 0 && (
-                  <>
-                    <Section id="bieu-do-mua" title="Mưa từng giờ & dự báo 3 giờ tới tại xã" className="scroll-mt-20">
-                      <RainfallChart height={250} />
-                    </Section>
-                    <Section title="Ngưỡng sạt lở theo mưa – trạm mưa trong xã" hint={LANDSLIDE_HINT}>
-                      <LandslideScatter height={250} />
-                    </Section>
-                  </>
-                )}
-                <Section id="du-bao-72h" title="Dự báo mưa 3 ngày tới" className="lg:col-span-2" hint={FORECAST_HINT}>
-                  <p className="mb-2 text-[13px] text-muted">
-                    {!stationsState.loading && rainStations === 0 && 'Xã chưa có trạm đo mưa — theo dõi bằng dự báo. '}
-                    Đường đậm: lượng mưa có khả năng nhất; vùng tô: khoảng có thể xảy ra.
-                  </p>
-                  <AreaForecastChart height={220} />
-                </Section>
-              </div>
-              {logSection({
-                title: 'Nhật ký sự kiện của xã',
-                limit: 40,
-                className: 'xl:sticky xl:top-16 xl:h-[calc(100vh-8.5rem)] xl:self-start xl:overflow-hidden xl:tall:h-[calc(100vh-10.5rem)]', // màn đủ cao: trừ cả thanh trạng thái
-                listClass: isLg ? 'h-[60vh] xl:h-full' : undefined,
-              })}
-            </div>
-          </CommuneView>
-        </div>
-      )}
-
-      {tab === 'mua_lon' && (
-        // Mưa lớn: mưa từng giờ bình quân lưu vực + cộng dồn + 3 giờ tới; dự báo mưa 3 ngày theo xã (khoảng có thể xảy ra)
-        <div ref={ref} className="grid grid-cols-1 gap-2.5 bg-bg sm:gap-3.5 xl:grid-cols-2 [&>*]:min-w-0">
-          <Section id="bieu-do-mua" title={rainTitle(k, rainfall)} hint={RAIN_HINT}>
-            <RainfallChart height={300} />
-          </Section>
-          <Section id="du-bao-72h" title={forecastTitle(fcAreas)} hint={FORECAST_HINT}>
-            <AreaForecastChart height={300} />
-          </Section>
-        </div>
-      )}
-
-      {tab === 'ngap_lut' && (
-        // Ngập lụt: mực nước các trạm thủy văn so với Báo động I–III; vùng ngập, vùng sẽ ngập theo báo động ở Bản đồ giám sát
-        <div ref={ref} className="flex flex-col gap-2.5 bg-bg sm:gap-3.5">
-          <Section title={hydroTitle(activeRow)} hint={HYDRO_HINT}>
-            {hydroBody(320)}
-          </Section>
-          <p className="px-1 text-[13px] text-muted no-print">
-            Vùng đang ngập và vùng sẽ ngập khi sông lên Báo động I – III:{' '}
-            <button type="button" className="tap inline-flex items-center font-semibold text-accent hover:underline" onClick={() => navigate('/ban-do')}>xem trên Bản đồ giám sát</button>
-          </p>
-        </div>
-      )}
-
-      {tab === 'sat_lo' && (
-        // Cảm biến cảnh báo sớm lên đầu (thiết kế A: heatmap chuỗi thời gian độ nghiêng / độ ẩm đất), rồi điểm đen & đường đèo
-        <div ref={ref} className="flex flex-col gap-2.5 bg-bg sm:gap-3.5">
-          <Section title="Cảm biến cảnh báo sớm sạt lở 48 giờ qua (độ nghiêng mái taluy, độ ẩm đất)">
-            <SensorHeatmap />
-          </Section>
-          <div className="card p-3 sm:p-5">
-            <LandslideMonitor areaScoped showAll={forceOpen} onSelectOnMap={openOnMap} />
-          </div>
-        </div>
-      )}
+      {otherTabs}
 
       {tab === 'tong_hop' && (
         <>
@@ -858,56 +1069,7 @@ export default function Dashboard() {
 
                 {/* Biểu đồ theo chuyên đề — xem một chuyên đề một lúc (bớt rối cho lãnh đạo) hoặc "Tất cả" */}
                 <div className="card p-2 sm:p-2.5">
-                  <Segmented
-                    label="Chuyên đề biểu đồ"
-                    value={chartSegment}
-                    onChange={setChartSegment}
-                    options={[
-                      { value: 'mua', label: 'Mưa lớn', short: 'Mưa lớn', icon: CloudRain },
-                      { value: 'sat_lo', label: 'Sạt lở, lũ quét', short: 'Sạt lở', icon: Mountain },
-                      { value: 'thuy_van', label: 'Ngập lụt (mực nước sông)', short: 'Ngập lụt', icon: Waves },
-                      canResource && { value: 'vat_tu', label: 'Kho vật tư', short: 'Kho', icon: Server },
-                      { value: 'tat_ca', label: 'Tất cả', hint: 'Xem mọi biểu đồ cùng lúc' },
-                    ].filter(Boolean)}
-                  />
-
-                  <div className="mt-3 space-y-3">
-                    {showSeg('thuy_van') && (
-                      <div ref={hydroRef} className="min-w-0 scroll-mt-20">
-                        <Section title={hydroTitle(activeRow)} hint={HYDRO_HINT} {...fold('thuy_van')}>
-                          {hydroBody(250)}
-                        </Section>
-                      </div>
-                    )}
-
-                    {showSeg('mua') && (
-                      <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-                        <Section id="bieu-do-mua" title={rainTitle(k, rainfall)} hint={RAIN_HINT} className="scroll-mt-20" {...fold('mua')}>
-                          <RainfallChart height={260} />
-                        </Section>
-                        <Section id="du-bao-72h" title={forecastTitle(fcAreas)} hint={FORECAST_HINT} className="scroll-mt-20" {...fold('du_bao')}>
-                          <AreaForecastChart height={260} />
-                        </Section>
-                      </div>
-                    )}
-
-                    {showSeg('sat_lo') && (
-                      <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-                        <Section title={landslideTitle(lsRisk)} hint={LANDSLIDE_HINT} {...fold('sat_lo')}>
-                          <LandslideScatter height={250} />
-                        </Section>
-                        <Section title="Cảm biến sạt lở 48 giờ qua (độ nghiêng mái taluy, độ ẩm đất)" {...fold('sat_lo')}>
-                          <SensorHeatmap height={250} />
-                        </Section>
-                      </div>
-                    )}
-
-                    {canResource && showSeg('vat_tu') && (
-                      <Section title={suppliesTitle(supplies)} hint={SUPPLIES_HINT} {...fold('vat_tu')}>
-                        <SuppliesChart height={250} />
-                      </Section>
-                    )}
-                  </div>
+                  {chartsInner}
                 </div>
               </div>
 
@@ -964,24 +1126,7 @@ export default function Dashboard() {
         onSos={canReport ? () => setReportOpen(true) : null}
       />
 
-      {canReport && <QuickIncidentModal open={reportOpen} onClose={() => setReportOpen(false)} />}
-      {/* Xã xin chi viện lên tỉnh: cùng hộp thoại báo cáo nhanh, chế độ support (phiếu SOS gắn thẻ — rescueFacts) */}
-      {supportOpen && <QuickIncidentModal open onClose={() => setSupportOpen(false)} support />}
-      <ReportDocModal
-        open={docOpen}
-        onClose={(pages) => {
-          setDocOpen(false);
-          if (pages) toast({ tone: 'good', title: `Đã xuất báo cáo văn bản (${pages} trang)`, duration: 3500 });
-        }}
-        onExport={exportDoc}
-        summary={{
-          ready: !!k,
-          scope: filterLabel,
-          tabLabel: TABS.find((t) => t.id === tab)?.label || 'Tổng quan',
-          stations: waterStations.length,
-          landslides: (k?.landslides?.blocked_count || 0) + (k?.landslides?.warning_count || 0),
-        }}
-      />
+      {modals}
     </div>
   );
 }

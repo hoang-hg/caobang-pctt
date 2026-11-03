@@ -34,7 +34,7 @@ const STAFF_PAGES = [
   ['/dashboard?tab=sat_lo', 'Tổng quan · sạt lở, lũ quét'],
   ['/dashboard?tab=ngap_lut', 'Tổng quan · ngập lụt'],
   ['/dashboard?tab=cap_xa', 'Tổng quan · cấp xã/phường'],
-  ['/dashboard?tab=he_thong', 'Tổng quan · hệ thống & dữ liệu'],
+  ['/dashboard?tab=he_thong', 'Tổng quan · hệ thống'],
   ['/ban-do', 'Bản đồ giám sát'],
   ['/cuu-ho', 'Điều hành cứu hộ'],
   ['/phan-anh', 'Phản ánh người dân'],

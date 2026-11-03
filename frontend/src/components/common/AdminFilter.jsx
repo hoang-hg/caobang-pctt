@@ -135,9 +135,10 @@ export default function AdminFilter() {
         aria-expanded={open}
       >
         <MapPin size={15} className="shrink-0" aria-hidden="true" />
-        <span className="truncate lg:hidden">{short}</span>
-        {/* Chữ "Đang xem:" chỉ từ 1536 px — màn nhỏ hơn nó ăn chỗ của tên địa bàn, ô tìm kiếm ("Toàn tỉnh Cao …" bị cắt) */}
-        <span className="hidden truncate lg:inline"><span className="hidden font-normal text-muted 2xl:inline">Đang xem: </span>{label}</span>
+        <span className="truncate 2xl:hidden">{short}</span>
+        {/* Nhãn gọn ("Toàn tỉnh", tên xã bỏ chữ "Xã") tới 1535 px như bản vẽ desktop — nhường chỗ cho menu ngang; từ 1536 px
+            đủ chỗ cho "Đang xem: Toàn tỉnh Cao Bằng" */}
+        <span className="hidden truncate 2xl:inline"><span className="font-normal text-muted">Đang xem: </span>{label}</span>
         {/* Điện thoại: bỏ mũi tên — nhường chỗ cho tên xã (nút vẫn báo là mở hộp chọn qua aria-haspopup) */}
         <ChevronDown size={14} className="shrink-0 max-sm:hidden" aria-hidden="true" />
       </button>

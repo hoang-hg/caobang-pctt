@@ -9,7 +9,7 @@ import { tipsFor } from '../../utils/guides';
  * liên kết tới trang Hướng dẫn xử lý. "Đã hiểu" nhớ riêng từng nhóm: máy dùng chung đổi sang tài khoản cấp khác vẫn thấy
  * gợi ý của cấp mình (khoá của cấp tỉnh giữ như cũ — ai đã bấm "Đã hiểu" ở Tổng quan không phải bấm lại).
  */
-export default function RoleTips({ page, className }) {
+export default function RoleTips({ page, className, compact }) {
   const role = useGuideRole();
   const steps = tipsFor(page, role);
   if (!steps) return null;
@@ -19,6 +19,7 @@ export default function RoleTips({ page, className }) {
       id={role === 'tinh' ? page : `${page}-${role}`}
       steps={steps}
       className={className}
+      compact={compact}
       more={(
         <Link to={`/huong-dan?vai=${role}`} className="btn-ghost tap px-2 py-1 text-xs font-semibold text-accent">
           <BookOpen size={14} aria-hidden="true" /> Hướng dẫn đầy đủ

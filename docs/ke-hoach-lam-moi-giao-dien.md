@@ -455,3 +455,30 @@ báo; bảng đối chiếu mục B ↔ bố cục B). Mục 13 (giảm rối) g
 | 3c | Cảnh báo: câu quy tắc soạn – duyệt thường trực ở đầu trang thành "Hai người: soạn · duyệt" + nút "?"; tên trùng vai trò ghi một lần. Nguồn dữ liệu: "Nâng cao — dành cho kỹ thuật viên" là dòng chữ nhỏ (khung chỉ khi mở). Giữ có chủ ý: viền đỏ ô SOS quá hạn (thiết kế A.2), nhãn "Quá hạn" nhấp nháy trên thẻ phiếu (thiết kế D), 3 ô giải thích cấp tài khoản (thiết kế G) — màu / chữ mang nghĩa | Xong |
 | 3d | Thanh thẻ mọi trang (Tabs dùng chung, thẻ Tổng quan, bảng số liệu chi tiết) theo bản mẫu B: thanh trắng bo 14 px, thẻ đang mở chữ màu nhấn trên nền nhấn nhạt (như menu trên cùng) thay kiểu gạch chân — lớp `tab-track` / `tab-item` / `tab-item-on` (index.css) | Xong |
 | 3e | Thanh trên cùng như bản mẫu B: mục menu chỉ chữ (biểu tượng chỉ trong "Thêm"), biểu trưng khiên + "ĐIỀU HÀNH PCTT / Tỉnh Cao Bằng" từ 1440 px, nút tài khoản là vòng tròn chữ viết tắt (VD QT). Menu đủ chỗ hơn: 1280 px 4 mục, 1366 px 5 mục (trước 3 / 4); không tràn ở 1024 – 1920 px | Xong |
+
+## 15. Bản vẽ desktop mọi trang (03/11/2026)
+
+Chủ dự án vẽ giao diện máy tính cho **tất cả các trang** (artifact Design "Phương án diện mạo PCTT Cao Bằng" — 15 nhóm, ~160
+khung 1440 × 900) và yêu cầu làm đúng theo bản vẽ, **dùng luồng dữ liệu sẵn có** (không thêm API chỉ để vẽ cho giống). Phần
+khung bản vẽ ghi "theo code main hiện tại" là gốc; khung con (bước form, hộp thoại, trạng thái) là chi tiết của trang đó.
+
+Quyết định của chủ dự án (03/11/2026), thay quy ước cũ "Dải khẩn: giữ": máy tính ≥ 1024 px **bỏ hẳn dải "Khẩn cấp"** dưới thanh
+trên và **bỏ số đếm cạnh mục menu**; thanh trên có nút viền đỏ "Báo cáo nhanh" + nút đỏ "N SOS chờ xử lý" (mở Điều hành cứu
+hộ). Việc khẩn khác: "Việc chờ quyết định" (Tổng quan), chip trên Bản đồ. Điện thoại / máy tính bảng giữ dải khẩn + ngăn ☰.
+
+Mỗi nhóm một PR (lint + build + ảnh chụp đối chiếu bản vẽ ở 1280 / 1440 / 1920 px, bản tối).
+
+| Nhóm | Nội dung | Trạng thái |
+|---|---|---|
+| Khung | Thanh trên 68 px, nút 44 px; "Báo cáo nhanh" viền đỏ + "N SOS chờ xử lý"; menu không số đếm; địa bàn nhãn gọn "Toàn tỉnh" tới 1535 px | Xong (A1) |
+| A | Tổng quan ≥ 1280 px: 3 cột vừa một màn hình — cột **Tình hình** xanh đêm (câu tóm tắt, Nguy hiểm nhất, Việc chờ quyết định, Trình chiếu · Xuất) · cột giữa (thẻ chỉ chữ + chấm mức, 6 ô số 3 × 2, khối **Điểm nóng · Biểu đồ · Bảng số liệu** với lọc Tất cả / Cam trở lên / Đỏ) · **Nhật ký sự kiện**; thẻ "Hệ thống & dữ liệu" → "Hệ thống" | Xong (A1) |
+| A (tiếp) | Ô số riêng từng thẻ (Mưa lớn, Sạt lở, Ngập lụt); thẻ Cấp xã = bảng 56 xã nặng nhất lên đầu (A7); Tổng quan của cán bộ xã (A11); nhật ký đầy đủ dạng ngăn phải (A16); trình chiếu (A2); menu Xuất, báo cáo văn bản, báo cáo nhanh 3 bước, chọn địa bàn, kết quả tìm địa điểm | Kế tiếp |
+| B | Bản đồ giám sát (B–B10) | Kế tiếp |
+| C | Điều hành cứu hộ (C–C15) | Kế tiếp |
+| D | Cảnh báo & Hotline (D–D10) | Kế tiếp |
+| E | Vật tư & Lực lượng (E–E8) | Kế tiếp |
+| F · G | Phản ánh người dân (F–F6) · Đợt thiên tai (G–G4) | Kế tiếp |
+| H · I | Nhập dữ liệu (H–H8) · Nguồn dữ liệu (I–I8) | Kế tiếp |
+| J · K | Phân quyền (J–J12) · Hướng dẫn xử lý (K, K2) | Kế tiếp |
+| L · M | Đăng nhập & tài khoản (L1–L8b) · Trạng thái chung (M1–M5) | Kế tiếp |
+| N · O | Cổng người dân (N1–N19) · Nhiệm vụ trưởng nhóm (O1–O5) | Kế tiếp |

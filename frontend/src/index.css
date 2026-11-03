@@ -142,7 +142,15 @@ body {
   .tab-track { @apply inline-flex max-w-full gap-1 overflow-x-auto rounded-[14px] border border-line bg-panel p-1 shadow-sm; }
   .tab-item { @apply flex shrink-0 items-center gap-2 whitespace-nowrap rounded-[10px] px-3.5 py-1.5 text-sm font-medium text-ink-2 transition-colors hover:bg-panel2 hover:text-ink; }
   .tab-item-on { @apply bg-accent/10 font-semibold text-accent hover:bg-accent/10 hover:text-accent; }
-  
+  /* Thẻ con trong một khối (bản vẽ desktop 11/2026: "Điểm nóng | Biểu đồ", "Tất cả | Cam trở lên | Đỏ"): rãnh xám nhạt, thẻ
+     đang mở là viên trắng nổi — phân biệt với thanh thẻ chính của trang (tab-track) */
+  .seg-track { @apply inline-flex max-w-full gap-1 overflow-x-auto rounded-xl bg-panel2 p-1; }
+  .seg-item { @apply inline-flex min-h-[34px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[9px] px-3.5 text-sm text-ink-2 transition-colors hover:text-ink [@media(pointer:coarse)]:min-h-[44px]; }
+  .seg-item-on { @apply bg-panel font-semibold text-ink shadow-sm; }
+  /* Khối lớn của trang dạng bảng điều khiển (bản vẽ desktop: cột Tổng quan, bảng nổi): bo 18 px, bóng mềm, không viền */
+  .sheet { @apply rounded-[18px] border border-transparent bg-panel; box-shadow: 0 10px 30px rgb(15 23 42 / 0.08); }
+  .dark .sheet { @apply border-line/80; box-shadow: var(--shadow-card); }
+
   .input { @apply w-full rounded-lg border border-line bg-panel2 px-3 py-1.5 text-sm text-ink placeholder:text-muted transition-colors focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25; }
   /* Số liệu: chữ số đều bề ngang (cột số thẳng hàng, số đổi không làm chữ nhảy) — không dùng font mono cho số đếm */
   .num { font-variant-numeric: tabular-nums lining-nums; }
@@ -288,5 +296,5 @@ body {
      đang thấy. Khi in: mở hết chiều cao để nội dung sang các trang sau. */
   html, body, #root { height: auto; }
   /* Giấy: thẻ chỉ còn viền (bóng in ra thành vệt xám) */
-  .card { box-shadow: none !important; }
+  .card, .sheet { box-shadow: none !important; }
 }
