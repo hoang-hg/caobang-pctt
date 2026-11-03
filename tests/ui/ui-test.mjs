@@ -508,7 +508,9 @@ async function staff(ctx, trackCode) {
     const dec = page.locator('[aria-label="Việc chờ quyết định"]');
     if (await dec.count()) {
       const [d, kpi] = await Promise.all([dec.boundingBox(), page.locator('[aria-label="Chỉ số nhanh"]').boundingBox()]);
-      if (vp.mobile ? d.y < kpi.y : d.y > kpi.y) throw new Error(`"Việc chờ quyết định" ${vp.mobile ? 'phải ngay sau' : 'phải đứng trước'} 6 ô chỉ số`);
+      // Máy tính ≥ 1280 px (bản vẽ desktop, khung A): việc chờ nằm ở cột Tình hình BÊN TRÁI 6 ô chỉ số — đứng trước theo chiều đọc
+      const leftCol = !vp.mobile && d.x + d.width <= kpi.x + 1;
+      if (vp.mobile ? d.y < kpi.y : d.y > kpi.y && !leftCol) throw new Error(`"Việc chờ quyết định" ${vp.mobile ? 'phải ngay sau' : 'phải đứng trước (hoặc ở cột bên trái)'} 6 ô chỉ số`);
     }
 
     // Gợi ý 3 bước: hiện lần đầu — diện mạo B (DESIGN.md: không chữ hướng dẫn thường trực): một nút "Bắt đầu từ đâu?" ở đầu

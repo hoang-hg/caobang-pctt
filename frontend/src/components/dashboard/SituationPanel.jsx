@@ -28,7 +28,7 @@ export default function SituationPanel({
       className={clsx('dark flex min-h-0 flex-col gap-4 overflow-y-auto rounded-[18px] bg-[#0B1A33] p-5 text-white shadow-[0_10px_30px_rgb(15_23_42/0.14)] scroll-thin', className)}
     >
       <div className="flex items-center justify-between gap-2">
-        <div className="text-[11px] font-bold uppercase tracking-[.04em] text-[#A9B6CC]">
+        <div className="text-xs font-bold text-[#A9B6CC]">
           Tình hình{time ? <> · số liệu lúc <span className="num">{time}</span></> : kState?.error ? ' · chưa tải được số liệu' : ' · đang tải…'}
         </div>
         {hint /* nút "?" giải thích mức báo động và thang màu */}
@@ -45,7 +45,7 @@ export default function SituationPanel({
       )}
       {worst && (
         <div className={clsx('rounded-[14px] border-l-[5px] bg-[#16294A] p-3.5', risk(worst.level).edge)}>
-          <div className="text-[11px] font-bold uppercase tracking-[.04em] text-[#FCA5A5]">Nguy hiểm nhất</div>
+          <div className="text-xs font-bold text-[#FCA5A5]">Nguy hiểm nhất</div>
           <div className="mt-1 text-[15px] font-semibold">{worst.name}</div>
           <div className="text-[13px] leading-normal text-[#CBD5E1]">
             {worst.detail}

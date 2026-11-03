@@ -56,7 +56,7 @@ export function DecisionList({ k, kState }) {
   const { rows, fresh, total } = useDecisionRows(k);
   return (
     <section aria-label="Việc chờ quyết định" className="flex flex-col gap-2 no-print">
-      <h2 className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[.04em] text-[#A9B6CC]">
+      <h2 className="flex items-center gap-1.5 text-xs font-bold text-[#A9B6CC]">
         Việc chờ quyết định{rows.length > 0 && <span className="num">· {int(total)} việc</span>}
         <Hint label="Việc chờ quyết định">{HINT}</Hint>
       </h2>
