@@ -371,6 +371,8 @@ export default function RescueCenter() {
       {/* Máy tính ≥ 1280 px (bản vẽ desktop khung C): không tiêu đề trang / 4 ô lớn — hàng chip chỉ số + "Bản đồ cứu hộ ›",
           gợi ý, làm mới; bảng điều phối chiếm phần còn lại */}
       {wide ? (
+        // Một khối: hàng chip + (khi mở) bản đồ cứu hộ & diễn biến 48 giờ ngay dưới — nút mở nằm trong chính khối này
+        <section aria-label="Tình hình cứu hộ" className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-2.5 no-print">
           <h1 className="sr-only">Điều hành cứu hộ — {scopeLabel}</h1>
           <RescueKpis chips ticketsQ={ticketsQ} tickets={tickets} factsOf={factsOf} evacQ={evacQ} onGo={go} onEvac={() => scrollTo(document.getElementById('so-tan'))} />
@@ -380,6 +382,7 @@ export default function RescueCenter() {
             type="button"
             onClick={() => setOverviewOpen((v) => !v)}
             aria-expanded={overviewOpen}
+            aria-label="Bản đồ cứu hộ & diễn biến 48 giờ"
             className="btn-secondary tap h-11 rounded-xl px-4"
             title="Bản đồ cứu hộ (phiếu đang mở, lộ trình đội, vùng nguy cơ, điểm sơ tán) và diễn biến 48 giờ"
           >
@@ -396,6 +399,13 @@ export default function RescueCenter() {
             <RefreshCw size={16} className={clsx(refreshing && 'animate-spin')} aria-hidden="true" />
           </button>
         </div>
+        {overviewOpen && (
+          <div className="sheet grid gap-4 p-4 no-print xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+            <RescueMap tickets={tickets} now={now} onOpen={openTicket} />
+            <SosTrend query={ticketsQ} tickets={tickets} now={now} />
+          </div>
+        )}
+        </section>
       ) : (
       <PageHeader
         tips={<RoleTips page="cuu-ho" />}
@@ -414,8 +424,8 @@ export default function RescueCenter() {
 
       {/* Lãnh đạo nắm tình hình: bản đồ cứu hộ (phiếu đang mở, lộ trình + giờ dự kiến tới của đội, vùng nguy cơ, điểm sơ tán) và diễn biến
           48 giờ (phiếu theo mức, thời gian xử lý) — cùng danh sách phiếu với bảng điều phối; thu gọn được */}
-      {/* Máy tính ≥ 1280 px: chỉ hiện khi bấm "Bản đồ cứu hộ" ở hàng chip (không còn thanh gập thường trực) */}
-      {(!wide || overviewOpen) && (
+      {/* Máy tính ≥ 1280 px: bản đồ & diễn biến mở ngay dưới hàng chip (nút "Bản đồ cứu hộ") — không còn thanh gập thường trực */}
+      {!wide && (
       <Section
         title="Bản đồ cứu hộ & diễn biến 48 giờ"
         collapsible={!wide}
