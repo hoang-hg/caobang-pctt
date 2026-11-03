@@ -11,6 +11,7 @@ import { useStore } from '../app/store';
 import { useGuideRole } from '../rbac/usePermission';
 import { GUIDE_ROLES, RESPONSE_LEVELS, SCENARIOS } from '../utils/guides';
 import { NO_DATA, RISK, risk } from '../utils/risk';
+import { useMediaQuery } from '../utils/useMediaQuery';
 
 /** Cuộn tới thẻ tình huống (khung cuộn là <main>, không phải cửa sổ); hệ điều hành bật giảm chuyển động → nhảy thẳng. */
 const jump = (id) => {
@@ -132,6 +133,9 @@ export default function Guide() {
   const list = SCENARIOS[role];
   const mine = useStore((s) => s.auth?.user?.assignments?.[0]);
   const { hash } = useLocation();
+  // Máy tính ≥ 1280 px (bản vẽ desktop khung K): cột trái dính — vai trò + "Bạn đang gặp việc gì?" dạng danh sách; các bước
+  // của từng việc ở cột phải (đủ mọi việc — in được, chạm việc bên trái thì cuộn tới)
+  const desk = useMediaQuery('(min-width: 1280px)');
 
   // Mở từ liên kết có #tình-huống → cuộn tới thẻ đó
   useEffect(() => {
@@ -144,6 +148,57 @@ export default function Guide() {
     return next;
   }, { replace: true });
 
+  const printBtn = (
+    <button type="button" onClick={() => window.print()} className="btn-secondary tap h-9 px-3" title="In hướng dẫn để tập huấn, dán tại phòng trực">
+      <Printer size={15} aria-hidden="true" /> <span className="max-sm:hidden">In hướng dẫn</span>
+    </button>
+  );
+
+  if (desk) {
+    return (
+      <div className={PAGE}>
+        <h1 className="sr-only">Hướng dẫn xử lý</h1>
+        <div className="grid grid-cols-[320px_minmax(0,1fr)] items-start gap-5">
+          <aside aria-label="Chọn việc" className="sheet sticky top-0 flex flex-col gap-3 p-5 no-print">
+            <Segmented
+              label="Hướng dẫn cho"
+              value={role}
+              onChange={setRole}
+              options={GUIDE_ROLES.map((r) => ({ value: r.value, label: r.value === own ? `${r.short || r.label} (bạn)` : r.short || r.label }))}
+            />
+            <p className="text-[13px] leading-snug text-muted">
+              {info.who}.
+              {role !== own && ' Bạn đang xem hướng dẫn của vai trò khác.'}
+            </p>
+            <section aria-labelledby="chon-viec">
+              <h2 id="chon-viec" className="mb-2 text-[15px] font-bold text-ink">Bạn đang gặp việc gì?</h2>
+              <ul className="flex flex-col gap-2">
+                {list.map((x) => (
+                  <li key={x.id}>
+                    <button type="button" onClick={() => jump(x.id)} className="tap flex min-h-[44px] w-full items-center rounded-xl bg-panel2 px-3.5 py-2 text-left text-sm leading-snug text-ink hover:bg-accent/10 hover:text-accent">
+                      {x.title}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+            {mine && <p className="text-xs text-muted">Tài khoản của bạn: <b className="font-semibold text-ink-2">{mine.role_name}</b> · {mine.domain_label}</p>}
+          </aside>
+          <div className="flex min-w-0 flex-col gap-3">
+            <div className="flex items-center justify-between gap-2 no-print">
+              <p className="text-sm text-ink-2">Làm theo từng bước đúng quy trình điều hành của tỉnh — nút dưới mỗi việc mở thẳng màn hình xử lý.</p>
+              {printBtn}
+            </div>
+            <div key={role} className="flex flex-col gap-3 print:block print:[&>*]:mb-3">
+              {list.map((x) => <Scenario key={x.id} s={x} />)}
+            </div>
+            <Conventions />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={PAGE}>
       <PageHeader
@@ -153,11 +208,7 @@ export default function Guide() {
           <span key="tk">Tài khoản của bạn: <b className="font-semibold text-ink-2">{mine.role_name}</b> · {mine.domain_label}</span>,
         ] : []}
         description="Việc thường gặp, làm theo từng bước đúng quy trình điều hành phòng chống thiên tai của tỉnh. Nút dưới mỗi việc mở thẳng màn hình xử lý."
-        actions={(
-          <button type="button" onClick={() => window.print()} className="btn-secondary tap h-9 px-3" title="In hướng dẫn để tập huấn, dán tại phòng trực">
-            <Printer size={15} aria-hidden="true" /> <span className="max-sm:hidden">In hướng dẫn</span>
-          </button>
-        )}
+        actions={printBtn}
       />
 
       <div className="flex flex-col gap-1.5 no-print">
