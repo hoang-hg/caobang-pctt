@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { ChevronLeft, ChevronRight, Flag, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Flag, Plus, RefreshCw } from 'lucide-react';
 import { api, useAreaParams } from '../api/client';
 import { useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
@@ -68,6 +68,9 @@ export default function DisasterEvents() {
   const qc = useQueryClient();
   const toast = useStore((s) => s.toast);
   const isLg = useMediaQuery('(min-width: 1024px)');
+  // Máy tính ≥ 1280 px (bản vẽ desktop khung G): cột trái "Các đợt thiên tai" + nút "Mở đợt thiên tai" ở đáy cột, báo cáo đợt
+  // bên phải; không tiêu đề trang / dải "Đang diễn ra" (đợt đang diễn ra đánh dấu ngay trong danh sách)
+  const desk = useMediaQuery('(min-width: 1280px)');
   const online = useOnline();
   const canManage = usePermission('event', 'manage');
   const area = useAreaParams();
@@ -130,7 +133,7 @@ export default function DisasterEvents() {
     <div className={clsx(PAGE, 'pb-8')}>
       <ConnectionBanner updatedAt={q.dataUpdatedAt || null} />
       {/* Đợt đang diễn ra luôn trên cùng — chạm mở báo cáo */}
-      {live.length > 0 && !(showReport && !isLg) && (
+      {live.length > 0 && !desk && !(showReport && !isLg) && (
         <div role="status" aria-label="Đợt thiên tai đang diễn ra" className="flex flex-wrap items-center gap-2 rounded-xl border border-accent/40 bg-accent/10 px-3 py-2 text-sm">
           <Flag size={15} className="shrink-0 text-accent" aria-hidden="true" />
           <span className="font-semibold text-ink">Đang diễn ra:</span>
@@ -142,6 +145,7 @@ export default function DisasterEvents() {
         </div>
       )}
 
+      {desk ? <h1 className="sr-only">Đợt thiên tai & báo cáo</h1> : (
       <PageHeader
         title="Đợt thiên tai & báo cáo"
         short="Đợt thiên tai"
@@ -162,8 +166,31 @@ export default function DisasterEvents() {
         onRefresh={refresh}
         refreshing={refreshing}
       />
+      )}
 
-      {isLg ? (
+      {desk ? (
+        <div className="grid items-start gap-5 grid-cols-[300px_minmax(0,1fr)]">
+          <aside aria-label="Các đợt" className="sheet sticky top-0 flex flex-col gap-3 p-[18px]">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-[15px] font-bold text-ink">Các đợt thiên tai</h2>
+              <button type="button" onClick={refresh} disabled={refreshing} className="btn-ghost tap-sq h-8 w-8 p-0" aria-label="Làm mới" title={area.admin_codes ? 'Làm mới — số liệu theo vùng đang lọc' : 'Làm mới'}>
+                <RefreshCw size={14} className={clsx(refreshing && 'animate-spin')} aria-hidden="true" />
+              </button>
+            </div>
+            {list}
+            {canManage && events.length > 0 && (
+              <button type="button" className="btn-primary tap mt-1 h-11 w-full rounded-xl" onClick={newEvent} disabled={!online} title={online ? 'Gom phiếu SOS, lệnh điều động, cảnh báo, vật tư theo đợt để báo cáo, rút kinh nghiệm' : 'Mất mạng — chưa mở được đợt'}>
+                <Plus size={15} aria-hidden="true" /> Mở đợt thiên tai
+              </button>
+            )}
+          </aside>
+          <div className="min-w-0">
+            {current ? (
+              <EventReport key={current} code={current} canManage={canManage} onEdit={(e) => setForm({ event: e })} onEnd={setEnding} />
+            ) : !q.isLoading && events.length ? <EmptyState height={200}>Chọn một đợt để xem báo cáo</EmptyState> : null}
+          </div>
+        </div>
+      ) : isLg ? (
         <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
           <div className="min-w-0">{list}</div>
           <div className="min-w-0">
