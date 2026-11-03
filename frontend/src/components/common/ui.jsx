@@ -384,7 +384,8 @@ const tipsSeen = (id) => { try { return localStorage.getItem(tipsKey(id)) === '1
  * cả điện thoại 360 px. `more`: liên kết đứng trước nút "Đã hiểu" (VD tới trang Hướng dẫn xử lý — RoleTips). Gợi ý theo vai
  * trò: dùng RoleTips.
  */
-export function PageTips({ id, title = 'Bắt đầu từ đâu?', steps, more, className }) {
+// `compact`: chỉ biểu tượng (tên nút vẫn đọc được qua trình đọc màn hình / title) — hàng thẻ chật của Tổng quan máy tính
+export function PageTips({ id, title = 'Bắt đầu từ đâu?', steps, more, className, compact = false }) {
   const [open, setOpen] = useState(() => !tipsSeen(id));
   const [expanded, setExpanded] = useState(false);
   const [pos, setPos] = useState(null);
@@ -428,7 +429,7 @@ export function PageTips({ id, title = 'Bắt đầu từ đâu?', steps, more, 
         className="btn-secondary tap-sq h-9 min-w-[36px] px-2.5 text-accent"
       >
         <Lightbulb size={15} aria-hidden="true" />
-        <span className="max-sm:sr-only">{title}</span>
+        <span className={compact ? 'sr-only' : 'max-sm:sr-only'}>{title}</span>
       </button>
       {expanded && pos && createPortal(
         <div

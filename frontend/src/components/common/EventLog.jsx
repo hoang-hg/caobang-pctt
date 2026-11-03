@@ -54,7 +54,7 @@ export default function EventLog({ limit = 50, className, preview }) {
 
   return (
     <div className={clsx('flex h-full flex-col gap-2 print:h-auto', className)}>
-      <div className="scroll-thin -mx-1 flex items-center gap-1 overflow-x-auto px-1 pb-0.5 no-print" role="group" aria-label="Lọc nhật ký theo loại">
+      <div className="flex flex-wrap items-center gap-1 self-start rounded-xl bg-panel2 p-1 no-print" role="group" aria-label="Lọc nhật ký theo loại">
         {FILTERS.map((f) => (
           <button
             key={f.id}
@@ -62,8 +62,9 @@ export default function EventLog({ limit = 50, className, preview }) {
             aria-pressed={filter === f.id}
             onClick={() => setFilter(f.id)}
             className={clsx(
-              'tap min-h-[32px] shrink-0 whitespace-nowrap rounded-lg border px-2.5 text-[13px] font-medium',
-              filter === f.id ? 'border-accent bg-accent/10 font-semibold text-accent' : 'border-transparent text-ink-2 hover:bg-panel2 hover:text-ink',
+              // Rãnh xám, thẻ đang chọn là viên trắng (bản vẽ desktop) — xuống dòng thay vì cắt chữ ở cột hẹp
+              'tap min-h-[32px] shrink-0 whitespace-nowrap rounded-[9px] px-2.5 text-[13px]',
+              filter === f.id ? 'bg-panel font-semibold text-ink shadow-sm' : 'text-ink-2 hover:text-ink',
             )}
           >
             {f.label}

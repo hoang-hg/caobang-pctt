@@ -34,7 +34,7 @@ const STAFF_PAGES = [
   ['/dashboard?tab=sat_lo', 'Tổng quan · sạt lở, lũ quét'],
   ['/dashboard?tab=ngap_lut', 'Tổng quan · ngập lụt'],
   ['/dashboard?tab=cap_xa', 'Tổng quan · cấp xã/phường'],
-  ['/dashboard?tab=he_thong', 'Tổng quan · hệ thống & dữ liệu'],
+  ['/dashboard?tab=he_thong', 'Tổng quan · hệ thống'],
   ['/ban-do', 'Bản đồ giám sát'],
   ['/cuu-ho', 'Điều hành cứu hộ'],
   ['/phan-anh', 'Phản ánh người dân'],
@@ -508,7 +508,9 @@ async function staff(ctx, trackCode) {
     const dec = page.locator('[aria-label="Việc chờ quyết định"]');
     if (await dec.count()) {
       const [d, kpi] = await Promise.all([dec.boundingBox(), page.locator('[aria-label="Chỉ số nhanh"]').boundingBox()]);
-      if (vp.mobile ? d.y < kpi.y : d.y > kpi.y) throw new Error(`"Việc chờ quyết định" ${vp.mobile ? 'phải ngay sau' : 'phải đứng trước'} 6 ô chỉ số`);
+      // Máy tính ≥ 1280 px (bản vẽ desktop, khung A): việc chờ nằm ở cột Tình hình BÊN TRÁI 6 ô chỉ số — đứng trước theo chiều đọc
+      const leftCol = !vp.mobile && d.x + d.width <= kpi.x + 1;
+      if (vp.mobile ? d.y < kpi.y : d.y > kpi.y && !leftCol) throw new Error(`"Việc chờ quyết định" ${vp.mobile ? 'phải ngay sau' : 'phải đứng trước (hoặc ở cột bên trái)'} 6 ô chỉ số`);
     }
 
     // Gợi ý 3 bước: hiện lần đầu — diện mạo B (DESIGN.md: không chữ hướng dẫn thường trực): một nút "Bắt đầu từ đâu?" ở đầu
@@ -557,6 +559,9 @@ async function staff(ctx, trackCode) {
 
     // Mọi biểu đồ (chuyên đề "Tất cả"): tiêu đề là câu kết luận; không còn tiếng Anh / viết tắt trên màn (bỏ nội dung nhật
     // ký — câu do máy chủ ghi — và bản đồ)
+    // Máy tính 3 cột (bản vẽ desktop khung A): biểu đồ nằm sau thẻ "Biểu đồ" của khối Điểm nóng — mở thẻ đó trước
+    const chartsTab = page.getByRole('tab', { name: 'Biểu đồ', exact: true });
+    if (await chartsTab.count()) await chartsTab.click();
     await page.getByRole('group', { name: 'Chuyên đề biểu đồ' }).getByRole('button', { name: 'Tất cả' }).click();
     await page.waitForTimeout(2_000);
     const jargon = await page.evaluate(() => {

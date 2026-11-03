@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CircleMarker, MapContainer, Pane, Popup, Tooltip, ZoomControl, useMap } from 'react-leaflet';
 import clsx from 'clsx';
-import { Crosshair, Maximize2, Minimize2, Tag } from 'lucide-react';
+import { ChevronRight, Crosshair, Maximize2, Minimize2, Tag } from 'lucide-react';
 import { useAreaQuery } from '../../api/hooks';
 import { useStore } from '../../app/store';
 import { useChartTheme } from '../charts/chartTheme';
@@ -106,8 +106,10 @@ function ZoomWatcher({ onChange }) {
  * đang lọc (AreaFocus), điểm nóng từ /map/layers + KPI. Không có điểm nóng → nói rõ, không vẽ điểm minh hoạ.
  * `focus` ({ id, at }): yêu cầu từ ngoài (câu "Nguy hiểm nhất") — cuộn tới bản đồ và bay tới điểm đó.
  * `tall`: cột phải của Tổng quan màn lớn ≥ 1680 px — cao ít nhất 420 px và giãn bằng cột trái (việc chờ + 6 ô số); danh
- * sách điểm nóng cuộn trong chiều cao đó, không đẩy hàng cao thêm. */
-export default function TacticalMiniMap({ k, className, focus, tall = false, heroLayout, onSetHeroLayout }) {
+ * sách điểm nóng cuộn trong chiều cao đó, không đẩy hàng cao thêm.
+ * `fill` (bản vẽ desktop Tổng quan ≥ 1280 px): khối giãn hết chiều cao còn lại của cột giữa — `lead` (thẻ "Điểm nóng | Biểu
+ * đồ") thay tiêu đề, lọc mức thành thẻ viên bên phải, danh sách 250 px cạnh bản đồ, "Bản đồ đầy đủ" ở cuối danh sách. */
+export default function TacticalMiniMap({ k, className, focus, tall = false, fill = false, lead, heroLayout, onSetHeroLayout }) {
   const { data: layers, isError: layersError, refetch } = useAreaQuery('map-layers', '/map/layers', {}, { refetchInterval: 30_000 });
   const { data: area } = useAreaQuery('area', '/admin-units/area', {}, { staleTime: Infinity });
   const filtered = useStore((s) => s.filter.codes.length > 0);
@@ -132,7 +134,20 @@ export default function TacticalMiniMap({ k, className, focus, tall = false, her
   const count = (m) => hotspots.filter((h) => h.level >= m).length;
 
   return (
-    <section ref={box} className={clsx('card flex scroll-mt-20 flex-col gap-2 p-3', className)}>
+    <section ref={box} className={clsx(fill ? 'sheet flex min-h-0 flex-col gap-3 p-4' : 'card flex scroll-mt-20 flex-col gap-2 p-3', className)}>
+      {fill ? (
+        <div className="flex flex-wrap items-center justify-between gap-2.5">
+          {lead}
+          <h2 className="sr-only">Điểm nóng trên bản đồ</h2>
+          <div className="seg-track" role="group" aria-label="Lọc điểm nóng theo mức">
+            {FILTERS.map((f) => (
+              <button key={f.id} type="button" onClick={() => setLevel(f.id)} aria-pressed={level === f.id} className={clsx('seg-item', level === f.id && 'seg-item-on')}>
+                {f.label} <span className="num">{count(f.min)}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="card-title">
           <Crosshair size={15} className="text-accent" aria-hidden="true" /> Điểm nóng trên bản đồ
@@ -194,11 +209,12 @@ export default function TacticalMiniMap({ k, className, focus, tall = false, her
           )}
         </div>
       </div>
+      )}
 
       {/* Danh sách điểm nóng nằm cạnh bản đồ từ 1280 px; hẹp hơn (iPad, cột trái 3/5) xuống dưới để bản đồ đủ rộng */}
-      <div className={clsx('grid gap-2 xl:grid-cols-[minmax(0,1fr)_240px] [&>*]:min-w-0', tall && 'flex-1')}>
+      <div className={clsx('grid gap-2 [&>*]:min-w-0', fill ? 'min-h-0 flex-1 grid-cols-[minmax(0,1fr)_220px] gap-3 min-[1440px]:grid-cols-[minmax(0,1fr)_250px]' : 'xl:grid-cols-[minmax(0,1fr)_240px]', tall && 'flex-1')}>
         {/* isolate: các lớp Leaflet (z-index tới 1000) không đè dải báo động dính trên cùng khi cuộn */}
-        <div className={clsx('relative isolate z-0 overflow-hidden rounded-lg border border-line', tall ? 'min-h-[420px]' : 'h-[220px] sm:h-[300px] xl:h-[320px]')}>
+        <div className={clsx('relative isolate z-0 overflow-hidden', fill ? 'min-h-[260px] rounded-[14px]' : 'rounded-lg border border-line', !fill && (tall ? 'min-h-[420px]' : 'h-[220px] sm:h-[300px] xl:h-[320px]'))}>
           {/* Không phóng bằng lăn chuột: trang Tổng quan cuộn được — lăn qua bản đồ phải cuộn trang (phóng bằng nút +/−) */}
           <MapContainer center={CENTER} zoom={8.8} zoomSnap={0.1} zoomDelta={0.5} zoomControl={false} scrollWheelZoom={false} className="h-full w-full">
             <BaseLayer basemap="auto" />
@@ -322,7 +338,7 @@ export default function TacticalMiniMap({ k, className, focus, tall = false, her
           )}
         </div>
 
-        <ul className={clsx('scroll-thin flex flex-col gap-1 overflow-y-auto pr-1 print:max-h-none print:overflow-visible', tall ? 'h-0 min-h-full' : 'max-h-[200px] xl:max-h-[320px]')}>
+        <ul className={clsx('scroll-thin flex flex-col overflow-y-auto pr-1 print:max-h-none print:overflow-visible', fill ? 'h-0 min-h-full gap-2' : 'gap-1', !fill && (tall ? 'h-0 min-h-full' : 'max-h-[200px] xl:max-h-[320px]'))}>
           {shown.slice(0, 30).map((h) => {
             const isTarget = target && target.lat === h.lat && target.lon === h.lon;
             return (
@@ -331,14 +347,15 @@ export default function TacticalMiniMap({ k, className, focus, tall = false, her
                   type="button"
                   onClick={() => setTarget({ lat: h.lat, lon: h.lon, at: Date.now() })}
                   className={clsx(
-                    'flex w-full items-start gap-2 rounded-md border px-2 py-1.5 text-left text-xs transition',
-                    isTarget ? 'border-accent bg-accent/15 ring-1 ring-accent' : 'border-line/60 hover:bg-panel2',
+                    'flex w-full items-start text-left transition',
+                    fill ? 'gap-2.5 rounded-xl px-3 py-2.5' : 'gap-2 rounded-md border px-2 py-1.5 text-xs',
+                    fill ? (isTarget ? 'bg-accent/10 ring-1 ring-accent' : 'bg-panel2 hover:bg-line/50') : isTarget ? 'border-accent bg-accent/15 ring-1 ring-accent' : 'border-line/60 hover:bg-panel2',
                   )}
                 >
                   <span className="mt-1 inline-block h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: risk(h.level).hex }} />
                   <span className="min-w-0">
-                    <span className={clsx('block truncate', isTarget ? 'font-bold text-accent' : 'font-semibold text-ink')}>{h.name}</span>
-                    <span className="block truncate text-muted">{h.kind}{h.detail ? ` · ${h.detail}` : ''}</span>
+                    <span className={clsx('block truncate', fill && 'text-sm', isTarget ? 'font-bold text-accent' : 'font-semibold text-ink')}>{h.name}</span>
+                    <span className={clsx('block truncate text-muted', fill && 'text-xs')}>{h.kind}{h.detail ? ` · ${h.detail}` : ''}</span>
                   </span>
                 </button>
               </li>
@@ -346,6 +363,11 @@ export default function TacticalMiniMap({ k, className, focus, tall = false, her
           })}
           {layers && !shown.length && <li className="py-6 text-center text-xs text-muted">Không có điểm nóng ở mức đã chọn</li>}
           {shown.length > 30 && <li className="text-center text-[11px] text-muted">… và {shown.length - 30} điểm khác — xem bản đồ đầy đủ</li>}
+          {fill && (
+            <li>
+              <Link to="/ban-do" className="touch-hit inline-flex items-center text-sm font-semibold text-accent hover:underline">Bản đồ đầy đủ <ChevronRight size={15} aria-hidden="true" /></Link>
+            </li>
+          )}
         </ul>
       </div>
     </section>

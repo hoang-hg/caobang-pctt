@@ -48,6 +48,48 @@ function useDecisionRows(k) {
 const HINT = 'Những việc đang chờ chính bạn xử lý. Bấm vào từng việc để mở đúng nơi làm việc đó; xong việc thì việc tự mất khỏi đây.';
 
 /**
+ * "Việc chờ quyết định" trong cột Tình hình nền xanh đêm (bản vẽ desktop Tổng quan, ≥ 1280 px): tiêu đề nhỏ "VIỆC CHỜ QUYẾT
+ * ĐỊNH · N VIỆC", mỗi việc một ô — chấm màu (Đỏ chỉ việc khẩn), số đậm + việc, nút trắng ghi đúng thao tác. Cùng dữ liệu,
+ * cùng quy tắc với DecisionPanel. Đặt trong khối có lớp `dark`.
+ */
+export function DecisionList({ k, kState }) {
+  const { rows, fresh, total } = useDecisionRows(k);
+  return (
+    <section aria-label="Việc chờ quyết định" className="flex flex-col gap-2 no-print">
+      <h2 className="flex items-center gap-1.5 text-xs font-bold text-[#A9B6CC]">
+        Việc chờ quyết định{rows.length > 0 && <span className="num">· {int(total)} việc</span>}
+        <Hint label="Việc chờ quyết định">{HINT}</Hint>
+      </h2>
+      {!rows.length && !k ? (
+        kState?.error
+          ? <p className="text-[13px] text-[#CBD5E1]">Không tải được — chưa biết việc nào đang chờ</p>
+          : <Skeleton height={56} />
+      ) : rows.length ? (
+        <ul className="flex flex-col gap-2">
+          {rows.map((r) => (
+            <li key={r.key} className={clsx(fresh(r.key) && 'motion-safe:animate-enter')}>
+              <Link to={r.to} className="group flex items-center gap-2.5 rounded-[14px] bg-[#16294A] p-3 transition-colors hover:bg-[#1C3359]">
+                <span className={clsx('h-2.5 w-2.5 shrink-0 rounded-full', r.level != null ? risk(r.level).fill : 'bg-[#94A3B8]')} aria-hidden="true" />
+                <span className="min-w-0 flex-1 text-sm leading-snug text-white">
+                  <b className="num font-bold">{int(r.n)}</b> {r.text}
+                </span>
+                <span className="inline-flex h-9 shrink-0 items-center gap-0.5 whitespace-nowrap rounded-[10px] bg-white px-3 text-[13px] font-semibold text-[#1D5BC7] group-hover:bg-[#EEF3FC]">
+                  {r.action} <ChevronRight size={14} aria-hidden="true" />
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="flex items-center gap-2 rounded-[14px] bg-[#16294A] p-3 text-sm text-[#CBD5E1]">
+          <CircleCheckBig size={18} className="shrink-0" aria-hidden="true" /> Không có việc nào đang chờ bạn quyết định.
+        </p>
+      )}
+    </section>
+  );
+}
+
+/**
  * "Việc chờ quyết định" nằm TRONG khối đầu trang Tổng quan (diện mạo B — một khối dẫn đầu; 640 – 1679 px): một hàng nút
  * việc trên nền xanh đêm — số · việc · thao tác. Cùng dữ liệu, cùng quy tắc với DecisionPanel (chỉ Đỏ cho việc khẩn).
  */

@@ -24,7 +24,8 @@ function Badge({ n, warm }) {
 /**
  * Menu ngang của thanh trên cùng (máy tính ≥ 1024 px — DESIGN.md, phương án B: không còn menu trái). Nhóm "Điều hành" hiện
  * thẳng; mục KHÔNG ĐỦ CHỖ tự dồn vào "Thêm" (đo bề rộng thật — thanh không bao giờ tràn ngang ở 1024 / 1280 / 1440 px), cùng
- * các nhóm Dữ liệu & báo cáo, Quản trị, Trợ giúp, cổng người dân, số 112. Số đếm khẩn (SOS chờ, lệnh chờ duyệt…) như menu cũ.
+ * các nhóm Dữ liệu & báo cáo, Quản trị, Trợ giúp, cổng người dân, số 112. Bản vẽ desktop (11/2026): mục trên thanh KHÔNG có số
+ * đếm (số SOS chờ ở nút đỏ "N SOS chờ xử lý" của thanh trên, việc khác ở "Việc chờ quyết định") — số chỉ còn trong danh sách "Thêm".
  * Như bản mẫu B: mục trên thanh chỉ có chữ (biểu tượng chỉ trong "Thêm" — danh sách dọc dễ dò hơn).
  */
 export default function TopNav() {
@@ -84,14 +85,13 @@ export default function TopNav() {
     >
       {inMenu && <it.icon size={16} className="shrink-0" aria-hidden="true" />}
       <span className={inMenu ? 'flex-1' : undefined}>{inMenu ? it.label : it.short || it.label}</span>
-      <Badge n={count(it)} warm={warm(it)} />
+      {inMenu && <Badge n={count(it)} warm={warm(it)} />}
     </NavLink>
   );
 
   const shown = primary.slice(0, fit);
   const hidden = primary.slice(fit);
   const moreActive = [...hidden, ...others.flatMap((g) => g.items)].some((n) => pathname === n.to || pathname.startsWith(`${n.to}/`));
-  const moreCount = [...hidden, ...others.flatMap((g) => g.items)].reduce((s, n) => s + count(n), 0);
 
   return (
     <nav aria-label="Menu chính" ref={box} className="relative hidden min-w-0 flex-1 items-center gap-1 lg:flex">
@@ -99,7 +99,7 @@ export default function TopNav() {
       <div ref={measure} aria-hidden="true" className="pointer-events-none invisible absolute left-0 top-0 flex gap-1">
         {primary.map((it) => (
           <span key={it.to} className="flex shrink-0 items-center gap-1.5 whitespace-nowrap px-3.5 py-2 text-sm font-semibold">
-            {it.short || it.label} {count(it) ? <span className="chip px-1.5 py-0 text-[10px] font-bold">{count(it)}</span> : null}
+            {it.short || it.label}
           </span>
         ))}
       </div>
@@ -116,7 +116,7 @@ export default function TopNav() {
               moreActive ? 'bg-accent/10 text-accent' : 'text-ink-2 hover:bg-panel2 hover:text-ink',
             )}
           >
-            Thêm <Badge n={moreCount} /> <ChevronDown size={14} aria-hidden="true" />
+            Thêm <ChevronDown size={14} aria-hidden="true" />
           </button>
           {open && (
             <div className="card absolute left-0 top-11 z-[1200] flex w-72 flex-col gap-2 p-2 shadow-2xl">

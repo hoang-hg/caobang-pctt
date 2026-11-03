@@ -7,7 +7,8 @@ import { ChevronDown, Download, Loader2 } from 'lucide-react';
  * còn việc chính. `items`: [{ key, label, hint (dòng phụ), icon, onClick, disabled, busy (đang xuất — nút hiện vòng quay) }].
  * Bàn phím: mở là con trỏ ở mục đầu, ↑ ↓ chuyển mục, Esc đóng và trả con trỏ về nút.
  */
-export default function ExportMenu({ items, label = 'Xuất', title = 'Xuất báo cáo, bảng số liệu', className }) {
+// `up`: menu mở lên trên (nút ở đáy khối — cột Tình hình của Tổng quan); `buttonClass`: thay kiểu nút (nền tối)
+export default function ExportMenu({ items, label = 'Xuất', title = 'Xuất báo cáo, bảng số liệu', className, up = false, buttonClass }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const busy = items.some((it) => it.busy);
@@ -47,14 +48,14 @@ export default function ExportMenu({ items, label = 'Xuất', title = 'Xuất b�
         aria-haspopup="menu"
         aria-expanded={open}
         title={title}
-        className="btn-secondary tap-sq h-9 min-w-[36px] px-2.5"
+        className={buttonClass || 'btn-secondary tap-sq h-9 min-w-[36px] px-2.5'}
       >
         {busy ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <Download size={15} aria-hidden="true" />}
         <span className="max-sm:sr-only">{label}</span>
         <ChevronDown size={13} className={clsx('transition-transform max-sm:hidden', open && 'rotate-180')} aria-hidden="true" />
       </button>
       {open && (
-        <div role="menu" aria-label={title} className="card absolute right-0 top-full z-[1100] mt-1.5 w-72 max-w-[calc(100vw-1.5rem)] p-1.5 shadow-xl">
+        <div role="menu" aria-label={title} className={clsx('card absolute z-[1100] w-72 max-w-[calc(100vw-1.5rem)] p-1.5 shadow-xl', up ? 'bottom-full left-0 mb-1.5' : 'right-0 top-full mt-1.5')}>
           {items.map((it) => (
             <button
               key={it.key}
