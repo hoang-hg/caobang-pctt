@@ -8,6 +8,7 @@ import {
 import { useStore } from '../../app/store';
 import { FIELD_REPORT, PRIORITY, VEHICLE, VULNERABLE } from '../../utils/labels';
 import { dateTime, time } from '../../utils/format';
+import { useMediaQuery } from '../../utils/useMediaQuery';
 
 /** Mã nhiệm vụ nằm sau dấu # của đường dẫn: trình duyệt không gửi phần này lên máy chủ (không vào nhật ký truy cập,
  * không lọt qua Referer khi bấm sang Google Maps) — trang đọc mã rồi gửi trong header X-Mission-Token. */
@@ -112,6 +113,9 @@ export default function MissionPage() {
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [sendError, setSendError] = useState('');
+  // Máy tính ≥ 1280 px (bản vẽ desktop khung O1 — trực ban / trưởng nhóm mở trên máy tính): thanh trên tối, 2 cột — lệnh, chỉ
+  // đường, liên lạc, lực lượng (trái) · báo cáo về trung tâm, đã báo (phải, dính). Điện thoại giữ một cột như cũ
+  const desk = useMediaQuery('(min-width: 1280px)');
 
   useEffect(() => {
     document.title = 'Nhiệm vụ cứu hộ – PCTT Cao Bằng';
@@ -215,8 +219,8 @@ export default function MissionPage() {
       : { kind: 'need_support', note: note.trim() });
   };
 
-  return (
-    <Screen>
+  const pHead = (
+    <>
       <header className="card overflow-hidden">
         <div className="flex items-center gap-2 bg-danger px-4 py-2.5 text-white">
           <Siren size={18} />
@@ -230,13 +234,19 @@ export default function MissionPage() {
           </span>
         </div>
       </header>
-
+    </>
+  );
+  const pErr = (
+    <>
       {error && (
         <div className="rounded-lg border border-warn bg-warn/10 p-2 text-sm text-ink">
           Mất kết nối — đang hiện thông tin lúc {time(dataUpdatedAt)}. Có sóng trở lại trang tự cập nhật.
         </div>
       )}
-
+    </>
+  );
+  const pOrder = (
+    <>
       <section className="card p-4">
         <div className="text-lg font-bold text-ink">
           {m.incident_label} · <span className="text-danger">{m.trapped_count} người</span>
@@ -253,7 +263,10 @@ export default function MissionPage() {
         {m.raw_message && <p className="mt-2 rounded-lg bg-panel2 p-2 text-sm italic text-ink-2 [overflow-wrap:anywhere]">“{m.raw_message}”</p>}
         <div className="mt-2 text-xs text-muted">Nhận tin lúc {dateTime(m.received_at)}</div>
       </section>
-
+    </>
+  );
+  const pRoute = (
+    <>
       <section className="card flex flex-col gap-2 p-4">
         <a className="btn-primary w-full py-3 text-base" href={maps} target="_blank" rel="noopener noreferrer">
           <Navigation size={18} /> Chỉ đường tới điểm SOS
@@ -284,7 +297,10 @@ export default function MissionPage() {
           </p>
         )}
       </section>
-
+    </>
+  );
+  const pReport = (
+    <>
       <section className="card flex flex-col gap-2 p-4">
         <h2 className="card-title"><Users size={14} /> Báo cáo về trung tâm</h2>
         {arrived ? (
@@ -351,7 +367,10 @@ export default function MissionPage() {
         )}
         {sendError && <p className="rounded-lg border border-danger/50 bg-danger/5 p-2 text-sm text-danger">{sendError}</p>}
       </section>
-
+    </>
+  );
+  const pContact = (
+    <>
       <section className="card flex flex-col gap-2 p-4">
         <h2 className="card-title"><Phone size={14} /> Liên lạc</h2>
         {m.reporter_phone ? (
@@ -372,7 +391,10 @@ export default function MissionPage() {
           </a>
         ))}
       </section>
-
+    </>
+  );
+  const pForce = (
+    <>
       <section className="card p-4 text-sm">
         <h2 className="card-title"><Truck size={14} /> Lực lượng được điều động</h2>
         <div className="mt-1 font-semibold text-ink">{m.force_name}</div>
@@ -390,7 +412,10 @@ export default function MissionPage() {
           Phát lệnh {dateTime(m.dispatched_at)}{m.dispatched_by ? ` — ${m.dispatched_by}` : ''}{m.distance_km ? ` · ${m.distance_km} km` : ''}
         </div>
       </section>
-
+    </>
+  );
+  const pDone = (
+    <>
       {m.reports.length > 0 && (
         <section className="card p-4 text-sm">
           <h2 className="card-title"><Clock size={14} /> Đã báo</h2>
@@ -409,7 +434,10 @@ export default function MissionPage() {
           </ul>
         </section>
       )}
-
+    </>
+  );
+  const pFoot = (
+    <>
       <footer className="flex flex-col items-center gap-2 px-1 text-center text-xs text-muted">
         <button type="button" className="btn-ghost px-3 py-1 text-xs" onClick={() => refetch()} disabled={isFetching}>
           <RefreshCw size={13} className={isFetching ? 'animate-spin' : ''} /> Cập nhật lúc {time(dataUpdatedAt)}
@@ -420,6 +448,58 @@ export default function MissionPage() {
           khi mất sóng, tự xoá khi link đóng.
         </p>
       </footer>
+    </>
+  );
+
+  if (desk) {
+    return (
+      <div className="h-full overflow-y-auto scroll-thin bg-bg">
+        <header className="sticky top-0 z-10 flex h-16 items-center gap-3.5 bg-[#0B1A33] px-6 text-white">
+          <ShieldAlert size={28} className="shrink-0 text-sky-400" aria-hidden="true" />
+          <div className="min-w-0 leading-tight">
+            <div className="font-bold">Nhiệm vụ cứu hộ – PCTT Cao Bằng</div>
+            <div className="text-xs text-[#A9B6CC]">Link nhiệm vụ của trưởng nhóm · không cần đăng nhập</div>
+          </div>
+          <span className="flex-1" />
+          <span className="text-[13px] text-[#A9B6CC]">Hiệu lực tới {dateTime(m.expires_at)}</span>
+          {m.hotlines?.[0] && (
+            <a href={`tel:${m.hotlines?.[0].phone.replace(/\s/g, '')}`} className="tap inline-flex h-10 items-center gap-1.5 rounded-xl bg-white px-4 text-sm font-semibold text-ink hover:bg-panel2" title={m.hotlines?.[0].org}>
+              <Phone size={15} aria-hidden="true" /> Gọi trực ban
+            </a>
+          )}
+        </header>
+        <main className="mx-auto grid max-w-[1400px] grid-cols-[minmax(0,1fr)_420px] items-start gap-5 p-5">
+          <div className="flex min-w-0 flex-col gap-3">
+            {pHead}
+            {pErr}
+            {pOrder}
+            {pRoute}
+            <div className="grid grid-cols-2 items-start gap-3">
+              {pContact}
+              {pForce}
+            </div>
+          </div>
+          <aside className="sticky top-[84px] flex flex-col gap-3">
+            {pReport}
+            {pDone}
+            {pFoot}
+          </aside>
+        </main>
+      </div>
+    );
+  }
+
+  return (
+    <Screen>
+      {pHead}
+      {pErr}
+      {pOrder}
+      {pRoute}
+      {pReport}
+      {pContact}
+      {pForce}
+      {pDone}
+      {pFoot}
     </Screen>
   );
 }
