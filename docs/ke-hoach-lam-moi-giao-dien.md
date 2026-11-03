@@ -472,7 +472,8 @@ Mỗi nhóm một PR (lint + build + ảnh chụp đối chiếu bản vẽ ở 
 |---|---|---|
 | Khung | Thanh trên 68 px, nút 44 px; "Báo cáo nhanh" viền đỏ + "N SOS chờ xử lý"; menu không số đếm; địa bàn nhãn gọn "Toàn tỉnh" tới 1535 px | Xong (A1) |
 | A | Tổng quan ≥ 1280 px: 3 cột vừa một màn hình — cột **Tình hình** xanh đêm (câu tóm tắt, Nguy hiểm nhất, Việc chờ quyết định, Trình chiếu · Xuất) · cột giữa (thẻ chỉ chữ + chấm mức, 6 ô số 3 × 2, khối **Điểm nóng · Biểu đồ · Bảng số liệu** với lọc Tất cả / Cam trở lên / Đỏ) · **Nhật ký sự kiện**; thẻ "Hệ thống & dữ liệu" → "Hệ thống" | Xong (A1) |
-| A (tiếp) | Ô số riêng từng thẻ (Mưa lớn, Sạt lở, Ngập lụt); thẻ Cấp xã = bảng 56 xã nặng nhất lên đầu (A7); Tổng quan của cán bộ xã (A11); nhật ký đầy đủ dạng ngăn phải (A16); trình chiếu (A2); menu Xuất, báo cáo văn bản, báo cáo nhanh 3 bước, chọn địa bàn, kết quả tìm địa điểm | Kế tiếp |
+| A2 | Hàng 3 ô số riêng thẻ Mưa lớn (mưa trung bình 24 giờ · xã có thể mưa rất to · dự báo 3 ngày) và Sạt lở, lũ quét (điểm cấm đường · cảm biến vượt ngưỡng · xã vượt ngưỡng mưa sạt lở) — A4, A5; thẻ Cấp xã của cấp tỉnh = bảng các xã nặng nhất lên đầu, tìm xã, bấm dòng vào chi tiết xã (A7) | Xong (A2) |
+| A (tiếp) | Tổng quan của cán bộ xã (A11); nhật ký đầy đủ dạng ngăn phải (A16); trình chiếu (A2); menu Xuất, báo cáo văn bản, báo cáo nhanh 3 bước, chọn địa bàn, kết quả tìm địa điểm | Kế tiếp |
 | B | Bản đồ giám sát (B–B10) | Kế tiếp |
 | C | Điều hành cứu hộ (C–C15) | Kế tiếp |
 | D | Cảnh báo & Hotline (D–D10) | Kế tiếp |
