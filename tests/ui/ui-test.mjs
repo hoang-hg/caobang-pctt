@@ -1466,6 +1466,7 @@ async function mapLayers(ctx, phone) {
   // Thiết kế B.1 "Bảng cảnh báo khẩn cấp: dòng thời gian cuộn liên tục (feed) các tín hiệu SOS… cảnh báo từ cảm biến"
   await step(ctx, 'Diễn biến: mới nhất trên cùng, lọc theo loại; sự kiện mới đến khi đang cuộn → "N mục mới", không nhảy; chạm mục → bay tới', async () => {
     if (phone) await page.getByRole('navigation', { name: 'Thao tác nhanh' }).getByRole('button', { name: /^Cảnh báo/ }).click();
+    else await openAlertsPanel(page); // máy tính ≥ 1280 px: bảng cảnh báo gập sẵn
     await visible(page.getByRole('button', { name: 'Diễn biến', exact: true })).click();
     const log = visible(page.getByRole('log', { name: 'Diễn biến, mới nhất trên cùng' }));
     await log.locator('li').first().waitFor({ timeout: 15_000 });
@@ -2410,6 +2411,8 @@ async function communeHome(ctx) {
   });
   await step(ctx, `Bản đồ — tài khoản phường ${WARD.name}: nhãn "Tình hình · Phường ${WARD.name}", không ghi Toàn tỉnh`, async () => {
     await page.goto(`${ROOT}/ban-do`);
+    await page.locator('.leaflet-container').waitFor({ timeout: 20_000 });
+    await openAlertsPanel(page); // máy tính ≥ 1280 px: bảng cảnh báo (6 chỉ số Tình hình) gập sẵn
     const box = page.locator('[aria-label^="Tình hình · "]').first();
     await box.waitFor({ state: 'attached', timeout: 20_000 });
     const label = await box.getAttribute('aria-label');
