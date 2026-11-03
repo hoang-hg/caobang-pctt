@@ -11,6 +11,7 @@ import { Confirm, Empty, EmptyState, ErrorState, Modal, Skeleton, Tabs } from '.
 import PageHeader from '../components/common/PageHeader';
 import RoleTips from '../components/common/RoleTips';
 import { PAGE } from '../components/layout/page';
+import { useMediaQuery } from '../utils/useMediaQuery';
 import { usePermission } from '../rbac/usePermission';
 import { STATION_TYPE } from '../utils/labels';
 import { risk } from '../utils/risk';
@@ -281,7 +282,8 @@ function SourcesTab({ sources, devices }) {
     );
   }
   return (
-    <ul className="grid gap-3 xl:grid-cols-2" aria-label="Các nguồn dữ liệu">
+    // Máy tính ≥ 1280 px (bản vẽ desktop khung I): 3 thẻ nguồn một hàng
+    <ul className="grid gap-3 xl:grid-cols-3" aria-label="Các nguồn dữ liệu">
       {sources.map((s) => {
         const T = TYPE[s.type] || { name: s.name, label: '', tech: s.type, icon: Activity };
         const st = sourceState(s, devices);
@@ -609,6 +611,7 @@ function MonitorTab({ sources, devices }) {
 
 export default function DataSources() {
   const [tab, setTab] = useState('sources');
+  const desk = useMediaQuery('(min-width: 1280px)'); // bản vẽ desktop khung I
   const sourcesQ = useQuery({ queryKey: ['int-sources'], queryFn: () => api('/integrations/sources'), refetchInterval: 20_000 });
   const devicesQ = useQuery({ queryKey: ['int-devices'], queryFn: () => api('/integrations/devices'), refetchInterval: 15_000 });
   const sources = sourcesQ.data || [];
@@ -625,19 +628,31 @@ export default function DataSources() {
   const lost = devices.filter((d) => d.enabled && d.status === 'mat_tin_hieu').length;
   return (
     <div className={`${PAGE} pb-8`}>
-      <PageHeader
-        tips={<RoleTips page="nguon-du-lieu" />}
-        title="Nguồn dữ liệu & thiết bị đo"
-        short="Nguồn dữ liệu"
-        time={dataTime}
-        timeNote={sourcesQ.isError ? 'Chưa tải được số liệu' : 'Đang tải số liệu…'}
-        description="Số liệu dự báo và trạm đo hiện trường về hệ thống từ đâu, có đang về đều không."
-      />
+      {/* Máy tính ≥ 1280 px (bản vẽ desktop khung I): không tiêu đề trang — hàng thẻ + "Chỉ Cấp 1 — Quản trị hệ thống" + gợi ý */}
+      {desk ? <h1 className="sr-only">Nguồn dữ liệu & thiết bị đo</h1> : (
+        <PageHeader
+          tips={<RoleTips page="nguon-du-lieu" />}
+          title="Nguồn dữ liệu & thiết bị đo"
+          short="Nguồn dữ liệu"
+          time={dataTime}
+          timeNote={sourcesQ.isError ? 'Chưa tải được số liệu' : 'Đang tải số liệu…'}
+          description="Số liệu dự báo và trạm đo hiện trường về hệ thống từ đâu, có đang về đều không."
+        />
+      )}
+      <div className={desk ? 'flex items-center gap-2 [&>*:not(:first-child)]:shrink-0' : 'contents'}>
       <Tabs value={tab} onChange={setTab} tabs={[
         { value: 'sources', label: 'Nguồn số liệu', icon: CloudSun, alert: broken ? { level: 3, text: `${broken} nguồn đang lỗi` } : undefined },
         { value: 'devices', label: 'Thiết bị đo', icon: Cpu, alert: lost ? { level: 2, text: `${lost} thiết bị mất tín hiệu` } : undefined },
         { value: 'monitor', label: 'Tình trạng nhận số liệu', short: 'Tình trạng', icon: Activity },
       ]} />
+      {desk && (
+        <>
+          <span className="flex-1" />
+          <span className="text-[13px] text-muted" title={dataTime ? `Số liệu lúc ${dataTime}` : undefined}>Chỉ Cấp 1 — Quản trị hệ thống</span>
+          <RoleTips page="nguon-du-lieu" compact />
+        </>
+      )}
+      </div>
       {tab === 'sources' && canManage && <SimulationCard />}
       {tab === 'sources' && gate(sourcesQ, 'danh sách nguồn số liệu', <SourcesTab sources={sources} devices={devices} />)}
       {tab === 'devices' && gate(devicesQ, 'danh sách thiết bị đo', <DevicesTab devices={devices} />)}
