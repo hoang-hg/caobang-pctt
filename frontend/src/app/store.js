@@ -180,6 +180,7 @@ export const useStore = create((set, get) => ({
     set((s) => ({ toasts: [...s.toasts, { id, tone: 'info', ...t }].slice(-4) }));
     setTimeout(() => set((s) => ({ toasts: s.toasts.filter((x) => x.id !== id) })), t.duration || 6000);
   },
+  dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((x) => x.id !== id) })),
 }));
 
 followSystemTheme();
