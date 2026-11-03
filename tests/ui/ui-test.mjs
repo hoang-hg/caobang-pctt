@@ -559,6 +559,9 @@ async function staff(ctx, trackCode) {
 
     // Mọi biểu đồ (chuyên đề "Tất cả"): tiêu đề là câu kết luận; không còn tiếng Anh / viết tắt trên màn (bỏ nội dung nhật
     // ký — câu do máy chủ ghi — và bản đồ)
+    // Máy tính 3 cột (bản vẽ desktop khung A): biểu đồ nằm sau thẻ "Biểu đồ" của khối Điểm nóng — mở thẻ đó trước
+    const chartsTab = page.getByRole('tab', { name: 'Biểu đồ', exact: true });
+    if (await chartsTab.count()) await chartsTab.click();
     await page.getByRole('group', { name: 'Chuyên đề biểu đồ' }).getByRole('button', { name: 'Tất cả' }).click();
     await page.waitForTimeout(2_000);
     const jargon = await page.evaluate(() => {
