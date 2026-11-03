@@ -488,13 +488,15 @@ Mỗi nhóm một PR (lint + build + ảnh chụp đối chiếu bản vẽ ở 
 | F · G (tiếp) | Phản ánh: soạn phần công khai ngay trong chi tiết (F4–F5), từ chối / chuyển SOS / điểm sự cố (F2, F3, F6) · Đợt thiên tai khung con (G2–G4) | Kế tiếp |
 | H1 | Nhập dữ liệu ≥ 1280 px (khung H): danh sách loại dữ liệu luôn ở cột trái (nhóm theo cụm, loại đang chọn tô nhấn, biểu tượng "hiện cho người dân"), quy trình nhập ở giữa; bỏ tiêu đề trang, gợi ý ở hàng thẻ | Xong (H1) |
 | I1 | Nguồn dữ liệu ≥ 1280 px (khung I): bỏ tiêu đề trang — hàng thẻ + "Chỉ Cấp 1 — Quản trị hệ thống" + gợi ý; thẻ nguồn 3 cột | Xong (I1) |
+| H2 | Nhập dữ liệu ≥ 1280 px (khung H): cột phải "Hồ sơ xã gửi chờ duyệt" (cấp tỉnh) — tối đa 5 hồ sơ, nút "Xem & duyệt" mở thẳng hồ sơ; câu "chưa ghi vào hệ thống cho tới khi cấp tỉnh duyệt" | Xong (H2) |
 | I2 | Nguồn dữ liệu ≥ 1280 px (khung I): cột phải "Thiết bị đo" — số đăng ký, đang gửi / im lặng, từng thiết bị (cách gửi · câu trạng thái, chấm màu), nút "Quản lý thiết bị đo" | Xong (I2) |
-| H · I (tiếp) | Nhập dữ liệu: cột phải hồ sơ xã chờ duyệt (H), khung con H2–H8 · Nguồn dữ liệu: khung con I2–I8 | Kế tiếp |
+| H · I (tiếp) | Nhập dữ liệu: khung con H2–H8 · Nguồn dữ liệu: khung con I2–I8 | Kế tiếp |
 | J1 | Phân quyền ≥ 1280 px (khung J): 3 ô giải thích cấp xếp dọc ở cột trái ("Cấp N" + tên, ô cấp của bạn viền nhấn, câu "chỉ cấp trên…"), bảng tài khoản bên phải; bỏ tiêu đề trang — "Bạn: …" + gợi ý ở hàng thẻ | Xong (J1) |
 | K1 | Hướng dẫn xử lý ≥ 1280 px (khung K): cột trái dính — vai trò + "Bạn đang gặp việc gì?" dạng danh sách; các bước từng việc ở cột phải (đủ mọi việc để in, chạm việc thì cuộn tới), nút In ở đầu cột phải; bỏ tiêu đề trang | Xong (K1) |
 | J · K (tiếp) | Phân quyền khung con (J2–J12) · Hướng dẫn cấp xã (K2) | Kế tiếp |
 | L1 | Đăng nhập ≥ 1280 px (khung L1): biểu trưng "ĐIỀU HÀNH PCTT / Tỉnh Cao Bằng" (cùng chữ thanh trên — mọi trang dùng BrandLockup), tiêu đề + việc chính ngay dưới, hình ranh giới tỉnh mờ phía dưới; bỏ "hồ" khỏi câu giới thiệu (ngoài phạm vi theo dõi) | Xong (L1) |
-| L · M | Đăng nhập: các bước 2 lớp, quên / đổi mật khẩu, menu tài khoản (L1b–L8b) · Trạng thái chung (M1–M5) | Kế tiếp |
+| M1 | Trạng thái chung: "SOS mới" khi đang ở trang khác thành thẻ nổi góc phải trên (dưới thanh trên) — Mở phiếu (mở thẳng phiếu ở Điều hành cứu hộ) · Để sau · đóng, giữ 20 giây (khung M1); dải mất kết nối có nút "Thử lại" (khung M2, giữ màu trung tính — mất mạng không phải mức nguy hiểm) | Xong (M1) |
+| L · M | Đăng nhập: các bước 2 lớp, quên / đổi mật khẩu, menu tài khoản (L1b–L8b) · Trạng thái chung: nhắc bật chuông, đang tải / lỗi / rỗng, không quyền, hết phiên (M1b, M3–M5) | Kế tiếp |
 | N1 | Cổng người dân ≥ 1280 px (khung N1): trang trải hết bề ngang; chuyên mục lên thanh trên (tên cổng 2 dòng, Gọi 112 viền đỏ + Gửi yêu cầu 44 px, Bản nhẹ dạng chữ); Bản đồ cảnh báo 3 cột — "Bạn muốn làm gì?" + ô cứu nạn khẩn cấp · bản đồ · bảng chú thích / cảnh báo / mưa | Xong (N1) |
 | O1 | Nhiệm vụ trưởng nhóm ≥ 1280 px (khung O1): thanh trên tối (tên, hiệu lực tới, Gọi trực ban), 2 cột — lệnh, chỉ đường, liên lạc · lực lượng (trái) · Báo cáo về trung tâm, đã báo (phải, dính); điện thoại giữ một cột | Xong (O1) |
 | N · O | Cổng người dân: lớp bản đồ dạng chip, bản tin + 3 chuyên đề cột phải, các màn N2–N19 · Nhiệm vụ: đã cứu, chi viện, mất mạng, hết hiệu lực (O2–O5) | Kế tiếp |

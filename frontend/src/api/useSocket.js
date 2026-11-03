@@ -14,10 +14,15 @@ const CATCH_UP_MARGIN_MS = 60_000; // tìm lại lùi thêm 1 phút trước tin
 /** Người duyệt được lệnh cảnh báo: quyền phê duyệt + đã cấp PIN ký (trực ban cấp tỉnh chưa cấp PIN không duyệt được). */
 const approver = (u) => hasPermission(u?.permissions, 'alert', 'approve') && !!u?.has_pin;
 
+// Bản vẽ desktop khung M1: thẻ nổi góc phải trên (dưới thanh trên cùng) — "Mở phiếu" mở thẳng phiếu ở Điều hành cứu hộ,
+// "Để sau" đóng; giữ 20 giây (chuông SOS vẫn kêu theo cài đặt)
 const sosToast = (t) => ({
   tone: t.priority === 1 ? 'danger' : 'warn',
-  title: `SOS mới ${t.code}`,
-  body: `${INCIDENT[t.incident_type]} – ${t.address || t.admin_name || ''} (${t.trapped_count} người)`,
+  placement: 'top',
+  duration: 20000,
+  title: `SOS mới · ${t.code}${t.priority ? ` · Cấp ${t.priority}` : ''}`,
+  body: `${INCIDENT[t.incident_type]} · ${t.trapped_count} người · ${t.address || t.admin_name || ''}`,
+  actions: [{ label: 'Mở phiếu', to: `/cuu-ho?phieu=${encodeURIComponent(t.code)}`, primary: true }, { label: 'Để sau' }],
 });
 
 /** Kết nối WebSocket /ws: nhận sự kiện realtime và làm mới dữ liệu tương ứng (không cần F5). */

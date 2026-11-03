@@ -93,7 +93,7 @@ export default function DataImport() {
       ) : isError ? (
         <ErrorState onRetry={refetch}>Không tải được danh sách loại dữ liệu</ErrorState>
       ) : desk ? (
-        <div className="grid grid-cols-[280px_minmax(0,1fr)] items-start gap-5">
+        <div className={clsx('grid items-start gap-5', canImport ? 'grid-cols-[280px_minmax(0,1fr)_300px]' : 'grid-cols-[280px_minmax(0,1fr)]')}>
           <DatasetNav datasets={datasets} submitMode={!canImport} current={ds?.name} onPick={choose} />
           {ds ? (
             <DatasetPanel key={ds.name} ds={ds} submitMode={!canImport} onBack={() => choose(null)} onSubmitted={open} />
@@ -108,6 +108,7 @@ export default function DataImport() {
               </p>
             </div>
           )}
+          {canImport && <PendingColumn onOpen={open} />}
         </div>
       ) : ds ? (
         <DatasetPanel key={ds.name} ds={ds} submitMode={!canImport} onBack={() => choose(null)} onSubmitted={open} />
@@ -161,6 +162,49 @@ function DatasetChooser({ datasets, submitMode, onPick }) {
         </section>
       ))}
     </nav>
+  );
+}
+
+/**
+ * Cột phải "Hồ sơ xã gửi chờ duyệt" (máy tính ≥ 1280 px, bản vẽ khung H — chỉ cấp tỉnh): tối đa 5 hồ sơ cũ nhất trước, mỗi hồ sơ
+ * một nút "Xem & duyệt" mở thẳng hồ sơ (duyệt / trả lại ở màn hồ sơ — phải xem dữ liệu trước). Cùng khoá truy vấn với thẻ "Hồ sơ
+ * xã/phường gửi" (không gọi thêm).
+ */
+function PendingColumn({ onOpen }) {
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['submissions', 'cho_duyet'],
+    queryFn: () => api('/data-import/submissions', { params: { status: 'cho_duyet', limit: 100 } }),
+    refetchInterval: 30_000,
+  });
+  const items = data?.items || [];
+  return (
+    <aside aria-label="Hồ sơ xã gửi chờ duyệt" className="sheet sticky top-0 flex flex-col gap-3 p-5">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-[15px] font-bold text-ink">Hồ sơ xã gửi chờ duyệt</h2>
+        {items.length > 0 && <span className="num chip bg-panel2 text-ink-2">{items.length}</span>}
+      </div>
+      {isLoading ? <Skeleton height={120} /> : isError ? (
+        <ErrorState onRetry={refetch}>Không tải được hồ sơ chờ duyệt</ErrorState>
+      ) : items.length ? (
+        <ul className="flex flex-col gap-2">
+          {items.slice(0, 5).map((x) => (
+            <li key={x.code} className="flex flex-col gap-2 rounded-[14px] bg-panel2 p-3.5">
+              <b className="text-sm leading-snug text-ink">{x.dataset_label} — {x.admin_names}</b>
+              <span className="text-xs text-muted">{x.submitted_by_name} · {x.code}{x.summary ? ` · ${x.summary.creates ?? 0} mới, ${x.summary.updates ?? 0} sửa` : ''}</span>
+              <button type="button" onClick={() => onOpen(x.code)} className="btn-primary tap h-10 self-start rounded-xl px-4 text-sm">
+                Xem & duyệt <ChevronRight size={15} aria-hidden="true" />
+              </button>
+            </li>
+          ))}
+          {items.length > 5 && <li className="text-xs text-muted">… và {items.length - 5} hồ sơ khác ở thẻ "Hồ sơ xã/phường gửi"</li>}
+        </ul>
+      ) : (
+        <p className="text-sm text-muted">Không có hồ sơ nào chờ duyệt.</p>
+      )}
+      <p className="rounded-[14px] border border-dashed border-line p-3 text-[13px] leading-normal text-ink-2">
+        Xã/phường gửi dữ liệu → nằm chờ ở đây, chưa ghi vào hệ thống cho tới khi cấp tỉnh duyệt.
+      </p>
+    </aside>
   );
 }
 
