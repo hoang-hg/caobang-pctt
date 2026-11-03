@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import {
-  Activity, CircleDashed, CloudSun, Copy, Cpu, FlaskConical, KeyRound, Play, Plus, Power, Radio, Settings2, Trash2, Wifi, WifiOff,
+  Activity, ChevronRight, CircleDashed, CloudSun, Copy, Cpu, FlaskConical, KeyRound, Play, Plus, Power, Radio, Settings2, Trash2, Wifi, WifiOff,
 } from 'lucide-react';
 import { api } from '../api/client';
 import { startSimulation, stopSimulation } from '../api/simulationSwitch';
@@ -84,6 +84,53 @@ function deviceState(d) {
   if (d.status === 'truc_tuyen') return { level: 0, icon: Wifi, text: `Đang gửi số đo — lần cuối ${ago(d.last_seen_at)}` };
   if (d.status === 'mat_tin_hieu') return { level: 2, icon: WifiOff, text: `Mất tín hiệu từ ${since(d.last_seen_at)} (${ago(d.last_seen_at)})` };
   return { level: null, icon: CircleDashed, text: 'Chưa gửi số đo lần nào' };
+}
+
+const PROTOCOL_SHORT = { http: '4G / NB-IoT', mqtt: 'MQTT', lorawan: 'LoRa' };
+
+/**
+ * Cột phải "Thiết bị đo" của thẻ Nguồn số liệu (máy tính ≥ 1280 px — bản vẽ khung I): tóm tắt đang gửi / im lặng, mỗi thiết
+ * bị một dòng (tên, cách gửi · câu trạng thái, chấm màu: Xanh đang gửi · Cam mất tín hiệu · Xám đã tắt / chưa gửi), nút mở
+ * thẻ Thiết bị đo (đăng ký, sửa, tạm tắt ở đó).
+ */
+function DevicesColumn({ devices, onManage }) {
+  const active = devices.filter((d) => d.enabled);
+  const on = active.filter((d) => d.status === 'truc_tuyen').length;
+  return (
+    <aside aria-label="Thiết bị đo" className="sheet sticky top-0 flex flex-col gap-3 p-5">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-[15px] font-bold text-ink">Thiết bị đo</h2>
+        <span className="num chip bg-panel2 text-ink-2">{devices.length} đăng ký</span>
+      </div>
+      {devices.length > 0 && (
+        <div className="flex items-center gap-2 rounded-full bg-panel2 px-3.5 py-2 text-sm text-ink-2">
+          <span className={clsx('h-2.5 w-2.5 rounded-full', on ? risk(0).fill : risk(1).fill)} aria-hidden="true" />
+          <b className="num text-ink">{on}</b> đang gửi số đo · <b className="num text-ink">{active.length - on}</b> im lặng
+        </div>
+      )}
+      {devices.length ? (
+        <ul className="scroll-thin flex max-h-[28rem] flex-col gap-2 overflow-y-auto">
+          {devices.map((d) => {
+            const st = deviceState(d);
+            return (
+              <li key={d.id} className="flex gap-2.5 rounded-[14px] bg-panel2 p-3">
+                <span className={clsx('mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full', st.level == null ? 'bg-muted' : risk(st.level).fill)} aria-hidden="true" />
+                <span className="min-w-0">
+                  <b className="block text-sm leading-snug text-ink">{d.name}</b>
+                  <span className="block text-xs text-muted">{PROTOCOL_SHORT[d.protocol] || d.protocol} · {st.text}</span>
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p className="text-sm text-muted">Chưa có thiết bị đo — số liệu trạm đang lấy từ nguồn dự báo / mô phỏng.</p>
+      )}
+      <button type="button" onClick={onManage} className="btn-primary tap mt-1 h-11 w-full rounded-xl">
+        Quản lý thiết bị đo <ChevronRight size={15} aria-hidden="true" />
+      </button>
+    </aside>
+  );
 }
 
 function useRun() {
@@ -653,8 +700,16 @@ export default function DataSources() {
         </>
       )}
       </div>
-      {tab === 'sources' && canManage && <SimulationCard />}
-      {tab === 'sources' && gate(sourcesQ, 'danh sách nguồn số liệu', <SourcesTab sources={sources} devices={devices} />)}
+      {tab === 'sources' && (
+        // Máy tính ≥ 1280 px (bản vẽ khung I): cột phải "Thiết bị đo"
+        <div className={desk ? 'grid grid-cols-[minmax(0,1fr)_340px] items-start gap-5' : 'contents'}>
+          <div className={desk ? 'flex min-w-0 flex-col gap-4' : 'contents'}>
+            {canManage && <SimulationCard />}
+            {gate(sourcesQ, 'danh sách nguồn số liệu', <SourcesTab sources={sources} devices={devices} />)}
+          </div>
+          {desk && <DevicesColumn devices={devices} onManage={() => setTab('devices')} />}
+        </div>
+      )}
       {tab === 'devices' && gate(devicesQ, 'danh sách thiết bị đo', <DevicesTab devices={devices} />)}
       {tab === 'monitor' && <MonitorTab sources={sources} devices={devices} />}
     </div>

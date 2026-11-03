@@ -488,7 +488,8 @@ Mỗi nhóm một PR (lint + build + ảnh chụp đối chiếu bản vẽ ở 
 | F · G (tiếp) | Phản ánh: soạn phần công khai ngay trong chi tiết (F4–F5), từ chối / chuyển SOS / điểm sự cố (F2, F3, F6) · Đợt thiên tai khung con (G2–G4) | Kế tiếp |
 | H1 | Nhập dữ liệu ≥ 1280 px (khung H): danh sách loại dữ liệu luôn ở cột trái (nhóm theo cụm, loại đang chọn tô nhấn, biểu tượng "hiện cho người dân"), quy trình nhập ở giữa; bỏ tiêu đề trang, gợi ý ở hàng thẻ | Xong (H1) |
 | I1 | Nguồn dữ liệu ≥ 1280 px (khung I): bỏ tiêu đề trang — hàng thẻ + "Chỉ Cấp 1 — Quản trị hệ thống" + gợi ý; thẻ nguồn 3 cột | Xong (I1) |
-| H · I (tiếp) | Nhập dữ liệu: cột phải hồ sơ xã chờ duyệt (H), khung con H2–H8 · Nguồn dữ liệu: cột phải thiết bị đo (I), khung con I2–I8 | Kế tiếp |
+| I2 | Nguồn dữ liệu ≥ 1280 px (khung I): cột phải "Thiết bị đo" — số đăng ký, đang gửi / im lặng, từng thiết bị (cách gửi · câu trạng thái, chấm màu), nút "Quản lý thiết bị đo" | Xong (I2) |
+| H · I (tiếp) | Nhập dữ liệu: cột phải hồ sơ xã chờ duyệt (H), khung con H2–H8 · Nguồn dữ liệu: khung con I2–I8 | Kế tiếp |
 | J1 | Phân quyền ≥ 1280 px (khung J): 3 ô giải thích cấp xếp dọc ở cột trái ("Cấp N" + tên, ô cấp của bạn viền nhấn, câu "chỉ cấp trên…"), bảng tài khoản bên phải; bỏ tiêu đề trang — "Bạn: …" + gợi ý ở hàng thẻ | Xong (J1) |
 | K1 | Hướng dẫn xử lý ≥ 1280 px (khung K): cột trái dính — vai trò + "Bạn đang gặp việc gì?" dạng danh sách; các bước từng việc ở cột phải (đủ mọi việc để in, chạm việc thì cuộn tới), nút In ở đầu cột phải; bỏ tiêu đề trang | Xong (K1) |
 | J · K (tiếp) | Phân quyền khung con (J2–J12) · Hướng dẫn cấp xã (K2) | Kế tiếp |
