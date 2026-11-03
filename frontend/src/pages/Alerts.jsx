@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { BookUser, History, Megaphone, Radio, ScrollText, ShieldCheck, XCircle } from 'lucide-react';
+import { BookUser, ChevronRight, History, Megaphone, Radio, RefreshCw, ScrollText, ShieldCheck, XCircle } from 'lucide-react';
 import { api } from '../api/client';
 import { useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
@@ -28,6 +28,7 @@ import AuditLog from '../components/alerts/AuditLog';
 import { alertAlerts, broadcastFacts, sortBroadcasts } from '../components/alerts/alertFacts';
 import { useAllowedCodes, usePermission } from '../rbac/usePermission';
 import { useOnline } from '../utils/useOnline';
+import { useMediaQuery } from '../utils/useMediaQuery';
 import { useNewKeys } from '../utils/useNewKeys';
 import { useShowMore } from '../utils/useShowMore';
 
@@ -71,6 +72,9 @@ export default function Alerts() {
   const [refreshing, setRefreshing] = useState(false);
   // Bản đồ + chuyển giao: mặc định thu gọn để danh sách lệnh chờ duyệt & soạn lệnh lên ngay tầm mắt
   const [overviewOpen, setOverviewOpen] = useState(false);
+  // Máy tính ≥ 1280 px (bản vẽ desktop khung D): cột trái là danh mục các phần + "Bản đồ vùng cảnh báo" + quy tắc hai người;
+  // bên phải hàng chip chỉ số rồi nội dung phần đang mở (Phát cảnh báo: soạn lệnh giữa, chờ duyệt / đang hiệu lực bên phải)
+  const desk = useMediaQuery('(min-width: 1280px)');
 
   // Tài khoản xã: tiêu đề là xã của mình (như Tổng quan), không ghi "Toàn tỉnh"
   const scope = useAllowedCodes('alert', 'view');
@@ -184,6 +188,28 @@ export default function Alerts() {
     );
   }
 
+  const sections = [
+    { value: 'phat', label: 'Phát cảnh báo', short: 'Phát tin', icon: Megaphone, count: pending.length || undefined, alert: pending.length ? { level: 2, text: `${pending.length} lệnh chờ phê duyệt` } : undefined },
+    { value: 'lich_su', label: 'Lịch sử lệnh', short: 'Lịch sử', icon: History },
+    { value: 'danh_ba', label: 'Danh bạ & Tổng đài', short: 'Danh bạ', icon: BookUser },
+    ...(canAudit ? [{ value: 'nhat_ky', label: 'Nhật ký pháp lý', short: 'Nhật ký', icon: ScrollText }] : []),
+  ];
+  const twoPerson = (
+    <Hint label="Quy tắc soạn – duyệt lệnh cảnh báo">
+      Người soạn và người duyệt là hai người khác nhau; lãnh đạo ký bằng mã PIN. Mọi thao tác ghi nhật ký pháp lý.
+    </Hint>
+  );
+  const overview = (
+    <Section title="Bản đồ vùng cảnh báo & chuyển giao" collapsible={!desk} open={overviewOpen} onToggle={() => setOverviewOpen((v) => !v)} className="no-print">
+      {overviewOpen && (bq.data ? (
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+          <AlertMap broadcasts={list} factsOf={factsOf} />
+          <DeliveryChart broadcasts={list} factsOf={factsOf} />
+        </div>
+      ) : bq.isError ? <ErrorState height={120} onRetry={bq.refetch}>Không tải được danh sách lệnh cảnh báo</ErrorState> : <Skeleton height={240} />)}
+    </Section>
+  );
+
   return (
     <div className={PAGE}>
       {/* Thông tin khẩn luôn trên cùng (Cam / Đỏ dính khi cuộn) + mất mạng */}
@@ -197,6 +223,60 @@ export default function Alerts() {
       />
       <ConnectionBanner updatedAt={bq.dataUpdatedAt || null} />
 
+      {desk ? (
+        <div className="grid grid-cols-[260px_minmax(0,1fr)] items-start gap-5">
+          <aside aria-label="Cảnh báo khẩn cấp & Hotline" className="sheet sticky top-0 flex flex-col gap-4 p-5">
+            <h1 className="text-[15px] font-bold text-ink">Cảnh báo khẩn cấp & Hotline</h1>
+            <div role="tablist" aria-label="Phần của trang Cảnh báo" className="flex flex-col gap-1">
+              {sections.map((t) => (
+                <button
+                  key={t.value}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === t.value}
+                  onClick={() => setTab(t.value)}
+                  className={clsx('tap flex min-h-[44px] items-center justify-between gap-2 rounded-xl px-3.5 text-left text-sm transition-colors', tab === t.value ? 'bg-accent/10 font-semibold text-accent' : 'text-ink-2 hover:bg-panel2 hover:text-ink')}
+                >
+                  {t.label}
+                  {t.count > 0 && <span className="num chip bg-danger/10 text-danger" title={t.alert?.text}>{t.count}</span>}
+                </button>
+              ))}
+            </div>
+            <button type="button" onClick={() => { setTab('phat'); setOverviewOpen((v) => !v); }} aria-expanded={overviewOpen} className="btn-secondary tap h-11 rounded-xl px-4">
+              Bản đồ vùng cảnh báo <ChevronRight size={15} className={clsx('transition-transform', overviewOpen && 'rotate-90')} aria-hidden="true" />
+            </button>
+            <div className="text-[13px] leading-normal text-ink-2">
+              <div className="mb-1 flex items-center gap-1 text-xs font-bold text-muted">Hai người: soạn · duyệt {twoPerson}</div>
+              Người soạn không tự duyệt. Lãnh đạo duyệt bằng mã PIN, cần quyền trên mọi xã nhận tin.
+              {role && <div className="mt-1 text-muted">Bạn: {auth.user.full_name === role ? role : `${auth.user.full_name} — ${role}`}</div>}
+            </div>
+            <div className="flex items-center gap-2">
+              <RoleTips page="canh-bao" compact />
+              <button type="button" onClick={refresh} disabled={refreshing} className="btn-secondary tap-sq h-9 min-w-[36px] px-2.5" aria-label="Làm mới số liệu" title={`Làm mới — ${scopeLabel}`}>
+                <RefreshCw size={15} className={clsx(refreshing && 'animate-spin')} aria-hidden="true" />
+              </button>
+            </div>
+          </aside>
+          <div className="flex min-w-0 flex-col gap-4">
+            <AlertKpis chips query={bq} broadcasts={list} factsOf={factsOf} onGo={go} />
+            {tab === 'phat' && overviewOpen && overview}
+            {tab === 'phat' && (
+              <div className={clsx('flex flex-col gap-3', canCreate && 'grid grid-cols-[minmax(0,1fr)_380px] items-start')}>
+                {canCreate && <div id="soan-canh-bao" className="min-w-0 scroll-mt-20"><Composer online={online} /></div>}
+                <div className="flex min-w-0 flex-col gap-3">{lists}</div>
+              </div>
+            )}
+            {tab === 'lich_su' && <BroadcastHistory now={now} scopeLabel={scopeLabel} />}
+            {tab === 'danh_ba' && (
+              <div className="grid gap-3 2xl:grid-cols-[minmax(0,1fr)_380px] [&>*]:min-w-0">
+                <ContactDirectory scopeLabel={scopeLabel} />
+                <HotlinePanel online={online} />
+              </div>
+            )}
+            {tab === 'nhat_ky' && canAudit && <AuditLog />}
+          </div>
+        </div>
+      ) : (
       <PageHeader
         tips={<RoleTips page="canh-bao" />}
         title="Cảnh báo khẩn cấp & Hotline"
@@ -217,33 +297,17 @@ export default function Alerts() {
         refreshing={refreshing}
       />
 
-      <AlertKpis query={bq} broadcasts={list} factsOf={factsOf} onGo={go} />
+      )}
 
-      <Tabs
-        fit
-        label="Phần của trang Cảnh báo"
-        value={tab}
-        onChange={(t) => setTab(t)}
-        tabs={[
-          { value: 'phat', label: 'Phát cảnh báo', short: 'Phát tin', icon: Megaphone, count: pending.length || undefined, alert: pending.length ? { level: 2, text: `${pending.length} lệnh chờ phê duyệt` } : undefined },
-          { value: 'lich_su', label: 'Lịch sử lệnh', short: 'Lịch sử', icon: History },
-          { value: 'danh_ba', label: 'Danh bạ & Tổng đài', short: 'Danh bạ', icon: BookUser },
-          ...(canAudit ? [{ value: 'nhat_ky', label: 'Nhật ký pháp lý', short: 'Nhật ký', icon: ScrollText }] : []),
-        ]}
-      />
+      {!desk && <AlertKpis query={bq} broadcasts={list} factsOf={factsOf} onGo={go} />}
 
-      {tab === 'phat' && (
+      {!desk && <Tabs fit label="Phần của trang Cảnh báo" value={tab} onChange={(t) => setTab(t)} tabs={sections} />}
+
+      {!desk && tab === 'phat' && (
         <>
           {/* Lãnh đạo: vùng đang có cảnh báo (xã tô theo mức nặng nhất) + chuyển giao theo kênh — cùng danh sách lệnh của ô chỉ
               số. Chỉ ở thẻ này: Lịch sử / Danh bạ / Nhật ký là việc tra cứu, không đẩy xuống dưới khối bản đồ (iPad dọc ~600 px) */}
-          <Section title="Bản đồ vùng cảnh báo & chuyển giao" collapsible open={overviewOpen} onToggle={() => setOverviewOpen((v) => !v)} className="no-print">
-            {overviewOpen && (bq.data ? (
-              <div className="grid gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-                <AlertMap broadcasts={list} factsOf={factsOf} />
-                <DeliveryChart broadcasts={list} factsOf={factsOf} />
-              </div>
-            ) : bq.isError ? <ErrorState height={120} onRetry={bq.refetch}>Không tải được danh sách lệnh cảnh báo</ErrorState> : <Skeleton height={240} />)}
-          </Section>
+          {overview}
           <div className={clsx('flex flex-col gap-3', canCreate && 'xl:grid xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)] xl:items-start')}>
             {/* Điện thoại: chờ phê duyệt → soạn lệnh → đang hiệu lực → bị từ chối (lãnh đạo duyệt bằng điện thoại không phải cuộn
                 qua form soạn); máy tính: form cột trái, danh sách cột phải */}
@@ -254,14 +318,14 @@ export default function Alerts() {
           </div>
         </>
       )}
-      {tab === 'lich_su' && <BroadcastHistory now={now} scopeLabel={scopeLabel} />}
-      {tab === 'danh_ba' && (
+      {!desk && tab === 'lich_su' && <BroadcastHistory now={now} scopeLabel={scopeLabel} />}
+      {!desk && tab === 'danh_ba' && (
         <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_380px] [&>*]:min-w-0">
           <ContactDirectory scopeLabel={scopeLabel} />
           <HotlinePanel online={online} />
         </div>
       )}
-      {tab === 'nhat_ky' && canAudit && <AuditLog />}
+      {!desk && tab === 'nhat_ky' && canAudit && <AuditLog />}
 
       {approve && <ApproveModal b={approve.b} initial={approve.mode} onClose={() => setApprove(null)} />}
       {/* Điện thoại: việc hay làm ở vùng ngón cái (khung chung với Tổng quan, Bản đồ, Vật tư, Cứu hộ). Cấp tỉnh: Chờ duyệt (số =

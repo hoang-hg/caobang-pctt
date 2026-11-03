@@ -474,10 +474,15 @@ Mỗi nhóm một PR (lint + build + ảnh chụp đối chiếu bản vẽ ở 
 | A | Tổng quan ≥ 1280 px: 3 cột vừa một màn hình — cột **Tình hình** xanh đêm (câu tóm tắt, Nguy hiểm nhất, Việc chờ quyết định, Trình chiếu · Xuất) · cột giữa (thẻ chỉ chữ + chấm mức, 6 ô số 3 × 2, khối **Điểm nóng · Biểu đồ · Bảng số liệu** với lọc Tất cả / Cam trở lên / Đỏ) · **Nhật ký sự kiện**; thẻ "Hệ thống & dữ liệu" → "Hệ thống" | Xong (A1) |
 | A2 | Hàng 3 ô số riêng thẻ Mưa lớn (mưa trung bình 24 giờ · xã có thể mưa rất to · dự báo 3 ngày) và Sạt lở, lũ quét (điểm cấm đường · cảm biến vượt ngưỡng · xã vượt ngưỡng mưa sạt lở) — A4, A5; thẻ Cấp xã của cấp tỉnh = bảng các xã nặng nhất lên đầu, tìm xã, bấm dòng vào chi tiết xã (A7) | Xong (A2) |
 | A (tiếp) | Tổng quan của cán bộ xã (A11); nhật ký đầy đủ dạng ngăn phải (A16); trình chiếu (A2); menu Xuất, báo cáo văn bản, báo cáo nhanh 3 bước, chọn địa bàn, kết quả tìm địa điểm | Kế tiếp |
-| B | Bản đồ giám sát (B–B10) | Kế tiếp |
-| C | Điều hành cứu hộ (C–C15) | Kế tiếp |
-| D | Cảnh báo & Hotline (D–D10) | Kế tiếp |
-| E | Vật tư & Lực lượng (E–E8) | Kế tiếp |
+| B1 | Bản đồ ≥ 1280 px (khung B, B2, B6): bỏ dải khẩn; bảng **Bộ lọc** mở sẵn — chế độ xem, 3 nút thiên tai (bật / tắt cả nhóm lớp), nền bản đồ, "Lớp dữ liệu chi tiết" gập sẵn; chip chỉ số khẩn gọn giữa trên; bảng cảnh báo gập thành nút "Danh mục cảnh báo" (mở ra vẫn đủ 6 chỉ số Tình hình + Điểm nóng · Diễn biến · Phiếu SOS · Cảm biến); thanh thời gian trái dưới, chú giải phải dưới. 1024 – 1279 px giữ bố cục cũ | Xong (B1) |
+| B (tiếp) | Khung con: khoanh vùng → cảnh báo (B3), đánh dấu / kết thúc sự cố (B4, B10), bản tin bão (B5), tìm đường (B7), chi tiết trạm (B8), bấm điểm (B9), nền tối (B-tối) | Kế tiếp |
+| Dải khẩn | Dải khẩn dùng chung (UrgentStrip — Cứu hộ, Cảnh báo, Vật tư) ẩn ở ≥ 1024 px; ui-test bỏ kiểm dải ở máy tính | Xong (C1) |
+| C1 | Cứu hộ ≥ 1280 px (khung C): hàng chip 4 chỉ số (phiếu đang mở · quá hạn · người cần cứu · sơ tán — vẫn là nút lọc) + "Bản đồ cứu hộ ›" (mở bản đồ & diễn biến 48 giờ), gợi ý, làm mới; bỏ tiêu đề trang và thanh gập thường trực | Xong (C1) |
+| C (tiếp) | Bảng điều phối cột nền xám + thẻ gọn, hàng lọc một dòng (C); điều đội 3 bước (C2–C2c), chi tiết / sửa / đóng / chuyển phiếu (C3, C5, C13), nhận tin (C6), đội đã đến · huỷ lệnh · chi viện · link nhiệm vụ (C7, C8, C11, C14), sơ tán (C9–C10, C15), nền tối | Kế tiếp |
+| D1 | Cảnh báo ≥ 1280 px (khung D): cột trái "Cảnh báo khẩn cấp & Hotline" — các phần (Phát cảnh báo · Lịch sử lệnh · Danh bạ & Tổng đài · Nhật ký pháp lý), "Bản đồ vùng cảnh báo", quy tắc hai người, gợi ý, làm mới; bên phải hàng chip 4 chỉ số (StatCard chip — dùng chung) rồi nội dung phần: soạn lệnh giữa, chờ duyệt / đang hiệu lực cột phải 380 px | Xong (D1) |
+| D (tiếp) | Soạn lệnh bước 2–3 (D2, D3), duyệt PIN / trả lại (D4, D4b), lịch sử, gia hạn, danh bạ, mẫu tin, nhật ký, bản đồ vùng (D5–D10) | Kế tiếp |
+| E1 | Vật tư ≥ 1280 px (khung E): 2 cột — nội dung (4 ô chỉ số, thẻ Lực lượng / Kho / Phương tiện + gợi ý, làm mới, danh sách) · "Cần bổ sung / cần sửa" dính cột phải (xếp dọc từng việc); bỏ tiêu đề trang | Xong (E1) |
+| E (tiếp) | Bảng lọc dọc bên trái (khung E), điều động nhanh (E2), nhập / xuất kho (E3, E5, E5b), thẻ kho / phương tiện (E4, E6, E6b), nhiên liệu (E7), sổ kho (E8) | Kế tiếp |
 | F · G | Phản ánh người dân (F–F6) · Đợt thiên tai (G–G4) | Kế tiếp |
 | H1 | Nhập dữ liệu ≥ 1280 px (khung H): danh sách loại dữ liệu luôn ở cột trái (nhóm theo cụm, loại đang chọn tô nhấn, biểu tượng "hiện cho người dân"), quy trình nhập ở giữa; bỏ tiêu đề trang, gợi ý ở hàng thẻ | Xong (H1) |
 | I1 | Nguồn dữ liệu ≥ 1280 px (khung I): bỏ tiêu đề trang — hàng thẻ + "Chỉ Cấp 1 — Quản trị hệ thống" + gợi ý; thẻ nguồn 3 cột | Xong (I1) |
