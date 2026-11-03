@@ -18,6 +18,7 @@ import RecordForm from './DataImportForm';
 import Submissions, { IssueList, PreviewTable } from './DataSubmissions';
 import DataThresholds from './DataThresholds';
 import { cardOf, DATASET_GROUPS, exampleRows, fieldRule, rowLabel } from './dataImportFacts';
+import { useMediaQuery } from '../utils/useMediaQuery';
 
 /**
  * Nhập dữ liệu chính thức — như điền biểu mẫu (thiết kế mục G). Chọn loại bằng thẻ có hình và câu mô tả (?loai=<tên>) →
@@ -45,6 +46,9 @@ export default function DataImport() {
     refetchInterval: 60_000,
   });
   const pending = subs?.counts?.cho_duyet || 0;
+  // Máy tính ≥ 1280 px (bản vẽ desktop khung H): danh sách loại dữ liệu luôn ở cột trái, quy trình nhập của loại đang chọn ở
+  // giữa — không phải quay lại lưới thẻ để đổi loại; không tiêu đề trang (gợi ý ở hàng thẻ)
+  const desk = useMediaQuery('(min-width: 1280px)');
   const ds = datasets.find((d) => d.name === params.get('loai'));
   // Chọn loại = một mục lịch sử: nút Quay lại của trình duyệt về danh sách thẻ
   const choose = (name) => setParams(name ? { loai: name } : {});
@@ -55,13 +59,18 @@ export default function DataImport() {
 
   return (
     <div className={clsx(PAGE, 'pb-8')}>
-      <PageHeader
-        tips={<RoleTips page="nhap-du-lieu" />}
-        title={canImport ? 'Nhập dữ liệu' : 'Gửi dữ liệu của xã/phường'}
-        description={canImport
-          ? 'Cập nhật danh sách điểm sơ tán, kho, danh bạ… cho cả tỉnh. Máy kiểm tra từng dòng, hết lỗi mới ghi.'
-          : 'Gửi danh sách điểm sơ tán, kho, danh bạ… của xã. Cấp tỉnh duyệt xong mới hiện trên hệ thống.'}
-      />
+      {desk ? (
+        <h1 className="sr-only">{canImport ? 'Nhập dữ liệu' : 'Gửi dữ liệu của xã/phường'}</h1>
+      ) : (
+        <PageHeader
+          tips={<RoleTips page="nhap-du-lieu" />}
+          title={canImport ? 'Nhập dữ liệu' : 'Gửi dữ liệu của xã/phường'}
+          description={canImport
+            ? 'Cập nhật danh sách điểm sơ tán, kho, danh bạ… cho cả tỉnh. Máy kiểm tra từng dòng, hết lỗi mới ghi.'
+            : 'Gửi danh sách điểm sơ tán, kho, danh bạ… của xã. Cấp tỉnh duyệt xong mới hiện trên hệ thống.'}
+        />
+      )}
+      <div className={desk ? 'flex items-center gap-2 [&>*:not(:first-child)]:shrink-0' : 'contents'}>
       <Tabs
         value={tab}
         onChange={setTab}
@@ -73,6 +82,8 @@ export default function DataImport() {
           ...(canImport ? [{ value: 'nguong', label: 'Ngưỡng cảnh báo', short: 'Ngưỡng', icon: Gauge }] : []),
         ]}
       />
+      {desk && <><span className="flex-1" /><RoleTips page="nhap-du-lieu" compact /></>}
+      </div>
       {tab === 'nguong' ? (
         <DataThresholds />
       ) : tab === 'ho-so' ? (
@@ -81,6 +92,23 @@ export default function DataImport() {
         <Skeleton height={320} />
       ) : isError ? (
         <ErrorState onRetry={refetch}>Không tải được danh sách loại dữ liệu</ErrorState>
+      ) : desk ? (
+        <div className="grid grid-cols-[280px_minmax(0,1fr)] items-start gap-5">
+          <DatasetNav datasets={datasets} submitMode={!canImport} current={ds?.name} onPick={choose} />
+          {ds ? (
+            <DatasetPanel key={ds.name} ds={ds} submitMode={!canImport} onBack={() => choose(null)} onSubmitted={open} />
+          ) : (
+            <div className="sheet flex min-h-[320px] flex-col items-center justify-center gap-2 p-8 text-center">
+              <FileUp size={28} className="text-accent" aria-hidden="true" />
+              <p className="font-semibold text-ink">Chọn loại dữ liệu ở cột bên trái</p>
+              <p className="max-w-md text-sm text-ink-2">
+                {canImport
+                  ? 'Tải tệp mẫu, điền rồi chọn tệp (hoặc điền trực tiếp) — máy kiểm tra từng dòng, hết lỗi mới ghi vào hệ thống.'
+                  : 'Tải tệp mẫu, điền rồi chọn tệp (hoặc điền trực tiếp) — cấp tỉnh duyệt xong mới hiện trên hệ thống.'}
+              </p>
+            </div>
+          )}
+        </div>
       ) : ds ? (
         <DatasetPanel key={ds.name} ds={ds} submitMode={!canImport} onBack={() => choose(null)} onSubmitted={open} />
       ) : (
@@ -129,6 +157,44 @@ function DatasetChooser({ datasets, submitMode, onPick }) {
                 </li>
               );
             })}
+          </ul>
+        </section>
+      ))}
+    </nav>
+  );
+}
+
+/** Máy tính ≥ 1280 px (bản vẽ khung H): danh sách loại dữ liệu dạng cột trái, nhóm theo cụm; loại đang chọn tô màu nhấn. */
+function DatasetNav({ datasets, submitMode, current, onPick }) {
+  const known = new Set(DATASET_GROUPS.flatMap((g) => g.names));
+  const groups = [
+    ...DATASET_GROUPS.map((g) => ({ ...g, items: g.names.map((n) => datasets.find((d) => d.name === n)).filter(Boolean) })),
+    { key: 'khac', title: 'Loại khác', items: datasets.filter((d) => !known.has(d.name)) },
+  ].filter((g) => g.items.length);
+  return (
+    <nav aria-label="Loại dữ liệu" className="sheet sticky top-0 flex flex-col gap-3 p-5">
+      <h2 className="text-[15px] font-bold leading-snug text-ink">{submitMode ? 'Xã bạn muốn gửi danh sách nào?' : 'Bạn muốn cập nhật danh sách nào?'}</h2>
+      {groups.map((g) => (
+        <section key={g.key} aria-labelledby={`nhom-loai-${g.key}`}>
+          <h3 id={`nhom-loai-${g.key}`} className="mb-1 text-xs font-bold text-muted">{g.title}</h3>
+          <ul className="flex flex-col gap-0.5">
+            {g.items.map((d) => (
+              <li key={d.name}>
+                <button
+                  type="button"
+                  onClick={() => onPick(d.name)}
+                  aria-current={current === d.name ? 'true' : undefined}
+                  title={cardOf(d).hint}
+                  className={clsx(
+                    'tap flex min-h-[40px] w-full items-center gap-2 rounded-xl px-3 text-left text-sm transition-colors',
+                    current === d.name ? 'bg-accent/10 font-semibold text-accent' : 'text-ink-2 hover:bg-panel2 hover:text-ink',
+                  )}
+                >
+                  <span className="min-w-0 flex-1">{d.label}</span>
+                  {d.public && <Globe2 size={13} className="shrink-0 text-muted" aria-label="Hiện cho người dân" />}
+                </button>
+              </li>
+            ))}
           </ul>
         </section>
       ))}
