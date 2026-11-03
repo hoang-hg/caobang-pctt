@@ -63,7 +63,7 @@ export default function CommuneTable({ units, onPick }) {
         <div className="scroll-thin -mx-1 min-h-0 flex-1 overflow-auto px-1">
           <table className="w-full border-collapse text-sm">
             <thead className="sticky top-0 z-[1] bg-panel">
-              <tr className="border-b border-line text-left text-[11px] font-bold uppercase tracking-[.04em] text-muted">
+              <tr className="border-b border-line text-left text-xs font-bold text-muted">
                 <th className="px-3 py-2 font-bold">Xã / phường</th>
                 <th className="px-3 py-2 font-bold">Mức</th>
                 <th className="px-3 py-2 font-bold">SOS mở</th>
