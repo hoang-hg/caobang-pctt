@@ -14,6 +14,7 @@ import { usePermission, useScopeLabel } from '../rbac/usePermission';
 import { ago, dateTime } from '../utils/format';
 import { useNewKeys } from '../utils/useNewKeys';
 import { INCIDENT, VULNERABLE } from '../utils/labels';
+import { useMediaQuery } from '../utils/useMediaQuery';
 
 const STATUS = {
   cho_duyet: { label: 'Chờ duyệt', cls: 'bg-warn text-black' },
@@ -21,6 +22,8 @@ const STATUS = {
   da_xu_ly: { label: 'Đã xử lý', cls: 'bg-accent text-white' },
   tu_choi: { label: 'Từ chối', cls: 'bg-panel2 text-muted' },
 };
+// Nhãn ngắn cho thẻ trạng thái của cột danh sách hẹp (máy tính, bản vẽ khung F)
+const SHORT = { cho_duyet: 'Chờ duyệt', da_duyet: 'Đã duyệt', da_xu_ly: 'Đã xử lý', tu_choi: 'Từ chối' };
 
 function ActionModal({ report, action, onClose }) {
   const qc = useQueryClient();
@@ -217,7 +220,7 @@ function ActionModal({ report, action, onClose }) {
   );
 }
 
-function ReportCard({ r, onAction, onPhoto, fresh = false }) {
+function ReportCard({ r, onAction, onPhoto, fresh = false, large = false }) {
   const urgent = r.category === 'mac_ket' && r.status === 'cho_duyet'; // có người mắc kẹt, chưa xử lý
   const navigate = useNavigate();
   const setFocus = useStore((s) => s.setFocus);
@@ -225,7 +228,7 @@ function ReportCard({ r, onAction, onPhoto, fresh = false }) {
   const st = STATUS[r.status];
 
   return (
-    <div className={clsx('card flex flex-col gap-2.5 p-3.5', r.status === 'cho_duyet' && (urgent ? 'border-danger ring-1 ring-danger/40' : 'border-warn/70'), fresh && 'motion-safe:animate-enter')}>
+    <div className={clsx('card flex flex-col gap-2.5', large ? 'p-5' : 'p-3.5', r.status === 'cho_duyet' && (urgent ? 'border-danger ring-1 ring-danger/40' : 'border-warn/70'), fresh && 'motion-safe:animate-enter')}>
       <div className="flex items-center gap-2">
         <b className="font-bold text-sm text-ink">{r.code}</b>
         {urgent && <span className="chip bg-danger text-white text-[10px] font-bold">Khẩn</span>}
@@ -257,7 +260,7 @@ function ReportCard({ r, onAction, onPhoto, fresh = false }) {
               className="relative group overflow-hidden rounded-xl border border-line hover:border-accent shadow-sm"
               title="Xem ảnh phóng to"
             >
-              <img src={p.thumb} alt={`Ảnh ${i + 1} của ${r.code}`} className="h-24 w-24 object-cover" loading="lazy" />
+              <img src={large ? p.full : p.thumb} alt={`Ảnh ${i + 1} của ${r.code}`} className={large ? 'h-44 w-60 object-cover' : 'h-24 w-24 object-cover'} loading="lazy" />
               <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity">
                 <ZoomIn size={16} />
               </div>
@@ -295,7 +298,8 @@ function ReportCard({ r, onAction, onPhoto, fresh = false }) {
       )}
 
       {canModerate && (
-        <div className="flex flex-wrap items-center gap-1.5 border-t border-line pt-2 mt-auto">
+        // Khung chi tiết máy tính: nút cao 44 px, chữ 14 px (bản vẽ khung F)
+        <div className={clsx('flex flex-wrap items-center gap-1.5 border-t border-line pt-2 mt-auto', large && 'gap-2.5 pt-4 [&_button]:min-h-[44px] [&_button]:rounded-xl [&_button]:px-4 [&_button]:text-sm')}>
           {r.status !== 'da_duyet' && r.status !== 'da_xu_ly' && (
             <button className="btn-primary px-2.5 py-1 text-xs shadow-sm font-semibold" onClick={() => onAction(r, 'approve')}>
               <Check size={12} /> Duyệt công khai
@@ -333,6 +337,36 @@ function ReportCard({ r, onAction, onPhoto, fresh = false }) {
   );
 }
 
+/** Một dòng của cột danh sách (máy tính ≥ 1280 px — bản vẽ khung F): ảnh nhỏ, mã, chấm khẩn, thời gian, nội dung một dòng,
+ * xã · số ảnh. Chọn → chi tiết bên phải. */
+function ReportRow({ r, selected, onSelect }) {
+  const urgent = r.category === 'mac_ket' && r.status === 'cho_duyet';
+  const thumb = r.photo_urls?.[0]?.thumb;
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(r.id)}
+      aria-current={selected ? 'true' : undefined}
+      className={clsx('tap flex w-full gap-3 rounded-[14px] p-3 text-left transition-colors', selected ? 'bg-accent/10 ring-2 ring-accent' : 'bg-panel2 hover:bg-line/50')}
+    >
+      {thumb
+        ? <img src={thumb} alt="" className="h-16 w-16 shrink-0 rounded-xl object-cover" loading="lazy" />
+        : <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-line/60 text-[11px] text-muted">chưa có ảnh</span>}
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-1.5">
+          <b className="text-sm text-ink">{r.code}</b>
+          {urgent && <span className="h-2 w-2 shrink-0 rounded-full bg-danger" aria-label="Khẩn — có người mắc kẹt" />}
+          <span className="ml-auto shrink-0 text-xs text-muted" title={dateTime(r.created_at)}>{ago(r.created_at)}</span>
+        </span>
+        <span className="mt-0.5 block truncate text-sm text-ink">{r.description}</span>
+        <span className="block truncate text-xs text-muted">
+          {r.admin_name}{r.hamlet_name ? ` · ${r.hamlet_name}` : ''} · {r.photo_urls?.length ? `${r.photo_urls.length} ảnh` : 'chưa có ảnh'}
+        </span>
+      </span>
+    </button>
+  );
+}
+
 // Màn trống từng thẻ trạng thái: nói rõ chưa có gì và việc sẽ diễn ra (không để một dòng chữ xám)
 const EMPTY = {
   cho_duyet: 'Không có phản ánh nào chờ duyệt. Phản ánh người dân gửi từ cổng công khai sẽ hiện ở đây — trang tự cập nhật mỗi 30 giây.',
@@ -364,6 +398,10 @@ export default function CitizenReports() {
   const [modal, setModal] = useState(null);
   const [photo, setPhoto] = useState(null);
   const [search, setSearch] = useState('');
+  const [picked, setPicked] = useState(null);
+  // Máy tính ≥ 1280 px (bản vẽ desktop khung F): danh sách – chi tiết — cột trái thẻ trạng thái + tìm + danh sách gọn, bên phải
+  // chi tiết phản ánh đang chọn (ảnh, nội dung gốc, người gửi, thao tác)
+  const desk = useMediaQuery('(min-width: 1280px)');
   const qc = useQueryClient();
   const toast = useStore((s) => s.toast);
   const reportsQ = useAreaQuery('reports', '/reports', { status: tab }, { refetchInterval: 30_000 });
@@ -395,6 +433,82 @@ export default function CitizenReports() {
       r.reporter_name?.toLowerCase().includes(q)
     );
   }, [data?.items, search]);
+
+  const modals = (
+    <>
+      {modal && modal.action !== 'reopen' && (
+        <ActionModal report={modal.r} action={modal.action} onClose={() => setModal(null)} />
+      )}
+      {photo && (
+        <div
+          className="fixed inset-0 z-[1600] flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 animate-in fade-in"
+          onClick={() => setPhoto(null)}
+        >
+          <div className="relative max-h-full max-w-4xl" onClick={(e) => e.stopPropagation()}>
+            <img src={photo} alt="Ảnh phản ánh phóng to" className="max-h-[85vh] max-w-full rounded-2xl shadow-2xl border border-line/40" />
+            <button
+              onClick={() => setPhoto(null)}
+              className="absolute -top-3 -right-3 rounded-full bg-panel p-1.5 text-ink shadow-lg hover:bg-panel2"
+              title="Đóng ảnh"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+
+  if (desk) {
+    const selected = filteredItems.find((r) => r.id === picked) || filteredItems[0];
+    return (
+      <div className={`${PAGE} pb-8`}>
+        <h1 className="sr-only">Phản ánh hiện trường của người dân — {scopeLabel}</h1>
+        <div className="grid grid-cols-[400px_minmax(0,1fr)] items-start gap-5">
+          <aside aria-label="Danh sách phản ánh" className="sheet sticky top-0 flex max-h-[calc(100vh-9rem)] flex-col gap-3 p-[18px]">
+            <div className="seg-track self-start" role="tablist" aria-label="Trạng thái phản ánh">
+              {Object.keys(STATUS).map((k) => (
+                <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => { setTab(k); setPicked(null); }} className={clsx('seg-item px-2.5', tab === k && 'seg-item-on')} title={STATUS[k].label}>
+                  {SHORT[k]}
+                  {counts[k] > 0 && <span className="num rounded-full bg-panel2 px-1.5 text-xs font-semibold text-ink-2">{counts[k]}</span>}
+                </button>
+              ))}
+            </div>
+            <label className="flex h-11 items-center gap-2 rounded-xl border border-line bg-panel px-3 text-sm focus-within:border-accent">
+              <Search size={15} className="shrink-0 text-muted" aria-hidden="true" />
+              <input className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-muted" placeholder="Tìm phản ánh, địa bàn, SĐT…" aria-label="Tìm phản ánh theo mã, nội dung, địa bàn, số điện thoại" value={search} onChange={(e) => setSearch(e.target.value)} />
+            </label>
+            <div className="scroll-thin -mx-1 min-h-0 flex-1 overflow-y-auto px-1">
+              {!data && reportsQ.isError ? (
+                <ErrorState onRetry={() => reportsQ.refetch()}>Không tải được danh sách phản ánh — không có nghĩa là không có phản ánh mới</ErrorState>
+              ) : !data ? (
+                <div className="flex flex-col gap-2">{[0, 1, 2].map((i) => <Skeleton key={i} height={88} />)}</div>
+              ) : filteredItems.length ? (
+                <ul className="flex flex-col gap-2" aria-label="Các phản ánh">
+                  {filteredItems.map((r) => <li key={r.id}><ReportRow r={r} selected={r.id === selected?.id} onSelect={setPicked} /></li>)}
+                </ul>
+              ) : (
+                <p className="py-8 text-center text-sm text-muted">{search.trim() ? `Không thấy phản ánh khớp "${search.trim()}" ở thẻ này.` : EMPTY[tab]}</p>
+              )}
+            </div>
+            <div className="flex items-center gap-2 text-xs text-muted">
+              <span className="flex-1">Tự cập nhật mỗi 30 giây{dataTime ? ` · lúc ${dataTime}` : ''} · tiếp nhận từ cổng công khai</span>
+              <RoleTips page="phan-anh" compact />
+            </div>
+          </aside>
+          <div className="min-w-0">
+            {selected ? (
+              <ReportCard key={selected.id} r={selected} large onAction={onAction} onPhoto={setPhoto} />
+            ) : data ? (
+              <EmptyState art="hop-thu" className="sheet py-16">Chọn một phản ánh ở cột bên trái để xem ảnh, nội dung và duyệt.</EmptyState>
+            ) : null}
+            <p className="mt-2 text-xs text-muted">Chỉ công khai sau khi cán bộ phê duyệt; số điện thoại người gửi không bao giờ hiện ra cổng công khai.</p>
+          </div>
+        </div>
+        {modals}
+      </div>
+    );
+  }
 
   return (
     <div className={`${PAGE} pb-8`}>
@@ -452,27 +566,7 @@ export default function CitizenReports() {
         />
       )}
 
-      {modal && modal.action !== 'reopen' && (
-        <ActionModal report={modal.r} action={modal.action} onClose={() => setModal(null)} />
-      )}
-
-      {photo && (
-        <div
-          className="fixed inset-0 z-[1600] flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 animate-in fade-in"
-          onClick={() => setPhoto(null)}
-        >
-          <div className="relative max-h-full max-w-4xl" onClick={(e) => e.stopPropagation()}>
-            <img src={photo} alt="Ảnh phản ánh phóng to" className="max-h-[85vh] max-w-full rounded-2xl shadow-2xl border border-line/40" />
-            <button
-              onClick={() => setPhoto(null)}
-              className="absolute -top-3 -right-3 rounded-full bg-panel p-1.5 text-ink shadow-lg hover:bg-panel2"
-              title="Đóng ảnh"
-            >
-              <X size={18} />
-            </button>
-          </div>
-        </div>
-      )}
+      {modals}
     </div>
   );
 }
