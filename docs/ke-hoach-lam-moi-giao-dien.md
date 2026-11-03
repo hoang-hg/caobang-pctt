@@ -483,7 +483,8 @@ Mỗi nhóm một PR (lint + build + ảnh chụp đối chiếu bản vẽ ở 
 | D (tiếp) | Soạn lệnh bước 2–3 (D2, D3), duyệt PIN / trả lại (D4, D4b), lịch sử, gia hạn, danh bạ, mẫu tin, nhật ký, bản đồ vùng (D5–D10) | Kế tiếp |
 | E1 | Vật tư ≥ 1280 px (khung E): 2 cột — nội dung (4 ô chỉ số, thẻ Lực lượng / Kho / Phương tiện + gợi ý, làm mới, danh sách) · "Cần bổ sung / cần sửa" dính cột phải (xếp dọc từng việc); bỏ tiêu đề trang | Xong (E1) |
 | E (tiếp) | Bảng lọc dọc bên trái (khung E), điều động nhanh (E2), nhập / xuất kho (E3, E5, E5b), thẻ kho / phương tiện (E4, E6, E6b), nhiên liệu (E7), sổ kho (E8) | Kế tiếp |
-| F · G | Phản ánh người dân (F–F6) · Đợt thiên tai (G–G4) | Kế tiếp |
+| G1 | Đợt thiên tai ≥ 1280 px (khung G): cột trái "Các đợt thiên tai" + nút "Mở đợt thiên tai" ở đáy cột, báo cáo đợt bên phải; bỏ tiêu đề trang và dải "Đang diễn ra" (đợt đang diễn ra đã đánh dấu trong danh sách) | Xong (G1) |
+| F · G (tiếp) | Phản ánh người dân dạng danh sách – chi tiết (F–F6) · Đợt thiên tai khung con (G2–G4) | Kế tiếp |
 | H1 | Nhập dữ liệu ≥ 1280 px (khung H): danh sách loại dữ liệu luôn ở cột trái (nhóm theo cụm, loại đang chọn tô nhấn, biểu tượng "hiện cho người dân"), quy trình nhập ở giữa; bỏ tiêu đề trang, gợi ý ở hàng thẻ | Xong (H1) |
 | I1 | Nguồn dữ liệu ≥ 1280 px (khung I): bỏ tiêu đề trang — hàng thẻ + "Chỉ Cấp 1 — Quản trị hệ thống" + gợi ý; thẻ nguồn 3 cột | Xong (I1) |
 | H · I (tiếp) | Nhập dữ liệu: cột phải hồ sơ xã chờ duyệt (H), khung con H2–H8 · Nguồn dữ liệu: cột phải thiết bị đo (I), khung con I2–I8 | Kế tiếp |
