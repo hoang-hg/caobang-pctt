@@ -479,7 +479,8 @@ Mỗi nhóm một PR (lint + build + ảnh chụp đối chiếu bản vẽ ở 
 | Dải khẩn | Dải khẩn dùng chung (UrgentStrip — Cứu hộ, Cảnh báo, Vật tư) ẩn ở ≥ 1024 px; ui-test bỏ kiểm dải ở máy tính | Xong (C1) |
 | C1 | Cứu hộ ≥ 1280 px (khung C): hàng chip 4 chỉ số (phiếu đang mở · quá hạn · người cần cứu · sơ tán — vẫn là nút lọc) + "Bản đồ cứu hộ ›" (mở bản đồ & diễn biến 48 giờ), gợi ý, làm mới; bỏ tiêu đề trang và thanh gập thường trực | Xong (C1) |
 | C (tiếp) | Bảng điều phối cột nền xám + thẻ gọn, hàng lọc một dòng (C); điều đội 3 bước (C2–C2c), chi tiết / sửa / đóng / chuyển phiếu (C3, C5, C13), nhận tin (C6), đội đã đến · huỷ lệnh · chi viện · link nhiệm vụ (C7, C8, C11, C14), sơ tán (C9–C10, C15), nền tối | Kế tiếp |
-| D | Cảnh báo & Hotline (D–D10) | Kế tiếp |
+| D1 | Cảnh báo ≥ 1280 px (khung D): cột trái "Cảnh báo khẩn cấp & Hotline" — các phần (Phát cảnh báo · Lịch sử lệnh · Danh bạ & Tổng đài · Nhật ký pháp lý), "Bản đồ vùng cảnh báo", quy tắc hai người, gợi ý, làm mới; bên phải hàng chip 4 chỉ số (StatCard chip — dùng chung) rồi nội dung phần: soạn lệnh giữa, chờ duyệt / đang hiệu lực cột phải 380 px | Xong (D1) |
+| D (tiếp) | Soạn lệnh bước 2–3 (D2, D3), duyệt PIN / trả lại (D4, D4b), lịch sử, gia hạn, danh bạ, mẫu tin, nhật ký, bản đồ vùng (D5–D10) | Kế tiếp |
 | E | Vật tư & Lực lượng (E–E8) | Kế tiếp |
 | F · G | Phản ánh người dân (F–F6) · Đợt thiên tai (G–G4) | Kế tiếp |
 | H · I | Nhập dữ liệu (H–H8) · Nguồn dữ liệu (I–I8) | Kế tiếp |
