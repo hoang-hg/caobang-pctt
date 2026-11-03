@@ -491,5 +491,6 @@ Mỗi nhóm một PR (lint + build + ảnh chụp đối chiếu bản vẽ ở 
 | J1 | Phân quyền ≥ 1280 px (khung J): 3 ô giải thích cấp xếp dọc ở cột trái ("Cấp N" + tên, ô cấp của bạn viền nhấn, câu "chỉ cấp trên…"), bảng tài khoản bên phải; bỏ tiêu đề trang — "Bạn: …" + gợi ý ở hàng thẻ | Xong (J1) |
 | K1 | Hướng dẫn xử lý ≥ 1280 px (khung K): cột trái dính — vai trò + "Bạn đang gặp việc gì?" dạng danh sách; các bước từng việc ở cột phải (đủ mọi việc để in, chạm việc thì cuộn tới), nút In ở đầu cột phải; bỏ tiêu đề trang | Xong (K1) |
 | J · K (tiếp) | Phân quyền khung con (J2–J12) · Hướng dẫn cấp xã (K2) | Kế tiếp |
-| L · M | Đăng nhập & tài khoản (L1–L8b) · Trạng thái chung (M1–M5) | Kế tiếp |
+| M1 | Trạng thái chung: "SOS mới" khi đang ở trang khác thành thẻ nổi góc phải trên (dưới thanh trên) — Mở phiếu (mở thẳng phiếu ở Điều hành cứu hộ) · Để sau · đóng, giữ 20 giây (khung M1); dải mất kết nối có nút "Thử lại" (khung M2, giữ màu trung tính — mất mạng không phải mức nguy hiểm) | Xong (M1) |
+| L · M | Đăng nhập & tài khoản (L1–L8b) · Trạng thái chung: nhắc bật chuông, đang tải / lỗi / rỗng, không quyền, hết phiên (M1b, M3–M5) | Kế tiếp |
 | N · O | Cổng người dân (N1–N19) · Nhiệm vụ trưởng nhóm (O1–O5) | Kế tiếp |
