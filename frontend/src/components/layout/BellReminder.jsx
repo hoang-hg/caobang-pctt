@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { useStore } from '../../app/store';
 
@@ -13,12 +13,14 @@ export default function BellReminder() {
   const audioReady = useStore((s) => s.audioReady);
   const presentation = useStore((s) => s.presentation);
   const [hidden, setHidden] = useState(false);
+  const closeRef = useRef(null);
   const showing = soundOn && !audioReady && !presentation && !hidden;
   useEffect(() => {
     if (!showing) return undefined;
-    const hide = () => setHidden(true);
-    window.addEventListener('pointerdown', hide, { capture: true, once: true });
-    window.addEventListener('keydown', hide, { capture: true, once: true });
+    // Nhấn trúng "✕" không ẩn ngay: nút phải còn đó tới lúc nhả chuột thì lần bấm mới trọn vẹn (onClick ẩn thẻ)
+    const hide = (e) => { if (!closeRef.current?.contains(e.target)) setHidden(true); };
+    window.addEventListener('pointerdown', hide, { capture: true });
+    window.addEventListener('keydown', hide, { capture: true });
     return () => {
       window.removeEventListener('pointerdown', hide, { capture: true });
       window.removeEventListener('keydown', hide, { capture: true });
@@ -38,6 +40,7 @@ export default function BellReminder() {
         </p>
       </div>
       <button
+        ref={closeRef}
         type="button"
         onClick={() => setHidden(true)}
         className="tap-sq pointer-events-auto -mr-1 -mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-panel2 hover:text-ink"
