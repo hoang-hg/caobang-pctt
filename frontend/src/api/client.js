@@ -15,10 +15,11 @@ function mustChangePassword() {
 /** 401 khi đang đăng nhập: phiên hết hạn / bị thu hồi (đổi mật khẩu, đổi quyền, khoá) → về trang đăng nhập, báo lý do
  * (trước đây chuyển trang không một lời giải thích). Sai mật khẩu lúc đăng nhập cũng là 401 nhưng khi đó chưa có phiên. */
 function sessionEnded(detail) {
-  const { auth, setAuth, toast } = useStore.getState();
+  const { auth, setAuth } = useStore.getState();
   if (!auth) return;
   setAuth(null);
-  toast({ tone: 'warn', title: 'Phiên đăng nhập đã kết thúc', body: detail, duration: 10000 });
+  // Bản vẽ khung M5: trang đăng nhập báo ngay trên form (thay thông báo nổi dễ trôi mất); đăng nhập xong về đúng trang (?next=)
+  useStore.setState({ sessionNote: detail || '' }); // '' = báo chung, không kèm lý do của máy chủ
 }
 
 /** Chế độ giả lập (app/store.js: bật chủ động, chỉ trình duyệt này) cho API nội bộ. Cổng công khai /public/* luôn gọi máy

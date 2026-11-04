@@ -1,8 +1,10 @@
 import { lazy, Suspense, useEffect } from 'react';
-import { Navigate, Route, Routes, useLocation, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, Route, Routes, useLocation, useSearchParams } from 'react-router-dom';
+import { Lock } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Header from './components/layout/Header';
 import StatusBar from './components/layout/StatusBar';
+import BellReminder from './components/layout/BellReminder';
 import Sidebar from './components/layout/Sidebar';
 import SessionKeeper from './components/layout/SessionKeeper';
 import Toasts from './components/common/Toasts';
@@ -42,14 +44,29 @@ function PageLoading() {
 function Guard({ obj, act, or, children }) {
   const main = usePermission(obj, act);
   const alt = usePermission(or?.[0], or?.[1]); // quyền thay thế (VD nhập dữ liệu: nhập thẳng HOẶC gửi chờ duyệt)
-  return main || (or && alt) ? children : <NoAccess />;
+  return main || (or && alt) ? children : <NoAccess obj={obj} />;
 }
 
-function NoAccess() {
+// Tên trang theo quyền xem (cho câu "chưa được mở trang …"); integration: chỉ Cấp 1 (trang Nguồn dữ liệu ghi rõ như vậy)
+const PAGE_NAME = {
+  monitoring: 'theo dõi tình hình', resource: 'Vật tư & Lực lượng', sos: 'Điều hành cứu hộ', alert: 'Cảnh báo khẩn cấp',
+  report: 'Phản ánh người dân', integration: 'Nguồn dữ liệu & thiết bị đo', data: 'Nhập dữ liệu', user: 'Phân quyền',
+};
+
+/** Không có quyền mở trang (bản vẽ khung M4): thẻ giữa trang — biểu tượng khoá, nói trang nào, nhờ ai, nút về Tổng quan. */
+function NoAccess({ obj }) {
   return (
-    <div className="p-8 text-center text-muted">
-      <div className="text-lg font-semibold text-ink">Không có quyền truy cập</div>
-      Tài khoản của bạn chưa được cấp quyền cho chức năng này. Liên hệ lãnh đạo BCH để được phân quyền.
+    <div className="flex min-h-[60vh] items-center justify-center p-5">
+      <div className="card flex w-full max-w-[520px] flex-col items-center gap-3.5 rounded-[18px] p-8 text-center">
+        <Lock size={52} strokeWidth={1.5} className="text-muted" aria-hidden="true" />
+        <h1 className="text-xl font-bold text-ink">Tài khoản của bạn chưa được mở trang này</h1>
+        <p className="text-sm leading-relaxed text-ink-2">
+          {obj === 'integration'
+            ? <>Nguồn dữ liệu & thiết bị đo chỉ dành cho <b className="text-ink">Cấp 1 · Quản trị hệ thống</b>. Cần dùng thì nhờ đơn vị kỹ thuật.</>
+            : <>Trang <b className="text-ink">{PAGE_NAME[obj] || 'này'}</b> chưa được cấp cho tài khoản của bạn. Cần dùng thì nhờ lãnh đạo Ban Chỉ huy phân quyền.</>}
+        </p>
+        {obj !== 'monitoring' && <Link to="/dashboard" className="btn-primary tap h-11 rounded-xl px-5 font-semibold">Về Tổng quan</Link>}
+      </div>
     </div>
   );
 }
@@ -103,6 +120,7 @@ function Shell() {
         </main>
       </div>
       {!presentation && <StatusBar />}
+      <BellReminder />
     </div>
   );
 }

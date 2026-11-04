@@ -103,6 +103,7 @@ function MfaStep({ mfa, onBack, onDone }) {
  */
 export default function Login() {
   const setAuth = useStore((s) => s.setAuth);
+  const sessionNote = useStore((s) => s.sessionNote);
 
   const [username, setUsername] = useState(() => {
     try {
@@ -214,6 +215,14 @@ export default function Login() {
             <h2 className="text-2xl font-bold text-ink">Đăng nhập</h2>
             <p className="mt-1 text-sm text-ink-2">Dành cho cán bộ Ban Chỉ huy tỉnh, xã, phường.</p>
 
+            {/* Phiên trước kết thúc (hết hạn, đổi quyền, bị khoá) — bản vẽ khung M5 */}
+            {sessionNote != null && !mfa && (
+              <div role="alert" className="mt-4 rounded-xl border border-accent/30 bg-accent/10 p-3 text-sm font-semibold leading-relaxed text-ink">
+                Phiên đăng nhập đã hết hạn hoặc quyền của bạn vừa thay đổi — đăng nhập lại để tiếp tục.
+                {sessionNote && <span className="mt-1 block text-[13px] font-normal text-ink-2">{sessionNote}</span>}
+                <span className="mt-1 block text-[13px] font-normal text-ink-2">Đăng nhập xong sẽ quay lại đúng trang đang làm.</span>
+              </div>
+            )}
             {mfa ? (
               <MfaStep
                 mfa={mfa}
