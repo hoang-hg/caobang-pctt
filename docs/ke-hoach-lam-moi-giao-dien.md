@@ -498,7 +498,8 @@ Mỗi nhóm một PR (lint + build + ảnh chụp đối chiếu bản vẽ ở 
 | I1 | Nguồn dữ liệu ≥ 1280 px (khung I): bỏ tiêu đề trang — hàng thẻ + "Chỉ Cấp 1 — Quản trị hệ thống" + gợi ý; thẻ nguồn 3 cột | Xong (I1) |
 | H2 | Nhập dữ liệu ≥ 1280 px (khung H): cột phải "Hồ sơ xã gửi chờ duyệt" (cấp tỉnh) — tối đa 5 hồ sơ, nút "Xem & duyệt" mở thẳng hồ sơ; câu "chưa ghi vào hệ thống cho tới khi cấp tỉnh duyệt" | Xong (H2) |
 | I2 | Nguồn dữ liệu ≥ 1280 px (khung I): cột phải "Thiết bị đo" — số đăng ký, đang gửi / im lặng, từng thiết bị (cách gửi · câu trạng thái, chấm màu), nút "Quản lý thiết bị đo" | Xong (I2) |
-| H · I (tiếp) | Nhập dữ liệu: khung con H2–H8 · Nguồn dữ liệu: khung con I2–I8 | Kế tiếp |
+| H (khung con) | Dải 3 bước, hộp "Tệp mẫu", hộp "Ghi xong", hộp "Trả lại hồ sơ", xã gửi lại hồ sơ đã trả. Giữ: form điền trực tiếp tại trang (nhiều trường, khung bảng hẹp không đủ chỗ), bản đồ thay đổi ở hồ sơ, nút "Xem & duyệt" ở cột phải (xem xong mới duyệt). Máy chủ chỉ có một tệp mẫu nên không có nút CSV riêng | Xong |
+| I (tiếp) | Nguồn dữ liệu: khung con I2–I8 | Kế tiếp |
 | J1 | Phân quyền ≥ 1280 px (khung J): 3 ô giải thích cấp xếp dọc ở cột trái ("Cấp N" + tên, ô cấp của bạn viền nhấn, câu "chỉ cấp trên…"), bảng tài khoản bên phải; bỏ tiêu đề trang — "Bạn: …" + gợi ý ở hàng thẻ | Xong (J1) |
 | K1 | Hướng dẫn xử lý ≥ 1280 px (khung K): cột trái dính — vai trò + "Bạn đang gặp việc gì?" dạng danh sách; các bước từng việc ở cột phải (đủ mọi việc để in, chạm việc thì cuộn tới), nút In ở đầu cột phải; bỏ tiêu đề trang | Xong (K1) |
 | J2 | Phân quyền: tạo tài khoản 4 bước cỡ vừa "Bước n/4", chọn cấp gọn ở máy tính, Xem lại dạng bảng + ghi chú (J2 – J4); đổi cấp, khoá, đặt lại 2 lớp có phụ đề (J7 – J9); mật khẩu / PIN chọn việc Đặt lại mật khẩu · Đổi mã PIN · Cả hai, "Tạo ngẫu nhiên" mật khẩu tạm (J5, J10); nhật ký thao tác có ô tìm + lọc việc (J6); 3 cấp & quyền hạn ≥ 1280 px là bảng việc × 3 cấp dựng từ danh mục quyền của máy chủ (J11) | Xong (J2) |
