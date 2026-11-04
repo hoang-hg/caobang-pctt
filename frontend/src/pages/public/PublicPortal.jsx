@@ -325,7 +325,8 @@ function AlertDetail({ a, others, onNearest, onAll, onClose }) {
       }
     >
       <div className="flex flex-col gap-3">
-        <p className="text-[13px] text-muted">
+        <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] text-muted">
+          {a.active !== false && LEVEL[a.severity] && <span className={clsx('chip px-2 py-0 text-xs font-bold', LEVEL[a.severity].cls)}>{LEVEL[a.severity].label}</span>}
           <span className="font-mono">{a.code}</span> · phát {dateTime(a.issued_at)}
           {a.active === false ? (a.ended_at ? ` · đã kết thúc lúc ${dateTime(a.ended_at)}` : ' · đã hết hiệu lực') : (a.valid_until ? ` · hiệu lực tới ${dateTime(a.valid_until)}` : '')}
         </p>
