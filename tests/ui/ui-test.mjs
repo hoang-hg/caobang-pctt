@@ -88,6 +88,9 @@ const slug =(s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd
 /** Theo dõi lỗi của trang: lỗi JavaScript không bắt (React sập → màn hình trắng) và API trả 5xx. */
 function watch(page) {
   const problems = [];
+  // Thẻ nổi "SOS mới" (máy tính: góc phải trên, giữ 20 giây — bản vẽ khung M1) xuất hiện bất kỳ lúc nào bộ mô phỏng tạo phiếu
+  // → đè các nút góc phải (Xuất, đổi cách xem…). Thẻ hiện lúc sắp bấm thì đóng trước, như người trực bấm "✕"
+  page.addLocatorHandler(page.getByRole('button', { name: 'Đóng thông báo' }).first(), (b) => b.click(), { noWaitAfter: true }).catch(() => {});
   page.on('pageerror', (e) => problems.push(`lỗi JS: ${e.message.split('\n')[0]}`));
   page.on('response', (r) => {
     if (r.status() >= 500 && new URL(r.url()).pathname.startsWith('/api/')) {
@@ -1736,20 +1739,11 @@ async function resourcesPage(ctx) {
     if (await pager.count() && !/^1–/.test(await pager.innerText())) throw new Error('đổi cách xếp không về trang 1');
     const fuel = (await rows.allInnerTexts()).map((t) => Number(t.match(/(\d+)%/)?.[1])).filter((x) => !Number.isNaN(x));
     if (fuel.some((x, i) => i && fuel[i - 1] > x)) throw new Error(`"Nhiên liệu thấp trước" xếp sai: ${fuel.slice(0, 6)}`);
-    // Máy tính ≥ 1280 px (bản vẽ khung C): Excel / PDF nằm trong menu "Xuất" của hàng chip
-    const exportBy = async (name) => {
-      const direct = page.getByRole('button', { name, exact: true });
-      if (await direct.isVisible().catch(() => false)) return direct.click();
-      // Thẻ nổi "SOS mới" (góc phải trên, giữ 20 giây — bộ mô phỏng tạo phiếu liên tục) đè lên nút "Xuất" → đóng trước
-      for (const c of await page.getByRole('button', { name: 'Đóng thông báo' }).all()) await c.click().catch(() => {});
-      await page.getByRole('button', { name: /^Xuất/ }).click();
-      return page.getByRole('menuitem', { name: new RegExp(name) }).click();
-    };
-    const [xlsx] = await Promise.all([page.waitForEvent('download', { timeout: 20_000 }), exportBy('Excel')]);
+    const [xlsx] = await Promise.all([page.waitForEvent('download', { timeout: 20_000 }), page.getByRole('button', { name: 'Excel', exact: true }).click()]);
     if (!/^phuong-tien-.*\.xlsx$/.test(xlsx.suggestedFilename())) throw new Error(`tên tệp Excel: ${xlsx.suggestedFilename()}`);
     let pdfNote = '';
     if (wide) {
-      const [pdf] = await Promise.all([page.waitForEvent('download', { timeout: 60_000 }), exportBy('PDF')]);
+      const [pdf] = await Promise.all([page.waitForEvent('download', { timeout: 60_000 }), page.getByRole('button', { name: 'PDF', exact: true }).click()]);
       if (!/^nguon-luc-phuong_tien-.*\.pdf$/.test(pdf.suggestedFilename())) throw new Error(`tên tệp PDF: ${pdf.suggestedFilename()}`);
       await page.waitForTimeout(300);
       if ((await rows.count()) > size) throw new Error('chụp PDF xong không trở lại phân trang');
@@ -2025,11 +2019,20 @@ async function rescuePage(ctx) {
     const sortBox = page.getByLabel('Sắp xếp');
     if (!(await sortBox.isVisible())) await page.getByRole('button', { name: /^Bộ lọc/ }).click();
     await sortBox.selectOption('cho_lau');
-    const [xlsx] = await Promise.all([page.waitForEvent('download', { timeout: 20_000 }), page.getByRole('button', { name: 'Excel', exact: true }).click()]);
+    // Máy tính ≥ 1280 px (bản vẽ khung C): Excel / PDF nằm trong menu "Xuất" của hàng chip
+    const exportBy = async (name) => {
+      const direct = page.getByRole('button', { name, exact: true });
+      if (await direct.isVisible().catch(() => false)) return direct.click();
+      // Thẻ nổi "SOS mới" (góc phải trên, giữ 20 giây — bộ mô phỏng tạo phiếu liên tục) đè lên nút "Xuất" → đóng trước
+      for (const c of await page.getByRole('button', { name: 'Đóng thông báo' }).all()) await c.click().catch(() => {});
+      await page.getByRole('button', { name: /^Xuất/ }).click();
+      return page.getByRole('menuitem', { name: new RegExp(name) }).click();
+    };
+    const [xlsx] = await Promise.all([page.waitForEvent('download', { timeout: 20_000 }), exportBy('Excel')]);
     if (!/^phieu-sos-.*\.xlsx$/.test(xlsx.suggestedFilename())) throw new Error(`tên tệp Excel: ${xlsx.suggestedFilename()}`);
     let note = xlsx.suggestedFilename();
     if (wide) {
-      const [pdfFile] = await Promise.all([page.waitForEvent('download', { timeout: 60_000 }), page.getByRole('button', { name: 'PDF', exact: true }).click()]);
+      const [pdfFile] = await Promise.all([page.waitForEvent('download', { timeout: 60_000 }), exportBy('PDF')]);
       if (!/^phieu-sos-.*\.pdf$/.test(pdfFile.suggestedFilename())) throw new Error(`tên tệp PDF: ${pdfFile.suggestedFilename()}`);
       note += ` · ${pdfFile.suggestedFilename()}`;
     }
