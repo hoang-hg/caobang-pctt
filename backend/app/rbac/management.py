@@ -225,7 +225,7 @@ async def create_user(actor, username, full_name, position, password, pin, role,
 
 
 async def update_user(
-    actor, user_id, *, full_name=None, position=None, password=None, pin=None, is_active=None, email=None
+    actor, user_id, *, full_name=None, position=None, password=None, pin=None, is_active=None, lock_reason=None, email=None
 ) -> dict:
     target = await get_user(user_id)
     await assert_can_manage_user(actor, target)
@@ -275,9 +275,10 @@ async def update_user(
         }.items()
         if v is not None
     ]
-    await rbac_audit(
-        actor, "user.update", target["username"], details={"changed": changed, "is_active": is_active}
-    )
+    details = {"changed": changed, "is_active": is_active}
+    if is_active is False and (reason := (lock_reason or "").strip()):
+        details["lock_reason"] = reason
+    await rbac_audit(actor, "user.update", target["username"], details=details)
     return await get_user(user_id)
 
 

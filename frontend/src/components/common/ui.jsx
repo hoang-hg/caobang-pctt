@@ -168,7 +168,7 @@ export function Modal({ open, onClose, title, subtitle, children, wide, size, fo
  * là câu hỏi, `children` nói rõ hậu quả bằng lời; nút xác nhận ghi đúng việc sẽ làm (`confirmLabel`), `danger` → nút đỏ;
  * `busy`: đang gửi (khoá nút). Thay window.confirm — hộp của trình duyệt không nói được hậu quả, khó đọc trên điện thoại.
  */
-export function Confirm({ title, subtitle, children, confirmLabel, cancelLabel = 'Huỷ', danger = false, busy = false, onConfirm, onClose }) {
+export function Confirm({ title, subtitle, children, confirmLabel, cancelLabel = 'Huỷ', danger = false, busy = false, confirmDisabled = false, onConfirm, onClose }) {
   return (
     <Modal
       open
@@ -178,7 +178,7 @@ export function Confirm({ title, subtitle, children, confirmLabel, cancelLabel =
       footer={(
         <>
           <button type="button" className="btn-ghost tap" disabled={busy} onClick={onClose}>{cancelLabel}</button>
-          <button type="button" className={clsx(danger ? 'btn-danger' : 'btn-primary', 'tap')} disabled={busy} onClick={onConfirm}>
+          <button type="button" className={clsx(danger ? 'btn-danger' : 'btn-primary', 'tap')} disabled={busy || confirmDisabled} onClick={onConfirm}>
             {busy && <Loader2 size={15} className="animate-spin" aria-hidden="true" />} {confirmLabel}
           </button>
         </>
