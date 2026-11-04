@@ -107,6 +107,8 @@ export default function Alerts() {
   // Dải khẩn / ô chỉ số → thẻ "Phát cảnh báo", cuộn tới khối
   const go = ({ anchor }) => {
     if (tab !== 'phat') setTab('phat');
+    // Chạm ô / dải "n lệnh chờ phê duyệt" → hiện đủ n lệnh (máy tính mặc định chỉ 3 lệnh cũ nhất)
+    if (anchor === 'cho-duyet') setAllPending(true);
     scrollTo(anchor);
   };
   // Bản nháp từ Bản đồ giám sát (vùng vẽ) / bảng tác chiến / "Soạn lại" → mở thẻ soạn, cuộn tới form
