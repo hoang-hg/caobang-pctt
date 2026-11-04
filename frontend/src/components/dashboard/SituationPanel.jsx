@@ -71,6 +71,7 @@ export default function SituationPanel({
         {exports?.length > 0 && (
           <ExportMenu
             up
+            floating
             items={exports}
             className="flex-1"
             buttonClass="tap flex h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-[#2B3F63] text-sm text-white hover:bg-white/5"

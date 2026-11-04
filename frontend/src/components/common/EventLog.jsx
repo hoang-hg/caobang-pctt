@@ -37,7 +37,8 @@ const plain = (m) => (m || '').replace(/\bBĐ\s+(I{1,3})\b/g, 'Báo động $1')
  * Lọc bằng nút chữ (Tất cả / Cứu hộ / Cảnh báo / Người dân), tìm nhanh theo chữ. `preview` (số mục): chỉ HIỆN N
  * sự kiện mới nhất + nút "Xem tất cả" (iPad dọc / điện thoại) — chỉ cắt phần hiển thị, truy vấn (`limit`) giữ nguyên.
  */
-export default function EventLog({ limit = 50, className, preview }) {
+export default function EventLog({ limit = 50, className, preview, ranged = false }) {
+  const [range, setRange] = useState('hom_nay');
   const q = useAreaQuery('logs', '/dashboard/logs', { limit });
   const data = useMemo(() => q.data || [], [q.data]);
   const [showAll, setShowAll] = useState(false);
@@ -48,8 +49,11 @@ export default function EventLog({ limit = 50, className, preview }) {
   const filtered = useMemo(() => {
     const f = FILTERS.find((x) => x.id === filter);
     const needle = search.trim().toLowerCase();
-    return data.filter((l) => f.match(l) && (!needle || (l.message || '').toLowerCase().includes(needle)));
-  }, [data, filter, search]);
+    const from = ranged && range !== 'tat_ca'
+      ? (range === 'hom_nay' ? new Date().setHours(0, 0, 0, 0) : Date.now() - 7 * 86_400_000)
+      : null;
+    return data.filter((l) => (from == null || new Date(l.time).getTime() >= from) && f.match(l) && (!needle || (l.message || '').toLowerCase().includes(needle)));
+  }, [data, filter, search, ranged, range]);
   const shown = preview && !showAll ? filtered.slice(0, preview) : filtered;
 
   return (
@@ -72,25 +76,34 @@ export default function EventLog({ limit = 50, className, preview }) {
         ))}
       </div>
 
-      <div className="relative no-print">
-        <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted" aria-hidden="true" />
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Tìm trong nhật ký (tên xã, trạm, phiếu…)"
-          aria-label="Tìm trong nhật ký"
-          className="input tap min-h-[36px] py-1 pl-8 pr-8 text-[13px]"
-        />
-        {search && (
-          <button
-            type="button"
-            onClick={() => setSearch('')}
-            className="tap-sq absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded text-muted hover:text-ink"
-            aria-label="Xoá chữ tìm"
-          >
-            <X size={13} aria-hidden="true" />
-          </button>
+      <div className={clsx(ranged && 'flex items-start gap-2 [&>*:first-child]:min-w-0 [&>*:first-child]:flex-1')}>
+        <div className="relative no-print">
+          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted" aria-hidden="true" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Tìm trong nhật ký (tên xã, trạm, phiếu…)"
+            aria-label="Tìm trong nhật ký"
+            className="input tap min-h-[36px] py-1 pl-8 pr-8 text-[13px]"
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              className="tap-sq absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded text-muted hover:text-ink"
+              aria-label="Xoá chữ tìm"
+            >
+              <X size={13} aria-hidden="true" />
+            </button>
+          )}
+        </div>
+        {ranged && (
+          <select className="input tap min-h-[36px] w-auto shrink-0 py-1 text-[13px]" aria-label="Khoảng thời gian" value={range} onChange={(e) => setRange(e.target.value)}>
+            <option value="hom_nay">Hôm nay</option>
+            <option value="7n">7 ngày qua</option>
+            <option value="tat_ca">Mọi sự kiện đã tải</option>
+          </select>
         )}
       </div>
 
