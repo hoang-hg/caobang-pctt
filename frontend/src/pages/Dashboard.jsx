@@ -11,6 +11,8 @@ import { useStore } from '../app/store';
 import { EmptyState, ErrorState, Hint, RiskLegend, Section, Segmented, Skeleton } from '../components/common/ui';
 import RoleTips from '../components/common/RoleTips';
 import EventLog from '../components/common/EventLog';
+import EventLogDrawer from '../components/common/EventLogDrawer';
+import PresentationBoard from '../components/dashboard/PresentationBoard';
 import Hydrograph from '../components/charts/Hydrograph';
 import RainfallChart from '../components/charts/RainfallChart';
 import LandslideScatter from '../components/charts/LandslideScatter';
@@ -138,6 +140,8 @@ export default function Dashboard() {
   // hiểm nhất, việc chờ quyết định, Trình chiếu · Xuất) · cột giữa (thẻ, chỉ số, Điểm nóng | Biểu đồ | Bảng số liệu) · nhật
   // ký sự kiện. Trình chiếu giữ bố cục riêng
   const desk = useMediaQuery('(min-width: 1280px)') && !presentation;
+  const tvBoard = useMediaQuery('(min-width: 1024px)'); // màn trình chiếu riêng (khung A2) — thanh trên, dải khẩn đều không hiện
+  const [logOpen, setLogOpen] = useState(false); // ngăn nhật ký đầy đủ (khung A16)
   const [centerView, setCenterView] = useState('diem_nong'); // khối lớn cột giữa thẻ Tổng hợp: 'diem_nong' | 'bieu_do' | 'bang'
   const [heroLayout, setHeroLayoutState] = useState(() => {
     try {
@@ -318,8 +322,9 @@ export default function Dashboard() {
   const exitRef = useRef(exitPresentation);
   exitRef.current = exitPresentation;
   const rotateRef = useRef(null);
-  rotateRef.current = () => {
-    setTab(ROTATION[(ROTATION.indexOf(tab) + 1) % ROTATION.length]);
+  rotateRef.current = (step = 1) => {
+    const i = Math.max(0, ROTATION.indexOf(tab));
+    setTab(ROTATION[(i + step + ROTATION.length) % ROTATION.length]);
     document.querySelector('main')?.scrollTo(0, 0);
   };
   // Mở bằng link ?trinh-chieu=1; rời trang khi đang trình chiếu → trả lại thanh trên / menu cho trang khác
@@ -338,7 +343,15 @@ export default function Dashboard() {
     const keepAwake = () => navigator.wakeLock?.request('screen').then((l) => { lock = l; }).catch(() => {});
     keepAwake();
     const onVisible = () => { if (document.visibilityState === 'visible') keepAwake(); };
-    const onKey = (e) => { if (e.key === 'Escape') exitRef.current(); };
+    const onKey = (e) => {
+      if (e.key === 'Escape') exitRef.current();
+      else if (e.key === 'ArrowRight') rotateRef.current(1);
+      else if (e.key === 'ArrowLeft') rotateRef.current(-1);
+      else if (e.key === ' ' && !e.target.closest?.('button, a, input, select, textarea')) {
+        e.preventDefault();
+        setRotatePaused((p) => !p);
+      }
+    };
     const onFull = () => {
       if (document.fullscreenElement) full = true;
       else if (full) exitRef.current(); // Esc thoát toàn màn hình → thoát luôn trình chiếu
@@ -842,17 +855,36 @@ export default function Dashboard() {
         <aside aria-label="Nhật ký sự kiện" className={clsx('sheet flex min-h-0 flex-col gap-3 p-[18px]', sideW)}>
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-[15px] font-bold text-ink">{tab === 'cap_xa' && communeCode ? 'Nhật ký sự kiện của xã' : 'Nhật ký sự kiện'}</h2>
-            {wsStatus === 'online'
-              ? <span className="shrink-0 whitespace-nowrap text-xs text-muted">Tự cập nhật</span>
-              : <span className="shrink-0 whitespace-nowrap text-xs font-semibold text-warn">Mất kết nối — đang thử lại</span>}
+            {wsStatus !== 'online' && <span className="shrink-0 whitespace-nowrap text-xs font-semibold text-warn">Mất kết nối — đang thử lại</span>}
+            <button type="button" className="tap shrink-0 whitespace-nowrap text-xs font-semibold text-accent hover:underline" onClick={() => setLogOpen(true)}>Xem đầy đủ</button>
           </div>
           <EventLog className="min-h-0 flex-1" limit={tab === 'cap_xa' && communeCode ? 40 : 60} />
         </aside>
+        {logOpen && <EventLogDrawer area={filterLabel} onClose={() => setLogOpen(false)} />}
         {modals}
       </div>
     );
   }
 
+
+  if (presentation && tab === 'tong_hop' && tvBoard) {
+    return (
+      <PresentationBoard
+        k={k}
+        waterStations={waterStations}
+        stationsError={stationsState.error}
+        hotspots={hotspots}
+        area={filterLabel}
+        tabs={ROTATION.map((id) => [id, TABS.find((t) => t.id === id)?.label || id])}
+        tab={tab}
+        onTab={setTab}
+        onExit={exitPresentation}
+        rotateSec={rotateSec}
+        paused={rotatePaused}
+        onTogglePause={() => setRotatePaused((p) => !p)}
+      />
+    );
+  }
 
   return (
     <div className={PAGE}>
@@ -860,7 +892,7 @@ export default function Dashboard() {
       {/* Máy tính ≥ 1024 px không còn dải khẩn (quyết định của chủ dự án 03/11/2026 — số SOS chờ ở nút đỏ thanh trên, việc
           khẩn ở "Việc chờ quyết định"); `contents`: dải vẫn dính khi cuộn trên điện thoại / máy tính bảng. Trình chiếu giữ dải */}
       {k && (
-        <div className={presentation ? 'contents' : 'contents lg:hidden'}>
+        <div className="contents lg:hidden">
           <SituationBar
             k={k}
             waterStations={waterStations}
