@@ -739,6 +739,7 @@ export default function Dashboard() {
           if (pages) toast({ tone: 'good', title: `Đã xuất báo cáo văn bản (${pages} trang)`, duration: 3500 });
         }}
         onExport={exportDoc}
+        content={{ k, stations: waterStations, evacSites: evacQ.data?.sites }}
         summary={{
           ready: !!k,
           scope: filterLabel,

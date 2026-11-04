@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { BookUser, FileUp, Home, MapPinned, PhoneCall, Send, Shield, Siren, Users } from 'lucide-react';
+import { BookUser, ChevronRight, FileUp, Home, MapPinned, PhoneCall, Send, Shield, Siren, Users } from 'lucide-react';
 import { api } from '../../api/client';
 import { useAreaQuery } from '../../api/hooks';
 import { useIsCommuneUser, usePermission } from '../../rbac/usePermission';
@@ -10,6 +10,7 @@ import { ErrorState, Progress, Skeleton } from '../common/ui';
 import { FORCE_TYPE, INCIDENT, PRIORITY, SOS_STATUS } from '../../utils/labels';
 import { dateTime, int, minutesSince, pct } from '../../utils/format';
 import { slaState } from '../../utils/sla';
+import { useMediaQuery } from '../../utils/useMediaQuery';
 import { EvacuationModal } from '../rescue/Evacuation';
 import CommuneKpis from './CommuneKpis';
 
@@ -34,6 +35,94 @@ function Panel({ id, icon: Icon, title, right, empty, q, children, className }) 
 }
 
 const flatten = (nodes) => nodes.flatMap((n) => [n, ...flatten(n.children || [])]);
+
+const waitWords = (sec) => {
+  const m = Math.max(1, Math.round(sec / 60));
+  return m >= 60 ? `${Math.floor(m / 60)} giờ ${m % 60} phút` : `${m} phút`;
+};
+
+/**
+ * "Việc của xã hôm nay" (cán bộ xã trên máy tính — bản vẽ khung A11): mỗi dòng một việc, nút mở thẳng chỗ xử lý. Việc lấy từ dữ
+ * liệu đang có: phiếu quá hạn, cập nhật sơ tán, hồ sơ chờ tỉnh duyệt, phản ánh chờ duyệt, gửi dữ liệu của xã.
+ */
+function CommuneToday({ unit, hamlets, code, open, progress, canEvac, onEvac, onSupport }) {
+  const canSubmit = usePermission('data', 'submit', code);
+  const canReports = usePermission('report', 'moderate', code);
+  const subsQ = useQuery({
+    queryKey: ['submissions', 'cho_duyet', 'cua-xa'],
+    queryFn: () => api('/data-import/submissions', { params: { status: 'cho_duyet', limit: 5 } }),
+    enabled: canSubmit,
+    refetchInterval: 60_000,
+  });
+  const reportsQ = useAreaQuery('reports', '/reports', { status: 'cho_duyet', limit: 1 }, { refetchInterval: 30_000, enabled: canReports });
+  const pendingReports = reportsQ.data?.counts?.cho_duyet || 0;
+  const now = Date.now();
+  const late = open
+    .map((t) => ({ t, sla: slaState(t, now) }))
+    .filter((x) => x.sla?.breached)
+    .sort((a, b) => b.sla.waitedSec - a.sla.waitedSec);
+  const others = open.length - Math.min(late.length, 3);
+  const dot = (level) => <span className={clsx('h-2.5 w-2.5 shrink-0 rounded-full', level === 3 ? 'bg-danger' : 'bg-muted')} aria-hidden="true" />;
+  const row = 'flex min-h-[52px] items-center gap-3 rounded-[14px] bg-panel2 px-3.5 py-2 text-sm text-ink';
+  const act = 'btn-secondary tap h-9 shrink-0 rounded-xl px-3 text-[13px]';
+  return (
+    <section className="sheet flex flex-col gap-2.5 p-5" aria-label="Việc của xã hôm nay">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-[17px] font-bold text-ink">Việc của xã hôm nay</h2>
+          <p className="text-[13px] text-ink-2">
+            {unitLabel(unit)} · dân số <b className="num font-semibold">{int(unit.population)}</b> · <b className="num font-semibold">{int(unit.households)}</b> hộ{hamlets > 0 ? ` · ${hamlets} xóm / tổ dân phố` : ''}
+          </p>
+        </div>
+        <button type="button" onClick={onSupport} className="btn-primary tap h-11 rounded-xl px-4" title="Yêu cầu tới thẳng bảng điều phối của trực ban tỉnh (mục &quot;Xã xin chi viện&quot;)">
+          <Send size={15} aria-hidden="true" /> Gửi yêu cầu chi viện lên tỉnh
+        </button>
+      </div>
+      <ul className="flex flex-col gap-2">
+        {late.slice(0, 3).map(({ t, sla }) => (
+          <li key={t.id} className={row}>
+            {dot(3)}
+            <span className="min-w-0 flex-1"><b className="num">{t.code}</b> quá hạn phản hồi — {sla.label.toLowerCase()} {waitWords(sla.waitedSec)}{t.status === 'moi' ? ', chưa ai nhận' : ', chưa có đội'}</span>
+            <Link to={`/cuu-ho?phieu=${t.code}`} className={act}>Xem phiếu <ChevronRight size={14} aria-hidden="true" /></Link>
+          </li>
+        ))}
+        {others > 0 && (
+          <li className={row}>
+            {dot()}
+            <span className="min-w-0 flex-1">{late.length > 3 ? `Còn ${others} phiếu SOS khác đang mở` : `${others} phiếu SOS đang mở, chưa quá hạn`}</span>
+            <Link to="/cuu-ho" className={act}>Xem bảng cứu hộ <ChevronRight size={14} aria-hidden="true" /></Link>
+          </li>
+        )}
+        {canEvac && (
+          <li className={row}>
+            {dot()}
+            <span className="min-w-0 flex-1">{progress ? <>Cập nhật số hộ đã sơ tán (lần cuối {dateTime(progress.updated_at)})</> : 'Xã chưa cập nhật kế hoạch, tiến độ sơ tán'}</span>
+            <button type="button" className={act} onClick={onEvac}><Home size={14} aria-hidden="true" /> Cập nhật sơ tán</button>
+          </li>
+        )}
+        {(subsQ.data?.items || []).map((s) => (
+          <li key={s.id} className={row}>
+            {dot()}
+            <span className="min-w-0 flex-1">Hồ sơ {s.dataset_label} đang chờ tỉnh duyệt</span>
+            <Link to={`/nhap-du-lieu?ho-so=${encodeURIComponent(s.code)}`} className={act}>Xem hồ sơ</Link>
+          </li>
+        ))}
+        {pendingReports > 0 && (
+          <li className={row}>
+            {dot()}
+            <span className="min-w-0 flex-1"><b className="num">{int(pendingReports)}</b> phản ánh của người dân chờ duyệt</span>
+            <Link to="/phan-anh" className={act}>Duyệt</Link>
+          </li>
+        )}
+        <li className={row}>
+          {dot()}
+          <span className="min-w-0 flex-1">Gửi danh sách điểm sơ tán, kho, danh bạ của xã</span>
+          <Link to="/nhap-du-lieu" className={act}><FileUp size={14} aria-hidden="true" /> Gửi dữ liệu</Link>
+        </li>
+      </ul>
+    </section>
+  );
+}
 
 /**
  * Góc nhìn cấp xã/phường — trang chủ của tài khoản cấp xã: xã đang xem (chọn xã khi phạm vi nhiều xã — cấp tỉnh xem từng
@@ -75,12 +164,15 @@ export default function CommuneView({ code, units, onChange, onSupport, children
   // Kênh báo cáo / xin chi viện lên tỉnh: chỉ tài khoản cấp xã (cấp tỉnh xem trang này không "xin chi viện lên tỉnh")
   const isCommuneUser = useIsCommuneUser();
   const toSos = () => document.getElementById('sos-xa')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  // Cán bộ một xã trên máy tính (bản vẽ khung A11): 6 ô số + "Việc của xã hôm nay" thay thẻ đầu
+  const desk = useMediaQuery('(min-width: 1280px)');
+  const today = desk && isCommuneUser && !!unit && units.length <= 1;
 
   return (
     <div className="flex flex-col gap-3">
       {/* Thẻ đầu: xã đang xem + việc chính của tài khoản cấp xã (xin chi viện — nút đỏ duy nhất; báo cáo nhanh tạo SOS đã có
           trên thanh trên cùng / "Báo SOS" ở thanh dưới điện thoại) */}
-      <div className="card flex flex-wrap items-center justify-between gap-x-4 gap-y-3 p-3 sm:px-4">
+      {!today && <div className="card flex flex-wrap items-center justify-between gap-x-4 gap-y-3 p-3 sm:px-4">
         <div className="min-w-0">
           <h2 className="text-lg font-bold leading-tight text-ink">{unitLabel(unit) || 'Chọn xã/phường'}</h2>
           {unit && (
@@ -124,7 +216,7 @@ export default function CommuneView({ code, units, onChange, onSupport, children
             </div>
           </div>
         )}
-      </div>
+      </div>}
 
       {!unit ? (
         <p className="card border-dashed p-4 text-center text-sm text-muted">
@@ -139,7 +231,20 @@ export default function CommuneView({ code, units, onChange, onSupport, children
             canSos={canSos}
             onSos={toSos}
             onEvac={canEvac ? () => setEvacOpen(true) : undefined}
+            six={today}
           />
+          {today && (
+            <CommuneToday
+              unit={unit}
+              hamlets={myHamlets.length}
+              code={code}
+              open={open}
+              progress={progress}
+              canEvac={canEvac}
+              onEvac={() => setEvacOpen(true)}
+              onSupport={onSupport}
+            />
+          )}
           {children}
 
           <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3 [&>*]:min-w-0">
