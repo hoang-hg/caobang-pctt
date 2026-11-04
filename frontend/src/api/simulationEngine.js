@@ -677,7 +677,7 @@ function handle(path, { method = 'GET', body, params } = {}) {
     const t = [...state.tickets, ...fixtureTickets()].map(withPatch).find((x) => x.dispatch_id === m[1]);
     if (!t) throw new ApiError(404, 'Không tìm thấy lệnh điều động');
     return m[2] === 'arrived'
-      ? patchTicket(t.id, { dispatch_status: 'da_den', progress: 1, arrived_at: nowIso() })
+      ? patchTicket(t.id, { dispatch_status: 'da_den', progress: 1, arrived_at: nowIso(), ...(body?.note ? { notes: [t.notes, `Đội đã đến: ${body.note}`].filter(Boolean).join('\n') } : {}) })
       : patchTicket(t.id, { status: 'dieu_phoi', dispatch_status: 'huy' });
   }
   if (method === 'POST' && pathname === '/map/area-stats') {

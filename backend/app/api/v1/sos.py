@@ -660,12 +660,19 @@ async def dispatch(body: DispatchIn, user: dict = Depends(require_any("dispatch"
     }
 
 
+class ArrivedIn(BaseModel):
+    note: str | None = Field(None, max_length=500, description="VD: Trưởng nhóm gọi lúc 13:40")
+
+
 @router.post("/dispatch/{order_id}/arrived")
 async def dispatch_arrived(
-    order_id: str, user: dict = Depends(require_permission("sos", "update", scope_loaders.dispatch_order))
+    order_id: str,
+    body: ArrivedIn | None = None,
+    user: dict = Depends(require_permission("sos", "update", scope_loaders.dispatch_order)),
 ):
     """Đội báo đã đến hiện trường (điện thoại / bộ đàm — chưa có GPS) → lệnh "đã đến", tiến độ 100%, ghi giờ đến. Trước
     đây khi chạy thật tiến độ đứng 0% tới lúc xác nhận "Đã cứu"."""
+    note = (body.note or "").strip() or None if body else None
     async with transaction() as conn:
         row = await fetch_one(
             """UPDATE operations.dispatch_orders SET status = 'da_den', progress = 1, arrived_at = now()
@@ -678,15 +685,27 @@ async def dispatch_arrived(
             raise HTTPException(409, "Lệnh không còn ở trạng thái đang di chuyển (đã đến / đã xong / huỷ)")
         # Lịch sử trên link nhiệm vụ: đội thấy trực ban đã ghi nhận (báo qua bộ đàm / điện thoại)
         await execute(
-            """INSERT INTO operations.dispatch_field_reports (order_id, kind, via) VALUES (:o, 'arrived', 'staff')""",
-            {"o": row["id"]},
+            """INSERT INTO operations.dispatch_field_reports (order_id, kind, note, via)
+               VALUES (:o, 'arrived', :n, 'staff')""",
+            {"o": row["id"], "n": note},
             conn,
         )
+        if note:  # ghi vào phiếu: báo cáo hiện trường sau đó không làm mất ghi chú này
+            await execute(
+                """UPDATE operations.sos_tickets SET notes = concat_ws(E'\n', notes, CAST(:n AS text))
+                    WHERE id = :t""",
+                {"t": row["ticket_id"], "n": f"Đội đã đến: {note} ({user['full_name']})"},
+                conn,
+            )
     ticket = await get_ticket(row["ticket_id"])
     force = await fetch_one("SELECT name FROM resources.forces WHERE id = :f", {"f": row["force_id"]})
     minutes = round((row["arrived_at"] - row["dispatched_at"]).total_seconds() / 60)
     await audit(
-        user, "dispatch.arrived", "sos_ticket", ticket["code"], {"order": order_id, "minutes": minutes}
+        user,
+        "dispatch.arrived",
+        "sos_ticket",
+        ticket["code"],
+        {"order": order_id, "minutes": minutes, "note": note},
     )
     await hub.publish("sos.updated", ticket, "sos", ticket["admin_code"])
     await hub.publish(

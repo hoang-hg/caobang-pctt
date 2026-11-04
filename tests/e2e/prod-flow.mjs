@@ -321,9 +321,10 @@ if (force) {
   check('Đội báo "cần chi viện" qua link → thẻ phiếu của trực ban hiện ngay', support.status === 200
     && boardSupport?.field_kind === 'need_support', `HTTP ${support.status}`);
   // Chưa có GPS: trực ban ghi "đội đã đến hiện trường" khi đội báo qua điện thoại / bộ đàm
-  const arrived = await call('POST', `/dispatch/${disp.data?.order?.id}/arrived`, null, admin);
+  const arrived = await call('POST', `/dispatch/${disp.data?.order?.id}/arrived`, { note: `Trưởng nhóm gọi báo (kiểm thử ${stamp})` }, admin);
   check('Đội báo đã đến hiện trường → lệnh "đã đến", ghi giờ đến', arrived.status === 200 && arrived.data?.dispatch_status === 'da_den'
     && !!arrived.data?.arrived_at, `HTTP ${arrived.status}`);
+  check('Ghi chú khi báo đội đã đến lưu vào phiếu', String(arrived.data?.notes || '').includes(`Trưởng nhóm gọi báo (kiểm thử ${stamp})`), arrived.data?.notes);
   check('Báo "đã đến" lần hai → 409', (await call('POST', `/dispatch/${disp.data?.order?.id}/arrived`, null, admin)).status === 409);
   check('Phiếu đang có đội thực hiện không kéo về "Chờ xử lý" (409 — phải huỷ lệnh trước)',
     (await call('PATCH', `/sos/${ticket.id}`, { status: 'moi' }, admin)).status === 409);

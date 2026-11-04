@@ -27,6 +27,7 @@ import Intake from '../components/rescue/Intake';
 import RescueBoard from '../components/rescue/RescueBoard';
 import RescueKpis from '../components/rescue/RescueKpis';
 import RescueMap from '../components/rescue/RescueMap';
+import SupportTable from '../components/rescue/SupportTable';
 import SosTrend from '../components/rescue/SosTrend';
 import TicketDrawer from '../components/rescue/TicketDrawer';
 import TicketTable from '../components/rescue/TicketTable';
@@ -100,6 +101,7 @@ export default function RescueCenter() {
   const [intakeOpen, setIntakeOpen] = useState(false);
   const [arriveFor, setArriveFor] = useState(null); // hỏi lại "Đội đã đến hiện trường?" (khung C7)
   const [arriving, setArriving] = useState(false);
+  const [arriveNote, setArriveNote] = useState('');
   const [detailId, setDetailId] = useState(null); // phiếu đang mở ở ngăn chi tiết (máy tính — khung C3)
   // Bản đồ + diễn biến: mặc định thu gọn để bảng điều phối SOS lên ngay tầm mắt người trực ban
   const [overviewOpen, setOverviewOpen] = useState(false);
@@ -220,8 +222,9 @@ export default function RescueCenter() {
   const onArrived = async (t) => {
     setArriving(true);
     try {
-      await api(`/dispatch/${t.dispatch_id}/arrived`, { method: 'POST' });
+      await api(`/dispatch/${t.dispatch_id}/arrived`, { method: 'POST', body: { note: arriveNote.trim() || null } });
       setArriveFor(null);
+      setArriveNote('');
       qc.invalidateQueries({ queryKey: ['sos'] });
       toast({ tone: 'good', title: `${t.force_name || 'Lực lượng'} đã đến hiện trường ${t.code}` });
     } catch (e) {
@@ -327,6 +330,10 @@ export default function RescueCenter() {
   else if (listQ.isError && !listQ.data) {
     // Không tải được: nói rõ, KHÔNG hiện "không có phiếu" (dễ hiểu nhầm là không ai cần cứu)
     body = <ErrorState height={220} onRetry={listQ.refetch}>Không tải được danh sách phiếu SOS — không có nghĩa là không có ai cần cứu</ErrorState>;
+  } else if (wide && !pdf && (filters.th === 'xa_chi_vien' || filters.th === 'chi_vien')) {
+    // Bản vẽ khung C11: lọc đúng tình huống chi viện → bảng "từ đâu, cần gì" thay bảng điều phối
+    const title = filters.th === 'chi_vien' ? 'Đội cần chi viện' : 'Xã xin chi viện';
+    body = <SupportTable rows={rows} title={title} now={now} online={online} onDispatch={cardProps.onDispatch} onOpen={cardProps.onOpen} empty={`Không có yêu cầu nào: ${title.toLowerCase()}.`} />;
   } else if (listView) {
     body = rows.length ? (
       <div className="flex flex-col gap-2">
@@ -548,7 +555,7 @@ export default function RescueCenter() {
           confirmLabel="Đội đã đến"
           busy={arriving}
           onConfirm={() => onArrived(arriveFor)}
-          onClose={() => setArriveFor(null)}
+          onClose={() => { setArriveFor(null); setArriveNote(''); }}
         >
           <p className="rounded-xl bg-panel2 px-3.5 py-2.5 text-ink">
             <b>{arriveFor.code}</b> · {arriveFor.force_name || 'đội đã điều'}{arriveFor.dispatched_at ? ` · xuất phát ${dateTime(arriveFor.dispatched_at)}` : ''}
@@ -557,6 +564,10 @@ export default function RescueCenter() {
             Đội báo qua điện thoại / bộ đàm <b className="text-ink">đã đến hiện trường</b>? Thanh tiến độ của đội dừng ở “Đã đến”, phiếu vẫn ở
             cột “Đội đang đến” tới khi xác nhận đã cứu. Trưởng nhóm cũng tự báo được trên link nhiệm vụ.
           </p>
+          <label className="block">
+            <span className="text-[13px] font-semibold text-ink-2">Ghi chú (không bắt buộc)</span>
+            <input className="input tap mt-1 w-full" maxLength={500} placeholder="VD: Trưởng nhóm gọi lúc 13:40" value={arriveNote} onChange={(e) => setArriveNote(e.target.value)} />
+          </label>
         </Confirm>
       )}
       {/* Việc mở hộp thoại riêng (điều đội, không cần cứu): đóng ngăn trước — hai lớp chồng nhau, Esc đóng cả hai */}
