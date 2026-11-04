@@ -701,7 +701,11 @@ async def dispatch_arrived(
     force = await fetch_one("SELECT name FROM resources.forces WHERE id = :f", {"f": row["force_id"]})
     minutes = round((row["arrived_at"] - row["dispatched_at"]).total_seconds() / 60)
     await audit(
-        user, "dispatch.arrived", "sos_ticket", ticket["code"], {"order": order_id, "minutes": minutes, "note": note}
+        user,
+        "dispatch.arrived",
+        "sos_ticket",
+        ticket["code"],
+        {"order": order_id, "minutes": minutes, "note": note},
     )
     await hub.publish("sos.updated", ticket, "sos", ticket["admin_code"])
     await hub.publish(
