@@ -1,10 +1,11 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Circle, CircleMarker, GeoJSON, Marker, Polyline, Popup, Tooltip, useMap } from 'react-leaflet';
 import { Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, YAxis } from 'recharts';
 import { Phone, Send, Video, PackageMinus, Users } from 'lucide-react';
 import clsx from 'clsx';
+import { Segmented } from '../common/ui';
 import { api } from '../../api/client';
 import { useStore } from '../../app/store';
 import Hydrograph from '../charts/Hydrograph';
@@ -28,9 +29,12 @@ const Tel = ({ phone, label = 'Gọi' }) =>
     <a className="btn-ghost px-2 py-1 text-xs" href={`tel:${phone.replace(/\s/g, '')}`} aria-label={label}><Phone size={12} aria-hidden="true" /> {label}</a>
   ) : null;
 
-function MiniSeries({ stationId, unit }) {
+const SERIES_RANGE = [{ value: 24, label: '24 giờ' }, { value: 72, label: '72 giờ' }, { value: 168, label: '7 ngày' }];
+const rangeLabel = (h) => (h === 168 ? '7 ngày qua' : `${h} giờ qua`);
+
+function MiniSeries({ stationId, unit, hours = 24 }) {
   const c = useChartTheme();
-  const { data } = useQuery({ queryKey: ['series', stationId, 24], queryFn: () => api(`/stations/${stationId}/series`, { params: { hours: 24 } }) });
+  const { data } = useQuery({ queryKey: ['series', stationId, hours], queryFn: () => api(`/stations/${stationId}/series`, { params: { hours } }) });
   if (!data) return <div className="h-20 motion-safe:animate-pulse rounded bg-panel2" />;
   return (
     <div>
@@ -40,12 +44,13 @@ function MiniSeries({ stationId, unit }) {
           <Line dataKey="value" stroke={c.s1} strokeWidth={2} dot={false} isAnimationActive={false} />
         </LineChart>
       </ResponsiveContainer>
-      <div className="text-[10px] text-muted">24 giờ qua ({unit})</div>
+      <div className="text-[10px] text-muted">{rangeLabel(hours)} ({unit})</div>
     </div>
   );
 }
 
 function StationPopup({ p }) {
+  const [hours, setHours] = useState(24); // bản vẽ khung B8: xem 24 giờ / 72 giờ / 7 ngày
   const lv = p.value == null ? 0 : alarmLevel(p.value, p.thresholds);
   const value = p.value == null ? null : `${num(p.value, p.type === 'muc_nuoc' ? 2 : 1)} ${p.unit}`;
   const chip = p.thresholds?.bd1 != null && <span className={clsx('chip', ALARM[lv].cls)}>{ALARM[lv].label}</span>;
@@ -75,7 +80,9 @@ function StationPopup({ p }) {
           <span className="text-[11px] text-muted">{fmtVn(p.time)}</span>
         </div>
       )}
-      {p.type === 'muc_nuoc' ? <Hydrograph stationId={p.id} height={130} hours={24} compact /> : <MiniSeries stationId={p.id} unit={p.unit} />}
+      <Segmented className="mb-1.5" label="Khoảng thời gian của biểu đồ" value={hours} onChange={setHours} options={SERIES_RANGE} />
+      {p.type === 'muc_nuoc' ? <Hydrograph stationId={p.id} height={130} hours={hours} compact /> : <MiniSeries stationId={p.id} unit={p.unit} hours={hours} />}
+      <p className="mt-1.5 text-[11px] leading-snug text-muted">Quá 3 chu kỳ không có số đo thì trạm chuyển xám “chưa có số liệu”, không có nghĩa là an toàn.</p>
     </div>
   );
 }
