@@ -454,6 +454,7 @@ function UsersTab() {
   const [q, setQ] = useState('');
   const [levelFilter, setLevelFilter] = useState('all');
   const [modal, setModal] = useState(null);
+  const [lockReason, setLockReason] = useState(''); // lý do khoá (khung J8) — ghi vào nhật ký thao tác
   const [busy, setBusy] = useState(false);
   // Máy tính ≥ 1280 px (bản vẽ desktop khung J): 3 ô giải thích cấp xếp dọc ở cột trái (ô cấp của bạn viền màu nhấn), bảng
   // tài khoản bên phải
@@ -643,11 +644,24 @@ function UsersTab() {
           confirmLabel="Khoá tài khoản"
           danger
           busy={busy}
-          onClose={() => setModal(null)}
-          onConfirm={() => confirm(() => api(`/rbac/users/${modal.user.id}`, { method: 'PATCH', body: { is_active: false } }), `Đã khoá tài khoản ${modal.user.full_name}`)}
+          confirmDisabled={lockReason.trim().length < 3}
+          onClose={() => { setModal(null); setLockReason(''); }}
+          onConfirm={async () => {
+            await confirm(() => api(`/rbac/users/${modal.user.id}`, { method: 'PATCH', body: { is_active: false, lock_reason: lockReason.trim() } }), `Đã khoá tài khoản ${modal.user.full_name}`);
+            setLockReason('');
+          }}
         >
           <p>{modal.user.full_name} bị đăng xuất ngay trên mọi máy và không đăng nhập được cho tới khi được mở khoá.</p>
-          <p>Phiếu cứu hộ, nhật ký do người này làm vẫn giữ nguyên. Dùng khi mất máy, nghỉ việc, chuyển công tác.</p>
+          <p>Phiếu cứu hộ, nhật ký do người này làm vẫn giữ nguyên.</p>
+          <label className="block">
+            <span className="text-[13px] font-semibold text-ink-2">Lý do (ghi nhật ký) *</span>
+            <input className="input tap mt-1 w-full" maxLength={300} placeholder="VD: Mất điện thoại" value={lockReason} onChange={(e) => setLockReason(e.target.value)} />
+          </label>
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Lý do hay gặp">
+            {['Mất máy', 'Nghỉ việc', 'Chuyển công tác'].map((r) => (
+              <button key={r} type="button" className="chip tap min-h-[32px] border border-line bg-panel px-3 text-xs hover:border-accent" onClick={() => setLockReason(r)}>{r}</button>
+            ))}
+          </div>
         </Confirm>
       )}
       {modal?.type === 'mfa' && (
@@ -772,7 +786,10 @@ function AuditTab() {
             <tr key={a.id}>
               <td className="num whitespace-nowrap text-xs">{dateTime(a.time)}</td>
               <td className="font-semibold text-ink">{a.actor_name}</td>
-              <td>{AUDIT_LABEL[a.action] || a.action}</td>
+              <td>
+                {AUDIT_LABEL[a.action] || a.action}
+                {a.details?.lock_reason && <div className="text-xs text-ink-2">Khoá — lý do: {a.details.lock_reason}</div>}
+              </td>
               <td className="font-mono text-xs">{a.target_user || '–'}</td>
               <td>{a.role ? <TierChip role={a.role} /> : '–'}</td>
               <td className="text-sm text-ink-2">{a.domain_label || a.domain || '–'}</td>
