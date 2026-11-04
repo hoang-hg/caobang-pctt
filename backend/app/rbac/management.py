@@ -225,7 +225,16 @@ async def create_user(actor, username, full_name, position, password, pin, role,
 
 
 async def update_user(
-    actor, user_id, *, full_name=None, position=None, password=None, pin=None, is_active=None, lock_reason=None, email=None
+    actor,
+    user_id,
+    *,
+    full_name=None,
+    position=None,
+    password=None,
+    pin=None,
+    is_active=None,
+    lock_reason=None,
+    email=None,
 ) -> dict:
     target = await get_user(user_id)
     await assert_can_manage_user(actor, target)
