@@ -2,11 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { ChevronRight, Columns3, Home, Inbox, List, Maximize2, Minimize2, Navigation, RefreshCw } from 'lucide-react';
+import { ChevronRight, Columns3, FileDown, FileSpreadsheet, Home, Inbox, List, Maximize2, Minimize2, Navigation, RefreshCw } from 'lucide-react';
 import { api } from '../api/client';
 import { useAreaQuery, useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
 import { ErrorState, Pager, Section, Segmented, Skeleton } from '../components/common/ui';
+import ExportMenu from '../components/common/ExportMenu';
 import FilterToolbar from '../components/common/FilterToolbar';
 import UrgentStrip from '../components/common/UrgentStrip';
 import PageHeader from '../components/common/PageHeader';
@@ -388,11 +389,19 @@ export default function RescueCenter() {
           >
             Bản đồ cứu hộ <ChevronRight size={15} className={clsx('transition-transform', overviewOpen && 'rotate-90')} aria-hidden="true" />
           </button>
+          <ExportMenu
+            title={`Xuất ${rows.length} phiếu đang lọc`}
+            buttonClass="btn-secondary tap h-11 rounded-xl px-4"
+            items={[
+              { key: 'xlsx', label: 'Bảng Excel', hint: `${rows.length} phiếu đang lọc — không kèm SĐT, nội dung tin`, icon: FileSpreadsheet, onClick: doExcel, disabled: !rows.length },
+              { key: 'pdf', label: 'Báo cáo PDF', hint: 'Bảng phiếu đang lọc, khổ A4 ngang', icon: FileDown, onClick: doPdf, disabled: !rows.length, busy: pdf },
+            ]}
+          />
           <button
             type="button"
             onClick={refresh}
             disabled={refreshing}
-            className="btn-secondary tap-sq h-11 w-11 rounded-xl p-0"
+            className="btn-secondary tap-sq h-11 w-11 rounded-xl p-0 max-2xl:hidden"
             aria-label="Làm mới số liệu"
             title={`Làm mới — số liệu lúc ${dataTime || '…'} · hạn phản hồi: cấp 1 Đỏ 3 phút · cấp 2 Cam 15 phút · cấp 3 Vàng 60 phút`}
           >
@@ -443,8 +452,10 @@ export default function RescueCenter() {
       )}
 
       <FilterToolbar
+        inline={wide}
         fields={FILTERS}
-        sorts={SORTS}
+        // Bảng điều phối máy tính: không ô "Xếp" (bản vẽ khung C — cột tự xếp quá hạn, cấp 1 trước); Danh sách vẫn có
+        sorts={wide && view === 'bang' ? [] : SORTS}
         placeholder="Tìm mã phiếu, số điện thoại, địa chỉ, nội dung tin…"
         q={q}
         onSearch={setQ}
@@ -457,21 +468,31 @@ export default function RescueCenter() {
         shown={rows.length}
         total={listTickets.length}
         noun="phiếu"
-        onExcel={doExcel}
-        onPdf={doPdf}
+        onExcel={wide ? null : doExcel}
+        onPdf={wide ? null : doPdf}
         exporting={pdf}
-      />
+      >
+        {/* Máy tính ≥ 1280 px (bản vẽ khung C): đổi cách xem nằm cuối hàng lọc */}
+        {wide && (
+          <Segmented
+            label="Cách xem phiếu"
+            value={view}
+            onChange={(v) => setParam({ xem: v === 'bang' ? '' : v })}
+            options={VIEWS.map(([v, label, icon]) => ({ value: v, label, icon }))}
+          />
+        )}
+      </FilterToolbar>
 
       <div className={clsx('grid gap-3 items-stretch', sideOpen ? '2xl:grid-cols-[minmax(0,1fr)_370px]' : 'grid-cols-1')}>
         <div ref={boardRef} className="flex min-w-0 scroll-mt-20 flex-col gap-2.5">
-          <div className="flex flex-wrap items-center justify-between gap-2 no-print shrink-0">
+          <div className={clsx('flex flex-wrap items-center justify-between gap-2 no-print shrink-0', wide && view === 'bang' && 'max-2xl:hidden')}>
             <div className="flex flex-wrap items-center gap-2">
-              <Segmented
+              {!wide && <Segmented
                 label="Cách xem phiếu"
                 value={view}
                 onChange={(v) => setParam({ xem: v === 'bang' ? '' : v })}
                 options={VIEWS.map(([v, label, icon]) => ({ value: v, label, icon }))}
-              />
+              />}
               {/* Nút bật/tắt toàn màn hình cho bảng SOS trên màn hình rộng */}
               <button
                 type="button"
@@ -493,7 +514,7 @@ export default function RescueCenter() {
                 )}
               </button>
             </div>
-            {view === 'bang' && wide && <span className="text-xs text-muted">Kéo thẻ phiếu sang cột khác, hoặc chọn “Chuyển sang…” trên thẻ</span>}
+            {view === 'bang' && wide && <span className="text-xs text-muted">Kéo thẻ phiếu sang cột khác, hoặc chọn “⋯ → Chuyển sang…” trên thẻ</span>}
             {view === 'danh_sach' && (
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="text-xs text-muted">Phiếu đã xong trong</span>

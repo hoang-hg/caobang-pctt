@@ -88,6 +88,9 @@ const slug =(s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd
 /** Theo dõi lỗi của trang: lỗi JavaScript không bắt (React sập → màn hình trắng) và API trả 5xx. */
 function watch(page) {
   const problems = [];
+  // Thẻ nổi "SOS mới" (máy tính: góc phải trên, giữ 20 giây — bản vẽ khung M1) xuất hiện bất kỳ lúc nào bộ mô phỏng tạo phiếu
+  // → đè các nút góc phải (Xuất, đổi cách xem…). Thẻ hiện lúc sắp bấm thì đóng trước, như người trực bấm "✕"
+  page.addLocatorHandler(page.getByRole('button', { name: 'Đóng thông báo' }).first(), (b) => b.click(), { noWaitAfter: true }).catch(() => {});
   page.on('pageerror', (e) => problems.push(`lỗi JS: ${e.message.split('\n')[0]}`));
   page.on('response', (r) => {
     if (r.status() >= 500 && new URL(r.url()).pathname.startsWith('/api/')) {
@@ -638,7 +641,7 @@ async function staff(ctx, trackCode) {
     if (READONLY && !(await btn.count())) return 'bỏ qua: không có phiếu chờ xử lý';
     await btn.click();
     const dialog = page.getByRole('dialog');
-    await dialog.getByText(/Lệnh điều động – SOS-/).waitFor();
+    await dialog.getByText(/Điều đội cho SOS-/).waitFor();
     await dialog.getByRole('radio').first().waitFor({ timeout: 20_000 }); // danh sách lực lượng gần nhất
     await expectNoOverflow(ctx, 'hộp thoại điều động', dialog);
     if (READONLY) {
@@ -649,7 +652,7 @@ async function staff(ctx, trackCode) {
     // Lệnh điều động 3 bước: Chọn đội → Vật tư mang theo → Xác nhận (tóm tắt lệnh) → Phát lệnh
     await dialog.getByRole('button', { name: /^Tiếp: vật tư/ }).click();
     await dialog.getByRole('button', { name: /^Tiếp: xác nhận/ }).click();
-    await dialog.getByText('Tóm tắt lệnh — kiểm tra trước khi phát').waitFor({ timeout: 5_000 });
+    await dialog.getByText('Bước 3/3 — kiểm tra trước khi phát lệnh').waitFor({ timeout: 5_000 });
     await dialog.getByRole('button', { name: 'Phát lệnh điều động' }).click();
     await dialog.getByText(/Đã ghi lệnh điều động SOS-/).waitFor({ timeout: 20_000 });
     // Chưa tích hợp SMS / Push → phải nói rõ hệ thống CHƯA gửi tin cho đội
@@ -1991,7 +1994,8 @@ async function rescuePage(ctx) {
 
   await step(ctx, 'Chạm ô "Quá hạn phản hồi" → chỉ phiếu quá hạn; Quay lại trả bộ lọc cũ', async () => {
     const tile = kpis.getByRole('button', { name: /Quá hạn phản hồi/ });
-    const n = Number((await tile.innerText()).match(/(\d+)\s*phiếu/)?.[1] ?? 0);
+    // Ô thường: "8 phiếu"; chip máy tính ≥ 1280 px (bản vẽ khung C): "8 quá hạn"
+    const n = Number((await tile.innerText()).match(/(\d+)\s*(?:phiếu|quá hạn)/)?.[1] ?? 0);
     const before = page.url();
     await tile.click();
     await page.waitForURL(/th=qua_han/);
@@ -2015,11 +2019,20 @@ async function rescuePage(ctx) {
     const sortBox = page.getByLabel('Sắp xếp');
     if (!(await sortBox.isVisible())) await page.getByRole('button', { name: /^Bộ lọc/ }).click();
     await sortBox.selectOption('cho_lau');
-    const [xlsx] = await Promise.all([page.waitForEvent('download', { timeout: 20_000 }), page.getByRole('button', { name: 'Excel', exact: true }).click()]);
+    // Máy tính ≥ 1280 px (bản vẽ khung C): Excel / PDF nằm trong menu "Xuất" của hàng chip
+    const exportBy = async (name) => {
+      const direct = page.getByRole('button', { name, exact: true });
+      if (await direct.isVisible().catch(() => false)) return direct.click();
+      // Thẻ nổi "SOS mới" (góc phải trên, giữ 20 giây — bộ mô phỏng tạo phiếu liên tục) đè lên nút "Xuất" → đóng trước
+      for (const c of await page.getByRole('button', { name: 'Đóng thông báo' }).all()) await c.click().catch(() => {});
+      await page.getByRole('button', { name: /^Xuất/ }).click();
+      return page.getByRole('menuitem', { name: new RegExp(name) }).click();
+    };
+    const [xlsx] = await Promise.all([page.waitForEvent('download', { timeout: 20_000 }), exportBy('Excel')]);
     if (!/^phieu-sos-.*\.xlsx$/.test(xlsx.suggestedFilename())) throw new Error(`tên tệp Excel: ${xlsx.suggestedFilename()}`);
     let note = xlsx.suggestedFilename();
     if (wide) {
-      const [pdfFile] = await Promise.all([page.waitForEvent('download', { timeout: 60_000 }), page.getByRole('button', { name: 'PDF', exact: true }).click()]);
+      const [pdfFile] = await Promise.all([page.waitForEvent('download', { timeout: 60_000 }), exportBy('PDF')]);
       if (!/^phieu-sos-.*\.pdf$/.test(pdfFile.suggestedFilename())) throw new Error(`tên tệp PDF: ${pdfFile.suggestedFilename()}`);
       note += ` · ${pdfFile.suggestedFilename()}`;
     }
@@ -2140,12 +2153,28 @@ async function rescueForms(ctx) {
     return picked.join(' · ') || 'bóc tách chưa chọn mức';
   });
 
+  // Thẻ gọn của bảng 4 cột (máy tính ≥ 1280 px — bản vẽ khung C13): việc phụ nằm trong menu "⋯" của thẻ → mở lần lượt từng
+  // menu tới khi gặp mục cần (bỏ qua mục tắt). Điện thoại / iPad: nút nằm thẳng trên thẻ
+  const cardAction = async (direct, item) => {
+    const btn = visible(direct);
+    if (await btn.count()) { await btn.click(); return true; }
+    const menus = page.getByRole('button', { name: /^Thao tác khác — SOS-/ });
+    const n = await menus.count();
+    for (let i = 0; i < n; i += 1) {
+      const m = menus.nth(i);
+      if (!(await m.isVisible())) continue;
+      await m.click();
+      const it = page.getByRole('menuitem', { name: item });
+      if ((await it.count()) && (await it.getAttribute('aria-disabled')) !== 'true') { await it.click(); return true; }
+      await page.keyboard.press('Escape');
+    }
+    return false;
+  };
+
   await step(ctx, 'Sửa phiếu: Lưu khi chưa đổi gì → nói rõ; Huỷ lệnh thiếu lý do → báo dưới ô, con trỏ về ô lý do', async () => {
     await open();
     const notes = [];
-    const edit = visible(page.getByRole('button', { name: /^Sửa phiếu SOS-/ }));
-    if (await edit.count()) {
-      await edit.click();
+    if (await cardAction(page.getByRole('button', { name: /^Sửa phiếu SOS-/ }), /^Sửa mức, số người/)) {
       await dlg.waitFor();
       await dlg.getByRole('button', { name: 'Lưu', exact: true }).click();
       await dlg.getByText(/Chưa thay đổi gì/).waitFor({ timeout: 3_000 });
@@ -2157,9 +2186,7 @@ async function rescueForms(ctx) {
     }
     // Lệnh điều động đang chạy ở cột "Đang thực thi" (bảng hẹp: thẻ cột trên địa chỉ trang)
     await open('/cuu-ho?cot=thuc_thi');
-    const cancel = visible(page.getByRole('button', { name: /Huỷ lệnh/ }));
-    if (await cancel.count()) {
-      await cancel.click();
+    if (await cardAction(page.getByRole('button', { name: /Huỷ lệnh/ }), /^Huỷ lệnh điều động/)) {
       await dlg.waitFor();
       await dlg.getByRole('button', { name: 'Huỷ lệnh', exact: true }).click();
       await dlg.locator('#loi-ly-do-huy').waitFor({ timeout: 3_000 });
@@ -2299,8 +2326,9 @@ async function rescueOverview(ctx) {
     await page.goto(`${ROOT}/cuu-ho?xem=danh_sach`);
     const group = page.getByRole('group', { name: /Kỳ tra cứu/ });
     await group.waitFor({ timeout: 20_000 });
-    const excel = page.getByRole('button', { name: 'Excel', exact: true });
-    // Số phiếu của Danh sách (không lọc): ghi trên nút Excel "Xuất Excel N phiếu đang lọc"
+    // Số phiếu của Danh sách (không lọc): ghi trên nút Excel "Xuất Excel N phiếu đang lọc" — máy tính ≥ 1280 px: nút menu
+    // "Xuất" của hàng chip ghi "Xuất N phiếu đang lọc" (bản vẽ khung C)
+    const excel = page.getByRole('button', { name: 'Excel', exact: true }).or(page.getByRole('button', { name: /^Xuất/ })).first();
     const shown = async () => Number((await excel.getAttribute('title'))?.match(/(\d+)/)?.[1] ?? -1);
     const rowsOrEmpty = page.locator('main article[aria-label^="SOS-"], main table tbody tr').or(page.getByText(/Không có phiếu SOS nào trong/));
     await visible(rowsOrEmpty).waitFor({ timeout: 15_000 });

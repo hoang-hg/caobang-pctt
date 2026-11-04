@@ -126,7 +126,11 @@ export function BackButton({ onClick, children = 'Quay lại Bản đồ', class
 /** Hộp thoại — gắn thẳng vào <body> (portal): mở từ trong header (backdrop-blur tạo khung chứa cho `position: fixed`)
  * thì vẫn phủ toàn màn hình, không bị cắt trong dải header. Hộp thoại không cao quá màn hình: chỉ phần thân cuộn, hàng
  * nút (footer) luôn thấy — trước đây thân cao tới 75vh cộng tiêu đề + nút vượt màn 740 px, nút chính nằm dưới mép. */
-export function Modal({ open, onClose, title, children, wide, footer }) {
+/**
+ * Hộp thoại. `wide`: max-w-4xl; `size="md"`: max-w-3xl (form nhiều bước theo bản vẽ desktop, ~760 px); `subtitle`: dòng nhỏ
+ * dưới tiêu đề (VD "Bước 1/3").
+ */
+export function Modal({ open, onClose, title, subtitle, children, wide, size, footer }) {
   useEscapeToClose(open, onClose);
   const titleId = useId(); // tiêu đề là tên hộp thoại cho trình đọc màn hình
   if (!open) return null;
@@ -135,7 +139,7 @@ export function Modal({ open, onClose, title, children, wide, footer }) {
       <div
         className={clsx(
           'card flex max-h-[calc(100vh-4rem)] w-full flex-col shadow-2xl supports-[height:100dvh]:max-h-[calc(100dvh-4rem)]',
-          wide ? 'max-w-4xl' : 'max-w-lg',
+          wide ? 'max-w-4xl' : size === 'md' ? 'max-w-3xl' : 'max-w-lg',
         )}
         onMouseDown={(e) => e.stopPropagation()}
         role="dialog"
@@ -143,7 +147,10 @@ export function Modal({ open, onClose, title, children, wide, footer }) {
         aria-labelledby={titleId}
       >
         <div className="flex shrink-0 items-center justify-between border-b border-line px-4 py-3">
-          <h3 id={titleId} className="font-semibold">{title}</h3>
+          <div className="min-w-0">
+            <h3 id={titleId} className={clsx('font-semibold', subtitle && 'text-lg leading-tight')}>{title}</h3>
+            {subtitle && <div className="mt-0.5 text-[13px] text-muted">{subtitle}</div>}
+          </div>
           <button type="button" className="touch-hit rounded p-1 text-muted hover:bg-panel2" onClick={onClose} aria-label="Đóng">
             <X size={18} />
           </button>
