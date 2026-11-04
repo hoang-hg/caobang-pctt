@@ -1740,6 +1740,8 @@ async function resourcesPage(ctx) {
     const exportBy = async (name) => {
       const direct = page.getByRole('button', { name, exact: true });
       if (await direct.isVisible().catch(() => false)) return direct.click();
+      // Thẻ nổi "SOS mới" (góc phải trên, giữ 20 giây — bộ mô phỏng tạo phiếu liên tục) đè lên nút "Xuất" → đóng trước
+      for (const c of await page.getByRole('button', { name: 'Đóng thông báo' }).all()) await c.click().catch(() => {});
       await page.getByRole('button', { name: /^Xuất/ }).click();
       return page.getByRole('menuitem', { name: new RegExp(name) }).click();
     };
@@ -2321,8 +2323,9 @@ async function rescueOverview(ctx) {
     await page.goto(`${ROOT}/cuu-ho?xem=danh_sach`);
     const group = page.getByRole('group', { name: /Kỳ tra cứu/ });
     await group.waitFor({ timeout: 20_000 });
-    const excel = page.getByRole('button', { name: 'Excel', exact: true });
-    // Số phiếu của Danh sách (không lọc): ghi trên nút Excel "Xuất Excel N phiếu đang lọc"
+    // Số phiếu của Danh sách (không lọc): ghi trên nút Excel "Xuất Excel N phiếu đang lọc" — máy tính ≥ 1280 px: nút menu
+    // "Xuất" của hàng chip ghi "Xuất N phiếu đang lọc" (bản vẽ khung C)
+    const excel = page.getByRole('button', { name: 'Excel', exact: true }).or(page.getByRole('button', { name: /^Xuất/ })).first();
     const shown = async () => Number((await excel.getAttribute('title'))?.match(/(\d+)/)?.[1] ?? -1);
     const rowsOrEmpty = page.locator('main article[aria-label^="SOS-"], main table tbody tr').or(page.getByText(/Không có phiếu SOS nào trong/));
     await visible(rowsOrEmpty).waitFor({ timeout: 15_000 });
