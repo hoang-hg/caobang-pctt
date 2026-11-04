@@ -59,7 +59,8 @@ export default function CancelDispatchModal({ ticket, onClose }) {
     <Modal
       open
       onClose={onClose}
-      title={`Huỷ lệnh điều động – ${ticket.code}`}
+      title={`Huỷ lệnh điều động ${ticket.code}?`}
+      subtitle="Lý do lưu vào nhật ký điều động"
       footer={
         <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:justify-end">
           <button type="button" className={clsx('btn-ghost', big)} onClick={onClose} disabled={busy}>Đóng</button>

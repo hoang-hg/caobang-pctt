@@ -36,7 +36,7 @@ export default function CitizenMenu({ onMyReports }) {
       <>
         <button type="button" className="btn-ghost px-2.5 py-1.5 text-xs" onClick={() => setDialog('login')} aria-label="Đăng nhập tài khoản người dân">
           <UserRound size={14} aria-hidden="true" />
-          <span className="hidden md:inline">Đăng nhập</span>
+          <span className="hidden md:inline xl:max-[1439px]:hidden">Đăng nhập</span>
         </button>
         {auth}
       </>
@@ -55,7 +55,7 @@ export default function CitizenMenu({ onMyReports }) {
         aria-label={`Tài khoản người dân: ${name}`}
       >
         <UserRound size={14} aria-hidden="true" />
-        <span className="hidden truncate md:inline">{name}</span>
+        <span className="hidden truncate md:inline xl:max-[1535px]:hidden">{name}</span>
       </button>
       {menu && (
         <div className="float-panel absolute right-0 top-full z-[1200] mt-1 w-56 p-1 text-sm" role="menu">

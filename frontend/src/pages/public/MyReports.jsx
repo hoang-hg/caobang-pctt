@@ -18,7 +18,9 @@ const STATUS = {
  * (progress_label — phiếu đã thành phiếu cứu hộ theo tiến độ phiếu SOS; phiếu cứu hộ còn mở tô đỏ); "Xem tiến độ" tra cứu bằng
  * mã + số điện thoại của tài khoản (không phải nhập lại). Chưa đăng nhập → không hiện (tra cứu bằng mã như cũ ở ngay dưới).
  */
-export default function MyReports({ onTrack }) {
+// `compact` (cột trái của Tra cứu phiếu trên máy tính — bản vẽ khung N10): mỗi phiếu là một nút gọn (mã · tiến độ, loại · giờ
+// gửi), phiếu đang xem (`active`) viền nhấn
+export default function MyReports({ onTrack, compact = false, active = '' }) {
   const session = useCitizen((s) => s.session);
   const ready = !!session && !session.account.must_change_password;
   const q = useQuery({
@@ -29,6 +31,42 @@ export default function MyReports({ onTrack }) {
   });
   if (!ready) return null;
   const items = q.data || [];
+  if (compact) {
+    return (
+      <section className="mt-2 flex flex-col gap-2" aria-label="Phiếu của tôi">
+        <h3 className="text-xs font-bold text-ink-2">Phiếu của tôi</h3>
+        {q.isLoading ? <Skeleton height={72} /> : q.isError && !q.data ? (
+          <ErrorState onRetry={() => q.refetch()}>Không tải được danh sách phiếu của bạn</ErrorState>
+        ) : !items.length ? (
+          <p className="text-[13px] text-muted">Bạn chưa gửi yêu cầu nào bằng tài khoản này.</p>
+        ) : (
+          <ul className="scroll-thin flex max-h-[22rem] flex-col gap-2 overflow-y-auto">
+            {items.map((r) => {
+              const [label] = STATUS[r.status] || [r.status];
+              // Mã tra cứu có đuôi (PA-1001-KXMPQR) vẫn là phiếu PA-1001
+              const on = !!active && [r.code, r.sos_code].some((c) => c && (active === c || active.startsWith(`${c}-`)));
+              return (
+                <li key={r.code}>
+                  <button
+                    type="button"
+                    onClick={() => onTrack(r.code, session.account.phone)}
+                    aria-current={on ? 'true' : undefined}
+                    className={clsx('tap w-full rounded-[14px] border-2 px-3.5 py-2.5 text-left transition-colors', on ? 'border-accent bg-accent/5' : 'border-transparent bg-panel2 hover:border-line')}
+                  >
+                    <span className="block text-sm text-ink">
+                      <b className="num">{r.code}</b>{' '}
+                      <span className={clsx('text-[13px]', r.rescue_open ? 'font-semibold text-danger' : 'text-muted')}>({r.progress_label || label})</span>
+                    </span>
+                    <span className="block truncate text-xs text-muted">{r.category_label} · gửi {dateTime(r.created_at)}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+    );
+  }
   return (
     <section className="card flex flex-col gap-3 p-4" aria-label="Phiếu của tôi">
       <h2 className="flex items-center gap-2 text-base font-bold text-ink">

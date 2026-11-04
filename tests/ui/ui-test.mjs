@@ -2087,6 +2087,8 @@ async function rescueForms(ctx) {
   const dlg = page.getByRole('dialog');
   const bar = page.getByRole('navigation', { name: 'Thao tác nhanh' });
   const touch = await page.evaluate(() => matchMedia('(pointer: coarse)').matches);
+  // Máy tính ≥ 1280 px: nhận tin là hộp thoại, sơ tán là màn riêng (bản vẽ khung C6, C9)
+  const wide = await page.evaluate(() => innerWidth >= 1280);
   const open = async (path = '/cuu-ho') => {
     await page.goto(`${ROOT}${path}`);
     await page.getByRole('group', { name: 'Chỉ số cứu hộ' }).getByRole('button').first().waitFor({ timeout: 20_000 });
@@ -2098,7 +2100,8 @@ async function rescueForms(ctx) {
   };
 
   await step(ctx, 'Form "Cập nhật sơ tán" 2 bước: chạm chọn xã (tìm không dấu) → số liệu; lỗi ngay dưới ô; bấm Lưu khi thiếu → con trỏ về ô lỗi', async () => {
-    await open();
+    // Máy tính ≥ 1280 px (bản vẽ khung C9): sơ tán là màn riêng của trang (?xem=so_tan), không còn cột phải
+    await open(wide ? '/cuu-ho?xem=so_tan' : undefined);
     if (!(await page.getByRole('button', { name: '+ Cập nhật xã' }).count())) return 'tài khoản không có quyền cập nhật sơ tán';
     const opener = vp.mobile ? bar.getByRole('button', { name: /Sơ tán/ }) : page.getByRole('button', { name: '+ Cập nhật xã' });
     await opener.click();
@@ -2128,6 +2131,13 @@ async function rescueForms(ctx) {
   });
 
   await step(ctx, 'Nhận tin báo 2 bước: SĐT sai báo ngay khi gõ; nội dung ngắn báo khi bấm "Tự điền"; bước 2: mức ưu tiên kèm hạn phản hồi bằng lời, số người −/+', async () => {
+    // Máy tính ≥ 1280 px (bản vẽ khung C6): nhận tin là hộp thoại mở từ đầu cột "Mới báo"
+    if (wide) {
+      await open(); // bước trước để trang ở màn Sơ tán
+      const opener = page.getByRole('button', { name: 'Nhận tin báo cứu hộ', exact: true });
+      if (!(await opener.count())) return 'tài khoản không có quyền tạo phiếu SOS';
+      await opener.first().click();
+    }
     const box = page.locator('section').filter({ has: page.getByRole('heading', { name: /Nhận tin báo cứu hộ/ }) }).first();
     if (!(await box.count())) return 'tài khoản không có quyền tạo phiếu SOS';
     await box.scrollIntoViewIfNeeded();

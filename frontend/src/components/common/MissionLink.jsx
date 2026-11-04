@@ -68,7 +68,8 @@ export function MissionLinkModal({ ticket, onClose }) {
     <Modal
       open
       onClose={onClose}
-      title={`Link nhiệm vụ – ${ticket.code}`}
+      title={`Link nhiệm vụ — ${ticket.code}`}
+      subtitle="Trưởng nhóm mở trên điện thoại, không cần đăng nhập"
       footer={result ? (
         <button className="btn-primary" onClick={onClose}>Đóng</button>
       ) : (

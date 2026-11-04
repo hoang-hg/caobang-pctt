@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { BellOff, CornerUpLeft, KeyRound, Loader2, ShieldCheck, TimerReset } from 'lucide-react';
+import { BellOff, Check, CornerUpLeft, KeyRound, Loader2, ShieldCheck, TimerReset } from 'lucide-react';
 import { api } from '../../api/client';
 import { useUnits } from '../../api/hooks';
 import { useStore } from '../../app/store';
@@ -10,6 +10,8 @@ import { ALERT_VALID_HOURS, CHANNEL, LEVEL, notIntegrated } from '../../utils/la
 import { dateTime, int } from '../../utils/format';
 import { SHOW_STORM } from '../../utils/hazardScope';
 import { useOnline } from '../../utils/useOnline';
+import { risk } from '../../utils/risk';
+import { SEVERITY_LEVEL } from './alertFacts';
 
 const BIG = 'tap min-h-[44px] text-sm sm:min-h-0';
 const PIN_RE = /^\d{4,8}$/;
@@ -118,14 +120,16 @@ export function ApproveModal({ b, initial = 'approve', onClose }) {
   return (
     <Modal
       open
+      size="md"
       onClose={onClose}
       title={`Duyệt lệnh ${b.code}`}
+      subtitle={`Soạn: ${b.created_by_name || 'hệ thống (máy đề xuất)'} · ${dateTime(b.created_at)}`}
       footer={
         <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:justify-end">
-          <button type="button" className={clsx('btn-ghost', BIG)} onClick={onClose} disabled={busy}>Đóng</button>
+          <button type="button" className={clsx('btn-secondary', BIG)} onClick={onClose} disabled={busy}>Huỷ</button>
           <button
             type="button"
-            className={clsx(approve ? 'btn-danger' : 'btn-ghost text-danger', 'font-bold', BIG)}
+            className={clsx('btn-primary font-bold', BIG)}
             aria-label={approve ? 'Ký duyệt & phát' : 'Trả lại lệnh'}
             disabled={busy || !online}
             title={!online ? OFFLINE : undefined}
@@ -133,13 +137,13 @@ export function ApproveModal({ b, initial = 'approve', onClose }) {
             onClick={run}
           >
             {busy ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : approve ? <ShieldCheck size={15} aria-hidden="true" /> : <CornerUpLeft size={15} aria-hidden="true" />}
-            {approve ? <><span className="sm:hidden">Ký & phát</span><span className="hidden sm:inline">Ký duyệt & phát</span></> : 'Trả lại lệnh'}
+            {approve ? <><span className="sm:hidden">Ký & phát</span><span className="hidden sm:inline">Ký duyệt & phát</span></> : 'Trả lại người soạn'}
           </button>
         </div>
       }
     >
       <div className="flex flex-col gap-3 text-sm">
-        <div className="rounded-lg bg-panel2 p-3">
+        <div className={clsx('rounded-xl border-l-4 bg-panel2 p-3.5', risk(SEVERITY_LEVEL[b.severity]).edge)}>
           <div className="flex flex-wrap items-center gap-1.5">
             <span className={clsx('chip', LEVEL[b.severity]?.cls)}>{LEVEL[b.severity]?.label}</span>
             {b.auto_generated && <span className="chip border border-warn bg-warn/20 text-ink">Máy đề xuất — cần người duyệt{b.trigger_source ? ` · ${b.trigger_source}` : ''}</span>}
@@ -154,13 +158,31 @@ export function ApproveModal({ b, initial = 'approve', onClose }) {
             <li>Người soạn: {b.created_by_name || 'Hệ thống (máy đề xuất)'} · {dateTime(b.created_at)}</li>
           </ul>
         </div>
-        <div className="grid grid-cols-2 gap-1.5" role="radiogroup" aria-label="Quyết định">
-          <button type="button" role="radio" aria-checked={approve} onClick={() => { setMode('approve'); setTried(false); }} className={clsx('tap flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg border-2 text-sm font-semibold', approve ? 'border-transparent bg-accent text-white' : 'border-line bg-panel2/50 text-ink-2')}>
-            <ShieldCheck size={15} aria-hidden="true" /> Duyệt
-          </button>
-          <button type="button" role="radio" aria-checked={!approve} onClick={() => { setMode('reject'); setTried(false); setServerErr(null); }} className={clsx('tap flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg border-2 text-sm font-semibold', !approve ? 'border-transparent bg-danger text-white' : 'border-line bg-panel2/50 text-ink-2')}>
-            <CornerUpLeft size={15} aria-hidden="true" /> Trả lại
-          </button>
+        {/* Quyết định (bản vẽ khung D4 / D4b): hai ô lớn có dấu chọn — "Ký duyệt & phát" · "Trả lại người soạn" */}
+        <div>
+          <div className="mb-1.5 text-xs font-bold text-ink-2" id="quyet-dinh-duyet">Quyết định</div>
+          <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-labelledby="quyet-dinh-duyet">
+            {[
+              [true, 'Ký duyệt & phát', 'Duyệt', ShieldCheck],
+              [false, 'Trả lại người soạn', 'Trả lại', CornerUpLeft],
+            ].map(([on, label, short, Icon]) => (
+              <button
+                key={short}
+                type="button"
+                role="radio"
+                aria-checked={approve === on}
+                aria-label={short}
+                onClick={() => { setMode(on ? 'approve' : 'reject'); setTried(false); setServerErr(null); }}
+                className={clsx('tap flex min-h-[48px] items-center gap-2.5 rounded-xl border-2 px-3.5 text-left text-sm font-semibold', approve === on ? 'border-accent bg-accent/5 text-ink' : 'border-transparent bg-panel2 text-ink-2 hover:border-line')}
+              >
+                <span className={clsx('flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2', approve === on ? 'border-accent bg-accent text-white' : 'border-muted/60 bg-panel')} aria-hidden="true">
+                  {approve === on && <Check size={13} strokeWidth={3} />}
+                </span>
+                <Icon size={15} className="shrink-0 text-muted max-sm:hidden" aria-hidden="true" />
+                <span className="max-sm:hidden">{label}</span><span className="sm:hidden">{short}</span>
+              </button>
+            ))}
+          </div>
         </div>
         {approve ? (
           <>
