@@ -1998,7 +1998,8 @@ async function rescuePage(ctx) {
 
   await step(ctx, 'Chạm ô "Quá hạn phản hồi" → chỉ phiếu quá hạn; Quay lại trả bộ lọc cũ', async () => {
     const tile = kpis.getByRole('button', { name: /Quá hạn phản hồi/ });
-    const n = Number((await tile.innerText()).match(/(\d+)\s*phiếu/)?.[1] ?? 0);
+    // Ô thường: "8 phiếu"; chip máy tính ≥ 1280 px (bản vẽ khung C): "8 quá hạn"
+    const n = Number((await tile.innerText()).match(/(\d+)\s*(?:phiếu|quá hạn)/)?.[1] ?? 0);
     const before = page.url();
     await tile.click();
     await page.waitForURL(/th=qua_han/);
