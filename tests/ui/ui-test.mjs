@@ -1017,10 +1017,15 @@ async function firstScreen(ctx) {
     await page.setViewportSize({ width: 1920, height: 1080 });
     await page.goto(`${ROOT}/dashboard?trinh-chieu=1&xoay=15`);
     await waitMain(page);
-    await page.locator('[aria-label="Chỉ số nhanh"] > *').nth(5).waitFor();
+    // Bản vẽ khung A2: màn "Tổng hợp" riêng — 4 số lớn, nguy hiểm nhất, đếm ngược; không dải khẩn
+    await page.getByRole('region', { name: 'Tự chuyển chuyên đề' }).waitFor();
+    for (const t of ['SOS chờ', 'Mưa lớn nhất 24 giờ', 'Trạm trên báo động', 'Đã sơ tán']) await page.getByText(t, { exact: true }).first().waitFor();
+    if (await page.getByText('Khẩn cấp:', { exact: true }).count()) throw new Error('trình chiếu vẫn còn dải khẩn');
     if (await page.locator('header').count()) throw new Error('vẫn còn thanh trên');
     if (!(await page.evaluate(() => document.documentElement.classList.contains('dark')))) throw new Error('chưa chuyển nền tối');
     await page.waitForURL(/tab=mua_lon/, { timeout: 25_000 });
+    // Chuyên đề khác giữ màn có biểu đồ, không dùng màn "Tổng hợp"
+    await page.getByRole('region', { name: 'Tự chuyển chuyên đề' }).waitFor({ state: 'detached', timeout: 5_000 });
     await page.keyboard.press('Escape');
     await page.locator('header').waitFor({ timeout: 5_000 });
     return 'tự sang Mưa lớn sau 15 giây';
