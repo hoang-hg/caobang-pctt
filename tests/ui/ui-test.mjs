@@ -2087,6 +2087,8 @@ async function rescueForms(ctx) {
   const dlg = page.getByRole('dialog');
   const bar = page.getByRole('navigation', { name: 'Thao tác nhanh' });
   const touch = await page.evaluate(() => matchMedia('(pointer: coarse)').matches);
+  // Máy tính ≥ 1280 px: nhận tin là hộp thoại, sơ tán là màn riêng (bản vẽ khung C6, C9)
+  const wide = await page.evaluate(() => innerWidth >= 1280);
   const open = async (path = '/cuu-ho') => {
     await page.goto(`${ROOT}${path}`);
     await page.getByRole('group', { name: 'Chỉ số cứu hộ' }).getByRole('button').first().waitFor({ timeout: 20_000 });
