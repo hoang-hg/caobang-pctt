@@ -372,6 +372,7 @@ export default function PublicPortal() {
   // cảnh báo 3 cột — "Bạn muốn làm gì?" + cứu nạn khẩn cấp · bản đồ · bảng cảnh báo / chú thích / mưa
   const desk = useMediaQuery('(min-width: 1280px)');
   const [quickOpen, setQuickOpen] = useState(true);
+  const [siteCommune, setSiteCommune] = useState(''); // máy tính: lọc bảng điểm sơ tán theo xã (khung N5)
   const [layersOpen, setLayersOpen] = useState(false); // điện thoại: danh sách lớp bản đồ mở khi bấm
   const resultsRef = useRef(null);
 
@@ -1039,7 +1040,7 @@ export default function PublicPortal() {
           </nav>}
           {(() => {
             const g = GROUPS.find((x) => x.tabs.includes(activeTab));
-            if (!g || g.tabs.length < 2) return null;
+            if (!g || g.tabs.length < 2 || desk) return null;
             return (
               <div role="group" aria-label={g.label} className="flex gap-1.5">
                 {g.tabs.map((t) => (
@@ -1108,12 +1109,18 @@ export default function PublicPortal() {
                       ['evac', 'Điểm sơ tán'],
                       ['reports', 'Phản ánh dân'],
                     ].map(([k, l]) => (
-                      <label key={k} className="flex cursor-pointer items-center gap-1.5 select-none hover:text-ink">
+                      <label
+                        key={k}
+                        className={clsx(
+                          'flex cursor-pointer select-none items-center gap-1.5',
+                          desk ? clsx('rounded-full border px-3 py-1 text-[13px] font-medium transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent', layers[k] ? 'border-accent bg-accent text-white' : 'border-line bg-panel text-ink-2 hover:border-accent') : 'hover:text-ink',
+                        )}
+                      >
                         <input
                           type="checkbox"
                           checked={layers[k]}
                           onChange={(e) => setLayers((x) => ({ ...x, [k]: e.target.checked }))}
-                          className="rounded accent-[rgb(var(--accent))]"
+                          className={desk ? 'sr-only' : 'rounded accent-[rgb(var(--accent))]'}
                         />
                         <span>{l}</span>
                       </label>
@@ -1636,6 +1643,7 @@ export default function PublicPortal() {
         {/* TAB GIÁM SÁT ĐIỂM ĐEN SẠT TRƯỢT & ĐƯỜNG ĐÈO */}
         {activeTab === 'satlo' && (
           <LandslideMonitor
+            compact={desk}
             onBackToMap={goToMap}
             onSelectOnMap={(pt) => {
               setSelectedPoint({
@@ -1675,7 +1683,46 @@ export default function PublicPortal() {
         )}
 
         {/* TAB 2: MỰC NƯỚC SÔNG SUỐI */}
-        {activeTab === 'muanuoc' && (
+        {/* Máy tính ≥ 1280 px (bản vẽ khung N4): bảng trạm + bản đồ bên phải; trạm không gửi số đo nói rõ không có nghĩa là an toàn */}
+        {activeTab === 'muanuoc' && desk && (
+          <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,520px)] items-stretch gap-5">
+            <section className="sheet flex min-w-0 flex-col gap-3 p-5" aria-label="Mực nước sông suối">
+              <div>
+                <h2 className="text-lg font-bold text-ink">Mực nước sông suối</h2>
+                <p className="mt-0.5 text-[13px] text-ink-2">Số liệu trạm thủy văn tự động cập nhật liên tục</p>
+              </div>
+              {(overview?.rivers || []).length ? (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs font-bold text-ink-2">
+                      <th className="px-3 py-2 font-bold">Trạm</th>
+                      <th className="px-3 py-2 font-bold">Mực nước</th>
+                      <th className="px-3 py-2 font-bold">Mức</th>
+                      <th className="px-3 py-2 font-bold">Số đo lúc</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {overview.rivers.map((r) => (
+                      <tr key={r.name} className="border-t border-line">
+                        <td className="px-3 py-2.5"><b className="block text-ink">{r.name.replace(/\s*\(sông[^)]*\)/i, '')}</b><span className="text-xs text-muted">Sông {r.river}</span></td>
+                        <td className={clsx('num px-3 py-2.5', r.stale && 'text-muted')}>{r.value != null ? `${r.value} m` : '—'}</td>
+                        <td className="px-3 py-2.5"><span className={clsx('chip whitespace-nowrap text-xs font-bold', riskStyle(r.level).chip)}>{r.level_label}</span></td>
+                        <td className={clsx('px-3 py-2.5 text-[13px]', r.stale ? 'text-serious' : 'text-ink-2')}>{r.time ? dateTime(r.time) : 'Chưa có số đo'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : <p className="text-sm text-muted">Chưa có trạm đo mực nước trong hệ thống.</p>}
+              <p className="rounded-[14px] border border-dashed border-line p-3 text-[13px] leading-normal text-ink-2">
+                Trạm không gửi số đo hiện “Chưa có số đo” — không có nghĩa là an toàn.
+              </p>
+            </section>
+            <div className="min-h-[520px] overflow-hidden rounded-[18px] border border-line">
+              <PublicMap data={map} forecast={forecast} geo={geo} me={me} route={route} target={target} layers={{ ...layers, stations: true }} basemap={basemap} onSelectPoint={handleSelectPoint} provinceArea={provinceArea} />
+            </div>
+          </div>
+        )}
+        {activeTab === 'muanuoc' && !desk && (
           <section className="card p-4 sm:p-6">
             <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
@@ -1713,7 +1760,90 @@ export default function PublicPortal() {
         )}
 
         {/* TAB 3: ĐIỂM SƠ TÁN AN TOÀN */}
-        {activeTab === 'sotan' && (
+        {/* Máy tính ≥ 1280 px (bản vẽ khung N5): một màn — bảng điểm sơ tán (lọc xã) + cột đường dây nóng */}
+        {desk && (activeTab === 'sotan' || activeTab === 'hotlines') && (() => {
+          const sites = map?.evacuation_sites || [];
+          const communes = [...new Set(sites.map((x) => x.admin_name).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'vi'));
+          const shown = siteCommune ? sites.filter((x) => x.admin_name === siteCommune) : sites;
+          return (
+            <div className="grid grid-cols-[minmax(0,1fr)_400px] items-start gap-5">
+              <section className="sheet flex min-w-0 flex-col gap-3 p-5" aria-label="Điểm sơ tán an toàn">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <h2 className="text-lg font-bold text-ink">Điểm sơ tán an toàn</h2>
+                  <span className="flex-1" />
+                  <button type="button" onClick={locate} className="btn-secondary tap h-11 rounded-xl px-4"><LocateFixed size={15} aria-hidden="true" /> Tìm điểm gần tôi</button>
+                  <select className="input tap h-11 w-auto rounded-xl bg-panel" aria-label="Lọc điểm sơ tán theo xã, phường" value={siteCommune} onChange={(e) => setSiteCommune(e.target.value)}>
+                    <option value="">Mọi xã, phường</option>
+                    {communes.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                {shown.length ? (
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-xs font-bold text-ink-2">
+                        <th className="px-3 py-2 font-bold">Điểm sơ tán</th>
+                        <th className="px-3 py-2 font-bold">Đang ở / sức chứa</th>
+                        <th className="px-3 py-2"><span className="sr-only">Còn chỗ</span></th>
+                        <th className="px-3 py-2"><span className="sr-only">Thao tác</span></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {shown.map((site) => {
+                        const free = Math.max(0, site.capacity - site.current_occupancy);
+                        return (
+                          <tr key={site.id} className="border-t border-line">
+                            <td className="px-3 py-2.5"><b className="block text-ink">{site.name}</b><span className="text-xs text-muted">{site.admin_name}</span></td>
+                            <td className="num px-3 py-2.5">{site.current_occupancy} / {site.capacity}</td>
+                            <td className="px-3 py-2.5"><span className={clsx('chip whitespace-nowrap text-xs font-semibold', free > 0 ? 'bg-good/15 text-good' : 'bg-danger/15 text-danger')}>{free > 0 ? `Còn ${free} chỗ` : 'Hết chỗ'}</span></td>
+                            <td className="px-3 py-2.5 text-right">
+                              <span className="inline-flex gap-1.5">
+                                {site.hotline && <a href={`tel:${site.hotline.replace(/\s+/g, '')}`} className="btn-secondary tap h-9 rounded-xl px-3 text-[13px]" title={`Gọi số trực điểm sơ tán ${site.hotline}`}><PhoneCall size={13} aria-hidden="true" /> Gọi</a>}
+                                <button
+                                  type="button"
+                                  className="btn-secondary tap h-9 rounded-xl px-3 text-[13px]"
+                                  onClick={() => {
+                                    setSelectedPoint({
+                                      id: site.id, name: site.name, sub: site.admin_name, value: `Còn ${free}/${site.capacity} chỗ`,
+                                      status: free > 0 ? 'Còn chỗ' : 'Hết chỗ', statusColor: free > 0 ? 'text-good' : 'text-danger',
+                                      lat: site.lat, lon: site.lon, type: 'evac', raw: site, sourceTab: 'sotan',
+                                    });
+                                    setMapSidebarTab('legend');
+                                    setTarget({ lat: site.lat, lon: site.lon, zoom: 14 });
+                                    setActiveTab('bando');
+                                    scrollToContent();
+                                  }}
+                                >
+                                  <Navigation size={13} aria-hidden="true" /> Xem bản đồ
+                                </button>
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                ) : <p className="text-sm text-muted">Chưa có điểm sơ tán trong danh sách{siteCommune ? ' của xã này' : ''}.</p>}
+              </section>
+              <aside className="sheet sticky top-4 flex flex-col gap-2.5 p-5" aria-label="Đường dây nóng">
+                <h2 className="text-[15px] font-bold text-ink">Tổng đài cứu hộ cứu nạn khẩn cấp</h2>
+                {(hotlines?.national || [{ number: '112', name: 'Tìm kiếm cứu nạn' }, { number: '114', name: 'Cứu nạn cứu hộ – Phòng cháy chữa cháy' }, { number: '115', name: 'Cấp cứu y tế' }, { number: '113', name: 'Công an' }]).map((h) => (
+                  <div key={h.number} className="flex items-center gap-3 rounded-[14px] bg-panel2 px-3.5 py-2.5">
+                    <b className="num w-12 shrink-0 text-2xl text-danger">{h.number}</b>
+                    <span className="min-w-0 flex-1 text-sm leading-snug text-ink">{h.name}</span>
+                    <a href={`tel:${h.number}`} className="btn-secondary tap h-10 shrink-0 rounded-xl px-3.5" aria-label={`Gọi ${h.number} — ${h.name}`}>Gọi</a>
+                  </div>
+                ))}
+                {(hotlines?.province || []).map((p) => (
+                  <a key={p.phone} href={`tel:${p.phone.replace(/\s/g, '')}`} className="tap block rounded-[14px] border border-line px-3.5 py-2.5 hover:border-accent">
+                    <b className="block text-sm text-ink">{p.org}</b>
+                    <span className="num text-sm text-ink-2">{p.phone}{p.position ? <span className="font-sans text-muted"> · {p.position}</span> : ''}</span>
+                  </a>
+                ))}
+              </aside>
+            </div>
+          );
+        })()}
+        {activeTab === 'sotan' && !desk && (
           <section className="card p-4 sm:p-6">
             <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
@@ -1801,7 +1931,7 @@ export default function PublicPortal() {
         )}
 
         {/* TAB 4: ĐƯỜNG DÂY NÓNG */}
-        {activeTab === 'hotlines' && (
+        {activeTab === 'hotlines' && !desk && (
           <section className="card p-4 sm:p-6 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
