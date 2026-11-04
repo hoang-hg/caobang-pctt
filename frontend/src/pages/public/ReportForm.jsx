@@ -32,6 +32,8 @@ const KINDS = {
     icon: Siren,
     cls: 'border-danger/50 hover:bg-danger/10',
     iconCls: 'text-danger',
+    tile: 'bg-danger/10',
+    cta: 'Yêu cầu cứu người',
   },
   tiep_te: {
     category: 'tiep_te',
@@ -42,6 +44,8 @@ const KINDS = {
     icon: Package,
     cls: 'border-serious/50 hover:bg-serious/10',
     iconCls: 'text-serious',
+    tile: 'bg-serious/10',
+    cta: 'Yêu cầu tiếp tế',
   },
   bao_tin: {
     category: null, // người dân chọn loại sự việc
@@ -52,6 +56,8 @@ const KINDS = {
     icon: Camera,
     cls: 'border-line hover:bg-panel2',
     iconCls: 'text-accent',
+    tile: 'bg-accent/10',
+    cta: 'Báo tin kèm ảnh',
   },
 };
 const RESCUE_CODES = ['mac_ket', 'tiep_te']; // loại tạo phiếu SOS — không nằm trong danh sách "báo tin"
@@ -76,37 +82,51 @@ function Picker({ value, onChange }) {
   return value ? <Marker position={[value.lat, value.lon]} icon={pinIcon('!', '#dc2626')} /> : null;
 }
 
-/** Bước đầu của "Gửi yêu cầu": Gọi 112 trên cùng, rồi 3 việc người dân có thể cần. */
+/**
+ * Bước đầu của "Gửi yêu cầu": Gọi 112 trên cùng, rồi 3 việc người dân có thể cần. Từ 768 px (bản vẽ desktop khung N6): dải đỏ
+ * nhạt "Đang nguy hiểm… Gọi 112" + 3 thẻ lớn nằm ngang (ô biểu tượng, tên việc, khi nào dùng, lời mời ở đáy thẻ).
+ */
 function KindChooser({ onPick, onClose }) {
   return (
-    <Modal open onClose={onClose} title="Gửi yêu cầu">
-      <div className="flex flex-col gap-3 text-sm">
-        <a
-          href="tel:112"
-          className="tap flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-danger px-3 py-2.5 text-sm font-bold text-white shadow-sm hover:brightness-110"
-        >
-          <PhoneCall size={16} aria-hidden="true" /> Đang nguy hiểm đến tính mạng? Gọi ngay 112
-        </a>
-        <p className="text-muted">Hoặc chọn việc bạn cần — gửi kèm vị trí và ảnh:</p>
-        <div className="grid gap-2">
+    <Modal open wide onClose={onClose} title="Gửi yêu cầu">
+      <div className="flex flex-col gap-3 text-sm md:gap-4">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-4 md:rounded-[18px] md:bg-danger/10 md:px-5 md:py-4">
+          <b className="hidden flex-1 text-base text-danger md:block">Đang nguy hiểm, cần hỗ trợ ngay? Gọi 112 — không cần tài khoản.</b>
+          <a
+            href="tel:112"
+            className="tap flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-danger px-3 py-2.5 text-sm font-bold text-white shadow-sm hover:brightness-110 md:h-12 md:px-7 md:text-base"
+          >
+            <PhoneCall size={16} aria-hidden="true" /> <span className="md:hidden">Đang nguy hiểm đến tính mạng?</span> Gọi ngay 112
+          </a>
+        </div>
+        <p className="text-muted md:text-base md:text-ink-2">Hoặc chọn việc bạn cần — gửi kèm vị trí và ảnh:</p>
+        <div className="grid gap-2 md:grid-cols-3 md:gap-4">
           {Object.entries(KINDS).map(([k, v]) => (
             <button
               key={k}
               type="button"
               onClick={() => onPick(k)}
-              className={clsx('tap flex min-h-[64px] items-center gap-3 rounded-xl border bg-panel p-3 text-left transition-colors', v.cls)}
+              className={clsx(
+                'tap flex min-h-[64px] items-center gap-3 rounded-xl border bg-panel p-3 text-left transition-colors',
+                'md:min-h-[210px] md:flex-col md:items-start md:gap-2.5 md:rounded-[18px] md:border-2 md:p-5 md:shadow-[0_10px_30px_rgb(15_23_42/0.08)]',
+                v.cls,
+              )}
             >
-              <v.icon size={26} className={clsx('shrink-0', v.iconCls)} aria-hidden="true" />
-              <span className="min-w-0">
-                <span className="block text-base font-bold text-ink">{v.short}</span>
-                <span className="block text-xs text-muted">{v.hint}</span>
+              <span className={clsx('flex shrink-0 items-center justify-center md:h-[52px] md:w-[52px] md:rounded-[14px]', v.tile)} aria-hidden="true">
+                <v.icon size={26} className={v.iconCls} />
+              </span>
+              <span className="min-w-0 md:flex md:flex-1 md:flex-col md:gap-1.5">
+                <span className="block text-base font-bold text-ink md:text-xl">{v.short}</span>
+                <span className="block text-xs text-muted md:text-sm md:leading-normal md:text-ink-2">{v.hint}</span>
+                <span className={clsx('mt-auto hidden pt-2 text-sm font-bold md:block', v.iconCls)}>{v.cta} ›</span>
               </span>
             </button>
           ))}
         </div>
-        <p className="text-xs leading-relaxed text-muted">
+        <p className="text-xs leading-relaxed text-muted md:rounded-[14px] md:border md:border-dashed md:border-line md:p-3 md:text-[13px] md:text-ink-2">
           Cần cứu người, cần tiếp tế: yêu cầu tới thẳng bảng điều hành cứu hộ, cán bộ gọi lại để xác minh. Báo tin hiện trường:
-          cán bộ xác minh trước khi hiện trên bản đồ của cổng.
+          cán bộ xác minh trước khi hiện trên bản đồ của cổng. Gửi cần <b>tài khoản người dân</b> (đăng ký khoảng 1 phút); họ tên,
+          số điện thoại không bao giờ hiện công khai.
         </p>
       </div>
     </Modal>

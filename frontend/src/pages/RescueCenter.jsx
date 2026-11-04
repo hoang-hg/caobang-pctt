@@ -2,11 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { ChevronRight, Columns3, FileDown, FileSpreadsheet, Home, Inbox, List, Maximize2, Minimize2, Navigation, RefreshCw } from 'lucide-react';
+import { ChevronRight, Columns3, FileDown, FileSpreadsheet, Home, Inbox, List, Navigation, Plus, RefreshCw } from 'lucide-react';
 import { api } from '../api/client';
 import { useAreaQuery, useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
-import { ErrorState, Pager, Section, Segmented, Skeleton } from '../components/common/ui';
+import { Confirm, ErrorState, Pager, Section, Segmented, Skeleton } from '../components/common/ui';
 import ExportMenu from '../components/common/ExportMenu';
 import FilterToolbar from '../components/common/FilterToolbar';
 import UrgentStrip from '../components/common/UrgentStrip';
@@ -28,6 +28,7 @@ import RescueBoard from '../components/rescue/RescueBoard';
 import RescueKpis from '../components/rescue/RescueKpis';
 import RescueMap from '../components/rescue/RescueMap';
 import SosTrend from '../components/rescue/SosTrend';
+import TicketDrawer from '../components/rescue/TicketDrawer';
 import TicketTable from '../components/rescue/TicketTable';
 import {
   COLUMN_KEYS, FILTERS, SORTS, matchTicket, optionCounts, rescueAlerts, sortTickets, ticketFacts,
@@ -52,6 +53,8 @@ function useNow(ms = 1000) {
 }
 
 const VIEWS = [['bang', 'Bảng điều phối', Columns3], ['danh_sach', 'Danh sách', List]];
+// Máy tính ≥ 1280 px (bản vẽ khung C9): "Sơ tán" là một cách xem của trang (không còn cột phải thường trực)
+const DESK_VIEWS = [...VIEWS, ['so_tan', 'Sơ tán', Home]];
 // Kỳ tra cứu của Danh sách (?ky=): phiếu đang mở + phiếu xong trong kỳ — báo cáo tuần / tháng. Bảng điều phối luôn 48 giờ
 const PERIODS = [['', '48 giờ', 48], ['7n', '7 ngày', 24 * 7], ['30n', '30 ngày', 24 * 30]];
 const minutes = (from, to) => (from && to ? Math.round((new Date(to) - new Date(from)) / 60000) : '');
@@ -94,35 +97,16 @@ export default function RescueCenter() {
   const [editFor, setEditFor] = useState(null);
   const [reportOpen, setReportOpen] = useState(false);
   const [evacOpen, setEvacOpen] = useState(false);
+  const [intakeOpen, setIntakeOpen] = useState(false);
+  const [arriveFor, setArriveFor] = useState(null); // hỏi lại "Đội đã đến hiện trường?" (khung C7)
+  const [arriving, setArriving] = useState(false);
+  const [detailId, setDetailId] = useState(null); // phiếu đang mở ở ngăn chi tiết (máy tính — khung C3)
   // Bản đồ + diễn biến: mặc định thu gọn để bảng điều phối SOS lên ngay tầm mắt người trực ban
   const [overviewOpen, setOverviewOpen] = useState(false);
-  // Cột Tiếp nhận SOS & Giám sát sơ tán bên phải: có thể thu gọn để bảng điều phối chiếm 100% không gian
-  const [sideOpen, setSideOpen] = useState(true);
-  const asideRef = useRef(null);
-  const [asideHeight, setAsideHeight] = useState(1200);
   const contentRef = useRef(null);
   const boardRef = useRef(null);
-
-  // Tự động đồng bộ chiều cao bảng Kanban với cột Tiếp nhận & Sơ tán bên phải để bố cục luôn cân đối hoàn hảo
-  useEffect(() => {
-    if (!asideRef.current) return;
-    const update = () => {
-      if (asideRef.current) {
-        const h = asideRef.current.offsetHeight;
-        setAsideHeight(h);
-      }
-    };
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(asideRef.current);
-    return () => ro.disconnect();
-  }, [sideOpen]);
-
-  // Chiều cao cột Kanban: chỉ khi cột Tiếp nhận & Sơ tán nằm CẠNH bảng (≥ 1536 px, đang mở) mới cao bằng cột đó (trừ hàng nút
-  // 46 px + khe 10 px). Còn lại (1280–1535 px cột phải nằm dưới bảng, hoặc đang thu gọn) cột kéo tới đáy màn hình, phiếu cuộn
-  // trong cột — laptop 1366 × 768 không phải cuộn cả trang mới thấy đáy cột (RescueBoard)
-  const sideBySide = useMediaQuery('(min-width: 1536px)') && sideOpen;
-  const boardHeight = wide && sideBySide ? Math.max(360, asideHeight - 56) : null;
+  // Máy tính ≥ 1280 px: màn Sơ tán (?xem=so_tan) thay bảng điều phối
+  const evacView = wide && params.get('xem') === 'so_tan';
 
   // Tài khoản xã chưa lọc: tiêu đề là xã của mình, không ghi "Toàn tỉnh" (như Tổng quan)
   const scope = useAllowedCodes('sos', 'view');
@@ -207,6 +191,7 @@ export default function RescueCenter() {
     } else if (t.status !== COLUMN_KEYS[0]) next.set('cot', t.status);
     setParams(next, { replace: true });
     setQ(wanted);
+    if (t && wide) setDetailId(t.id); // máy tính: mở luôn ngăn chi tiết (thẻ "SOS mới" → "Mở phiếu")
     scrollTo(boardRef.current);
   }, [wanted, ticketsQ.data]); // eslint-disable-line react-hooks/exhaustive-deps -- chỉ chạy khi có mã cần mở / danh sách vừa tải
   const clearAll = () => {
@@ -233,12 +218,16 @@ export default function RescueCenter() {
     }
   };
   const onArrived = async (t) => {
+    setArriving(true);
     try {
       await api(`/dispatch/${t.dispatch_id}/arrived`, { method: 'POST' });
+      setArriveFor(null);
       qc.invalidateQueries({ queryKey: ['sos'] });
       toast({ tone: 'good', title: `${t.force_name || 'Lực lượng'} đã đến hiện trường ${t.code}` });
     } catch (e) {
       toast({ tone: 'danger', title: 'Không cập nhật được', body: e.message });
+    } finally {
+      setArriving(false);
     }
   };
   const onFocus = (t) => {
@@ -302,13 +291,15 @@ export default function RescueCenter() {
     onDispatch: setDispatch,
     onResolve: (x) => move(x.id, 'hoan_thanh'),
     onFocus,
-    onArrived,
+    onArrived: setArriveFor,
     onLink: setLinkFor,
     onCancel: setCancelFor,
     onEdit: setEditFor,
     onMove: (x, status) => move(x.id, status),
     onCloseTicket: setCloseFor,
+    onOpen: wide ? (x) => setDetailId(x.id) : undefined,
   };
+  const detail = detailId ? tickets.find((x) => x.id === detailId) || listTickets.find((x) => x.id === detailId) : null;
   const dataTime = ticketsQ.dataUpdatedAt ? new Date(ticketsQ.dataUpdatedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : null;
   const listView = view === 'danh_sach' || pdf;
   // Tài khoản một xã: "Sơ tán" mở thẳng số liệu của xã mình (bỏ bước chọn xã)
@@ -318,6 +309,19 @@ export default function RescueCenter() {
   const fieldAsks = tickets.filter((t) => factsOf(t).needSupport || factsOf(t).rescuedPending).length;
   const offlineSlot = !online ? { disabled: true, title: 'Mất mạng — chưa ghi được' } : {};
 
+  // Máy tính ≥ 1280 px (bản vẽ khung C6): nhận tin báo mở hộp thoại 2 bước từ đầu cột "Mới báo" / đầu danh sách
+  const intakeButton = (
+    <button
+      type="button"
+      onClick={() => setIntakeOpen(true)}
+      disabled={!online}
+      title={!online ? 'Mất mạng — chưa tạo phiếu được' : 'Dán tin Zalo / SMS hoặc ghi lời người gọi — máy tự điền, kiểm tra rồi tạo phiếu'}
+      className="tap flex h-10 w-full shrink-0 items-center justify-center gap-1.5 rounded-xl border border-dashed border-accent/50 bg-panel/70 text-sm font-semibold text-accent hover:bg-panel disabled:opacity-50"
+    >
+      <Plus size={15} aria-hidden="true" /> Nhận tin báo cứu hộ
+    </button>
+  );
+
   let body;
   if (listQ.isLoading) body = <Skeleton height={360} />;
   else if (listQ.isError && !listQ.data) {
@@ -326,6 +330,7 @@ export default function RescueCenter() {
   } else if (listView) {
     body = rows.length ? (
       <div className="flex flex-col gap-2">
+        {canReport && wide && <div className="max-w-xs">{intakeButton}</div>}
         <TicketTable rows={paged.visible} asTable={isLg || pdf} pdf={pdf} sort={sort} onSort={setSort} factsOf={factsOf} now={now} cardProps={cardProps} />
         {!pdf && <Pager paged={paged} size={pageSize} onSize={setPageSize} noun="phiếu" />}
       </div>
@@ -345,7 +350,7 @@ export default function RescueCenter() {
         filtered={activeFilters}
         cardProps={cardProps}
         onDrop={(id, status) => move(id, status)}
-        height={boardHeight}
+        lead={canReport && wide ? { moi: intakeButton } : undefined}
       />
     );
   }
@@ -376,7 +381,7 @@ export default function RescueCenter() {
         <section aria-label="Tình hình cứu hộ" className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-2.5 no-print">
           <h1 className="sr-only">Điều hành cứu hộ — {scopeLabel}</h1>
-          <RescueKpis chips ticketsQ={ticketsQ} tickets={tickets} factsOf={factsOf} evacQ={evacQ} onGo={go} onEvac={() => scrollTo(document.getElementById('so-tan'))} />
+          <RescueKpis chips ticketsQ={ticketsQ} tickets={tickets} factsOf={factsOf} evacQ={evacQ} onGo={go} onEvac={() => setParam({ xem: 'so_tan' }, false)} />
           <span className="flex-1" />
           <RoleTips page="cuu-ho" compact />
           <button
@@ -451,6 +456,16 @@ export default function RescueCenter() {
       </Section>
       )}
 
+      {evacView ? (
+        <>
+          <div className="flex items-center gap-3 no-print">
+            <Segmented label="Cách xem phiếu" value="so_tan" onChange={(v) => setParam({ xem: v === 'bang' ? '' : v })} options={DESK_VIEWS.map(([v, label, icon]) => ({ value: v, label, icon }))} />
+            <span className="text-sm text-ink-2">Tiến độ sơ tán theo xã và sức chứa điểm sơ tán — cổng người dân dùng chung số này</span>
+          </div>
+          <Evacuation wide query={evacQ} online={online} />
+        </>
+      ) : (
+      <>
       <FilterToolbar
         inline={wide}
         fields={FILTERS}
@@ -478,14 +493,14 @@ export default function RescueCenter() {
             label="Cách xem phiếu"
             value={view}
             onChange={(v) => setParam({ xem: v === 'bang' ? '' : v })}
-            options={VIEWS.map(([v, label, icon]) => ({ value: v, label, icon }))}
+            options={DESK_VIEWS.map(([v, label, icon]) => ({ value: v, label, icon }))}
           />
         )}
       </FilterToolbar>
 
-      <div className={clsx('grid gap-3 items-stretch', sideOpen ? '2xl:grid-cols-[minmax(0,1fr)_370px]' : 'grid-cols-1')}>
+      <div className="grid gap-3 items-stretch">
         <div ref={boardRef} className="flex min-w-0 scroll-mt-20 flex-col gap-2.5">
-          <div className={clsx('flex flex-wrap items-center justify-between gap-2 no-print shrink-0', wide && view === 'bang' && 'max-2xl:hidden')}>
+          <div className={clsx('flex flex-wrap items-center justify-between gap-2 no-print shrink-0', wide && view === 'bang' && 'hidden')}>
             <div className="flex flex-wrap items-center gap-2">
               {!wide && <Segmented
                 label="Cách xem phiếu"
@@ -493,26 +508,6 @@ export default function RescueCenter() {
                 onChange={(v) => setParam({ xem: v === 'bang' ? '' : v })}
                 options={VIEWS.map(([v, label, icon]) => ({ value: v, label, icon }))}
               />}
-              {/* Nút bật/tắt toàn màn hình cho bảng SOS trên màn hình rộng */}
-              <button
-                type="button"
-                onClick={() => setSideOpen((v) => !v)}
-                className="btn-ghost tap hidden 2xl:flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-accent hover:bg-accent/10 rounded-lg transition-colors border border-accent/25"
-                title={sideOpen ? 'Thu gọn cột Tiếp nhận & Sơ tán để mở rộng tối đa Bảng điều phối SOS' : 'Mở lại cột Tiếp nhận SOS & Giám sát sơ tán'}
-                aria-pressed={sideOpen}
-              >
-                {sideOpen ? (
-                  <>
-                    <Maximize2 size={13} aria-hidden="true" />
-                    <span>Toàn màn hình bảng SOS</span>
-                  </>
-                ) : (
-                  <>
-                    <Minimize2 size={13} aria-hidden="true" />
-                    <span>Hiện Tiếp nhận & Sơ tán</span>
-                  </>
-                )}
-              </button>
             </div>
             {view === 'bang' && wide && <span className="text-xs text-muted">Kéo thẻ phiếu sang cột khác, hoặc chọn “⋯ → Chuyển sang…” trên thẻ</span>}
             {view === 'danh_sach' && (
@@ -529,20 +524,52 @@ export default function RescueCenter() {
           </div>
           <div ref={contentRef} className="bg-bg flex-1 flex flex-col h-full min-h-0">{body}</div>
         </div>
-        {/* Điện thoại: giám sát sơ tán trước, tiếp nhận tin (việc của trực ban ở bàn) sau; màn rộng: cột phải */}
-        {sideOpen && (
-          <aside ref={asideRef} className="flex min-w-0 flex-col gap-3 self-start">
-            <Can I="sos" a="create"><div className="order-2 2xl:order-1"><Intake online={online} /></div></Can>
-            <Evacuation query={evacQ} online={online} className="order-1 2xl:order-2" />
+        {/* Dưới 1280 px: giám sát sơ tán trước, tiếp nhận tin (việc của trực ban ở bàn) sau, nằm dưới bảng. Máy tính: nhận tin
+            là hộp thoại, sơ tán là màn riêng */}
+        {!wide && (
+          <aside className="flex min-w-0 flex-col gap-3">
+            <Evacuation query={evacQ} online={online} />
+            <Can I="sos" a="create"><Intake online={online} /></Can>
           </aside>
         )}
       </div>
+      </>
+      )}
 
       {dispatch && <DispatchModal ticket={dispatch} onClose={() => setDispatch(null)} />}
       {linkFor && <MissionLinkModal ticket={linkFor} onClose={() => setLinkFor(null)} />}
       {cancelFor && <CancelDispatchModal ticket={cancelFor} onClose={() => setCancelFor(null)} />}
       {closeFor && <CloseTicketModal ticket={closeFor} onClose={() => setCloseFor(null)} />}
       {editFor && <EditTicketModal ticket={editFor} onClose={() => setEditFor(null)} />}
+      {intakeOpen && <Intake online={online} onClose={() => setIntakeOpen(false)} />}
+      {arriveFor && (
+        <Confirm
+          title="Đội đã đến hiện trường?"
+          confirmLabel="Đội đã đến"
+          busy={arriving}
+          onConfirm={() => onArrived(arriveFor)}
+          onClose={() => setArriveFor(null)}
+        >
+          <p className="rounded-xl bg-panel2 px-3.5 py-2.5 text-ink">
+            <b>{arriveFor.code}</b> · {arriveFor.force_name || 'đội đã điều'}{arriveFor.dispatched_at ? ` · xuất phát ${dateTime(arriveFor.dispatched_at)}` : ''}
+          </p>
+          <p>
+            Đội báo qua điện thoại / bộ đàm <b className="text-ink">đã đến hiện trường</b>? Thanh tiến độ của đội dừng ở “Đã đến”, phiếu vẫn ở
+            cột “Đội đang đến” tới khi xác nhận đã cứu. Trưởng nhóm cũng tự báo được trên link nhiệm vụ.
+          </p>
+        </Confirm>
+      )}
+      {/* Việc mở hộp thoại riêng (điều đội, không cần cứu): đóng ngăn trước — hai lớp chồng nhau, Esc đóng cả hai */}
+      {detail && wide && (
+        <TicketDrawer
+          t={detail}
+          x={factsOf(detail)}
+          {...cardProps}
+          onDispatch={(x) => { setDetailId(null); setDispatch(x); }}
+          onCloseTicket={(x) => { setDetailId(null); setCloseFor(x); }}
+          onClose={() => setDetailId(null)}
+        />
+      )}
       {evacOpen && <EvacuationModal row={evacRow} progress={evacQ.data?.progress} onClose={() => setEvacOpen(false)} />}
       {/* Điện thoại: việc hay làm ở vùng ngón cái — phiếu mới báo (số = phiếu chưa ai nhận), báo sơ tán, đội đang đến (số =
           đội xin chi viện / báo đã cứu chờ xác nhận); khung chung với Tổng quan, Bản đồ, Vật tư */}

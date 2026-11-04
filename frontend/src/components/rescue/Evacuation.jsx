@@ -217,6 +217,55 @@ function EvacuationRow({ r, online, onEdit }) {
   );
 }
 
+/** Dòng bảng tiến độ sơ tán (màn Sơ tán máy tính — khung C9). Thanh tiến độ màu trung tính (cao = tốt). */
+function EvacuationTableRow({ r, online, onEdit }) {
+  const canEdit = usePermission('evacuation', 'update', r.code);
+  const p = pct(r.evacuated_households, r.planned_households);
+  return (
+    <tr className="border-t border-line">
+      <td className="px-3 py-2.5 font-semibold text-ink">{r.name}</td>
+      <td className="px-3 py-2.5">
+        <div className="flex items-center gap-2">
+          <Progress value={p} tone="accent" className="flex-1" />
+          <span className="num w-10 text-right text-xs font-semibold text-ink">{p}%</span>
+        </div>
+      </td>
+      <td className="num px-3 py-2.5">{int(r.evacuated_households)}/{int(r.planned_households)} hộ</td>
+      <td className="px-3 py-2.5 text-ink-2">{r.updated_at ? time(r.updated_at) : '—'}</td>
+      <td className="px-3 py-2.5 text-right">
+        {canEdit && (
+          <button type="button" className="btn-secondary tap h-9 rounded-xl px-3 text-[13px]" onClick={() => onEdit(r)} disabled={!online} aria-label={`Cập nhật sơ tán ${r.name}`}>
+            Cập nhật
+          </button>
+        )}
+      </td>
+    </tr>
+  );
+}
+
+/** Thẻ điểm sơ tán (cột phải màn Sơ tán máy tính — khung C9): tên, xã, đang chứa / sức chứa, nhãn Đã đầy / Sắp đầy / Còn chỗ. */
+function SiteCard({ s, online, onEdit }) {
+  const canEdit = usePermission('evacuation', 'update', s.admin_code);
+  const lv = occupancyLevel(s.current_occupancy, s.capacity);
+  return (
+    <li className="flex items-center gap-2.5 rounded-xl bg-panel2 px-3 py-2.5">
+      <span className="min-w-0 flex-1">
+        <b className="block text-sm leading-snug text-ink">{s.name}</b>
+        <span className="block text-xs text-muted">{s.admin_name}</span>
+      </span>
+      <b className="num shrink-0 text-ink" title="Đang chứa / sức chứa">{int(s.current_occupancy)}/{int(s.capacity)}</b>
+      <span className={clsx('chip shrink-0 py-0.5 text-xs font-semibold', lv >= 2 ? risk(lv).chip : 'bg-good/15 text-good')}>
+        {lv === 3 ? 'Đã đầy' : lv === 2 ? 'Sắp đầy' : 'Còn chỗ'}
+      </span>
+      {canEdit && (
+        <button type="button" className="tap-sq h-9 shrink-0 rounded-lg px-2 text-[13px] font-semibold text-accent hover:bg-accent/10 disabled:opacity-40" onClick={() => onEdit(s)} disabled={!online} aria-label={`Cập nhật số người ở ${s.name}`}>
+          Sửa
+        </button>
+      )}
+    </li>
+  );
+}
+
 function SiteRow({ s, online, onEdit }) {
   const canEdit = usePermission('evacuation', 'update', s.admin_code);
   const p = pct(s.current_occupancy, s.capacity);
@@ -243,7 +292,12 @@ function SiteRow({ s, online, onEdit }) {
  * sắp đầy (trên 85%) Cam, cùng thang với biểu tượng điểm sơ tán trên Bản đồ / cổng công khai (occupancyLevel). Đang tải /
  * lỗi (Thử lại) / chưa có số liệu nói rõ; mất mạng → nút "Sửa" tắt.
  */
-export default function Evacuation({ query, online, className }) {
+/**
+ * `wide` (máy tính ≥ 1280 px — bản vẽ desktop khung C9, màn "Sơ tán" của Điều hành cứu hộ): hai khối — bảng tiến độ theo
+ * xã (thanh tiến độ, đã / kế hoạch, giờ cập nhật, nút "Cập nhật") và cột điểm sơ tán (đang chứa / sức chứa, nhãn Đã đầy /
+ * Sắp đầy / Còn chỗ); hiện đủ, không "Xem thêm".
+ */
+export default function Evacuation({ query, online, className, wide = false }) {
   const canUpdate = usePermission('evacuation', 'update');
   const [editing, setEditing] = useState(null); // null | 'new' | dòng tiến độ
   const [site, setSite] = useState(null); // điểm sơ tán đang cập nhật số người
@@ -253,6 +307,61 @@ export default function Evacuation({ query, online, className }) {
   // Hiện dần 6 dòng (máy chủ đã xếp: xã tiến độ thấp nhất, điểm đầy nhất lên đầu) — không cuộn lồng trong trang trên điện thoại
   const prog = useShowMore(data?.progress || [], 6, 'xa');
   const sites = useShowMore(data?.sites || [], 6, 'diem');
+  const modals = (
+    <>
+      {editing && <EvacuationModal row={editing === 'new' ? null : editing} progress={data?.progress} onClose={() => setEditing(null)} />}
+      {site && <OccupancyModal site={site} onClose={() => setSite(null)} />}
+    </>
+  );
+
+  if (wide) {
+    const body = query.isLoading ? <Skeleton height={240} />
+      : query.isError && !data ? <ErrorState height={160} onRetry={query.refetch}>Không tải được số liệu sơ tán</ErrorState> : null;
+    return (
+      <div id="so-tan" className={clsx('grid scroll-mt-20 grid-cols-[minmax(0,1fr)_380px] items-start gap-5', className)}>
+        <section aria-labelledby="so-tan-xa" className="sheet flex min-w-0 flex-col gap-3 p-5">
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 id="so-tan-xa" className="text-[15px] font-bold text-ink">Tiến độ sơ tán theo xã — thấp nhất lên đầu</h2>
+            {data && <span className="num text-sm text-ink-2">{int(totDone)}/{int(totPlanned)} hộ đã sơ tán</span>}
+            <span className="flex-1" />
+            {canUpdate && (
+              <button type="button" className="btn-primary tap h-11 rounded-xl px-4" onClick={() => setEditing('new')} disabled={!online} title={!online ? 'Mất mạng — chưa ghi được' : undefined}>
+                + Cập nhật xã
+              </button>
+            )}
+          </div>
+          {body || (data.progress.length ? (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs font-bold text-ink-2">
+                  <th className="px-3 py-2 font-bold">Xã / phường</th>
+                  <th className="w-[26%] px-3 py-2 font-bold">Tiến độ</th>
+                  <th className="px-3 py-2 font-bold">Đã / kế hoạch</th>
+                  <th className="px-3 py-2 font-bold">Cập nhật</th>
+                  <th className="px-3 py-2"><span className="sr-only">Thao tác</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.progress.map((r) => <EvacuationTableRow key={r.code} r={r} online={online} onEdit={setEditing} />)}
+              </tbody>
+            </table>
+          ) : <EmptyState>Chưa có xã nào báo tiến độ sơ tán{canUpdate ? ' — bấm "+ Cập nhật xã"' : ''}</EmptyState>)}
+        </section>
+        <aside aria-labelledby="so-tan-diem" className="sheet sticky top-0 flex flex-col gap-2.5 p-5">
+          <h2 id="so-tan-diem" className="text-[15px] font-bold text-ink">Điểm sơ tán: đang chứa / sức chứa (đầy lên đầu)</h2>
+          {body || (data.sites.length ? (
+            <ul className="scroll-thin flex max-h-[calc(100vh-20rem)] flex-col gap-2 overflow-y-auto">
+              {data.sites.map((x) => <SiteCard key={x.id} s={x} online={online} onEdit={setSite} />)}
+            </ul>
+          ) : <EmptyState>Chưa có điểm sơ tán trong vùng — nhập bằng loại dữ liệu “Điểm sơ tán”</EmptyState>)}
+          <p className="rounded-[14px] border border-dashed border-line p-3 text-[13px] leading-normal text-ink-2">
+            Cổng người dân hiện chỗ còn trống của từng điểm theo số này — cập nhật ngay khi dân đến / rời điểm.
+          </p>
+        </aside>
+        {modals}
+      </div>
+    );
+  }
 
   return (
     <Section
@@ -294,8 +403,7 @@ export default function Evacuation({ query, online, className }) {
               </div>
             </div>
           )}
-      {editing && <EvacuationModal row={editing === 'new' ? null : editing} progress={data?.progress} onClose={() => setEditing(null)} />}
-      {site && <OccupancyModal site={site} onClose={() => setSite(null)} />}
+      {modals}
     </Section>
   );
 }

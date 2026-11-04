@@ -19,7 +19,8 @@ const EMPTY = {
  * phiếu quá hạn) rồi danh sách phiếu của cột — không cuộn lồng nhau, không phải lướt qua 3 cột mới tới cột cần xem. Cột
  * theo trạng thái, KHÔNG tô màu rủi ro (màu Đỏ / Cam / Vàng dành cho mức ưu tiên của từng phiếu).
  */
-export default function RescueBoard({ tickets, factsOf, wide, column, onColumn, filtered, cardProps, onDrop, height }) {
+// `lead`: { [cột]: phần tử } đặt đầu danh sách phiếu của cột (VD nút "Nhận tin báo cứu hộ" ở cột Mới báo — khung C6)
+export default function RescueBoard({ tickets, factsOf, wide, column, onColumn, filtered, cardProps, onDrop, height, lead }) {
   const [over, setOver] = useState(null);
   const byCol = Object.fromEntries(COLUMNS.map((c) => [c.key, tickets.filter((t) => t.status === c.key)]));
   const overdueIn = (key) => byCol[key].filter((t) => factsOf(t).overdue).length;
@@ -90,6 +91,7 @@ export default function RescueBoard({ tickets, factsOf, wide, column, onColumn, 
               <div className="mt-1 text-xs text-ink-2">{c.lead || c.hint}</div>
             </div>
             <div className="scroll-thin flex flex-1 min-h-0 flex-col gap-2.5 overflow-y-auto px-2.5 pb-2.5 print:overflow-visible">
+              {lead?.[c.key]}
               {byCol[c.key].length ? cards(c.key) : empty(c.key)}
             </div>
           </section>

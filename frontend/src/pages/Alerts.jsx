@@ -31,6 +31,7 @@ import { useOnline } from '../utils/useOnline';
 import { useMediaQuery } from '../utils/useMediaQuery';
 import { useNewKeys } from '../utils/useNewKeys';
 import { useShowMore } from '../utils/useShowMore';
+import { notIntegrated } from '../utils/labels';
 
 function useNow(ms) {
   const [now, setNow] = useState(Date.now());
@@ -68,6 +69,7 @@ export default function Alerts() {
   const [reportOpen, setReportOpen] = useState(false);
   const tab = TAB_IDS.includes(params.get('tab')) && (params.get('tab') !== 'nhat_ky' || canAudit) ? params.get('tab') : 'phat';
   const [approve, setApprove] = useState(null); // { b, mode: 'approve' | 'reject' }
+  const [allPending, setAllPending] = useState(false); // máy tính: hiện hết lệnh chờ duyệt (mặc định 3 lệnh cũ nhất)
   const [manage, setManage] = useState(null); // { b, mode: 'extend' | 'end' }
   const [refreshing, setRefreshing] = useState(false);
   // Bản đồ + chuyển giao: mặc định thu gọn để danh sách lệnh chờ duyệt & soạn lệnh lên ngay tầm mắt
@@ -105,6 +107,8 @@ export default function Alerts() {
   // Dải khẩn / ô chỉ số → thẻ "Phát cảnh báo", cuộn tới khối
   const go = ({ anchor }) => {
     if (tab !== 'phat') setTab('phat');
+    // Chạm ô / dải "n lệnh chờ phê duyệt" → hiện đủ n lệnh (máy tính mặc định chỉ 3 lệnh cũ nhất)
+    if (anchor === 'cho-duyet') setAllPending(true);
     scrollTo(anchor);
   };
   // Bản nháp từ Bản đồ giám sát (vùng vẽ) / bảng tác chiến / "Soạn lại" → mở thẻ soạn, cuộn tới form
@@ -140,10 +144,16 @@ export default function Alerts() {
   } else {
     lists = (
       <>
-        <Section id="cho-duyet" className="order-1 scroll-mt-20" title={`${pending.some((x) => x.can_approve) ? 'Chờ bạn duyệt' : 'Chờ lãnh đạo duyệt'} · ${pending.length}`} right={<ShieldCheck size={16} className="text-serious" aria-hidden="true" />}>
+        <Section id="cho-duyet" className="order-1 scroll-mt-20" title={`${pending.some((x) => x.can_approve) ? 'Chờ bạn duyệt' : 'Chờ lãnh đạo duyệt'} · ${pending.length}`} right={desk ? <span className="text-xs text-muted">cũ nhất trước</span> : <ShieldCheck size={16} className="text-serious" aria-hidden="true" />}>
           {pending.length ? (
-            <div className="grid gap-2 lg:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
-              {pending.map((b) => <PendingCard key={b.id} b={b} x={factsOf(b)} me={me} online={online} unitName={unitName} onApprove={(x, mode) => setApprove({ b: x, mode })} fresh={isNew(`cho:${b.id}`)} />)}
+            // Máy tính ≥ 1280 px (bản vẽ khung D): thẻ gọn, 3 lệnh cũ nhất trước + "Xem thêm n lệnh"
+            <div className={clsx('grid', desk ? 'grid-cols-1 gap-3' : 'gap-2 lg:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2')}>
+              {(desk && !allPending ? pending.slice(0, 3) : pending).map((b) => <PendingCard key={b.id} b={b} x={factsOf(b)} me={me} online={online} unitName={unitName} compact={desk} onApprove={(x, mode) => setApprove({ b: x, mode })} fresh={isNew(`cho:${b.id}`)} />)}
+              {desk && !allPending && pending.length > 3 && (
+                <button type="button" className="tap justify-self-start rounded px-1 text-sm font-semibold text-accent hover:underline" onClick={() => setAllPending(true)}>
+                  Xem thêm {pending.length - 3} lệnh <ChevronRight size={14} className="inline" aria-hidden="true" />
+                </button>
+              )}
             </div>
           ) : <EmptyState height={72}>Không có lệnh chờ duyệt</EmptyState>}
         </Section>
@@ -254,6 +264,13 @@ export default function Alerts() {
               Người soạn không tự duyệt. Lãnh đạo duyệt bằng mã PIN, cần quyền trên mọi xã nhận tin.
               {role && <div className="mt-1 text-muted">Bạn: {auth.user.full_name === role ? role : `${auth.user.full_name} — ${role}`}</div>}
             </div>
+            {/* Kênh gửi tin chưa nối nhà cung cấp (lệnh đã duyệt có kênh "chưa nối") → nói rõ ngay ở cột trái (khung D) */}
+            {list.some(notIntegrated) && (
+              <p className="rounded-[14px] border border-dashed border-line p-3.5 text-[13px] leading-normal text-ink-2">
+                <b className="text-ink">Chưa gửi tin thật.</b> SMS, tin nhắn vùng, Zalo, ứng dụng, loa chưa nối nhà cung cấp — lệnh duyệt
+                xong công bố trên cổng người dân và bản nhẹ.
+              </p>
+            )}
             <div className="flex items-center gap-2">
               <RoleTips page="canh-bao" compact />
               <button type="button" onClick={refresh} disabled={refreshing} className="btn-secondary tap-sq h-9 min-w-[36px] px-2.5" aria-label="Làm mới số liệu" title={`Làm mới — ${scopeLabel}`}>
@@ -262,7 +279,8 @@ export default function Alerts() {
             </div>
           </aside>
           <div className="flex min-w-0 flex-col gap-4">
-            <AlertKpis chips query={bq} broadcasts={list} factsOf={factsOf} onGo={go} />
+            {/* Hàng chip chỉ ở phần Phát cảnh báo (bản vẽ khung D5, D7, D9: các phần tra cứu không có hàng chỉ số) */}
+            {tab === 'phat' && <AlertKpis chips query={bq} broadcasts={list} factsOf={factsOf} onGo={go} />}
             {tab === 'phat' && overviewOpen && overview}
             {tab === 'phat' && (
               <div className={clsx('flex flex-col gap-3', canCreate && 'grid grid-cols-[minmax(0,1fr)_380px] items-start')}>
@@ -272,7 +290,8 @@ export default function Alerts() {
             )}
             {tab === 'lich_su' && <BroadcastHistory now={now} scopeLabel={scopeLabel} />}
             {tab === 'danh_ba' && (
-              <div className="grid gap-3 2xl:grid-cols-[minmax(0,1fr)_380px] [&>*]:min-w-0">
+              // Bản vẽ khung D7: danh bạ + tổng đài phím bấm cột phải
+              <div className="grid grid-cols-[minmax(0,1fr)_340px] items-start gap-5 [&>*]:min-w-0">
                 <ContactDirectory scopeLabel={scopeLabel} />
                 <HotlinePanel online={online} />
               </div>

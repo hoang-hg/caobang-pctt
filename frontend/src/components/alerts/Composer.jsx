@@ -220,7 +220,8 @@ export default function Composer({ online = true }) {
         <div>
           <div className="mb-1 font-medium" id="mau-tin">Mẫu tin dựng sẵn</div>
           {tplLoading ? <Skeleton height={88} /> : (
-            <div className="grid grid-cols-1 gap-1.5 min-[400px]:grid-cols-2" role="radiogroup" aria-labelledby="mau-tin">
+            // Máy tính ≥ 1280 px (bản vẽ khung D): 3 cột, chỉ chữ (tên + khi nào dùng, chấm mức) — không ô biểu tượng
+            <div className="grid grid-cols-1 gap-1.5 min-[400px]:grid-cols-2 xl:grid-cols-3 xl:gap-2" role="radiogroup" aria-labelledby="mau-tin">
               {templates.filter((t) => !HIDDEN_TEMPLATE_CODES.has(t.code)).sort((a, b) => (TEMPLATE_CARD[a.code]?.order ?? 99) - (TEMPLATE_CARD[b.code]?.order ?? 99)).map((t) => {
                 const Icon = TEMPLATE_CARD[t.code]?.icon || Megaphone;
                 return (
@@ -233,7 +234,7 @@ export default function Composer({ online = true }) {
                     onClick={() => { setTpl(t.code); setParams({}); if (!title.trim()) setTitle(t.name); }}
                   >
                     {/* Ô biểu tượng loại tin: thẻ đang chọn màu nhấn, thẻ khác xám */}
-                    <span className={clsx('icon-tile h-9 w-9', tpl !== t.code && 'bg-panel2 text-ink-2 ring-line')} aria-hidden="true">
+                    <span className={clsx('icon-tile h-9 w-9 xl:hidden', tpl !== t.code && 'bg-panel2 text-ink-2 ring-line')} aria-hidden="true">
                       <Icon size={18} strokeWidth={1.75} />
                     </span>
                     <span className="min-w-0 flex-1">
@@ -247,7 +248,7 @@ export default function Composer({ online = true }) {
                 );
               })}
               <button type="button" role="radio" aria-checked={!tpl} className={card(!tpl)} onClick={() => { setTpl(''); setParams({}); }}>
-                <span className={clsx('icon-tile h-9 w-9', tpl && 'bg-panel2 text-ink-2 ring-line')} aria-hidden="true">
+                <span className={clsx('icon-tile h-9 w-9 xl:hidden', tpl && 'bg-panel2 text-ink-2 ring-line')} aria-hidden="true">
                   <Pencil size={18} strokeWidth={1.75} />
                 </span>
                 <span className="min-w-0 flex-1">
@@ -481,17 +482,19 @@ export default function Composer({ online = true }) {
           <button type="button" className={clsx('btn-ghost', big)} onClick={() => setStep(step - 1)} disabled={sending}><ChevronLeft size={15} aria-hidden="true" /> Quay lại</button>
         ) : <span className="sm:hidden" />}
         {step < 2 ? (
-          <button type="button" className={clsx('btn-primary', big)} onMouseDown={(e) => e.preventDefault()} onClick={next}>Tiếp <ChevronRight size={15} aria-hidden="true" /></button>
+          <button type="button" className={clsx('btn-primary', big)} onMouseDown={(e) => e.preventDefault()} onClick={next}>
+            {step === 0 ? 'Tiếp: chọn vùng nhận' : 'Tiếp: kênh & gửi'} <ChevronRight size={15} aria-hidden="true" />
+          </button>
         ) : (
           <button
             type="button"
-            className={clsx('btn-danger font-bold', big)}
+            className={clsx('btn-primary font-bold', big)}
             onMouseDown={(e) => e.preventDefault()}
             onClick={submit}
             disabled={sending || !online || !auth}
             title={!online ? 'Mất mạng — chưa gửi được' : undefined}
           >
-            {sending ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <Send size={15} aria-hidden="true" />} Gửi lãnh đạo phê duyệt
+            {sending ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <Send size={15} aria-hidden="true" />} Gửi đi duyệt
           </button>
         )}
       </div>

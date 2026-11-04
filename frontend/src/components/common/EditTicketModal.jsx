@@ -61,7 +61,8 @@ export default function EditTicketModal({ ticket, onClose }) {
     <Modal
       open
       onClose={onClose}
-      title={`Sửa thông tin phiếu – ${ticket.code}`}
+      title={`Sửa phiếu ${ticket.code}`}
+      subtitle="Mức ưu tiên, số người, nhóm yếu thế — ghi vào nhật ký"
       footer={
         <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:justify-end">
           <button type="button" className={clsx('btn-ghost', big)} onClick={onClose} disabled={busy}>Huỷ</button>
