@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { Camera, Check, X, Siren, MapPin, Phone, RotateCcw, CheckCheck, Inbox, Search, ZoomIn, Pencil } from 'lucide-react';
+import { Camera, Check, X, Siren, MapPin, Phone, RotateCcw, CheckCheck, Inbox, Search, ZoomIn, Pencil, Loader2 } from 'lucide-react';
 import { api } from '../api/client';
 import { useAreaQuery } from '../api/hooks';
 import { useStore } from '../app/store';
@@ -220,12 +220,127 @@ function ActionModal({ report, action, onClose }) {
   );
 }
 
+/**
+ * Ô chi tiết của phản ánh CHỜ DUYỆT trên máy tính (bản vẽ desktop khung F, F4): bên trái ảnh lớn, nội dung gốc (chỉ cán bộ
+ * thấy), người gửi; bên phải "Phần công khai" soạn ngay tại chỗ — nội dung (gợi ý sẵn, đã che SĐT / email / giấy tờ), vị trí
+ * công khai Làm tròn / Chính xác, công khai ảnh, ghi chú công khai; chân ô: Từ chối… · Chuyển thành phiếu SOS · Duyệt và công
+ * khai (gửi luôn, không qua hộp thoại). Cùng API /reports/{id}/moderate với hộp thoại cũ.
+ */
+function ModerateDetail({ r, onAction, onPhoto }) {
+  const qc = useQueryClient();
+  const toast = useStore((s) => s.toast);
+  const navigate = useNavigate();
+  const setFocus = useStore((s) => s.setFocus);
+  const urgent = r.category === 'mac_ket';
+  const [pubDesc, setPubDesc] = useState(r.public_description || r.public_description_suggested || '');
+  const [exact, setExact] = useState(!!r.exact_location);
+  const [pubPhotos, setPubPhotos] = useState(r.public_photos ?? true);
+  const [note, setNote] = useState(r.public_note || '');
+  const [busy, setBusy] = useState(false);
+  const short = pubDesc.trim().length < 10;
+  const approve = async () => {
+    setBusy(true);
+    try {
+      await api(`/reports/${r.id}/moderate`, {
+        method: 'POST',
+        body: { action: 'approve', public_note: note.trim() || null, reject_reason: null, public_description: pubDesc.trim(), exact_location: exact, public_photos: pubPhotos },
+      });
+      toast({ tone: 'good', title: `Đã duyệt & công khai ${r.code}`, body: 'Người dân thấy trên bản đồ cổng công khai' });
+      qc.invalidateQueries({ queryKey: ['reports'] });
+    } catch (e) {
+      toast({ tone: 'danger', title: 'Không thực hiện được', body: e.message });
+    } finally {
+      setBusy(false);
+    }
+  };
+  const seg = (on) => clsx('tap h-10 rounded-[9px] px-3.5 text-sm', on ? 'bg-panel font-semibold text-ink shadow-sm' : 'text-ink-2 hover:text-ink');
+  return (
+    <section aria-label={`Phản ánh ${r.code}`} className={clsx('card flex flex-col gap-4 p-5', urgent && 'border-danger ring-1 ring-danger/40')}>
+      <div className="flex flex-wrap items-center gap-2.5">
+        <h2 className="text-lg font-bold text-ink">{r.code} · {r.category_label}</h2>
+        {urgent && <span className="chip bg-danger text-xs font-bold text-white">Khẩn</span>}
+        <span className={clsx('chip text-xs font-bold', STATUS.cho_duyet.cls)}>{STATUS.cho_duyet.label}</span>
+        <span className="ml-auto text-[13px] text-muted" title={dateTime(r.created_at)}>gửi {ago(r.created_at)} · {r.admin_name}</span>
+      </div>
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="flex min-w-0 flex-col gap-3">
+          {r.photo_urls.length > 0 ? (
+            <div className="grid grid-cols-2 gap-2.5">
+              {r.photo_urls.map((p, i) => (
+                <button key={p.thumb} type="button" onClick={() => onPhoto(p.full)} className="group relative overflow-hidden rounded-xl border border-line hover:border-accent" title="Xem ảnh phóng to">
+                  <img src={p.full} alt={`Ảnh ${i + 1} của ${r.code}`} className="h-44 w-full object-cover" loading="lazy" />
+                  <span className="absolute inset-0 flex items-center justify-center bg-black/30 text-white opacity-0 transition-opacity group-hover:opacity-100"><ZoomIn size={16} aria-hidden="true" /></span>
+                </button>
+              ))}
+            </div>
+          ) : <p className="rounded-xl border border-dashed border-line p-3 text-[13px] text-muted">Người gửi không kèm ảnh.</p>}
+          <div className="text-xs font-bold text-ink-2">Nội dung gốc — chỉ cán bộ thấy</div>
+          <p className="rounded-xl bg-panel2 px-3.5 py-3 text-sm leading-relaxed text-ink">{r.description}</p>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ink-2">
+            <button type="button" className="flex items-center gap-1 font-medium text-accent hover:underline" onClick={() => { setFocus({ lat: r.lat, lon: r.lon, zoom: 15, label: r.code }); navigate('/ban-do'); }}>
+              <MapPin size={13} aria-hidden="true" /> {r.hamlet_name ? `${r.hamlet_name} · ` : ''}{r.address ? `${r.address}, ` : ''}{r.admin_name}
+            </button>
+            {(r.reporter_name || r.reporter_phone) && (
+              <span>
+                Người gửi: <b className="text-ink">{r.reporter_name || 'ẩn danh'}</b>
+                {r.reporter_phone && <> · <a className="font-mono text-accent hover:underline" href={`tel:${r.reporter_phone.replace(/\s/g, '')}`}>{r.reporter_phone}</a></>}
+                {' '}— không bao giờ hiện ra cổng công khai.
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="flex flex-col gap-2.5" role="group" aria-label="Phần công khai">
+          <label htmlFor={`cong-khai-${r.id}`} className="text-xs font-bold text-ink-2">Nội dung công khai (người dân sẽ thấy trên cổng)</label>
+          <textarea
+            id={`cong-khai-${r.id}`}
+            className={clsx('input min-h-[110px] rounded-xl bg-panel text-sm leading-relaxed', short && pubDesc && 'border-danger')}
+            maxLength={1000}
+            value={pubDesc}
+            onChange={(e) => setPubDesc(e.target.value)}
+          />
+          <span className="text-[11px] text-muted">Đã tự che SĐT, email, số giấy tờ — bỏ tiếp tên người, số nhà.</span>
+          <div className="text-xs font-bold text-ink-2" id={`vi-tri-${r.id}`}>Vị trí công khai</div>
+          <div className="seg-track self-start" role="radiogroup" aria-labelledby={`vi-tri-${r.id}`}>
+            <button type="button" role="radio" aria-checked={!exact} className={seg(!exact)} onClick={() => setExact(false)}>Làm tròn ~150 m</button>
+            <button type="button" role="radio" aria-checked={exact} className={seg(exact)} onClick={() => setExact(true)} title="Chỉ chọn khi là điểm công cộng (đường, cầu, taluy, bờ sông)">Vị trí chính xác</button>
+          </div>
+          {r.photo_urls.length > 0 && (
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" className="mt-1 h-4 w-4" checked={pubPhotos} onChange={(e) => setPubPhotos(e.target.checked)} />
+              <span>Công khai ảnh <span className="text-muted">(bỏ chọn nếu có mặt người, biển số xe, số nhà)</span></span>
+            </label>
+          )}
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-bold text-ink-2">Ghi chú công khai (tuỳ chọn)</span>
+            <input className="input tap h-11 rounded-xl bg-panel text-sm" maxLength={500} placeholder="VD: Đã cắm biển cảnh báo" value={note} onChange={(e) => setNote(e.target.value)} />
+          </label>
+        </div>
+      </div>
+      <div className="mt-auto flex flex-wrap items-center gap-2.5 border-t border-line pt-4">
+        <button type="button" className="btn-secondary tap h-11 rounded-xl px-4" onClick={() => onAction(r, 'reject')}>Từ chối…</button>
+        {!r.sos_ticket_id && (
+          <button type="button" className="btn-secondary tap h-11 rounded-xl px-4" onClick={() => onAction(r, 'sos')}>
+            <Siren size={15} className="text-danger" aria-hidden="true" /> Chuyển thành phiếu SOS
+          </button>
+        )}
+        <span className="flex-1" />
+        {short && <span className="text-xs text-danger">Nội dung công khai ít nhất 10 ký tự</span>}
+        <button type="button" className="btn-primary tap h-11 rounded-xl px-5 font-semibold" disabled={busy || short} onClick={approve}>
+          {busy ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <Check size={15} aria-hidden="true" />} Duyệt và công khai
+        </button>
+      </div>
+    </section>
+  );
+}
+
 function ReportCard({ r, onAction, onPhoto, fresh = false, large = false }) {
   const urgent = r.category === 'mac_ket' && r.status === 'cho_duyet'; // có người mắc kẹt, chưa xử lý
   const navigate = useNavigate();
   const setFocus = useStore((s) => s.setFocus);
   const canModerate = usePermission('report', 'moderate', r.admin_code);
   const st = STATUS[r.status];
+  // Máy tính: phản ánh chờ duyệt → soạn phần công khai ngay trong ô (khung F4)
+  if (large && canModerate && r.status === 'cho_duyet') return <ModerateDetail key={r.id} r={r} onAction={onAction} onPhoto={onPhoto} />;
 
   return (
     <div className={clsx('card flex flex-col gap-2.5', large ? 'p-5' : 'p-3.5', r.status === 'cho_duyet' && (urgent ? 'border-danger ring-1 ring-danger/40' : 'border-warn/70'), fresh && 'motion-safe:animate-enter')}>
