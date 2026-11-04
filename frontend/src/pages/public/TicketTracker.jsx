@@ -9,6 +9,7 @@ import {
 import { api } from '../../api/client';
 import { useStore } from '../../app/store';
 import { BackButton } from '../../components/common/ui';
+import { useMediaQuery } from '../../utils/useMediaQuery';
 
 // Màu từng bước tiến độ (tên màu do backend services/tracking.py trả) theo bảng màu chung của hệ thống (utils/risk.js):
 // chip vàng / cam / xanh lá chữ ĐEN, đỏ chữ trắng — chữ trắng trên hổ phách / cam chỉ đạt 2,1–2,8 : 1, khó đọc ngoài nắng
@@ -45,7 +46,12 @@ const STEP_COLORS = {
   },
 };
 
-export default function TicketTracker({ initialCode = '', initialPhone = '', onQueryChange, onBackToMap }) {
+/**
+ * `side`: khối đặt dưới khung tra cứu ở cột trái (máy tính — "Phiếu của tôi"). Máy tính ≥ 1280 px (bản vẽ desktop khung N10,
+ * N10b): cột trái 380 px dính (tra cứu xếp dọc + `side`), kết quả / không thấy / chưa tra ở bên phải.
+ */
+export default function TicketTracker({ initialCode = '', initialPhone = '', onQueryChange, onBackToMap, side = null }) {
+  const desk = useMediaQuery('(min-width: 1280px)');
   const toast = useStore((s) => s.toast);
   const [code, setCode] = useState(initialCode);
   const [phone, setPhone] = useState(initialPhone);
@@ -95,9 +101,34 @@ export default function TicketTracker({ initialCode = '', initialPhone = '', onQ
   const items = data?.results || [];
   const currentItem = items[selectedIdx] || items[0];
 
-  return (
-    <div className="flex flex-col gap-5">
-      {/* Khung tìm kiếm chính */}
+  const deskForm = (
+    <form onSubmit={handleSearch} className="flex flex-col gap-2.5">
+      <input
+        type="text"
+        value={code}
+        onChange={(e) => setCode(e.target.value)}
+        placeholder="Mã phiếu / mã tra cứu: PA-… hoặc SOS-…"
+        aria-label="Mã phiếu"
+        autoCapitalize="characters"
+        className="input tap h-11 rounded-xl bg-panel font-mono text-sm"
+      />
+      <input
+        type="tel"
+        inputMode="tel"
+        value={phone}
+        onChange={(e) => setPhone(e.target.value)}
+        placeholder="SĐT đã dùng khi gửi (nếu có)"
+        aria-label="Số điện thoại đã dùng khi gửi"
+        autoComplete="tel"
+        className="input tap h-11 rounded-xl bg-panel text-sm"
+      />
+      <button type="submit" disabled={!code.trim() || isLoading} className="btn-primary tap h-11 w-full rounded-xl font-semibold">
+        {isLoading ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <Search size={16} aria-hidden="true" />} Tra cứu
+      </button>
+    </form>
+  );
+
+  const searchCard = (
       <div className="card p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
           <div className="max-w-2xl">
@@ -168,6 +199,10 @@ export default function TicketTracker({ initialCode = '', initialPhone = '', onQ
         </form>
 
       </div>
+  );
+
+  const results = (
+    <>
 
       {/* Vùng hiển thị Kết quả */}
       {isLoading && (
@@ -480,6 +515,49 @@ export default function TicketTracker({ initialCode = '', initialPhone = '', onQ
         </div>
       )}
 
+    </>
+  );
+
+  if (desk) {
+    return (
+      <div className="grid grid-cols-[380px_minmax(0,1fr)] items-start gap-5">
+        <aside className="sheet sticky top-4 flex flex-col gap-3 p-5" aria-label="Tra cứu phiếu">
+          <h2 className="text-[15px] font-bold text-ink">Tra cứu trực tuyến 24/7</h2>
+          <p className="text-[13px] leading-normal text-ink-2">
+            Nhập mã phiếu (dạng <b className="font-mono">SOS-1080</b>, <b className="font-mono">PA-1017</b>) và số điện thoại đã dùng khi
+            gửi, hoặc mã tra cứu được cấp khi gửi (dạng <b className="font-mono">PA-1017-KXMPQR</b>).
+          </p>
+          {deskForm}
+          {side}
+        </aside>
+        <div className="flex min-w-0 flex-col gap-4">
+          {!activeQuery && (
+            <div className="sheet flex min-h-[420px] flex-col items-center justify-center gap-2 p-8 text-center">
+              <Search size={30} className="text-muted" aria-hidden="true" />
+              <b className="text-lg text-ink">Chưa chọn phiếu</b>
+              <p className="max-w-md text-sm text-ink-2">
+                Nhập mã phiếu ở cột trái (đã đăng nhập tài khoản người dân: chọn phiếu trong "Phiếu của tôi") — tiến độ xử lý
+                hiện ở đây, tự đồng bộ mỗi 15 giây.
+              </p>
+            </div>
+          )}
+          {results}
+          {onBackToMap && (
+            <div className="flex justify-end">
+              <BackButton onClick={onBackToMap}>Quay lại Bản đồ & Cảnh báo</BackButton>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      {side}
+      {/* Khung tìm kiếm chính */}
+      {searchCard}
+      {results}
       {onBackToMap && (
         <div className="flex justify-center pt-2">
           <BackButton onClick={onBackToMap}>Quay lại Bản đồ & Cảnh báo</BackButton>
