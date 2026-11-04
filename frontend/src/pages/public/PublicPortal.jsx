@@ -22,7 +22,7 @@ import L from 'leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import MapLegendBox, { PointIcon } from '../../components/map/MapLegendBox';
 import { RainBar } from '../../components/map/MapLegend';
-import { BackButton, Segmented, useEscapeToClose } from '../../components/common/ui';
+import { BackButton, Modal, Segmented, useEscapeToClose } from '../../components/common/ui';
 import ReportForm from './ReportForm';
 import TicketTracker from './TicketTracker';
 import LandslideMonitor, { maxTiltText } from './LandslideMonitor';
@@ -298,15 +298,54 @@ function PublicMap({ data, forecast, geo, me, route, target, layers, basemap = '
   );
 }
 
+// Điện thoại mở bảng chia sẻ; máy tính sao chép liên kết rồi báo
+const shareAlert = async (a, toast) => {
+  const url = `${window.location.origin}/api/v1/public/alerts/${a.code}/share`;
+  try {
+    if (navigator.share) await navigator.share({ title: a.title, text: a.message_body, url });
+    else { await navigator.clipboard.writeText(url); toast({ title: 'Đã sao chép liên kết chia sẻ' }); }
+  } catch { /* người dùng huỷ */ }
+};
+
+/** Chi tiết một cảnh báo (bản vẽ khung N16): mở từ "Xem cảnh báo" hoặc liên kết chia sẻ ?canh-bao=MÃ. */
+function AlertDetail({ a, others, onNearest, onAll, onClose }) {
+  const toast = useStore((s) => s.toast);
+  return (
+    <Modal
+      open
+      size="md"
+      onClose={onClose}
+      title={a.active === false ? 'Cảnh báo đã kết thúc' : 'Cảnh báo đang hiệu lực'}
+      subtitle="Bản tin chỉ đạo đã được duyệt"
+      footer={
+        <>
+          {others > 0 && <button type="button" className="btn-secondary mr-auto" onClick={onAll}>Xem cả {others + 1} cảnh báo</button>}
+          <button type="button" className="btn-secondary" onClick={onClose}>Đóng</button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-3">
+        <p className="text-[13px] text-muted">
+          <span className="font-mono">{a.code}</span> · phát {dateTime(a.issued_at)}
+          {a.active === false ? (a.ended_at ? ` · đã kết thúc lúc ${dateTime(a.ended_at)}` : ' · đã hết hiệu lực') : (a.valid_until ? ` · hiệu lực tới ${dateTime(a.valid_until)}` : '')}
+        </p>
+        <h3 className="text-lg font-bold leading-snug text-ink">{a.title}</h3>
+        <p className="whitespace-pre-line text-[15px] leading-relaxed text-ink">{a.message_body}</p>
+        <dl className="border-t border-line text-sm">
+          <div className="flex gap-3 py-2.5"><dt className="w-24 shrink-0 text-ink-2">Vùng nhận</dt><dd className="min-w-0 flex-1 font-semibold text-ink">{a.areas.join(', ') || 'Toàn tỉnh'}</dd></div>
+        </dl>
+        <div className="flex flex-wrap gap-2">
+          {a.active !== false && <button type="button" className="btn-primary tap h-11 rounded-xl px-4" onClick={onNearest}><LocateFixed size={15} aria-hidden="true" /> Xem điểm sơ tán gần tôi</button>}
+          <button type="button" className="btn-secondary tap h-11 rounded-xl px-4" onClick={() => shareAlert(a, toast)}><Share2 size={15} aria-hidden="true" /> Chia sẻ cảnh báo</button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 function AlertCard({ a, highlight }) {
   const toast = useStore((s) => s.toast);
-  const share = async () => {
-    const url = `${window.location.origin}/api/v1/public/alerts/${a.code}/share`;
-    try {
-      if (navigator.share) await navigator.share({ title: a.title, text: a.message_body, url });
-      else { await navigator.clipboard.writeText(url); toast({ title: 'Đã sao chép liên kết chia sẻ' }); }
-    } catch { /* người dùng huỷ */ }
-  };
+  const share = () => shareAlert(a, toast);
   return (
     <div id={`canh-bao-${a.code}`} className={clsx('card p-3.5 border-l-4 transition hover:shadow-md', a.active === false ? 'border-l-line opacity-75' : SEV[a.severity] || SEV.vang, highlight && 'ring-2 ring-accent')}>
       <div className="flex items-start gap-2.5">
@@ -345,6 +384,7 @@ export default function PublicPortal() {
   const tabParam = ({ hochua: 'muanuoc' })[params.get('tab')] || params.get('tab') || '';
   const [activeTab, setActiveTab] = useState(tabParam || (trackParam ? 'tracuu' : 'bando')); // bando | tracuu | muanuoc | sotan | hotlines | huongdan
   const [mapSidebarTab, setMapSidebarTab] = useState(focusAlert ? 'alerts' : 'legend'); // legend | alerts | rain
+  const [alertCode, setAlertCode] = useState(focusAlert || null); // máy tính: cảnh báo đang mở trong hộp (khung N16)
   const scrolledToAlert = useRef(false);
   // Cuộn tới thanh tab (ngay trên bản đồ / nội dung tab) — theo phần tử, không theo số pixel cố định: khối phía trên
   // (kết quả định vị, chú thích ký hiệu) cao thấp khác nhau
@@ -405,6 +445,7 @@ export default function PublicPortal() {
   const handleSelectCommune = (code) => {
     const u = units.find((x) => x.code === code);
     if (!u) return;
+    if (desk) setActiveTab('bando');
     setSelectedCommuneCode(code);
     setMe({ lat: u.lat, lon: u.lon, name: u.name, accuracy: 100, isManual: true });
     setTarget({ lat: u.lat, lon: u.lon, zoom: 13.5 });
@@ -474,6 +515,7 @@ export default function PublicPortal() {
   }, [locating, locErr]);
 
   const locate = () => {
+    if (desk) setActiveTab('bando');
     setLocErr('');
     setSelectedCommuneCode('');
     if (!navigator.geolocation) {
@@ -541,6 +583,246 @@ export default function PublicPortal() {
   const riversAbove = (overview?.rivers || []).filter((r) => r.level >= 1).length;
   // Chưa có số liệu tình hình (đang tải / máy chủ lỗi): KHÔNG được hiện "không có cảnh báo" — người dân đọc thành "an toàn"
   const statusUnknown = !overview;
+
+  const hasResult = !!(locating || locErr || here);
+  const resultBlock = (stacked) => hasResult && (
+          <section ref={resultsRef} aria-label="Tôi đang ở đâu? Có an toàn không?" className={clsx('card relative scroll-mt-20 p-4', stacked ? 'min-h-0 overflow-y-auto' : 'border-accent/40 bg-panel2/60')}>
+            {stacked && <h2 className="mb-2.5 pr-[7.5rem] text-[17px] font-bold leading-snug text-ink">Tôi đang ở đâu? Có an toàn không?</h2>}
+            <button
+              type="button"
+              onClick={() => { setMe(null); setLocErr(''); setRoute(null); setSelectedCommuneCode(''); }}
+              className="absolute top-3 right-3 px-2.5 py-1 rounded-lg text-xs font-semibold text-muted hover:text-danger hover:bg-danger/10 border border-line bg-panel shadow-xs transition-colors z-10 flex items-center gap-1 cursor-pointer"
+              title="Đóng kết quả tra cứu vị trí"
+            >
+              <X size={14} />
+              <span>Đóng tra cứu</span>
+            </button>
+            {locating && (
+              <div className="flex items-center gap-2 py-3 text-sm text-accent">
+                <Loader2 size={18} className="animate-spin" />
+                <span>Đang kết nối GPS định vị và phân tích nguy cơ thiên tai tại toạ độ của bạn…</span>
+              </div>
+            )}
+            {locErr && (
+              <div className="py-2 space-y-3">
+                <div className="flex items-center gap-2 text-sm text-danger">
+                  <AlertTriangle size={18} className="shrink-0" />
+                  <span>{locErr}</span>
+                </div>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 bg-panel p-3 rounded-xl border border-line">
+                  <label className="text-xs font-semibold text-ink whitespace-nowrap">
+                    Chọn Xã/Phường tra cứu trực tiếp:
+                  </label>
+                  <select
+                    className="select text-xs py-2 px-3 flex-1 bg-panel2 border border-line rounded-lg text-ink"
+                    value={selectedCommuneCode}
+                    onChange={(e) => handleSelectCommune(e.target.value)}
+                  >
+                    <option value="">-- Danh sách 56 Xã/Phường tỉnh Cao Bằng --</option>
+                    {sortedUnits.map((u) => (
+                      <option key={u.code} value={u.code}>
+                        {u.unit_type === 'phuong' ? 'Phường' : 'Xã'} {u.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+            {here && (() => {
+              const R = RISK[here.risk] || RISK.thap;
+              const RIcon = R.icon;
+              return (
+                // [&>*]:min-w-0: cột co được — tên điểm sơ tán dài + số điện thoại + "Chỉ đường" từng đẩy khung rộng 456 px trên
+                // màn 412 px → trang bị thu nhỏ, khối cảnh báo đè lên nút "Chỉ đường" (không bấm được trên điện thoại)
+                <div className={clsx('items-start [&>*]:min-w-0', stacked ? 'flex flex-col gap-4 [&>*]:w-full' : 'grid gap-4 md:grid-cols-[1.1fr_1.3fr]')}>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={clsx('chip px-3 py-1 text-xs font-bold', R.cls)}>
+                        <RIcon size={14} /> {R.label}
+                      </span>
+                      <b className="text-base text-ink">
+                        {units.find((u) => u.code === here.commune.code)?.unit_type === 'phuong' ? 'Phường' : 'Xã'} {here.commune.name}
+                      </b>
+                      {me?.isManual && (
+                        <span className="chip px-2 py-0.5 text-[11px] bg-accent/10 text-accent border border-accent/30 font-medium">
+                          Đã chọn thủ công
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Hộp chuyển nhanh xã khác hoặc định vị lại */}
+                    <div className="flex items-center gap-2 pt-1 flex-wrap">
+                      <span className="text-[11px] text-muted whitespace-nowrap">Xem xã khác:</span>
+                      <select
+                        className="select text-xs py-1 px-2.5 bg-panel border border-line rounded-lg text-ink max-w-[220px]"
+                        value={selectedCommuneCode}
+                        onChange={(e) => handleSelectCommune(e.target.value)}
+                      >
+                        <option value="">-- Đổi xã/phường khác --</option>
+                        {sortedUnits.map((u) => (
+                          <option key={u.code} value={u.code}>
+                            {u.unit_type === 'phuong' ? 'Phường' : 'Xã'} {u.name}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={locate}
+                        title="Bấm để định vị lại bằng GPS"
+                        className="text-xs text-accent hover:underline flex items-center gap-1 shrink-0 ml-auto"
+                      >
+                        <LocateFixed size={13} /> GPS
+                      </button>
+                    </div>
+
+                    <p className="text-sm text-ink-2 bg-panel p-3 rounded-xl border border-line leading-relaxed">
+                      {here.advice || R.tip}
+                    </p>
+
+                    <div className="text-xs text-muted flex items-center gap-2">
+                      <CloudRain size={14} className="text-accent" />
+                      <span>Mưa dự báo 24 giờ tới: <b className="text-ink font-mono">{here.forecast_24h?.p50 ?? '–'} mm</b> (có thể lên tới {here.forecast_24h?.p90 ?? '–'} mm)</span>
+                    </div>
+
+                    {here.hazards.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        <div className="text-xs font-semibold text-danger">Cảnh báo điểm nguy cơ gần bạn:</div>
+                        {here.hazards.slice(0, 3).map((h) => (
+                          <div key={h.name} className="text-xs text-ink-2 flex items-center gap-1.5 bg-danger/10 px-2 py-1 rounded-lg">
+                            <AlertTriangle size={12} className="text-danger shrink-0" />
+                            <span>{h.name} — <b>{h.distance_m === 0 ? 'Bạn đang ở trong vùng này' : `cách ${h.distance_m} m`}</b></span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <div className="mb-2 text-xs font-semibold text-muted flex items-center gap-1.5">
+                      <Home size={14} className="text-good" />
+                      <span>Điểm sơ tán an toàn gần nhất còn chỗ trống</span>
+                    </div>
+
+                    <div className="space-y-2">
+                      {here.evacuation_sites.map((s) => (
+                        <div key={s.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-xl border border-line bg-panel p-3 shadow-sm hover:border-good transition-colors">
+                          <div className="min-w-0 grow basis-48">
+                            <div className="font-semibold text-sm text-ink truncate">{s.name}</div>
+                            <div className="text-xs text-muted flex flex-wrap items-center gap-x-2 mt-0.5">
+                              <span>Khoảng cách: <b className="font-mono text-ink">{s.distance_km} km</b></span>
+                              <span>·</span>
+                              <span>Còn <b className="text-good font-mono">{s.capacity - s.current_occupancy}</b>/{s.capacity} chỗ</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+                            {s.hotline && (
+                              <a
+                                href={`tel:${s.hotline.replace(/\s+/g, '')}`}
+                                className="btn-ghost text-xs px-2.5 py-1.5 text-good border border-good/40 bg-good/10 hover:bg-good/20 font-semibold flex items-center gap-1"
+                                title={`Gọi số trực điểm sơ tán: ${s.hotline}`}
+                              >
+                                <PhoneCall size={13} />
+                                <span>{s.hotline}</span>
+                              </a>
+                            )}
+                            <button
+                              className="btn-ghost text-xs px-3 py-1.5 text-accent border-accent/40 bg-accent/5 hover:bg-accent/15"
+                              onClick={() => directions(s)}
+                            >
+                              <Navigation size={13} /> Chỉ đường
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      {!here.evacuation_sites.length && (
+                        <div className="text-xs text-muted p-3 text-center bg-panel rounded-xl">
+                          Chưa có điểm sơ tán tập trung được ghi nhận gần vị trí này. Vui lòng liên hệ Trực ban xã/phường để được hướng dẫn.
+                        </div>
+                      )}
+                    </div>
+
+                    {route && (
+                      <div className={`mt-3 p-3 rounded-xl bg-panel border border-accent/40 text-xs flex flex-col ${stacked ? '' : 'sm:flex-row '}sm:items-center justify-between gap-2.5 shadow-xs`}>
+                        <div className="flex items-center gap-2">
+                          <Compass size={16} className="text-accent shrink-0" />
+                          <div>
+                            {!route.roads?.length ? (
+                              // Chưa có mạng đường chính thức: không có "lộ trình", không ước thời gian di chuyển
+                              <>
+                                Khoảng cách chim bay: <b>{route.distance_km} km</b>.{' '}
+                                <span className="font-bold text-warn">
+                                  Chưa có dữ liệu đường tại khu vực này — nét đứt chỉ là hướng chim bay, không phải đường đi. Hãy đi theo chỉ dẫn của cán bộ địa phương.
+                                </span>
+                                {route.hazards?.length > 0 && (
+                                  <span className="block font-bold text-danger">
+                                    Hướng này cắt qua vùng nguy cơ: {route.hazards.join(', ')} — hết sức cẩn thận, hỏi cán bộ địa phương hoặc gọi 112
+                                  </span>
+                                )}
+                              </>
+                            ) : (
+                              <>Lộ trình sơ tán: <b>{route.distance_km} km</b> (~{route.duration_min} phút di chuyển). Trạng thái:{' '}</>
+                            )}
+                            {!route.roads?.length ? null : route.safe ? (
+                              // Chỉ khẳng định điều hệ thống biết: không cắt vùng nguy hiểm ĐÃ GHI NHẬN (không phải "an toàn")
+                              <span className="font-bold text-good">Không đi qua vùng nguy hiểm đã được ghi nhận</span>
+                            ) : (
+                              <span className="font-bold text-danger">
+                                Tuyến đi qua vùng nguy cơ{route.hazards?.length ? `: ${route.hazards.join(', ')}` : ''} — hết sức cẩn thận, hỏi cán bộ địa phương hoặc gọi 112
+                              </span>
+                            )}
+                            {route.roads?.length > 0 && route.offroad_km >= 0.5 && (
+                              <span className="block text-warn">
+                                Có khoảng {route.offroad_km} km chưa có dữ liệu đường (đoạn nối tới / từ đường chính) — tự quan sát khi di chuyển, không đi qua suối, ngầm tràn đang ngập.
+                              </span>
+                            )}
+                            {/* Trạm mực nước vượt báo động / mất tín hiệu, điểm nguy hiểm, mưa rất to quanh tuyến */}
+                            {route.warnings?.length > 0 && (
+                              <ul className="mt-1 list-inside list-disc text-warn">
+                                {route.warnings.map((w) => <li key={w}>{w}</li>)}
+                              </ul>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveTab('bando');
+                              scrollToContent();
+                            }}
+                            className="btn-ghost text-xs px-2.5 py-1 text-accent border border-accent/40 bg-accent/5 hover:bg-accent/15 rounded-lg flex items-center gap-1 cursor-pointer font-medium"
+                          >
+                            <Navigation size={13} /> Xem bản đồ
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setRoute(null)}
+                            className="btn-ghost text-xs px-2.5 py-1 text-danger border border-danger/40 bg-danger/5 hover:bg-danger/15 rounded-lg flex items-center gap-1 font-semibold cursor-pointer"
+                            title="Tắt hiển thị đường đi trên bản đồ"
+                          >
+                            <X size={13} /> Tắt đường đi
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Thanh chân trang đóng tra cứu — bản cột trái đã có nút đóng ở góc */}
+            <div className={stacked ? 'hidden' : undefined}><div className="mt-4 pt-3 border-t border-line/60 flex flex-wrap items-center justify-between gap-2 text-xs">
+              <span className="text-muted">Đang xem phân tích vị trí{here?.commune?.name ? `: ${here.commune.name}` : ''}.</span>
+              <button
+                type="button"
+                onClick={() => { setMe(null); setLocErr(''); setRoute(null); setSelectedCommuneCode(''); }}
+                className="px-3 py-1.5 rounded-lg bg-panel hover:bg-danger/10 text-muted hover:text-danger border border-line font-medium transition-colors flex items-center gap-1.5 cursor-pointer ml-auto"
+              >
+                <X size={14} /> Thoát tra cứu vị trí & trở về mặc định
+              </button>
+            </div></div>
+          </section>
+  );
 
   return (
     <div className="min-h-full bg-bg text-ink pb-20 sm:pb-8">
@@ -731,7 +1013,7 @@ export default function PublicPortal() {
               {active > 0 && (
                 <button
                   type="button"
-                  onClick={() => { setActiveTab('bando'); setMapSidebarTab('alerts'); scrollToContent(); }}
+                  onClick={() => { setActiveTab('bando'); setMapSidebarTab('alerts'); scrollToContent(); if (desk && activeAlerts[0]) setAlertCode(activeAlerts[0].code); }}
                   className={clsx('btn px-3 py-1.5 text-xs font-semibold', onRed ? 'border border-white/60 text-white hover:bg-white/10' : 'border border-black/40 text-black hover:bg-black/5')}
                 >
                   Xem cảnh báo <ChevronRight size={14} aria-hidden="true" />
@@ -765,244 +1047,18 @@ export default function PublicPortal() {
           )}
         </section>
 
-        {/* Khối hiển thị kết quả Định vị khi người dân bấm kiểm tra */}
-        {(locating || locErr || here) && (
-          <section ref={resultsRef} className="card relative scroll-mt-20 border-accent/40 bg-panel2/60 p-4">
-            <button
-              type="button"
-              onClick={() => { setMe(null); setLocErr(''); setRoute(null); setSelectedCommuneCode(''); }}
-              className="absolute top-3 right-3 px-2.5 py-1 rounded-lg text-xs font-semibold text-muted hover:text-danger hover:bg-danger/10 border border-line bg-panel shadow-xs transition-colors z-10 flex items-center gap-1 cursor-pointer"
-              title="Đóng kết quả tra cứu vị trí"
-            >
-              <X size={14} />
-              <span>Đóng tra cứu</span>
-            </button>
-            {locating && (
-              <div className="flex items-center gap-2 py-3 text-sm text-accent">
-                <Loader2 size={18} className="animate-spin" />
-                <span>Đang kết nối GPS định vị và phân tích nguy cơ thiên tai tại toạ độ của bạn…</span>
-              </div>
-            )}
-            {locErr && (
-              <div className="py-2 space-y-3">
-                <div className="flex items-center gap-2 text-sm text-danger">
-                  <AlertTriangle size={18} className="shrink-0" />
-                  <span>{locErr}</span>
-                </div>
-                <div className="flex flex-col sm:flex-row sm:items-center gap-2 bg-panel p-3 rounded-xl border border-line">
-                  <label className="text-xs font-semibold text-ink whitespace-nowrap">
-                    Chọn Xã/Phường tra cứu trực tiếp:
-                  </label>
-                  <select
-                    className="select text-xs py-2 px-3 flex-1 bg-panel2 border border-line rounded-lg text-ink"
-                    value={selectedCommuneCode}
-                    onChange={(e) => handleSelectCommune(e.target.value)}
-                  >
-                    <option value="">-- Danh sách 56 Xã/Phường tỉnh Cao Bằng --</option>
-                    {sortedUnits.map((u) => (
-                      <option key={u.code} value={u.code}>
-                        {u.unit_type === 'phuong' ? 'Phường' : 'Xã'} {u.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            )}
-            {here && (() => {
-              const R = RISK[here.risk] || RISK.thap;
-              const RIcon = R.icon;
-              return (
-                // [&>*]:min-w-0: cột co được — tên điểm sơ tán dài + số điện thoại + "Chỉ đường" từng đẩy khung rộng 456 px trên
-                // màn 412 px → trang bị thu nhỏ, khối cảnh báo đè lên nút "Chỉ đường" (không bấm được trên điện thoại)
-                <div className="grid gap-4 md:grid-cols-[1.1fr_1.3fr] items-start [&>*]:min-w-0">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className={clsx('chip px-3 py-1 text-xs font-bold', R.cls)}>
-                        <RIcon size={14} /> {R.label}
-                      </span>
-                      <b className="text-base text-ink">
-                        {units.find((u) => u.code === here.commune.code)?.unit_type === 'phuong' ? 'Phường' : 'Xã'} {here.commune.name}
-                      </b>
-                      {me?.isManual && (
-                        <span className="chip px-2 py-0.5 text-[11px] bg-accent/10 text-accent border border-accent/30 font-medium">
-                          Đã chọn thủ công
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Hộp chuyển nhanh xã khác hoặc định vị lại */}
-                    <div className="flex items-center gap-2 pt-1 flex-wrap">
-                      <span className="text-[11px] text-muted whitespace-nowrap">Xem xã khác:</span>
-                      <select
-                        className="select text-xs py-1 px-2.5 bg-panel border border-line rounded-lg text-ink max-w-[220px]"
-                        value={selectedCommuneCode}
-                        onChange={(e) => handleSelectCommune(e.target.value)}
-                      >
-                        <option value="">-- Đổi xã/phường khác --</option>
-                        {sortedUnits.map((u) => (
-                          <option key={u.code} value={u.code}>
-                            {u.unit_type === 'phuong' ? 'Phường' : 'Xã'} {u.name}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        type="button"
-                        onClick={locate}
-                        title="Bấm để định vị lại bằng GPS"
-                        className="text-xs text-accent hover:underline flex items-center gap-1 shrink-0 ml-auto"
-                      >
-                        <LocateFixed size={13} /> GPS
-                      </button>
-                    </div>
-
-                    <p className="text-sm text-ink-2 bg-panel p-3 rounded-xl border border-line leading-relaxed">
-                      {here.advice || R.tip}
-                    </p>
-
-                    <div className="text-xs text-muted flex items-center gap-2">
-                      <CloudRain size={14} className="text-accent" />
-                      <span>Mưa dự báo 24 giờ tới: <b className="text-ink font-mono">{here.forecast_24h?.p50 ?? '–'} mm</b> (có thể lên tới {here.forecast_24h?.p90 ?? '–'} mm)</span>
-                    </div>
-
-                    {here.hazards.length > 0 && (
-                      <div className="mt-2 space-y-1">
-                        <div className="text-xs font-semibold text-danger">Cảnh báo điểm nguy cơ gần bạn:</div>
-                        {here.hazards.slice(0, 3).map((h) => (
-                          <div key={h.name} className="text-xs text-ink-2 flex items-center gap-1.5 bg-danger/10 px-2 py-1 rounded-lg">
-                            <AlertTriangle size={12} className="text-danger shrink-0" />
-                            <span>{h.name} — <b>{h.distance_m === 0 ? 'Bạn đang ở trong vùng này' : `cách ${h.distance_m} m`}</b></span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <div className="mb-2 text-xs font-semibold text-muted flex items-center gap-1.5">
-                      <Home size={14} className="text-good" />
-                      <span>Điểm sơ tán an toàn gần nhất còn chỗ trống</span>
-                    </div>
-
-                    <div className="space-y-2">
-                      {here.evacuation_sites.map((s) => (
-                        <div key={s.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-xl border border-line bg-panel p-3 shadow-sm hover:border-good transition-colors">
-                          <div className="min-w-0 grow basis-48">
-                            <div className="font-semibold text-sm text-ink truncate">{s.name}</div>
-                            <div className="text-xs text-muted flex flex-wrap items-center gap-x-2 mt-0.5">
-                              <span>Khoảng cách: <b className="font-mono text-ink">{s.distance_km} km</b></span>
-                              <span>·</span>
-                              <span>Còn <b className="text-good font-mono">{s.capacity - s.current_occupancy}</b>/{s.capacity} chỗ</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1.5 shrink-0 ml-auto">
-                            {s.hotline && (
-                              <a
-                                href={`tel:${s.hotline.replace(/\s+/g, '')}`}
-                                className="btn-ghost text-xs px-2.5 py-1.5 text-good border border-good/40 bg-good/10 hover:bg-good/20 font-semibold flex items-center gap-1"
-                                title={`Gọi số trực điểm sơ tán: ${s.hotline}`}
-                              >
-                                <PhoneCall size={13} />
-                                <span>{s.hotline}</span>
-                              </a>
-                            )}
-                            <button
-                              className="btn-ghost text-xs px-3 py-1.5 text-accent border-accent/40 bg-accent/5 hover:bg-accent/15"
-                              onClick={() => directions(s)}
-                            >
-                              <Navigation size={13} /> Chỉ đường
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                      {!here.evacuation_sites.length && (
-                        <div className="text-xs text-muted p-3 text-center bg-panel rounded-xl">
-                          Chưa có điểm sơ tán tập trung được ghi nhận gần vị trí này. Vui lòng liên hệ Trực ban xã/phường để được hướng dẫn.
-                        </div>
-                      )}
-                    </div>
-
-                    {route && (
-                      <div className="mt-3 p-3 rounded-xl bg-panel border border-accent/40 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-xs">
-                        <div className="flex items-center gap-2">
-                          <Compass size={16} className="text-accent shrink-0" />
-                          <div>
-                            {!route.roads?.length ? (
-                              // Chưa có mạng đường chính thức: không có "lộ trình", không ước thời gian di chuyển
-                              <>
-                                Khoảng cách chim bay: <b>{route.distance_km} km</b>.{' '}
-                                <span className="font-bold text-warn">
-                                  Chưa có dữ liệu đường tại khu vực này — nét đứt chỉ là hướng chim bay, không phải đường đi. Hãy đi theo chỉ dẫn của cán bộ địa phương.
-                                </span>
-                                {route.hazards?.length > 0 && (
-                                  <span className="block font-bold text-danger">
-                                    Hướng này cắt qua vùng nguy cơ: {route.hazards.join(', ')} — hết sức cẩn thận, hỏi cán bộ địa phương hoặc gọi 112
-                                  </span>
-                                )}
-                              </>
-                            ) : (
-                              <>Lộ trình sơ tán: <b>{route.distance_km} km</b> (~{route.duration_min} phút di chuyển). Trạng thái:{' '}</>
-                            )}
-                            {!route.roads?.length ? null : route.safe ? (
-                              // Chỉ khẳng định điều hệ thống biết: không cắt vùng nguy hiểm ĐÃ GHI NHẬN (không phải "an toàn")
-                              <span className="font-bold text-good">Không đi qua vùng nguy hiểm đã được ghi nhận</span>
-                            ) : (
-                              <span className="font-bold text-danger">
-                                Tuyến đi qua vùng nguy cơ{route.hazards?.length ? `: ${route.hazards.join(', ')}` : ''} — hết sức cẩn thận, hỏi cán bộ địa phương hoặc gọi 112
-                              </span>
-                            )}
-                            {route.roads?.length > 0 && route.offroad_km >= 0.5 && (
-                              <span className="block text-warn">
-                                Có khoảng {route.offroad_km} km chưa có dữ liệu đường (đoạn nối tới / từ đường chính) — tự quan sát khi di chuyển, không đi qua suối, ngầm tràn đang ngập.
-                              </span>
-                            )}
-                            {/* Trạm mực nước vượt báo động / mất tín hiệu, điểm nguy hiểm, mưa rất to quanh tuyến */}
-                            {route.warnings?.length > 0 && (
-                              <ul className="mt-1 list-inside list-disc text-warn">
-                                {route.warnings.map((w) => <li key={w}>{w}</li>)}
-                              </ul>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setActiveTab('bando');
-                              scrollToContent();
-                            }}
-                            className="btn-ghost text-xs px-2.5 py-1 text-accent border border-accent/40 bg-accent/5 hover:bg-accent/15 rounded-lg flex items-center gap-1 cursor-pointer font-medium"
-                          >
-                            <Navigation size={13} /> Xem bản đồ
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setRoute(null)}
-                            className="btn-ghost text-xs px-2.5 py-1 text-danger border border-danger/40 bg-danger/5 hover:bg-danger/15 rounded-lg flex items-center gap-1 font-semibold cursor-pointer"
-                            title="Tắt hiển thị đường đi trên bản đồ"
-                          >
-                            <X size={13} /> Tắt đường đi
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* Thanh chân trang đóng tra cứu */}
-            <div className="mt-4 pt-3 border-t border-line/60 flex flex-wrap items-center justify-between gap-2 text-xs">
-              <span className="text-muted">Đang xem phân tích vị trí{here?.commune?.name ? `: ${here.commune.name}` : ''}.</span>
-              <button
-                type="button"
-                onClick={() => { setMe(null); setLocErr(''); setRoute(null); setSelectedCommuneCode(''); }}
-                className="px-3 py-1.5 rounded-lg bg-panel hover:bg-danger/10 text-muted hover:text-danger border border-line font-medium transition-colors flex items-center gap-1.5 cursor-pointer ml-auto"
-              >
-                <X size={14} /> Thoát tra cứu vị trí & trở về mặc định
-              </button>
-            </div>
-          </section>
+        {desk && alertCode && alerts.find((a) => a.code === alertCode) && (
+          <AlertDetail
+            a={alerts.find((a) => a.code === alertCode)}
+            others={activeAlerts.filter((a) => a.code !== alertCode).length}
+            onClose={() => setAlertCode(null)}
+            onAll={() => { setAlertCode(null); setActiveTab('bando'); setMapSidebarTab('alerts'); setMe(null); setLocErr(''); }}
+            onNearest={() => { setAlertCode(null); locate(); }}
+          />
         )}
+
+        {/* Khối kết quả định vị: máy tính ≥ 1280 px nằm trong cột trái cạnh bản đồ (khung N2) */}
+        {!desk && resultBlock(false)}
 
         {/* Menu 5 nhóm (máy tính, máy tính bảng — điện thoại dùng menu ≡) + hàng trang con của nhóm có 2 màn. Neo cuộn tới
             nội dung (scrollToContent) */}
@@ -1075,9 +1131,10 @@ export default function PublicPortal() {
           <div className="space-y-4">
             {/* Khung Bản đồ & Bảng tác chiến. Điện thoại: 2 khung xếp chồng, mỗi khung cao riêng — chung 1 lưới cao cố định thì
                 bảng bên phải chiếm hết chiều cao, bản đồ còn 0px. Máy tính (lg): 2 cột cao 700px */}
-            <div className={clsx('grid grid-cols-1 items-stretch gap-4 lg:h-[calc(100vh-17rem)] lg:min-h-[520px]', desk ? 'grid-cols-[300px_minmax(0,1fr)_380px]' : 'lg:grid-cols-[1fr_390px]')}>
+            <div className={clsx('grid grid-cols-1 items-stretch gap-4 lg:h-[calc(100vh-17rem)] lg:min-h-[520px]', desk ? (hasResult ? 'grid-cols-[440px_minmax(0,1fr)]' : 'grid-cols-[300px_minmax(0,1fr)_380px]') : 'lg:grid-cols-[1fr_390px]')}>
               {/* Máy tính ≥ 1280 px: cột trái "Bạn muốn làm gì?" + cứu nạn khẩn cấp (bản vẽ khung N1) */}
-              {desk && (
+              {desk && resultBlock(true)}
+              {desk && !hasResult && (
                 <aside className="card flex min-h-0 flex-col gap-2 overflow-y-auto p-3">
                   <nav aria-label="Bạn muốn làm gì?">
                     <div className="px-2 pb-1 text-sm font-bold text-ink">Bạn muốn làm gì?</div>
@@ -1298,7 +1355,7 @@ export default function PublicPortal() {
               )}
 
               {/* Cột Bên Phải: Bảng điều hành đa năng 3 trong 1 */}
-              <section className="card flex h-[480px] flex-col overflow-hidden sm:h-[560px] lg:h-full">
+              <section className={clsx('card flex h-[480px] flex-col overflow-hidden sm:h-[560px] lg:h-full', desk && hasResult && 'hidden')}>
                 {/* Header Tab chuyển đổi tinh gọn */}
                 <div className="flex items-center border-b border-line bg-panel2/70 p-1.5 gap-1 shrink-0">
                   <button
@@ -1404,12 +1461,12 @@ export default function PublicPortal() {
                       )}
                       {alertsLoaded && !alerts.length && (
                         <div className="py-12 px-4 text-center">
-                          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-good/15 text-good mx-auto mb-3">
-                            <CheckCircle2 size={24} />
+                          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-panel2 text-muted mx-auto mb-3">
+                            <Megaphone size={24} />
                           </div>
-                          <div className="font-bold text-sm text-ink">Tình hình an toàn</div>
+                          <div className="font-bold text-sm text-ink">Chưa có bản tin cảnh báo</div>
                           <div className="text-xs text-muted mt-1 leading-relaxed max-w-xs mx-auto">
-                            Không có bản tin cảnh báo khẩn cấp nào trong 7 ngày qua trên địa bàn tỉnh Cao Bằng.
+                            Không có bản tin cảnh báo khẩn cấp nào trong 7 ngày qua trên địa bàn tỉnh Cao Bằng. Khi mưa lớn vẫn cần chú ý nơi sườn dốc, ven suối.
                           </div>
                         </div>
                       )}
