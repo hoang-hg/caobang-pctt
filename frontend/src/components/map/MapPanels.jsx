@@ -836,7 +836,7 @@ export const toolList = (canIncident) => [
 const TOOL_NAME = { measure: 'Thước đo', route: 'Dò đường an toàn', incident: 'Đánh dấu sự cố' };
 
 /** Hướng dẫn công cụ đang dùng (và kết quả dò đường: đang tìm / lỗi + thử lại / lộ trình — RouteTool). */
-export function ToolHint({ tool, routeInfo, onClose, className }) {
+export function ToolHint({ tool, routeInfo, routeDest, onClose, className }) {
   return (
     <div className={clsx('float-panel border-accent/40 px-3.5 py-2 text-xs', className)} role="status">
       <div className="mb-1 flex items-center justify-between gap-2 font-semibold text-accent">
@@ -873,7 +873,7 @@ export function ToolHint({ tool, routeInfo, onClose, className }) {
           {routeInfo.warnings?.map((w) => <span key={w} className="block text-warn">⚠ {w}</span>)}
         </span>
       ) : (
-        'Chạm chọn điểm A (vị trí lực lượng) rồi điểm B (nơi cần cứu hộ).'
+        routeDest ? `Chạm chọn điểm A (vị trí lực lượng) — điểm B là ${routeDest.label}.` : 'Chạm chọn điểm A (vị trí lực lượng) rồi điểm B (nơi cần cứu hộ).'
       ))}
       {(tool === 'polygon' || tool === 'circle') && 'Vẽ vùng nguy cơ: hệ thống tự động đếm số hộ dân và chuẩn bị cảnh báo sơ tán.'}
       {tool === 'incident' && 'Chạm vào vị trí sự cố trên bản đồ để đánh dấu (hiện ngay trên cổng công khai).'}

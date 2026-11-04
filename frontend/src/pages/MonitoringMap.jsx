@@ -156,6 +156,7 @@ export default function MonitoringMap() {
   const [issue, setIssue] = useState(null);
   const [drawn, setDrawn] = useState(null);
   const [routeInfo, setRouteInfo] = useState(null);
+  const [routeDest, setRouteDest] = useState(null); // điểm B chọn sẵn khi Tìm đường từ popup phiếu SOS
   const [incident, setIncident] = useState(null); // { lat, lon, report? } → form đánh dấu sự cố
   const [stormForm, setStormForm] = useState(false);
   const [occupancy, setOccupancy] = useState(null); // điểm sơ tán đang cập nhật số người
@@ -274,6 +275,7 @@ export default function MonitoringMap() {
   }, [drawn, unitsGeo]);
 
   const toggleTool = (t) => {
+    setRouteDest(null);
     setTool((cur) => (cur === t ? null : t));
     setRouteInfo(null);
     setSheet(null);
@@ -538,13 +540,14 @@ export default function MonitoringMap() {
             onCamera={setCamera}
             onIssue={setIssue}
             onIncident={setIncident}
+            onRoute={(dest) => { setRouteDest(dest); setRouteInfo(null); setTool('route'); }}
             onOccupancy={setOccupancy}
           />
           <PickPoint active={tool === 'incident'} onPick={(pt) => { setTool(null); setIncident(pt); }} />
           <FocusHandler padding={mapPad} />
           <DrawTool mode={tool === 'polygon' || tool === 'circle' ? tool : null} onDrawn={onDrawn} />
           <MeasureTool active={tool === 'measure'} />
-          <RouteTool active={tool === 'route'} onResult={setRouteInfo} />
+          <RouteTool active={tool === 'route'} onResult={setRouteInfo} dest={routeDest} />
         </MapContainer>
 
         {wide ? (
@@ -789,7 +792,7 @@ export default function MonitoringMap() {
                     </button>
                   </div>
                 )}
-                {tool && <ToolHint tool={tool} routeInfo={routeInfo} onClose={() => setTool(null)} className="max-w-xs" />}
+                {tool && <ToolHint tool={tool} routeInfo={routeInfo} routeDest={routeDest} onClose={() => setTool(null)} className="max-w-xs" />}
                 {drawnCard}
               </div>
               <div className="pointer-events-auto flex h-full items-start">
@@ -895,7 +898,7 @@ export default function MonitoringMap() {
                   </button>
                 </div>
               )}
-              {tool && <ToolHint tool={tool} routeInfo={routeInfo} onClose={() => setTool(null)} className="pointer-events-auto w-full" />}
+              {tool && <ToolHint tool={tool} routeInfo={routeInfo} routeDest={routeDest} onClose={() => setTool(null)} className="pointer-events-auto w-full" />}
               {drawnCard}
             </div>
 
