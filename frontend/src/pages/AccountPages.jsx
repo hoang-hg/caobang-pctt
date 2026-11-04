@@ -6,6 +6,8 @@ import { api } from '../api/client';
 import { useStore } from '../app/store';
 import { Modal } from '../components/common/ui';
 import { BrandLockup } from '../components/layout/BrandMark';
+import AuthAside from '../components/layout/AuthAside';
+import { useMediaQuery } from '../utils/useMediaQuery';
 
 export const PASSWORD_HINT = 'Tối thiểu 8 ký tự, gồm cả chữ và số';
 export const weakPassword = (p) => p.length < 8 || !/\d/.test(p) || !/[A-Za-zÀ-ỹ]/.test(p);
@@ -13,6 +15,32 @@ export const weakPassword = (p) => p.length < 8 || !/\d/.test(p) || !/[A-Za-zÀ-
 /** Khung chung các trang tài khoản (đổi mật khẩu lần đầu, quên / đặt lại mật khẩu): dải xanh đêm có biểu trưng như trang
  * Đăng nhập trên điện thoại, thẻ nội dung đè lên mép dưới dải (màu chuyển chỉ trong khối có data-mau-chuyen). */
 function Shell({ title, children, footer }) {
+  // Máy tính ≥ 1024 px (bản vẽ khung L4, L5, L8): cùng bố cục trang Đăng nhập — cột trái xanh đêm, thẻ giữa cột phải
+  const wide = useMediaQuery('(min-width: 1024px)');
+  const foot = (
+    <div className="mt-4 flex justify-between text-sm">
+      {footer || (
+        <>
+          <Link to="/dang-nhap" className="tap text-accent hover:underline">‹ Quay lại đăng nhập</Link>
+          <Link to="/" className="tap text-muted hover:underline">Cổng thông tin công khai</Link>
+        </>
+      )}
+    </div>
+  );
+  if (wide) {
+    return (
+      <div className="flex min-h-full bg-bg">
+        <AuthAside />
+        <main className="flex flex-1 items-center justify-center px-8 py-8">
+          <div className="card h-fit w-full max-w-[440px] rounded-[18px] p-8">
+            <h2 className="mb-4 text-[22px] font-bold text-ink">{title}</h2>
+            {children}
+            {foot}
+          </div>
+        </main>
+      </div>
+    );
+  }
   return (
     <div className="flex min-h-full flex-col bg-bg">
       <header data-mau-chuyen="" className="hero-brand px-4 pb-16 pt-6 text-slate-200 sm:pb-24 sm:pt-10">
@@ -22,14 +50,7 @@ function Shell({ title, children, footer }) {
         <div className="card h-fit w-full max-w-md p-6">
           <h1 className="mb-3 text-xl font-bold text-ink">{title}</h1>
           {children}
-          <div className="mt-4 flex justify-between text-xs">
-            {footer || (
-              <>
-                <Link to="/dang-nhap" className="text-accent hover:underline">← Đăng nhập</Link>
-                <Link to="/" className="text-muted hover:underline">Cổng thông tin công khai</Link>
-              </>
-            )}
-          </div>
+          {foot}
         </div>
       </main>
     </div>
@@ -65,10 +86,10 @@ export function FirstPasswordChange() {
   };
   return (
     <Shell
-      title="Đặt mật khẩu của riêng bạn"
+      title="Đổi mật khẩu trước khi dùng"
       footer={
         <button type="button" className="inline-flex items-center gap-1 text-muted hover:underline" onClick={logout}>
-          <LogOut size={12} /> Đăng xuất
+          <LogOut size={14} /> Đăng xuất
         </button>
       }
     >
@@ -77,15 +98,16 @@ export function FirstPasswordChange() {
           Tài khoản <b className="font-mono">{auth?.user?.username}</b> đang dùng mật khẩu do cấp trên đặt. Đặt mật khẩu mới chỉ
           mình bạn biết để tiếp tục sử dụng hệ thống.
         </p>
-        <label>Mật khẩu hiện tại (cấp trên đã giao)<input className="input mt-1" type="password" autoComplete="current-password" autoFocus value={cur} onChange={(e) => setCur(e.target.value)} /></label>
-        <label>Mật khẩu mới<input className="input mt-1" type="password" autoComplete="new-password" value={pw} onChange={(e) => setPw(e.target.value)} /></label>
-        <label>Nhập lại mật khẩu mới<input className="input mt-1" type="password" autoComplete="new-password" value={pw2} onChange={(e) => setPw2(e.target.value)} /></label>
-        <div className={pw && weakPassword(pw) ? 'text-xs text-warn' : 'text-xs text-muted'}>{PASSWORD_HINT}</div>
+        <label>Mật khẩu hiện tại (cấp trên đã giao)<input className="input tap mt-1 h-11 rounded-xl" type="password" autoComplete="current-password" autoFocus value={cur} onChange={(e) => setCur(e.target.value)} /></label>
+        <label>Mật khẩu mới<input className="input tap mt-1 h-11 rounded-xl" type="password" autoComplete="new-password" value={pw} onChange={(e) => setPw(e.target.value)} /></label>
+        <div className={pw ? (weakPassword(pw) ? 'text-xs font-semibold text-danger' : 'text-[13px] text-good') : 'text-xs text-muted'}>{pw && !weakPassword(pw) ? '✓ Mật khẩu đủ mạnh' : PASSWORD_HINT}</div>
+        <label>Nhập lại mật khẩu mới<input className="input tap mt-1 h-11 rounded-xl" type="password" autoComplete="new-password" value={pw2} onChange={(e) => setPw2(e.target.value)} /></label>
         {pw2 && pw !== pw2 && <div className="text-xs text-danger">Mật khẩu nhập lại không khớp</div>}
         {error && <div className="text-danger">{error}</div>}
-        <button className="btn-primary justify-center" disabled={!cur || weakPassword(pw) || pw !== pw2 || busy}>
+        <button className="btn-primary tap h-12 justify-center rounded-xl font-semibold" disabled={!cur || weakPassword(pw) || pw !== pw2 || busy}>
           {busy ? <Loader2 size={15} className="animate-spin" /> : <KeyRound size={15} />} Đặt mật khẩu và tiếp tục
         </button>
+        <p className="text-[13px] text-muted">Đổi xong, các phiên đăng nhập khác của bạn bị đăng xuất.</p>
       </form>
     </Shell>
   );
@@ -111,14 +133,17 @@ export function ForgotPassword() {
   return (
     <Shell title="Quên mật khẩu">
       {msg ? (
-        <div className="rounded-lg bg-good/10 p-3 text-sm"><Mail size={16} className="mr-1 inline text-good" />{msg}</div>
+        <div className="flex flex-col gap-3">
+          <div className="rounded-xl bg-good/10 p-3.5 text-sm"><Mail size={16} className="mr-1 inline text-good" aria-hidden="true" />{msg}</div>
+          <p className="rounded-[14px] border border-dashed border-line p-3 text-[13px] leading-normal text-ink-2">Tài khoản chưa khai email: nhờ cấp trên “Đặt lại mật khẩu” ở Phân quyền.</p>
+        </div>
       ) : (
         <form onSubmit={submit} className="flex flex-col gap-3 text-sm">
           <p className="text-ink-2">Nhập tên đăng nhập hoặc email của tài khoản. Hệ thống sẽ gửi liên kết đặt lại mật khẩu (hiệu lực 30 phút) tới email đã đăng ký.</p>
-          <input className="input" autoFocus placeholder="Tên đăng nhập hoặc email" value={login} onChange={(e) => setLogin(e.target.value)} />
+          <input className="input tap h-11 rounded-xl" autoFocus aria-label="Tên đăng nhập hoặc email" placeholder="Tên đăng nhập hoặc email" value={login} onChange={(e) => setLogin(e.target.value)} />
           {error && <div className="text-danger">{error}</div>}
-          <button className="btn-primary justify-center" disabled={login.length < 3 || busy}>{busy ? <Loader2 size={15} className="animate-spin" /> : <Mail size={15} />} Gửi liên kết</button>
-          <p className="text-xs text-muted">Tài khoản chưa có email: liên hệ quản trị cấp trên để được đặt lại mật khẩu.</p>
+          <button className="btn-primary tap h-12 justify-center rounded-xl font-semibold" disabled={login.length < 3 || busy}>{busy ? <Loader2 size={15} className="animate-spin" /> : <Mail size={15} />} Gửi liên kết</button>
+          <p className="rounded-[14px] border border-dashed border-line p-3 text-[13px] leading-normal text-ink-2">Tài khoản chưa khai email: nhờ cấp trên “Đặt lại mật khẩu” ở Phân quyền.</p>
         </form>
       )}
     </Shell>
@@ -133,6 +158,7 @@ export function ResetPassword() {
   const [pw, setPw] = useState('');
   const [pw2, setPw2] = useState('');
   const [error, setError] = useState('');
+  const [expired, setExpired] = useState(false); // máy chủ trả 400: liên kết sai / hết hạn / đã dùng (bản vẽ khung L8b)
   const [busy, setBusy] = useState(false);
   const submit = async (e) => {
     e.preventDefault();
@@ -143,21 +169,30 @@ export function ResetPassword() {
       toast({ tone: 'good', title: r.message });
       navigate('/dang-nhap');
     } catch (err) {
-      setError(err.message);
+      if (err.status === 400) setExpired(true);
+      else setError(err.message);
     } finally {
       setBusy(false);
     }
   };
   return (
-    <Shell title="Đặt lại mật khẩu">
-      {!token ? <div className="text-sm text-danger">Liên kết không hợp lệ.</div> : (
+    <Shell title="Đặt mật khẩu mới">
+      {!token || expired ? (
+        <div className="flex flex-col gap-3 text-sm">
+          <p role="alert" className="rounded-xl bg-danger/10 px-3.5 py-3 font-semibold text-danger">Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn</p>
+          <p className="text-ink-2">Đường dẫn chỉ dùng được một lần, trong 30 phút. Gửi yêu cầu mới, hoặc nhờ cấp trên đặt lại mật khẩu ở Phân quyền.</p>
+          <Link to="/quen-mat-khau" className="btn-primary tap h-12 justify-center rounded-xl font-semibold">Gửi lại yêu cầu</Link>
+        </div>
+      ) : (
         <form onSubmit={submit} className="flex flex-col gap-3 text-sm">
-          <label>Mật khẩu mới<input className="input mt-1" type="password" autoComplete="new-password" autoFocus value={pw} onChange={(e) => setPw(e.target.value)} /></label>
-          <label>Nhập lại mật khẩu mới<input className="input mt-1" type="password" autoComplete="new-password" value={pw2} onChange={(e) => setPw2(e.target.value)} /></label>
-          <div className={pw && weakPassword(pw) ? 'text-xs text-warn' : 'text-xs text-muted'}>{PASSWORD_HINT}</div>
+          <p className="text-ink-2">Từ đường dẫn trong email (hiệu lực 30 phút, dùng một lần).</p>
+          <label>Mật khẩu mới<input className="input tap mt-1 h-11 rounded-xl" type="password" autoComplete="new-password" autoFocus value={pw} onChange={(e) => setPw(e.target.value)} /></label>
+          <div className={pw ? (weakPassword(pw) ? 'text-xs font-semibold text-danger' : 'text-[13px] text-good') : 'text-xs text-muted'}>{pw && !weakPassword(pw) ? '✓ Mật khẩu đủ mạnh' : PASSWORD_HINT}</div>
+          <label>Nhập lại mật khẩu mới<input className="input tap mt-1 h-11 rounded-xl" type="password" autoComplete="new-password" value={pw2} onChange={(e) => setPw2(e.target.value)} /></label>
           {pw2 && pw !== pw2 && <div className="text-xs text-danger">Mật khẩu nhập lại không khớp</div>}
           {error && <div className="text-danger">{error}</div>}
-          <button className="btn-primary justify-center" disabled={weakPassword(pw) || pw !== pw2 || busy}>{busy ? <Loader2 size={15} className="animate-spin" /> : <KeyRound size={15} />} Đặt mật khẩu mới</button>
+          <p className="text-[13px] text-muted">Đặt xong: mọi phiên đăng nhập cũ bị đăng xuất; đăng nhập lại bằng mật khẩu mới.</p>
+          <button className="btn-primary tap h-12 justify-center rounded-xl font-semibold" disabled={weakPassword(pw) || pw !== pw2 || busy}>{busy ? <Loader2 size={15} className="animate-spin" /> : <KeyRound size={15} />} Đặt mật khẩu mới</button>
         </form>
       )}
     </Shell>
