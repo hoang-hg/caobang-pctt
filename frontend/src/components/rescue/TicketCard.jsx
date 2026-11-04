@@ -27,7 +27,7 @@ const BTN = 'tap inline-flex min-h-[32px] items-center justify-center gap-1.5 wh
  * viền đỏ 2 px; chỉ còn MỘT nút chính trọn bề ngang; mọi việc phụ (chuyển cột, bản đồ, gọi, link nhiệm vụ, huỷ lệnh, sửa
  * phiếu, không cần cứu) gom vào menu "⋯" ở góc thẻ.
  */
-export default function TicketCard({ t, x, now, online, compact = false, fresh = false, onDispatch, onResolve, onFocus, onArrived, onLink, onCancel, onEdit, onMove, onCloseTicket }) {
+export default function TicketCard({ t, x, now, online, compact = false, fresh = false, onDispatch, onResolve, onFocus, onArrived, onLink, onCancel, onEdit, onMove, onCloseTicket, onOpen }) {
   const canUpdate = usePermission('sos', 'update', t.admin_code);
   const canResolve = usePermission('sos', 'resolve', t.admin_code);
   const canDispatch = usePermission('dispatch', 'create', t.admin_code);
@@ -97,6 +97,7 @@ export default function TicketCard({ t, x, now, online, compact = false, fresh =
       return null;
     };
     const menu = [
+      ...(onOpen ? [{ key: 'open', label: 'Xem chi tiết phiếu', onClick: () => onOpen(t) }, { separator: true }] : []),
       ...(canUpdate && open ? [
         { header: 'Chuyển sang…' },
         ...COLUMNS.map((c) => ({
@@ -126,6 +127,8 @@ export default function TicketCard({ t, x, now, online, compact = false, fresh =
         draggable={canUpdate && open}
         onDragStart={(e) => e.dataTransfer.setData('text/plain', t.id)}
         aria-label={`${t.code} — ${INCIDENT[t.incident_type] || t.incident_type}, ${pr.label}${overdue ? ', quá hạn phản hồi' : ''}`}
+        // Bấm vào thẻ (ngoài nút / liên kết) → ngăn chi tiết phiếu (khung C3); bàn phím: nút mã phiếu
+        onClick={onOpen ? (e) => { if (!e.target.closest('button, a, input, select')) onOpen(t); } : undefined}
         className={clsx(
           'flex min-w-0 select-none flex-col gap-1.5 rounded-[14px] border-2 bg-panel p-3 shadow-sm transition-shadow hover:shadow-md',
           overdue ? 'border-danger' : 'border-transparent',
@@ -141,7 +144,11 @@ export default function TicketCard({ t, x, now, online, compact = false, fresh =
         )}
         <div className="flex items-center gap-1.5">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-1">
-            <b className="whitespace-nowrap text-sm font-bold text-ink" title={`Kênh: ${sourceLabel(t)}`}>{t.code}</b>
+            {onOpen ? (
+              <button type="button" onClick={() => onOpen(t)} className="whitespace-nowrap rounded text-sm font-bold text-ink hover:text-accent hover:underline" title={`Kênh: ${sourceLabel(t)} — xem chi tiết phiếu`} aria-label={`Xem chi tiết ${t.code}`}>
+                {t.code}
+              </button>
+            ) : <b className="whitespace-nowrap text-sm font-bold text-ink" title={`Kênh: ${sourceLabel(t)}`}>{t.code}</b>}
             <span className={clsx('chip whitespace-nowrap py-0.5 text-xs font-bold', pr.cls)} title={pr.label}>Cấp {t.priority} · {pr.short}</span>
             {overdue && <span className="chip whitespace-nowrap bg-danger py-0.5 text-xs font-bold text-white motion-safe:animate-blink-text">Quá hạn</span>}
           </div>

@@ -4,7 +4,7 @@ import clsx from 'clsx';
 import { AlertTriangle, ChevronLeft, ChevronRight, Inbox, Loader2, ScanText } from 'lucide-react';
 import { api } from '../../api/client';
 import { useStore } from '../../app/store';
-import { FieldError, Section, StepChips } from '../common/ui';
+import { FieldError, Modal, Section, StepChips } from '../common/ui';
 import QtyStepper from '../common/QtyStepper';
 import { INCIDENT, PRIORITY, SOURCE, VULNERABLE } from '../../utils/labels';
 import { risk, sosLevel } from '../../utils/risk';
@@ -30,7 +30,9 @@ const AutoTag = ({ on }) => (on ? <span className="chip ml-1.5 bg-warn/25 py-0 t
  * Lỗi hiện ngay dưới ô (SĐT sai khi gõ; nội dung quá ngắn, số người ngoài khoảng khi bấm Tiếp / Tạo). Bóc tách lỗi (mất
  * mạng, máy chủ) → nói rõ, vẫn sang bước 2 để trực ban tự phân loại; mất mạng → không tạo phiếu được, nói lý do.
  */
-export default function Intake({ online = true }) {
+// `onClose` (máy tính ≥ 1280 px — bản vẽ desktop khung C6, C6b): form nằm trong hộp thoại "Nhận tin báo cứu hộ" mở từ cột
+// "Mới báo" (không còn cột phải thường trực); tạo phiếu xong thì đóng
+export default function Intake({ online = true, onClose }) {
   const qc = useQueryClient();
   const toast = useStore((s) => s.toast);
   const [step, setStep] = useState(0);
@@ -109,6 +111,7 @@ export default function Intake({ online = true }) {
       }
       qc.invalidateQueries({ queryKey: ['sos'] });
       reset();
+      onClose?.();
     } catch (e) {
       toast({ tone: 'danger', title: 'Không tạo được phiếu', body: e.message });
     } finally {
@@ -123,8 +126,8 @@ export default function Intake({ online = true }) {
   const chip = (on, tone) => clsx('chip tap min-h-[36px] border px-3 text-xs', on ? (tone || 'border-accent bg-accent text-white') : 'border-line bg-panel2 text-ink-2 hover:bg-panel');
   const big = 'tap min-h-[40px] text-xs sm:text-sm';
 
-  return (
-    <Section title="Nhận tin báo cứu hộ">
+  const content = (
+    <>
       <StepChips steps={STEPS} step={step} onStep={setStep} done={[!errors.text && !errors.phone]} disabled={busy || creating} />
       {step === 0 ? (
         <div className="flex flex-col gap-2.5 text-sm">
@@ -261,6 +264,24 @@ export default function Intake({ online = true }) {
           </div>
         </div>
       )}
-    </Section>
+    </>
   );
+  if (onClose) {
+    return (
+      <Modal
+        open
+        size="md"
+        onClose={creating ? () => {} : onClose}
+        title="Nhận tin báo cứu hộ"
+        subtitle={step === 0 ? 'Trực ban dán tin Zalo / SMS hoặc ghi lời người gọi' : 'Bước 2/2 — kiểm tra rồi tạo phiếu'}
+      >
+        {/* Vẫn là một khối có tên (trình đọc màn hình, kiểm thử giao diện tìm theo tên khối) */}
+        <section aria-labelledby="tiep-nhan-tieu-de" className="flex flex-col gap-3">
+          <h2 id="tiep-nhan-tieu-de" className="sr-only">Nhận tin báo cứu hộ</h2>
+          {content}
+        </section>
+      </Modal>
+    );
+  }
+  return <Section title="Nhận tin báo cứu hộ">{content}</Section>;
 }
