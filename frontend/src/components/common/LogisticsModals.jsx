@@ -115,7 +115,9 @@ export function VehicleModal({ vehicle: v, onClose }) {
     <Modal
       open
       onClose={onClose}
-      title={`Tình trạng phương tiện – ${v.code}`}
+      size="md"
+      title={`Báo tình trạng — ${v.code}`}
+      subtitle="Thao tác ghi vào nhật ký"
       footer={
         <Footer onCancel={onClose} busy={busy}>
           <button type="button" className={primary} disabled={busy} onMouseDown={keepFocus} onClick={submit}>Lưu tình trạng</button>
@@ -275,7 +277,9 @@ export function ReceiveModal({ warehouse: w, onClose }) {
     <Modal
       open
       onClose={onClose}
-      title={`Nhập thêm hàng – ${w.name}`}
+      size="md"
+      title={`Nhập kho — ${w.name}`}
+      subtitle="Ghi sổ xuất – nhập kho"
       footer={
         <Footer back={step > 0 ? () => setStep(0) : null} onCancel={onClose} busy={busy}>
           {step === 0 ? (
@@ -472,7 +476,9 @@ export function FuelDepotModal({ depot: d, onClose }) {
     <Modal
       open
       onClose={onClose}
-      title={`Nhiên liệu dự trữ – ${d.name}`}
+      size="md"
+      title={`Nhiên liệu dự trữ — ${d.name}`}
+      subtitle="Cập nhật lượng còn lại theo báo cáo của điểm cấp"
       footer={
         <Footer onCancel={onClose} busy={busy}>
           <button type="button" className={primary} disabled={busy} onMouseDown={keepFocus} onClick={submit}>Lưu</button>
