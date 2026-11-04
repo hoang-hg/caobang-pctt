@@ -5,6 +5,8 @@ import clsx from 'clsx';
 import { api } from '../../api/client';
 import { useUnits } from '../../api/hooks';
 import { useStore } from '../../app/store';
+import { FileDown, FileSpreadsheet } from 'lucide-react';
+import ExportMenu from '../common/ExportMenu';
 import FilterToolbar from '../common/FilterToolbar';
 import { ErrorState, Pager, Skeleton, SortTh } from '../common/ui';
 import { CHANNEL, LEVEL, broadcastStatus } from '../../utils/labels';
@@ -15,7 +17,7 @@ import { risk } from '../../utils/risk';
 import { useMediaQuery } from '../../utils/useMediaQuery';
 import { usePaged } from '../../utils/usePaged';
 import {
-  CHANNEL_SHORT, FILTERS, PHASE_LABEL, SEVERITY_LEVEL, SORTS, broadcastFacts, matchBroadcast, optionCounts, sortBroadcasts,
+  CHANNEL_SHORT, FILTERS, PHASES, PHASE_LABEL, SEVERITY_LEVEL, SORTS, broadcastFacts, leftText, matchBroadcast, optionCounts, sortBroadcasts,
 } from './alertFacts';
 
 const deliveredPct = (b) => {
@@ -58,6 +60,46 @@ function Row({ b, x, pdf }) {
   );
 }
 
+/**
+ * Dòng bảng gọn trên máy tính (bản vẽ khung D5): gộp vùng · hộ · kênh và soạn · duyệt để bảng vừa khung, tình trạng kèm một dòng
+ * nói rõ (còn bao lâu / hết lúc nào / lý do trả lại, kết thúc). Bản PDF vẫn dùng bảng đủ cột.
+ */
+function DeskRow({ b, x, unitName, now }) {
+  const dp = deliveredPct(b);
+  const names = (b.target_admin_codes || []).map(unitName);
+  const left = x.live && b.valid_until ? Date.parse(b.valid_until) - now : null;
+  return (
+    <tr className={clsx(x.pending && 'bg-warn/10')}>
+      <td className={clsx('whitespace-nowrap border-l-4', risk(SEVERITY_LEVEL[b.severity]).edge)}>
+        <b className="font-mono text-ink">{b.code}</b>
+        {b.auto_generated && <div className="text-xs text-ink-2">Máy đề xuất</div>}
+      </td>
+      <td><span className={clsx('chip whitespace-nowrap', LEVEL[b.severity]?.cls)}>{LEVEL[b.severity]?.label}</span></td>
+      <td className="max-w-[22rem]">
+        <div className="font-medium text-ink [overflow-wrap:anywhere]">{b.title}</div>
+        <div className="line-clamp-1 text-xs text-muted [overflow-wrap:anywhere]" title={b.message_body}>{b.message_body}</div>
+      </td>
+      <td className="text-xs">
+        <div className="text-sm text-ink">{names.length > 2 ? `${names.length} xã` : names.length ? names.join(', ') : 'Vùng vẽ'} · <span className="num">{int(b.audience?.households)}</span> hộ</div>
+        <div className="text-muted">{(b.channels || []).map((c) => CHANNEL_SHORT[c] || c).join(' · ')}{dp != null ? ` · nhận ${dp}%` : ''}</div>
+      </td>
+      <td className="text-xs">
+        <span className={clsx('chip whitespace-nowrap', broadcastStatus(b).cls)}>{x.pending ? PHASE_LABEL.cho_duyet : broadcastStatus(b).label}</span>
+        <div className={clsx('mt-1 [overflow-wrap:anywhere]', b.status === 'rejected' ? 'text-danger' : x.soon ? 'font-semibold text-serious' : 'text-muted')}>
+          {b.status === 'rejected' ? `Trả lại: ${b.rejected_reason}`
+            : b.ended_at ? `Kết thúc ${dateTime(b.ended_at)}${b.end_note ? `: ${b.end_note}` : ''}`
+              : left != null ? `còn ${leftText(left)}`
+                : b.valid_until ? `Hết ${dateTime(b.valid_until)}` : ''}
+        </div>
+      </td>
+      <td className="whitespace-nowrap text-xs">
+        {b.created_by_name || 'Hệ thống'} <span className="text-muted">{dateTime(b.created_at)}</span>
+        {b.approved_by_name && b.status !== 'rejected' && <div>Duyệt: {b.approved_by_name} <span className="text-muted">{dateTime(b.approved_at)}</span></div>}
+      </td>
+    </tr>
+  );
+}
+
 function Card({ b, x }) {
   const dp = deliveredPct(b);
   return (
@@ -88,7 +130,10 @@ function Card({ b, x }) {
  * (mã, tiêu đề, nội dung, người soạn / duyệt), lọc trạng thái / mức / kênh / nguồn kèm số lệnh (trên địa chỉ trang), xếp,
  * phân trang; Excel / PDF mọi lệnh đang lọc. Máy tính: bảng; điện thoại, iPad dọc: thẻ. Đang tải / lỗi / trống nói rõ.
  */
-export default function BroadcastHistory({ now, scopeLabel }) {
+export default function BroadcastHistory({ now, scopeLabel, onManage }) {
+  // Máy tính ≥ 1280 px (bản vẽ khung D5): một khối — thẻ trạng thái, ô tìm + lọc + Xuất, bảng gọn; lệnh sắp hết hiệu lực có
+  // nút Gia hạn / Kết thúc ngay dưới bảng
+  const desk = useMediaQuery('(min-width: 1280px)');
   const toast = useStore((s) => s.toast);
   const { data: units = [] } = useUnits();
   const isLg = useMediaQuery('(min-width: 1024px)');
@@ -175,6 +220,24 @@ export default function BroadcastHistory({ now, scopeLabel }) {
         {activeFilters ? 'Không có lệnh khớp ô tìm / bộ lọc.' : 'Chưa có lệnh cảnh báo nào trong phạm vi bạn được xem.'}
       </p>
     );
+  } else if (desk && !pdf) {
+    body = (
+      <div className="overflow-x-auto">
+        <table className="table-base">
+          <thead>
+            <tr>
+              <SortTh>Mã</SortTh>
+              <SortTh>Mức</SortTh>
+              <SortTh>Tiêu đề · nội dung</SortTh>
+              <SortTh k="nhieu_ho" dir="descending" sort={sort} onSort={setSort}>Vùng nhận · kênh</SortTh>
+              <SortTh k="uu_tien" sort={sort} onSort={setSort}>Tình trạng</SortTh>
+              <SortTh k="moi_nhat" dir="descending" sort={sort} onSort={setSort}>Soạn · duyệt</SortTh>
+            </tr>
+          </thead>
+          <tbody>{paged.visible.map((b) => <DeskRow key={b.id} b={b} x={factsOf(b)} unitName={unitName} now={now} />)}</tbody>
+        </table>
+      </div>
+    );
   } else if (isLg || pdf) {
     body = (
       <div className="card overflow-x-auto">
@@ -198,6 +261,64 @@ export default function BroadcastHistory({ now, scopeLabel }) {
     );
   } else {
     body = <div className="grid gap-2 md:grid-cols-2">{paged.visible.map((b) => <Card key={b.id} b={b} x={factsOf(b)} />)}</div>;
+  }
+
+  const soonRows = all.filter((b) => factsOf(b).soon && b.can_manage);
+  if (desk) {
+    const phase = FILTERS.find((f) => f.key === 'tt');
+    const ttCounts = counts.tt || {};
+    return (
+      <section aria-label="Lịch sử lệnh" className="sheet flex flex-col gap-3 p-4">
+        <div className="seg-track self-start" role="group" aria-label={phase.label}>
+          {[['', 'Tất cả'], ...PHASES].map(([v, label]) => (
+            <button key={v || 'tat-ca'} type="button" aria-pressed={filters.tt === v} onClick={() => setParam({ tt: v })} className={clsx('tap seg-item min-h-[40px]', filters.tt === v && 'seg-item-on')}>
+              {label}{v && query.data && ttCounts[v] ? <span className="num text-muted"> ({ttCounts[v]})</span> : ''}
+            </button>
+          ))}
+        </div>
+        <FilterToolbar
+          inline
+          fields={FILTERS.filter((f) => f.key !== 'tt')}
+          sorts={[]}
+          placeholder="Tìm mã lệnh, tiêu đề, nội dung, người soạn…"
+          q={q}
+          onSearch={setQ}
+          filters={filters}
+          counts={query.data ? counts : null}
+          onFilter={(key, value) => setParam({ [key]: value })}
+          onClear={clearAll}
+          shown={rows.length}
+          total={all.length}
+          noun="lệnh"
+        >
+          <ExportMenu
+            title={`Xuất ${rows.length} lệnh đang lọc`}
+            buttonClass="btn-secondary tap h-11 rounded-xl px-4"
+            items={[
+              { key: 'xlsx', label: 'Bảng Excel', hint: `${rows.length} lệnh đang lọc`, icon: FileSpreadsheet, onClick: doExcel, disabled: !rows.length },
+              { key: 'pdf', label: 'Báo cáo PDF', hint: 'Bảng đủ cột, khổ A4 ngang', icon: FileDown, onClick: doPdf, disabled: !rows.length, busy: pdf },
+            ]}
+          />
+        </FilterToolbar>
+        <div ref={contentRef} className="flex flex-col gap-2 bg-panel">
+          {body}
+          {!pdf && rows.length > 0 && <Pager paged={paged} size={pageSize} onSize={setPageSize} noun="lệnh" />}
+        </div>
+        {onManage && soonRows.map((b) => (
+          <div key={b.id} className="flex flex-wrap items-center gap-3 rounded-[14px] bg-panel2 p-3.5">
+            <b className="text-sm text-ink">{b.code} sắp hết hiệu lực</b>
+            <span className="text-[13px] text-ink-2">còn {leftText(Date.parse(b.valid_until) - now)}</span>
+            <span className="flex-1" />
+            <button type="button" className="btn-secondary tap h-10 rounded-xl px-4" onClick={() => onManage({ b, mode: 'extend' })}>Gia hạn…</button>
+            <button type="button" className="btn-secondary tap h-10 rounded-xl px-4" onClick={() => onManage({ b, mode: 'end' })}>Kết thúc…</button>
+          </div>
+        ))}
+        <p className="rounded-[14px] border border-dashed border-line p-3 text-[13px] leading-normal text-ink-2">
+          Gia hạn / kết thúc cần quyền duyệt và mã PIN. Lệnh đã hết hạn không gia hạn được — soạn lệnh mới.
+          {all.length >= 200 && ' Hiện 200 lệnh gần nhất; lệnh cũ hơn tra trong Nhật ký pháp lý.'}
+        </p>
+      </section>
+    );
   }
 
   return (

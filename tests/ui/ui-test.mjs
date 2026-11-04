@@ -2542,20 +2542,31 @@ async function alertsPage(ctx) {
     await page.goto(`${ROOT}/canh-bao?tab=lich_su`);
     const rows = page.locator('main table tbody tr').or(page.locator('main article[aria-label^="CB-"]'));
     await rows.first().or(page.getByText(/Chưa có lệnh cảnh báo nào/)).waitFor({ timeout: 20_000 });
-    const box = page.getByLabel('Trạng thái', { exact: true });
-    if (!(await box.isVisible())) await page.getByRole('button', { name: /^Bộ lọc/ }).click();
-    await box.selectOption('hieu_luc');
+    // Máy tính ≥ 1280 px (bản vẽ khung D5): trạng thái là hàng thẻ; nhỏ hơn: ô chọn (điện thoại trong khung Bộ lọc)
+    const phaseTabs = page.getByRole('group', { name: 'Trạng thái', exact: true });
+    if (await phaseTabs.count()) await phaseTabs.getByRole('button', { name: /^Đang hiệu lực/ }).click();
+    else {
+      const box = page.getByLabel('Trạng thái', { exact: true });
+      if (!(await box.isVisible())) await page.getByRole('button', { name: /^Bộ lọc/ }).click();
+      await box.selectOption('hieu_luc');
+    }
     await page.waitForURL(/tt=hieu_luc/);
     await page.waitForTimeout(400);
     const shown = await rows.count();
     if (shown !== Math.min(live, wide ? 20 : 10)) throw new Error(`lọc "Đang hiệu lực" ra ${shown} lệnh, ô chỉ số ghi ${live}`);
     let note = `${shown} đang hiệu lực`;
     if (shown) {
-      const [xlsx] = await Promise.all([page.waitForEvent('download', { timeout: 20_000 }), page.getByRole('button', { name: 'Excel', exact: true }).click()]);
+      const exportBy = async (name) => {
+        const direct = page.getByRole('button', { name, exact: true });
+        if (await direct.isVisible().catch(() => false)) return direct.click();
+        await page.getByRole('button', { name: /^Xuất/ }).click();
+        return page.getByRole('menuitem', { name: new RegExp(name) }).click();
+      };
+      const [xlsx] = await Promise.all([page.waitForEvent('download', { timeout: 20_000 }), exportBy('Excel')]);
       if (!/^lenh-canh-bao-.*\.xlsx$/.test(xlsx.suggestedFilename())) throw new Error(`tên tệp Excel: ${xlsx.suggestedFilename()}`);
       note += ` · ${xlsx.suggestedFilename()}`;
       if (wide) {
-        const [pdfFile] = await Promise.all([page.waitForEvent('download', { timeout: 60_000 }), page.getByRole('button', { name: 'PDF', exact: true }).click()]);
+        const [pdfFile] = await Promise.all([page.waitForEvent('download', { timeout: 60_000 }), exportBy('PDF')]);
         if (!/^lenh-canh-bao-.*\.pdf$/.test(pdfFile.suggestedFilename())) throw new Error(`tên tệp PDF: ${pdfFile.suggestedFilename()}`);
       }
     }

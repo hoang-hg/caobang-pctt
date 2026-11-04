@@ -220,10 +220,12 @@ export function ApproveModal({ b, initial = 'approve', onClose }) {
  * Gia hạn (thiên tai kéo dài) / kết thúc sớm (hết nguy hiểm) một cảnh báo đang hiệu lực — người duyệt ký PIN. Thời gian gia
  * hạn chọn bằng chip; lý do kết thúc chọn nhanh / tự ghi (người dân thấy "đã kết thúc"). Lỗi ngay dưới ô.
  */
-export function ManageModal({ b, mode, onClose }) {
+export function ManageModal({ b, mode: initialMode, onClose }) {
   const qc = useQueryClient();
   const toast = useStore((s) => s.toast);
   const online = useOnline();
+  // Đổi được ngay trong hộp (bản vẽ khung D6): Gia hạn · Kết thúc
+  const [mode, setMode] = useState(initialMode);
   const [hours, setHours] = useState(24);
   const [note, setNote] = useState('');
   const [pin, setPin] = useState('');
@@ -265,8 +267,10 @@ export function ManageModal({ b, mode, onClose }) {
   return (
     <Modal
       open
+      size="md"
       onClose={onClose}
       title={`${end ? 'Kết thúc' : 'Gia hạn'} cảnh báo – ${b.code}`}
+      subtitle={end ? 'Hết nguy hiểm · ký PIN như phê duyệt' : 'Thiên tai kéo dài · ký PIN như phê duyệt'}
       footer={
         <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:justify-end">
           <button type="button" className={clsx('btn-ghost', BIG)} onClick={onClose} disabled={busy}>Huỷ</button>
@@ -285,9 +289,23 @@ export function ManageModal({ b, mode, onClose }) {
       }
     >
       <div className="flex flex-col gap-3 text-sm">
-        <div className="rounded-lg bg-panel2 p-2.5">
+        <div className="rounded-xl bg-panel2 p-3">
           <b className="[overflow-wrap:anywhere]">{b.title}</b>
           <div className="text-xs text-muted">Đang hiệu lực đến {dateTime(b.valid_until)}</div>
+        </div>
+        <div className="seg-track self-start" role="radiogroup" aria-label="Việc cần làm với lệnh">
+          {[['extend', 'Gia hạn'], ['end', 'Kết thúc']].map(([v, label]) => (
+            <button
+              key={v}
+              type="button"
+              role="radio"
+              aria-checked={mode === v}
+              onClick={() => { setMode(v); setTried(false); setServerErr(null); }}
+              className={clsx('tap seg-item min-h-[40px]', mode === v && 'seg-item-on')}
+            >
+              {label}
+            </button>
+          ))}
         </div>
         {end ? (
           <>
@@ -326,6 +344,7 @@ export function ManageModal({ b, mode, onClose }) {
                 </button>
               ))}
             </div>
+            {b.valid_until && <p className="mt-2 text-ink-2">Hạn mới: <b className="text-ink">{dateTime(new Date(Date.parse(b.valid_until) + hours * 3600e3))}</b></p>}
           </div>
         )}
         <PinField value={pin} onChange={(v) => { setPin(v); setServerErr(null); }} error={pinErr} inputRef={pinRef} />

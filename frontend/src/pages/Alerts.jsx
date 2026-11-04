@@ -288,7 +288,7 @@ export default function Alerts() {
                 <div className="flex min-w-0 flex-col gap-3">{lists}</div>
               </div>
             )}
-            {tab === 'lich_su' && <BroadcastHistory now={now} scopeLabel={scopeLabel} />}
+            {tab === 'lich_su' && <BroadcastHistory now={now} scopeLabel={scopeLabel} onManage={setManage} />}
             {tab === 'danh_ba' && (
               // Bản vẽ khung D7: danh bạ + tổng đài phím bấm cột phải
               <div className="grid grid-cols-[minmax(0,1fr)_340px] items-start gap-5 [&>*]:min-w-0">
