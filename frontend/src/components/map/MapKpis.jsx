@@ -35,7 +35,7 @@ export function kpiTiles(k, stations) {
   return [
     {
       key: 'sos', icon: Siren, title: 'SOS chờ xử lý', short: 'SOS', level: sosLv, alert: late,
-      value: int(sos.waiting), unit: 'phiếu mới',
+      value: int(sos.waiting), unit: 'phiếu chờ',
       sub: sos.overdue > 0 ? `${sos.overdue} quá hạn phản hồi` : sos.no_team_15m > 0 ? `${sos.no_team_15m} chờ quá 15′`
         : sos.critical > 0 ? `${sos.critical} cấp 1 chưa xong` : `Đang xử lý ${int(sos.in_progress)}`,
     },

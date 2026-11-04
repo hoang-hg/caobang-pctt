@@ -14,7 +14,7 @@ export function rainFacts(rain) {
 
 /**
  * SOS chờ xử lý. Đỏ nhấp nháy (thiết kế A.2): quá hạn phản hồi theo cấp, HOẶC chờ quá 15 phút chưa có lực lượng tiếp nhận
- * (mọi cấp); còn phiếu cấp 1 chưa xong cũng Đỏ; chỉ có phiếu mới → Vàng.
+ * (mọi cấp); còn phiếu cấp 1 chưa xong cũng Đỏ; chỉ có phiếu chờ chưa quá hạn → Vàng.
  */
 export function sosFacts(sos = {}) {
   const late = sos.overdue > 0 || sos.no_team_15m > 0;
