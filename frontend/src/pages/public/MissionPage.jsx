@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import {
   AlertTriangle, CheckCircle2, Clock, Copy, LifeBuoy, Loader2, MapPin, Navigation, Phone, RefreshCw, Send,
-  ShieldAlert, Siren, Truck, Users,
+  ShieldAlert, Siren, Truck, Users, WifiOff,
 } from 'lucide-react';
 import { useStore } from '../../app/store';
 import { FIELD_REPORT, PRIORITY, VEHICLE, VULNERABLE } from '../../utils/labels';
@@ -90,15 +90,35 @@ function Screen({ children }) {
   );
 }
 
-function Notice({ icon: Icon, tone, title, children }) {
+/**
+ * Màn báo link không dùng được (bản vẽ khung O5): máy tính có thanh trên tối như trang nhiệm vụ; `call` = { phone, org } →
+ * nút "Gọi trực ban" (số trực ban 24/7 của tỉnh từ /public/hotlines — link đã đóng thì không còn số trong lệnh).
+ */
+function Notice({ icon: Icon, tone, title, children, call, desk = false }) {
+  const card = (
+    <div className={clsx('card flex flex-col items-center gap-2 p-6 text-center', desk ? 'w-[520px] gap-3.5 rounded-[18px] p-8' : 'mt-8')}>
+      <Icon size={36} className={tone} aria-hidden="true" />
+      <h1 className="text-lg font-bold text-ink">{title}</h1>
+      <div className="text-sm leading-relaxed text-ink-2">{children}</div>
+      {call && (
+        <a href={`tel:${call.phone.replace(/s/g, '')}`} className="btn-primary tap mt-1 h-11 rounded-xl px-5 font-semibold" title={call.org}>
+          <Phone size={16} aria-hidden="true" /> Gọi trực ban
+        </a>
+      )}
+    </div>
+  );
+  if (!desk) return <Screen>{card}</Screen>;
   return (
-    <Screen>
-      <div className="card mt-8 flex flex-col items-center gap-2 p-6 text-center">
-        <Icon size={36} className={tone} />
-        <h1 className="text-lg font-bold text-ink">{title}</h1>
-        <div className="text-sm text-ink-2">{children}</div>
-      </div>
-    </Screen>
+    <div className="flex h-full flex-col bg-bg">
+      <header className="flex h-16 shrink-0 items-center gap-3.5 bg-[#0B1A33] px-6 text-white">
+        <ShieldAlert size={28} className="shrink-0 text-sky-400" aria-hidden="true" />
+        <div className="min-w-0 leading-tight">
+          <div className="font-bold">Nhiệm vụ cứu hộ – PCTT Cao Bằng</div>
+          <div className="text-xs text-[#A9B6CC]">Link nhiệm vụ của trưởng nhóm · không cần đăng nhập</div>
+        </div>
+      </header>
+      <main className="flex flex-1 items-center justify-center p-5">{card}</main>
+    </div>
   );
 }
 
@@ -113,6 +133,7 @@ export default function MissionPage() {
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [sendError, setSendError] = useState('');
+  const [unsent, setUnsent] = useState(null); // báo cáo chưa gửi được vì mất mạng (bản vẽ khung O4) — giữ để gửi lại / sao chép
   // Máy tính ≥ 1280 px (bản vẽ desktop khung O1 — trực ban / trưởng nhóm mở trên máy tính): thanh trên tối, 2 cột — lệnh, chỉ
   // đường, liên lạc, lực lượng (trái) · báo cáo về trung tâm, đã báo (phải, dính). Điện thoại giữ một cột như cũ
   const desk = useMediaQuery('(min-width: 1280px)');
@@ -137,6 +158,15 @@ export default function MissionPage() {
     refetchInterval: (q) => (ENDED.includes(q.state.error?.status) ? false : 30_000),
     retry: (n, e) => (e.status === 0 || e.status >= 500) && n < 2,
   });
+  // Link đã đóng / hết hiệu lực → số trực ban 24/7 của tỉnh (danh bạ công khai) cho nút "Gọi trực ban" (bản vẽ khung O5)
+  const ended = !!error && ENDED.includes(error.status);
+  const { data: hot } = useQuery({
+    queryKey: ['pub-hotlines'],
+    queryFn: () => fetch('/api/v1/public/hotlines').then((r) => (r.ok ? r.json() : null)),
+    enabled: ended,
+    staleTime: Infinity,
+  });
+  const dutyLine = hot?.province?.find((h) => /trực ban/i.test(`${h.position} ${h.org}`)) || hot?.province?.[0] || null;
 
   if (!token) {
     return (
@@ -147,9 +177,11 @@ export default function MissionPage() {
   }
   if (error && ENDED.includes(error.status)) {
     return error.status === 410 ? (
-      <Notice icon={CheckCircle2} tone="text-good" title="Link nhiệm vụ đã đóng">{error.message}</Notice>
+      <Notice icon={CheckCircle2} tone="text-good" title="Link nhiệm vụ đã đóng" call={dutyLine} desk={desk}>{error.message}</Notice>
     ) : (
-      <Notice icon={ShieldAlert} tone="text-danger" title="Link không dùng được">{error.message}</Notice>
+      <Notice icon={ShieldAlert} tone="text-danger" title="Link nhiệm vụ không còn hiệu lực" call={dutyLine} desk={desk}>
+        Lệnh đã xong, đã huỷ, hoặc link đã hết hạn / được cấp lại. Gọi trực ban để nhận link mới.
+      </Notice>
     );
   }
   if (isLoading) {
@@ -193,6 +225,7 @@ export default function MissionPage() {
     setSendError('');
     try {
       const res = await call(token, body);
+      setUnsent(null);
       qc.setQueryData(['mission', token], res);
       saveMission(token, res);
       setForm(null);
@@ -204,9 +237,8 @@ export default function MissionPage() {
         saveMission(token, null);
         refetch();
       }
-      setSendError(e.status === 0
-        ? 'Chưa gửi được: mất kết nối mạng. Bấm gửi lại khi có sóng, hoặc gọi điện báo trực ban.'
-        : e.message);
+      if (e.status === 0) setUnsent(body); // dải "Mất kết nối mạng" trên đầu trang: Thử lại · Sao chép nội dung
+      else setSendError(e.message);
     } finally {
       setBusy(false);
     }
@@ -312,8 +344,15 @@ export default function MissionPage() {
             {busy && !form ? <Loader2 size={18} className="animate-spin" /> : <MapPin size={18} />} Đã đến hiện trường
           </button>
         )}
-        <button type="button" className={clsx('w-full py-3 text-base', form === 'rescued' ? 'btn-soft' : 'btn-good')} disabled={busy} onClick={() => toggle('rescued')}>
-          <CheckCircle2 size={18} /> Đã cứu an toàn
+        {/* Bản vẽ khung O2, O3: "Đã cứu an toàn…" viền xanh lá, "Cần chi viện…" viền đỏ — biểu mẫu đang mở thì nền nhạt cùng màu */}
+        <button
+          type="button"
+          aria-expanded={form === 'rescued'}
+          className={clsx('btn w-full border-2 border-good py-3 text-base font-bold text-good', form === 'rescued' ? 'bg-good/10' : 'bg-panel hover:bg-good/10')}
+          disabled={busy}
+          onClick={() => toggle('rescued')}
+        >
+          <CheckCircle2 size={18} /> Đã cứu an toàn…
         </button>
         {form === 'rescued' && (
           <form onSubmit={submit} className="flex flex-col gap-2 rounded-lg border border-good/50 bg-good/5 p-3 text-sm">
@@ -342,8 +381,14 @@ export default function MissionPage() {
             </button>
           </form>
         )}
-        <button type="button" className={clsx('w-full py-3 text-base', form === 'need_support' ? 'btn-soft' : 'btn-danger')} disabled={busy} onClick={() => toggle('need_support')}>
-          <LifeBuoy size={18} /> Cần chi viện
+        <button
+          type="button"
+          aria-expanded={form === 'need_support'}
+          className={clsx('btn w-full border-2 border-danger py-3 text-base font-bold text-danger', form === 'need_support' ? 'bg-danger/10' : 'bg-panel hover:bg-danger/10')}
+          disabled={busy}
+          onClick={() => toggle('need_support')}
+        >
+          <LifeBuoy size={18} /> Cần chi viện…
         </button>
         {form === 'need_support' && (
           <form onSubmit={submit} className="flex flex-col gap-2 rounded-lg border border-danger/50 bg-danger/5 p-3 text-sm">
@@ -451,6 +496,34 @@ export default function MissionPage() {
     </>
   );
 
+  const unsentText = unsent && [
+    `${m.code} — ${FIELD_REPORT[unsent.kind] || unsent.kind}`,
+    unsent.people_safe != null && `Số người đã an toàn: ${unsent.people_safe}`,
+    unsent.note && `Ghi chú: ${unsent.note}`,
+  ].filter(Boolean).join('\n');
+  const pOffline = unsent && (
+    <div role="alert" className="card flex flex-wrap items-center gap-x-3 gap-y-2 border-2 border-line p-3 text-sm">
+      <WifiOff size={18} className="shrink-0 text-ink-2" aria-hidden="true" />
+      <b className="text-ink">Mất kết nối mạng</b>
+      <span className="min-w-0 flex-1 text-ink-2">Báo cáo chưa gửi được — giữ nguyên nội dung, có mạng thì bấm Thử lại; khẩn thì gọi trực ban.</span>
+      <span className="flex gap-2">
+        <button type="button" className="btn-secondary tap h-10 rounded-xl px-3" disabled={busy} onClick={() => send(unsent)}>
+          {busy ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <RefreshCw size={15} aria-hidden="true" />} Thử lại
+        </button>
+        <button
+          type="button"
+          className="btn-secondary tap h-10 rounded-xl px-3"
+          onClick={() => navigator.clipboard?.writeText(unsentText).then(
+            () => toast({ tone: 'good', title: 'Đã sao chép — dán vào tin nhắn gửi trực ban' }),
+            () => toast({ tone: 'danger', title: 'Không sao chép được — chép tay nội dung báo cáo' }),
+          )}
+        >
+          <Copy size={15} aria-hidden="true" /> Sao chép nội dung
+        </button>
+      </span>
+    </div>
+  );
+
   if (desk) {
     return (
       <div className="h-full overflow-y-auto scroll-thin bg-bg">
@@ -470,6 +543,7 @@ export default function MissionPage() {
         </header>
         <main className="mx-auto grid max-w-[1400px] grid-cols-[minmax(0,1fr)_420px] items-start gap-5 p-5">
           <div className="flex min-w-0 flex-col gap-3">
+            {pOffline}
             {pHead}
             {pErr}
             {pOrder}
@@ -491,6 +565,7 @@ export default function MissionPage() {
 
   return (
     <Screen>
+      {pOffline}
       {pHead}
       {pErr}
       {pOrder}
