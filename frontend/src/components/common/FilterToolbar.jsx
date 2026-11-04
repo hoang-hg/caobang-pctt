@@ -21,7 +21,7 @@ export default function FilterToolbar({
   const [open, setOpen] = useState(false);
   const active = fields.filter((f) => filters[f.key]);
   const searchBox = (
-    <div className={clsx('relative min-w-0', inline ? 'flex-1' : 'flex-[1_1_100%] sm:flex-1')}>
+    <div className={clsx('relative', inline ? 'min-w-[13rem] flex-1' : 'min-w-0 flex-[1_1_100%] sm:flex-1')}>
       <Search size={inline ? 16 : 14} className={clsx('pointer-events-none absolute top-1/2 -translate-y-1/2 text-muted', inline ? 'left-3.5' : 'left-2.5')} aria-hidden="true" />
       <input
         className={clsx('input pr-9', inline ? 'tap h-11 rounded-xl bg-panel pl-10 text-sm' : clsx('pl-8', CTRL))}
@@ -43,7 +43,7 @@ export default function FilterToolbar({
       )}
     </div>
   );
-  const selCls = (on) => clsx('input min-w-0', inline ? 'tap h-11 w-auto max-w-[13rem] rounded-xl bg-panel px-3 text-sm' : clsx('w-full px-2 sm:w-auto sm:max-w-[15rem]', CTRL), on && 'border-accent font-semibold text-accent');
+  const selCls = (on) => clsx('input min-w-0', inline ? 'tap h-11 w-auto max-w-[11rem] rounded-xl bg-panel px-3 text-sm' : clsx('w-full px-2 sm:w-auto sm:max-w-[15rem]', CTRL), on && 'border-accent font-semibold text-accent');
   const selects = fields.map((f) => (
     <select key={f.key} className={selCls(filters[f.key])} value={filters[f.key]} onChange={(e) => onFilter(f.key, e.target.value)} aria-label={f.label}>
       <option value="">{f.all}</option>
