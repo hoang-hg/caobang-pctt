@@ -59,7 +59,8 @@ export default function CloseTicketModal({ ticket, onClose }) {
     <Modal
       open
       onClose={onClose}
-      title={`Đóng phiếu không cần cứu – ${ticket.code}`}
+      title={`Đóng phiếu ${ticket.code} — không cần cứu?`}
+      subtitle="Thao tác ghi vào nhật ký"
       footer={
         <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:justify-end">
           <button type="button" className={clsx('btn-ghost', big)} onClick={onClose} disabled={busy}>Huỷ</button>
