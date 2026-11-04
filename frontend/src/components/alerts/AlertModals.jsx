@@ -20,23 +20,39 @@ const OFFLINE = 'Mất mạng — chưa thực hiện được';
 const REJECT_REASONS = ['Sai vùng nhận tin', 'Nội dung chưa rõ, thiếu hướng dẫn', 'Mức cảnh báo chưa phù hợp', 'Trùng lệnh đã phát', 'Chưa đến mức phải cảnh báo'];
 const END_NOTES = ['Nước đã rút, dỡ bỏ lệnh sơ tán', 'Hết nguy cơ sạt lở', ...(SHOW_STORM ? ['Bão / áp thấp đã suy yếu'] : [])];
 
-/** Ô PIN dùng chung: to, chỉ số, lỗi ngay dưới ô (sai định dạng khi bấm; sai PIN / tạm khoá / chưa cấp PIN từ máy chủ). */
+/**
+ * Ô PIN dùng chung: chỉ số, lỗi ngay dưới ô (sai định dạng khi bấm; sai PIN / tạm khoá / chưa cấp PIN từ máy chủ). Bản vẽ khung D6:
+ * mỗi số một ô, hiện chấm thay số. PIN dài 4–8 số nên 6 ô, nhập quá 6 thì thêm ô. Vẫn là một ô nhập trong suốt phủ lên trên.
+ */
 function PinField({ value, onChange, error, inputRef }) {
+  const [focused, setFocused] = useState(false);
+  const boxes = Math.max(6, Math.min(8, value.length + (value.length >= 6 ? 1 : 0)));
   return (
     <label className="flex flex-col gap-1 text-sm">
       <span className="flex items-center gap-1 font-medium"><KeyRound size={14} aria-hidden="true" /> Mã PIN ký duyệt của bạn</span>
-      <input
-        ref={inputRef}
-        type="password"
-        inputMode="numeric"
-        autoComplete="one-time-code"
-        maxLength={8}
-        className={clsx('input tap min-h-[44px] w-44 font-mono text-lg tracking-[0.4em]', error && 'border-danger')}
-        value={value}
-        onChange={(e) => onChange(e.target.value.replace(/\D/g, ''))}
-        aria-invalid={!!error}
-        aria-describedby="loi-pin"
-      />
+      <span className="relative w-fit">
+        <input
+          ref={inputRef}
+          type="password"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          maxLength={8}
+          className="absolute inset-0 z-10 h-full w-full cursor-text opacity-0"
+          value={value}
+          onChange={(e) => onChange(e.target.value.replace(/\D/g, ''))}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          aria-invalid={!!error}
+          aria-describedby="loi-pin"
+        />
+        <span className="flex gap-2" aria-hidden="true">
+          {Array.from({ length: boxes }, (_, i) => (
+            <span key={i} className={clsx('flex h-12 w-11 items-center justify-center rounded-xl border bg-panel', error ? 'border-danger' : focused && i === Math.min(value.length, boxes - 1) ? 'border-accent ring-2 ring-accent/30' : 'border-line')}>
+              {value[i] && <span className="h-2.5 w-2.5 rounded-full bg-ink" />}
+            </span>
+          ))}
+        </span>
+      </span>
       <FieldError id="loi-pin">{error}</FieldError>
     </label>
   );
