@@ -6,7 +6,8 @@ import { Camera, Check, X, Siren, MapPin, Phone, RotateCcw, CheckCheck, Inbox, S
 import { api } from '../api/client';
 import { useAreaQuery } from '../api/hooks';
 import { useStore } from '../app/store';
-import { EmptyState, ErrorState, Modal, Skeleton, Tabs } from '../components/common/ui';
+import { EmptyState, ErrorState, Modal, Segmented, Skeleton, Tabs } from '../components/common/ui';
+import IncidentModal from '../components/map/IncidentModal';
 import PageHeader from '../components/common/PageHeader';
 import RoleTips from '../components/common/RoleTips';
 import { PAGE } from '../components/layout/page';
@@ -90,28 +91,42 @@ function ActionModal({ report, action, onClose }) {
     }
   };
 
+  // Bản vẽ khung F2, F3: tiêu đề nói rõ việc, dòng tóm tắt phiếu, nút chính đúng tên việc
+  const heading = {
+    reject: { title: `Từ chối phản ánh ${report.code}?`, subtitle: 'Thao tác ghi vào nhật ký', confirm: 'Từ chối phản ánh' },
+    sos: { title: 'Chuyển phản ánh thành phiếu SOS', subtitle: 'Phiếu mới vào cột “Mới báo” ở Cứu hộ', confirm: 'Tạo phiếu SOS' },
+  }[action] || { title: `${title} – ${report.code}`, confirm: 'Xác nhận' };
+  const brief = action === 'reject' || action === 'sos';
   return (
     <Modal
       open
+      size={brief ? 'md' : undefined}
       onClose={onClose}
-      title={`${title} – ${report.code}`}
+      title={heading.title}
+      subtitle={heading.subtitle}
       footer={
         <>
-          <button className="btn-ghost" onClick={onClose}>Huỷ</button>
+          <button type="button" className={brief ? 'btn-secondary' : 'btn-ghost'} onClick={onClose}>Huỷ</button>
           <button
-            className={action === 'reject' ? 'btn-ghost text-danger' : 'btn-primary'}
-            disabled={busy || (action === 'reject' && reason.length < 3) || (publishing && pubDesc.trim().length < 10)}
+            type="button"
+            className="btn-primary"
+            disabled={busy || (action === 'reject' && reason.trim().length < 3) || (publishing && pubDesc.trim().length < 10)}
             onClick={submit}
           >
-            Xác nhận
+            {heading.confirm}
           </button>
         </>
       }
     >
       <div className="flex flex-col gap-3 text-sm">
+        {brief && (
+          <p className="rounded-[14px] bg-panel2 p-3">
+            <b>{report.code} · {report.category_label}</b> · {[report.hamlet_name, report.admin_name].filter(Boolean).join(', ')} · {report.photo_urls.length ? `${report.photo_urls.length} ảnh` : 'chưa có ảnh'}
+          </p>
+        )}
         <div>
           {publishing && <span className="font-semibold text-xs text-muted">Nội dung người dân gửi (chỉ cán bộ xem)</span>}
-          <p className="rounded-xl bg-panel2 p-3 italic text-ink border border-line/60 mt-1">
+          <p className={clsx('rounded-xl bg-panel2 p-3 italic text-ink border border-line/60', publishing && 'mt-1')}>
             “{report.description}”
           </p>
         </div>
@@ -166,40 +181,45 @@ function ActionModal({ report, action, onClose }) {
         )}
 
         {action === 'reject' && (
-          <label className="space-y-1">
-            <span className="font-semibold text-xs text-muted">Lý do từ chối (lưu hồ sơ nội bộ)</span>
-            <input
-              className="input mt-1"
-              autoFocus
-              maxLength={500}
-              placeholder="VD: Ảnh không liên quan, trùng phản ánh PA-…"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-            />
-          </label>
+          <>
+            <label className="space-y-1">
+              <span className="font-semibold text-[13px] text-ink-2">Lý do từ chối (lưu hồ sơ nội bộ) *</span>
+              <textarea
+                className="input mt-1 min-h-[80px]"
+                autoFocus
+                maxLength={500}
+                placeholder="VD: Ảnh không liên quan, trùng phản ánh PA-…"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+              />
+            </label>
+            <p className="rounded-[14px] border border-dashed border-line p-3 text-[13px] leading-normal text-ink-2">
+              Phản ánh bị từ chối không hiện trên cổng công khai. Lý do chỉ cán bộ thấy.
+            </p>
+          </>
         )}
 
         {action === 'sos' && (
-          <div className="grid grid-cols-3 gap-2">
-            <label>
-              <span className="text-xs text-muted">Loại sự cố</span>
-              <select className="input mt-1" value={incident} onChange={(e) => setIncident(e.target.value)}>
-                {Object.entries(INCIDENT).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-              </select>
-            </label>
-            <label>
-              <span className="text-xs text-muted">Ưu tiên</span>
-              <select className="input mt-1" value={priority} onChange={(e) => setPriority(Number(e.target.value))}>
-                <option value={1}>Cấp 1 – Đỏ</option>
-                <option value={2}>Cấp 2 – Cam</option>
-                <option value={3}>Cấp 3 – Vàng</option>
-              </select>
-            </label>
-            <label>
-              <span className="text-xs text-muted">Số người mắc kẹt</span>
-              <input className="input mt-1" type="number" min={0} value={trapped} placeholder="theo nội dung" onChange={(e) => setTrapped(e.target.value)} />
-            </label>
-          </div>
+          <>
+            <div role="radiogroup" aria-label="Loại sự cố">
+              <div className="mb-1 font-semibold text-[13px] text-ink-2">Loại sự cố</div>
+              <div className="flex flex-wrap gap-1.5">
+                {Object.entries(INCIDENT).map(([k, v]) => (
+                  <button key={k} type="button" role="radio" aria-checked={incident === k} onClick={() => setIncident(k)} className={clsx('tap h-10 rounded-xl border px-3.5 text-sm font-medium', incident === k ? 'border-accent bg-accent/10 text-accent' : 'border-line bg-panel text-ink-2 hover:border-accent')}>{v}</button>
+                ))}
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <div className="mb-1 font-semibold text-[13px] text-ink-2">Mức ưu tiên</div>
+                <Segmented label="Mức ưu tiên" value={priority} onChange={setPriority} options={[{ value: 1, label: 'Cấp 1 · Đỏ' }, { value: 2, label: 'Cấp 2 · Cam' }, { value: 3, label: 'Cấp 3 · Vàng' }]} />
+              </div>
+              <label>
+                <span className="font-semibold text-[13px] text-ink-2">Số người cần cứu</span>
+                <input className="input mt-1" type="number" min={0} value={trapped} placeholder="Để trống: máy đọc từ nội dung" onChange={(e) => setTrapped(e.target.value)} />
+              </label>
+            </div>
+          </>
         )}
         {action === 'sos' && parsed && (parsed.trapped_count != null || parsed.vulnerable?.length > 0) && (
           <p className="text-xs text-muted">
@@ -210,7 +230,7 @@ function ActionModal({ report, action, onClose }) {
         )}
 
         {action === 'sos' && report.status === 'cho_duyet' && (
-          <p className="text-xs text-muted">
+          <p className="rounded-[14px] border border-dashed border-line p-3 text-[13px] leading-normal text-ink-2">
             Cổng công khai chỉ hiện loại phản ánh, vị trí làm tròn (~150 m) và &quot;đã chuyển thành yêu cầu cứu hộ&quot; —
             không công khai nội dung, ảnh người dân gửi. Đọc lại rồi dùng <b>Sửa phần công khai</b> nếu muốn công khai thêm.
           </p>
@@ -227,6 +247,7 @@ function ActionModal({ report, action, onClose }) {
  * khai (gửi luôn, không qua hộp thoại). Cùng API /reports/{id}/moderate với hộp thoại cũ.
  */
 function ModerateDetail({ r, onAction, onPhoto }) {
+  const canIncident = usePermission('incident', 'update', r.admin_code);
   const qc = useQueryClient();
   const toast = useStore((s) => s.toast);
   const navigate = useNavigate();
@@ -318,6 +339,7 @@ function ModerateDetail({ r, onAction, onPhoto }) {
       </div>
       <div className="mt-auto flex flex-wrap items-center gap-2.5 border-t border-line pt-4">
         <button type="button" className="btn-secondary tap h-11 rounded-xl px-4" onClick={() => onAction(r, 'reject')}>Từ chối…</button>
+        {canIncident && <button type="button" className="btn-secondary tap h-11 rounded-xl px-4" onClick={() => onAction(r, 'incident')}>Đánh dấu điểm sự cố…</button>}
         {!r.sos_ticket_id && (
           <button type="button" className="btn-secondary tap h-11 rounded-xl px-4" onClick={() => onAction(r, 'sos')}>
             <Siren size={15} className="text-danger" aria-hidden="true" /> Chuyển thành phiếu SOS
@@ -333,6 +355,65 @@ function ModerateDetail({ r, onAction, onPhoto }) {
   );
 }
 
+/**
+ * Phản ánh đã công khai trong khung chi tiết máy tính (bản vẽ khung F5): phần người dân thấy trước, từng dòng; nội dung gốc và
+ * người gửi vẫn ở dưới — chỉ cán bộ thấy. "Đánh dấu đã xử lý": phản ánh vẫn hiện trên cổng với nhãn đã xử lý.
+ */
+function PublishedDetail({ r, canModerate, onAction, onPhoto, onMap }) {
+  const canIncident = usePermission('incident', 'update', r.admin_code);
+  const live = r.status === 'da_duyet';
+  const n = r.photo_urls.length;
+  const row = (label, value) => (
+    <div className="flex gap-3 border-t border-line py-2.5">
+      <dt className="w-40 shrink-0 text-ink-2">{label}</dt>
+      <dd className="min-w-0 flex-1 font-medium text-ink">{value}</dd>
+    </div>
+  );
+  return (
+    <div className="card flex flex-col gap-3 p-5">
+      <div className="flex flex-wrap items-center gap-2.5">
+        <h2 className="text-lg font-bold text-ink">{r.code} · {r.category_label}</h2>
+        <span className={clsx('chip text-xs font-semibold', live ? 'bg-accent/10 text-accent' : 'bg-good/15 text-good')}>{live ? 'Đang công khai' : 'Đã xử lý'}</span>
+        <span className="ml-auto text-[13px] text-muted" title={dateTime(r.created_at)}>{ago(r.created_at)} · {r.admin_name}</span>
+      </div>
+      <dl className="text-sm">
+        {row('Phần công khai', r.public_description || r.public_description_suggested)}
+        {row('Vị trí công khai', <button type="button" className="tap text-left font-medium text-accent hover:underline" onClick={onMap}>{r.exact_location ? 'Vị trí chính xác' : 'Làm tròn, lệch tối đa ~150 m'}{r.hamlet_name ? ` · ${r.hamlet_name}` : ''}</button>)}
+        {row('Ảnh', n ? (r.public_photos ? `Công khai ${n} ảnh` : `Không công khai ${n} ảnh`) : 'Không có ảnh')}
+        {r.public_note && row('Ghi chú công khai', r.public_note)}
+        {row('Đã chuyển SOS', r.sos_code ? `${r.sos_code} — tiến độ, đóng phiếu ở trang Cứu hộ` : 'Chưa')}
+        {row('Nội dung gốc', <span className="font-normal">{r.description} <span className="text-muted">(chỉ cán bộ thấy)</span></span>)}
+        {(r.reporter_name || r.reporter_phone) && row('Người gửi', (
+          <span className="font-normal">
+            {r.reporter_name || 'ẩn danh'}
+            {r.reporter_phone && <a className="num ml-2 text-accent hover:underline" href={`tel:${r.reporter_phone.replace(/\s/g, '')}`}>{r.reporter_phone}</a>}
+          </span>
+        ))}
+        {r.moderated_by_name && row('Duyệt bởi', <span className="font-normal">{r.moderated_by_name} · {dateTime(r.moderated_at)}</span>)}
+      </dl>
+      {n > 0 && (
+        <div className="flex gap-2">
+          {r.photo_urls.map((p, i) => (
+            <button key={p.thumb} type="button" onClick={() => onPhoto(p.full)} className="overflow-hidden rounded-xl border border-line hover:border-accent" title="Xem ảnh phóng to">
+              <img src={p.thumb} alt={`Ảnh ${i + 1} của ${r.code}`} className="h-24 w-32 object-cover" loading="lazy" />
+            </button>
+          ))}
+        </div>
+      )}
+      {canModerate && (
+        <div className="mt-1 flex flex-wrap items-center gap-2.5 border-t border-line pt-4">
+          <button type="button" className="btn-secondary tap h-11 rounded-xl px-4" onClick={() => onAction(r, 'edit_public')}><Pencil size={14} aria-hidden="true" /> Sửa phần công khai</button>
+          {!r.sos_ticket_id && <button type="button" className="btn-secondary tap h-11 rounded-xl px-4" onClick={() => onAction(r, 'sos')}><Siren size={14} className="text-danger" aria-hidden="true" /> Chuyển thành phiếu SOS</button>}
+          {canIncident && <button type="button" className="btn-secondary tap h-11 rounded-xl px-4" onClick={() => onAction(r, 'incident')}>Đánh dấu điểm sự cố…</button>}
+          <span className="flex-1" />
+          {live && <button type="button" className="btn-primary tap h-11 rounded-xl px-5" onClick={() => onAction(r, 'resolve')}><CheckCheck size={15} aria-hidden="true" /> Đánh dấu đã xử lý</button>}
+        </div>
+      )}
+      <p className="rounded-[14px] border border-dashed border-line p-3 text-[13px] leading-normal text-ink-2">Đã xử lý vẫn hiện trên cổng với nhãn “đã xử lý”.</p>
+    </div>
+  );
+}
+
 function ReportCard({ r, onAction, onPhoto, fresh = false, large = false }) {
   const urgent = r.category === 'mac_ket' && r.status === 'cho_duyet'; // có người mắc kẹt, chưa xử lý
   const navigate = useNavigate();
@@ -341,6 +422,9 @@ function ReportCard({ r, onAction, onPhoto, fresh = false, large = false }) {
   const st = STATUS[r.status];
   // Máy tính: phản ánh chờ duyệt → soạn phần công khai ngay trong ô (khung F4)
   if (large && canModerate && r.status === 'cho_duyet') return <ModerateDetail key={r.id} r={r} onAction={onAction} onPhoto={onPhoto} />;
+  if (large && (r.status === 'da_duyet' || r.status === 'da_xu_ly')) {
+    return <PublishedDetail key={r.id} r={r} canModerate={canModerate} onAction={onAction} onPhoto={onPhoto} onMap={() => { setFocus({ lat: r.lat, lon: r.lon, zoom: 15, label: r.code }); navigate('/ban-do'); }} />;
+  }
 
   return (
     <div className={clsx('card flex flex-col gap-2.5', large ? 'p-5' : 'p-3.5', r.status === 'cho_duyet' && (urgent ? 'border-danger ring-1 ring-danger/40' : 'border-warn/70'), fresh && 'motion-safe:animate-enter')}>
@@ -552,7 +636,12 @@ export default function CitizenReports() {
   const modals = (
     <>
       {modal && modal.action !== 'reopen' && (
-        <ActionModal report={modal.r} action={modal.action} onClose={() => setModal(null)} />
+        modal.action === 'incident' ? (
+          <IncidentModal
+            at={{ lat: modal.r.lat, lon: modal.r.lon, report: { ...modal.r, incident_type: modal.r.category === 'sat_lo' ? 'sat_lo' : 'giao_thong' } }}
+            onClose={() => setModal(null)}
+          />
+        ) : <ActionModal report={modal.r} action={modal.action} onClose={() => setModal(null)} />
       )}
       {photo && (
         <div
@@ -581,7 +670,7 @@ export default function CitizenReports() {
         <h1 className="sr-only">Phản ánh hiện trường của người dân — {scopeLabel}</h1>
         <div className="grid grid-cols-[400px_minmax(0,1fr)] items-start gap-5">
           <aside aria-label="Danh sách phản ánh" className="sheet sticky top-0 flex max-h-[calc(100vh-9rem)] flex-col gap-3 p-[18px]">
-            <div className="seg-track self-start" role="tablist" aria-label="Trạng thái phản ánh">
+            <div className="seg-track flex-wrap self-start" role="tablist" aria-label="Trạng thái phản ánh">
               {Object.keys(STATUS).map((k) => (
                 <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => { setTab(k); setPicked(null); }} className={clsx('seg-item px-2.5', tab === k && 'seg-item-on')} title={STATUS[k].label}>
                   {SHORT[k]}

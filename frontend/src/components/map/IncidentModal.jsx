@@ -61,8 +61,10 @@ export default function IncidentModal({ at, onClose }) {
   return (
     <Modal
       open
+      size={r ? 'md' : undefined}
       onClose={onClose}
-      title={r ? `Tạo điểm sự cố từ phản ánh ${r.code}` : 'Đánh dấu điểm sự cố'}
+      title={r ? 'Đánh dấu điểm sự cố từ phản ánh' : 'Đánh dấu điểm sự cố'}
+      subtitle={r ? 'Không cần phiếu SOS — chỉ là điểm nguy hiểm trên đường' : undefined}
       footer={
         <>
           <button type="button" className="btn-ghost min-h-[44px] sm:min-h-0" onClick={onClose}>Huỷ</button>
@@ -74,6 +76,7 @@ export default function IncidentModal({ at, onClose }) {
       }
     >
       <div className="grid gap-3 text-sm sm:grid-cols-2">
+        {r && <p className="rounded-[14px] bg-panel2 p-3 sm:col-span-2">Từ phản ánh <b>{r.code}</b>{r.admin_name ? ` · ${r.admin_name}` : ''} · vị trí người dân chấm</p>}
         <label className="flex flex-col gap-1 sm:col-span-2">
           Loại sự cố *
           <select className={field} value={f.type} onChange={set('type')}>
