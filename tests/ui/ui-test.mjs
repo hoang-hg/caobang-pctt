@@ -317,7 +317,7 @@ async function publicPortal(ctx) {
     await page.getByLabel('Mã phiếu').fill('PA-9999999');
     await page.getByLabel('Số điện thoại đã dùng khi gửi').fill('0900000000');
     await page.getByRole('button', { name: 'Tra cứu', exact: true }).click();
-    await page.getByText('Không tìm thấy thông tin phù hợp').waitFor({ timeout: 10_000 });
+    await page.getByText('Không thể hoàn tất tra cứu').waitFor({ timeout: 10_000 });
   });
 
   await step(ctx, 'Bản nhẹ /ban-nhe (mạng yếu) mở được', async () => {

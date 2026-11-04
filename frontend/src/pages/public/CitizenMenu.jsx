@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { ClipboardList, KeyRound, LogOut, UserRound } from 'lucide-react';
+import { citizenApi } from '../../api/citizen';
 import { useCitizen } from '../../app/citizenSession';
 import { Modal, useEscapeToClose } from '../../components/common/ui';
 import CitizenAuth from './CitizenAuth';
@@ -17,6 +19,12 @@ export default function CitizenMenu({ onMyReports }) {
   const [dialog, setDialog] = useState(null); // 'login' | 'change' | 'profile'
   const [skipTemp, setSkipTemp] = useState(false); // đã đóng khung đổi mật khẩu tạm trong lần mở trang này
   const box = useRef(null);
+  // Cùng khoá với "Phiếu của tôi" ở Tra cứu; chỉ tải khi mở menu
+  const mine = useQuery({
+    queryKey: ['my-reports', session?.account?.id],
+    queryFn: () => citizenApi('/public/account/reports'),
+    enabled: menu && !!session && !session.account.must_change_password,
+  });
   useEscapeToClose(menu, () => setMenu(false));
   const mustChange = !!session?.account?.must_change_password;
   const authOpen = dialog === 'login' || dialog === 'change' || (mustChange && !skipTemp);
@@ -62,13 +70,13 @@ export default function CitizenMenu({ onMyReports }) {
         <div className="float-panel absolute right-0 top-full z-[1200] mt-1 w-56 p-1 text-sm" role="menu">
           <div className="border-b border-line px-3 py-2 text-xs text-muted">
             <div className="truncate font-semibold text-ink">{name}</div>
-            <div className="num">{session.account.phone}</div>
+            <div><span className="num">{session.account.phone}</span>{session.account.admin_name ? ` · ${session.account.admin_name}` : ''}</div>
           </div>
           <button type="button" role="menuitem" className={item} onClick={() => { setMenu(false); setDialog('profile'); }}>
             <UserRound size={15} aria-hidden="true" /> Thông tin tài khoản
           </button>
           <button type="button" role="menuitem" className={item} onClick={() => { setMenu(false); onMyReports?.(); }}>
-            <ClipboardList size={15} aria-hidden="true" /> Phiếu của tôi
+            <ClipboardList size={15} aria-hidden="true" /> Phiếu của tôi{mine.data ? <span className="num text-muted">({mine.data.length})</span> : null}
           </button>
           <button type="button" role="menuitem" className={item} onClick={() => { setMenu(false); setDialog('change'); }}>
             <KeyRound size={15} aria-hidden="true" /> Đổi mật khẩu

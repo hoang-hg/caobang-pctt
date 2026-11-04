@@ -14,7 +14,7 @@ import { useStore } from '../../app/store';
 import { AdminBoundaries, AreaFocus, BaseLayer, RAIN_BINS } from '../../components/map/MapTools';
 import { evacIcon, hazardIcon, pinIcon, stationIcon } from '../../components/map/icons';
 import { LEVEL, landslideStatus } from '../../utils/labels';
-import { levelOf, rainLabel, rainLevel, RISK as RISK_SCALE, risk as riskStyle, TILT_LEVEL } from '../../utils/risk';
+import { HAZARD_LEVEL as SEVERITY_LEVEL, levelOf, rainLabel, rainLevel, RISK as RISK_SCALE, risk as riskStyle, TILT_LEVEL } from '../../utils/risk';
 import { ago, dateTime, num, time } from '../../utils/format';
 import { useMediaQuery } from '../../utils/useMediaQuery';
 import { stationView } from '../../utils/stations';
@@ -384,7 +384,7 @@ export default function PublicPortal() {
   // Link cũ ?tab=hochua (tab Hồ chứa đã bỏ — docs/pham-vi-thien-tai.md) → mực nước sông suối
   const tabParam = ({ hochua: 'muanuoc' })[params.get('tab')] || params.get('tab') || '';
   const [activeTab, setActiveTab] = useState(tabParam || (trackParam ? 'tracuu' : 'bando')); // bando | tracuu | muanuoc | sotan | hotlines | huongdan
-  const [mapSidebarTab, setMapSidebarTab] = useState(focusAlert ? 'alerts' : 'legend'); // legend | alerts | rain
+  const [mapSidebarTab, setMapSidebarTab] = useState(() => (focusAlert || window.matchMedia?.('(min-width: 1280px)').matches ? 'alerts' : 'legend')); // legend | alerts | rain — máy tính mở sẵn Bản tin (khung N1)
   const [alertCode, setAlertCode] = useState(focusAlert || null); // máy tính: cảnh báo đang mở trong hộp (khung N16)
   const scrolledToAlert = useRef(false);
   // Cuộn tới thanh tab (ngay trên bản đồ / nội dung tab) — theo phần tử, không theo số pixel cố định: khối phía trên
@@ -1381,13 +1381,14 @@ export default function PublicPortal() {
                     onClick={() => setMapSidebarTab('alerts')}
                     className={clsx(
                       'flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-bold transition cursor-pointer relative',
+                      desk && 'order-first',
                       mapSidebarTab === 'alerts'
                         ? 'bg-panel text-danger shadow-xs'
                         : 'text-muted hover:text-ink hover:bg-panel/50'
                     )}
                   >
                     <Megaphone size={14} className={activeAlerts.length > 0 ? 'text-danger motion-safe:animate-pulse' : ''} />
-                    <span className="truncate">Cảnh báo</span>
+                    <span className="truncate">{desk ? 'Bản tin' : 'Cảnh báo'}</span>
                     {activeAlerts.length > 0 ? (
                       <span className="chip text-[10px] py-0 px-1.5 bg-danger text-white font-mono font-bold motion-safe:animate-pulse">
                         {activeAlerts.length}
@@ -1426,7 +1427,81 @@ export default function PublicPortal() {
                   )}
 
                   {/* TAB 2: CẢNH BÁO CHÍNH THỨC */}
-                  {mapSidebarTab === 'alerts' && (
+                  {/* Máy tính ≥ 1280 px (bản vẽ khung N1): bản tin một dòng mỗi lệnh (bấm mở hộp chi tiết) + 3 chuyên đề */}
+                  {mapSidebarTab === 'alerts' && desk && (() => {
+                    const top = (overview?.rivers || []).reduce((m, r) => (!m || r.level > m.level ? r : m), null);
+                    const ls = overview?.landslides;
+                    const topics = [
+                      {
+                        key: 'mua',
+                        title: 'Mưa lớn',
+                        level: overview?.rain?.max_24h != null ? rainLevel(overview.rain.max_24h) : null,
+                        text: overview?.rain?.avg_24h != null
+                          ? <>Mưa 24 giờ qua trung bình <b className="num">{num(overview.rain.avg_24h, 1)} mm</b>{overview?.forecast_24h?.max_24h != null && <> · dự báo cao nhất <b className="num">{num(overview.forecast_24h.max_24h, 1)} mm</b></>}</>
+                          : 'Chưa có số liệu mưa — đang cập nhật',
+                        link: 'Xem bản đồ mưa dự báo theo xã',
+                        go: () => setActiveTab('dubao'),
+                      },
+                      {
+                        key: 'sat-lo',
+                        title: 'Sạt lở, lũ quét',
+                        level: ls ? (ls.blocked_count > 0 ? 3 : ls.warning_count > 0 ? 2 : null) : null,
+                        text: ls ? <>Cấm xe / tắc nghẽn: <b className="num">{ls.blocked_count ?? 0}</b> điểm · cảm biến nghiêng lớn nhất <b className="num">{maxTiltText(map?.landslides)}</b></> : 'Chưa có số liệu điểm đen',
+                        link: 'Xem điểm đen & lộ trình vòng tránh',
+                        go: () => setActiveTab('satlo'),
+                      },
+                      {
+                        key: 'ngap',
+                        title: 'Ngập lụt',
+                        level: top ? top.level : null,
+                        text: top ? <>Trạm cao nhất: <b>{top.name}</b> · {top.level_label}</> : 'Chưa có trạm đo mực nước trong hệ thống',
+                        link: 'Xem mực nước từng trạm',
+                        go: () => setActiveTab('muanuoc'),
+                      },
+                    ];
+                    return (
+                      <div className="flex flex-col gap-2.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <h2 className="text-[13px] font-bold text-ink-2">Bản tin chỉ đạo điều hành</h2>
+                          {mapAt > 0 && <span className="num text-[13px] text-muted">{time(mapAt)}</span>}
+                        </div>
+                        {!alertsLoaded ? (
+                          alertsFailed ? (
+                            <div role="alert" className="rounded-[14px] border border-dashed border-line p-3 text-sm text-ink-2">
+                              <b className="block text-ink">Chưa tải được bản tin cảnh báo</b>
+                              Mạng hoặc máy chủ đang gián đoạn — không có nghĩa là an toàn. Nguy hiểm đến tính mạng: gọi 112.
+                              <button type="button" className="btn-secondary tap mt-2 h-10 rounded-xl px-3 text-[13px]" onClick={() => refetchAlerts()}><RotateCw size={14} aria-hidden="true" /> Thử lại</button>
+                            </div>
+                          ) : <Loader2 size={22} className="mx-auto my-4 text-muted motion-safe:animate-spin" aria-label="Đang tải bản tin cảnh báo" />
+                        ) : alerts.length ? alerts.map((a) => (
+                          <button
+                            key={a.code}
+                            id={`canh-bao-${a.code}`}
+                            type="button"
+                            onClick={() => setAlertCode(a.code)}
+                            className={clsx('tap w-full rounded-[14px] border border-l-4 border-line px-3 py-2.5 text-left hover:bg-panel2', a.active === false ? 'opacity-75' : riskStyle(SEVERITY_LEVEL[a.severity]).edge, a.code === focusAlert && 'ring-2 ring-accent')}
+                          >
+                            <span className="flex items-start gap-2">
+                              {a.active !== false && LEVEL[a.severity] && <span className={clsx('chip shrink-0 px-2 py-0 text-xs font-bold', LEVEL[a.severity].cls)}>{LEVEL[a.severity].label}</span>}
+                              <b className="min-w-0 text-sm leading-snug text-ink">{a.title}</b>
+                            </span>
+                            <span className="mt-0.5 block text-[13px] leading-snug text-muted">
+                              {a.areas.slice(0, 3).join(', ')}{a.areas.length > 3 ? ` và ${a.areas.length - 3} xã khác` : ''}{a.active === false ? ' · đã kết thúc' : a.valid_until ? ` · tới ${dateTime(a.valid_until)}` : ''}
+                            </span>
+                          </button>
+                        )) : <p className="rounded-[14px] bg-panel2 p-3 text-sm font-semibold text-ink">Hiện không có cảnh báo khẩn cấp trên địa bàn tỉnh</p>}
+                        <h2 className="mt-1 text-[13px] font-bold text-ink-2">3 chuyên đề</h2>
+                        {topics.map((t) => (
+                          <button key={t.key} type="button" onClick={() => { t.go(); scrollToContent(); }} className={clsx('tap w-full rounded-[14px] border-l-4 bg-panel2 px-3 py-2.5 text-left hover:bg-panel2/70', t.level == null ? 'border-l-line' : riskStyle(t.level).edge)}>
+                            <b className="block text-sm text-ink">{t.title}</b>
+                            <span className="mt-0.5 block text-[13px] leading-snug text-ink-2">{t.text}</span>
+                            <span className="mt-1 inline-flex items-center text-[13px] font-semibold text-accent">{t.link} <ChevronRight size={13} aria-hidden="true" /></span>
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                  {mapSidebarTab === 'alerts' && !desk && (
                     <div className="flex flex-col gap-2.5">
                       <div className="flex items-center justify-between pb-2 border-b border-line/60">
                         <div className="text-xs font-bold text-muted flex items-center gap-1.5">
@@ -1541,7 +1616,7 @@ export default function PublicPortal() {
             </div>
 
             {/* 3 chuyên đề trọng tâm theo 3 nhóm thiên tai: Mưa lớn · Sạt lở, lũ quét · Ngập lụt */}
-            <section className="space-y-2.5 pt-2">
+            {!desk && <section className="space-y-2.5 pt-2">
               <div className="flex items-center justify-between">
                 <h2 className="text-xs font-bold text-muted flex items-center gap-1.5">
                   <span>3 chuyên đề trọng tâm: Mưa lớn · Sạt lở, lũ quét · Ngập lụt</span>
@@ -1709,7 +1784,7 @@ export default function PublicPortal() {
                 </div>
 
               </div>
-            </section>
+            </section>}
           </div>
         )}
 
@@ -2277,10 +2352,10 @@ export default function PublicPortal() {
               </div>
             ))}
             {!map?.reports?.length && (
-              <div className="col-span-full p-4 rounded-2xl bg-good/5 border border-good/20 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+              <div className="col-span-full p-4 rounded-2xl bg-panel2 border border-line flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-good/15 text-good">
-                    <CheckCircle2 size={20} />
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-panel text-muted">
+                    <Camera size={20} />
                   </div>
                   <div>
                     <div className="text-xs font-bold text-ink">Chưa có phản ánh hiện trường đã xác minh trong 72 giờ qua</div>
@@ -2300,12 +2375,26 @@ export default function PublicPortal() {
         </section>}
 
         {/* Footer */}
+        {desk ? (
+          <footer className="mt-1 border-t border-line/60 pt-3 pb-1 text-[13px] text-ink-2">
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
+              <span>Ban Chỉ huy Phòng chống thiên tai & Tìm kiếm cứu nạn tỉnh Cao Bằng</span>
+              {mapAt > 0 && <span>Số liệu lúc <span className="num">{time(mapAt)}</span></span>}
+              <span className="flex-1" />
+              <span>Mạng yếu? Dùng <a href="/ban-nhe" className="font-semibold text-accent hover:underline">bản nhẹ</a> (chỉ chữ, dưới 50 KB)</span>
+              <button type="button" onClick={() => openTab('huongdan')} className="font-semibold text-accent hover:underline">Cẩm nang an toàn</button>
+              <a href={auth?.token ? '/dashboard' : '/dang-nhap'} className="font-semibold text-accent hover:underline">{auth?.token ? 'Vào trang điều hành' : 'Cán bộ đăng nhập'}</a>
+            </div>
+            <div className="mt-1 text-xs text-muted">Số liệu quan trắc phục vụ chỉ đạo điều hành và thông tin cảnh báo an toàn cho nhân dân</div>
+          </footer>
+        ) : (
         <footer className="mt-4 border-t border-line/60 pt-6 pb-4 text-center text-xs text-muted leading-relaxed">
           <div className="font-semibold text-ink">Ban Chỉ huy Phòng chống thiên tai & Tìm kiếm cứu nạn tỉnh Cao Bằng</div>
           <div>Cập nhật dữ liệu thời gian thực · Trực ban tác chiến: <a href="tel:112" className="text-danger font-bold hover:underline">112</a></div>
           <div>Mạng yếu? Dùng <a href="/ban-nhe" className="text-accent font-semibold hover:underline">bản nhẹ</a> (chỉ chữ, dưới 50 KB) · <button type="button" onClick={() => openTab('huongdan')} className="font-semibold text-accent hover:underline">Cẩm nang an toàn</button></div>
           <div className="text-[11px] mt-1 text-muted/80">Số liệu quan trắc phục vụ chỉ đạo điều hành và thông tin cảnh báo an toàn cho nhân dân</div>
         </footer>
+        )}
       </main>
 
       {/* Modal Cứu nạn khẩn cấp */}

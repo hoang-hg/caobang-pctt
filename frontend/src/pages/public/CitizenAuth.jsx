@@ -110,7 +110,7 @@ export default function CitizenAuth({ initial = 'login', reason, onDone }) {
       )}
 
       <form
-        className="flex flex-col gap-3"
+        className={mode === 'register' ? 'grid gap-3 sm:grid-cols-2 [&>*]:min-w-0' : 'flex flex-col gap-3'}
         onSubmit={(e) => {
           e.preventDefault();
           ({ login, register, forgot, change })[mode]();
@@ -160,13 +160,15 @@ export default function CitizenAuth({ initial = 'login', reason, onDone }) {
         )}
         {mode === 'register' && (
           <>
-            <Field id="cd-xa" label="Xã / phường đang ở (không bắt buộc)">
-              <select id="cd-xa" className="input" value={f.admin_code} onChange={set('admin_code')}>
-                <option value="">— Chọn xã / phường —</option>
-                {communes.map((u) => <option key={u.code} value={u.code}>{u.name}</option>)}
-              </select>
-            </Field>
-            <label className="flex items-start gap-2 text-xs leading-relaxed text-ink-2">
+            <div className="sm:col-span-2">
+              <Field id="cd-xa" label="Xã / phường đang ở (không bắt buộc)">
+                <select id="cd-xa" className="input" value={f.admin_code} onChange={set('admin_code')}>
+                  <option value="">— Chọn xã / phường —</option>
+                  {communes.map((u) => <option key={u.code} value={u.code}>{u.name}</option>)}
+                </select>
+              </Field>
+            </div>
+            <label className="flex items-start gap-2 text-xs leading-relaxed text-ink-2 sm:col-span-2">
               <input type="checkbox" className="mt-0.5" checked={f.consent} onChange={set('consent')} />
               <span>
                 Tôi đồng ý cho Ban Chỉ huy Phòng chống thiên tai &amp; Tìm kiếm cứu nạn tỉnh Cao Bằng dùng họ tên, số điện thoại
@@ -175,7 +177,7 @@ export default function CitizenAuth({ initial = 'login', reason, onDone }) {
             </label>
             {/* Trường ẩn chống bot tự động */}
             <input type="text" name="website" tabIndex={-1} autoComplete="off" className="hidden" value={f.website} onChange={set('website')} aria-hidden="true" />
-            {siteKey && <Turnstile key={tokenRound} siteKey={siteKey} onToken={setToken} onError={onTurnstileError} />}
+            {siteKey && <div className="sm:col-span-2"><Turnstile key={tokenRound} siteKey={siteKey} onToken={setToken} onError={onTurnstileError} /></div>}
           </>
         )}
         {mode === 'forgot' && (
@@ -185,12 +187,12 @@ export default function CitizenAuth({ initial = 'login', reason, onDone }) {
           </p>
         )}
 
-        {error && <p role="alert" className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
-        {info && <p role="status" className="rounded-lg bg-good/10 px-3 py-2 text-sm text-ink">{info}</p>}
+        {error && <p role="alert" className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger sm:col-span-2">{error}</p>}
+        {info && <p role="status" className="rounded-lg bg-good/10 px-3 py-2 text-sm text-ink sm:col-span-2">{info}</p>}
 
         <button
           type="submit"
-          className="btn-primary justify-center py-2.5 text-sm font-semibold"
+          className="btn-primary justify-center py-2.5 text-sm font-semibold sm:col-span-2"
           disabled={busy || (mode === 'register' && (!f.consent || (siteKey && !token)))}
         >
           {busy ? 'Đang xử lý…' : { login: 'Đăng nhập', register: 'Đăng ký', forgot: 'Gửi đường dẫn đặt lại', change: 'Đổi mật khẩu' }[mode]}
@@ -198,10 +200,14 @@ export default function CitizenAuth({ initial = 'login', reason, onDone }) {
       </form>
 
       {mode === 'login' && (
-        <button type="button" onClick={() => go('forgot')} className="self-start text-xs font-semibold text-accent hover:underline">
-          Quên mật khẩu?
-        </button>
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs">
+          <button type="button" onClick={() => go('forgot')} className="font-semibold text-accent hover:underline">
+            Quên mật khẩu?
+          </button>
+          <span className="text-ink-2">Chưa có tài khoản? <button type="button" onClick={() => go('register')} className="font-semibold text-accent hover:underline">Đăng ký</button></span>
+        </div>
       )}
+      {mode === 'register' && <p className="text-xs text-ink-2">Mỗi số điện thoại một tài khoản. Đăng ký xong được đăng nhập luôn.</p>}
       {mode === 'forgot' && (
         <button type="button" onClick={() => go('login')} className="self-start text-xs font-semibold text-accent hover:underline">
           Quay lại đăng nhập

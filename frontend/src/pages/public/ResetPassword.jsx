@@ -29,7 +29,7 @@ export default function ResetPassword() {
   };
 
   return (
-    <div className="flex min-h-full items-start justify-center bg-bg p-4 pt-12 text-ink">
+    <div className="flex min-h-full items-start justify-center bg-bg p-4 pt-12 text-ink lg:items-center lg:pt-4">
       <div className="card w-full max-w-md p-5">
         <div className="mb-4 flex items-center gap-2.5">
           <ShieldAlert size={26} className="shrink-0 text-danger" aria-hidden="true" />

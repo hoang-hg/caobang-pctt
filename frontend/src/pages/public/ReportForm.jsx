@@ -275,8 +275,8 @@ export default function ReportForm({ onClose, myLocation, onTrack, initialKind =
         }
       >
         <div className="flex flex-col items-center gap-3 py-6 text-center">
-          <div className={clsx('flex h-16 w-16 items-center justify-center rounded-full', sos ? 'bg-danger/15 text-danger' : 'bg-good/15 text-good')}>
-            {sos ? <Siren size={36} /> : <CheckCircle2 size={40} />}
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-good/15 text-good">
+            <CheckCircle2 size={40} />
           </div>
           <div className="text-xl font-bold text-ink">{sos ? 'Đã chuyển tới bảng điều hành cứu hộ' : 'Đã tiếp nhận phản ánh'}</div>
           <div className="rounded-xl bg-panel2 p-3 text-sm flex flex-col items-center gap-1 max-w-sm w-full border border-line">
@@ -307,7 +307,7 @@ export default function ReportForm({ onClose, myLocation, onTrack, initialKind =
           <p className="max-w-md text-sm text-ink-2 leading-relaxed">
             {done.message || 'Cảm ơn bạn. Cán bộ địa phương sẽ xác minh phản ánh; nếu nguy hiểm đến tính mạng hãy gọi ngay 112.'}
           </p>
-          {sos && (
+          {(
             <a href="tel:112" className="tap inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-danger/50 px-4 text-sm font-bold text-danger hover:bg-danger/10">
               <PhoneCall size={16} aria-hidden="true" /> Nguy hiểm tăng lên? Gọi ngay 112
             </a>
