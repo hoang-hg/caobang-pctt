@@ -564,21 +564,15 @@ export default function PublicPortal() {
                     type="button"
                     onClick={() => setActiveTab(g.tabs[0])}
                     aria-current={on ? 'page' : undefined}
-                    className={clsx('tap flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[10px] px-3 py-2 text-sm', on ? 'bg-accent/10 font-semibold text-accent' : 'text-ink-2 hover:bg-panel2 hover:text-ink')}
+                    className={clsx('tap flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[10px] px-2.5 py-2 text-sm', on ? 'bg-accent/10 font-semibold text-accent' : 'text-ink-2 hover:bg-panel2 hover:text-ink')}
                   >
                     {g.label}
-                    {blocked ? <span className="rounded-full bg-danger px-1.5 text-[10px] font-bold text-white">{blocked} điểm cấm</span> : null}
+                    {/* Từ 1536 px: đủ chỗ ghi số điểm cấm ngay trên menu (dưới đó dải cảnh báo đầu trang đã nói) */}
+                    {blocked ? <span className="rounded-full bg-danger px-1.5 text-[10px] font-bold text-white max-2xl:hidden">{blocked} điểm cấm</span> : null}
                   </button>
                 );
               })}
-              <button
-                type="button"
-                onClick={() => setActiveTab('huongdan')}
-                aria-current={activeTab === 'huongdan' ? 'page' : undefined}
-                className={clsx('tap shrink-0 whitespace-nowrap rounded-[10px] px-3 py-2 text-sm', activeTab === 'huongdan' ? 'bg-accent/10 font-semibold text-accent' : 'text-muted hover:bg-panel2 hover:text-ink')}
-              >
-                Cẩm nang an toàn
-              </button>
+              {/* Cẩm nang an toàn: ở chân trang (bản vẽ khung N1) — 5 chuyên mục + nút gọi / gửi vừa một hàng ở 1280 – 1440 px */}
             </nav>
           )}
 
@@ -586,7 +580,8 @@ export default function PublicPortal() {
             {/* <a> chứ không phải <Link>: /ban-nhe là trang máy chủ dựng (nginx → backend), không phải route của ứng dụng */}
             <a
               href="/ban-nhe"
-              className={desk ? 'tap shrink-0 px-1 text-[13px] text-muted hover:text-ink hover:underline' : 'btn max-sm:hidden border border-line bg-panel px-2.5 py-1.5 text-xs font-semibold text-ink-2 hover:bg-panel2 hover:text-ink'}
+              // 1280 – 1439 px: bản nhẹ chỉ ở chân trang — 5 chuyên mục vừa một hàng
+              className={desk ? 'tap shrink-0 px-1 text-[13px] text-muted hover:text-ink hover:underline max-[1439px]:hidden' : 'btn max-sm:hidden border border-line bg-panel px-2.5 py-1.5 text-xs font-semibold text-ink-2 hover:bg-panel2 hover:text-ink'}
               title="Chuyển sang bản chỉ có chữ (dưới 50 KB) khi mạng 2G/3G yếu"
             >
               {!desk && <Zap size={14} className="shrink-0 text-amber-500" aria-hidden="true" />}
@@ -612,7 +607,7 @@ export default function PublicPortal() {
             </button>
 
             <button
-              className="btn-ghost p-2 text-ink-2 hover:text-ink"
+              className={clsx('btn-ghost p-2 text-ink-2 hover:text-ink', desk && 'max-[1439px]:hidden')}
               onClick={toggleTheme}
               aria-label="Đổi giao diện sáng/tối"
             >
@@ -1667,13 +1662,14 @@ export default function PublicPortal() {
         {/* TAB TRA CỨU TIẾN ĐỘ CỨU HỘ & PHẢN ÁNH */}
         {activeTab === 'tracuu' && (
           <>
-            {/* Đã đăng nhập tài khoản người dân: các phiếu đã gửi — xem tiến độ không cần nhập mã */}
-            <MyReports onTrack={(code, phone) => setTrack({ code, phone })} />
+            {/* Đã đăng nhập tài khoản người dân: các phiếu đã gửi — xem tiến độ không cần nhập mã. Máy tính: cột trái, dưới khung
+                tra cứu (bản vẽ khung N10); nhỏ hơn: trên khung tra cứu */}
             <TicketTracker
               initialCode={track.code}
               initialPhone={track.phone}
               onQueryChange={setTrack}
               onBackToMap={goToMap}
+              side={<MyReports compact={desk} active={track.code} onTrack={(code, phone) => setTrack({ code, phone })} />}
             />
           </>
         )}
