@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Check, Copy, Download, Loader2, QrCode, ShieldCheck, ShieldOff, Smartphone } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Check, Copy, Download, Loader2, QrCode, ShieldCheck, ShieldOff } from 'lucide-react';
 import { api } from '../../api/client';
 import { useStore } from '../../app/store';
 import { Modal } from '../common/ui';
@@ -92,12 +92,22 @@ export function MfaSetup({ challenge = null, onDone }) {
     }
   };
 
+  // Cài bắt buộc lúc đăng nhập (có challenge — bản vẽ khung L3): hiện mã QR ngay, không qua nút "Tạo mã QR"
+  const started = useRef(false);
+  useEffect(() => {
+    if (!challenge || started.current) return;
+    started.current = true;
+    call('/auth/mfa/setup', { challenge }, setSetup);
+  }, [challenge]); // chỉ một lần khi mở
+
   if (result) {
     return <RecoveryCodes codes={result.recovery_codes} onDone={() => onDone({ token: result.token, user: result.user })} />;
   }
   return (
     <div className="flex flex-col gap-3 text-sm">
-      {!setup ? (
+      {!setup && challenge && busy ? (
+        <div className="flex items-center gap-2 py-6 text-muted"><Loader2 size={16} className="animate-spin" aria-hidden="true" /> Đang tạo mã QR…</div>
+      ) : !setup ? (
         <>
           <p className="text-ink-2">
             Cài ứng dụng xác thực trên điện thoại (<b>Google Authenticator</b>, <b>Microsoft Authenticator</b> hoặc tương tự).
@@ -111,11 +121,14 @@ export function MfaSetup({ challenge = null, onDone }) {
       ) : (
         <form className="flex flex-col gap-3"
           onSubmit={(e) => { e.preventDefault(); call('/auth/mfa/enable', { challenge, code }, setResult); }}>
-          <div className="flex items-start gap-2 text-ink-2">
-            <Smartphone size={16} className="mt-0.5 shrink-0 text-accent" />
-            <span>Mở ứng dụng → <b>Thêm tài khoản</b> → <b>Quét mã QR</b>:</span>
+          <div className="flex flex-wrap items-center gap-3.5">
+            <img src={setup.qr} alt="Mã QR cài đặt xác thực 2 lớp" className="mx-auto h-40 w-40 shrink-0 rounded-xl border border-line bg-white p-1" />
+            <ol className="min-w-[12rem] flex-1 list-decimal space-y-1 pl-5 leading-relaxed text-ink-2">
+              <li>Cài <b className="text-ink">Google Authenticator</b> hoặc <b className="text-ink">Microsoft Authenticator</b></li>
+              <li>Mở ứng dụng → <b className="text-ink">Thêm tài khoản</b> → <b className="text-ink">Quét mã QR</b></li>
+              <li>Nhập mã 6 số đang hiện</li>
+            </ol>
           </div>
-          <img src={setup.qr} alt="Mã QR cài đặt xác thực 2 lớp" className="mx-auto h-48 w-48 rounded-lg bg-white p-1" />
           <details className="text-xs text-muted">
             <summary className="cursor-pointer">Không quét được? Nhập khoá thủ công</summary>
             <div className="mt-1 break-all rounded bg-panel2 p-2 font-mono text-ink">{setup.secret.match(/.{1,4}/g).join(' ')}</div>
@@ -125,7 +138,7 @@ export function MfaSetup({ challenge = null, onDone }) {
             <CodeInput value={code} onChange={setCode} />
           </label>
           <button className="btn-primary justify-center" disabled={code.length !== 6 || busy}>
-            {busy ? <Loader2 size={15} className="animate-spin" /> : <ShieldCheck size={15} />} Xác nhận & bật
+            {busy ? <Loader2 size={15} className="animate-spin" /> : <ShieldCheck size={15} />} Bật xác thực 2 lớp
           </button>
         </form>
       )}
