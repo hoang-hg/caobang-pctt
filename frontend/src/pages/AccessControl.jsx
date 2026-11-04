@@ -10,7 +10,7 @@ import { PAGE } from '../components/layout/page';
 import { Confirm, Empty, ErrorState, Modal, Segmented, Skeleton, StepChips, Tabs } from '../components/common/ui';
 import { usePermission } from '../rbac/usePermission';
 import { canManageAt, GLOBAL } from '../rbac/permissions';
-import { dateTime } from '../utils/format';
+import { dateTime, foldVi } from '../utils/format';
 import { PASSWORD_HINT, weakPassword } from './AccountPages';
 import CitizenAccountsTab from './CitizenAccountsTab';
 import { useMediaQuery } from '../utils/useMediaQuery';
@@ -100,11 +100,11 @@ function RoleChoice({ value, onChange }) {
             className={clsx('tap flex cursor-pointer items-start gap-3 rounded-lg border p-3', value === r.name ? 'border-accent bg-accent/5' : 'border-line hover:border-accent')}
           >
             <input type="radio" name="cap-tai-khoan" className="mt-1" checked={value === r.name} onChange={() => onChange(r.name)} />
-            <span className="icon-tile mt-0.5 h-10 w-10" aria-hidden="true"><t.icon size={20} strokeWidth={1.75} /></span>
+            <span className="icon-tile mt-0.5 h-10 w-10 xl:hidden" aria-hidden="true"><t.icon size={20} strokeWidth={1.75} /></span>
             <span className="min-w-0 text-sm">
               <b className="block">{t.name} <span className="font-normal text-muted">· Cấp {t.level}</span></b>
               <span className="block text-ink-2">Dành cho: {t.who}</span>
-              <span className="block text-ink-2">Làm được: {t.can}</span>
+              <span className="block text-ink-2 xl:hidden">Làm được: {t.can}</span>
             </span>
           </label>
         );
@@ -230,21 +230,20 @@ function CreateUserModal({ onClose }) {
   return (
     <Modal
       open
+      size="md"
       onClose={onClose}
       title="Tạo tài khoản công vụ"
+      subtitle={step === 3 ? 'Bước 4/4 — kiểm tra trước khi tạo' : `Bước ${step + 1}/4`}
       footer={
         <>
-          {step > 0 ? (
-            <button type="button" className="btn-ghost" disabled={busy} onClick={() => setStep(step - 1)}>Quay lại</button>
-          ) : (
-            <button type="button" className="btn-ghost" onClick={onClose}>Huỷ</button>
-          )}
+          {step > 0 && <button type="button" className="btn-secondary tap mr-auto" disabled={busy} onClick={() => setStep(step - 1)}>Quay lại</button>}
+          <button type="button" className="btn-secondary tap" disabled={busy} onClick={onClose}>Huỷ</button>
           {step < STEPS.length - 1 ? (
-            <button type="button" className="btn-primary" disabled={!ok[step]} title={missing ? `Còn thiếu: ${missing}` : undefined} onClick={() => setStep(step + 1)}>
+            <button type="button" className="btn-primary tap" disabled={!ok[step]} title={missing ? `Còn thiếu: ${missing}` : undefined} onClick={() => setStep(step + 1)}>
               Tiếp: {STEPS[step + 1].toLowerCase()}
             </button>
           ) : (
-            <button type="button" className="btn-primary" disabled={busy || !ok.every(Boolean)} onClick={submit}>
+            <button type="button" className="btn-primary tap" disabled={busy || !ok.every(Boolean)} onClick={submit}>
               <UserPlus size={15} /> Tạo tài khoản
             </button>
           )}
@@ -288,16 +287,29 @@ function CreateUserModal({ onClose }) {
       )}
       {step === 3 && (
         <div className="flex flex-col gap-3 text-sm">
-          <p className="rounded-lg bg-panel2 p-3">
-            Tạo tài khoản <b className="font-mono">{f.username}</b> cho <b>{f.full_name}</b>
-            {f.position ? ` (${f.position})` : ''} — <b>{getTier(f.role).name}</b>, {place}
-            {province && f.pin ? ', có mã PIN duyệt cảnh báo' : ''}.
-          </p>
-          <ul className="list-disc space-y-1 pl-5 text-ink-2">
-            <li>Người này đăng nhập bằng mật khẩu ban đầu bạn giao, lần đầu phải đổi sang mật khẩu của riêng mình.</li>
-            <li>Giao mật khẩu tận tay hoặc qua điện thoại — không gửi qua nhóm chat.</li>
-            <li>Tài khoản này làm được: {getTier(f.role).can}</li>
-          </ul>
+          {/* Xem lại dạng bảng (bản vẽ khung J4) */}
+          <dl className="border-y border-line">
+            {[
+              ['Cấp', `${getTier(f.role).name} · Cấp ${getTier(f.role).level}`],
+              ['Địa bàn', place],
+              ['Họ tên', f.full_name],
+              ['Chức vụ', f.position || '—'],
+              ['Email', f.email || '—'],
+              ['Tên đăng nhập', <span key="u" className="font-mono">{f.username}</span>],
+              ['Mật khẩu ban đầu', 'đã nhập — giao tận tay'],
+              ...(province ? [['Mã PIN duyệt cảnh báo', f.pin ? 'có' : 'chưa cấp']] : []),
+            ].map(([k, v]) => (
+              <div key={k} className="flex gap-3 border-t border-line py-2 first:border-t-0">
+                <dt className="w-44 shrink-0 text-ink-2">{k}</dt>
+                <dd className="min-w-0 flex-1 font-semibold [overflow-wrap:anywhere]">{v}</dd>
+              </div>
+            ))}
+          </dl>
+          <div className="rounded-[14px] border border-dashed border-line p-3 text-[13px] leading-normal text-ink-2">
+            Người này đăng nhập bằng mật khẩu ban đầu bạn giao, lần đầu phải đổi sang mật khẩu của riêng mình. Giao mật khẩu tận tay
+            hoặc qua điện thoại — không gửi qua nhóm chat.
+            <span className="mt-1 block">Làm được: {getTier(f.role).can}</span>
+          </div>
         </div>
       )}
       {missing && <p className="mt-3 text-xs text-muted">Còn thiếu: {missing}.</p>}
@@ -319,8 +331,10 @@ function AssignmentModal({ user, onClose }) {
   return (
     <Modal
       open
+      size="md"
       onClose={onClose}
       title={`Đổi cấp / địa bàn – ${user.full_name}`}
+      subtitle="Chỉ cấp trên đổi được cho cấp dưới"
       footer={
         <>
           <button type="button" className="btn-ghost" onClick={onClose}>Huỷ</button>
@@ -352,6 +366,23 @@ function CredentialsModal({ user, onClose }) {
   const [password, setPassword] = useState('');
   const [pin, setPin] = useState('');
   const canApprove = (user.level ?? 9) <= 2;
+  // Bản vẽ khung J10: chọn việc trước — mật khẩu · mã PIN · cả hai (đổi việc thì bỏ ô không dùng)
+  const [what, setWhat] = useState('mk');
+  const pick = (w) => {
+    setWhat(w);
+    if (w === 'pin') setPassword('');
+    if (w === 'mk') setPin('');
+  };
+  // Mật khẩu tạm ngẫu nhiên (bản vẽ khung J5) — sinh ngay trên máy, hiện ra để đọc / giao cho người dùng
+  const [shown, setShown] = useState(false);
+  const randomPassword = () => {
+    const pool = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const n = crypto.getRandomValues(new Uint32Array(12));
+    let p = '';
+    n.forEach((x) => { p += pool[x % pool.length]; });
+    setPassword(`${p}a7K`); // đủ chữ thường, chữ hoa, số theo quy tắc mật khẩu
+    setShown(true);
+  };
   const action = password && pin ? 'Đặt lại mật khẩu và mã PIN' : pin ? 'Đổi mã PIN' : 'Đặt lại mật khẩu';
   const submit = async () => {
     const body = { ...(password ? { password } : {}), ...(pin ? { pin } : {}) };
@@ -360,14 +391,16 @@ function CredentialsModal({ user, onClose }) {
   return (
     <Modal
       open
+      size="md"
       onClose={onClose}
       title={canApprove ? `Đặt lại mật khẩu / mã PIN – ${user.full_name}` : `Đặt lại mật khẩu – ${user.full_name}`}
+      subtitle={<>{user.username} · thao tác ghi vào nhật ký</>}
       footer={
         <>
-          <button type="button" className="btn-ghost" onClick={onClose}>Huỷ</button>
+          <button type="button" className="btn-secondary tap" onClick={onClose}>Huỷ</button>
           <button
             type="button"
-            className="btn-primary"
+            className="btn-primary tap"
             disabled={(!password && !pin) || (password && weakPassword(password)) || (pin && !PIN_RE.test(pin))}
             onClick={submit}
           >
@@ -376,11 +409,25 @@ function CredentialsModal({ user, onClose }) {
         </>
       }
     >
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Mật khẩu mới" hint={PASSWORD_HINT} error={password && weakPassword(password) ? PASSWORD_HINT : ''}>
-          <input className="input" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
-        </Field>
-        {canApprove && (
+      {canApprove && (
+        <div className="seg-track mb-3" role="radiogroup" aria-label="Việc cần làm">
+          {[['mk', 'Đặt lại mật khẩu'], ['pin', 'Đổi mã PIN'], ['ca_hai', 'Cả hai']].map(([v, label]) => (
+            <button key={v} type="button" role="radio" aria-checked={what === v} onClick={() => pick(v)} className={clsx('tap seg-item min-h-[40px]', what === v && 'seg-item-on')}>{label}</button>
+          ))}
+        </div>
+      )}
+      <div className="grid gap-3">
+        {what !== 'pin' && (
+          <div className="flex items-start gap-2">
+            <div className="min-w-0 flex-1">
+              <Field label="Mật khẩu mới" hint={PASSWORD_HINT} error={password && weakPassword(password) ? PASSWORD_HINT : ''}>
+                <input className="input font-mono" type={shown ? 'text' : 'password'} autoComplete="new-password" value={password} onChange={(e) => { setPassword(e.target.value); setShown(false); }} />
+              </Field>
+            </div>
+            <button type="button" className="btn-secondary tap mt-6 shrink-0" onClick={randomPassword}>Tạo ngẫu nhiên</button>
+          </div>
+        )}
+        {canApprove && what !== 'mk' && (
           <Field label="Mã PIN duyệt cảnh báo mới" hint="4–8 chữ số — để trống nếu không đổi" error={pin && !PIN_RE.test(pin) ? 'Mã PIN gồm 4–8 chữ số' : ''}>
             <input className="input font-mono" inputMode="numeric" autoComplete="off" value={pin} onChange={(e) => setPin(e.target.value)} />
           </Field>
@@ -592,6 +639,7 @@ function UsersTab() {
       {modal?.type === 'lock' && (
         <Confirm
           title={`Khoá tài khoản của ${modal.user.full_name}?`}
+          subtitle="Mở khoá lại được ở cùng chỗ"
           confirmLabel="Khoá tài khoản"
           danger
           busy={busy}
@@ -605,6 +653,7 @@ function UsersTab() {
       {modal?.type === 'mfa' && (
         <Confirm
           title={`Đặt lại xác thực 2 lớp của ${modal.user.full_name}?`}
+          subtitle="Ghi nhật ký thao tác"
           confirmLabel="Đặt lại xác thực 2 lớp"
           danger
           busy={busy}
@@ -622,10 +671,45 @@ function UsersTab() {
 
 /** 3 cấp cố định — chỉ xem (không tạo / sửa vai trò). */
 function RolesTab() {
+  const desk = useMediaQuery('(min-width: 1280px)');
   const { data: roles = [] } = useRoles();
   const { data: catalog = [] } = useQuery({ queryKey: ['rbac-perms'], queryFn: () => api('/rbac/permissions') });
   // Theo thứ tự danh mục quyền (giám sát → SOS → điều động → … → dữ liệu), không theo mã
   const inCatalogOrder = (codes) => catalog.filter((p) => codes.includes(p.code)).map((p) => p.description);
+  // Máy tính (bản vẽ khung J11): bảng việc × 3 cấp, dựng từ danh mục quyền của máy chủ (không ghi tay). Cấp 3 có quyền = "xã mình"
+  if (desk && roles.length && catalog.length) {
+    const sorted = [...roles].sort((a, b) => getTier(a.name).level - getTier(b.name).level);
+    const cell = (r, code) => {
+      if (!(r.permissions.includes('*.*') || r.permissions.includes(code))) return <span className="font-semibold text-muted">—</span>;
+      return r.scope_kind === 'tinh' ? <span className="font-semibold text-good" aria-label="Có">✓</span> : <span className="font-semibold text-ink-2">xã mình</span>;
+    };
+    return (
+      <section aria-label="3 cấp và quyền hạn" className="sheet flex flex-col gap-3 p-4">
+        <div className="scroll-thin max-h-[calc(100vh-17rem)] overflow-auto">
+          <table className="table-base">
+            <thead>
+              <tr>
+                <th>Việc</th>
+                {sorted.map((r) => <th key={r.name}>Cấp {getTier(r.name).level} · {getTier(r.name).name.replace('Quản trị ', '').replace(/^./, (c) => c.toUpperCase())} <span className="font-normal">({r.user_count} tài khoản)</span></th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {catalog.map((p) => (
+                <tr key={p.code}>
+                  <td className="font-medium text-ink">{p.description}</td>
+                  {sorted.map((r) => <td key={r.name}>{cell(r, p.code)}</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="rounded-[14px] border border-dashed border-line p-3 text-[13px] leading-normal text-ink-2">
+          Đúng 3 cấp cố định — mỗi tài khoản một cấp. Chức vụ chỉ ghi ở hồ sơ tài khoản; quyền do cấp quyết định, nhờ vậy nhật ký luôn rõ ai
+          làm gì với tư cách gì. Bảng lấy trực tiếp từ danh mục quyền của hệ thống.
+        </p>
+      </section>
+    );
+  }
   return (
     <div className="flex flex-col gap-3">
       <p className="max-w-3xl text-sm text-ink-2">
@@ -654,8 +738,23 @@ function RolesTab() {
 }
 
 function AuditTab() {
-  const { data = [] } = useQuery({ queryKey: ['rbac-audit'], queryFn: () => api('/rbac/audit') });
+  const { data: all = [] } = useQuery({ queryKey: ['rbac-audit'], queryFn: () => api('/rbac/audit') });
+  const [q, setQ] = useState('');
+  const [act, setAct] = useState('');
+  const nq = foldVi(q.trim());
+  const acts = [...new Set(all.map((a) => a.action))];
+  const data = all.filter((a) => (!act || a.action === act)
+    && (!nq || [a.actor_name, a.target_user, a.domain_label, a.domain].some((v) => v && foldVi(v).includes(nq))));
   return (
+    <div className="flex flex-col gap-3">
+    {/* Bản vẽ khung J6: tìm người làm, tài khoản bị tác động; lọc theo việc */}
+    <div className="flex flex-wrap gap-2.5">
+      <input className="input tap h-11 min-w-[14rem] flex-1 rounded-xl bg-panel" placeholder="Tìm người làm, tài khoản bị tác động…" aria-label="Tìm trong nhật ký thao tác" value={q} onChange={(e) => setQ(e.target.value)} />
+      <select className="input tap h-11 w-auto rounded-xl bg-panel" aria-label="Lọc theo việc" value={act} onChange={(e) => setAct(e.target.value)}>
+        <option value="">Mọi việc</option>
+        {acts.map((a) => <option key={a} value={a}>{AUDIT_LABEL[a] || a}</option>)}
+      </select>
+    </div>
     <div className="card overflow-x-auto">
       <table className="table-base">
         <thead>
@@ -681,7 +780,9 @@ function AuditTab() {
           ))}
         </tbody>
       </table>
-      {!data.length && <Empty>Chưa có thao tác phân quyền nào</Empty>}
+      {!data.length && <Empty>{all.length ? 'Không có thao tác khớp ô tìm / bộ lọc' : 'Chưa có thao tác phân quyền nào'}</Empty>}
+    </div>
+    <p className="text-[13px] text-muted">Thao tác phân quyền trong phạm vi bạn quản lý.</p>
     </div>
   );
 }
