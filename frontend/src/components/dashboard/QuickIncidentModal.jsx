@@ -2,13 +2,13 @@ import { useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import {
-  AlertTriangle, Check, ChevronLeft, ChevronRight, CloudOff, Copy, Crosshair, Loader2, Minus, PhoneCall, Plus, Send, X,
+  AlertTriangle, ChevronLeft, ChevronRight, CloudOff, Copy, Crosshair, Loader2, Minus, PhoneCall, Plus, Send, X,
 } from 'lucide-react';
 import { api, ApiError } from '../../api/client';
 import { useUnits } from '../../api/hooks';
 import { useStore } from '../../app/store';
 import { useAllowedCodes } from '../../rbac/usePermission';
-import { FieldError, Modal } from '../common/ui';
+import { FieldError, Modal, StepChips } from '../common/ui';
 import { INCIDENT, PRIORITY, VULNERABLE } from '../../utils/labels';
 import { useOnline } from '../../utils/useOnline';
 import { unitLabel } from './CommuneView';
@@ -212,7 +212,9 @@ export default function QuickIncidentModal({ open, onClose, support = false }) {
     <Modal
       open={open}
       onClose={close}
+      size="md"
       title={support ? 'Gửi yêu cầu chi viện lên tỉnh' : 'Báo cáo nhanh hiện trường → tạo phiếu SOS'}
+      subtitle={`Bước ${step + 1}/3 · ${support ? 'yêu cầu tới bảng điều phối của trực ban tỉnh' : 'cán bộ ở hiện trường, tổng đài nhận tin'}`}
       footer={
         // Điện thoại: nút chính chiếm trọn hàng dưới cùng (gần ngón cái, không gãy chữ); máy tính: một hàng như cũ
         <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:items-center sm:justify-end">
@@ -226,10 +228,10 @@ export default function QuickIncidentModal({ open, onClose, support = false }) {
           </button>
           {step < 2 ? (
             <button type="button" className={clsx('btn-primary col-span-2', bigBtn)} onClick={next}>
-              Tiếp <ChevronRight size={15} />
+              Tiếp: {STEPS[step + 1].toLowerCase()} <ChevronRight size={15} />
             </button>
           ) : (
-            <button type="button" className={clsx('btn-danger col-span-2 font-bold', bigBtn)} onClick={submit} disabled={sending}>
+            <button type="button" className={clsx('btn-primary col-span-2 font-bold', bigBtn)} onClick={submit} disabled={sending}>
               {sending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} {failure ? 'Gửi lại' : 'Tạo phiếu SOS'}
             </button>
           )}
@@ -237,24 +239,7 @@ export default function QuickIncidentModal({ open, onClose, support = false }) {
       }
     >
       {/* Bước: bấm được để quay lại bước đã qua (không nhảy cóc qua bước chưa điền) */}
-      <ol className="mb-3 flex flex-wrap gap-1.5 text-[11px]" aria-label="Các bước">
-        {STEPS.map((s, i) => (
-          <li key={s}>
-            <button
-              type="button"
-              disabled={i > step || sending}
-              onClick={() => setStep(i)}
-              aria-current={i === step ? 'step' : undefined}
-              className={clsx(
-                'chip min-h-[32px] px-2.5 py-0.5',
-                i === step ? 'bg-accent text-white' : i < step ? 'bg-good/15 text-good hover:bg-good/25' : 'bg-panel2 text-muted',
-              )}
-            >
-              {i < step && stepValid(i) && <Check size={11} aria-hidden="true" />} {i + 1}. {s}
-            </button>
-          </li>
-        ))}
-      </ol>
+      <StepChips steps={STEPS} step={step} onStep={setStep} done={STEPS.map((_, i) => stepValid(i))} disabled={sending} />
 
       {!choices.length && (
         <p className="mb-3 rounded-lg border border-danger/40 bg-danger/10 p-3 text-xs text-danger">Tài khoản chưa được giao quyền tạo phiếu SOS ở xã/phường nào.</p>

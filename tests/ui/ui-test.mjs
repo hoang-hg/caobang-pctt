@@ -420,10 +420,10 @@ async function staff(ctx, trackCode) {
     await open.click();
     const dialog = page.getByRole('dialog');
     // Bấm "Tiếp" khi chưa chọn → lỗi hiện ngay dưới ô (form không khoá nút mà không nói vì sao)
-    await dialog.getByRole('button', { name: 'Tiếp', exact: true }).click();
+    await dialog.getByRole('button', { name: /^Tiếp:/ }).click();
     await dialog.getByText('Chọn loại sự cố').waitFor();
     await dialog.getByRole('button', { name: 'Sạt lở', exact: true }).click();
-    await dialog.getByRole('button', { name: 'Tiếp', exact: true }).click(); // không lẫn với loại "Tiếp tế"
+    await dialog.getByRole('button', { name: /^Tiếp:/ }).click(); // không lẫn với loại "Tiếp tế"
     await dialog.getByText('Xã / phường *').waitFor();
     await expectNoOverflow(ctx, 'hộp thoại Báo cáo nhanh', dialog);
     await dialog.getByRole('button', { name: 'Huỷ', exact: true }).click();
@@ -438,8 +438,8 @@ async function staff(ctx, trackCode) {
     await page.getByRole('button', { name: 'Xuất', exact: true }).click();
     await page.getByRole('menuitem', { name: /Báo cáo văn bản/ }).click();
     const dialog = page.getByRole('dialog');
-    await dialog.getByRole('button', { name: 'Tiếp', exact: true }).click();
-    await dialog.getByRole('button', { name: 'Tiếp', exact: true }).click();
+    await dialog.getByRole('button', { name: /^Tiếp:/ }).click();
+    await dialog.getByRole('button', { name: /^Tiếp:/ }).click();
     await dialog.getByLabel(/Kèm phụ lục/).uncheck(); // không chụp màn hình → nhanh
     await expectNoOverflow(ctx, 'hộp thoại Báo cáo văn bản', dialog);
     const [dl] = await Promise.all([
@@ -896,7 +896,7 @@ async function smallPhone(ctx) {
     await sos.click();
     const dialog = page.getByRole('dialog');
     await dialog.getByRole('button', { name: 'Sạt lở', exact: true }).click();
-    await dialog.getByRole('button', { name: 'Tiếp', exact: true }).click();
+    await dialog.getByRole('button', { name: /^Tiếp:/ }).click();
     await dialog.getByText('Xã / phường *').waitFor();
     await expectNoOverflow(ctx, 'hộp thoại Báo cáo nhanh', dialog);
     await dialog.getByRole('button', { name: 'Huỷ', exact: true }).click();
@@ -2466,7 +2466,9 @@ async function communeHome(ctx) {
     if (!(await first.innerText()).includes(WARD.name)) throw new Error(`thẻ đầu không phải phường của tài khoản: "${await first.innerText()}"`);
     if ((await first.getAttribute('aria-selected')) !== 'true') throw new Error('thẻ phường không được chọn sẵn');
     const tiles = await kpis.locator(':scope > *').count();
-    if (tiles !== 4) throw new Error(`có ${tiles} ô chỉ số của xã (cần 4)`);
+    // Máy tính ≥ 1280 px (bản vẽ khung A11): 6 ô, kèm "Việc của xã hôm nay"; nhỏ hơn: 4 ô
+    const wantTiles = page.viewportSize().width >= 1280 ? 6 : 4;
+    if (tiles !== wantTiles) throw new Error(`có ${tiles} ô chỉ số của xã (cần ${wantTiles})`);
     if (await page.getByLabel('Chọn xã/phường').count()) throw new Error('tài khoản một phường vẫn có ô chọn xã');
     await expectNoOverflow(ctx, 'trang chủ phường');
     return `${tiles} ô chỉ số`;

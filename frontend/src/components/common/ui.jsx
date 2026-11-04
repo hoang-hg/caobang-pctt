@@ -139,7 +139,7 @@ export function Modal({ open, onClose, title, subtitle, children, wide, size, fo
       <div
         className={clsx(
           'card flex max-h-[calc(100vh-4rem)] w-full flex-col shadow-2xl supports-[height:100dvh]:max-h-[calc(100dvh-4rem)]',
-          wide ? 'max-w-4xl' : size === 'md' ? 'max-w-3xl' : 'max-w-lg',
+          wide ? 'max-w-4xl' : size === 'lg' ? 'max-w-[70rem]' : size === 'md' ? 'max-w-3xl' : 'max-w-lg',
         )}
         onMouseDown={(e) => e.stopPropagation()}
         role="dialog"
