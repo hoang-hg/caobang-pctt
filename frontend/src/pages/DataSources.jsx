@@ -189,7 +189,7 @@ function SourceModal({ source, onClose }) {
     if (await run(() => api(`/integrations/sources/${source.id}`, { method: 'PATCH', body }), 'Đã lưu cấu hình nguồn')) onClose();
   };
   return (
-    <Modal open wide onClose={onClose} title={`Cấu hình – ${source.name}`}
+    <Modal open wide onClose={onClose} title={`Cấu hình nguồn — ${nameOfSource(source)}`} subtitle="Nâng cao — dành cho kỹ thuật viên"
       footer={<><button className="btn-ghost" onClick={onClose}>Huỷ</button><button className="btn-primary" disabled={!parsed} onClick={save}>Lưu</button></>}>
       <div className="grid gap-3 text-sm md:grid-cols-2">
         <label className="md:col-span-2">Cấu hình (JSON)
@@ -277,6 +277,7 @@ function SimulationCard() {
       {ask && (
         <Confirm
           title="Bật dữ liệu giả lập trên trình duyệt này?"
+          subtitle="Diễn tập — không dùng khi đang trực thật"
           confirmLabel="Bật dữ liệu giả lập"
           busy={busy}
           onClose={() => setAsk(false)}
@@ -415,6 +416,7 @@ function SourcesTab({ sources, devices }) {
       {ask?.kind === 'token' && (
         <Confirm
           title={`Cấp khoá mới cho "${nameOfSource(ask.source)}"?`}
+          subtitle="Khoá cũ ngừng ngay sau khi bấm"
           confirmLabel="Cấp khoá mới"
           danger
           busy={busy === ask.source.id}
@@ -452,7 +454,7 @@ function DeviceModal({ onClose, onCreated }) {
     if (res) onCreated(res, f);
   };
   return (
-    <Modal open wide onClose={onClose} title="Đăng ký thiết bị đo"
+    <Modal open wide onClose={onClose} title="Đăng ký thiết bị đo" subtitle="Số đo của thiết bị ghi vào trạm đã chọn · quá 3 chu kỳ không gửi là mất tín hiệu"
       footer={<><button className="btn-ghost" onClick={onClose}>Huỷ</button><button className="btn-primary" disabled={!valid} onClick={submit}><Plus size={15} /> Đăng ký</button></>}>
       <div className="grid gap-3 text-sm sm:grid-cols-2">
         <label>Tên thiết bị<input className="input mt-1" value={f.name} onChange={set('name')} placeholder="Cảm biến mưa Phja Oắc" /></label>
@@ -491,7 +493,86 @@ function DeviceModal({ onClose, onCreated }) {
   );
 }
 
+/**
+ * Sửa thiết bị đo (bản vẽ khung I6): mã và giao thức không đổi được; tên, tạm tắt, trạm, hiệu chỉnh số đo, chu kỳ gửi đổi qua
+ * PATCH /integrations/devices/{id}. Xoá, cấp khoá mới vẫn qua hộp xác nhận riêng.
+ */
+function DeviceEditModal({ device, example, onClose, onAsk }) {
+  const run = useRun();
+  const { data: stations = [] } = useQuery({ queryKey: ['stations', 'CB', {}], queryFn: () => api('/stations') });
+  const [f, setF] = useState({
+    name: device.name,
+    enabled: device.enabled,
+    station_id: device.station_id,
+    value_field: device.value_field || 'value',
+    scale: device.scale ?? 1,
+    offset_value: device.offset_value ?? 0,
+    seconds: device.expected_interval_s,
+  });
+  const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }));
+  const scale = Number(f.scale);
+  const offset = Number(f.offset_value);
+  const seconds = Number(f.seconds);
+  const valid = f.name.trim().length > 1 && f.station_id && f.scale !== '' && Number.isFinite(scale) && f.offset_value !== '' && Number.isFinite(offset) && seconds >= 30 && seconds <= 86400;
+  const save = async () => {
+    const body = { name: f.name.trim(), enabled: f.enabled, station_id: f.station_id, scale, offset_value: offset, expected_interval_s: Math.round(seconds), ...(device.protocol === 'lorawan' ? { value_field: f.value_field } : {}) };
+    if (await run(() => api(`/integrations/devices/${device.id}`, { method: 'PATCH', body }), `Đã lưu ${f.name.trim()}`)) onClose();
+  };
+  return (
+    <Modal
+      open
+      wide
+      onClose={onClose}
+      title="Sửa thiết bị đo"
+      subtitle={device.name}
+      footer={
+        <>
+          <button type="button" className="btn-secondary" onClick={() => onAsk('delete')}>Xoá thiết bị…</button>
+          {device.protocol === 'http' && <button type="button" className="btn-secondary" onClick={() => onAsk('key')}>Cấp khoá mới…</button>}
+          <span className="flex-1" />
+          <button type="button" className="btn-secondary" onClick={onClose}>Huỷ</button>
+          <button type="button" className="btn-primary" disabled={!valid} onClick={save}>Lưu</button>
+        </>
+      }
+    >
+      <div className="grid gap-3 text-sm sm:grid-cols-2">
+        <p className="rounded-[14px] bg-panel2 p-3 sm:col-span-2"><b className="font-mono">{device.id}</b> · {PROTOCOL_SHORT[device.protocol] || device.protocol} · mã thiết bị và giao thức không đổi được</p>
+        <label>Tên<input className="input mt-1" value={f.name} onChange={set('name')} /></label>
+        <label className="tap flex items-center gap-2 self-end pb-2">
+          <input type="checkbox" checked={!f.enabled} onChange={(e) => setF((x) => ({ ...x, enabled: !e.target.checked }))} />
+          Tạm tắt nhận số đo từ thiết bị này
+        </label>
+        <label className="sm:col-span-2">Gắn với trạm đo
+          <select className="input mt-1" value={f.station_id} onChange={set('station_id')}>
+            {!stations.some((s) => s.id === f.station_id) && <option value={f.station_id}>{device.station_name}</option>}
+            {stations.map((s) => <option key={s.id} value={s.id}>{s.name} ({STATION_TYPE[s.type]}, {s.unit})</option>)}
+          </select>
+        </label>
+        <div className="grid gap-3 sm:col-span-2 sm:grid-cols-4">
+          {device.protocol === 'lorawan' && <label>Trường giá trị<input className="input mt-1 font-mono" value={f.value_field} onChange={set('value_field')} /></label>}
+          <label>Hệ số nhân<input className="input mt-1" type="number" step="any" value={f.scale} onChange={set('scale')} /></label>
+          <label>Bù<input className="input mt-1" type="number" step="any" value={f.offset_value} onChange={set('offset_value')} /></label>
+          <label>Chu kỳ gửi (giây)<input className="input mt-1" type="number" min={30} max={86400} value={f.seconds} onChange={set('seconds')} /></label>
+        </div>
+        <p className="rounded-[14px] border border-dashed border-line p-3 text-[13px] leading-normal text-ink-2 sm:col-span-2">
+          Giá trị lưu = giá trị gửi × hệ số + bù. Xoá thiết bị: số đo đã nhận vẫn giữ.
+        </p>
+        <div className="sm:col-span-2">
+          <Advanced>
+            <p className="text-xs text-muted">
+              {device.vendor ? `${device.vendor} · ` : ''}gửi qua {PROTOCOL[device.protocol] || device.protocol} · mỗi {every(device.expected_interval_s)} · trạm {device.station_id} đang dùng {STATION_SOURCE[device.station_source] || device.station_source}
+            </p>
+            <CopyBox label="Ví dụ gửi số đo" value={example} />
+          </Advanced>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 function DevicesTab({ devices }) {
+  const desk = useMediaQuery('(min-width: 1280px)');
+  const [editing, setEditing] = useState(null);
   const canManage = usePermission('integration', 'manage', '*');
   const run = useRun();
   const [adding, setAdding] = useState(false);
@@ -520,8 +601,49 @@ function DevicesTab({ devices }) {
 
   return (
     <div className="flex flex-col gap-3">
-      {canManage && <div><button type="button" className="btn-primary" onClick={() => setAdding(true)}><Plus size={15} /> Đăng ký thiết bị đo</button></div>}
-      {!devices.length ? (
+      {canManage && <div className={desk ? 'flex justify-end' : undefined}><button type="button" className="btn-primary" onClick={() => setAdding(true)}><Plus size={15} /> Đăng ký thiết bị đo</button></div>}
+      {editing && (
+        <DeviceEditModal
+          device={editing}
+          example={exampleFor(editing)}
+          onClose={() => setEditing(null)}
+          onAsk={(kind) => { setAsk({ kind, device: editing }); setEditing(null); }}
+        />
+      )}
+      {desk && devices.length > 0 ? (
+        <section className="sheet flex flex-col gap-3 p-5" aria-label="Các thiết bị đo">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs font-bold text-ink-2">
+                <th className="px-3 py-2 font-bold">Thiết bị</th>
+                <th className="px-3 py-2 font-bold">Giao thức</th>
+                <th className="px-3 py-2 font-bold">Gắn vào trạm</th>
+                <th className="px-3 py-2 font-bold">Số đo gần nhất</th>
+                <th className="px-3 py-2 font-bold">Tình trạng</th>
+                <th className="px-3 py-2"><span className="sr-only">Thao tác</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {devices.map((d) => {
+                const st = deviceState(d);
+                return (
+                  <tr key={d.id} className={clsx('border-t border-line align-top', !d.enabled && 'opacity-70')}>
+                    <td className="px-3 py-2.5"><b className="block text-ink">{d.name}</b><span className="font-mono text-xs text-muted">{d.id}</span></td>
+                    <td className="whitespace-nowrap px-3 py-2.5">{PROTOCOL_SHORT[d.protocol] || d.protocol}</td>
+                    <td className="px-3 py-2.5">{d.station_name}</td>
+                    <td className="num px-3 py-2.5">{d.last_value ?? '—'}</td>
+                    <td className={clsx('px-3 py-2.5 font-medium', risk(st.level).text)} data-trang-thai="">{st.text}</td>
+                    <td className="px-3 py-2.5 text-right">{canManage && <button type="button" className="btn-secondary tap h-9 rounded-xl px-3 text-[13px]" onClick={() => setEditing(d)}>Sửa…</button>}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <p className="rounded-[14px] border border-dashed border-line p-3 text-[13px] leading-normal text-ink-2">
+            Xoá thiết bị: số đo đã nhận vẫn giữ trong trạm. Tạm tắt, xoá, cấp khoá mới ở nút “Sửa…”.
+          </p>
+        </section>
+      ) : !devices.length ? (
         <EmptyState art="du-lieu" className="py-10">
           Chưa có thiết bị đo. {canManage ? 'Bấm "Đăng ký thiết bị đo"' : 'Quản trị hệ thống đăng ký thiết bị'} và gắn với trạm đo để thay số liệu mô phỏng bằng số liệu thật.
         </EmptyState>
@@ -599,6 +721,7 @@ function DevicesTab({ devices }) {
 }
 
 function MonitorTab({ sources, devices }) {
+  const desk = useMediaQuery('(min-width: 1280px)');
   const { data, isError, refetch } = useQuery({ queryKey: ['int-monitor'], queryFn: () => api('/integrations/monitor'), refetchInterval: 10_000 });
   if (!data) return isError ? <ErrorState onRetry={() => refetch()}>Không tải được tình trạng nhận số liệu</ErrorState> : <Skeleton height={320} />;
   const st = Object.fromEntries(data.stations.map((s) => [s.source, s.n]));
@@ -628,6 +751,68 @@ function MonitorTab({ sources, devices }) {
       text: data.last24.errors ? `${int(data.last24.errors)} lần lấy số liệu bị lỗi trong 24 giờ — xem thẻ "Nguồn số liệu".` : 'Không có lần lấy số liệu nào bị lỗi trong 24 giờ.',
     },
   ];
+  // Máy tính ≥ 1280 px (bản vẽ khung I8): đếm theo trạng thái + bảng nguồn / thiết bị + nhật ký cột phải. Không có cột "12 giờ
+  // qua" vì máy chủ chưa trả chuỗi số đo theo giờ; không số đo thì nói rõ, không bao giờ hiện là an toàn
+  if (desk) {
+    const rows = [
+      ...sources.map((s) => { const st = sourceState(s, devices); return { key: `s-${s.id}`, name: nameOfSource(s), sub: PULL.includes(s.type) ? `Hệ thống tự lấy · mỗi ${every(s.poll_interval_s)}` : 'Cổng nhận số đo', last: s.last_success_at, level: st.level, chip: st.chip, enabled: s.enabled }; }),
+      ...devices.map((d) => { const st = deviceState(d); return { key: `d-${d.id}`, name: d.name, sub: PROTOCOL_SHORT[d.protocol] || d.protocol, last: d.last_seen_at, level: st.level, chip: !d.enabled ? 'Đã tắt' : d.status === 'truc_tuyen' ? 'Đang gửi' : d.status === 'mat_tin_hieu' ? 'Mất tín hiệu' : 'Chưa gửi', enabled: d.enabled }; }),
+    ];
+    const pill = 'inline-flex items-center gap-2 rounded-full border border-line bg-panel px-3.5 py-2 text-sm text-ink';
+    const count = (fn) => rows.filter(fn).length;
+    return (
+      <div className="grid grid-cols-[minmax(0,1fr)_340px] items-start gap-5">
+        <div className="flex min-w-0 flex-col gap-3">
+          <div className="flex flex-wrap gap-2">
+            <span className={pill}><span className={clsx('h-2.5 w-2.5 rounded-full', risk(0).fill)} aria-hidden="true" /><b className="num">{count((r) => r.level === 0)}</b> bình thường</span>
+            <span className={pill}><span className={clsx('h-2.5 w-2.5 rounded-full', risk(2).fill)} aria-hidden="true" /><b className="num">{count((r) => r.level != null && r.level > 0)}</b> cần kiểm tra</span>
+            <span className={pill}><b className="num">{count((r) => r.level == null)}</b> đã tắt, chưa có số đo</span>
+          </div>
+          <section className="sheet flex flex-col gap-2 p-5" aria-label="Nguồn và thiết bị">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs font-bold text-ink-2">
+                  <th className="px-3 py-2 font-bold">Nguồn / thiết bị</th>
+                  <th className="px-3 py-2 font-bold">Lần cuối</th>
+                  <th className="px-3 py-2 font-bold">Tình trạng</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.key} className="border-t border-line">
+                    <td className="px-3 py-2.5"><b className="block text-ink">{r.name}</b><span className="text-xs text-muted">{r.sub}</span></td>
+                    <td className="px-3 py-2.5 text-ink-2">{r.last ? ago(r.last) : '—'}</td>
+                    <td className="px-3 py-2.5"><span className={clsx('chip whitespace-nowrap text-xs font-semibold', r.level == null ? 'bg-panel2 text-ink-2' : risk(r.level).chip)}>{r.chip}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+          <ul className="sheet flex flex-col gap-2 p-5 text-sm" aria-label="Tóm tắt nhận số liệu">
+            {lines.map((l) => (
+              <li key={l.text} className="flex items-start gap-2"><span className="mt-1.5"><Dot level={l.level} /></span><span>{l.text}</span></li>
+            ))}
+          </ul>
+        </div>
+        <aside className="sheet sticky top-0 flex max-h-[calc(100vh-12rem)] min-h-0 flex-col gap-2 p-5" aria-label="Nhật ký nhận số liệu">
+          <h2 className="text-[15px] font-bold text-ink">Nhật ký nhận số liệu</h2>
+          <ul className="scroll-thin min-h-0 flex-1 overflow-y-auto text-[13px] leading-snug">
+            {data.log.map((l) => (
+              <li key={l.id} className="border-t border-line py-2.5">
+                <b className="num text-ink">{dateTime(l.time)}</b> · {nameOf(l.source)}
+                <div className={clsx(l.level === 'error' ? 'text-danger' : l.level === 'warning' ? 'text-warn' : 'text-ink-2')}>{l.message.replace(/:s*{.*}s*$/s, '')}</div>
+                {(l.accepted > 0 || l.rejected > 0) && <div className="num text-xs text-muted">Nhận {l.accepted || 0} · bị loại {l.rejected || 0}</div>}
+              </li>
+            ))}
+          </ul>
+          {!data.log.length && <p className="text-sm text-muted">Chưa có hoạt động nhận số liệu.</p>}
+          <p className="rounded-[14px] border border-dashed border-line p-3 text-[13px] leading-normal text-ink-2">
+            Không có số đo là <b>xám, “chưa có số liệu”</b> — không bao giờ hiện là an toàn.
+          </p>
+        </aside>
+      </div>
+    );
+  }
   return (
     <div className="flex flex-col gap-3">
       <ul className="card flex flex-col gap-2 p-4 text-sm" aria-label="Tóm tắt nhận số liệu">
