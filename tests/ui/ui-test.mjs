@@ -695,6 +695,20 @@ async function staff(ctx, trackCode) {
       const row = code ? rows.getByRole('button', { name: new RegExp(code) }).first() : rows.getByRole('button').first();
       if (await row.count()) await row.click();
     }
+    // Máy tính (bản vẽ khung F4): phần công khai soạn ngay trong ô chi tiết — không qua hộp thoại
+    const inline = page.getByRole('group', { name: 'Phần công khai' });
+    if (await inline.count()) {
+      const pub = inline.getByLabel(/Nội dung công khai/);
+      if ((await pub.inputValue()).trim().length < 10) throw new Error('chưa gợi ý sẵn nội dung công khai');
+      if ((await inline.getByRole('radio', { name: /Làm tròn/ }).getAttribute('aria-checked')) !== 'true') throw new Error('"vị trí chính xác" không được chọn sẵn');
+      await expectNoOverflow(ctx, 'ô duyệt phản ánh');
+      if (READONLY) return 'chỉ xem';
+      const sec = page.getByRole('region', { name: /^Phản ánh PA-/ });
+      const name = await sec.getAttribute('aria-label');
+      await sec.getByRole('button', { name: 'Duyệt và công khai' }).click();
+      await page.getByRole('region', { name, exact: true }).waitFor({ state: 'detached', timeout: 15_000 });
+      return code || name;
+    }
     const card = code ? page.locator('.card', { hasText: code }).first() : page.locator('.card', { hasText: 'Chờ duyệt' }).first();
     const approve = visible(card.getByRole('button', { name: 'Duyệt công khai' }));
     await approve.waitFor({ timeout: READONLY ? 5_000 : 15_000 }).catch((e) => { if (!READONLY) throw e; });
