@@ -58,7 +58,7 @@ export default function RescueKpis({ ticketsQ, tickets, factsOf, evacQ, onGo, on
           <span><b className="num text-ink">{int(open.length)}</b> phiếu đang mở{open.length > 0 && <span className="text-muted"> · Đỏ {p1} · Cam {p2}{p3 ? ` · Vàng ${p3}` : ''}</span>}</span>,
           () => onGo({}), 'Phiếu cứu hộ chưa xong, theo mức ưu tiên — chạm để xem bảng điều phối')}
         {chip('qua-han', overdue ? 3 : 0, `Quá hạn phản hồi: ${overdue} phiếu${longest ? ` — chờ lâu nhất ${durWords(longest.sec)} (${longest.code})` : ''}`,
-          <span><b className={clsx('num', overdue ? 'text-danger' : 'text-ink')}>{int(overdue)} phiếu</b> quá hạn{longest && <span className="text-muted"> · lâu nhất {durWords(longest.sec)}</span>}</span>,
+          <span><b className={clsx('num', overdue ? 'text-danger' : 'text-ink')}>{int(overdue)}</b> quá hạn{longest && <span className="text-muted max-[1439px]:hidden"> · lâu nhất {durWords(longest.sec)}</span>}</span>,
           () => onGo({ th: 'qua_han' }), 'Phiếu chờ nhận / chờ điều đội quá hạn của cấp (cấp 1: 3 phút, cấp 2: 15 phút, cấp 3: 60 phút) — chạm để lọc')}
         {chip('nguoi', null, `Người cần cứu: ${trapped} người — đã cứu xong 48 giờ qua ${saved} người`,
           <span><b className="num text-ink">{int(trapped)}</b> người cần cứu</span>,

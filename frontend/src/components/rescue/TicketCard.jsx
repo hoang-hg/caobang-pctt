@@ -4,6 +4,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { Progress } from '../common/ui';
+import ActionMenu from '../common/ActionMenu';
 import { usePermission } from '../../rbac/usePermission';
 import { CLOSE_REASON, INCIDENT, PRIORITY, VULNERABLE, sourceLabel } from '../../utils/labels';
 import { time } from '../../utils/format';
@@ -22,6 +23,9 @@ const BTN = 'tap inline-flex min-h-[32px] items-center justify-center gap-1.5 wh
  * không cần cứu — phiếu người dân gửi qua cổng vào thẳng "Mới báo", cán bộ gọi lại xác minh tại đây). Phiếu từ cổng người dân
  * ghi mã yêu cầu PA- và ảnh người dân gửi. Nút ≥ 44 px trên màn cảm ứng; mất mạng → nút ghi tắt, nói lý do. `fresh`: phiếu
  * vừa đến khi đang xem → trượt vào một lần.
+ * `compact` (bảng 4 cột, máy tính ≥ 1280 px — bản vẽ desktop khung C, C13): thẻ trắng bo 14 px trên nền cột xám, quá hạn →
+ * viền đỏ 2 px; chỉ còn MỘT nút chính trọn bề ngang; mọi việc phụ (chuyển cột, bản đồ, gọi, link nhiệm vụ, huỷ lệnh, sửa
+ * phiếu, không cần cứu) gom vào menu "⋯" ở góc thẻ.
  */
 export default function TicketCard({ t, x, now, online, compact = false, fresh = false, onDispatch, onResolve, onFocus, onArrived, onLink, onCancel, onEdit, onMove, onCloseTicket }) {
   const canUpdate = usePermission('sos', 'update', t.admin_code);
@@ -82,6 +86,151 @@ export default function TicketCard({ t, x, now, online, compact = false, fresh =
     );
   } else if (doing && canResolve) {
     primary = confirm('btn-good');
+  }
+
+  if (compact) {
+    const open = t.status !== 'hoan_thanh';
+    const blocked = (c) => {
+      if (c.key === t.status) return null;
+      if (hasActiveTeam(t) && (c.key === 'moi' || c.key === 'dieu_phoi')) return 'đang có đội — huỷ lệnh trước';
+      if (c.key === 'hoan_thanh' && !canResolve) return 'cần quyền xác nhận đã cứu';
+      return null;
+    };
+    const menu = [
+      ...(canUpdate && open ? [
+        { header: 'Chuyển sang…' },
+        ...COLUMNS.map((c) => ({
+          key: c.key,
+          label: c.title,
+          current: c.key === t.status,
+          disabled: c.key === t.status || !!blocked(c) || !online,
+          hint: blocked(c) || (!online && c.key !== t.status ? 'mất mạng' : undefined),
+          onClick: () => onMove(t, c.key),
+        })),
+        { separator: true },
+      ] : []),
+      ...(t.lat != null ? [{ key: 'map', label: 'Xem trên bản đồ', onClick: () => onFocus(t) }] : []),
+      ...(t.reporter_phone ? [{ key: 'call', label: `Gọi người báo tin · ${t.reporter_phone}`, href: `tel:${t.reporter_phone.replace(/\s/g, '')}` }] : []),
+      ...(missionOpen && canDispatch ? [
+        { key: 'link', label: 'Cấp lại link nhiệm vụ', onClick: () => onLink(t) },
+        { key: 'cancel', label: 'Huỷ lệnh điều động…', danger: true, disabled: !online, onClick: () => onCancel(t) },
+      ] : []),
+      ...(canUpdate && open ? [{ key: 'edit', label: 'Sửa mức, số người, nhóm yếu thế…', onClick: () => onEdit(t) }] : []),
+      ...(canUpdate && open && !hasActiveTeam(t) && onCloseTicket
+        ? [{ key: 'close', label: 'Không cần cứu…', danger: true, disabled: !online, onClick: () => onCloseTicket(t) }]
+        : []),
+    ];
+    const big = 'tap inline-flex h-9 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-3 text-sm font-semibold';
+    return (
+      <article
+        draggable={canUpdate && open}
+        onDragStart={(e) => e.dataTransfer.setData('text/plain', t.id)}
+        aria-label={`${t.code} — ${INCIDENT[t.incident_type] || t.incident_type}, ${pr.label}${overdue ? ', quá hạn phản hồi' : ''}`}
+        className={clsx(
+          'flex min-w-0 select-none flex-col gap-1.5 rounded-[14px] border-2 bg-panel p-3 shadow-sm transition-shadow hover:shadow-md',
+          overdue ? 'border-danger' : 'border-transparent',
+          canUpdate && open ? 'cursor-grab active:cursor-grabbing' : 'cursor-default',
+          fresh && 'motion-safe:animate-enter',
+        )}
+      >
+        {isCommuneSupport(t) && (
+          <div className="-mx-3 -mt-3 mb-0.5 flex items-center gap-1.5 rounded-t-[12px] bg-danger px-3 py-1 text-xs font-bold text-white">
+            <HandHelping size={14} className="shrink-0" aria-hidden="true" />
+            <span className="min-w-0 truncate">Xã xin chi viện{t.admin_name ? ` — ${t.admin_name}` : ''}</span>
+          </div>
+        )}
+        <div className="flex items-center gap-1.5">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-1">
+            <b className="whitespace-nowrap text-sm font-bold text-ink" title={`Kênh: ${sourceLabel(t)}`}>{t.code}</b>
+            <span className={clsx('chip whitespace-nowrap py-0.5 text-xs font-bold', pr.cls)} title={pr.label}>Cấp {t.priority} · {pr.short}</span>
+            {overdue && <span className="chip whitespace-nowrap bg-danger py-0.5 text-xs font-bold text-white motion-safe:animate-blink-text">Quá hạn</span>}
+          </div>
+          <ActionMenu label={`Thao tác khác — ${t.code}`} items={menu} className="-my-1 -mr-1 h-8 w-8" />
+        </div>
+        <div className="text-sm text-ink">
+          <b>{INCIDENT[t.incident_type] || t.incident_type}</b> · <b className={t.trapped_count ? 'text-danger' : 'text-muted'}>{t.trapped_count ?? 0} người</b>
+        </div>
+        <div className="truncate text-[13px] text-ink-2" title={t.address || t.admin_name}>
+          {t.address || t.admin_name}{t.admin_name && t.address !== t.admin_name ? ` (${t.admin_name})` : ''}
+        </div>
+        {!!t.vulnerable?.length && (
+          <div className="flex flex-wrap gap-1">
+            {t.vulnerable.map((v) => <span key={v} className="chip bg-danger/15 py-0.5 text-xs font-semibold text-danger">{VULNERABLE[v] || v}</span>)}
+          </div>
+        )}
+        {t.raw_message && <p className="truncate text-xs italic text-ink-2" title={t.raw_message}>“{t.raw_message}”</p>}
+        {t.request_code && (
+          <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted">
+            <span>Yêu cầu của người dân <b className="num text-ink-2">{t.request_code}</b></span>
+            {t.request_photo_urls?.map((p, i) => (
+              <a key={p.thumb} href={p.full} target="_blank" rel="noreferrer" className="tap-sq block overflow-hidden rounded-md border border-line hover:border-accent" title={`Ảnh ${i + 1} người dân gửi — mở cỡ lớn`}>
+                <img src={p.thumb} alt={`Ảnh ${i + 1} của ${t.request_code}`} className="h-8 w-8 object-cover" loading="lazy" />
+              </a>
+            ))}
+          </div>
+        )}
+        {wait && (
+          <div
+            className={clsx('text-xs font-semibold', overdue ? 'text-danger' : 'text-ink-2')}
+            title={t.status === 'moi'
+              ? `Hạn phản hồi cấp ${t.priority}: ${t.sla_minutes} phút kể từ lúc nhận tin`
+              : `Chưa có đội nào được điều — hạn cấp ${t.priority}: ${t.sla_minutes} phút kể từ lúc nhận phiếu`}
+          >
+            {wait}
+          </div>
+        )}
+        {doing && t.force_name && (
+          <div className="space-y-1">
+            <div className="flex items-center gap-1 text-xs font-medium text-ink-2">
+              <Navigation size={12} className="text-accent" aria-hidden="true" />
+              <span className="truncate">{t.force_name}</span>
+            </div>
+            <div className="flex items-center gap-2" title={estimated ? 'Ước tính theo giờ xuất phát và giờ dự kiến tới (xe, xuồng chưa có định vị)' : undefined}>
+              <Progress value={progress} level={arrived ? 0 : undefined} tone="accent" className="flex-1" />
+              <span className={clsx('whitespace-nowrap text-[11px] font-semibold', !arrived && etaSec != null && etaSec <= -60 ? 'text-danger' : 'text-ink')}>
+                {arrived ? (t.arrived_at ? `Đã đến lúc ${time(t.arrived_at)}` : 'Đã đến') : etaSec != null ? etaText(etaSec) : 'Chưa có giờ dự kiến'}
+              </span>
+            </div>
+            {t.route_safe === false && (
+              <div className="flex items-center gap-1 text-[11px] font-semibold text-serious">
+                <TriangleAlert size={12} className="shrink-0" aria-hidden="true" /> Đường đi qua vùng nguy hiểm — nhắc đội cẩn trọng
+              </div>
+            )}
+            {needSupport && (
+              <div className="rounded-md border border-danger/50 bg-danger/10 px-2 py-1 text-[11px] text-danger [overflow-wrap:anywhere]">
+                <b>Đội cần chi viện</b> ({time(t.field_at)}){t.field_note ? `: ${t.field_note}` : ''}
+              </div>
+            )}
+            {rescued && (
+              <div className="rounded-md border border-good/50 bg-good/10 px-2 py-1 text-[11px] text-good [overflow-wrap:anywhere]">
+                <b>Đội báo đã cứu {t.trapped_count ? `${t.field_people_safe}/${t.trapped_count}` : t.field_people_safe} người</b>{' '}
+                ({time(t.field_at)}) — chờ xác nhận{t.field_note ? `: ${t.field_note}` : ''}
+              </div>
+            )}
+          </div>
+        )}
+        {t.status === 'hoan_thanh' && (t.close_reason ? (
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-muted">
+            <XCircle size={13} aria-hidden="true" /> Đã đóng — {(CLOSE_REASON[t.close_reason] || t.close_reason).toLowerCase()} lúc {time(t.resolved_at)}
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-good">
+            <CheckCircle2 size={13} aria-hidden="true" /> Đã cứu xong lúc {time(t.resolved_at)}
+          </span>
+        ))}
+        {(primary || needSupport) && (
+          <div className="no-print mt-1 flex flex-col gap-1.5 [&_button]:h-9 [&_button]:w-full [&_button]:rounded-xl [&_button]:text-sm">
+            {primary}
+            {enRoute && canResolve && confirm('btn-ghost')}
+            {needSupport && canDispatch && (
+              <button type="button" className={clsx('btn-danger', big)} onClick={() => onDispatch(t)} disabled={!online} title={offline || 'Đội tại hiện trường xin thêm lực lượng'}>
+                <LifeBuoy size={14} aria-hidden="true" /> Điều thêm đội
+              </button>
+            )}
+          </div>
+        )}
+      </article>
+    );
   }
 
   return (

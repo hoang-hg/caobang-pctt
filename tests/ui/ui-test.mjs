@@ -638,7 +638,7 @@ async function staff(ctx, trackCode) {
     if (READONLY && !(await btn.count())) return 'bỏ qua: không có phiếu chờ xử lý';
     await btn.click();
     const dialog = page.getByRole('dialog');
-    await dialog.getByText(/Lệnh điều động – SOS-/).waitFor();
+    await dialog.getByText(/Điều đội cho SOS-/).waitFor();
     await dialog.getByRole('radio').first().waitFor({ timeout: 20_000 }); // danh sách lực lượng gần nhất
     await expectNoOverflow(ctx, 'hộp thoại điều động', dialog);
     if (READONLY) {
@@ -649,7 +649,7 @@ async function staff(ctx, trackCode) {
     // Lệnh điều động 3 bước: Chọn đội → Vật tư mang theo → Xác nhận (tóm tắt lệnh) → Phát lệnh
     await dialog.getByRole('button', { name: /^Tiếp: vật tư/ }).click();
     await dialog.getByRole('button', { name: /^Tiếp: xác nhận/ }).click();
-    await dialog.getByText('Tóm tắt lệnh — kiểm tra trước khi phát').waitFor({ timeout: 5_000 });
+    await dialog.getByText('Bước 3/3 — kiểm tra trước khi phát lệnh').waitFor({ timeout: 5_000 });
     await dialog.getByRole('button', { name: 'Phát lệnh điều động' }).click();
     await dialog.getByText(/Đã ghi lệnh điều động SOS-/).waitFor({ timeout: 20_000 });
     // Chưa tích hợp SMS / Push → phải nói rõ hệ thống CHƯA gửi tin cho đội
@@ -1736,11 +1736,18 @@ async function resourcesPage(ctx) {
     if (await pager.count() && !/^1–/.test(await pager.innerText())) throw new Error('đổi cách xếp không về trang 1');
     const fuel = (await rows.allInnerTexts()).map((t) => Number(t.match(/(\d+)%/)?.[1])).filter((x) => !Number.isNaN(x));
     if (fuel.some((x, i) => i && fuel[i - 1] > x)) throw new Error(`"Nhiên liệu thấp trước" xếp sai: ${fuel.slice(0, 6)}`);
-    const [xlsx] = await Promise.all([page.waitForEvent('download', { timeout: 20_000 }), page.getByRole('button', { name: 'Excel', exact: true }).click()]);
+    // Máy tính ≥ 1280 px (bản vẽ khung C): Excel / PDF nằm trong menu "Xuất" của hàng chip
+    const exportBy = async (name) => {
+      const direct = page.getByRole('button', { name, exact: true });
+      if (await direct.isVisible().catch(() => false)) return direct.click();
+      await page.getByRole('button', { name: /^Xuất/ }).click();
+      return page.getByRole('menuitem', { name: new RegExp(name) }).click();
+    };
+    const [xlsx] = await Promise.all([page.waitForEvent('download', { timeout: 20_000 }), exportBy('Excel')]);
     if (!/^phuong-tien-.*\.xlsx$/.test(xlsx.suggestedFilename())) throw new Error(`tên tệp Excel: ${xlsx.suggestedFilename()}`);
     let pdfNote = '';
     if (wide) {
-      const [pdf] = await Promise.all([page.waitForEvent('download', { timeout: 60_000 }), page.getByRole('button', { name: 'PDF', exact: true }).click()]);
+      const [pdf] = await Promise.all([page.waitForEvent('download', { timeout: 60_000 }), exportBy('PDF')]);
       if (!/^nguon-luc-phuong_tien-.*\.pdf$/.test(pdf.suggestedFilename())) throw new Error(`tên tệp PDF: ${pdf.suggestedFilename()}`);
       await page.waitForTimeout(300);
       if ((await rows.count()) > size) throw new Error('chụp PDF xong không trở lại phân trang');
@@ -2140,12 +2147,28 @@ async function rescueForms(ctx) {
     return picked.join(' · ') || 'bóc tách chưa chọn mức';
   });
 
+  // Thẻ gọn của bảng 4 cột (máy tính ≥ 1280 px — bản vẽ khung C13): việc phụ nằm trong menu "⋯" của thẻ → mở lần lượt từng
+  // menu tới khi gặp mục cần (bỏ qua mục tắt). Điện thoại / iPad: nút nằm thẳng trên thẻ
+  const cardAction = async (direct, item) => {
+    const btn = visible(direct);
+    if (await btn.count()) { await btn.click(); return true; }
+    const menus = page.getByRole('button', { name: /^Thao tác khác — SOS-/ });
+    const n = await menus.count();
+    for (let i = 0; i < n; i += 1) {
+      const m = menus.nth(i);
+      if (!(await m.isVisible())) continue;
+      await m.click();
+      const it = page.getByRole('menuitem', { name: item });
+      if ((await it.count()) && (await it.getAttribute('aria-disabled')) !== 'true') { await it.click(); return true; }
+      await page.keyboard.press('Escape');
+    }
+    return false;
+  };
+
   await step(ctx, 'Sửa phiếu: Lưu khi chưa đổi gì → nói rõ; Huỷ lệnh thiếu lý do → báo dưới ô, con trỏ về ô lý do', async () => {
     await open();
     const notes = [];
-    const edit = visible(page.getByRole('button', { name: /^Sửa phiếu SOS-/ }));
-    if (await edit.count()) {
-      await edit.click();
+    if (await cardAction(page.getByRole('button', { name: /^Sửa phiếu SOS-/ }), /^Sửa mức, số người/)) {
       await dlg.waitFor();
       await dlg.getByRole('button', { name: 'Lưu', exact: true }).click();
       await dlg.getByText(/Chưa thay đổi gì/).waitFor({ timeout: 3_000 });
@@ -2157,9 +2180,7 @@ async function rescueForms(ctx) {
     }
     // Lệnh điều động đang chạy ở cột "Đang thực thi" (bảng hẹp: thẻ cột trên địa chỉ trang)
     await open('/cuu-ho?cot=thuc_thi');
-    const cancel = visible(page.getByRole('button', { name: /Huỷ lệnh/ }));
-    if (await cancel.count()) {
-      await cancel.click();
+    if (await cardAction(page.getByRole('button', { name: /Huỷ lệnh/ }), /^Huỷ lệnh điều động/)) {
       await dlg.waitFor();
       await dlg.getByRole('button', { name: 'Huỷ lệnh', exact: true }).click();
       await dlg.locator('#loi-ly-do-huy').waitFor({ timeout: 3_000 });
