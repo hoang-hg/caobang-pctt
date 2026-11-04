@@ -14,7 +14,7 @@ import { useStore } from '../../app/store';
 import { AdminBoundaries, AreaFocus, BaseLayer, RAIN_BINS } from '../../components/map/MapTools';
 import { evacIcon, hazardIcon, pinIcon, stationIcon } from '../../components/map/icons';
 import { LEVEL, landslideStatus } from '../../utils/labels';
-import { levelOf, RISK as RISK_SCALE, risk as riskStyle, TILT_LEVEL } from '../../utils/risk';
+import { levelOf, rainLabel, rainLevel, RISK as RISK_SCALE, risk as riskStyle, TILT_LEVEL } from '../../utils/risk';
 import { ago, dateTime, num, time } from '../../utils/format';
 import { useMediaQuery } from '../../utils/useMediaQuery';
 import { stationView } from '../../utils/stations';
@@ -22,7 +22,7 @@ import L from 'leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import MapLegendBox, { PointIcon } from '../../components/map/MapLegendBox';
 import { RainBar } from '../../components/map/MapLegend';
-import { BackButton, useEscapeToClose } from '../../components/common/ui';
+import { BackButton, Segmented, useEscapeToClose } from '../../components/common/ui';
 import ReportForm from './ReportForm';
 import TicketTracker from './TicketTracker';
 import LandslideMonitor, { maxTiltText } from './LandslideMonitor';
@@ -41,6 +41,7 @@ const GROUPS = [
   { id: 'so-tan', label: 'Sơ tán & đường dây nóng', icon: Home, tabs: ['sotan', 'hotlines'] },
   { id: 'tra-cuu', label: 'Tra cứu phiếu', icon: Search, tabs: ['tracuu'] },
 ];
+const MAP_VIEWS = ['dubao', 'phananh']; // màn con của "Bản đồ cảnh báo" — chỉ máy tính ≥ 1280 px (khung N17, N18)
 const SUB_LABEL = { muanuoc: 'Mực nước sông suối', sotan: 'Điểm sơ tán an toàn', hotlines: 'Đường dây nóng' };
 const SOURCE_TAB_LABEL = { satlo: 'Quay lại Sạt lở, lũ quét', sotan: 'Quay lại Điểm sơ tán' };
 const REFRESH = 60_000;
@@ -389,6 +390,9 @@ export default function PublicPortal() {
   });
   const activeAlerts = alerts.filter((a) => a.active !== false); // còn hiệu lực — đếm, nhấp nháy; lệnh đã kết thúc vẫn liệt kê bên dưới
   const { data: forecast } = useQuery({ queryKey: ['pub-forecast'], queryFn: () => pub('/forecast/areas', { hours: 24 }), refetchInterval: 10 * REFRESH });
+  // Khung N18: "3 ngày" chỉ tải khi mở đúng màn đó
+  const [fcHours, setFcHours] = useState(24);
+  const { data: forecast72 } = useQuery({ queryKey: ['pub-forecast', 72], queryFn: () => pub('/forecast/areas', { hours: 72 }), refetchInterval: 10 * REFRESH, enabled: activeTab === 'dubao' && fcHours === 72 });
   const { data: hotlines } = useQuery({ queryKey: ['pub-hotlines'], queryFn: () => pub('/hotlines'), staleTime: Infinity });
   const { data: geo } = useUnitsGeo();
   const { data: provinceArea } = useProvinceArea();
@@ -423,6 +427,11 @@ export default function PublicPortal() {
     const rep = (map.reports || []).length;
     return rain + ls + evac + rep;
   }, [map]);
+
+  // Màn con chỉ có trên máy tính: link ?tab=dubao mở trên điện thoại / thu nhỏ cửa sổ thì về bản đồ (có thẻ Mưa 24 giờ)
+  useEffect(() => {
+    if (!desk && MAP_VIEWS.includes(activeTab)) setActiveTab('bando');
+  }, [desk, activeTab]);
 
   const handleSelectPoint = (pt) => {
     setSelectedPoint(pt);
@@ -557,7 +566,7 @@ export default function PublicPortal() {
           {desk && (
             <nav aria-label="Các mục của cổng người dân" className="scroll-thin flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto">
               {GROUPS.map((g) => {
-                const on = g.tabs.includes(activeTab);
+                const on = g.tabs.includes(MAP_VIEWS.includes(activeTab) ? 'bando' : activeTab);
                 const blocked = g.id === 'deo-doc' && overview?.landslides?.blocked_count;
                 return (
                   <button
@@ -1000,7 +1009,7 @@ export default function PublicPortal() {
         <div ref={tabsRef} className="flex scroll-mt-20 flex-col gap-2">
           {!desk && <nav aria-label="Các mục của cổng người dân" className="scroll-thin flex gap-1.5 overflow-x-auto border-b border-line pb-2 pt-1 max-sm:hidden">
             {GROUPS.map((g) => {
-              const on = g.tabs.includes(activeTab);
+              const on = g.tabs.includes(MAP_VIEWS.includes(activeTab) ? 'bando' : activeTab);
               const badge = g.id === 'deo-doc' && overview?.landslides?.blocked_count
                   ? { text: `${overview.landslides.blocked_count} điểm cấm`, isEmergency: true, cls: 'bg-danger text-white' }
                   : null;
@@ -1435,6 +1444,12 @@ export default function PublicPortal() {
                         </div>
                       </div>
 
+                      {desk && (
+                        <button type="button" className="btn-secondary tap h-10 rounded-xl text-[13px]" onClick={() => { setActiveTab('dubao'); scrollToContent(); }}>
+                          Xem bản đồ và bảng theo từng xã
+                        </button>
+                      )}
+
                       {/* Danh sách các xã mưa nhiều nhất */}
                       <div className="space-y-1.5 mt-1">
                         <div className="text-[11px] font-bold text-ink">Xã dự báo mưa nhiều nhất:</div>
@@ -1482,7 +1497,7 @@ export default function PublicPortal() {
                 {/* Chuyên đề 1: Mưa lớn — mưa 24 giờ qua, dự báo 24 giờ tới theo xã; bấm mở bản đồ, thẻ "Mưa 24 giờ" */}
                 <div
                   onClick={() => {
-                    setActiveTab('bando');
+                    setActiveTab(desk ? 'dubao' : 'bando');
                     setMapSidebarTab('rain');
                     scrollToContent();
                   }}
@@ -1683,6 +1698,112 @@ export default function PublicPortal() {
         )}
 
         {/* TAB 2: MỰC NƯỚC SÔNG SUỐI */}
+        {/* Máy tính ≥ 1280 px (bản vẽ khung N18): bản đồ mưa dự báo + bảng theo xã. "Mức" dùng thang chung và chỉ áp cho 24 giờ */}
+        {activeTab === 'dubao' && desk && (() => {
+          const rows = (fcHours === 72 ? forecast72 : forecast) || [];
+          const withData = rows.filter((r) => r.p50 != null);
+          const avg = withData.length ? Math.round((withData.reduce((n, r) => n + r.p50, 0) / withData.length) * 10) / 10 : null;
+          const top = withData[0];
+          const span = fcHours === 72 ? '3 ngày tới' : '24 giờ tới';
+          return (
+            <div className="grid h-[720px] grid-cols-[minmax(0,1fr)_460px] gap-5">
+              <section className="sheet flex min-h-0 min-w-0 flex-col gap-3 p-5" aria-label={`Bản đồ mưa dự báo ${span}`}>
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="text-lg font-bold text-ink">Mưa dự báo {span} theo xã</h2>
+                  <Segmented label="Khoảng dự báo" value={fcHours} onChange={setFcHours} options={[{ value: 24, label: '24 giờ' }, { value: 72, label: '3 ngày' }]} />
+                </div>
+                <div className="min-h-0 flex-1 overflow-hidden rounded-[14px] border border-line">
+                  <PublicMap data={map} forecast={rows} geo={geo} me={me} route={route} target={target} layers={{ forecast: true }} basemap={basemap} onSelectPoint={handleSelectPoint} provinceArea={provinceArea} fitPad={1} />
+                </div>
+                <div className="w-64 text-[11px] text-muted"><RainBar bins={RAIN_BINS} unit="mm" /></div>
+              </section>
+              <section className="sheet flex min-h-0 min-w-0 flex-col gap-3 p-5" aria-label={`Bảng mưa dự báo ${span}`}>
+                {top ? (
+                  <p className="text-sm leading-normal text-ink-2">
+                    Mưa trung bình toàn tỉnh: <b className="num text-ink">{avg} mm</b> · Dự báo cao nhất: <b className="num text-ink">{top.p50} mm</b> · Xã mưa nhiều nhất: <b className="text-ink">{top.name}</b>
+                  </p>
+                ) : <p className="text-sm text-ink-2">Chưa có số dự báo {span} — không có nghĩa là không mưa.</p>}
+                <div className="scroll-thin min-h-0 flex-1 overflow-y-auto">
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 bg-panel">
+                      <tr className="text-left text-xs font-bold text-ink-2">
+                        <th className="px-3 py-2 font-bold">Xã, phường</th>
+                        <th className="px-3 py-2 font-bold">{fcHours === 72 ? '3 ngày tới' : '24 giờ tới'}</th>
+                        {fcHours === 24 && <th className="px-3 py-2 font-bold">Mức</th>}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((r) => {
+                        const lv = rainLevel(r.p50);
+                        return (
+                          <tr key={r.code} className="border-t border-line">
+                            <td className="px-3 py-2 font-semibold text-ink">{r.name}</td>
+                            <td className="num whitespace-nowrap px-3 py-2">{r.p50 != null ? <>{r.p50} mm <span className="font-sans text-xs text-muted">(tối đa {r.p90})</span></> : '—'}</td>
+                            {fcHours === 24 && <td className="px-3 py-2"><span className={clsx('chip whitespace-nowrap text-xs font-bold', riskStyle(lv).chip)}>{lv == null ? 'Chưa có số liệu' : rainLabel(lv)}</span></td>}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="rounded-[14px] border border-dashed border-line p-3 text-[13px] leading-normal text-ink-2">
+                  Số dự báo từ mô hình khí tượng, có thể sai lệch; theo dõi bản tin chính thức của Đài KTTV và lệnh của chính quyền.
+                </p>
+              </section>
+            </div>
+          );
+        })()}
+
+        {/* Máy tính ≥ 1280 px (bản vẽ khung N17): danh sách phản ánh đã công khai + bản đồ, bấm dòng / điểm mở thẻ chi tiết */}
+        {activeTab === 'phananh' && desk && (() => {
+          const open = selectedPoint?.type === 'report' ? (selectedPoint.raw || null) : null;
+          const pick = (r) => handleSelectPoint({ id: r.id, name: r.category_label, sub: r.commune_name || r.address || '', lat: r.lat, lon: r.lon, type: 'report', raw: r });
+          const status = (r) => (r.status === 'da_xu_ly' ? { text: 'Đã xử lý', cls: 'bg-good/15 text-good' } : { text: 'Đã xác minh', cls: 'bg-accent/10 text-accent' });
+          return (
+            <div className="grid h-[720px] grid-cols-[320px_minmax(0,1fr)] gap-5">
+              <aside className="sheet flex min-h-0 flex-col gap-2 p-4" aria-label="Phản ánh đã công khai">
+                <h2 className="text-[15px] font-bold text-ink">Phản ánh đã công khai</h2>
+                <div className="scroll-thin flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
+                  {(map?.reports || []).map((r) => (
+                    <button key={r.id} type="button" onClick={() => pick(r)} aria-pressed={open?.id === r.id} className={clsx('tap w-full rounded-[14px] border-2 px-3 py-2.5 text-left', open?.id === r.id ? 'border-accent bg-accent/10' : 'border-transparent bg-panel2 hover:border-line')}>
+                      <span className="flex items-start justify-between gap-2">
+                        <b className="min-w-0 text-sm text-ink">{r.category_label}</b>
+                        <span className={clsx('chip shrink-0 px-2 py-0 text-xs font-semibold', status(r).cls)}>{status(r).text}</span>
+                      </span>
+                      <span className="mt-0.5 block truncate text-[13px] text-muted">{r.commune_name || r.address || 'Hiện trường'} · {ago(r.created_at)}</span>
+                    </button>
+                  ))}
+                  {!map?.reports?.length && <p className="p-2 text-sm text-ink-2">Chưa có phản ánh đã xác minh trong 72 giờ qua.</p>}
+                </div>
+                <p className="rounded-[14px] border border-dashed border-line p-3 text-[13px] leading-normal text-ink-2">
+                  Chỉ phản ánh đã duyệt; không họ tên, số điện thoại; vị trí làm tròn nếu cán bộ chưa chọn chính xác.
+                </p>
+                <button type="button" className="btn-secondary tap h-11 rounded-xl" onClick={() => setReporting('bao_tin')}><Camera size={15} aria-hidden="true" /> Gửi phản ánh của bạn</button>
+              </aside>
+              <div className="relative min-w-0 overflow-hidden rounded-[18px] border border-line">
+                <PublicMap data={map} forecast={forecast} geo={geo} me={me} route={route} target={target} layers={{ hazard: true, reports: true }} basemap={basemap} onSelectPoint={handleSelectPoint} provinceArea={provinceArea} fitPad={1} />
+                {open && (
+                  <div className="float-panel absolute right-4 top-4 z-[1000] flex max-h-[calc(100%-2rem)] w-[368px] flex-col gap-2.5 overflow-y-auto p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <b className="min-w-0 flex-1 text-[17px] text-ink">{open.category_label}</b>
+                      <span className={clsx('chip shrink-0 text-xs font-semibold', status(open).cls)}>{status(open).text}</span>
+                      <button type="button" className="tap-sq -mr-1 -mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-panel2 hover:text-ink" onClick={() => setSelectedPoint(null)} aria-label="Đóng thẻ phản ánh"><X size={16} aria-hidden="true" /></button>
+                    </div>
+                    {open.photos?.length > 0 && (
+                      <div className="grid grid-cols-2 gap-2">
+                        {open.photos.slice(0, 2).map((p) => <a key={p.thumb} href={p.full || p.thumb} target="_blank" rel="noreferrer"><img src={p.thumb} alt={`Ảnh hiện trường: ${open.category_label}`} className="h-24 w-full rounded-xl object-cover" loading="lazy" /></a>)}
+                      </div>
+                    )}
+                    <p className="text-sm leading-normal text-ink">{open.description}</p>
+                    {open.public_note && <p className="text-[13px] leading-snug text-good"><b>Cán bộ:</b> {open.public_note}</p>}
+                    <p className="text-[13px] text-muted">{[open.commune_name || open.address, ago(open.created_at), open.approx_m ? `vị trí gần đúng (~${open.approx_m} m)` : null].filter(Boolean).join(' · ')}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Máy tính ≥ 1280 px (bản vẽ khung N4): bảng trạm + bản đồ bên phải; trạm không gửi số đo nói rõ không có nghĩa là an toàn */}
         {activeTab === 'muanuoc' && desk && (
           <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,520px)] items-stretch gap-5">
@@ -1718,7 +1839,7 @@ export default function PublicPortal() {
               </p>
             </section>
             <div className="min-h-[520px] overflow-hidden rounded-[18px] border border-line">
-              <PublicMap data={map} forecast={forecast} geo={geo} me={me} route={route} target={target} layers={{ ...layers, stations: true }} basemap={basemap} onSelectPoint={handleSelectPoint} provinceArea={provinceArea} />
+              <PublicMap data={map} forecast={forecast} geo={geo} me={me} route={route} target={target} layers={{ ...layers, stations: true }} basemap={basemap} onSelectPoint={handleSelectPoint} provinceArea={provinceArea} fitPad={1} />
             </div>
           </div>
         )}
@@ -2035,11 +2156,17 @@ export default function PublicPortal() {
         )}
 
         {/* Phần phản ánh hiện trường đã được xác minh */}
-        <section className="card p-4">
-          <div className="flex items-center justify-between mb-3">
+        {activeTab !== 'phananh' && <section className="card p-4">
+          <div className="flex items-center justify-between gap-2 mb-3">
             <h3 className="card-title text-sm">
               <Camera size={15} className="text-accent" /> Phản ánh hiện trường đã được xác minh
             </h3>
+            <span className="flex-1" />
+            {desk && map?.reports?.length > 0 && (
+              <button type="button" className="btn-ghost text-xs px-2.5 py-1 text-accent" onClick={() => { setSelectedPoint(null); setActiveTab('phananh'); scrollToContent(); }}>
+                Xem trên bản đồ
+              </button>
+            )}
             <button className="btn-ghost text-xs px-2.5 py-1 text-danger" onClick={() => setReporting('bao_tin')}>
               + Gửi phản ánh của bạn
             </button>
@@ -2064,7 +2191,7 @@ export default function PublicPortal() {
                   });
                   setMapSidebarTab('legend');
                   setTarget({ lat: r.lat, lon: r.lon, zoom: 14 });
-                  setActiveTab('bando');
+                  setActiveTab(desk ? 'phananh' : 'bando');
                   scrollToContent();
                 }}
                 className="card p-2.5 cursor-pointer hover:border-accent hover:shadow transition flex flex-col justify-between"
@@ -2098,8 +2225,8 @@ export default function PublicPortal() {
                     <CheckCircle2 size={20} />
                   </div>
                   <div>
-                    <div className="text-xs font-bold text-ink">Địa bàn tỉnh ổn định – Chưa có phản ánh sự cố khẩn cấp</div>
-                    <div className="text-[11px] text-muted mt-0.5">Không ghi nhận ách tắc, sạt lở hoặc ngập úng trong 72 giờ qua. Nếu phát hiện sự cố trên đường, bà con vui lòng chụp ảnh gửi để BCH tỉnh hỗ trợ xử lý kịp thời.</div>
+                    <div className="text-xs font-bold text-ink">Chưa có phản ánh hiện trường đã xác minh trong 72 giờ qua</div>
+                    <div className="text-[11px] text-muted mt-0.5">Điều này không có nghĩa là địa bàn an toàn — vẫn theo dõi cảnh báo chính thức. Nếu phát hiện sự cố trên đường, bà con vui lòng chụp ảnh gửi để BCH tỉnh hỗ trợ xử lý kịp thời.</div>
                   </div>
                 </div>
                 <button
@@ -2112,7 +2239,7 @@ export default function PublicPortal() {
               </div>
             )}
           </div>
-        </section>
+        </section>}
 
         {/* Footer */}
         <footer className="mt-4 border-t border-line/60 pt-6 pb-4 text-center text-xs text-muted leading-relaxed">
