@@ -5,10 +5,13 @@ import { usePermission } from '../../rbac/usePermission';
 import { INCIDENT, PRIORITY, sosStatusLabel, sourceLabel } from '../../utils/labels';
 import { dateTime, time } from '../../utils/format';
 import { risk, sosLevel } from '../../utils/risk';
-import { etaText, waitText } from './rescueFacts';
+import { etaText, durWords, waitText } from './rescueFacts';
 import TicketCard from './TicketCard';
 
 const BTN = 'tap inline-flex min-h-[32px] items-center justify-center gap-1 whitespace-nowrap rounded-lg px-2 text-xs font-semibold';
+
+// Một dòng cho bảng gọn (bản vẽ khung C4): "26 phút · quá hạn"; câu đầy đủ khi rê chuột và trong PDF
+const shortWait = (t, sla) => `${durWords(sla.waitedSec)}${t.sla_minutes * 60 < sla.waitedSec ? ' · quá hạn' : ''}`;
 
 function Row({ t, x, now, pdf, online, onDispatch, onFocus }) {
   const canDispatch = usePermission('dispatch', 'create', t.admin_code);
@@ -16,7 +19,7 @@ function Row({ t, x, now, pdf, online, onDispatch, onFocus }) {
   const waiting = t.status === 'moi' || t.status === 'dieu_phoi';
   const etaSec = t.eta ? (new Date(t.eta).getTime() - now) / 1000 : null;
   return (
-    <tr className={clsx(x.overdue && 'bg-danger/5')}>
+    <tr className={clsx(pdf && x.overdue && 'bg-danger/5')}>
       <td className={clsx('whitespace-nowrap border-l-4', risk(sosLevel(t.priority)).edge)}>
         <b className="num text-ink">{t.code}</b>
         <div className="text-xs text-muted">{sourceLabel(t)}</div>
@@ -33,7 +36,7 @@ function Row({ t, x, now, pdf, online, onDispatch, onFocus }) {
       <td className="whitespace-nowrap text-sm">{sosStatusLabel(t)}</td>
       <td className="text-xs">
         {x.sla
-          ? <span className={clsx(x.overdue ? 'font-bold text-danger' : 'text-ink-2')} title={`Hạn phản hồi cấp ${t.priority}: ${t.sla_minutes} phút`}>{waitText(t, x.sla)}</span>
+          ? <span className={clsx(x.overdue ? 'font-bold text-danger' : 'text-ink-2')} title={`${waitText(t, x.sla)} · hạn phản hồi cấp ${t.priority}: ${t.sla_minutes} phút`}>{pdf ? waitText(t, x.sla) : shortWait(t, x.sla)}</span>
           : <span className="text-muted">—</span>}
       </td>
       <td className="whitespace-nowrap text-xs">{dateTime(t.received_at)}</td>

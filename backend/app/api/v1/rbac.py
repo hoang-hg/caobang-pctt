@@ -74,6 +74,7 @@ class UserPatch(BaseModel):
     password: str | None = Field(None, max_length=128)
     pin: str | None = Field(None, pattern=r"^\d{4,8}$")
     is_active: bool | None = None
+    lock_reason: str | None = Field(None, max_length=300, description="Lý do khoá, ghi vào nhật ký thao tác")
     email: str | None = Field(None, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 

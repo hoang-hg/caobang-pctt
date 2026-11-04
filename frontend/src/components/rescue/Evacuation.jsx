@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import clsx from 'clsx';
 import { ChevronLeft, ChevronRight, Home, Loader2, Save, Search } from 'lucide-react';
 import { api } from '../../api/client';
@@ -9,7 +10,9 @@ import { EmptyState, ErrorState, FieldError, Modal, Progress, Section, ShowMore,
 import QtyStepper from '../common/QtyStepper';
 import OccupancyModal from '../common/OccupancyModal';
 import { useAllowedCodes, usePermission } from '../../rbac/usePermission';
-import { foldVi, int, pct, time } from '../../utils/format';
+import { axisProps, useChartTheme } from '../charts/chartTheme';
+import { exportExcel } from '../../utils/exportExcel';
+import { dateTime, foldVi, int, pct, time, vnFileStamp } from '../../utils/format';
 import { occupancyLevel, risk } from '../../utils/risk';
 import { useShowMore } from '../../utils/useShowMore';
 
@@ -218,7 +221,89 @@ function EvacuationRow({ r, online, onEdit }) {
 }
 
 /** Dòng bảng tiến độ sơ tán (màn Sơ tán máy tính — khung C9). Thanh tiến độ màu trung tính (cao = tốt). */
-function EvacuationTableRow({ r, online, onEdit }) {
+/**
+ * Diễn biến sơ tán của một xã (bản vẽ khung C15): biểu đồ hộ đã sơ tán so với kế hoạch + bảng từng lần số thay đổi, Xuất Excel.
+ * Lấy từ GET /evacuation/{code}/history (72 giờ). Máy chủ chưa lưu nguồn báo của từng lần nên bảng không có cột đó.
+ */
+function EvacuationHistoryModal({ row, onClose }) {
+  const c = useChartTheme();
+  const toast = useStore((s) => s.toast);
+  const q = useQuery({ queryKey: ['evacuation-history', row.code], queryFn: () => api(`/evacuation/${encodeURIComponent(row.code)}/history`, { params: { hours: 72 } }) });
+  const rows = q.data || [];
+  const series = rows.map((h) => ({ at: dateTime(h.time), done: h.evacuated_households }));
+  const planned = rows.at(-1)?.planned_households;
+  const excel = async () => {
+    try {
+      await exportExcel(
+        rows.map((h) => ({
+          Lúc: dateTime(h.time), 'Hộ đã sơ tán': h.evacuated_households, 'Hộ kế hoạch': h.planned_households,
+          'Nhân khẩu đã sơ tán': h.evacuated_persons, 'Nhân khẩu kế hoạch': h.planned_persons, 'Người ghi': h.actor_name || '',
+        })),
+        { sheet: 'Dien bien so tan', filename: `dien-bien-so-tan-${row.code}-${vnFileStamp(new Date(), true)}.xlsx` },
+      );
+    } catch (e) {
+      toast({ tone: 'danger', title: 'Không xuất được tệp', body: e.message });
+    }
+  };
+  return (
+    <Modal
+      open
+      size="md"
+      onClose={onClose}
+      title={`Diễn biến sơ tán — ${row.name}`}
+      subtitle="72 giờ qua"
+      footer={
+        <>
+          <button type="button" className="btn-secondary" disabled={!rows.length} onClick={excel}>Xuất Excel</button>
+          <button type="button" className="btn-primary" onClick={onClose}>Đóng</button>
+        </>
+      }
+    >
+      {q.isLoading ? <Skeleton height={220} />
+        : q.isError && !q.data ? <ErrorState onRetry={q.refetch}>Không tải được diễn biến sơ tán</ErrorState>
+          : !rows.length ? <EmptyState>Xã chưa có lần cập nhật nào trong 72 giờ qua</EmptyState>
+            : (
+              <div className="flex flex-col gap-3">
+                <div className="h-44">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={series} margin={{ top: 12, right: 12, bottom: 0, left: -12 }}>
+                      <CartesianGrid stroke={c.grid} vertical={false} />
+                      <XAxis dataKey="at" {...axisProps(c)} minTickGap={60} />
+                      <YAxis {...axisProps(c)} domain={[0, (m) => Math.max(m, planned || 0)]} />
+                      <Tooltip formatter={(v) => [`${int(v)} hộ`, 'Đã sơ tán']} />
+                      {planned > 0 && <ReferenceLine y={planned} stroke={c.axis} strokeDasharray="5 4" label={{ value: 'Kế hoạch', position: 'insideTopRight', fontSize: 11, fill: c.axis }} />}
+                      <Line type="stepAfter" dataKey="done" stroke={c.s1} strokeWidth={2} dot={{ r: 2.5 }} isAnimationActive={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs font-bold text-ink-2">
+                      <th className="px-3 py-2 font-bold">Lúc</th>
+                      <th className="px-3 py-2 font-bold">Hộ đã / kế hoạch</th>
+                      <th className="px-3 py-2 font-bold">Nhân khẩu</th>
+                      <th className="px-3 py-2 font-bold">Người ghi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.slice().reverse().map((h) => (
+                      <tr key={h.time} className="border-t border-line">
+                        <td className="whitespace-nowrap px-3 py-2">{dateTime(h.time)}</td>
+                        <td className="num px-3 py-2">{int(h.evacuated_households)}/{int(h.planned_households)} hộ</td>
+                        <td className="num px-3 py-2">{int(h.evacuated_persons)}/{int(h.planned_persons)} người</td>
+                        <td className="px-3 py-2 text-ink-2">{h.actor_name || 'Hệ thống'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <p className="rounded-[14px] bg-panel2 p-3 text-[13px] leading-normal text-ink-2">Mỗi lần số kế hoạch hoặc số đã sơ tán đổi là một dòng — dùng cho báo cáo đợt thiên tai.</p>
+              </div>
+            )}
+    </Modal>
+  );
+}
+
+function EvacuationTableRow({ r, online, onEdit, onHistory }) {
   const canEdit = usePermission('evacuation', 'update', r.code);
   const p = pct(r.evacuated_households, r.planned_households);
   return (
@@ -232,7 +317,8 @@ function EvacuationTableRow({ r, online, onEdit }) {
       </td>
       <td className="num px-3 py-2.5">{int(r.evacuated_households)}/{int(r.planned_households)} hộ</td>
       <td className="px-3 py-2.5 text-ink-2">{r.updated_at ? time(r.updated_at) : '—'}</td>
-      <td className="px-3 py-2.5 text-right">
+      <td className="whitespace-nowrap px-3 py-2.5 text-right">
+        <button type="button" className="tap mr-1.5 rounded px-1 text-[13px] font-semibold text-accent hover:underline" onClick={() => onHistory(r)} aria-label={`Diễn biến sơ tán ${r.name}`}>Diễn biến</button>
         {canEdit && (
           <button type="button" className="btn-secondary tap h-9 rounded-xl px-3 text-[13px]" onClick={() => onEdit(r)} disabled={!online} aria-label={`Cập nhật sơ tán ${r.name}`}>
             Cập nhật
@@ -301,6 +387,7 @@ export default function Evacuation({ query, online, className, wide = false }) {
   const canUpdate = usePermission('evacuation', 'update');
   const [editing, setEditing] = useState(null); // null | 'new' | dòng tiến độ
   const [site, setSite] = useState(null); // điểm sơ tán đang cập nhật số người
+  const [history, setHistory] = useState(null); // xã đang xem diễn biến (khung C15)
   const data = query.data;
   const totPlanned = data?.progress.reduce((s, r) => s + r.planned_households, 0) || 0;
   const totDone = data?.progress.reduce((s, r) => s + r.evacuated_households, 0) || 0;
@@ -311,6 +398,7 @@ export default function Evacuation({ query, online, className, wide = false }) {
     <>
       {editing && <EvacuationModal row={editing === 'new' ? null : editing} progress={data?.progress} onClose={() => setEditing(null)} />}
       {site && <OccupancyModal site={site} onClose={() => setSite(null)} />}
+      {history && <EvacuationHistoryModal row={history} onClose={() => setHistory(null)} />}
     </>
   );
 
@@ -342,7 +430,7 @@ export default function Evacuation({ query, online, className, wide = false }) {
                 </tr>
               </thead>
               <tbody>
-                {data.progress.map((r) => <EvacuationTableRow key={r.code} r={r} online={online} onEdit={setEditing} />)}
+                {data.progress.map((r) => <EvacuationTableRow key={r.code} r={r} online={online} onEdit={setEditing} onHistory={setHistory} />)}
               </tbody>
             </table>
           ) : <EmptyState>Chưa có xã nào báo tiến độ sơ tán{canUpdate ? ' — bấm "+ Cập nhật xã"' : ''}</EmptyState>)}
