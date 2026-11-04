@@ -3264,7 +3264,8 @@ async function eventsPage(ctx, { create }) {
     const head = page.locator('main h2').first().locator('xpath=..');
     if (!(await head.innerText()).includes('Đang diễn ra')) throw new Error(`báo cáo ${code} không ghi "Đang diễn ra"`);
     await page.getByRole('button', { name: 'Kết thúc đợt', exact: true }).click();
-    const end = page.getByRole('dialog', { name: `Kết thúc đợt ${code}` });
+    // Bản vẽ khung G3: tiêu đề dạng câu hỏi "Kết thúc đợt DT-…?"
+    const end = page.getByRole('dialog', { name: new RegExp(`^Kết thúc đợt ${code}\\??$`) });
     await end.waitFor();
     await end.getByRole('button', { name: 'Mưa đã ngớt, nước rút dưới báo động I' }).click();
     if (!(await end.locator('#dot-ket-thuc-ghi-chu').inputValue()).includes('nước rút')) throw new Error('chip lý do không điền vào ô ghi chú');

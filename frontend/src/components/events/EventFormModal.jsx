@@ -1,12 +1,12 @@
 import { useMemo, useRef, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { Check, ChevronLeft, ChevronRight, Flag, Loader2, Search } from 'lucide-react';
 import { api } from '../../api/client';
 import { usePresets, useUnits } from '../../api/hooks';
 import { useStore } from '../../app/store';
 import { FieldError, Modal, StepChips } from '../common/ui';
-import { foldVi } from '../../utils/format';
+import { foldVi, int } from '../../utils/format';
 import { useOnline } from '../../utils/useOnline';
 import { fromLocalInput, HAZARD, MAX_BACKDATE_DAYS, toLocalInput, when } from './eventFacts';
 import { EVENT_HAZARD_CHOICES } from '../../utils/hazardScope';
@@ -136,8 +136,10 @@ export default function EventFormModal({ event, onClose, onSaved }) {
     <Modal
       open
       onClose={onClose}
-      wide
+      size="md"
       title={editing ? `Sửa đợt ${event.code}` : 'Mở đợt thiên tai'}
+      // Bản vẽ khung G2, G4: một dòng nói rõ việc của hộp thoại
+      subtitle={editing ? event.name : 'Gom phiếu SOS, lệnh điều động, cảnh báo, vật tư theo đợt để báo cáo'}
       footer={(
         <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:items-center sm:justify-end">
           {step === 1 && (
@@ -343,8 +345,18 @@ export default function EventFormModal({ event, onClose, onSaved }) {
 
 const END_NOTES = ['Mưa đã ngớt, nước rút dưới báo động I', 'Đã khắc phục xong hậu quả trước mắt', 'Hết cảnh báo của Đài KTTV'];
 
-/** Kết thúc đợt: ghi chú (chọn nhanh, sửa được), giờ kết thúc "Bây giờ" hoặc giờ khác (sau giờ bắt đầu). */
+/**
+ * Kết thúc đợt: ghi chú (chọn nhanh, sửa được), giờ kết thúc "Bây giờ" hoặc giờ khác (sau giờ bắt đầu). Bản vẽ desktop khung
+ * G3: tiêu đề dạng câu hỏi, 3 ô tóm tắt kết quả đợt (phiếu SOS · người được cứu · cảnh báo đã phát — cùng số với báo cáo
+ * đợt, toàn tỉnh) để người kết thúc thấy trước khi chốt.
+ */
 export function EndEventModal({ event, onClose }) {
+  const { data: s } = useQuery({
+    queryKey: ['event-summary', event.code, 'CB'],
+    queryFn: () => api(`/events/${encodeURIComponent(event.code)}/summary`, { params: {} }),
+    staleTime: 30_000,
+  });
+  const sent = s ? s.alerts.filter((a) => ['sending', 'sent'].includes(a.status)).length : null;
   const qc = useQueryClient();
   const toast = useStore((s) => s.toast);
   const online = useOnline();
@@ -384,8 +396,10 @@ export function EndEventModal({ event, onClose }) {
   return (
     <Modal
       open
+      size="md"
       onClose={onClose}
-      title={`Kết thúc đợt ${event.code}`}
+      title={`Kết thúc đợt ${event.code}?`}
+      subtitle={event.name}
       footer={(
         <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:justify-end">
           <button type="button" className={clsx('btn-ghost', BIG)} onClick={onClose} disabled={busy}>Huỷ</button>
@@ -396,7 +410,22 @@ export function EndEventModal({ event, onClose }) {
       )}
     >
       <div className="flex flex-col gap-3 text-sm">
-        <p className="text-xs text-muted">{event.name} — phiếu, lệnh, cảnh báo tạo sau giờ kết thúc không gắn vào đợt; báo cáo của đợt vẫn xem / xuất được.</p>
+        {/* Tóm tắt kết quả đợt (khung G3) — đang tải: khung xám; lỗi: bỏ qua (không chặn việc kết thúc) */}
+        <div className="grid grid-cols-3 gap-3" aria-label="Kết quả đợt">
+          {[
+            ['Phiếu SOS', s && int(s.sos.total), 'phiếu', s && (s.sos.open ? `${int(s.sos.open)} còn mở` : 'đã xử lý hết')],
+            ['Người được cứu', s && int(s.sos.rescued), s && `/ ${int(s.sos.trapped)}`, 'đã cứu / mắc kẹt'],
+            ['Cảnh báo đã phát', s && int(sent), 'lệnh', null],
+          ].map(([title, value, unit, foot]) => (
+            <div key={title} className="rounded-[14px] border border-line bg-panel p-3.5">
+              <div className="text-[13px] font-semibold text-ink-2">{title}</div>
+              {s ? (
+                <div className="mt-0.5"><b className="num text-2xl text-ink">{value}</b> <span className="text-[13px] text-muted">{unit}</span></div>
+              ) : <div className="mt-1.5 h-7 w-16 animate-pulse rounded bg-panel2" aria-hidden="true" />}
+              {s && foot && <div className="text-xs text-muted">{foot}</div>}
+            </div>
+          ))}
+        </div>
         <fieldset>
           <legend className="font-medium">Giờ kết thúc</legend>
           <div className="mt-1 flex flex-wrap gap-1.5" role="radiogroup" aria-label="Giờ kết thúc">
@@ -423,6 +452,10 @@ export function EndEventModal({ event, onClose }) {
           </div>
           <textarea id="dot-ket-thuc-ghi-chu" className="input mt-1.5 min-h-[64px]" value={note} maxLength={1000} onChange={(e) => setNote(e.target.value)} />
         </div>
+        <p className="rounded-[14px] border border-dashed border-line p-3 text-[13px] leading-normal text-ink-2">
+          Sau khi kết thúc, phiếu, lệnh, cảnh báo mới <b className="text-ink">không</b> gom vào đợt này nữa. Báo cáo đợt vẫn xem và
+          xuất được (Excel / PDF ở đầu trang).
+        </p>
       </div>
     </Modal>
   );
