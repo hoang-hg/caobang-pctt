@@ -197,7 +197,7 @@ function WarehouseRow({ w, x, category, online, onReceive, onIssue, onMap, onLed
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
             {updated && <span>Cập nhật tồn kho: {dateTime(updated)}</span>}
             <span className="flex-1" />
-            {onLedger && <button type="button" className="tap rounded px-1 font-semibold text-accent hover:underline" onClick={() => onLedger(w)}>Sổ xuất – nhập</button>}
+            {onLedger && <button type="button" className="tap rounded px-1 font-semibold text-accent hover:underline" onClick={() => onLedger(w)} aria-label={`Sổ xuất – nhập của ${w.name}`}>Sổ xuất – nhập</button>}
             {w.phone && <a href={`tel:${w.phone.replace(/\s/g, '')}`} className="tap inline-flex items-center gap-1 rounded px-1 font-semibold text-accent hover:underline"><Phone size={13} aria-hidden="true" /> Gọi thủ kho</a>}
             {w.lat != null && <button type="button" className="tap inline-flex items-center gap-1 rounded px-1 font-semibold text-accent hover:underline" onClick={() => onMap(w.lat, w.lon, w.name)}><MapPin size={13} aria-hidden="true" /> Bản đồ</button>}
           </div>

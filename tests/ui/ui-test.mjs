@@ -1610,7 +1610,11 @@ async function inventoryLedger(ctx) {
   await step(ctx, 'Sổ xuất – nhập kho: mở từ thẻ kho (lọc sẵn đúng kho), dòng đúng kho, Excel, không tràn, vùng chạm ≥ 44 px', async () => {
     await page.goto(`${ROOT}/nguon-luc?tab=vat_tu`);
     const link = page.getByRole('button', { name: /^Sổ xuất – nhập của / }).first();
-    await link.waitFor({ timeout: 20_000 });
+    // Máy tính ≥ 1280 px (bản vẽ khung E4): bảng kho — sổ nằm trong dòng mở rộng, phải mở dòng trước
+    const detail = page.locator('ul[aria-label="Kho vật tư"]').getByRole('button', { name: /^Chi tiết / }).first();
+    await detail.or(link).first().waitFor({ timeout: 20_000 });
+    if (await detail.count()) await detail.click();
+    await link.waitFor({ timeout: 5_000 });
     const wh = (await link.getAttribute('aria-label')).replace('Sổ xuất – nhập của ', '');
     if (await page.locator('#so-kho [aria-label="Khoảng thời gian của sổ kho"]').count()) throw new Error('khối sổ kho mở sẵn — phải thu gọn, chưa tải');
     await link.click();
