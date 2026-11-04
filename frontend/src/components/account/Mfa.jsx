@@ -1,23 +1,53 @@
 import { useEffect, useRef, useState } from 'react';
+import clsx from 'clsx';
 import { Check, Copy, Download, Loader2, QrCode, ShieldCheck, ShieldOff } from 'lucide-react';
 import { api } from '../../api/client';
 import { useStore } from '../../app/store';
 import { Modal } from '../common/ui';
 
-/** Ô nhập mã 6 số (hoặc mã khôi phục khi `recovery`). */
+/**
+ * Ô nhập mã 6 số (hoặc mã khôi phục khi `recovery`). Mã số hiện thành 6 ô (bản vẽ khung L2) nhưng vẫn là MỘT ô nhập trong suốt
+ * phủ lên trên — dán cả mã, tự điền từ tin nhắn, trình đọc màn hình và phím xoá chạy như ô thường.
+ */
 export function CodeInput({ value, onChange, recovery = false, autoFocus = true }) {
+  const [focused, setFocused] = useState(autoFocus);
+  if (recovery) {
+    return (
+      <input
+        className="input text-center font-mono text-lg tracking-[0.3em]"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        inputMode="text"
+        autoComplete="one-time-code"
+        placeholder="xxxx-xxxx"
+        maxLength={12}
+        autoFocus={autoFocus}
+        aria-label="Mã khôi phục"
+      />
+    );
+  }
   return (
-    <input
-      className="input text-center font-mono text-lg tracking-[0.3em]"
-      value={value}
-      onChange={(e) => onChange(recovery ? e.target.value : e.target.value.replace(/\D/g, '').slice(0, 6))}
-      inputMode={recovery ? 'text' : 'numeric'}
-      autoComplete="one-time-code"
-      placeholder={recovery ? 'xxxx-xxxx' : '123456'}
-      maxLength={recovery ? 12 : 6}
-      autoFocus={autoFocus}
-      aria-label={recovery ? 'Mã khôi phục' : 'Mã 6 số trong ứng dụng xác thực'}
-    />
+    <div className="relative">
+      <input
+        className="absolute inset-0 z-10 h-full w-full cursor-text opacity-0"
+        value={value}
+        onChange={(e) => onChange(e.target.value.replace(/\D/g, '').slice(0, 6))}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        inputMode="numeric"
+        autoComplete="one-time-code"
+        maxLength={6}
+        autoFocus={autoFocus}
+        aria-label="Mã 6 số trong ứng dụng xác thực"
+      />
+      <div className="grid grid-cols-6 gap-2" aria-hidden="true">
+        {[0, 1, 2, 3, 4, 5].map((i) => (
+          <span key={i} className={clsx('flex h-12 items-center justify-center rounded-xl border bg-panel font-mono text-xl font-bold text-ink', focused && i === Math.min(value.length, 5) ? 'border-accent ring-2 ring-accent/30' : 'border-line')}>
+            {value[i] || ''}
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -190,10 +220,10 @@ export default function MfaModal({ onClose }) {
   } else {
     body = (
       <div className="flex flex-col gap-4 text-sm">
-        <div className="flex items-center gap-2 rounded-lg bg-good/10 p-3 text-good">
-          <ShieldCheck size={18} /> Đang bật · còn {mfa.recovery_left} mã khôi phục
-          {mfa.required && <span className="text-xs text-muted">(bắt buộc theo vai trò)</span>}
-        </div>
+        <dl className="border-b border-line">
+          <div className="flex gap-3 border-t border-line py-2.5"><dt className="w-36 shrink-0 text-ink-2">Trạng thái</dt><dd><b className="text-good">Đã bật</b>{mfa.required ? ' (bắt buộc theo vai trò)' : ''}</dd></div>
+          <div className="flex gap-3 border-t border-line py-2.5"><dt className="w-36 shrink-0 text-ink-2">Mã khôi phục còn</dt><dd className="num font-semibold text-ink">{mfa.recovery_left} mã</dd></div>
+        </dl>
         <label className="flex flex-col gap-1">
           Mã 6 số hiện tại (để tạo mã khôi phục mới hoặc tắt)
           <CodeInput value={code} onChange={setCode} />
@@ -202,11 +232,11 @@ export default function MfaModal({ onClose }) {
           onClick={() => act('codes', '/auth/mfa/recovery-codes', { code }, (r) => setCodes(r.recovery_codes))}>
           {busy === 'codes' ? <Loader2 size={15} className="animate-spin" /> : <ShieldCheck size={15} />} Tạo bộ mã khôi phục mới
         </button>
-        {mfa.required ? (
-          <p className="text-xs text-muted">
-            Vai trò của bạn bắt buộc xác thực 2 lớp. Mất điện thoại mà hết mã khôi phục: đề nghị quản trị cấp trên đặt lại.
-          </p>
-        ) : (
+        <p className="rounded-[14px] border border-dashed border-line p-3 text-[13px] leading-normal text-ink-2">
+          Tạo bộ mới thì bộ cũ hết hiệu lực.
+          {mfa.required ? ' Vai trò của bạn bắt buộc xác thực 2 lớp nên không tắt được. Mất điện thoại mà hết mã khôi phục: nhờ cấp trên đặt lại xác thực 2 lớp.' : ''}
+        </p>
+        {!mfa.required && (
           <div className="flex flex-col gap-2 border-t border-line pt-3">
             <label className="flex flex-col gap-1">
               Mật khẩu
@@ -227,7 +257,7 @@ export default function MfaModal({ onClose }) {
     );
   }
   return (
-    <Modal open onClose={onClose} title="Xác thực 2 lớp">
+    <Modal open size="md" onClose={onClose} title="Xác thực 2 lớp" subtitle={auth?.user?.username}>
       {body}
       {error && <div className="mt-2 text-sm text-danger">{error}</div>}
     </Modal>

@@ -1,11 +1,12 @@
 import { lazy, Suspense, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { LogOut, UserCircle2, ShieldCheck, KeyRound, Globe, Smartphone, Volume2, VolumeX, Monitor, Sun, Moon } from 'lucide-react';
+import { BookOpen, LogOut, UserCircle2, ShieldCheck, KeyRound, Globe, Smartphone, Volume2, VolumeX, Monitor, Sun, Moon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import clsx from 'clsx';
 import { ChangePasswordModal } from '../../pages/AccountPages';
 import { useStore } from '../../app/store';
 import { useClickOutside } from '../../utils/useClickOutside';
+import { useMediaQuery } from '../../utils/useMediaQuery';
 
 // Tách chunk: menu nằm trong gói tải đầu (cả cổng công khai) — chỉ tải phần xác thực 2 lớp khi mở
 const MfaModal = lazy(() => import('../account/Mfa'));
@@ -26,6 +27,7 @@ export default function UserMenu() {
   const [changing, setChanging] = useState(false);
   const [mfaOpen, setMfaOpen] = useState(false);
   const ref = useRef(null);
+  const desk = useMediaQuery('(min-width: 1280px)');
   useClickOutside(ref, () => setOpen(false));
   const user = auth?.user;
   if (!user) return null;
@@ -44,7 +46,37 @@ export default function UserMenu() {
         </span>
         <span className="hidden max-w-[10rem] truncate 2xl:inline">{user.full_name}</span>
       </button>
-      {open && (
+      {/* Bản vẽ khung L6: thông tin chính trên đầu, mỗi việc một dòng. Âm báo, kết nối, cổng người dân ở thanh trạng thái dưới cùng */}
+      {open && desk && (
+        <div className="float-panel scroll-thin absolute right-0 top-11 z-[1200] max-h-[calc(100vh-4rem)] w-80 overflow-y-auto p-2">
+          <div className="border-b border-line px-3 pb-2.5 pt-1.5">
+            <div className="text-base font-bold text-ink">{user.full_name}</div>
+            <div className="mt-0.5 text-[13px] leading-snug text-ink-2"><span className="font-mono">{user.username}</span>{user.position ? ` · ${user.position}` : ''}</div>
+            {user.assignments.map((a) => <div key={`${a.role}@${a.domain}`} className="text-[13px] leading-snug text-ink-2">{a.role_name} · {a.domain_label}</div>)}
+            {!user.assignments.length && <div className="text-[13px] text-danger">Chưa được cấp vai trò nào</div>}
+            <div className="mt-1 text-xs text-muted">PIN phê duyệt: {user.has_pin ? 'đã thiết lập' : 'chưa có'}{user.email ? ` · Email khôi phục: ${user.email}` : ''}</div>
+          </div>
+          <div className="flex flex-col py-1 text-sm">
+            <button type="button" className="tap flex h-10 items-center gap-2 rounded-xl px-3 text-left hover:bg-panel2" onClick={() => { setChanging(true); setOpen(false); }}><KeyRound size={15} aria-hidden="true" /> Đổi mật khẩu</button>
+            <button type="button" className="tap flex h-10 items-center gap-2 rounded-xl px-3 text-left hover:bg-panel2" onClick={() => { setMfaOpen(true); setOpen(false); }}>
+              <Smartphone size={15} aria-hidden="true" /> Xác thực 2 lớp · {user.mfa?.enabled ? <b className="font-semibold text-good">đã bật</b> : <span className="text-ink-2">chưa bật</span>}
+            </button>
+            <Link to="/huong-dan" className="tap flex h-10 items-center gap-2 rounded-xl px-3 hover:bg-panel2" onClick={() => setOpen(false)}><BookOpen size={15} aria-hidden="true" /> Hướng dẫn xử lý</Link>
+          </div>
+          <div className="border-t border-line px-3 py-2.5">
+            <div className="text-[13px] font-semibold text-ink-2">Nền</div>
+            <div className="mt-1 inline-flex gap-1 rounded-xl bg-panel2 p-1" role="group" aria-label="Giao diện">
+              {THEMES.map(([value, label]) => (
+                <button key={value} type="button" aria-pressed={themePref === value} className={clsx('tap h-8 rounded-lg px-3 text-sm', themePref === value ? 'bg-panel font-semibold text-ink shadow-sm' : 'text-ink-2 hover:text-ink')} onClick={() => setThemePref(value)}>{label}</button>
+              ))}
+            </div>
+          </div>
+          <div className="border-t border-line pt-1">
+            <button type="button" className="tap flex h-10 w-full items-center gap-2 rounded-xl px-3 text-left text-sm font-semibold text-danger hover:bg-danger/10" onClick={logout}><LogOut size={15} aria-hidden="true" /> Đăng xuất</button>
+          </div>
+        </div>
+      )}
+      {open && !desk && (
         <div className="card scroll-thin absolute right-0 top-11 z-[1200] max-h-[calc(100vh-4rem)] w-80 overflow-y-auto p-3 shadow-2xl supports-[height:100dvh]:max-h-[calc(100dvh-4rem)]">
           <div className="font-semibold">{user.full_name}</div>
           <div className="text-xs text-muted">{user.position} · <span className="font-mono">{user.username}</span></div>
