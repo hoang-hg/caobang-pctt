@@ -4,7 +4,7 @@ import clsx from 'clsx';
 import {
   AlertTriangle, ShieldAlert, Compass, RefreshCw, CloudRain,
   MapPin, Search, SlidersHorizontal, CheckCircle2, AlertOctagon,
-  Ban, ShieldCheck, Navigation, Gauge, Mountain, Milestone, Truck, CircleHelp
+  Ban, ShieldCheck, Navigation, Gauge, Mountain, Milestone, Truck, CircleHelp, ChevronDown
 } from 'lucide-react';
 import { api } from '../../api/client';
 import { useAreaQuery } from '../../api/hooks';
@@ -17,6 +17,21 @@ const EMPTY = [];
 
 const REFRESH_INTERVAL = 20_000;
 const PAGE = 9; // thẻ hiện mỗi lần (3 hàng × 3 cột trên máy tính)
+const PAGE_COMPACT = 18; // thẻ gọn: 6 hàng × 3 cột
+
+/** Một ô số của bản gọn (bản vẽ khung N3): viền trái theo mức, số lớn, đơn vị, một dòng ghi chú. */
+function Tile({ edge, label, value, unit, note, tone = 'text-ink' }) {
+  return (
+    <div className={clsx('sheet border-l-4 px-4 py-3', edge)}>
+      <div className="text-[13px] font-semibold text-ink">{label}</div>
+      <div className="mt-1 flex items-baseline gap-2">
+        <span className={clsx('num text-[28px] font-bold leading-none', tone)}>{value}</span>
+        <span className="text-[13px] text-ink-2">{unit}</span>
+      </div>
+      {note && <div className="mt-1.5 text-[13px] leading-snug text-ink-2">{note}</div>}
+    </div>
+  );
+}
 // Cấm đường → cảnh báo → chưa có dữ liệu giám sát (chưa biết) → thông suốt: mục khẩn luôn ở đầu, không bị ẩn sau "Xem thêm"
 const TRAFFIC_ORDER = { cam_duong: 0, canh_bao: 1, chua_co_du_lieu: 2, thong_suot: 3 };
 
@@ -30,8 +45,10 @@ export const maxTiltText = (points = []) => {
  * Điểm đen sạt lở & trạng thái đường đèo — dùng chung cho cổng công khai (toàn tỉnh) và tab Sạt lở của Tổng quan
  * (`areaScoped`: theo bộ lọc địa phương / phạm vi được giao — cùng số với ô KPI). Chưa tải được thì nói rõ, không hiện
  * "Không tìm thấy điểm nguy cơ…" hay số 0. `showAll`: hiện đủ mọi thẻ, bỏ "Xem thêm" (Tổng quan đang chụp PDF).
+ * `compact` (cổng người dân ≥ 1280 px — bản vẽ khung N3): ô số thấp, bộ lọc một hàng, thẻ gọn bấm để xem đủ (không mất thông tin).
  */
-export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScoped = false, showAll = false }) {
+export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScoped = false, showAll = false, compact = false }) {
+  const [openCode, setOpenCode] = useState(null); // bản gọn: thẻ đang mở xem đủ
   const [corridorFilter, setCorridorFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -66,7 +83,8 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScope
       return true;
     }).sort((a, b) => (TRAFFIC_ORDER[a.traffic_status] ?? 2) - (TRAFFIC_ORDER[b.traffic_status] ?? 2));
   }, [points, corridorFilter, statusFilter, categoryFilter, searchQuery]);
-  const shownPts = useShowMore(filteredPoints, PAGE, `${corridorFilter}|${statusFilter}|${categoryFilter}|${searchQuery}`, showAll);
+  const pageSize = compact ? PAGE_COMPACT : PAGE;
+  const shownPts = useShowMore(filteredPoints, pageSize, `${corridorFilter}|${statusFilter}|${categoryFilter}|${searchQuery}`, showAll);
 
   const blockedCount = data?.blocked_count || 0;
   const warningCount = data?.warning_count || 0;
@@ -78,6 +96,42 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScope
   // Chưa có mạng đường → không xác định được đoạn bị chia cắt: "0 điểm" là không biết, không phải "không ách tắc"
   const noRoads = data?.roads_available === false;
 
+  // Dòng trạng thái số liệu: chưa có cảm biến / tải lại lỗi thì nói thẳng, không hiện "Trực tiếp"
+  const liveChip = data && isError ? (
+    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-panel2 text-muted border border-dashed border-line" title="Lần tải lại gần nhất bị lỗi — đang hiện số liệu đã tải trước đó">
+      Chưa cập nhật được · số liệu lúc {time(dataUpdatedAt)}
+    </span>
+  ) : live ? (
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-good/15 text-good border border-good/30">
+      <span className="h-1.5 w-1.5 rounded-full bg-good" />
+      Trực tiếp
+    </span>
+  ) : (
+    data && (
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-panel2 text-muted border border-line">
+        Chưa có cảm biến báo số đo
+      </span>
+    )
+  );
+
+  const statusOptions = (
+    <>
+      <option value="all">Tất cả trạng thái</option>
+      <option value="cam_duong">⛔ Cấm lưu thông / Tắc đường</option>
+      <option value="canh_bao">⚠️ Cảnh báo / Hạn chế xe</option>
+      <option value="thong_suot">✅ Chưa ghi nhận nguy cơ</option>
+      <option value="chua_co_du_lieu">❔ Chưa có dữ liệu giám sát</option>
+    </>
+  );
+  const categoryOptions = (
+    <>
+      <option value="all">Mọi loại hình</option>
+      <option value="deo_doc">Đường đèo dốc huyết mạch</option>
+      <option value="khu_dan_cu">Khu dân cư sườn đồi</option>
+      <option value="ngam_tran">Ngầm tràn & Suối lũ quét</option>
+    </>
+  );
+
   const header = (
     <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-panel p-4 sm:p-5 rounded-2xl border border-line shadow-sm">
       <div className="flex items-center gap-2.5">
@@ -87,22 +141,7 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScope
             <h1 className="text-base sm:text-lg font-bold text-ink">
               Bản đồ điểm đen sạt trượt & trạng thái đường đèo
             </h1>
-            {data && isError ? (
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-panel2 text-muted border border-dashed border-line" title="Lần tải lại gần nhất bị lỗi — đang hiện số liệu đã tải trước đó">
-                Chưa cập nhật được · số liệu lúc {time(dataUpdatedAt)}
-              </span>
-            ) : live ? (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-good/15 text-good border border-good/30">
-                <span className="h-1.5 w-1.5 rounded-full bg-good" />
-                Trực tiếp
-              </span>
-            ) : (
-              data && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-panel2 text-muted border border-line">
-                  CHƯA CÓ CẢM BIẾN BÁO SỐ ĐO
-                </span>
-              )
-            )}
+            {liveChip}
           </div>
           <p className="text-xs text-muted mt-0.5">
             Giám sát nguy cơ sạt lở đất đá, ngập ngầm tràn, chia cắt giao thông đèo dốc và cảm biến dịch chuyển taluy
@@ -151,8 +190,8 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScope
   }
 
   return (
-    <div className="space-y-5 animate-in fade-in duration-200">
-      {header}
+    <div className={clsx('animate-in fade-in duration-200', compact ? 'space-y-4 [&>h1+*]:!mt-0' : 'space-y-5')}>
+      {compact ? <h1 className="sr-only">Bản đồ điểm đen sạt trượt & trạng thái đường đèo</h1> : header}
 
       {/* 2. Cảnh báo cấm đường khẩn cấp (nếu có điểm tắc đường / cấm xe) */}
       {blockedCount > 0 && (
@@ -177,8 +216,32 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScope
         </div>
       )}
 
+      {/* 3. Bản gọn: bốn ô số một hàng */}
+      {compact && (
+        <div className="grid grid-cols-4 gap-3">
+          <Tile edge="border-l-transparent" label="Tổng điểm đen theo dõi" value={totalCount} unit="vị trí trọng điểm" />
+          <Tile
+            edge={blockedCount > 0 ? 'border-l-danger' : noRoads ? 'border-l-line' : 'border-l-good'}
+            label="Tắc đường / Cấm phương tiện"
+            value={blockedCount > 0 || !noRoads ? blockedCount : '–'}
+            unit={blockedCount > 0 || !noRoads ? 'điểm cấm tuyệt đối' : 'chưa có dữ liệu mạng đường'}
+            note={blockedCount > 0 ? 'Theo vùng nguy hiểm đang hiệu lực' : noRoads ? 'Không xác định được đoạn bị chia cắt' : 'Không có điểm ách tắc'}
+            tone={blockedCount > 0 ? 'text-danger' : noRoads ? 'text-muted' : 'text-good'}
+          />
+          <Tile edge="border-l-serious" label="Cảnh báo nguy hiểm / Đá lăn" value={warningCount} unit="vị trí cần cảnh giác" note="Hạn chế lưu thông ban đêm" tone="text-serious" />
+          <Tile
+            edge={noDataCount ? 'border-l-line' : 'border-l-good'}
+            label={noDataCount ? 'Chưa có dữ liệu giám sát' : 'Chưa ghi nhận nguy cơ'}
+            value={noDataCount || safeCount}
+            unit="điểm"
+            note={noDataCount ? 'Không có nghĩa là an toàn — khi mưa lớn hạn chế đi qua' : 'Vẫn chú ý khi trời mưa'}
+            tone={noDataCount ? 'text-muted' : 'text-good'}
+          />
+        </div>
+      )}
+
       {/* 3. Thẻ thống kê tổng quan (4 Metric Cards) */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {!compact && <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {/* Card 1: Tổng số điểm đen */}
         <div className="card p-4 flex flex-col justify-between border-l-4 border-l-accent">
           <div className="flex items-center justify-between text-muted text-xs">
@@ -261,10 +324,38 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScope
               : 'Theo cảm biến và vùng cảnh báo đang hiệu lực — vẫn chú ý khi trời mưa'}
           </div>
         </div>
-      </div>
+      </div>}
+
+      {/* 4. Bản gọn: tìm + lọc + cập nhật một hàng (tuyến đường thành ô chọn, trạng thái số liệu nằm cuối hàng) */}
+      {compact && (
+        <div className="flex items-center gap-2.5">
+          <div className="relative min-w-[12rem] flex-1">
+            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" aria-hidden="true" />
+            <input
+              type="text"
+              aria-label="Tìm tên đèo, xã, tuyến đường"
+              placeholder="Tìm tên đèo, xã, tuyến đường…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="input tap h-11 w-full rounded-xl bg-panel pl-9"
+            />
+          </div>
+          <select aria-label="Lọc theo tuyến đường" value={corridorFilter} onChange={(e) => setCorridorFilter(e.target.value)} className="input tap h-11 w-auto max-w-[12rem] rounded-xl bg-panel">
+            <option value="all">Mọi tuyến đường ({points.length})</option>
+            {corridors.map((c) => <option key={c.name} value={c.name}>{c.name} ({c.count})</option>)}
+          </select>
+          <select aria-label="Lọc theo trạng thái" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="input tap h-11 w-auto max-w-[11rem] rounded-xl bg-panel">{statusOptions}</select>
+          <select aria-label="Lọc theo loại hình" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="input tap h-11 w-auto max-w-[10rem] rounded-xl bg-panel">{categoryOptions}</select>
+          <button type="button" onClick={() => refetch()} disabled={isFetching} className="btn-secondary tap h-11 shrink-0 rounded-xl px-4" title="Làm mới số liệu ngay">
+            <RefreshCw size={14} className={clsx(isFetching && 'animate-spin text-accent')} aria-hidden="true" />
+            {isFetching ? 'Đang cập nhật…' : 'Cập nhật ngay'}
+          </button>
+          <span className="shrink-0">{liveChip}</span>
+        </div>
+      )}
 
       {/* 4. Bộ lọc đa chiều (Tuyến đường / Phân loại / Trạng thái) */}
-      <div className="card p-3 sm:p-4 bg-panel2/40 border border-line space-y-3">
+      {!compact && <div className="card p-3 sm:p-4 bg-panel2/40 border border-line space-y-3">
         {/* Hàng 1: Tuyến đường */}
         <div className="flex items-center gap-1.5 overflow-x-auto scroll-thin pb-1">
           <span className="text-xs font-semibold text-muted shrink-0 mr-1 flex items-center gap-1">
@@ -306,11 +397,7 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScope
               onChange={(e) => setStatusFilter(e.target.value)}
               className="input tap py-1 text-xs w-auto font-medium"
             >
-              <option value="all">Tất cả trạng thái</option>
-              <option value="cam_duong">⛔ Cấm lưu thông / Tắc đường</option>
-              <option value="canh_bao">⚠️ Cảnh báo / Hạn chế xe</option>
-              <option value="thong_suot">✅ Chưa ghi nhận nguy cơ</option>
-              <option value="chua_co_du_lieu">❔ Chưa có dữ liệu giám sát</option>
+              {statusOptions}
             </select>
 
             <span className="text-xs text-muted ml-1">Loại hình:</span>
@@ -319,10 +406,7 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScope
               onChange={(e) => setCategoryFilter(e.target.value)}
               className="input tap py-1 text-xs w-auto font-medium"
             >
-              <option value="all">Mọi loại hình</option>
-              <option value="deo_doc">Đường đèo dốc huyết mạch</option>
-              <option value="khu_dan_cu">Khu dân cư sườn đồi</option>
-              <option value="ngam_tran">Ngầm tràn & Suối lũ quét</option>
+              {categoryOptions}
             </select>
           </div>
 
@@ -337,30 +421,57 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScope
             />
           </div>
         </div>
-      </div>
+      </div>}
 
       {/* 5. Danh sách thẻ chi tiết từng điểm đen sạt trượt */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className={clsx('grid gap-4 md:grid-cols-2 lg:grid-cols-3', compact && 'items-start')}>
         {shownPts.visible.map((p) => {
           const isBlocked = p.traffic_status === 'cam_duong';
           const isWarning = p.traffic_status === 'canh_bao';
           const isSafe = p.traffic_status === 'thong_suot';
           const isNoData = p.traffic_status === 'chua_co_du_lieu';
+          const road = p.road_name.split('(')[0].trim();
+          const open = openCode === p.code;
 
           return (
             <div
               key={p.code}
               className={clsx(
-                'card flex flex-col justify-between overflow-hidden transition duration-200 hover:shadow-lg',
-                isBlocked
-                  ? 'border-danger/80 bg-danger/5 ring-1 ring-danger/40'
-                  : isWarning
-                  ? 'border-serious/60 bg-serious/5'
-                  : 'border-line hover:border-accent/60'
+                'flex flex-col justify-between overflow-hidden transition duration-200',
+                compact
+                  ? clsx('sheet border-l-4', isBlocked ? 'border-l-danger' : isWarning ? 'border-l-serious' : isSafe ? 'border-l-good' : 'border-l-line')
+                  : clsx('card hover:shadow-lg', isBlocked
+                    ? 'border-danger/80 bg-danger/5 ring-1 ring-danger/40'
+                    : isWarning
+                    ? 'border-serious/60 bg-serious/5'
+                    : 'border-line hover:border-accent/60')
               )}
             >
+              {/* Bản gọn: một dòng tên + mức, một dòng loại · tuyến · xã, một dòng cần biết nhất — bấm mở xem đủ */}
+              {compact && (
+                <button
+                  type="button"
+                  onClick={() => setOpenCode(open ? null : p.code)}
+                  aria-expanded={open}
+                  className="tap block w-full px-4 py-3 text-left hover:bg-panel2/50"
+                >
+                  {/* Tên dài + chip dài → chip xuống dòng, không cắt tên thành "Đèo Khau Cốc C…" */}
+                  <span className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1">
+                    <b className="min-w-0 max-w-full text-[15px] text-ink">{p.name}</b>
+                    <span className={clsx(
+                      'chip max-w-full px-2.5 py-0.5 text-xs font-bold',
+                      isBlocked ? 'bg-danger text-white' : isWarning ? 'bg-serious text-black' : isNoData ? 'bg-panel2 text-muted' : 'bg-good/15 text-good',
+                    )}>{p.traffic_label}</span>
+                  </span>
+                  <span className="mt-0.5 block truncate text-[13px] text-muted">{p.category_label} · {road} · {p.admin_name}</span>
+                  <span className="mt-1 flex items-start justify-between gap-2">
+                    <span className="line-clamp-2 min-w-0 flex-1 text-sm leading-snug text-ink">{isBlocked && p.bypass_route ? p.bypass_route : p.description}</span>
+                    <ChevronDown size={15} className={clsx('mt-0.5 shrink-0 text-muted transition-transform', open && 'rotate-180')} aria-hidden="true" />
+                  </span>
+                </button>
+              )}
               {/* Header Thẻ */}
-              <div className="p-4 pb-3 border-b border-line/60">
+              {!compact && <div className="p-4 pb-3 border-b border-line/60">
                 {/* Thẻ hẹp (điện thoại, lưới 3 cột) → chip trạng thái xuống dòng dưới tên, không ép tên chỉ còn "Đèo Kh…" */}
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0 flex-[1_1_12rem]">
@@ -405,9 +516,10 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScope
                     {p.traffic_label}
                   </span>
                 </div>
-              </div>
+              </div>}
 
               {/* Body: Hiện trạng địa chất & Số liệu đo đạc */}
+              {(!compact || open) && <>
               <div className="p-4 space-y-3 flex-1">
                 {/* 1. Mô tả hiện trạng địa chất */}
                 <div className="text-xs text-ink-2 leading-relaxed bg-panel2/50 p-2.5 rounded-xl border border-line/50">
@@ -511,11 +623,12 @@ export default function LandslideMonitor({ onSelectOnMap, onBackToMap, areaScope
                   </button>
                 )}
               </div>
+              </>}
             </div>
           );
         })}
       </div>
-      <ShowMore list={shownPts} step={PAGE} noun="điểm" />
+      <ShowMore list={shownPts} step={pageSize} noun="điểm" />
 
       {filteredPoints.length === 0 && (
         <div className="card p-12 text-center text-muted text-sm space-y-2">

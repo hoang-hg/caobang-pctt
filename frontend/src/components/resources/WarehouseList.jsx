@@ -125,12 +125,110 @@ function WarehouseCard({ w, x, category, pdf, online, onReceive, onIssue, onMap,
   );
 }
 
+// Ba cột nhóm hàng của bảng kho (bản vẽ khung E4); ô là mặt hàng thiếu nhất trong nhóm (nhóm đủ khi mọi mặt hàng đủ)
+const GROUPS = [['Lương thực', ['luong_thuc']], ['Nước uống', ['nuoc_uong']], ['Cứu hộ, y tế', ['do_dung', 'y_te']]];
+const TABLE_COLS = 'grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))_7rem_13.5rem]'; // 2 cột cuối cố định: hàng tiêu đề thẳng cột các dòng
+
+function GroupCell({ items }) {
+  const known = items.filter((i) => i.pct != null);
+  if (!known.length) return <span className="text-xs text-muted">–</span>;
+  const low = known.reduce((m, i) => (i.pct < m.pct ? i : m));
+  const lv = stockLevel(low.pct);
+  return (
+    <span className="flex items-center gap-1.5" title={`Thấp nhất: ${low.name} ${low.pct}%`}>
+      <Progress className="min-w-0 flex-1" value={low.pct} level={lv} />
+      <span className={clsx('num w-9 shrink-0 text-right text-[13px] font-semibold', risk(lv).text)}>{low.pct}%</span>
+    </span>
+  );
+}
+
+/** Một kho trong bảng (máy tính): nhóm hàng theo %, tình trạng, Xuất kho / Nhập hàng; mở ra xem đủ mặt hàng, gọi, bản đồ, sổ. */
+function WarehouseRow({ w, x, category, online, onReceive, onIssue, onMap, onLedger }) {
+  const [open, setOpen] = useState(false);
+  const canIssue = usePermission('inventory', 'issue', w.admin_code);
+  const canReceive = usePermission('inventory', 'receive', w.admin_code);
+  const items = (category ? w.items.filter((i) => i.category === category) : w.items)
+    .map((i, n) => ({ i, n, exp: x.expiring.includes(i), lv: itemLevel(i, x.expiring.includes(i)) }))
+    .sort((a, b) => (b.lv ?? -1) - (a.lv ?? -1) || a.n - b.n);
+  const updated = w.items.reduce((m, i) => (i.last_updated > m ? i.last_updated : m), '');
+  const offline = !online ? 'Mất mạng — chưa ghi được' : undefined;
+  const small = 'btn-secondary tap h-9 whitespace-nowrap rounded-xl px-2.5 text-[13px]';
+  return (
+    <li className="border-t border-line first:border-t-0">
+      <div className={clsx('grid items-center gap-x-3 px-3 py-2.5', TABLE_COLS)}>
+        <div className="min-w-0">
+          <b className="block truncate text-sm text-ink" title={w.name}>{w.name}</b>
+          <span className="block truncate text-xs text-muted">{w.admin_name}{w.manager ? ` · ${w.manager}` : ''}</span>
+        </div>
+        {GROUPS.map(([g, cats]) => <GroupCell key={g} items={w.items.filter((i) => cats.includes(i.category))} />)}
+        <div className="flex flex-col items-start gap-1">
+          {x.low.length > 0 && <span className={clsx('chip whitespace-nowrap py-0.5 text-xs', RISK[3].chip)}>Cạn kiệt {x.low.length}</span>}
+          {x.expiring.length > 0 && <span className={clsx('chip whitespace-nowrap py-0.5 text-xs', RISK[2].chip)}>Sắp hết hạn {x.expiring.length}</span>}
+          {!x.low.length && x.watch.length > 0 && <span className={clsx('chip whitespace-nowrap py-0.5 text-xs', RISK[1].chip)}>Dưới {STOCK_WATCH}%: {x.watch.length}</span>}
+          {x.level === 0 && <span className={clsx('chip whitespace-nowrap py-0.5 text-xs', RISK[0].chip)}>Đủ</span>}
+          {x.level == null && <span className={clsx('chip whitespace-nowrap py-0.5 text-xs', NO_DATA.chip)}>Chưa có số liệu</span>}
+        </div>
+        <div className="flex items-center gap-1 no-print">
+          {canIssue && <button type="button" className={small} onClick={() => onIssue(w)} disabled={!online || !w.items.length} title={offline}>Xuất kho</button>}
+          {canReceive && <button type="button" className={small} onClick={() => onReceive(w)} disabled={!online} title={offline}>Nhập hàng</button>}
+          <button type="button" className="tap-sq flex h-9 w-9 items-center justify-center rounded-xl text-muted hover:bg-panel2 hover:text-ink" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-label={`Chi tiết ${w.name}`} title="Xem đủ mặt hàng, gọi thủ kho, bản đồ, sổ xuất – nhập">
+            <ChevronDown size={16} className={clsx('transition-transform', open && 'rotate-180')} aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+      {open && (
+        <div className="flex flex-col gap-2 border-t border-line/60 bg-panel2/50 px-3 py-3">
+          {items.length ? (
+            <ul className="grid gap-x-6 gap-y-2 md:grid-cols-2">
+              {items.map(({ i, exp, lv }) => (
+                <li key={i.item_code}>
+                  <div className="flex items-center justify-between gap-2 text-xs">
+                    <span className="min-w-0 truncate text-ink-2" title={i.name}>{i.name}</span>
+                    <span className="flex shrink-0 items-center gap-1.5">
+                      {exp && <span className={clsx('chip px-1.5 py-0 text-[10px]', RISK[2].chip)} title={`Hạn dùng ${vnDate(i.expiry_date)}`}>Hạn {vnDate(i.expiry_date)}</span>}
+                      <span className={clsx('font-mono', lv === 3 && 'font-bold text-danger')}>{int(i.quantity)} {i.unit}</span>
+                    </span>
+                  </div>
+                  <Progress className="mt-1" value={i.pct ?? 0} level={stockLevel(i.pct)} />
+                </li>
+              ))}
+            </ul>
+          ) : <p className="text-xs text-muted">Chưa có số liệu tồn kho — nhập bằng loại dữ liệu “Tồn kho vật tư” hoặc nút Nhập hàng.</p>}
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
+            {updated && <span>Cập nhật tồn kho: {dateTime(updated)}</span>}
+            <span className="flex-1" />
+            {onLedger && <button type="button" className="tap rounded px-1 font-semibold text-accent hover:underline" onClick={() => onLedger(w)} aria-label={`Sổ xuất – nhập của ${w.name}`}>Sổ xuất – nhập</button>}
+            {w.phone && <a href={`tel:${w.phone.replace(/\s/g, '')}`} className="tap inline-flex items-center gap-1 rounded px-1 font-semibold text-accent hover:underline"><Phone size={13} aria-hidden="true" /> Gọi thủ kho</a>}
+            {w.lat != null && <button type="button" className="tap inline-flex items-center gap-1 rounded px-1 font-semibold text-accent hover:underline" onClick={() => onMap(w.lat, w.lon, w.name)}><MapPin size={13} aria-hidden="true" /> Bản đồ</button>}
+          </div>
+        </div>
+      )}
+    </li>
+  );
+}
+
 /**
+ * `table` (máy tính ≥ 1280 px — bản vẽ khung E4): bảng kho gọn, mở từng dòng xem đủ mặt hàng. PDF vẫn dùng thẻ đầy đủ.
  * Kho vật tư (thiết kế C.2): mỗi kho một thẻ, vạch trái theo mức nặng nhất (thang chung — Đỏ: có hàng dưới 20 % định mức,
  * Cam: sắp hết hạn, Vàng: dưới 50 %). Trong thẻ, mặt hàng thiếu / sắp hết hạn lên đầu, phần còn lại thu gọn. Nút Xuất kho /
  * Nhập hàng chỉ hiện với tài khoản có quyền ở đúng xã của kho (backend kiểm tra lại); mất mạng → nút tắt, ghi lý do.
  */
-export default function WarehouseList({ rows, factsOf, category, pdf, online, onReceive, onIssue, onMap, onLedger }) {
+export default function WarehouseList({ rows, factsOf, category, pdf, online, onReceive, onIssue, onMap, onLedger, table = false }) {
+  if (table && !pdf) {
+    return (
+      <div className="sheet overflow-hidden">
+        <div className={clsx('grid gap-x-3 bg-panel2 px-3 py-2.5 text-xs font-semibold text-muted', TABLE_COLS)} aria-hidden="true">
+          <span>Kho</span>
+          {GROUPS.map(([g]) => <span key={g}>{g}</span>)}
+          <span>Tình trạng</span>
+          <span />
+        </div>
+        <ul aria-label="Kho vật tư">
+          {rows.map((w) => <WarehouseRow key={w.id} w={w} x={factsOf(w)} category={category} online={online} onReceive={onReceive} onIssue={onIssue} onMap={onMap} onLedger={onLedger} />)}
+        </ul>
+      </div>
+    );
+  }
   return (
     <ul className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3" aria-label="Kho vật tư">
       {rows.map((w) => (

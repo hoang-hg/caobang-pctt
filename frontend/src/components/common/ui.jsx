@@ -168,12 +168,13 @@ export function Modal({ open, onClose, title, subtitle, children, wide, size, fo
  * là câu hỏi, `children` nói rõ hậu quả bằng lời; nút xác nhận ghi đúng việc sẽ làm (`confirmLabel`), `danger` → nút đỏ;
  * `busy`: đang gửi (khoá nút). Thay window.confirm — hộp của trình duyệt không nói được hậu quả, khó đọc trên điện thoại.
  */
-export function Confirm({ title, children, confirmLabel, cancelLabel = 'Huỷ', danger = false, busy = false, onConfirm, onClose }) {
+export function Confirm({ title, subtitle, children, confirmLabel, cancelLabel = 'Huỷ', danger = false, busy = false, onConfirm, onClose }) {
   return (
     <Modal
       open
       onClose={busy ? () => {} : onClose}
       title={title}
+      subtitle={subtitle}
       footer={(
         <>
           <button type="button" className="btn-ghost tap" disabled={busy} onClick={onClose}>{cancelLabel}</button>

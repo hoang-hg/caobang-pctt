@@ -1,27 +1,19 @@
 import { lazy, Suspense, useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ShieldCheck, LogIn, Loader2, UserRound, Lock, Eye, EyeOff, AlertCircle, KeyRound, Smartphone, Map as MapIcon, Siren,
-  Megaphone,
+  ShieldCheck, LogIn, Loader2, UserRound, Lock, Eye, EyeOff, AlertCircle, KeyRound, Smartphone,
 } from 'lucide-react';
 import { api } from '../api/client';
 import { useStore } from '../app/store';
 import { CodeInput, MfaSetup } from '../components/account/Mfa';
 import { BrandLockup } from '../components/layout/BrandMark';
-import ProvinceArt from '../components/layout/ProvinceArt';
+import AuthAside from '../components/layout/AuthAside';
 import { useMediaQuery } from '../utils/useMediaQuery';
 
 // Vào nhanh chế độ giả lập: CHỈ máy dev (app/store.js) — bản build chạy thật không có khối này
 const DemoLoginPanel = import.meta.env.DEV ? lazy(() => import('../components/common/DemoLoginPanel')) : null;
 
 const REMEMBER_KEY = 'cb_pctt_saved_login';
-
-// Ba việc chính của hệ thống (cột trái, máy tính) — biểu tượng trùng mục menu cùng việc (components/layout/nav.js)
-const WORK = [
-  { icon: MapIcon, text: 'Giám sát mưa, mực nước sông trên bản đồ' }, // hệ thống không theo dõi hồ chứa (docs/pham-vi-thien-tai.md)
-  { icon: Siren, text: 'Nhận tin báo cứu nạn, điều đội cứu hộ' },
-  { icon: Megaphone, text: 'Ban hành cảnh báo khẩn cấp tới người dân' },
-];
 
 /** Bước 2 của đăng nhập: nhập mã xác thực 2 lớp ("verify") hoặc cài đặt lần đầu khi vai trò bắt buộc ("setup"). */
 function MfaStep({ mfa, onBack, onDone }) {
@@ -65,7 +57,7 @@ function MfaStep({ mfa, onBack, onDone }) {
         <span>
           {recovery
             ? 'Nhập 1 mã khôi phục (dạng xxxx-xxxx) đã lưu khi bật xác thực 2 lớp. Mỗi mã chỉ dùng được 1 lần.'
-            : 'Mở ứng dụng xác thực trên điện thoại, nhập mã 6 số của tài khoản PCTT Cao Bằng.'}
+            : 'Mở ứng dụng xác thực (Google / Microsoft Authenticator) trên điện thoại, nhập mã 6 số đang hiện.'}
         </span>
       </div>
       <CodeInput key={String(recovery)} value={code} onChange={setCode} recovery={recovery} />
@@ -81,12 +73,10 @@ function MfaStep({ mfa, onBack, onDone }) {
       >
         {busy ? <Loader2 size={18} className="animate-spin" /> : <ShieldCheck size={18} />} Xác nhận
       </button>
-      <div className="flex items-center justify-between text-xs">
-        <button type="button" className="text-accent hover:underline" onClick={() => { setRecovery(!recovery); setCode(''); setError(''); }}>
+      <div className="flex items-center justify-between gap-3 text-sm">
+        <button type="button" className="tap text-accent hover:underline" onClick={() => onBack()}>‹ Đăng nhập lại</button>
+        <button type="button" className="tap font-semibold text-accent hover:underline" onClick={() => { setRecovery(!recovery); setCode(''); setError(''); }}>
           {recovery ? 'Dùng mã 6 số' : 'Mất điện thoại? Dùng mã khôi phục'}
-        </button>
-        <button type="button" className="text-muted hover:text-ink" onClick={() => onBack()}>
-          ← Quay lại
         </button>
       </div>
     </form>
@@ -172,33 +162,9 @@ export default function Login() {
 
   return (
     <div className="flex min-h-screen supports-[height:100dvh]:min-h-dvh flex-col bg-bg lg:flex-row">
-      {/* Cột trái (máy tính): ranh giới tỉnh và các xã từ dữ liệu của hệ thống — không dùng ảnh chụp ô bản đồ / ảnh trên mạng.
-          Dính đỉnh, cao đúng 1 màn hình: cột phải dài (cài xác thực 2 lớp) vẫn thấy đủ cột trái. Nền xanh đêm như khối đầu
-          trang Tổng quan; lưới chấm mờ dần + quầng sáng sau hình tỉnh tạo chiều sâu (màu chuyển chỉ trong khối có
-          data-mau-chuyen — docs/ke-hoach-lam-moi-giao-dien.md mục 1.3) */}
+      {/* Cột trái (máy tính) dùng chung với các trang tài khoản */}
       {wide ? (
-        <aside data-mau-chuyen="" className="hero-brand sticky top-0 isolate flex h-screen supports-[height:100dvh]:h-dvh w-[46%] shrink-0 flex-col gap-7 overflow-hidden p-10 text-slate-200">
-          <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(rgb(148_163_184/0.16)_1px,transparent_1px)] [background-size:22px_22px] [mask-image:radial-gradient(75%_60%_at_50%_42%,black,transparent)]" />
-          <div aria-hidden="true" className="pointer-events-none absolute left-1/2 top-[42%] -z-10 aspect-square w-[90%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,rgb(37_99_235/0.35),transparent)]" />
-          <BrandLockup />
-          {/* ≥ 1280 px (bản vẽ khung L1): tiêu đề, việc chính ngay dưới biểu trưng; hình tỉnh mờ phía dưới */}
-          <ProvinceArt className="min-h-0 w-full flex-1 text-slate-300 drop-shadow-[0_0_14px_rgb(59_130_246/0.45)] xl:order-3 xl:opacity-60" />
-          <div className="max-w-md xl:order-2">
-            <h1 className="text-balance text-[26px] font-bold leading-tight text-white xl:text-3xl">Điều hành phòng chống thiên tai và tìm kiếm cứu nạn</h1>
-            <p className="mt-3 text-base text-slate-300">Tỉnh Cao Bằng · 56 xã, phường · trực 24/7</p>
-            <ul className="mt-6 flex flex-col gap-3 [@media(max-height:640px)]:hidden">
-              {WORK.map((w) => (
-                <li key={w.text} className="flex items-center gap-3 text-[15px] leading-snug text-slate-200">
-                  <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.08] text-sky-300 ring-1 ring-inset ring-white/10" aria-hidden="true">
-                    <w.icon size={18} />
-                  </span>
-                  {w.text}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <p className="text-xs text-slate-400 xl:order-4">Hình: ranh giới tỉnh và các xã, phường từ dữ liệu của hệ thống.</p>
-        </aside>
+        <AuthAside />
       ) : (
         // Điện thoại, máy tính bảng: dải xanh đêm trên cùng, thẻ đăng nhập đè lên mép dưới dải
         <header data-mau-chuyen="" className="hero-brand px-4 pb-14 pt-6 text-slate-200 sm:px-8">
@@ -212,8 +178,12 @@ export default function Login() {
       <main className="relative flex flex-1 justify-center px-4 pb-8 max-lg:-mt-9 sm:px-8 lg:items-center lg:py-8">
         <div className="w-full max-w-sm">
           <div className="card p-5 sm:p-7">
-            <h2 className="text-2xl font-bold text-ink">Đăng nhập</h2>
-            <p className="mt-1 text-sm text-ink-2">Dành cho cán bộ Ban Chỉ huy tỉnh, xã, phường.</p>
+            {/* Tiêu đề theo bước (bản vẽ khung L2, L3) */}
+            <h2 className="text-2xl font-bold text-ink">{!mfa ? 'Đăng nhập' : mfa.stage === 'setup' ? 'Cài xác thực 2 lớp' : 'Xác thực 2 lớp'}</h2>
+            {!mfa && <p className="mt-1 text-sm text-ink-2">Dành cho cán bộ Ban Chỉ huy tỉnh, xã, phường.</p>}
+            {mfa?.stage === 'setup' && (
+              <p role="note" className="mt-3 rounded-xl bg-accent/10 px-3 py-2.5 text-[13px] font-semibold text-accent">Vai trò của bạn bắt buộc xác thực 2 lớp.</p>
+            )}
 
             {/* Phiên trước kết thúc (hết hạn, đổi quyền, bị khoá) — bản vẽ khung M5 */}
             {sessionNote != null && !mfa && (

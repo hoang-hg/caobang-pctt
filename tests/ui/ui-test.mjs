@@ -58,7 +58,8 @@ async function openPublic(page, [group, sub]) {
   if (await menu.isVisible()) await menu.click();
   const esc = group.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   await visible(page.getByRole('button', { name: new RegExp(`^${esc}( \\d.*)?$`) })).click();
-  if (sub) await visible(page.getByRole('button', { name: sub, exact: true })).click();
+  // Máy tính ≥ 1280 px (bản vẽ khung N5): Sơ tán + Đường dây nóng một màn — không có hàng trang con
+  if (sub && page.viewportSize().width < 1280) await visible(page.getByRole('button', { name: sub, exact: true })).click();
 }
 
 let failures = 0;
@@ -694,6 +695,20 @@ async function staff(ctx, trackCode) {
     if (await rows.count()) {
       const row = code ? rows.getByRole('button', { name: new RegExp(code) }).first() : rows.getByRole('button').first();
       if (await row.count()) await row.click();
+    }
+    // Máy tính (bản vẽ khung F4): phần công khai soạn ngay trong ô chi tiết — không qua hộp thoại
+    const inline = page.getByRole('group', { name: 'Phần công khai' });
+    if (await inline.count()) {
+      const pub = inline.getByLabel(/Nội dung công khai/);
+      if ((await pub.inputValue()).trim().length < 10) throw new Error('chưa gợi ý sẵn nội dung công khai');
+      if ((await inline.getByRole('radio', { name: /Làm tròn/ }).getAttribute('aria-checked')) !== 'true') throw new Error('"vị trí chính xác" không được chọn sẵn');
+      await expectNoOverflow(ctx, 'ô duyệt phản ánh');
+      if (READONLY) return 'chỉ xem';
+      const sec = page.getByRole('region', { name: /^Phản ánh PA-/ });
+      const name = await sec.getAttribute('aria-label');
+      await sec.getByRole('button', { name: 'Duyệt và công khai' }).click();
+      await page.getByRole('region', { name, exact: true }).waitFor({ state: 'detached', timeout: 15_000 });
+      return code || name;
     }
     const card = code ? page.locator('.card', { hasText: code }).first() : page.locator('.card', { hasText: 'Chờ duyệt' }).first();
     const approve = visible(card.getByRole('button', { name: 'Duyệt công khai' }));
@@ -1596,7 +1611,11 @@ async function inventoryLedger(ctx) {
   await step(ctx, 'Sổ xuất – nhập kho: mở từ thẻ kho (lọc sẵn đúng kho), dòng đúng kho, Excel, không tràn, vùng chạm ≥ 44 px', async () => {
     await page.goto(`${ROOT}/nguon-luc?tab=vat_tu`);
     const link = page.getByRole('button', { name: /^Sổ xuất – nhập của / }).first();
-    await link.waitFor({ timeout: 20_000 });
+    // Máy tính ≥ 1280 px (bản vẽ khung E4): bảng kho — sổ nằm trong dòng mở rộng, phải mở dòng trước
+    const detail = page.locator('ul[aria-label="Kho vật tư"]').getByRole('button', { name: /^Chi tiết / }).first();
+    await detail.or(link).first().waitFor({ timeout: 20_000 });
+    if (await detail.count()) await detail.click();
+    await link.waitFor({ timeout: 5_000 });
     const wh = (await link.getAttribute('aria-label')).replace('Sổ xuất – nhập của ', '');
     if (await page.locator('#so-kho [aria-label="Khoảng thời gian của sổ kho"]').count()) throw new Error('khối sổ kho mở sẵn — phải thu gọn, chưa tải');
     await link.click();
@@ -2524,20 +2543,31 @@ async function alertsPage(ctx) {
     await page.goto(`${ROOT}/canh-bao?tab=lich_su`);
     const rows = page.locator('main table tbody tr').or(page.locator('main article[aria-label^="CB-"]'));
     await rows.first().or(page.getByText(/Chưa có lệnh cảnh báo nào/)).waitFor({ timeout: 20_000 });
-    const box = page.getByLabel('Trạng thái', { exact: true });
-    if (!(await box.isVisible())) await page.getByRole('button', { name: /^Bộ lọc/ }).click();
-    await box.selectOption('hieu_luc');
+    // Máy tính ≥ 1280 px (bản vẽ khung D5): trạng thái là hàng thẻ; nhỏ hơn: ô chọn (điện thoại trong khung Bộ lọc)
+    const phaseTabs = page.getByRole('group', { name: 'Trạng thái', exact: true });
+    if (await phaseTabs.count()) await phaseTabs.getByRole('button', { name: /^Đang hiệu lực/ }).click();
+    else {
+      const box = page.getByLabel('Trạng thái', { exact: true });
+      if (!(await box.isVisible())) await page.getByRole('button', { name: /^Bộ lọc/ }).click();
+      await box.selectOption('hieu_luc');
+    }
     await page.waitForURL(/tt=hieu_luc/);
     await page.waitForTimeout(400);
     const shown = await rows.count();
     if (shown !== Math.min(live, wide ? 20 : 10)) throw new Error(`lọc "Đang hiệu lực" ra ${shown} lệnh, ô chỉ số ghi ${live}`);
     let note = `${shown} đang hiệu lực`;
     if (shown) {
-      const [xlsx] = await Promise.all([page.waitForEvent('download', { timeout: 20_000 }), page.getByRole('button', { name: 'Excel', exact: true }).click()]);
+      const exportBy = async (name) => {
+        const direct = page.getByRole('button', { name, exact: true });
+        if (await direct.isVisible().catch(() => false)) return direct.click();
+        await page.getByRole('button', { name: /^Xuất/ }).click();
+        return page.getByRole('menuitem', { name: new RegExp(name) }).click();
+      };
+      const [xlsx] = await Promise.all([page.waitForEvent('download', { timeout: 20_000 }), exportBy('Excel')]);
       if (!/^lenh-canh-bao-.*\.xlsx$/.test(xlsx.suggestedFilename())) throw new Error(`tên tệp Excel: ${xlsx.suggestedFilename()}`);
       note += ` · ${xlsx.suggestedFilename()}`;
       if (wide) {
-        const [pdfFile] = await Promise.all([page.waitForEvent('download', { timeout: 60_000 }), page.getByRole('button', { name: 'PDF', exact: true }).click()]);
+        const [pdfFile] = await Promise.all([page.waitForEvent('download', { timeout: 60_000 }), exportBy('PDF')]);
         if (!/^lenh-canh-bao-.*\.pdf$/.test(pdfFile.suggestedFilename())) throw new Error(`tên tệp PDF: ${pdfFile.suggestedFilename()}`);
       }
     }
@@ -3250,7 +3280,8 @@ async function eventsPage(ctx, { create }) {
     const head = page.locator('main h2').first().locator('xpath=..');
     if (!(await head.innerText()).includes('Đang diễn ra')) throw new Error(`báo cáo ${code} không ghi "Đang diễn ra"`);
     await page.getByRole('button', { name: 'Kết thúc đợt', exact: true }).click();
-    const end = page.getByRole('dialog', { name: `Kết thúc đợt ${code}` });
+    // Bản vẽ khung G3: tiêu đề dạng câu hỏi "Kết thúc đợt DT-…?"
+    const end = page.getByRole('dialog', { name: new RegExp(`^Kết thúc đợt ${code}\\??$`) });
     await end.waitFor();
     await end.getByRole('button', { name: 'Mưa đã ngớt, nước rút dưới báo động I' }).click();
     if (!(await end.locator('#dot-ket-thuc-ghi-chu').inputValue()).includes('nước rút')) throw new Error('chip lý do không điền vào ô ghi chú');
