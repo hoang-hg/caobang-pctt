@@ -3,6 +3,7 @@ import { ClipboardList, KeyRound, LogOut, UserRound } from 'lucide-react';
 import { useCitizen } from '../../app/citizenSession';
 import { Modal, useEscapeToClose } from '../../components/common/ui';
 import CitizenAuth from './CitizenAuth';
+import CitizenProfile from './CitizenProfile';
 
 /**
  * Thanh trên của cổng: tài khoản NGƯỜI DÂN (Đ5) — chưa đăng nhập: nút "Đăng nhập"; đã đăng nhập: tên + menu (Phiếu của
@@ -13,7 +14,7 @@ export default function CitizenMenu({ onMyReports }) {
   const session = useCitizen((s) => s.session);
   const setSession = useCitizen((s) => s.setSession);
   const [menu, setMenu] = useState(false);
-  const [dialog, setDialog] = useState(null); // 'login' | 'change'
+  const [dialog, setDialog] = useState(null); // 'login' | 'change' | 'profile'
   const [skipTemp, setSkipTemp] = useState(false); // đã đóng khung đổi mật khẩu tạm trong lần mở trang này
   const box = useRef(null);
   useEscapeToClose(menu, () => setMenu(false));
@@ -63,6 +64,9 @@ export default function CitizenMenu({ onMyReports }) {
             <div className="truncate font-semibold text-ink">{name}</div>
             <div className="num">{session.account.phone}</div>
           </div>
+          <button type="button" role="menuitem" className={item} onClick={() => { setMenu(false); setDialog('profile'); }}>
+            <UserRound size={15} aria-hidden="true" /> Thông tin tài khoản
+          </button>
           <button type="button" role="menuitem" className={item} onClick={() => { setMenu(false); onMyReports?.(); }}>
             <ClipboardList size={15} aria-hidden="true" /> Phiếu của tôi
           </button>
@@ -75,6 +79,11 @@ export default function CitizenMenu({ onMyReports }) {
         </div>
       )}
       {auth}
+      {dialog === 'profile' && (
+        <Modal open size="md" onClose={() => setDialog(null)} title="Thông tin tài khoản">
+          <CitizenProfile onChangePassword={() => setDialog('change')} />
+        </Modal>
+      )}
     </div>
   );
 }
