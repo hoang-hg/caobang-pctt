@@ -774,7 +774,12 @@ async function staff(ctx, trackCode) {
     await ds.waitFor({ timeout: READONLY ? 5_000 : 15_000 }).catch((e) => { if (!READONLY) throw e; });
     if (READONLY && !(await ds.count())) return 'bỏ qua: tài khoản không nhập / gửi điểm sơ tán';
     await ds.click();
+    // Máy tính ≥ 1280 px (bản vẽ khung H2): tải mẫu trong hộp "Tệp mẫu"
+    const tplOpen = page.getByRole('button', { name: 'Tải tệp mẫu', exact: true });
+    const tplDesk = await tplOpen.isVisible();
+    if (tplDesk) await tplOpen.click();
     const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 15_000 }), page.getByRole('button', { name: 'Tải mẫu Excel' }).click()]);
+    if (tplDesk) await page.getByRole('button', { name: 'Đóng', exact: true }).last().click();
     const tpl = fs.readFileSync(await dl.path(), 'utf8').replace(/^\uFEFF/, '').split(/\r?\n/).filter(Boolean);
     if (tpl.length < 2) throw new Error('tệp mẫu không có dòng ví dụ');
     const head = tpl[0].split(',');
@@ -806,9 +811,9 @@ async function staff(ctx, trackCode) {
     const first = page.getByRole('list', { name: 'Danh sách hồ sơ' }).getByRole('button').first();
     if (!(await first.waitFor({ timeout: 8_000 }).then(() => true, () => false))) return 'bỏ qua: không có hồ sơ chờ duyệt';
     await first.click();
-    const back = page.getByRole('button', { name: 'Trả lại', exact: true });
+    const back = page.getByRole('button', { name: 'Trả lại xã…', exact: true });
     if (!(await back.waitFor({ timeout: 10_000 }).then(() => true, () => false))) return 'bỏ qua: tài khoản không duyệt hồ sơ này';
-    await page.getByRole('button', { name: 'Duyệt', exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Duyệt và ghi', exact: true }).waitFor();
     await back.click();
     const confirmBack = page.getByRole('button', { name: 'Trả lại hồ sơ' });
     if (await confirmBack.isEnabled()) throw new Error('chưa ghi lý do mà đã trả lại được');

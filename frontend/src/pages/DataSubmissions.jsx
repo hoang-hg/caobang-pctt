@@ -6,7 +6,7 @@ import { CircleMarker, GeoJSON, MapContainer, Tooltip, useMap } from 'react-leaf
 import { AlertTriangle, CheckCircle2, Download, Info, Loader2, ShieldCheck, Undo2 } from 'lucide-react';
 import { api, apiDownload } from '../api/client';
 import { useStore } from '../app/store';
-import { Empty, EmptyState, ErrorState, Skeleton } from '../components/common/ui';
+import { Empty, EmptyState, ErrorState, Skeleton, Modal } from '../components/common/ui';
 import { BaseLayer, ProvinceMask } from '../components/map/MapTools';
 import { dateTime } from '../utils/format';
 import { SUBMISSION_STATUS } from '../utils/labels';
@@ -34,7 +34,7 @@ const counts = (s) =>
  * lại" kèm lý do (xã đọc được, sửa rồi gửi lại); người gửi: theo dõi, rút hồ sơ đang chờ. `code`: hồ sơ đang mở (?ho-so=HS-…
  * trên URL, link trong email); `datasets`: danh sách loại dữ liệu (tên cột, chữ tiếng Việt của giá trị chọn).
  */
-export default function Submissions({ canImport, code, onOpen, datasets = [] }) {
+export default function Submissions({ canImport, code, onOpen, datasets = [], onResend }) {
   const [status, setStatus] = useState(canImport ? 'cho_duyet' : '');
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['submissions', status],
@@ -95,14 +95,14 @@ export default function Submissions({ canImport, code, onOpen, datasets = [] }) 
           </ul>
         )}
       </div>
-      {code ? <SubmissionDetail key={code} code={code} datasets={datasets} canImport={canImport} /> : (
+      {code ? <SubmissionDetail key={code} code={code} datasets={datasets} canImport={canImport} onResend={onResend} /> : (
         <div className="card p-3"><Empty>Chọn một hồ sơ để xem chi tiết</Empty></div>
       )}
     </div>
   );
 }
 
-function SubmissionDetail({ code, datasets, canImport }) {
+function SubmissionDetail({ code, datasets, canImport, onResend }) {
   const toast = useStore((s) => s.toast);
   const qc = useQueryClient();
   const { data: s, isLoading, error, refetch } = useQuery({
@@ -181,6 +181,9 @@ function SubmissionDetail({ code, datasets, canImport }) {
           )}
           {s.status === 'da_rut' && <p>Người gửi đã rút hồ sơ lúc {dateTime(s.reviewed_at)}.</p>}
           {s.review_note && <p className="mt-1 text-ink-2"><b>{s.status === 'tu_choi' ? 'Lý do' : 'Ghi chú'}:</b> {s.review_note}</p>}
+          {s.status === 'tu_choi' && !canImport && ds && onResend && (
+            <button type="button" className="btn-primary mt-2" onClick={() => onResend(ds.name)}>Gửi lại bản đã sửa</button>
+          )}
         </div>
       )}
 
@@ -202,9 +205,30 @@ function SubmissionDetail({ code, datasets, canImport }) {
 
       {s.can_review && (
         <div className="flex flex-col gap-3 rounded-lg border border-line p-3">
-          {returning ? (
-            <>
-              <h3 className="font-semibold">Trả lại hồ sơ cho xã</h3>
+          {returning && (
+            <Modal
+              open
+              size="md"
+              onClose={() => setReturning(false)}
+              title="Trả lại hồ sơ cho xã"
+              subtitle="Ghi lý do trả lại"
+              footer={
+                <>
+                  <button type="button" className="btn-secondary" disabled={!!busy} onClick={() => setReturning(false)}>Quay lại</button>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    disabled={!!busy || reason.trim().length < 3}
+                    title={reason.trim().length < 3 ? 'Ghi lý do trả lại' : undefined}
+                    onClick={() => act('reject', { reason: reason.trim() }, `Đã trả lại ${code} cho xã`)}
+                  >
+                    {busy === 'reject' ? <Loader2 size={15} className="animate-spin" /> : <Undo2 size={15} />} Trả lại hồ sơ cho xã
+                  </button>
+                </>
+              }
+            >
+              <div className="flex flex-col gap-3">
+              <p className="rounded-[14px] bg-panel2 p-3 text-sm"><b>{s.dataset_label} — {s.admin_names}</b> · {counts(s.summary)}</p>
               <div className="flex flex-wrap gap-1.5" role="group" aria-label="Lý do hay gặp">
                 {REASONS.map((r) => (
                   <button
@@ -222,24 +246,14 @@ function SubmissionDetail({ code, datasets, canImport }) {
                 <textarea className="input min-h-[64px]" maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)}
                   placeholder="VD: Điểm sơ tán Trường THCS chưa có vị trí, sức chứa ghi 3000 — kiểm tra lại" />
               </label>
-              <div className="flex flex-wrap justify-end gap-2">
-                <button type="button" className="btn-ghost" disabled={!!busy} onClick={() => setReturning(false)}>Quay lại</button>
-                <button
-                  type="button"
-                  className="btn-primary"
-                  disabled={!!busy || reason.trim().length < 3}
-                  title={reason.trim().length < 3 ? 'Ghi lý do trả lại' : undefined}
-                  onClick={() => act('reject', { reason: reason.trim() }, `Đã trả lại ${code} cho xã`)}
-                >
-                  {busy === 'reject' ? <Loader2 size={15} className="animate-spin" /> : <Undo2 size={15} />} Trả lại hồ sơ
-                </button>
+              <p className="rounded-[14px] bg-panel2 p-3 text-[13px] leading-normal text-ink-2">Xã nhận thông báo kèm lý do, sửa rồi gửi lại. Không có gì được ghi vào hệ thống.</p>
               </div>
-            </>
-          ) : (
-            <>
+            </Modal>
+          )}
+          <>
               <p className="text-sm text-ink-2">
                 {check?.ok
-                  ? <>Bấm <b>Duyệt</b> để ghi ngay vào hệ thống — {cardOf(ds).noun}: {counts(total)}{ds?.public ? '; hiện cho người dân' : ''}. Thấy sai thì <b>Trả lại</b> kèm lý do để xã sửa.</>
+                  ? <>Bấm <b>Duyệt và ghi</b> để ghi ngay vào hệ thống — {cardOf(ds).noun}: {counts(total)}{ds?.public ? '; hiện cho người dân' : ''}. Thấy sai thì <b>Trả lại</b> kèm lý do để xã sửa.</>
                   : <>Hồ sơ còn lỗi với dữ liệu hiện tại nên chưa duyệt được — bấm <b>Trả lại</b> kèm lý do để xã sửa, gửi lại.</>}
               </p>
               {check?.ok && (
@@ -250,7 +264,7 @@ function SubmissionDetail({ code, datasets, canImport }) {
               )}
               <div className="flex flex-wrap justify-end gap-2">
                 <button type="button" className="btn-secondary" disabled={!!busy} onClick={() => setReturning(true)}>
-                  <Undo2 size={15} /> Trả lại
+                  <Undo2 size={15} /> Trả lại xã…
                 </button>
                 <button
                   type="button"
@@ -258,11 +272,13 @@ function SubmissionDetail({ code, datasets, canImport }) {
                   disabled={!!busy || !check?.ok}
                   onClick={() => act('approve', { note: note.trim() || null }, `Đã duyệt ${code} — dữ liệu đã ghi vào hệ thống`)}
                 >
-                  {busy === 'approve' ? <Loader2 size={15} className="animate-spin" /> : <ShieldCheck size={15} />} Duyệt
+                  {busy === 'approve' ? <Loader2 size={15} className="animate-spin" /> : <ShieldCheck size={15} />} Duyệt và ghi
                 </button>
               </div>
-            </>
-          )}
+              <p className="rounded-[14px] border border-dashed border-line p-3 text-[13px] leading-normal text-ink-2">
+                Máy kiểm tra lại toàn bộ lúc bấm duyệt — dữ liệu đã đổi từ lúc xã gửi thì hồ sơ phải trả lại để xã sửa.
+              </p>
+          </>
         </div>
       )}
       {s.can_withdraw && (

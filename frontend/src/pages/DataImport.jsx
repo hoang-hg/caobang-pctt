@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import {
@@ -9,7 +9,7 @@ import {
 import { api, apiDownload, apiUpload } from '../api/client';
 import { useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
-import { BackButton, Empty, ErrorState, Segmented, Skeleton, Tabs } from '../components/common/ui';
+import { BackButton, Empty, ErrorState, Modal, Segmented, Skeleton, Tabs } from '../components/common/ui';
 import PageHeader from '../components/common/PageHeader';
 import RoleTips from '../components/common/RoleTips';
 import { PAGE } from '../components/layout/page';
@@ -18,6 +18,7 @@ import RecordForm from './DataImportForm';
 import Submissions, { IssueList, PreviewTable } from './DataSubmissions';
 import DataThresholds from './DataThresholds';
 import { cardOf, DATASET_GROUPS, exampleRows, fieldRule, rowLabel } from './dataImportFacts';
+import { time } from '../utils/format';
 import { useMediaQuery } from '../utils/useMediaQuery';
 
 /**
@@ -87,7 +88,7 @@ export default function DataImport() {
       {tab === 'nguong' ? (
         <DataThresholds />
       ) : tab === 'ho-so' ? (
-        <Submissions canImport={canImport} code={code} onOpen={open} datasets={datasets} />
+        <Submissions canImport={canImport} code={code} onOpen={open} datasets={datasets} onResend={(name) => { setParams({ loai: name }); setTab('nhap'); }} />
       ) : isLoading ? (
         <Skeleton height={320} />
       ) : isError ? (
@@ -247,7 +248,8 @@ function DatasetNav({ datasets, submitMode, current, onPick }) {
 }
 
 /** Một bước của quy trình: số thứ tự + tên bước; xong → dấu ✓. */
-function Step({ n, title, done, children }) {
+function Step({ n, title, done, plain = false, children }) {
+  if (plain) return <section className="flex min-w-0 flex-col gap-3" aria-label={`Bước ${n}: ${title}`}>{children}</section>;
   return (
     <section className="flex min-w-0 flex-col gap-3 border-t border-line pt-4" aria-label={`Bước ${n}: ${title}`}>
       <h3 className="flex items-center gap-2 font-semibold">
@@ -266,7 +268,68 @@ function Step({ n, title, done, children }) {
 
 const kb = (n) => (n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
 
+/** Dải 3 bước (bản vẽ khung H1): bước đã xong có dấu tích, dòng dưới là tệp đang dùng. */
+function StepStrip({ steps }) {
+  return (
+    <ol className="grid grid-cols-3 gap-2.5" aria-label="Các bước nhập">
+      {steps.map((s, i) => (
+        <li key={s.title} className="flex items-center gap-2.5 rounded-[14px] bg-panel2 px-3 py-3">
+          <span className={clsx('flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-bold', s.done ? 'bg-good text-white' : 'bg-accent text-white')} aria-hidden="true">
+            {s.done ? <Check size={15} /> : i + 1}
+          </span>
+          <span className="min-w-0">
+            <b className="block text-sm leading-snug text-ink">{s.title}</b>
+            <span className="block truncate text-xs text-ink-2" title={s.note}>{s.note}</span>
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/** Hộp "Tệp mẫu" (bản vẽ khung H2): tải mẫu, các cột và cách ghi. Lúc chưa chọn loại này không mở được. */
+function TemplateModal({ ds, noun, polygon, onDownload, onForm, onClose }) {
+  return (
+    <Modal open wide onClose={onClose} title={`Tệp mẫu — ${ds.label}`} subtitle="Các cột phải có và cách điền" footer={<button type="button" className="btn-secondary" onClick={onClose}>Đóng</button>}>
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <button type="button" className="btn-primary" onClick={onDownload}><Download size={15} aria-hidden="true" /> {polygon ? 'Tải tệp mẫu (GeoJSON)' : 'Tải mẫu Excel'}</button>
+          <button type="button" className="btn-secondary" onClick={onForm}>Hoặc {polygon ? 'vẽ' : 'điền'} trực tiếp trên web <ChevronRight size={15} aria-hidden="true" /></button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] text-left text-sm">
+            <thead className="text-xs text-ink-2">
+              <tr><th className="px-3 py-2 font-bold">Cột</th><th className="px-3 py-2 font-bold">Ý nghĩa</th><th className="px-3 py-2"><span className="sr-only">Bắt buộc</span></th><th className="px-3 py-2 font-bold">Cách ghi</th></tr>
+            </thead>
+            <tbody>
+              {ds.fields.map((f) => (
+                <tr key={f.name} className="border-t border-line align-top">
+                  <td className="px-3 py-2 font-mono text-[13px] font-semibold text-ink">{f.name}</td>
+                  <td className="px-3 py-2 text-ink">{f.label}</td>
+                  <td className="px-3 py-2"><span className={clsx('chip whitespace-nowrap px-2 py-0 text-xs font-semibold', f.required ? 'bg-accent/10 text-accent' : 'bg-panel2 text-ink-2')}>{f.required ? 'Bắt buộc' : 'Không bắt buộc'}</span></td>
+                  <td className="px-3 py-2 text-ink-2">{fieldRule(f)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="rounded-[14px] border border-dashed border-line p-3 text-[13px] leading-normal text-ink-2">
+          {polygon
+            ? 'Tệp mẫu có sẵn một vùng ví dụ.'
+            : `Có sẵn một dòng ví dụ: điền đè lên, mỗi dòng một ${noun}; lưu lại dạng .xlsx hoặc .csv đều được. Còn sót dòng ví dụ thì máy sẽ nhắc.`}
+        </p>
+        <p className="rounded-[14px] bg-panel2 p-3 text-[13px] leading-normal text-ink-2">
+          Tên cột viết có dấu cũng được. Ghi trùng mã: sửa {noun} đang có, không tạo thêm.
+        </p>
+      </div>
+    </Modal>
+  );
+}
+
 function DatasetPanel({ ds, submitMode, onBack, onSubmitted }) {
+  const desk = useMediaQuery('(min-width: 1280px)'); // bản vẽ khung H1: dải 3 bước, tệp mẫu trong hộp riêng
+  const navigate = useNavigate();
+  const [tplOpen, setTplOpen] = useState(false);
   const toast = useStore((s) => s.toast);
   const qc = useQueryClient();
   const c = cardOf(ds);
@@ -356,15 +419,21 @@ function DatasetPanel({ ds, submitMode, onBack, onSubmitted }) {
   const destructive = mode === 'replace' && report?.deletes > 0;
   const ready = report?.ok && !result && (!destructive || confirmed) && !busy;
   const changes = report ? changeWords(report) : '';
+  const download = () => apiDownload(`/data-import/datasets/${ds.name}/template`, `mau_${ds.name}`).catch((e) =>
+    toast({ tone: 'danger', title: 'Không tải được tệp mẫu', body: e.message }));
+  const located = polygon || ds.fields.some((f) => f.name === 'vi_do');
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
-      <BackButton onClick={onBack} className="self-start">Chọn loại khác</BackButton>
+      {!desk && <BackButton onClick={onBack} className="self-start">Chọn loại khác</BackButton>}
       <section className="card flex min-w-0 flex-col gap-4 p-4">
         <div className="flex items-start gap-3">
-          <span className="icon-tile mt-0.5 h-11 w-11" aria-hidden="true"><c.icon size={22} strokeWidth={1.75} /></span>
-          <div className="min-w-0">
-            <h2 className="text-lg font-semibold leading-tight">{submitMode ? `Gửi ${ds.label.toLowerCase()}` : ds.label}</h2>
+          {!desk && <span className="icon-tile mt-0.5 h-11 w-11" aria-hidden="true"><c.icon size={22} strokeWidth={1.75} /></span>}
+          <div className="min-w-0 flex-1">
+            <h2 className="flex flex-wrap items-center gap-2 text-lg font-semibold leading-tight">
+              {submitMode ? `Gửi ${ds.label.toLowerCase()}` : ds.label}
+              {desk && ds.public && <span className="chip bg-accent/10 px-2 py-0 text-xs font-semibold text-accent">Hiện cho người dân</span>}
+            </h2>
             <p className="mt-0.5 text-sm text-ink-2">{c.hint}</p>
             <details className="mt-1 text-sm">
               <summary className="tap cursor-pointer text-accent">Lưu ý khi nhập loại này</summary>
@@ -373,9 +442,19 @@ function DatasetPanel({ ds, submitMode, onBack, onSubmitted }) {
               {ds.public && <p className="mt-1 text-ink-2">Dữ liệu này hiện cho người dân trên cổng thông tin sau khi ghi.</p>}
             </details>
           </div>
+          {desk && <button type="button" className="btn-secondary tap h-11 shrink-0 rounded-xl px-4" onClick={() => setTplOpen(true)}>Tải tệp mẫu</button>}
         </div>
 
-        <Step n={1} title="Chuẩn bị dữ liệu" done={!!report}>
+        {desk && (
+          <StepStrip steps={[
+            { title: 'Tải tệp mẫu', note: polygon ? 'Tệp GeoJSON có sẵn vùng ví dụ' : 'Excel, CSV có sẵn cột', done: !!file || viaForm },
+            { title: 'Chọn tệp hoặc điền trực tiếp', note: file ? `${viaForm ? 'Điền trực tiếp' : file.name}${report ? ` · ${report.total} ${unit}` : ''}` : 'Chưa có dữ liệu', done: !!report },
+            { title: 'Máy kiểm tra từng dòng', note: submitMode ? 'Hết lỗi mới gửi tỉnh duyệt' : 'Hết lỗi mới ghi', done: !!report?.ok },
+          ]} />
+        )}
+        {tplOpen && <TemplateModal ds={ds} noun={c.noun} polygon={polygon} onDownload={download} onClose={() => setTplOpen(false)} onForm={() => { setTplOpen(false); setMethod('form'); setFile(null); clear(); }} />}
+
+        <Step n={1} title="Chuẩn bị dữ liệu" done={!!report} plain={desk}>
           <Segmented
             label="Cách nhập"
             touch
@@ -413,22 +492,21 @@ function DatasetPanel({ ds, submitMode, onBack, onSubmitted }) {
             <RecordForm ds={ds} noun={c.noun} communes={communes} onReady={(f) => { setFile(f); check(f); }} />
           ) : (
             <div className="flex flex-col gap-3">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() => apiDownload(`/data-import/datasets/${ds.name}/template`, `mau_${ds.name}`).catch((e) =>
-                    toast({ tone: 'danger', title: 'Không tải được tệp mẫu', body: e.message }))}
-                >
-                  <Download size={15} /> {polygon ? 'Tải tệp mẫu (GeoJSON)' : 'Tải mẫu Excel'}
-                </button>
-                <span className="text-sm text-ink-2">
-                  {polygon
-                    ? 'Tệp mẫu có sẵn một vùng ví dụ.'
-                    : `Có sẵn một dòng ví dụ: điền đè lên, mỗi dòng một ${c.noun}; lưu lại dạng .xlsx hoặc .csv đều được.`}
-                </span>
-              </div>
-              <ColumnsTable ds={ds} />
+              {!desk && (
+                <>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                    <button type="button" className="btn-secondary" onClick={download}>
+                      <Download size={15} /> {polygon ? 'Tải tệp mẫu (GeoJSON)' : 'Tải mẫu Excel'}
+                    </button>
+                    <span className="text-sm text-ink-2">
+                      {polygon
+                        ? 'Tệp mẫu có sẵn một vùng ví dụ.'
+                        : `Có sẵn một dòng ví dụ: điền đè lên, mỗi dòng một ${c.noun}; lưu lại dạng .xlsx hoặc .csv đều được.`}
+                    </span>
+                  </div>
+                  <ColumnsTable ds={ds} />
+                </>
+              )}
               <label
                 className={clsx(
                   'flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed px-4 py-5 text-center text-sm transition-colors focus-within:border-accent hover:border-accent',
@@ -464,13 +542,13 @@ function DatasetPanel({ ds, submitMode, onBack, onSubmitted }) {
         </Step>
 
         {report && (
-          <Step n={2} title="Kết quả kiểm tra" done={report.ok}>
+          <Step n={2} title="Kết quả kiểm tra" done={report.ok} plain={desk}>
             <ReportView report={report} ds={ds} label={label} unit={unit} viaForm={viaForm} />
           </Step>
         )}
 
         {report?.ok && !result && (
-          <Step n={3} title={submitMode ? 'Gửi tỉnh duyệt' : 'Ghi vào hệ thống'}>
+          <Step n={3} title={submitMode ? 'Gửi tỉnh duyệt' : 'Ghi vào hệ thống'} plain={desk}>
             {submitMode && (
               <label className="flex flex-col gap-1 text-sm">
                 Ghi chú gửi cấp tỉnh (không bắt buộc)
@@ -503,18 +581,41 @@ function DatasetPanel({ ds, submitMode, onBack, onSubmitted }) {
           </Step>
         )}
 
+        {/* Bản vẽ khung H4: hộp "Ghi xong" — ba số thật từ máy chủ; đóng hộp là nhập tiếp được */}
         {result && (
-          <div className="flex flex-col gap-2 rounded-lg bg-good/10 p-3 text-sm" role="status">
-            <p className="flex items-center gap-2 font-semibold">
-              <CheckCircle2 size={18} className="shrink-0 text-good" aria-hidden="true" />
-              Đã ghi vào hệ thống: {result.created} mới, {result.updated} cập nhật, {result.deleted} xoá.
-            </p>
-            <p className="text-ink-2">Nhật ký đã ghi lại người nhập và giờ nhập.</p>
-            <div className="flex flex-wrap gap-2">
-              <button type="button" className="btn-secondary" onClick={again}>Nhập tiếp {ds.label.toLowerCase()}</button>
-              <button type="button" className="btn-ghost" onClick={onBack}>Chọn loại khác</button>
+          <Modal
+            open
+            size="md"
+            onClose={again}
+            title="Ghi xong"
+            subtitle="Nhật ký đã ghi lại người nhập và giờ nhập"
+            footer={
+              <>
+                {located && <button type="button" className="btn-secondary mr-auto" onClick={() => navigate('/ban-do')}>Xem trên bản đồ <ChevronRight size={15} aria-hidden="true" /></button>}
+                <button type="button" className="btn-secondary" onClick={onBack}>Nhập loại khác</button>
+                <button type="button" className="btn-primary" onClick={again}>Xong</button>
+              </>
+            }
+          >
+            <div className="flex flex-col gap-3" role="status">
+              <div className="flex items-center gap-3">
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-good/15 text-good" aria-hidden="true"><Check size={24} /></span>
+                <div className="min-w-0">
+                  <b className="block text-lg leading-snug text-ink">Đã ghi {ds.label.toLowerCase()} vào hệ thống</b>
+                  <span className="text-sm text-ink-2">{time(Date.now())} · ghi trong một lần, không dòng nào dở dang</span>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2.5">
+                {[['Thêm mới', result.created], ['Cập nhật', result.updated], ['Xoá', result.deleted]].map(([k, v]) => (
+                  <div key={k} className="rounded-[14px] border border-line px-3 py-2.5">
+                    <div className="text-[13px] font-semibold text-ink">{k}</div>
+                    <div className="num mt-0.5 text-2xl font-bold text-ink">{v} <span className="font-sans text-[13px] font-normal text-ink-2">{c.noun}</span></div>
+                  </div>
+                ))}
+              </div>
+              {ds.public && <p className="rounded-[14px] bg-panel2 p-3 text-[13px] leading-normal text-ink-2">Dữ liệu này hiện cho người dân trên cổng thông tin.</p>}
             </div>
-          </div>
+          </Modal>
         )}
       </section>
     </div>
@@ -560,8 +661,17 @@ function ColumnsTable({ ds }) {
 function ReportView({ report, ds, label, unit, viaForm }) {
   const bad = report.total - report.valid;
   const leftover = exampleRows(ds, report.preview);
+  const desk = useMediaQuery('(min-width: 1280px)');
+  const pill = 'inline-flex items-center gap-2 rounded-full border border-line bg-panel px-3.5 py-2 text-sm text-ink';
   return (
     <div className="flex flex-col gap-3">
+      {desk && report.total > 0 && (
+        <div className="flex flex-wrap gap-2">
+          <span className={pill}><span className="h-2 w-2 rounded-full bg-good" aria-hidden="true" /><b className="num">{report.valid}</b> {unit} hợp lệ</span>
+          {bad > 0 && <span className={pill}><span className="h-2 w-2 rounded-full bg-danger" aria-hidden="true" /><b className="num">{bad}</b> {unit} lỗi</span>}
+          <span className={pill}>{changeWords(report)}</span>
+        </div>
+      )}
       {report.ok ? (
         <p className="flex items-start gap-2 rounded-lg bg-good/10 p-3 text-sm" role="status">
           <CheckCircle2 size={18} className="mt-px shrink-0 text-good" aria-hidden="true" />
