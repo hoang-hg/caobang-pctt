@@ -12,6 +12,7 @@ import { ApiError } from './client';
 import { demoAuth } from './demoUsers';
 import { COMMUNE_SUPPORT_TAG } from '../components/rescue/rescueFacts';
 import { INCIDENT } from '../utils/labels';
+import { slaClock } from '../utils/sla';
 
 const COMMUNE = 'CB-COBA'; // xã của bộ dữ liệu cấp xã (= tests/ui/demo-record.mjs)
 const DAY = 86_400_000;
@@ -224,13 +225,14 @@ function patchTicket(id, fields) {
 
 // Số đếm SOS của ô KPI như backend api/v1/dashboard.py — phiếu nào đổi trong phiên thì trừ phần cũ, cộng phần mới
 function sosCounts(t) {
-  const age = (Date.now() - Date.parse(t.received_at)) / 60_000;
-  const waiting = t.status === 'moi';
+  const clock = slaClock(t); // cùng tập phiếu với WAITING_SQL của backend: mới báo, hoặc đang điều phối mà chưa có đội
+  const waiting = !!clock;
+  const age = clock ? (Date.now() - Date.parse(clock.since)) / 60_000 : 0;
   return {
     waiting: +waiting,
     overdue: +(waiting && age > (t.sla_minutes ?? SLA_MINUTES[t.priority] ?? 15)),
     no_team_15m: +(waiting && age > 15),
-    in_progress: +['dieu_phoi', 'thuc_thi'].includes(t.status),
+    in_progress: +(!waiting && ['dieu_phoi', 'thuc_thi'].includes(t.status)),
     resolved_24h: +(t.status === 'hoan_thanh' && Date.now() - Date.parse(t.resolved_at || 0) < DAY),
     critical: +(t.status !== 'hoan_thanh' && t.priority === 1),
   };
@@ -247,8 +249,8 @@ function adjustSosKpi(sos, scope, codes) {
     for (const k of Object.keys(a)) if (k in sos) sos[k] += a[k] - (b[k] || 0);
   }
   if (changed.length) {
-    const waiting = allTickets(scope, codes, fixtureTickets().filter((t) => inScope(t, scope, codes))).filter((t) => t.status === 'moi');
-    sos.oldest_waiting = waiting.reduce((m, t) => (!m || t.received_at < m ? t.received_at : m), null);
+    const since = allTickets(scope, codes, fixtureTickets().filter((t) => inScope(t, scope, codes))).map((t) => slaClock(t)?.since).filter(Boolean);
+    sos.oldest_waiting = since.reduce((m, at) => (!m || at < m ? at : m), null);
   }
 }
 

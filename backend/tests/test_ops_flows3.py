@@ -55,6 +55,14 @@ def test_only_account_endpoints_accept_users_who_must_change_password():
     assert direct == ["/auth/change-password", "/auth/me", "/auth/refresh"]
 
 
+def test_waiting_covers_every_overdue_ticket():
+    # "SOS chờ" và "quá hạn" cùng một tập: phiếu "Đang điều phối" chưa có đội được đếm là chờ, không đếm là đang xử lý
+    from app.services.sos import WAITING_SQL
+
+    assert "t.status = 'moi'" in WAITING_SQL
+    assert "t.status = 'dieu_phoi'" in WAITING_SQL and "o.status IN ('dang_di', 'da_den')" in WAITING_SQL
+
+
 def test_dispatch_wait_counts_toward_overdue():
     # "Đang điều phối" mà chưa có đội đang đi / ở hiện trường: quá SLA kể từ lúc chuyển cột → quá hạn như "Chờ xử lý"
     assert "t.status = 'dieu_phoi' AND t.status_changed_at <" in OVERDUE_SQL

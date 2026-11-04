@@ -1,7 +1,8 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
-import { AlertTriangle, Check, ChevronLeft, ChevronRight, FileText, Loader2, RotateCcw, X } from 'lucide-react';
-import { FieldError, Modal } from '../common/ui';
+import { AlertTriangle, ChevronLeft, ChevronRight, FileText, Loader2, RotateCcw, X } from 'lucide-react';
+import { FieldError, Modal, StepChips } from '../common/ui';
+import { useMediaQuery } from '../../utils/useMediaQuery';
 
 const STEPS = ['Thông tin văn bản', 'Đánh giá & người ký', 'Xem lại & xuất'];
 const STEP_FIELDS = [['issuer', 'parent', 'number', 'recipients'], ['assessment', 'signerTitle', 'signerName'], []];
@@ -37,7 +38,52 @@ const nonEmpty = (t) => String(t || '').split(/\r?\n/).map((x) => x.trim()).filt
  * văn bản → đánh giá & người ký → xem lại & xuất. Lỗi hiện ngay dưới ô (độ dài: ngay khi gõ; ô bắt buộc: khi rời ô hoặc bấm
  * Tiếp). Số liệu do Tổng quan đưa vào lúc bấm Xuất (`onExport(form)` → số trang); `summary`: phạm vi + số mục sẽ có.
  */
-export default function ReportDocModal({ open, onClose, onExport, summary }) {
+/**
+ * Xem trước bản đang soạn (bản vẽ khung A — máy tính): cùng thể thức, cùng câu chữ với PDF (reportContent của utils/reportPdf,
+ * nạp khi mở hộp), bảng chi tiết chỉ có trong PDF. Số liệu là số đang hiện trên Tổng quan.
+ */
+function DocPreview({ f, content, step }) {
+  const [mod, setMod] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    import('../../utils/reportPdf').then((m) => { if (alive) setMod(m); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+  const parts = mod && content?.k ? mod.reportContent({ ...content, assessment: f.assessment }) : [];
+  const to = nonEmpty(f.recipients);
+  return (
+    <div className="scroll-thin max-h-[26rem] overflow-y-auto rounded-[14px] border border-line bg-white p-5 text-[12px] leading-snug text-[#111]" style={{ fontFamily: '"Times New Roman", Tinos, serif' }} aria-label="Xem trước báo cáo">
+      <div className="grid grid-cols-2 gap-3 text-center">
+        <div>
+          {f.parent.trim() && <div>{f.parent.trim().toLocaleUpperCase('vi')}</div>}
+          <div className="font-bold">{f.issuer.trim().toLocaleUpperCase('vi')}</div>
+          <div className="mt-0.5">Số: {f.number || '…/BC'}</div>
+        </div>
+        <div>
+          <div className="font-bold">CỘNG HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
+          <div className="font-bold">Độc lập - Tự do - Hạnh phúc</div>
+          <div className="mt-0.5 italic">{mod ? mod.placeDate(new Date()) : ''}</div>
+        </div>
+      </div>
+      <div className="mt-3 text-center font-bold">BÁO CÁO NHANH</div>
+      <div className="text-center font-bold">Tình hình thiên tai và công tác ứng phó</div>
+      <div className="mt-1 text-center">Kính gửi: {to.join('; ') || '…'}</div>
+      <div className="mt-2 space-y-1">
+        {parts.map((p, i) => (
+          <div key={i} className={p.heading && step === 1 && p.heading.startsWith('III') ? 'rounded bg-[#FEF3C7] px-1' : undefined}>
+            {p.heading && <b>{p.heading}</b>}
+            {p.sub && <b className="font-semibold">{p.sub}: </b>}
+            {p.text}
+          </div>
+        ))}
+        {!parts.length && <div className="text-[#555]">Đang chuẩn bị số liệu…</div>}
+      </div>
+    </div>
+  );
+}
+
+export default function ReportDocModal({ open, onClose, onExport, summary, content }) {
+  const desk = useMediaQuery('(min-width: 1280px)');
   const [step, setStep] = useState(0);
   const [f, setF] = useState(() => ({ ...readSaved(), assessment: '', appendix: true }));
   const [shown, setShown] = useState({});
@@ -124,8 +170,10 @@ export default function ReportDocModal({ open, onClose, onExport, summary }) {
     <Modal
       open={open}
       onClose={close}
-      wide
-      title="Báo cáo văn bản (PDF định dạng chuẩn)"
+      wide={!desk}
+      size="lg"
+      title="Báo cáo văn bản (PDF)"
+      subtitle="Quốc hiệu, số liệu, đánh giá – kiến nghị, chỗ ký — chữ tìm và sao chép được"
       footer={
         <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:items-center sm:justify-end">
           {step > 0 && (
@@ -138,7 +186,7 @@ export default function ReportDocModal({ open, onClose, onExport, summary }) {
           </button>
           {step < 2 ? (
             <button type="button" className={clsx('btn-primary col-span-2', bigBtn)} onClick={() => guard(step) && setStep(step + 1)}>
-              Tiếp <ChevronRight size={15} />
+              Tiếp: {STEPS[step + 1].toLowerCase()} <ChevronRight size={15} />
             </button>
           ) : (
             <button type="button" className={clsx('btn-primary col-span-2 font-bold', bigBtn)} onClick={submit} disabled={busy || !summary.ready}>
@@ -148,24 +196,10 @@ export default function ReportDocModal({ open, onClose, onExport, summary }) {
         </div>
       }
     >
-      <ol className="mb-3 flex flex-wrap gap-1.5 text-[11px]" aria-label="Các bước">
-        {STEPS.map((s, i) => (
-          <li key={s}>
-            <button
-              type="button"
-              disabled={i > step || busy}
-              onClick={() => setStep(i)}
-              aria-current={i === step ? 'step' : undefined}
-              className={clsx(
-                'chip min-h-[32px] px-2.5 py-0.5',
-                i === step ? 'bg-accent text-white' : i < step ? 'bg-good/15 text-good hover:bg-good/25' : 'bg-panel2 text-muted',
-              )}
-            >
-              {i < step && stepValid(i) && <Check size={11} aria-hidden="true" />} {i + 1}. {s}
-            </button>
-          </li>
-        ))}
-      </ol>
+      <StepChips steps={STEPS} step={step} onStep={setStep} done={STEPS.map((_, i) => i === 2 || stepValid(i))} disabled={busy} />
+
+      <div className={clsx(desk && 'grid grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] items-start gap-5')}>
+      <div className="min-w-0">
 
       {step === 0 && (
         <div className="flex flex-col gap-3 text-xs">
@@ -233,6 +267,9 @@ export default function ReportDocModal({ open, onClose, onExport, summary }) {
           )}
         </div>
       )}
+      </div>
+      {desk && <DocPreview f={f} content={content} step={step} />}
+      </div>
     </Modal>
   );
 }

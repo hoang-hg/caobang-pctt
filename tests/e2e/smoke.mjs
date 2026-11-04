@@ -298,6 +298,8 @@ const oldestMin = s15.oldest_waiting ? (Date.now() - new Date(s15.oldest_waiting
 check('KPI SOS: đếm phiếu chờ quá 15 phút chưa có đội tiếp nhận', Number.isInteger(s15.no_team_15m) && s15.no_team_15m >= 0 &&
   (oldestMin <= 15.5 || s15.no_team_15m >= 1) && s15.no_team_15m <= s15.waiting + s15.in_progress,
   `${s15.no_team_15m} phiếu (chờ lâu nhất ${Math.round(oldestMin)}′, quá hạn theo cấp ${s15.overdue})`);
+check('KPI SOS: số quá hạn, chờ quá 15 phút không vượt số phiếu chờ (cùng một tập phiếu)',
+  s15.overdue <= s15.waiting && s15.no_team_15m <= s15.waiting, `${s15.waiting} chờ · ${s15.overdue} quá hạn · ${s15.no_team_15m} quá 15′`);
 const one = (await call('GET', '/dashboard/kpis?admin_codes=CB-BAOLAC', null, checker)).data;
 check('Vùng chỉ có 1 trạm mưa: lấy đúng số của trạm (không dựng được đa giác)',
   one.rain?.stations === 1 && one.rain.avg_method === 'trung_binh_cong' && one.rain.avg_24h === one.rain.max_24h, JSON.stringify(one.rain));
