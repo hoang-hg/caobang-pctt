@@ -12,16 +12,16 @@ const CTRL = 'tap min-h-[40px] text-xs sm:text-sm';
  * (cán bộ hiện trường chủ yếu tìm theo tên). Máy tính: một hàng. Đang lọc → hàng nhãn "Đang lọc" bỏ từng điều kiện được.
  * `sorts` rỗng (VD danh bạ): không có ô "Sắp xếp".
  * `inline` (máy tính ≥ 1280 px — bản vẽ desktop khung C): MỘT hàng không khung — ô tìm giãn, các ô lọc, cách xếp, `children`
- * (VD đổi cách xem) cao 44 px; không có Excel / PDF (trang để ở menu "Xuất").
+ * (VD đổi cách xem) cao 44 px; không có Excel / PDF (trang để ở menu "Xuất"). `searchMin`: bề rộng tối thiểu ô tìm (px).
  */
 export default function FilterToolbar({
   fields, sorts, placeholder, q, onSearch, filters, counts, onFilter, onClear, sort, onSort, shown, total, noun, onExcel, onPdf, exporting,
-  children, inline = false,
+  children, inline = false, searchMin = 208,
 }) {
   const [open, setOpen] = useState(false);
   const active = fields.filter((f) => filters[f.key]);
   const searchBox = (
-    <div className={clsx('relative', inline ? 'min-w-[13rem] flex-1' : 'min-w-0 flex-[1_1_100%] sm:flex-1')}>
+    <div className={clsx('relative', inline ? 'flex-1' : 'min-w-0 flex-[1_1_100%] sm:flex-1')} style={inline ? { minWidth: searchMin } : undefined}>
       <Search size={inline ? 16 : 14} className={clsx('pointer-events-none absolute top-1/2 -translate-y-1/2 text-muted', inline ? 'left-3.5' : 'left-2.5')} aria-hidden="true" />
       <input
         className={clsx('input pr-9', inline ? 'tap h-11 rounded-xl bg-panel pl-10 text-sm' : clsx('pl-8', CTRL))}

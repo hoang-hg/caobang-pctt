@@ -2,7 +2,7 @@ import { cloneElement, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { PackageMinus, PackagePlus, RefreshCw, Truck } from 'lucide-react';
+import { FileDown, FileSpreadsheet, PackageMinus, PackagePlus, RefreshCw, Truck } from 'lucide-react';
 import { useAreaQuery, useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
 import { EmptyState, ErrorState, Pager, Section, Segmented, Skeleton, Tabs } from '../components/common/ui';
@@ -25,6 +25,8 @@ import { ForceReadinessChart, VehicleStatusChart } from '../components/resources
 import ResourceAlerts from '../components/resources/ResourceAlerts';
 import ResourceKpis from '../components/resources/ResourceKpis';
 import ResourceTodo from '../components/resources/ResourceTodo';
+import ExportMenu from '../components/common/ExportMenu';
+import FilterPanel from '../components/common/FilterPanel';
 import FilterToolbar from '../components/common/FilterToolbar';
 import VehicleList, { FuelDepots, VehicleMap } from '../components/resources/VehicleList';
 import WarehouseList, { STOCK_NOTE } from '../components/resources/WarehouseList';
@@ -69,6 +71,8 @@ export default function Resources() {
   const qc = useQueryClient();
   const online = useOnline();
   const desk = useMediaQuery('(min-width: 1280px)'); // bản vẽ desktop khung E: 2 cột, "Cần bổ sung / cần sửa" bên phải
+  // Từ 1440 px (bản vẽ khung E): thêm cột "Bộ lọc" dọc bên trái — 1280 – 1439 px cột giữa quá hẹp cho bảng, giữ hàng lọc ngang
+  const filterCol = useMediaQuery('(min-width: 1440px)');
   const isLg = useMediaQuery('(min-width: 1024px)');
   const filter = useStore((s) => s.filter);
   const setFocus = useStore((s) => s.setFocus);
@@ -82,7 +86,8 @@ export default function Resources() {
   const [sorts, setSorts] = useState({});
   const sort = sorts[tab] || SORTS[tab][0][0];
   const [pageSize, setPageSize] = useState(() => (window.innerWidth >= 1024 ? 20 : 10));
-  const [chartOpen, setChartOpen] = useState(() => window.innerWidth >= 768);
+  // Biểu đồ trên danh sách: mở sẵn từ 768 px; từ 1440 px gập sẵn (bản vẽ khung E — danh sách lên ngay dưới hàng thẻ)
+  const [chartOpen, setChartOpen] = useState(() => window.innerWidth >= 768 && window.innerWidth < 1440);
   const [supplyView, setSupplyView] = useState('kho'); // thẻ Vật tư: biểu đồ theo kho | tổng hợp theo mặt hàng
   const [pdf, setPdf] = useState(false); // đang chụp PDF: mọi dòng đang lọc, dạng bảng, bỏ nút
   const [refreshing, setRefreshing] = useState(false);
@@ -333,10 +338,31 @@ export default function Resources() {
 
   return (
     // Điện thoại: chừa chỗ cho thanh thao tác nhanh dưới đáy (không che dòng cuối, nút phân trang)
-    // Máy tính ≥ 1280 px (bản vẽ desktop khung E): 2 cột — nội dung (ô chỉ số, thẻ, danh sách) · "Cần bổ sung / cần sửa"
-    // dính bên phải; không tiêu đề trang (gợi ý, làm mới ở hàng thẻ)
+    // Máy tính ≥ 1280 px (bản vẽ desktop khung E): 3 cột — "Bộ lọc" dọc (dính, gợi ý + làm mới ở đáy) · nội dung (ô chỉ số;
+    // hàng thẻ + ô tìm + Xuất; danh sách) · "Cần bổ sung / cần sửa" dính bên phải; không tiêu đề trang
     <div className={PAGE}>
-      <div className={desk ? 'grid grid-cols-[minmax(0,1fr)_320px] items-start gap-5' : 'contents'}>
+      <div className={filterCol ? 'grid grid-cols-[230px_minmax(0,1fr)_300px] items-start gap-5' : desk ? 'grid grid-cols-[minmax(0,1fr)_320px] items-start gap-5' : 'contents'}>
+      {filterCol && (
+        <div className="sticky top-0 flex min-w-0 flex-col gap-3">
+          <FilterPanel
+            fields={FILTERS[tab]}
+            filters={filters}
+            counts={query.data ? counts : null}
+            onFilter={setFilter}
+            onClear={clearAll}
+            sorts={SORTS[tab]}
+            sort={sort}
+            onSort={setSort}
+          />
+          <div className="flex items-center gap-2 px-1">
+            <RoleTips page="nguon-luc" compact />
+            <button type="button" onClick={refresh} disabled={refreshing} className="btn-secondary tap-sq h-9 min-w-[36px] px-2.5" aria-label="Làm mới số liệu" title={`Làm mới — số liệu lúc ${dataTime || '…'}, tự cập nhật khi kho xuất, nhập, đội nhận lệnh`}>
+              <RefreshCw size={15} className={clsx(refreshing && 'animate-spin')} aria-hidden="true" />
+            </button>
+            <span className="text-xs text-muted">Số liệu lúc {dataTime || '…'}</span>
+          </div>
+        </div>
+      )}
       {desk && <aside aria-label="Việc cần làm" className="sticky top-0 order-last flex min-w-0 flex-col">{cloneElement(todo, { narrow: true })}</aside>}
       <div className={desk ? 'flex min-w-0 flex-col gap-4' : 'contents'}>
       {/* Thông tin khẩn luôn trên cùng (Cam / Đỏ dính khi cuộn) + mất mạng */}
@@ -368,7 +394,7 @@ export default function Resources() {
 
       {!desk && todo}
 
-      <div ref={tabsRef} className={clsx('scroll-mt-20', desk && 'flex items-center gap-2 [&>*:not(:first-child)]:shrink-0')}>
+      <div ref={tabsRef} className={clsx('scroll-mt-20', filterCol ? 'flex items-start gap-3 [&>*:first-child]:shrink-0' : desk && 'flex items-center gap-2 [&>*:not(:first-child)]:shrink-0')}>
         <Tabs
           fit
           label="Danh mục nguồn lực"
@@ -378,7 +404,7 @@ export default function Resources() {
             value: t.id, label: t.label, short: t.short, icon: t.icon, count: queries[t.id].data ? searched[t.id].length : undefined, alert: tabAlert(t.id),
           }))}
         />
-        {desk && (
+        {desk && !filterCol && (
           <>
             <span className="flex-1" />
             <RoleTips page="nguon-luc" compact />
@@ -387,9 +413,39 @@ export default function Resources() {
             </button>
           </>
         )}
+        {filterCol && (
+          // Ô tìm + Xuất cùng hàng thẻ (bản vẽ khung E); các điều kiện lọc ở cột "Bộ lọc" bên trái
+          <div className="min-w-0 flex-1">
+            <FilterToolbar
+              inline
+              searchMin={144}
+              fields={[]}
+              sorts={[]}
+              placeholder={PLACEHOLDER[tab]}
+              q={q}
+              onSearch={setQ}
+              filters={filters}
+              counts={null}
+              onFilter={setFilter}
+              onClear={clearAll}
+              shown={rows.length}
+              total={query.data?.length || 0}
+              noun={tabInfo.noun}
+            >
+              <ExportMenu
+                title={`Xuất ${rows.length} ${tabInfo.noun} đang lọc`}
+                buttonClass="btn-secondary tap h-11 rounded-xl px-4"
+                items={[
+                  { key: 'xlsx', label: 'Bảng Excel', hint: `${rows.length} ${tabInfo.noun} đang lọc`, icon: FileSpreadsheet, onClick: doExcel, disabled: !rows.length },
+                  { key: 'pdf', label: 'Báo cáo PDF', hint: `Danh sách ${tabInfo.noun} đang lọc, khổ A4 ngang`, icon: FileDown, onClick: doPdf, disabled: !rows.length, busy: pdf },
+                ]}
+              />
+            </FilterToolbar>
+          </div>
+        )}
       </div>
 
-      <FilterToolbar
+      {!filterCol && <FilterToolbar
         fields={FILTERS[tab]}
         sorts={SORTS[tab]}
         placeholder={PLACEHOLDER[tab]}
@@ -407,7 +463,7 @@ export default function Resources() {
         onExcel={doExcel}
         onPdf={doPdf}
         exporting={pdf}
-      />
+      />}
 
       <div ref={contentRef} className="flex flex-col gap-3 bg-bg">
         {/* Biểu đồ cho lãnh đạo, trên danh sách của mỗi thẻ — thu gọn được (điện thoại mặc định thu gọn: danh sách lên trước) */}
