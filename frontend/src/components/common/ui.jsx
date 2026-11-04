@@ -281,14 +281,15 @@ export function ErrorState({ height, onRetry, className, children = 'Không tả
     <div
       role="alert"
       style={height ? { height } : undefined}
-      className={clsx('flex flex-col items-center justify-center gap-2 rounded-lg border border-danger/40 bg-danger/5 px-4 py-5 text-center text-xs text-danger', className)}
+      // Bản vẽ khung M3: viền đứt đỏ, câu lỗi đậm, nút "Thử lại" màu chính — khác hẳn khối rỗng (viền đứt xám)
+      className={clsx('flex flex-col items-center justify-center gap-2.5 rounded-[14px] border border-dashed border-danger/70 bg-danger/5 px-4 py-5 text-center text-sm text-danger', className)}
     >
-      <span className="flex items-center gap-1.5 font-semibold">
-        <AlertTriangle size={14} className="shrink-0" /> {children}
+      <span className="flex items-center gap-1.5 font-bold">
+        <AlertTriangle size={15} className="shrink-0" aria-hidden="true" /> {children}
       </span>
       {onRetry && (
-        <button type="button" className="btn-ghost min-h-[36px] px-3 py-1 text-xs" onClick={() => onRetry()}>
-          <RefreshCw size={12} /> Thử lại
+        <button type="button" className="btn-primary tap min-h-[40px] rounded-xl px-4 text-sm" onClick={() => onRetry()}>
+          <RefreshCw size={14} aria-hidden="true" /> Thử lại
         </button>
       )}
     </div>

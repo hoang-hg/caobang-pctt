@@ -149,9 +149,13 @@ export const useStore = create((set, get) => ({
   setAuth: (auth) => {
     safeSet('pctt_auth', auth ? JSON.stringify(auth) : null);
     const user = auth?.user?.username;
-    if (user === get().auth?.user?.username) return set({ auth });
-    return set({ auth, filter: savedFilterOf(user) });
+    // Đăng nhập lại xong → bỏ lời báo "phiên đã hết" trên trang đăng nhập
+    const note = auth ? { sessionNote: null } : {};
+    if (user === get().auth?.user?.username) return set({ auth, ...note });
+    return set({ auth, filter: savedFilterOf(user), ...note });
   },
+  // Lý do phiên kết thúc (401 khi đang đăng nhập — api/client.js) → trang đăng nhập báo ngay trên form (bản vẽ khung M5)
+  sessionNote: null,
 
   // ---- Trạng thái kết nối realtime & âm báo ----
   wsStatus: 'connecting',
