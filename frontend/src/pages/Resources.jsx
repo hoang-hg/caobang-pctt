@@ -305,6 +305,7 @@ export default function Resources() {
   } else if (tab === 'vat_tu') {
     body = (
       <WarehouseList
+        table={desk}
         rows={paged.visible}
         factsOf={factsOf}
         category={filters.nhom}
@@ -343,7 +344,8 @@ export default function Resources() {
     <div className={PAGE}>
       <div className={filterCol ? 'grid grid-cols-[230px_minmax(0,1fr)_300px] items-start gap-5' : desk ? 'grid grid-cols-[minmax(0,1fr)_320px] items-start gap-5' : 'contents'}>
       {filterCol && (
-        <div className="sticky top-0 flex min-w-0 flex-col gap-3">
+        // Nhiều nút lọc (thẻ Kho): cuộn trong cột, không tràn khỏi màn hình
+        <div className="scroll-thin sticky top-0 flex max-h-[calc(100vh-7rem)] min-w-0 flex-col gap-3 overflow-y-auto">
           <FilterPanel
             fields={FILTERS[tab]}
             filters={filters}
