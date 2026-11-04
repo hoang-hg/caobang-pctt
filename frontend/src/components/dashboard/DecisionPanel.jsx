@@ -34,7 +34,7 @@ function useDecisionRows(k) {
     badges.alerts > 0 && { key: 'canh-bao', to: '/canh-bao', n: badges.alerts, text: 'lệnh cảnh báo chờ duyệt', action: 'Duyệt lệnh', icon: Megaphone },
     canSos && sos.overdue > 0 && { key: 'sos-qua-han', to: '/cuu-ho', n: sos.overdue, level: 3, text: 'phiếu SOS quá hạn', action: 'Điều động', icon: Siren },
     canSos && !(sos.overdue > 0) && sos.waiting > 0 && {
-      key: 'sos-cho', to: '/cuu-ho', n: sos.waiting, level: sos.no_team_15m > 0 ? 3 : undefined, text: 'phiếu SOS chờ nhận', action: 'Điều động', icon: Siren,
+      key: 'sos-cho', to: '/cuu-ho', n: sos.waiting, level: sos.no_team_15m > 0 ? 3 : undefined, text: 'phiếu SOS chờ đội', action: 'Điều động', icon: Siren,
     },
     badges.submissions > 0 && { key: 'ho-so', to: '/nhap-du-lieu', n: badges.submissions, text: 'hồ sơ của xã chờ duyệt', action: 'Duyệt hồ sơ', icon: FileUp },
     badges.reports > 0 && { key: 'phan-anh', to: '/phan-anh', n: badges.reports, text: 'phản ánh của dân chờ duyệt', action: 'Duyệt', icon: Camera },

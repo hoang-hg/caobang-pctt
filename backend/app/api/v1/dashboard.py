@@ -15,7 +15,7 @@ from app.services.events import log_event, station_place
 from app.services.landslides import get_landslides_overview
 from app.services.lite import VN_TZ
 from app.services.simulator import alarm_level
-from app.services.sos import NO_TEAM_15M_SQL, OVERDUE_SQL
+from app.services.sos import NO_TEAM_15M_SQL, OVERDUE_SQL, WAIT_SINCE_SQL, WAITING_SQL
 from app.services.thresholds import classify_landslide, get_thresholds, threshold_curves
 from app.ws.hub import hub
 
@@ -70,13 +70,13 @@ async def _kpis(codes: list[str]) -> dict:
         p,
     )
     sos = await fetch_one(
-        f"""SELECT count(*) FILTER (WHERE status = 'moi') AS waiting,
+        f"""SELECT count(*) FILTER (WHERE {WAITING_SQL}) AS waiting,
                    count(*) FILTER (WHERE {OVERDUE_SQL}) AS overdue,
                    count(*) FILTER (WHERE {NO_TEAM_15M_SQL}) AS no_team_15m,
-                   count(*) FILTER (WHERE status IN ('dieu_phoi', 'thuc_thi')) AS in_progress,
+                   count(*) FILTER (WHERE status IN ('dieu_phoi', 'thuc_thi') AND NOT {WAITING_SQL}) AS in_progress,
                    count(*) FILTER (WHERE status = 'hoan_thanh' AND resolved_at > now() - interval '24 hours') AS resolved_24h,
                    count(*) FILTER (WHERE status <> 'hoan_thanh' AND priority = 1) AS critical,
-                   min(received_at) FILTER (WHERE status = 'moi') AS oldest_waiting
+                   min({WAIT_SINCE_SQL}) FILTER (WHERE {WAITING_SQL}) AS oldest_waiting
               FROM operations.sos_tickets t WHERE {area_clause('t.location', codes)}""",
         p,
     )

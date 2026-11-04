@@ -266,7 +266,7 @@ export default function OmniSearch() {
     <div className="relative w-full max-w-md" ref={ref}>
       {field}
       {open && (
-        <div className="card scroll-thin absolute left-0 right-0 top-11 z-[1200] max-h-[min(70vh,28rem)] overflow-y-auto p-1 shadow-2xl">
+        <div className="card scroll-thin absolute left-0 right-0 top-11 z-[1200] max-h-[min(70vh,28rem)] overflow-y-auto p-1 shadow-2xl lg:left-auto lg:w-[30rem]">
           {results}
         </div>
       )}

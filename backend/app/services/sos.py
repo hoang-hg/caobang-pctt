@@ -18,6 +18,20 @@ _SLA_INTERVAL = (
 )
 
 
+# Phiếu đang CHỜ ĐỘI: "Chờ xử lý", hoặc "Đang điều phối" mà chưa có đội nào đang đi / ở hiện trường (lệnh đã huỷ, mới kéo cột).
+# Ô "SOS chờ", nút đỏ thanh trên dùng tập này — cùng tập với "quá hạn" nên số quá hạn không bao giờ vượt số chờ.
+_NO_ACTIVE_TEAM_SQL = (
+    "NOT EXISTS (SELECT 1 FROM operations.dispatch_orders o"
+    " WHERE o.ticket_id = t.id AND o.status IN ('dang_di', 'da_den'))"
+)
+WAITING_SQL = f"(t.status = 'moi' OR (t.status = 'dieu_phoi' AND {_NO_ACTIVE_TEAM_SQL}))"
+# Đồng hồ chờ của phiếu trong WAITING_SQL — như no_team_sql (và slaClock ở frontend)
+WAIT_SINCE_SQL = (
+    "CASE WHEN t.status = 'moi' THEN t.received_at"
+    " ELSE COALESCE(t.status_changed_at, t.acknowledged_at, t.received_at) END"
+)
+
+
 def no_team_sql(interval: str) -> str:
     """Phiếu CHƯA CÓ LỰC LƯỢNG TIẾP NHẬN quá `interval` (biểu thức SQL): "Chờ xử lý" kể từ lúc nhận tin; hoặc "Đang điều
     phối" mà chưa có đội nào đang đi / ở hiện trường ("Chờ điều động") kể từ lúc chuyển sang cột này / lúc huỷ lệnh trước
@@ -25,8 +39,7 @@ def no_team_sql(interval: str) -> str:
     return (
         f"((t.status = 'moi' AND t.received_at < now() - {interval})"
         f" OR (t.status = 'dieu_phoi' AND t.status_changed_at < now() - {interval}"
-        " AND NOT EXISTS (SELECT 1 FROM operations.dispatch_orders o"
-        " WHERE o.ticket_id = t.id AND o.status IN ('dang_di', 'da_den'))))"
+        f" AND {_NO_ACTIVE_TEAM_SQL}))"
     )
 
 
