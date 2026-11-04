@@ -1,4 +1,7 @@
 import { useRef, useState } from 'react';
+import { FileDown, FileSpreadsheet } from 'lucide-react';
+import ExportMenu from '../common/ExportMenu';
+import { useMediaQuery } from '../../utils/useMediaQuery';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
@@ -48,6 +51,8 @@ export default function AuditLog() {
   const [sort, setSort] = useState('moi');
   const [pageSize, setPageSize] = useState(() => (window.innerWidth >= 1024 ? 50 : 20));
   const [pdf, setPdf] = useState(false);
+  // Máy tính ≥ 1280 px (bản vẽ khung D9): một khối, khoảng thời gian + ô tìm + lọc + Xuất, câu "không sửa / xoá được" ở cuối
+  const desk = useMediaQuery('(min-width: 1280px)');
   const ref = useRef(null);
 
   const all = (query.data || []).map((a) => ({ ...a, act: auditAction(a.action), text: auditDetail(a.details) }));
@@ -160,8 +165,8 @@ export default function AuditLog() {
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="card flex flex-col gap-2 p-2 no-print">
+    <div className={clsx('flex flex-col gap-3', desk && 'sheet p-4')}>
+      <div className={clsx('flex flex-col gap-2 no-print', !desk && 'card p-2')}>
         <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Khoảng thời gian">
           <span className="mr-1 text-xs font-medium text-muted">Khoảng</span>
           {RANGES.map(([k, label]) => (
@@ -185,8 +190,9 @@ export default function AuditLog() {
         )}
       </div>
       <FilterToolbar
+        inline={desk}
         fields={fields}
-        sorts={SORTS}
+        sorts={desk ? [] : SORTS}
         placeholder="Tìm người, thao tác, mã đối tượng, chi tiết…"
         q={q}
         onSearch={setQ}
@@ -199,10 +205,21 @@ export default function AuditLog() {
         shown={rows.length}
         total={all.length}
         noun="thao tác"
-        onExcel={doExcel}
-        onPdf={doPdf}
+        onExcel={desk ? null : doExcel}
+        onPdf={desk ? null : doPdf}
         exporting={pdf}
-      />
+      >
+        {desk && (
+          <ExportMenu
+            title={`Xuất ${rows.length} thao tác đang lọc`}
+            buttonClass="btn-secondary tap h-11 rounded-xl px-4"
+            items={[
+              { key: 'xlsx', label: 'Bảng Excel', hint: `${rows.length} thao tác đang lọc`, icon: FileSpreadsheet, onClick: doExcel, disabled: !rows.length },
+              { key: 'pdf', label: 'Báo cáo PDF', hint: 'Khổ A4 ngang', icon: FileDown, onClick: doPdf, disabled: !rows.length, busy: pdf },
+            ]}
+          />
+        )}
+      </FilterToolbar>
       {query.data && (
         <p className="text-[11px] text-muted">
           {int(all.length)} thao tác {rangeLabel}{failed ? <> · <b className="text-danger">{failed} thất bại</b></> : ''}
@@ -213,6 +230,7 @@ export default function AuditLog() {
         {body}
         {!pdf && rows.length > 0 && <Pager paged={paged} size={pageSize} sizes={[20, 50, 100]} onSize={setPageSize} noun="thao tác" />}
       </div>
+      {desk && <p className="text-[13px] text-ink-2">Nhật ký pháp lý: mọi thao tác ghi đều lưu, không sửa / xoá được. Cần quyền xem nhật ký.</p>}
     </div>
   );
 }
