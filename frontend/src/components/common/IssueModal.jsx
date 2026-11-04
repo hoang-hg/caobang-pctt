@@ -104,8 +104,10 @@ function IssueForm({ warehouse, onClose }) {
   return (
     <Modal
       open
+      size="md"
       onClose={onClose}
-      title={`Ra lệnh xuất kho – ${warehouse.name}`}
+      title={`Xuất kho — ${warehouse.name}`}
+      subtitle={`Bước ${step + 1}/2 · ghi sổ xuất – nhập kho`}
       footer={
         // Điện thoại: nút chính chiếm trọn hàng dưới cùng (gần ngón cái); máy tính: một hàng
         <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:items-center sm:justify-end">
