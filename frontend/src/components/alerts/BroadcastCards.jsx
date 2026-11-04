@@ -46,8 +46,55 @@ function Meta({ b, extra }) {
  * (tên xã), số hộ, kênh; lãnh đạo có quyền: "Duyệt bằng PIN" (nút chính) và "Trả lại" kèm lý do — trọn hàng trên điện thoại.
  * Người soạn / không có quyền thấy lý do vì sao chưa duyệt được. `unitName(code)` → tên xã.
  */
-export function PendingCard({ b, x, me, online, onApprove, unitName = (c) => c, fresh = false }) {
+export function PendingCard({ b, x, me, online, onApprove, unitName = (c) => c, fresh = false, compact = false }) {
   const names = (b.target_admin_codes || []).map(unitName);
+  // Máy tính ≥ 1280 px (bản vẽ khung D): cột phải 380 px — thẻ gọn: mã · mức, tiêu đề, "Vùng nhận: tên xã · hộ · kênh",
+  // "chờ … · soạn: …", hai nút cao 44 px (Duyệt bằng PIN màu chính, Trả lại). Nội dung tin đọc đủ trong hộp duyệt
+  if (compact) {
+    const long = x.waitedMin >= LONG_WAIT_MIN;
+    return (
+      <article
+        className={clsx('min-w-0 rounded-[14px] border border-line border-l-4 bg-panel p-4', risk(SEVERITY_LEVEL[b.severity]).edge, long && 'ring-2 ring-danger', fresh && 'motion-safe:animate-enter')}
+        aria-label={`${b.code} — ${LEVEL[b.severity]?.label}, chờ duyệt ${waitText(x.waitedMin)}`}
+      >
+        <Head b={b} status={false} pending />
+        <h3 className="mt-1 text-[15px] font-semibold leading-snug text-ink [overflow-wrap:anywhere]">{b.title}</h3>
+        <p className="mt-1 text-[13px] text-ink-2 [overflow-wrap:anywhere]">
+          Vùng nhận: <b className="text-ink">{names.length ? `${names.slice(0, 3).join(', ')}${names.length > 3 ? ` +${names.length - 3} xã` : ''}` : 'vùng vẽ trên bản đồ'}</b>
+          {' · '}{int(b.audience?.households)} hộ · {(b.channels || []).map((c) => CHANNEL_SHORT[c] || c).join(' · ')}
+        </p>
+        <p className={clsx('mt-0.5 text-[13px]', long ? 'font-semibold text-danger' : 'text-danger/90')}>
+          chờ {waitText(x.waitedMin)} · soạn: {b.created_by_name || 'hệ thống (máy đề xuất)'}
+        </p>
+        {b.can_approve ? (
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="btn-primary tap h-11 rounded-xl px-4 font-semibold"
+              onClick={() => onApprove(b, 'approve')}
+              disabled={!online}
+              title={!online ? OFFLINE : 'Đọc lại tin, ký duyệt bằng mã PIN — tin phát tới người dân ngay'}
+            >
+              Duyệt bằng PIN
+            </button>
+            <button
+              type="button"
+              className="btn-secondary tap h-11 rounded-xl px-4"
+              onClick={() => onApprove(b, 'reject')}
+              disabled={!online}
+              title={!online ? OFFLINE : 'Chưa đồng ý — trả lại người soạn kèm lý do để sửa'}
+            >
+              Trả lại
+            </button>
+          </div>
+        ) : (
+          <p className="mt-2 text-xs italic text-muted">
+            {b.created_by === me ? 'Lệnh bạn soạn — chờ lãnh đạo khác duyệt (người soạn không tự duyệt)' : 'Chờ lãnh đạo Ban Chỉ huy ký duyệt'}
+          </p>
+        )}
+      </article>
+    );
+  }
   return (
     <article
       className={clsx('card min-w-0 border-l-4 p-3', risk(SEVERITY_LEVEL[b.severity]).edge, x.waitedMin >= LONG_WAIT_MIN && 'ring-2 ring-danger', fresh && 'motion-safe:animate-enter')}
