@@ -58,7 +58,8 @@ async function openPublic(page, [group, sub]) {
   if (await menu.isVisible()) await menu.click();
   const esc = group.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   await visible(page.getByRole('button', { name: new RegExp(`^${esc}( \\d.*)?$`) })).click();
-  if (sub) await visible(page.getByRole('button', { name: sub, exact: true })).click();
+  // Máy tính ≥ 1280 px (bản vẽ khung N5): Sơ tán + Đường dây nóng một màn — không có hàng trang con
+  if (sub && page.viewportSize().width < 1280) await visible(page.getByRole('button', { name: sub, exact: true })).click();
 }
 
 let failures = 0;
