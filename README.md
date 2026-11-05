@@ -315,6 +315,7 @@ backend/            API + worker (Python, FastAPI) — app/ (api/v1, rbac, servi
 frontend/           giao diện (React, Vite) — src/ (pages, components, api, rbac, app), nginx.conf + nginx/ (snippet),
                     scripts/compress.mjs (nén sẵn khi build), Dockerfile
 tests/e2e/          kiểm thử API qua HTTP (Node) — cần stack dev chạy với DEMO_MODE=true
+tests/du-lieu-gia-lap/  bộ tệp nhập giả lập + diễn tập trên CSDL trống (chỉ stack thử, xem README trong thư mục)
 tests/ui/           kiểm thử giao diện bằng trình duyệt thật (Playwright) — máy tính, máy tính bảng, điện thoại
 tests/load/         kiểm thử tải (k6)
 scripts/maintenance/  script bảo trì CSDL máy dev (có chặn production)

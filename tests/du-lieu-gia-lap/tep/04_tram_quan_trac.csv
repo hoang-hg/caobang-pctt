@@ -1,0 +1,22 @@
+﻿ma,ten,loai,song,don_vi,bao_dong_1,bao_dong_2,bao_dong_3,vi_do,kinh_do
+CB-WL-01,Trạm thủy văn Cao Bằng (sông Bằng Giang),muc_nuoc,Bằng Giang,m,180.0,181.0,182.0,22.668,106.257
+CB-WL-02,Trạm thủy văn Nà Phía (sông Hiến),muc_nuoc,Hiến,m,184.5,185.5,186.5,22.7,106.215
+CB-WL-03,Trạm thủy văn Bảo Lạc (sông Gâm),muc_nuoc,Gâm,m,212.0,214.0,216.0,22.952,105.668
+CB-WL-04,Trạm thủy văn Bản Giốc (sông Quây Sơn),muc_nuoc,Quây Sơn,m,337.0,338.0,339.0,22.853,106.716
+CB-WL-05,Trạm thủy văn Quảng Uyên (sông Bắc Vọng),muc_nuoc,Bắc Vọng,m,290.0,291.0,292.0,22.69,106.448
+CB-RN-01,Trạm đo mưa TP. Cao Bằng,luong_mua,,mm/h,,,,22.66,106.265
+CB-RN-02,Trạm đo mưa Nguyên Bình,luong_mua,,mm/h,,,,22.656,105.95
+CB-RN-03,Trạm đo mưa Phja Oắc (Tĩnh Túc),luong_mua,,mm/h,,,,22.61,105.88
+CB-RN-04,Trạm đo mưa Bảo Lạc,luong_mua,,mm/h,,,,22.948,105.68
+CB-RN-05,Trạm đo mưa Pác Miầu (Bảo Lâm),luong_mua,,mm/h,,,,22.86,105.48
+CB-RN-06,Trạm đo mưa Hà Quảng,luong_mua,,mm/h,,,,22.9,106.075
+CB-RN-07,Trạm đo mưa Trùng Khánh,luong_mua,,mm/h,,,,22.832,106.525
+CB-RN-08,Trạm đo mưa Đông Khê,luong_mua,,mm/h,,,,22.435,106.43
+CB-RN-09,Trạm đo mưa Hạ Lang,luong_mua,,mm/h,,,,22.708,106.672
+CB-RN-10,Trạm đo mưa Ca Thành,luong_mua,,mm/h,,,,22.688,105.645
+CB-TL-01,Cảm biến nghiêng đèo Khau Cốc Chà,do_nghieng,,độ,0.5,1.0,2.0,22.805,105.722
+CB-TL-02,Cảm biến nghiêng đèo Mẻ Pia,do_nghieng,,độ,0.5,1.0,2.0,22.87,105.845
+CB-TL-03,Cảm biến nghiêng taluy QL34 – Tĩnh Túc,do_nghieng,,độ,0.5,1.0,2.0,22.648,105.89
+CB-TL-04,Cảm biến nghiêng đèo Mã Phục (QL3),do_nghieng,,độ,0.5,1.0,2.0,22.77,106.285
+CB-SM-01,Độ ẩm đất sườn đồi Pác Miầu,do_am_dat,,%,38,43,48,22.868,105.47
+CB-SM-02,Độ ẩm đất Phja Oắc – Phja Đén,do_am_dat,,%,38,43,48,22.598,105.845

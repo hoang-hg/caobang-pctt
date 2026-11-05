@@ -1,0 +1,60 @@
+﻿ma,ten,loai,suc_chua,dang_o,sdt_lien_he,vi_do,kinh_do,ma_xa
+CB-DST-001,Trường THPT Chuyên Cao Bằng,truong_hoc,600,0,0999 100 601,22.67801,106.13048,CB-THUCPHAN
+CB-DST-002,Nhà Văn hóa tổ 5 phường Thục Phán,nha_van_hoa,150,0,0999 100 602,22.67094,106.16683,CB-THUCPHAN
+CB-DST-003,Trường THCS Hợp Giang,truong_hoc,400,0,0999 100 603,22.71148,106.22843,CB-NUNGTRICAO
+CB-DST-004,Trung tâm Văn hóa tỉnh,nha_van_hoa,800,0,0999 100 604,22.66439,106.26876,CB-NUNGTRICAO
+CB-DST-005,Trường Cao đẳng Sư phạm Cao Bằng,truong_hoc,700,0,0999 100 605,22.62993,106.22977,CB-TANGIANG
+CB-DST-006,Trường THPT Hòa An,truong_hoc,500,0,0999 100 606,22.7163,106.11028,CB-HOAAN
+CB-DST-007,Nhà Văn hóa xã Bạch Đằng,nha_van_hoa,200,0,0999 100 607,22.63682,106.19838,CB-BACHDANG
+CB-DST-008,Trường PTDTNT Nguyên Bình,truong_hoc,450,0,0999 100 608,22.67328,105.96089,CB-NGUYENBINH
+CB-DST-009,Trường THCS Tĩnh Túc,truong_hoc,300,0,0999 100 609,22.63226,105.86595,CB-TINHTUC
+CB-DST-010,Nhà Văn hóa xã Phan Thanh,nha_van_hoa,150,0,0999 100 610,22.6092,105.75852,CB-PHANTHANH
+CB-DST-011,Trường THPT Bảo Lạc,truong_hoc,500,0,0999 100 611,22.97413,105.5699,CB-BAOLAC
+CB-DST-012,Trụ sở UBND xã Khánh Xuân,tru_so,120,0,0999 100 612,22.96215,105.81775,CB-KHANHXUAN
+CB-DST-013,Trường PTDTNT Bảo Lâm,truong_hoc,450,0,0999 100 613,22.79921,105.55137,CB-BAOLAM
+CB-DST-014,Nhà Văn hóa xã Nam Quang,nha_van_hoa,150,0,0999 100 614,22.9092,105.43849,CB-NAMQUANG
+CB-DST-015,Trường THCS Lý Bôn,truong_hoc,250,0,0999 100 615,22.89276,105.57113,CB-LYBON
+CB-DST-016,Trường THPT Trùng Khánh,truong_hoc,500,0,0999 100 616,22.82548,106.49358,CB-TRUNGKHANH
+CB-DST-017,Trường THPT Quảng Uyên,truong_hoc,450,0,0999 100 617,22.72365,106.39951,CB-QUANGUYEN
+CB-DST-018,Trường THPT Phục Hòa,truong_hoc,400,0,0999 100 618,22.55096,106.48995,CB-PHUCHOA
+CB-DST-019,Doanh trại Đồn BP Tà Lùng,doanh_trai,200,0,0999 100 619,22.57676,106.46451,CB-PHUCHOA
+CB-DST-020,Trường THPT Thạch An,truong_hoc,400,0,0999 100 620,22.39458,106.42892,CB-DONGKHE
+CB-DST-021,Trường THPT Hà Quảng,truong_hoc,400,0,0999 100 621,22.98935,106.03652,CB-TRUONGHA
+CB-DST-022,Trường THPT Hạ Lang,truong_hoc,350,0,0999 100 622,22.62014,106.69557,CB-HALANG
+CB-DST-023,Nhà Văn hóa xã Ca Thành,nha_van_hoa,120,0,0999 100 623,22.75136,105.85924,CB-CATHANH
+CB-DST-024,Trường THCS Yên Thổ,truong_hoc,200,0,0999 100 624,22.7746,105.48507,CB-YENTHO
+CB-DST-025,Nhà văn hóa xã Nam Tuấn (giả định),nha_van_hoa,300,0,0999 100 625,22.77528,106.07511,CB-NAMTUAN
+CB-DST-026,Nhà văn hóa xã Nguyễn Huệ (giả định),nha_van_hoa,100,0,0999 100 626,22.72581,106.31539,CB-NGUYENHUE
+CB-DST-027,Nhà văn hóa xã Minh Khai (giả định),nha_van_hoa,150,0,0999 100 627,22.54023,106.20714,CB-MINHKHAI
+CB-DST-028,Nhà văn hóa xã Canh Tân (giả định),nha_van_hoa,200,0,0999 100 628,22.52595,106.26685,CB-CANHTAN
+CB-DST-029,Nhà văn hóa xã Kim Đồng (giả định),nha_van_hoa,250,0,0999 100 629,22.47372,106.32414,CB-KIMDONG
+CB-DST-030,Nhà văn hóa xã Thạch An (giả định),nha_van_hoa,300,0,0999 100 630,22.45626,106.39455,CB-THACHAN
+CB-DST-031,Nhà văn hóa xã Đức Long (giả định),nha_van_hoa,100,0,0999 100 631,22.44718,106.50171,CB-DUCLONG
+CB-DST-032,Nhà văn hóa xã Bế Văn Đàn (giả định),nha_van_hoa,200,0,0999 100 632,22.59814,106.50088,CB-BEVANDAN
+CB-DST-033,Nhà văn hóa xã Độc Lập (giả định),nha_van_hoa,300,0,0999 100 633,22.68342,106.54182,CB-DOCLAP
+CB-DST-034,Nhà văn hóa xã Hạnh Phúc (giả định),nha_van_hoa,350,0,0999 100 634,22.57499,106.43802,CB-HANHPHUC
+CB-DST-035,Nhà văn hóa xã Quang Hán (giả định),nha_van_hoa,100,0,0999 100 635,22.84124,106.25715,CB-QUANGHAN
+CB-DST-036,Nhà văn hóa xã Trà Lĩnh (giả định),nha_van_hoa,150,0,0999 100 636,22.78477,106.3354,CB-TRALINH
+CB-DST-037,Nhà văn hóa xã Quang Trung (giả định),nha_van_hoa,200,0,0999 100 637,22.80447,106.37298,CB-QUANGTRUNG
+CB-DST-038,Nhà văn hóa xã Đoài Dương (giả định),nha_van_hoa,300,0,0999 100 638,22.79587,106.59097,CB-DOAIDUONG
+CB-DST-039,Nhà văn hóa xã Đàm Thủy (giả định),nha_van_hoa,350,0,0999 100 639,22.80421,106.66211,CB-DAMTHUY
+CB-DST-040,Nhà văn hóa xã Đình Phong (giả định),nha_van_hoa,100,0,0999 100 640,22.89742,106.55484,CB-DINHPHONG
+CB-DST-041,Nhà văn hóa xã Lý Quốc (giả định),nha_van_hoa,200,0,0999 100 641,22.78003,106.8014,CB-LYQUOC
+CB-DST-042,Nhà văn hóa xã Vinh Quý (giả định),nha_van_hoa,250,0,0999 100 642,22.74733,106.59118,CB-VINHQUY
+CB-DST-043,Nhà văn hóa xã Quang Long (giả định),nha_van_hoa,300,0,0999 100 643,22.74438,106.64867,CB-QUANGLONG
+CB-DST-044,Nhà văn hóa xã Thông Nông (giả định),nha_van_hoa,350,0,0999 100 644,22.81867,105.9267,CB-THONGNONG
+CB-DST-045,Nhà văn hóa xã Cần Yên (giả định),nha_van_hoa,100,0,0999 100 645,22.89457,105.88612,CB-CANYEN
+CB-DST-046,Nhà văn hóa xã Thanh Long (giả định),nha_van_hoa,150,0,0999 100 646,22.74701,105.95797,CB-THANHLONG
+CB-DST-047,Nhà văn hóa xã Hà Quảng (giả định),nha_van_hoa,200,0,0999 100 647,22.82841,106.15973,CB-HAQUANG
+CB-DST-048,Nhà văn hóa xã Lũng Nặm (giả định),nha_van_hoa,300,0,0999 100 648,22.93051,106.14943,CB-LUNGNAM
+CB-DST-049,Nhà văn hóa xã Tổng Cọt (giả định),nha_van_hoa,350,0,0999 100 649,22.95576,106.2167,CB-TONGCOT
+CB-DST-050,Nhà văn hóa xã Minh Tâm (giả định),nha_van_hoa,200,0,0999 100 650,22.68779,106.08155,CB-MINHTAM
+CB-DST-051,Nhà văn hóa xã Thành Công (giả định),nha_van_hoa,300,0,0999 100 651,22.52044,105.879,CB-THANHCONG
+CB-DST-052,Nhà văn hóa xã Tam Kim (giả định),nha_van_hoa,350,0,0999 100 652,22.63124,106.04322,CB-TAMKIM
+CB-DST-053,Nhà văn hóa xã Hưng Đạo (giả định),nha_van_hoa,200,0,0999 100 653,22.85929,105.7103,CB-HUNGDAO
+CB-DST-054,Nhà văn hóa xã Cốc Pàng (giả định),nha_van_hoa,250,0,0999 100 654,23.08722,105.55023,CB-COCPANG
+CB-DST-055,Nhà văn hóa xã Cô Ba (giả định),nha_van_hoa,300,0,0999 100 655,23.01058,105.75657,CB-COBA
+CB-DST-056,Nhà văn hóa xã Xuân Trường (giả định),nha_van_hoa,100,0,0999 100 656,22.87045,105.83782,CB-XUANTRUONG
+CB-DST-057,Nhà văn hóa xã Huy Giáp (giả định),nha_van_hoa,150,0,0999 100 657,22.75446,105.78594,CB-HUYGIAP
+CB-DST-058,Nhà văn hóa xã Quảng Lâm (giả định),nha_van_hoa,350,0,0999 100 658,22.87095,105.37819,CB-QUANGLAM
+CB-DST-059,Nhà văn hóa xã Sơn Lộ (giả định),nha_van_hoa,150,0,0999 100 659,22.66956,105.59369,CB-SONLO
