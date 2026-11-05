@@ -86,7 +86,10 @@ export default function KpiStrip({
   }, [k]);
   const wide = gridW >= WIDE;
   const cols = stacked ? 2 : wide ? 6 : smUp ? 3 : 2;
-  const roomy = gridW > 0 && (gridW - (cols - 1) * 10) / cols >= ROOMY;
+  const tileW = gridW > 0 ? (gridW - (cols - 1) * 10) / cols : 0;
+  const roomy = tileW >= ROOMY;
+  // Chữ cạnh mũi tên xu hướng ("0,20 m/giờ") cần ô đủ rộng: 6 ô một hàng ở màn 1920 px mà hiện thì tiêu đề còn "Mực n…"
+  const trendText = xl2 && tileW >= 230;
   const fit = (short, full) => (roomy ? full : short);
   if (!k && kState.error) return <ErrorState onRetry={kState.refetch}>Không tải được chỉ số tổng quan</ErrorState>;
   if (!k) {
@@ -175,7 +178,7 @@ export default function KpiStrip({
             title="Mực nước"
             level={river.level}
             alert={river.level === 3}
-            trend={lead && <TrendTag {...trendProps(lead.trend, shortName(lead.s))} textClass="hidden 2xl:inline" />}
+            trend={lead && <TrendTag {...trendProps(lead.trend, shortName(lead.s))} textClass={trendText ? undefined : 'hidden'} />}
             value={river.rows.length ? `${river.above}/${river.rows.length}` : '–'}
             unit={river.rows.length ? fit('báo động', 'trạm báo động') : undefined}
             onClick={river.rows.length && onRiver ? () => onRiver(riverTarget.id) : undefined}

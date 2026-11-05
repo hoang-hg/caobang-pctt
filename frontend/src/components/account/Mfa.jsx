@@ -101,9 +101,11 @@ export function RecoveryCodes({ codes, onDone, doneLabel = 'Hoàn tất' }) {
 /**
  * Cài đặt xác thực 2 lớp: tạo mã QR → quét bằng ứng dụng → nhập mã đầu tiên → lưu mã khôi phục.
  * `challenge`: phiếu từ /auth/login khi vai trò bắt buộc (chưa đăng nhập); bỏ trống = tài khoản đang đăng nhập tự bật.
- * `onDone({ token, user })` sau khi người dùng xác nhận đã lưu mã khôi phục.
+ * `onDone({ token, user })` sau khi người dùng xác nhận đã lưu mã khôi phục. Tài khoản đang đăng nhập dùng `onEnabled` thay
+ * thế: bật xong phiên cũ bị thu hồi NGAY, nên phải nhận phiên mới trước khi hiện mã — chờ tới lúc người dùng chép xong thì
+ * lần tự làm mới số liệu đầu tiên đã văng ra màn đăng nhập, mất bộ mã chỉ hiện một lần.
  */
-export function MfaSetup({ challenge = null, onDone }) {
+export function MfaSetup({ challenge = null, onDone, onEnabled }) {
   const [setup, setSetup] = useState(null);
   const [code, setCode] = useState('');
   const [result, setResult] = useState(null);
@@ -150,7 +152,7 @@ export function MfaSetup({ challenge = null, onDone }) {
         </>
       ) : (
         <form className="flex flex-col gap-3"
-          onSubmit={(e) => { e.preventDefault(); call('/auth/mfa/enable', { challenge, code }, setResult); }}>
+          onSubmit={(e) => { e.preventDefault(); call('/auth/mfa/enable', { challenge, code }, onEnabled || setResult); }}>
           <div className="flex flex-wrap items-center gap-3.5">
             <img src={setup.qr} alt="Mã QR cài đặt xác thực 2 lớp" className="mx-auto h-40 w-40 shrink-0 rounded-xl border border-line bg-white p-1" />
             <ol className="min-w-[12rem] flex-1 list-decimal space-y-1 pl-5 leading-relaxed text-ink-2">
@@ -184,6 +186,7 @@ export default function MfaModal({ onClose }) {
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
   const [codes, setCodes] = useState(null);
+  const [justEnabled, setJustEnabled] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
 
@@ -205,18 +208,28 @@ export default function MfaModal({ onClose }) {
   };
 
   let body;
-  if (!mfa.enabled) {
+  if (codes) {
     body = (
-      <MfaSetup
-        onDone={(session) => {
-          setAuth(session);
-          toast({ tone: 'good', title: 'Đã bật xác thực 2 lớp', body: 'Các phiên đăng nhập trên thiết bị khác đã bị đăng xuất' });
+      <RecoveryCodes
+        codes={codes}
+        doneLabel={justEnabled ? 'Hoàn tất' : 'Đóng'}
+        onDone={() => {
+          if (justEnabled) toast({ tone: 'good', title: 'Đã bật xác thực 2 lớp', body: 'Các phiên đăng nhập trên thiết bị khác đã bị đăng xuất' });
+          refreshMe();
           onClose();
         }}
       />
     );
-  } else if (codes) {
-    body = <RecoveryCodes codes={codes} doneLabel="Đóng" onDone={() => { refreshMe(); onClose(); }} />;
+  } else if (!mfa.enabled) {
+    body = (
+      <MfaSetup
+        onEnabled={({ token, user, recovery_codes: list }) => {
+          setAuth({ token, user });
+          setJustEnabled(true);
+          setCodes(list);
+        }}
+      />
+    );
   } else {
     body = (
       <div className="flex flex-col gap-4 text-sm">
@@ -257,7 +270,14 @@ export default function MfaModal({ onClose }) {
     );
   }
   return (
-    <Modal open size="md" onClose={onClose} title="Xác thực 2 lớp" subtitle={auth?.user?.username}>
+    // Đang hiện mã: Esc, bấm nền, ✕ không đóng — bộ mã không xem lại được mà bộ cũ (nếu có) đã hết hiệu lực
+    <Modal
+      open
+      size="md"
+      onClose={codes ? () => setError('Mã chỉ hiện một lần. Lưu lại rồi đánh dấu "Tôi đã lưu" để đóng.') : onClose}
+      title="Xác thực 2 lớp"
+      subtitle={auth?.user?.username}
+    >
       {body}
       {error && <div className="mt-2 text-sm text-danger">{error}</div>}
     </Modal>

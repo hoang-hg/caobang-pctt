@@ -4,6 +4,33 @@ import { FileDown, FileSpreadsheet, Loader2, Search, SlidersHorizontal, X } from
 
 const CTRL = 'tap min-h-[40px] text-xs sm:text-sm';
 
+/** Dòng "Đang hiện N/M — lọc: …" khi đang lọc hoặc tìm: bỏ được từng điều kiện. */
+export function FilterChips({ fields, filters, q, shown, total, noun, onFilter, onClear }) {
+  const active = fields.filter((f) => filters[f.key]);
+  if (!active.length && !q) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 text-xs no-print" aria-live="polite">
+      <span className="text-muted">Đang hiện <b className="text-ink">{shown}</b>/{total} {noun}{active.length ? ' — lọc:' : ''}</span>
+      {active.map((f) => (
+        <button
+          key={f.key}
+          type="button"
+          onClick={() => onFilter(f.key, '')}
+          className="tap inline-flex min-h-[28px] items-center gap-1 rounded-full border border-accent/40 bg-accent/10 px-2.5 font-semibold text-accent hover:bg-accent/15"
+          aria-label={`Bỏ lọc ${f.label}: ${f.options.find(([v]) => v === filters[f.key])?.[1]}`}
+        >
+          {f.options.find(([v]) => v === filters[f.key])?.[1]} <X size={12} aria-hidden="true" />
+        </button>
+      ))}
+      {(active.length > 1 || (active.length > 0 && q)) && (
+        <button type="button" onClick={onClear} className="tap min-h-[28px] px-1.5 font-semibold text-muted underline-offset-2 hover:text-ink hover:underline">
+          Bỏ lọc tất cả
+        </button>
+      )}
+    </div>
+  );
+}
+
 /**
  * Thanh tìm kiếm · lọc · xếp · xuất dùng chung (Vật tư & Lực lượng, Điều hành cứu hộ…). `fields`: [{ key, label, all,
  * options: [[giá trị, nhãn]] }], `counts[key][giá trị]` = số dòng của từng lựa chọn; `sorts`: [[giá trị, nhãn]]; `children`:
@@ -13,10 +40,11 @@ const CTRL = 'tap min-h-[40px] text-xs sm:text-sm';
  * `sorts` rỗng (VD danh bạ): không có ô "Sắp xếp".
  * `inline` (máy tính ≥ 1280 px — bản vẽ desktop khung C): MỘT hàng không khung — ô tìm giãn, các ô lọc, cách xếp, `children`
  * (VD đổi cách xem) cao 44 px; không có Excel / PDF (trang để ở menu "Xuất"). `searchMin`: bề rộng tối thiểu ô tìm (px).
+ * `noChips`: trang tự đặt `FilterChips` chỗ khác (VD các ô lọc ở cột Bộ lọc, ô tìm hẹp — dòng này cần cả hàng).
  */
 export default function FilterToolbar({
   fields, sorts, placeholder, q, onSearch, filters, counts, onFilter, onClear, sort, onSort, shown, total, noun, onExcel, onPdf, exporting,
-  children, inline = false, searchMin = 208,
+  children, inline = false, searchMin = 208, noChips = false,
 }) {
   const [open, setOpen] = useState(false);
   const active = fields.filter((f) => filters[f.key]);
@@ -26,6 +54,7 @@ export default function FilterToolbar({
       <input
         className={clsx('input pr-9', inline ? 'tap h-11 rounded-xl bg-panel pl-10 text-sm' : clsx('pl-8', CTRL))}
         placeholder={placeholder}
+        title={placeholder}
         value={q}
         onChange={(e) => onSearch(e.target.value)}
         aria-label="Tìm trong danh sách"
@@ -57,27 +86,7 @@ export default function FilterToolbar({
       {sorts.map(([value, label]) => <option key={value} value={value}>Xếp: {label}</option>)}
     </select>
   );
-  const chips = (active.length > 0 || q) && (
-    <div className="flex flex-wrap items-center gap-1.5 text-xs" aria-live="polite">
-      <span className="text-muted">Đang hiện <b className="text-ink">{shown}</b>/{total} {noun}{active.length ? ' — lọc:' : ''}</span>
-      {active.map((f) => (
-        <button
-          key={f.key}
-          type="button"
-          onClick={() => onFilter(f.key, '')}
-          className="tap inline-flex min-h-[28px] items-center gap-1 rounded-full border border-accent/40 bg-accent/10 px-2.5 font-semibold text-accent hover:bg-accent/15"
-          aria-label={`Bỏ lọc ${f.label}: ${f.options.find(([v]) => v === filters[f.key])?.[1]}`}
-        >
-          {f.options.find(([v]) => v === filters[f.key])?.[1]} <X size={12} aria-hidden="true" />
-        </button>
-      ))}
-      {(active.length > 1 || (active.length && q)) && (
-        <button type="button" onClick={onClear} className="tap min-h-[28px] px-1.5 font-semibold text-muted underline-offset-2 hover:text-ink hover:underline">
-          Bỏ lọc tất cả
-        </button>
-      )}
-    </div>
-  );
+  const chips = !noChips && <FilterChips fields={fields} filters={filters} q={q} shown={shown} total={total} noun={noun} onFilter={onFilter} onClear={onClear} />;
   if (inline) {
     return (
       <div className="flex flex-col gap-2 no-print">

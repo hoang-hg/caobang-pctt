@@ -27,7 +27,7 @@ import ResourceKpis from '../components/resources/ResourceKpis';
 import ResourceTodo from '../components/resources/ResourceTodo';
 import ExportMenu from '../components/common/ExportMenu';
 import FilterPanel from '../components/common/FilterPanel';
-import FilterToolbar from '../components/common/FilterToolbar';
+import FilterToolbar, { FilterChips } from '../components/common/FilterToolbar';
 import VehicleList, { FuelDepots, VehicleMap } from '../components/resources/VehicleList';
 import WarehouseList, { STOCK_NOTE } from '../components/resources/WarehouseList';
 import {
@@ -420,6 +420,7 @@ export default function Resources() {
           <div className="min-w-0 flex-1">
             <FilterToolbar
               inline
+              noChips
               searchMin={144}
               fields={[]}
               sorts={[]}
@@ -447,6 +448,7 @@ export default function Resources() {
         )}
       </div>
 
+      {filterCol && <FilterChips fields={FILTERS[tab]} filters={filters} q={q} shown={rows.length} total={query.data?.length || 0} noun={tabInfo.noun} onFilter={setFilter} onClear={clearAll} />}
       {!filterCol && <FilterToolbar
         fields={FILTERS[tab]}
         sorts={SORTS[tab]}
@@ -501,10 +503,11 @@ export default function Resources() {
           </Section>
         )}
         {tab === 'phuong_tien' ? (
-          // Bảng cần đủ rộng: bản đồ + nhiên liệu chỉ đứng cột phải từ 1536 px; nhỏ hơn thì nằm dưới danh sách (2 cột từ 768 px)
-          <div className="grid gap-3 2xl:grid-cols-[minmax(0,1fr)_400px]">
+          // Bảng cần đủ rộng (cột giữa đã nhường chỗ cho Bộ lọc, Việc cần làm): bản đồ + nhiên liệu chỉ đứng cột phải từ 1800 px;
+          // nhỏ hơn thì nằm dưới danh sách (2 cột từ 768 px)
+          <div className="grid gap-3 min-[1800px]:grid-cols-[minmax(0,1fr)_400px]">
             <div className="flex min-w-0 flex-col gap-2">{body}{pager}</div>
-            <div className="grid min-w-0 content-start gap-3 md:grid-cols-2 2xl:grid-cols-1">
+            <div className="grid min-w-0 content-start gap-3 md:grid-cols-2 min-[1800px]:grid-cols-1">
               <VehicleMap rows={rows} />
               <FuelDepots query={depotsQ} online={online} onEdit={setDepotEdit} />
             </div>

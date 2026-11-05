@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { useStore } from '../../app/store';
+import { useDialogRoom } from '../../utils/useDialogRoom';
 
 /**
  * Nhắc bật chuông SOS (bản vẽ desktop khung M1b): trình duyệt chặn âm thanh tới lần bấm đầu tiên → thẻ nổi giữa trên "Bấm để
  * bật chuông SOS". Bấm / gõ phím bất kỳ đâu là chuông mở (watchAudioUnlock — App.jsx) và thẻ mất ngay, không chờ âm thanh sẵn
  * sàng; thẻ không chắn trang bên dưới (pointer-events-none, trừ nút "✕"): bấm trúng nút dưới thẻ vẫn ăn. Chỉ máy tính ≥ 1024 px (điện thoại đã có dòng nhắc ở thanh trạng thái), chỉ khi chuông đang bật, không khi
- * trình chiếu. Nút đóng cùng tên "Đóng thông báo" với các thẻ nổi khác.
+ * trình chiếu. Nút đóng cùng tên "Đóng thông báo" với các thẻ nổi khác. Có hộp thoại (VD mở thẳng phiếu từ liên kết) thì nhường
+ * chỗ: lần bấm đầu trong hộp đã mở chuông, không cần nhắc đè lên nội dung.
  */
 export default function BellReminder() {
   const soundOn = useStore((s) => s.soundOn);
@@ -15,6 +17,7 @@ export default function BellReminder() {
   const [hidden, setHidden] = useState(false);
   const closeRef = useRef(null);
   const showing = soundOn && !audioReady && !presentation && !hidden;
+  const dialog = useDialogRoom(showing);
   useEffect(() => {
     if (!showing) return undefined;
     // Nhấn trúng "✕" không ẩn ngay: nút phải còn đó tới lúc nhả chuột thì lần bấm mới trọn vẹn (onClick ẩn thẻ)
@@ -26,7 +29,7 @@ export default function BellReminder() {
       window.removeEventListener('keydown', hide, { capture: true });
     };
   }, [showing]);
-  if (!soundOn || audioReady || presentation || hidden) return null;
+  if (!showing || dialog) return null;
   return (
     <div
       role="status"
