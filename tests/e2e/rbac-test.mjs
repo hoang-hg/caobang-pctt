@@ -224,6 +224,9 @@ check('Không tự đổi vai trò của mình → 400', (await call('PUT', `/rb
 check('Cấp 1 nâng tài khoản lên Cấp 2', (await call('PUT', `/rbac/users/${sub.data.id}/assignment`, { role: 'admin_tinh', domain: '*' }, T.admin)).status === 200);
 check('Đã thành Cấp 2 → Cấp 2 khác không quản lý được nữa → 403',
   (await call('PATCH', `/rbac/users/${sub.data.id}`, { is_active: false }, T.tinh)).status === 403);
+for (const lockBody of [{ is_active: false }, { is_active: false, lock_reason: '  x ' }]) {
+  check('Khoá tài khoản không ghi lý do → 422', (await call('PATCH', `/rbac/users/${sub.data.id}`, lockBody, T.admin)).status === 422);
+}
 check('Cấp 1 khoá tài khoản, lý do ghi vào nhật ký', (await call('PATCH', `/rbac/users/${sub.data.id}`, { is_active: false, lock_reason: 'Kiểm thử mất máy' }, T.admin)).status === 200);
 check('Nhật ký thao tác có lý do khoá', ((await call('GET', '/rbac/audit', null, T.admin)).data || []).some((a) => a.details?.lock_reason === 'Kiểm thử mất máy'));
 check('Tài khoản bị khoá không đăng nhập được → 403',

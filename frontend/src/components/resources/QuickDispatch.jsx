@@ -16,7 +16,7 @@ export default function QuickDispatch({ force, onClose }) {
   const sosQ = useAreaQuery('sos', '/sos');
   const [ticket, setTicket] = useState(null);
   const [pickedId, setPickedId] = useState(null);
-  if (ticket) return <DispatchModal ticket={ticket} presetForceId={force.id} onClose={onClose} />;
+  if (ticket) return <DispatchModal ticket={ticket} presetForceId={force.id} presetForce={force} onClose={onClose} />;
   const open = (sosQ.data || []).filter((t) => t.status === 'moi' || t.status === 'dieu_phoi');
   const picked = open.find((t) => t.id === pickedId) || open[0];
   return (

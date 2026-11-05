@@ -30,7 +30,7 @@ const label = 'mb-1.5 text-xs font-bold text-ink-2';
  * Sau khi phát: quãng đường, giờ dự kiến tới, đường đi có an toàn không — nói bằng câu; nút "Gọi trưởng nhóm", "Sao chép lệnh
  * gửi Zalo", link nhiệm vụ. Lỗi hiện ngay dưới ô; bấm "Tiếp" / "Phát lệnh" khi còn thiếu → hiện lỗi, đưa con trỏ tới ô lỗi.
  */
-export default function DispatchModal({ ticket, presetForceId, onClose }) {
+export default function DispatchModal({ ticket, presetForceId, presetForce, onClose }) {
   const qc = useQueryClient();
   const toast = useStore((s) => s.toast);
   const allowed = usePermission('dispatch', 'create', ticket?.admin_code);
@@ -60,6 +60,19 @@ export default function DispatchModal({ ticket, presetForceId, onClose }) {
     enabled: !!ticket && allowed,
     retry: 1,
   });
+
+  // Điều động nhanh từ một đội (`presetForce`): đội ngoài bán kính tìm vẫn điều được — người bấm đã chủ động chọn đội này, /dispatch
+  // chỉ chặn đội hết người. Đội đó đứng đầu danh sách, ghi rõ khoảng cách để so với đội gần hơn bên dưới.
+  const outsideForce = match && presetForce && presetForce.personnel_ready > 0 && presetForce.status === 'san_sang'
+    && !match.forces.some((f) => f.id === presetForce.id)
+    ? {
+        ...presetForce,
+        skill_match: [],
+        chosen: true,
+        distance_km: presetForce.lat != null && ticket?.lat != null ? Math.round(distanceKm(presetForce.lat, presetForce.lon, ticket.lat, ticket.lon) * 10) / 10 : null,
+      }
+    : null;
+  const forces = outsideForce ? [outsideForce, ...match.forces] : match?.forces || [];
 
   useEffect(() => {
     if (!match) return;
@@ -105,8 +118,8 @@ export default function DispatchModal({ ticket, presetForceId, onClose }) {
 
   if (!ticket) return null;
   const pr = PRIORITY[ticket.priority] || PRIORITY[2];
-  const presetMissing = presetForceId && match && !match.forces.some((f) => f.id === presetForceId);
-  const force = match?.forces.find((f) => f.id === forceId);
+  const presetMissing = presetForceId && match && !forces.some((f) => f.id === presetForceId);
+  const force = forces.find((f) => f.id === forceId);
   const personnel = Number(personnelText);
   const errors = {
     force: !force ? 'Chọn một đội' : null,
@@ -317,7 +330,8 @@ export default function DispatchModal({ ticket, presetForceId, onClose }) {
           ) : step === 0 ? (
             <>
               <div className={label}>Đội sẵn sàng gần nhất <span className="font-normal text-muted">(trong bán kính {match.radius_km} km)</span></div>
-              {presetMissing && <p className="mb-1 text-xs text-warn">Đội được kéo thả không còn người sẵn sàng trong bán kính — chọn đội khác.</p>}
+              {presetMissing && <p className="mb-1 text-xs text-warn">Đội đã chọn hiện không còn người sẵn sàng hoặc ngoài bán kính tìm — chọn đội khác.</p>}
+              {outsideForce && <p className="mb-1 text-[13px] text-ink-2">{outsideForce.name} ở ngoài bán kính tìm — vẫn điều được; các đội gần hơn ở bên dưới để so sánh.</p>}
               <div
                 ref={refs.force}
                 tabIndex={-1}
@@ -327,7 +341,7 @@ export default function DispatchModal({ ticket, presetForceId, onClose }) {
                 aria-describedby="loi-don-vi"
                 className={clsx('flex flex-col gap-2 rounded-xl outline-none', err('force') && 'ring-1 ring-danger')}
               >
-                {match.forces.filter((f, i) => allForces || i < 3 || f.id === forceId).map((f, i) => (
+                {forces.filter((f, i) => allForces || i < 3 || f.id === forceId).map((f) => (
                   <label
                     key={f.id}
                     className={clsx(
@@ -339,7 +353,8 @@ export default function DispatchModal({ ticket, presetForceId, onClose }) {
                     <span className="min-w-0 flex-1">
                       <span className="flex flex-wrap items-center gap-1.5 text-[15px] font-semibold leading-snug">
                         {f.name}
-                        {i === 0 && <span className="chip bg-good/15 py-0 text-xs font-semibold text-good">Gợi ý</span>}
+                        {f.chosen && <span className="chip bg-accent/10 py-0 text-xs font-semibold text-accent">Đội bạn chọn</span>}
+                        {f.id === match.forces[0]?.id && <span className="chip bg-good/15 py-0 text-xs font-semibold text-good">Gợi ý</span>}
                       </span>
                       {/* Gợi ý viết thành câu: loại lực lượng · kỹ năng phù hợp · bao nhiêu người sẵn sàng */}
                       <span className="block text-[13px] text-ink-2">
@@ -348,19 +363,19 @@ export default function DispatchModal({ ticket, presetForceId, onClose }) {
                       </span>
                     </span>
                     <span className="shrink-0 text-right">
-                      <b className="num block">{f.distance_km} km</b>
+                      <b className="num block">{f.distance_km != null ? `${f.distance_km} km` : '–'}</b>
                       <span className="text-xs text-muted">cách phiếu</span>
                     </span>
-                    <a href={`tel:${f.contact_phone.replace(/\s/g, '')}`} className="tap-sq flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-accent hover:bg-accent/10" title={`Gọi ${f.commander}`} aria-label={`Gọi ${f.commander}`} onClick={(e) => e.stopPropagation()}>
+                    {f.contact_phone && (<a href={`tel:${f.contact_phone.replace(/\s/g, '')}`} className="tap-sq flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-accent hover:bg-accent/10" title={`Gọi ${f.commander}`} aria-label={`Gọi ${f.commander}`} onClick={(e) => e.stopPropagation()}>
                       <Phone size={16} aria-hidden="true" />
-                    </a>
+                    </a>)}
                   </label>
                 ))}
-                {!match.forces.length && <p className="text-sm text-danger">Không còn đội sẵn sàng trong bán kính tìm.</p>}
+                {!forces.length && <p className="text-sm text-danger">Không còn đội sẵn sàng trong bán kính tìm.</p>}
                 {/* 3 đội gần nhất trước (vừa một màn hình máy tính — bản vẽ C2); bấm để xem các đội còn lại */}
-                {!allForces && match.forces.length > 3 && (
+                {!allForces && forces.length > 3 && (
                   <button type="button" className={clsx('btn-ghost self-start px-2 text-sm text-accent', touchCls)} onClick={() => setAllForces(true)}>
-                    Xem thêm {match.forces.filter((f, i) => i >= 3 && f.id !== forceId).length} đội <ChevronRight size={15} aria-hidden="true" />
+                    Xem thêm {forces.filter((f, i) => i >= 3 && f.id !== forceId).length} đội <ChevronRight size={15} aria-hidden="true" />
                   </button>
                 )}
               </div>
