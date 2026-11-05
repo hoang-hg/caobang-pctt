@@ -245,13 +245,16 @@ export default function TicketTracker({ initialCode = '', initialPhone = '', onQ
             <Search size={30} />
           </div>
           <div className="font-bold text-ink text-base sm:text-lg">
-            Không tìm thấy thông tin phù hợp
+            Không thể hoàn tất tra cứu
           </div>
           <p className="text-xs sm:text-sm text-muted mt-1.5 leading-relaxed max-w-md">
             Không tìm thấy phiếu <b className="text-ink font-mono">{activeQuery.code}</b> khớp với số điện thoại đã nhập. Vui lòng kiểm tra lại mã phiếu và số điện thoại bạn dùng khi gửi
             (phản ánh không để lại số điện thoại: nhập đầy đủ mã tra cứu dạng PA-1017-KXMPQR).
           </p>
-          <div className="mt-5 p-3.5 rounded-xl bg-panel2 border border-line text-left text-xs space-y-1.5 w-full">
+          <p className="mt-4 w-full rounded-[14px] border border-dashed border-line p-3 text-[13px] leading-normal text-ink-2">
+            Mã sai và số điện thoại sai trả <b>cùng một thông báo</b> để không lộ phiếu của người khác. Tra quá nhiều lần bị tạm chặn.
+          </p>
+          <div className="mt-3 p-3.5 rounded-xl bg-panel2 border border-line text-left text-xs space-y-1.5 w-full">
             <div className="font-semibold text-ink flex items-center gap-1.5">
               <PhoneCall size={14} className="text-danger" />
               <span>Nếu đang trong tình huống nguy hiểm khẩn cấp:</span>

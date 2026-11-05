@@ -35,11 +35,15 @@ export default function NetworkBanner() {
 
   if (!online || savedAt) {
     return (
-      <div role="status" className="border-b border-warn/40 bg-warn/15 px-3 py-2 text-center text-xs text-ink sm:text-sm">
-        <CloudOff size={15} className="-mt-0.5 mr-1.5 inline text-warn" />
-        <b>{online ? 'Mạng chậm hoặc máy chủ chưa phản hồi' : 'Mất kết nối mạng'}</b> — đang hiển thị dữ liệu{' '}
-        {savedAt ? `đã lưu lúc ${dateTime(savedAt)}` : 'có thể chưa cập nhật'}. Khẩn cấp gọi{' '}
-        <a href="tel:112" className="font-bold text-danger">112</a>.
+      <div role="status" className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 border-b border-warn/40 bg-warn/15 px-3 py-2 text-center text-xs text-ink sm:text-sm">
+        <span>
+          <CloudOff size={15} className="-mt-0.5 mr-1.5 inline text-warn" />
+          <b>{online ? 'Mạng chậm hoặc máy chủ chưa phản hồi' : 'Mất kết nối mạng'}</b> — đang hiển thị dữ liệu{' '}
+          {savedAt ? `đã lưu lúc ${dateTime(savedAt)}` : 'có thể chưa cập nhật'}. Khẩn cấp gọi{' '}
+          <a href="tel:112" className="font-bold text-danger">112</a>.
+        </span>
+        <a href="/ban-nhe" className="touch-hit font-semibold text-accent hover:underline">Mở bản nhẹ (dưới 50 KB)</a>
+        <button type="button" className="btn-secondary tap h-8 rounded-lg px-3 text-xs" onClick={() => window.location.reload()}>Thử lại</button>
       </div>
     );
   }
