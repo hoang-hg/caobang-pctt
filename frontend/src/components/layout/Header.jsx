@@ -26,7 +26,7 @@ function Clock() {
     return () => clearInterval(id);
   }, []);
   return (
-    <div className="hidden border-l border-line/60 pl-2 text-right leading-tight 2xl:block 2xl:tall:hidden">
+    <div className="hidden border-l border-line/60 pl-2 text-right leading-tight min-[1900px]:block min-[1900px]:tall:hidden">
       <div className="num text-sm font-semibold text-ink">{now.toLocaleTimeString('vi-VN')}</div>
       <div className="text-[11px] text-muted">{now.toLocaleDateString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })}</div>
     </div>
@@ -81,7 +81,7 @@ export default function Header() {
 
       {/* Tìm kiếm toàn năng: từ 768 px là ô tìm; điện thoại là nút kính lúp (mở hộp tìm toàn màn) đứng cạnh cụm nút bên phải —
           trước đây điện thoại không tìm được gì */}
-      <div className="ml-auto min-w-0 flex-none md:ml-0 md:max-w-sm md:flex-1 lg:w-40 lg:flex-none 2xl:w-72">
+      <div className="ml-auto min-w-0 flex-none md:ml-0 md:max-w-sm md:flex-1 lg:w-40 lg:flex-none min-[2200px]:w-72">
         <OmniSearch />
       </div>
 

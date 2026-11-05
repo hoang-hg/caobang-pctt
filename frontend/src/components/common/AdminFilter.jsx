@@ -125,7 +125,7 @@ export default function AdminFilter() {
         ref={trigger}
         type="button"
         className={clsx(
-          'btn-ghost touch-hit min-w-0 max-w-full gap-1.5 px-2.5 lg:max-w-[18rem] 2xl:max-w-[22rem]',
+          'btn-ghost touch-hit min-w-0 max-w-full gap-1.5 px-2.5 lg:max-w-[18rem] min-[1900px]:max-w-[22rem]',
           filtered && 'border-accent bg-accent/10 text-accent',
         )}
         onClick={() => setOpen((o) => !o)}
@@ -135,10 +135,10 @@ export default function AdminFilter() {
         aria-expanded={open}
       >
         <MapPin size={15} className="shrink-0" aria-hidden="true" />
-        <span className="truncate 2xl:hidden">{short}</span>
-        {/* Nhãn gọn ("Toàn tỉnh", tên xã bỏ chữ "Xã") tới 1535 px như bản vẽ desktop — nhường chỗ cho menu ngang; từ 1536 px
-            đủ chỗ cho "Đang xem: Toàn tỉnh Cao Bằng" */}
-        <span className="hidden truncate 2xl:inline"><span className="font-normal text-muted">Đang xem: </span>{label}</span>
+        <span className="truncate min-[1900px]:hidden">{short}</span>
+        {/* Nhãn gọn ("Toàn tỉnh", tên xã bỏ chữ "Xã") tới 1899 px như bản vẽ desktop — nhường chỗ cho menu ngang (1536 px mà
+            hiện đủ thì menu chỉ còn "Tổng quan · Thêm"); từ 1900 px đủ chỗ cho "Đang xem: Toàn tỉnh Cao Bằng" */}
+        <span className="hidden truncate min-[1900px]:inline"><span className="font-normal text-muted">Đang xem: </span>{label}</span>
         {/* Điện thoại: bỏ mũi tên — nhường chỗ cho tên xã (nút vẫn báo là mở hộp chọn qua aria-haspopup) */}
         <ChevronDown size={14} className="shrink-0 max-sm:hidden" aria-hidden="true" />
       </button>

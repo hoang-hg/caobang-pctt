@@ -13,6 +13,7 @@
 //                     máy thật) không dùng được → máy thật: tạo 1 tài khoản Cấp 3 riêng để thử, khoá sau khi thử; bước
 //                     ngoài quyền của Cấp 3 được ghi "bỏ qua"
 //   UI_SHOTS=thư_mục  lưu ảnh chụp màn hình bước lỗi (CI tải lên làm artifact)
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import { chromium, devices } from 'playwright';
 
@@ -3408,6 +3409,272 @@ async function guidePage(ctx) {
   });
 }
 
+// ================================================================ Màn rộng ≥ 1440 px — mọi bước khác chạy 1366 px nên không chạm tới
+// Chỉ xem, chạy được với UI_READONLY. Cột Bộ lọc của Vật tư (≥ 1440), menu ngang và bảng Phương tiện ở 1536 (màn 1920 chỉnh tỉ lệ 125%),
+// ô chỉ số một hàng ở 1920.
+const clippedControls = (page) => page.evaluate(() => {
+  const out = [];
+  for (const el of document.querySelectorAll('main button, main a')) {
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height || el.closest('.leaflet-container, [aria-hidden="true"], .sr-only')) continue;
+    for (let par = el.parentElement; par && par !== document.body; par = par.parentElement) {
+      const o = getComputedStyle(par).overflowX;
+      if (o === 'auto' || o === 'scroll') break;
+      if (o === 'hidden' || o === 'clip') {
+        const pr = par.getBoundingClientRect();
+        if (r.right > pr.right + 2 || r.left < pr.left - 2) out.push((el.innerText || el.getAttribute('aria-label') || el.tagName).trim().slice(0, 24));
+        break;
+      }
+    }
+  }
+  return [...new Set(out)].slice(0, 5);
+});
+const navItems = (page) => page.locator('header nav a').filter({ visible: true }).count();
+const noPageOverflow = async (page, where) => {
+  const px = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  if (px > 0) throw new Error(`${where}: trang tràn ngang ${px}px`);
+};
+
+async function wideFlows(ctx) {
+  const { page } = ctx;
+  await loginAs(page, STAFF);
+
+  await step(ctx, 'Vật tư 1440: cột Bộ lọc — số cạnh nút = số dòng sau khi lọc, có dòng "Đang hiện", bỏ từng điều kiện, tìm, giữ điều kiện khi đổi cỡ màn', async () => {
+    const shownLine = page.getByText(/^Đang hiện/).first();
+    const panel = page.getByRole('complementary', { name: 'Bộ lọc' });
+    let tried = 0;
+    for (const tab of ['luc_luong', 'vat_tu', 'phuong_tien']) {
+      await page.goto(`${ROOT}/nguon-luc?tab=${tab}`);
+      await panel.waitFor();
+      const group = panel.getByRole('group').first();
+      const all = group.getByRole('button').first();
+      await group.getByRole('button', { name: /\(\d+\)/ }).first().waitFor(); // số dòng hiện khi dữ liệu đã về
+      const labels = await group.getByRole('button').allInnerTexts();
+      const at = labels.findIndex((t) => Number(t.match(/\((\d+)\)/)?.[1]) > 0);
+      if (at < 0) continue; // không có dữ liệu ở thẻ này
+      const n = labels[at].match(/\((\d+)\)/)[1];
+      const pick = group.getByRole('button').nth(at);
+      await pick.click();
+      await shownLine.waitFor();
+      if (!new RegExp(`Đang hiện\\s*${n}/`).test(await shownLine.innerText())) throw new Error(`${tab}: nút ghi (${n}) nhưng ${await shownLine.innerText()}`);
+      await page.getByRole('button', { name: /^Bỏ lọc .+: / }).first().click(); // nhãn điều kiện ngay trên danh sách
+      await shownLine.waitFor({ state: 'detached' });
+      if ((await all.getAttribute('aria-pressed')) !== 'true') throw new Error(`${tab}: bỏ nhãn mà nút lọc vẫn sáng`);
+      tried += 1;
+    }
+    if (tried) {
+      const search = visible(page.getByLabel('Tìm trong danh sách'));
+      await search.fill('zzzz-khong-co');
+      await page.getByText(/^Đang hiện 0\//).first().waitFor();
+      await search.fill('');
+      await shownLine.waitFor({ state: 'detached' });
+      // Đổi cỡ qua ngưỡng 1440: cột lọc ↔ hàng lọc, điều kiện không mất
+      const group = panel.getByRole('group').first();
+      const labels = await group.getByRole('button').allInnerTexts();
+      const pick = group.getByRole('button').nth(labels.findIndex((t) => Number(t.match(/\((\d+)\)/)?.[1]) > 0));
+      await pick.click();
+      const line = (await shownLine.innerText()).split('—')[0].trim();
+      await page.setViewportSize({ width: 1366, height: 768 });
+      await panel.waitFor({ state: 'detached' });
+      if ((await shownLine.innerText()).split('—')[0].trim() !== line) throw new Error('thu xuống 1366 px: mất điều kiện lọc');
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await panel.waitFor();
+      if ((await group.getByRole('button', { pressed: true }).count()) !== 1) throw new Error('phóng lại 1440 px: nút lọc không sáng');
+    }
+    await noPageOverflow(page, 'Vật tư 1440');
+    return tried ? `${tried} thẻ` : 'không có dữ liệu để lọc';
+  });
+
+  await step(ctx, '1536×864: menu ngang không hụt mục; bảng Phương tiện không bị cắt nút', async () => {
+    await page.setViewportSize({ width: 1536, height: 864 });
+    await page.goto(`${ROOT}/nguon-luc?tab=phuong_tien`);
+    await waitMain(page);
+    await page.waitForTimeout(1500);
+    const n = await navItems(page);
+    if (n < 4) throw new Error(`menu ngang còn ${n} mục (1440 px có 4)`);
+    const cut = await clippedControls(page);
+    if (cut.length) throw new Error(`nút bị cắt: ${cut.join(', ')}`);
+    await noPageOverflow(page, 'Phương tiện 1536');
+  });
+
+  await step(ctx, '1920×1080: Tổng quan — menu đủ, tiêu đề ô chỉ số không bị cắt, không cắt nút', async () => {
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await page.goto(`${ROOT}/dashboard`);
+    await waitMain(page);
+    await page.waitForTimeout(1500);
+    const n = await navItems(page);
+    if (n < 4) throw new Error(`menu ngang còn ${n} mục`);
+    for (const title of ['Mưa trung bình', 'Mực nước', 'SOS chờ']) {
+      const el = visible(page.locator('main').getByText(title, { exact: true }));
+      if ((await el.count()) && (await el.evaluate((e) => e.scrollWidth - e.clientWidth)) > 1) throw new Error(`tiêu đề ô "${title}" bị cắt`);
+    }
+    const cut = await clippedControls(page);
+    if (cut.length) throw new Error(`nút bị cắt: ${cut.join(', ')}`);
+    await noPageOverflow(page, 'Tổng quan 1920');
+  });
+}
+
+// ================================================================ Xác thực 2 lớp thật qua giao diện (ghi thật — bỏ qua khi UI_READONLY)
+const apiCall = async (method, path, body, token) => {
+  const res = await fetch(`${ROOT}/api/v1${path}`, {
+    method,
+    headers: { ...(body ? { 'Content-Type': 'application/json' } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  return { status: res.status, data: await res.json().catch(() => null) };
+};
+function totpNow(secret) {
+  const A = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  const bits = [...secret.replace(/=+$/, '').toUpperCase()].map((c) => A.indexOf(c).toString(2).padStart(5, '0')).join('');
+  const counter = Buffer.alloc(8);
+  counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30_000)));
+  const h = crypto.createHmac('sha1', Buffer.from(bits.match(/.{8}/g).map((b) => parseInt(b, 2)))).update(counter).digest();
+  const o = h[h.length - 1] & 15;
+  return String((h.readUInt32BE(o) & 0x7fffffff) % 1_000_000).padStart(6, '0');
+}
+
+/** Tài khoản thử riêng (khoá lại khi xong). Bật 2 lớp trên giao diện, rồi đăng nhập bằng mã khôi phục hiện trên màn. */
+async function recoveryFlow(ctx) {
+  const { page } = ctx;
+  const admin = (await apiCall('POST', '/auth/login', { username: STAFF.user, password: STAFF.pass })).data?.token;
+  const who = { user: `thu.kp.${Date.now().toString(36)}`, pass: 'MatKhauRieng2fa9' };
+  const first = 'MatKhau2fa9';
+  const made = await apiCall('POST', '/rbac/users', { username: who.user, full_name: 'Thử mã khôi phục', password: first, role: 'admin_xa', domain: 'BAOLAC/CB-COBA' }, admin);
+  const start = (await apiCall('POST', '/auth/login', { username: who.user, password: first })).data?.token;
+  await apiCall('POST', '/auth/change-password', { current_password: first, new_password: who.pass }, start);
+  const CODES = /\b[a-z0-9]{4}-[a-z0-9]{4}\b/gi;
+  const account = page.getByRole('button', { name: /^Tài khoản:/ });
+  const dialog = page.getByRole('dialog', { name: 'Xác thực 2 lớp' });
+  const openMfa = async () => {
+    await account.click();
+    await page.getByRole('button', { name: /Xác thực 2 lớp/ }).click();
+    await dialog.waitFor();
+  };
+  const signOut = async () => {
+    await account.click();
+    await page.getByRole('button', { name: 'Đăng xuất' }).click();
+    await page.waitForURL(/dang-nhap|cong-khai|\/$/, { timeout: 10_000 }).catch(() => {});
+  };
+  const password = async () => {
+    await page.goto(`${ROOT}/dang-nhap`);
+    await page.getByPlaceholder('Nhập tên đăng nhập hoặc email...').fill(who.user);
+    await page.getByPlaceholder('••••••••').fill(who.pass);
+    await page.locator('button[type="submit"]').click();
+    await page.getByRole('button', { name: /Dùng mã khôi phục/ }).click();
+    const box = page.getByLabel('Mã khôi phục');
+    await box.waitFor();
+    return box;
+  };
+  const send = page.getByRole('button', { name: 'Xác nhận', exact: true });
+  const refused = page.locator('form .text-danger').first();
+  let codes = [];
+
+  await step(ctx, 'Bật 2 lớp: màn hiện mã không đóng nhầm (Esc, bấm nền, ✕); lần tự làm mới số liệu không văng phiên', async () => {
+    if (made.status !== 201) throw new Error(`không tạo được tài khoản thử: HTTP ${made.status}`);
+    await loginAs(page, who);
+    await openMfa();
+    const [setup] = await Promise.all([
+      page.waitForResponse((r) => r.url().includes('/auth/mfa/setup')),
+      dialog.getByRole('button', { name: 'Tạo mã QR' }).click(),
+    ]);
+    await dialog.getByLabel('Mã 6 số trong ứng dụng xác thực').fill(totpNow((await setup.json()).secret));
+    await dialog.getByRole('button', { name: 'Bật xác thực 2 lớp' }).click();
+    await dialog.getByText(/^[a-z0-9]{4}-[a-z0-9]{4}$/i).first().waitFor();
+    codes = (await dialog.innerText()).match(CODES) || [];
+    if (codes.length !== 10) throw new Error(`hiện ${codes.length} mã (cần 10)`);
+    // Bật xong phiên cũ bị thu hồi: phải dùng phiên mới ngay, không chờ tới lúc chép xong mã
+    let expired = 0;
+    const on401 = (r) => { if (r.status() === 401 && r.url().includes('/api/v1/')) expired += 1; };
+    page.on('response', on401);
+    await page.keyboard.press('Escape');
+    await page.mouse.click(5, 400);
+    await dialog.getByRole('button', { name: 'Đóng', exact: true }).first().click();
+    await dialog.getByText(/Lưu lại rồi đánh dấu/).waitFor();
+    if (((await dialog.innerText()).match(CODES) || []).length !== 10) throw new Error('đóng nhầm: mất bộ mã');
+    await page.waitForResponse((r) => r.url().includes('/api/v1/') && r.request().method() === 'GET', { timeout: 70_000 });
+    await page.waitForTimeout(500);
+    page.off('response', on401);
+    if (expired || /dang-nhap/.test(page.url())) throw new Error(`đang chép mã mà hết phiên (${expired} lần 401)`);
+    if (!(await dialog.isVisible())) throw new Error('đang chép mã mà hộp đóng mất');
+    await dialog.locator('input[type="checkbox"]').check();
+    await dialog.getByRole('button', { name: 'Hoàn tất' }).click();
+    await dialog.waitFor({ state: 'detached' });
+    await signOut();
+  });
+
+  await step(ctx, 'Đăng nhập thật bằng mã khôi phục: sai báo đúng lời, đúng vào được, còn 9 mã, mã chỉ dùng 1 lần, in hoa không gạch vẫn nhận', async () => {
+    if (!codes.length) throw new Error('bước trước chưa có mã');
+    let box = await password();
+    if (await send.isEnabled()) throw new Error('chưa nhập mà nút đã bấm được');
+    await box.fill('abcd-efgh');
+    await send.click();
+    await refused.waitFor();
+    if (!/Mã khôi phục không đúng/.test(await refused.innerText())) throw new Error(`lời báo: ${await refused.innerText()}`);
+    await box.fill(codes[0]);
+    await send.click();
+    await page.waitForURL(/\/dashboard/);
+    await openMfa();
+    if (!/Mã khôi phục còn\s*9/.test((await dialog.innerText()).replace(/\s+/g, ' '))) throw new Error('không báo còn 9 mã');
+    await page.keyboard.press('Escape');
+    await dialog.waitFor({ state: 'detached' });
+    await signOut();
+    box = await password();
+    await box.fill(codes[0]);
+    await send.click();
+    await refused.waitFor();
+    if (!/dang-nhap/.test(page.url())) throw new Error('mã đã dùng vẫn vào được');
+    await box.fill(codes[1].replace('-', '').toUpperCase());
+    await send.click();
+    await page.waitForURL(/\/dashboard/);
+    await signOut();
+  });
+  if (made.data?.id) await apiCall('PATCH', `/rbac/users/${made.data.id}`, { is_active: false, lock_reason: 'Tài khoản thử của ui-test' }, admin);
+}
+
+/** Thẻ "SOS mới" (phiếu thật qua API + WebSocket) không che hộp thoại. Trang KHÔNG dùng watch(): handler của nó tự đóng thẻ. */
+async function sosCardFlow(ctx) {
+  const { page } = ctx;
+  const admin = (await apiCall('POST', '/auth/login', { username: STAFF.user, password: STAFF.pass })).data?.token;
+  const newSos = async () => {
+    const r = await apiCall('POST', '/sos', { lat: 22.67, lon: 106.24, incident_type: 'sat_lo', priority: 1, trapped_count: 2, source: 'CAN_BO', raw_message: 'Thử thẻ SOS mới (ui-test)' }, admin);
+    if (r.status >= 300) throw new Error(`không tạo được phiếu thử: HTTP ${r.status}`);
+  };
+  const overlap = (a, b) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+  const card = page.getByRole('alert').filter({ hasText: 'SOS mới' }).first();
+  const report = page.getByRole('dialog', { name: /Báo cáo nhanh hiện trường/ });
+  const openReport = async () => {
+    await page.locator('header').getByRole('button', { name: 'Báo cáo nhanh', exact: true }).click();
+    await report.waitFor();
+    await page.waitForTimeout(300);
+  };
+  await step(ctx, 'Thẻ "SOS mới" đang mở hộp Báo cáo nhanh: gọn thành dải trên hộp, không che nút đóng, Để sau không đóng hộp; đóng hộp thẻ về đầy đủ', async () => {
+    await loginAs(page, STAFF);
+    await page.waitForTimeout(1000);
+    await openReport();
+    await newSos();
+    await card.waitFor({ timeout: 15_000 });
+    await page.waitForTimeout(300);
+    if (overlap(await card.boundingBox(), await report.boundingBox())) throw new Error('thẻ đè hộp thoại');
+    const close = await report.getByRole('button', { name: 'Đóng', exact: true }).first().boundingBox();
+    const onTop = await page.evaluate(([x, y]) => !!document.elementFromPoint(x, y)?.closest('[role="dialog"]'), [close.x + close.width / 2, close.y + close.height / 2]);
+    if (!onTop) throw new Error('nút đóng hộp bị che');
+    if (!(await card.getByRole('link', { name: 'Mở phiếu' }).count())) throw new Error('dải mất nút Mở phiếu');
+    await card.getByRole('button', { name: 'Để sau' }).click();
+    if (!(await report.isVisible())) throw new Error('Để sau làm đóng hộp');
+    await page.keyboard.press('Escape');
+    await report.waitFor({ state: 'detached' });
+    await newSos();
+    await card.waitFor({ timeout: 15_000 });
+    await page.waitForTimeout(300);
+    const full = await card.boundingBox();
+    if (full.y < 64 || full.width < 400) throw new Error(`không có hộp mà thẻ không đầy đủ (y ${full.y}, rộng ${full.width})`);
+    await openReport(); // thẻ đang hiện rồi mới mở hộp
+    if (overlap(await card.boundingBox(), await report.boundingBox())) throw new Error('mở hộp sau khi thẻ đã hiện: thẻ đè hộp');
+    await page.keyboard.press('Escape');
+    await report.waitFor({ state: 'detached' });
+  });
+}
+
 // ================================================================ Các màn theo bản vẽ desktop (11/2026) — laptop 1366 px
 // Mã 2 lớp 6 ô, ngăn nhật ký, gửi báo cáo nhanh, Điều động nhanh, bảng chi viện, Tìm đường trong popup: giả lập API ở chỗ có ghi
 // dữ liệu (không tạo phiếu, lệnh thật — chạy được với UI_READONLY); chỉ "Sửa thiết bị" ghi thật rồi xoá, bỏ qua khi UI_READONLY.
@@ -3818,6 +4085,25 @@ try {
     const dPage = await dctx.newPage();
     await desktopFlows({ page: dPage, vp: { name: 'Màn theo bản vẽ · Laptop 1366×768', mobile: false }, problems: watch(dPage) });
     await dctx.close();
+    const wctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'vi-VN' });
+    wctx.setDefaultTimeout(15_000);
+    const wPage = await wctx.newPage();
+    await wideFlows({ page: wPage, vp: { name: 'Màn rộng ≥ 1440', mobile: false }, problems: watch(wPage) });
+    await wctx.close();
+    if (!READONLY) {
+      const rctx = await browser.newContext({ viewport: { width: 1366, height: 768 }, locale: 'vi-VN' });
+      rctx.setDefaultTimeout(15_000);
+      const rPage = await rctx.newPage();
+      await recoveryFlow({ page: rPage, vp: { name: 'Xác thực 2 lớp thật', mobile: false }, problems: watch(rPage) });
+      await rctx.close();
+      const sctx = await browser.newContext({ viewport: { width: 1366, height: 768 }, locale: 'vi-VN' });
+      sctx.setDefaultTimeout(15_000);
+      const sPage = await sctx.newPage();
+      const sProblems = [];
+      sPage.on('pageerror', (e) => sProblems.push(`lỗi JS: ${e.message.split('\n')[0]}`));
+      await sosCardFlow({ page: sPage, vp: { name: 'Thẻ SOS mới', mobile: false }, problems: sProblems });
+      await sctx.close();
+    }
   }
   // Đợt thiên tai — chạy cuối: đợt mở thử (laptop, điện thoại) chỉ ở 1 phường và kết thúc ngay; đặt cuối để bước lỗi giữa
   // chừng (đợt còn mở) không gắn phiếu / dòng sổ kho của các bước khác vào đợt

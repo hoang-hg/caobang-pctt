@@ -45,6 +45,8 @@ function MfaStep({ mfa, onBack, onDone }) {
       onDone(await api('/auth/mfa/verify', { method: 'POST', body: { challenge: mfa.challenge, code } }));
     } catch (err) {
       if (err.status === 401 && /hết hạn/.test(err.message)) onBack(err.message);
+      // Câu của máy chủ dành cho mã 6 số ("kiểm tra giờ trên điện thoại") — người dùng mã khôi phục thường đã mất điện thoại
+      else if (err.status === 401 && recovery) setError('Mã khôi phục không đúng hoặc đã dùng. Mỗi mã chỉ dùng được 1 lần — thử mã khác trong bộ đã lưu.');
       else setError(err.message);
     } finally {
       setBusy(false);

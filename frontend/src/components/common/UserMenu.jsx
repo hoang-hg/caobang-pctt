@@ -44,7 +44,7 @@ export default function UserMenu() {
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line bg-panel text-[13px] font-bold text-accent" aria-hidden="true">
           {initials(user.full_name) || <UserCircle2 size={16} />}
         </span>
-        <span className="hidden max-w-[10rem] truncate 2xl:inline">{user.full_name}</span>
+        <span className="hidden max-w-[10rem] truncate min-[1900px]:inline">{user.full_name}</span>
       </button>
       {/* Bản vẽ khung L6: thông tin chính trên đầu, mỗi việc một dòng. Âm báo, kết nối, cổng người dân ở thanh trạng thái dưới cùng */}
       {open && desk && (
