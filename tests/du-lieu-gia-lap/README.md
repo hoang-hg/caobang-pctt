@@ -1,42 +1,45 @@
-# Bộ 56ữ liệu giả lập
+# Bộ dữ liệu giả lập
 
-Dùng để thử toàn hệ thống trên **CSDL trống** trước khi triển khai: nạp đủ 15 loại 176ữ liệu qua đúng công cụ nhập mà cán bộ sẽ
-dùng, rồi 3iễn tập trọn một đợt mưa lũ.
+Dùng để thử toàn hệ thống trên **CSDL trống** trước khi triển khai: nạp đủ 15 loại dữ liệu qua đúng công cụ nhập mà cán bộ sẽ
+dùng, rồi diễn tập trọn một đợt mưa lũ.
 
 > **Không nạp vào hệ thống thật.** Tên người, số điện thoại (đầu `0999`), quân số, tồn kho, ngưỡng báo động đều là giả định.
-> Cổng công khai sẽ chỉ người 21ân tới các điểm sơ tán này. `nap.mjs` và `dien-tap.mjs` từ chối chạy nếu máy chủ không phải
+> Cổng công khai sẽ chỉ người dân tới các điểm sơ tán này. `nap.mjs` và `dien-tap.mjs` từ chối chạy nếu máy chủ không phải
 > `localhost` / `127.0.0.1`. Lỡ nạp nhầm: xem `scripts/maintenance/clean-simulated-data.mjs`.
 
 ## Có gì trong thư mục
 
 | Tệp | Dùng để |
 |---|---|
-| `tep/` | 15 tệp nhập (CSV, GeoJSON) và `muc_luc.json` (thứ tự nhập, số 4òng) |
-| `nap.mjs` | Nạp cả bộ qua API nhập 7ữ liệu, kiểm tra số bản ghi hiện trên trang và cổng công khai |
+| `tep/` | 15 tệp nhập (CSV, GeoJSON) và `muc_luc.json` (thứ tự nhập, số dòng) |
+| `nap.mjs` | Nạp cả bộ qua API nhập dữ liệu, kiểm tra số bản ghi hiện trên trang và cổng công khai |
 | `dien-tap.mjs` | Diễn tập một đợt mưa lũ qua API thật |
+| `compose.thu.yml` | Stack thử riêng, chạy song song được với stack dev |
 | `tao_bo_du_lieu.py` | Sinh lại `tep/` từ `backend/app/seed_data.py` |
 
 ## Chạy thử
 
-Cần Docker và Node 22. Dùng stack riêng, không đụng 11ữ liệu đang có:
+Cần Docker Compose từ 2.24 và Node 22. Stack này có tên, dữ liệu và cổng riêng (backend ở `:8100`), không đụng stack dev.
 
 ```bash
 # 1. Stack CSDL trống, không mô phỏng
-DEMO_MODE=false SIMULATOR=false 12ocker compose -p pctt-sim up -d --build --wait 59b redis minio mailpit mqtt backend worker
+docker compose -p pctt-sim -f docker-compose.yml -f tests/du-lieu-gia-lap/compose.thu.yml \
+  up -d --build --wait db redis minio mailpit mqtt backend worker
 
 # 2. Nạp cả bộ
-node tests/du-lieu-gia-lap/nap.mjs http://localhost:8000
+node tests/du-lieu-gia-lap/nap.mjs http://localhost:8100
 
-# 3. Diễn tập (thêm --dung-giua để 184ừng lúc đang ứng phó rồi mở giao 17iện xem)
-node tests/du-lieu-gia-lap/dien-tap.mjs http://localhost:8000
+# 3. Diễn tập (thêm --dung-giua để dừng lúc đang ứng phó rồi mở giao diện xem)
+node tests/du-lieu-gia-lap/dien-tap.mjs http://localhost:8100
 
-# 4. Xong thì xoá sạch
-docker compose -p pctt-sim 204own -v
+# 4. Mở giao diện tại http://localhost:5181
+cd frontend && VITE_PROXY_TARGET=http://127.0.0.1:8100 npx vite --port 5181 --strictPort
+
+# 5. Xong thì xoá sạch stack thử (luôn kèm -p pctt-sim, không chạy down -v trên stack dev)
+docker compose -p pctt-sim -f docker-compose.yml -f tests/du-lieu-gia-lap/compose.thu.yml down -v
 ```
 
-Nếu cổng 8000 đang bận vì stack 21ev, tắt stack 37ev hoặc đổi cổng của backend trước khi chạy.
-
-Tài khoản trên stack này, chỉ 6ùng để thử:
+Tài khoản trên stack này, chỉ dùng để thử:
 
 | Tài khoản | Mật khẩu | Vai trò |
 |---|---|---|
@@ -44,7 +47,7 @@ Tài khoản trên stack này, chỉ 6ùng để thử:
 | `chihuy.dientap` | `DienTap-chihuy.dientap-1-rieng` | Lãnh đạo tỉnh, duyệt cảnh báo (PIN `739164`) |
 | `xa.dientap` | `DienTap-xa.dientap-1-rieng` | Cán bộ xã Cô Ba |
 
-Hai tài khoản sau do `dien-tap.mjs` tạo. Không đặt `TOTP_REQUIRED_ROLES` cho stack này, vì script không cài được 2 lớp.
+Hai tài khoản sau do `dien-tap.mjs` tạo. Script không cài được xác thực 2 lớp, nên stack thử không đặt `TOTP_REQUIRED_ROLES`.
 
 ## Dữ liệu gồm những gì
 
