@@ -439,7 +439,7 @@ export default function PublicPortal() {
   const { data: overview, isError: overviewFailed, isFetching: overviewFetching, refetch: refetchOverview } = useQuery({
     queryKey: ['pub-overview'], queryFn: () => pub('/overview'), refetchInterval: REFRESH,
   });
-  const { data: map, dataUpdatedAt: mapAt } = useQuery({ queryKey: ['pub-map'], queryFn: () => pub('/map'), refetchInterval: REFRESH });
+  const { data: map, isError: mapFailed, dataUpdatedAt: mapAt } = useQuery({ queryKey: ['pub-map'], queryFn: () => pub('/map'), refetchInterval: REFRESH });
   const { data: alerts = NO_ALERTS, isSuccess: alertsLoaded, isError: alertsFailed, refetch: refetchAlerts } = useQuery({
     queryKey: ['pub-alerts'], queryFn: () => pub('/alerts'), refetchInterval: REFRESH,
   });
@@ -598,6 +598,9 @@ export default function PublicPortal() {
   const riversAbove = (overview?.rivers || []).filter((r) => r.level >= 1).length;
   // Chưa có số liệu tình hình (đang tải / máy chủ lỗi): KHÔNG được hiện "không có cảnh báo" — người dân đọc thành "an toàn"
   const statusUnknown = !overview;
+  // Chưa có phản hồi của máy chủ thì chưa biết có dữ liệu hay không: không nói "chưa có trạm", "chưa có điểm sơ tán" — trong lúc
+  // khẩn cấp, người dân đọc thành hệ thống không có gì, hoặc thành không có nguy hiểm
+  const notLoaded = (failed) => (failed ? 'Chưa tải được số liệu — không có nghĩa là an toàn' : 'Đang tải số liệu…');
 
   const hasResult = !!(locating || locErr || here);
   const resultBlock = (stacked) => hasResult && (
@@ -1452,7 +1455,7 @@ export default function PublicPortal() {
                         level: overview?.rain?.max_24h != null ? rainLevel(overview.rain.max_24h) : null,
                         text: overview?.rain?.avg_24h != null
                           ? <>Mưa 24 giờ qua trung bình <b className="num">{num(overview.rain.avg_24h, 1)} mm</b>{overview?.forecast_24h?.max_24h != null && <> · dự báo cao nhất <b className="num">{num(overview.forecast_24h.max_24h, 1)} mm</b></>}</>
-                          : 'Chưa có số liệu mưa — đang cập nhật',
+                          : overview ? 'Chưa có số liệu mưa — đang cập nhật' : notLoaded(overviewFailed),
                         link: 'Xem bản đồ mưa dự báo theo xã',
                         go: () => setActiveTab('dubao'),
                       },
@@ -1460,7 +1463,7 @@ export default function PublicPortal() {
                         key: 'sat-lo',
                         title: 'Sạt lở, lũ quét',
                         level: ls ? (ls.blocked_count > 0 ? 3 : ls.warning_count > 0 ? 2 : null) : null,
-                        text: ls ? <>Cấm xe / tắc nghẽn: <b className="num">{ls.blocked_count ?? 0}</b> điểm · cảm biến nghiêng lớn nhất <b className="num">{maxTiltText(map?.landslides)}</b></> : 'Chưa có số liệu điểm đen',
+                        text: ls ? <>Cấm xe / tắc nghẽn: <b className="num">{ls.blocked_count ?? 0}</b> điểm · cảm biến nghiêng lớn nhất <b className="num">{maxTiltText(map?.landslides)}</b></> : overview ? 'Chưa có số liệu điểm đen' : notLoaded(overviewFailed),
                         link: 'Xem điểm đen & lộ trình vòng tránh',
                         go: () => setActiveTab('satlo'),
                       },
@@ -1468,7 +1471,7 @@ export default function PublicPortal() {
                         key: 'ngap',
                         title: 'Ngập lụt',
                         level: top ? top.level : null,
-                        text: top ? <>Trạm cao nhất: <b>{top.name}</b> · {top.level_label}</> : 'Chưa có trạm đo mực nước trong hệ thống',
+                        text: top ? <>Trạm cao nhất: <b>{top.name}</b> · {top.level_label}</> : overview ? 'Chưa có trạm đo mực nước trong hệ thống' : notLoaded(overviewFailed),
                         link: 'Xem mực nước từng trạm',
                         go: () => setActiveTab('muanuoc'),
                       },
@@ -1982,7 +1985,7 @@ export default function PublicPortal() {
                     ))}
                   </tbody>
                 </table>
-              ) : <p className="text-sm text-muted">Chưa có trạm đo mực nước trong hệ thống.</p>}
+              ) : <p className="text-sm text-muted">{overview ? 'Chưa có trạm đo mực nước trong hệ thống.' : notLoaded(overviewFailed)}</p>}
               <p className="rounded-[14px] border border-dashed border-line p-3 text-[13px] leading-normal text-ink-2">
                 Trạm không gửi số đo hiện “Chưa có số đo” — không có nghĩa là an toàn.
               </p>
@@ -2093,7 +2096,7 @@ export default function PublicPortal() {
                       })}
                     </tbody>
                   </table>
-                ) : <p className="text-sm text-muted">Chưa có điểm sơ tán trong danh sách{siteCommune ? ' của xã này' : ''}.</p>}
+                ) : <p className="text-sm text-muted">{map ? `Chưa có điểm sơ tán trong danh sách${siteCommune ? ' của xã này' : ''}.` : notLoaded(mapFailed)}</p>}
               </section>
               <aside className="sheet sticky top-4 flex flex-col gap-2.5 p-5" aria-label="Đường dây nóng">
                 <h2 className="text-[15px] font-bold text-ink">Tổng đài cứu hộ cứu nạn khẩn cấp</h2>

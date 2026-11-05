@@ -3437,6 +3437,7 @@ const noPageOverflow = async (page, where) => {
 
 async function wideFlows(ctx) {
   const { page } = ctx;
+  await publicLoadingFlow(ctx);
   await loginAs(page, STAFF);
 
   await step(ctx, 'Vật tư 1440: cột Bộ lọc — số cạnh nút = số dòng sau khi lọc, có dòng "Đang hiện", bỏ từng điều kiện, tìm, giữ điều kiện khi đổi cỡ màn', async () => {
@@ -3672,6 +3673,43 @@ async function sosCardFlow(ctx) {
     if (overlap(await card.boundingBox(), await report.boundingBox())) throw new Error('mở hộp sau khi thẻ đã hiện: thẻ đè hộp');
     await page.keyboard.press('Escape');
     await report.waitFor({ state: 'detached' });
+  });
+}
+
+// Cổng công khai khi chưa có phản hồi của máy chủ: không được nói "chưa có trạm", "chưa có điểm sơ tán". Giả lập API, chỉ xem.
+async function publicLoadingFlow(ctx) {
+  const { page } = ctx;
+  await step(ctx, 'Cổng công khai đang tải rồi mất mạng: báo "Đang tải", "Chưa tải được", không nói chưa có trạm / điểm sơ tán', async () => {
+    let release;
+    const hold = new Promise((r) => { release = r; });
+    const urls = ['**/api/v1/public/overview', '**/api/v1/public/map'];
+    const handler = safeRoute(async (route) => {
+      await hold;
+      await route.abort();
+    });
+    for (const u of urls) await page.route(u, handler);
+    const noFalseClaim = async (where) => {
+      const text = (await page.locator('main, body').first().innerText()).replace(/\s+/g, ' ');
+      for (const bad of ['Chưa có trạm đo mực nước', 'Chưa có số liệu điểm đen', 'Chưa có số liệu mưa', 'Chưa có điểm sơ tán trong danh sách']) {
+        if (text.includes(bad)) throw new Error(`${where}: hiện "${bad}"`);
+      }
+    };
+    try {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.goto(`${ROOT}/cong-khai`);
+      await visible(page.getByText('Đang tải số liệu…')).waitFor();
+      if ((await page.getByText('Đang tải số liệu…').count()) < 3) throw new Error('3 thẻ chuyên đề không cùng báo đang tải');
+      await noFalseClaim('Đang tải');
+      await visible(page.getByRole('button', { name: /^Sơ tán/ })).click();
+      await visible(page.getByText('Đang tải số liệu…')).waitFor();
+      await noFalseClaim('Đang tải, trang sơ tán');
+      release();
+      await visible(page.getByText(/^Chưa tải được số liệu/)).waitFor({ timeout: 20_000 });
+      await noFalseClaim('Mất mạng, trang sơ tán');
+    } finally {
+      release();
+      for (const u of urls) await page.unroute(u, handler);
+    }
   });
 }
 
