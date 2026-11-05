@@ -3,7 +3,7 @@ import { X } from 'lucide-react';
 import { useStore } from '../../app/store';
 
 /**
- * Nhắc bật chuông SOS (bản vẽ desktop khung M1b): trình duyệt chặn âm thanh tới lần bấm đầu tiên → thẻ nổi giữa trên "Bấm để
+ * Nhắc bật chuông SOS (bản vẽ desktop khung M1b): trình duyệt chặn âm thanh tới lần bấm đầu tiên → thẻ nổi góc phải dưới (trên thanh trạng thái, không che hàng chip đầu trang) "Bấm để
  * bật chuông SOS". Bấm / gõ phím bất kỳ đâu là chuông mở (watchAudioUnlock — App.jsx) và thẻ mất ngay, không chờ âm thanh sẵn
  * sàng; thẻ không chắn trang bên dưới (pointer-events-none, trừ nút "✕"): bấm trúng nút dưới thẻ vẫn ăn. Chỉ máy tính ≥ 1024 px (điện thoại đã có dòng nhắc ở thanh trạng thái), chỉ khi chuông đang bật, không khi
  * trình chiếu. Nút đóng cùng tên "Đóng thông báo" với các thẻ nổi khác.
@@ -30,7 +30,7 @@ export default function BellReminder() {
   return (
     <div
       role="status"
-      className="no-print card pointer-events-none fixed left-1/2 top-[84px] z-[1900] flex w-[26rem] max-w-[calc(100vw-2rem)] -translate-x-1/2 gap-3 rounded-[16px] border-l-4 border-l-accent p-4 shadow-[0_10px_30px_rgb(15_23_42/0.18)] max-lg:hidden"
+      className="no-print card pointer-events-none fixed bottom-4 right-4 z-[1900] flex w-[26rem] max-w-[calc(100vw-2rem)] gap-3 lg:tall:bottom-12 rounded-[16px] border-l-4 border-l-accent p-4 shadow-[0_10px_30px_rgb(15_23_42/0.18)] max-lg:hidden"
     >
       <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-accent" aria-hidden="true" />
       <div className="min-w-0 flex-1">

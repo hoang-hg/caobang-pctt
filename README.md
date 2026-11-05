@@ -1112,7 +1112,7 @@ hành). Yêu cầu ở phạm vi toàn tỉnh không khớp quyền cấp xã.
 | `audit.view` | toàn tỉnh | Nhật ký pháp lý (`GET /api/v1/alerts/audit?since=&until=&limit=` — khoảng thời gian ISO 8601, tối đa 5.000 dòng / lần) |
 | `user.view` / `user.manage` | ✓ | Xem / tạo tài khoản cấp dưới, đổi cấp – phạm vi, đặt lại mật khẩu / PIN / 2 lớp, khoá |
 | `report.view` / `report.moderate` | ✓ | Xem (kể cả SĐT người gửi) / duyệt – từ chối – chuyển SOS phản ánh |
-| `citizen.view` / `citizen.manage` | — | Tài khoản người dân của cổng: tìm theo số điện thoại / khoá – mở khoá, đặt mật khẩu tạm khi người dân gọi đường dây nóng (`GET /citizens`, `PATCH /citizens/{id}`, `POST /citizens/{id}/reset-password`; ghi nhật ký pháp lý) |
+| `citizen.view` / `citizen.manage` | — | Tài khoản người dân của cổng: tìm theo số điện thoại / họ tên, lọc theo xã người dân khai (`?admin_code=`, `none` = chưa khai) / khoá – mở khoá, đặt mật khẩu tạm khi người dân gọi đường dây nóng (`GET /citizens`, `PATCH /citizens/{id}`, `POST /citizens/{id}/reset-password`; ghi nhật ký pháp lý) |
 | `integration.view` / `integration.manage` | toàn tỉnh | Xem / cấu hình nguồn dữ liệu, thiết bị IoT, cấp khoá, bật dữ liệu giả lập trên trình duyệt — **chỉ Cấp 1** |
 | `data.import` | toàn tỉnh | Nhập dữ liệu chính thức từ tệp; phê duyệt / từ chối hồ sơ xã gửi ([2.4](#nhap-du-lieu)) |
 | `data.submit` | ✓ | Gửi dữ liệu của xã mình chờ cấp tỉnh phê duyệt ([2.4](#nhap-du-lieu)) |
@@ -1189,7 +1189,7 @@ cùng lúc trước đây là bị 429).
 
 | Endpoint | Mô tả | Cache Redis |
 |---|---|---|
-| `GET /overview` | Mưa, sông, cảnh báo, SOS **chỉ đếm theo xã** | 30 s |
+| `GET /overview` | Mưa, sông (kèm xu thế ~3 giờ `trend_3h` / `trend_label`: Đang lên · Đang xuống · Ổn định · Chưa rõ — thiếu số đo ~3 giờ trước hoặc mất tín hiệu thì "Chưa rõ", không đoán), cảnh báo, SOS **chỉ đếm theo xã** | 30 s |
 | `GET /map` | GeoJSON vùng nguy hiểm, đường chia cắt, trạm, điểm sơ tán (kèm số trực `hotline`) | 30 s |
 | `GET /alerts`, `/alerts/{code}/share` | Cảnh báo đang / đã phát; trang chia sẻ Open Graph | 30 s / – |
 | `GET /forecast/areas?hours=24\|72`, `/forecast/areas/{code}` | Dự báo mưa theo xã P10/P50/P90 | 5 phút |
@@ -1892,6 +1892,12 @@ Kết quả đo 27/09/2026 trên máy thử: 8 CPU / 8 GB **dùng chung** cho CS
 | 20 cán bộ + 1 ảnh/s — dashboard p99 / tối đa | 1,1 s / 2,2 s | **0,65 s / 0,85 s** |
 | Cổng công khai — tải lần đầu (gzip) | 680 KB | **218 KB** |
 | 500 người dân **+** 60 cán bộ **cùng lúc** | tệp tĩnh p95 8 s, API công khai 6 s, tra cứu vị trí 31 s, dashboard 27 s | tệp tĩnh 50 ms, API công khai 55 ms; tra cứu vị trí và dashboard p95 ~7 s |
+
+Đo lại 05/11/2026 sau đợt làm giao diện theo bản vẽ desktop (máy thử 4 CPU, dùng chung như trên; kịch bản bỏ
+`/public/reservoirs` — hồ chứa đã bỏ khỏi hệ thống): 500 người dân — API công khai p95 **2,6 ms**, tra cứu vị trí **25 ms**,
+tệp tĩnh **1,3 ms**, ~417 yêu cầu/s, lỗi 0%; 60 cán bộ — p95 **189 ms**, lỗi 0%. Gói tải lần đầu của cổng ở 1440 px (đo theo
+mọi JS / CSS trình duyệt tải khi mở `/`, kể cả chunk bản đồ): **287 KB** gzip (ngày 30/10 là 273 KB) — vượt mốc ~220 KB, cần
+xem lại (chunk bản đồ 67 KB, vendor 65 KB, trang cổng 44 KB).
 
 Lượt đo "trước" dùng kịch bản cũ, có một phần yêu cầu bị 403/422 do chính kịch bản (tài khoản không có quyền,
 toạ độ ngoài tỉnh) nên không so tỉ lệ lỗi. Hàng cuối: backend cần ~3,7 lõi cho cả hai nhóm (người dân ~2 lõi, cán bộ ~1,7 lõi). Trên máy thử, 8 CPU phải chia cho

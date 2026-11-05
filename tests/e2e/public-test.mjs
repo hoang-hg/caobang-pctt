@@ -47,6 +47,8 @@ check('Điểm sơ tán công khai chỉ gồm trường cho phép (có số tr�
   map.evacuation_sites.length > 0 && map.evacuation_sites.every((e) => Object.keys(e).sort().join() === EVAC_FIELDS)
     && map.evacuation_sites.some((e) => e.hotline));
 const ov = (await call('GET', '/public/overview')).data;
+check('Tổng quan công khai: trạm mực nước có xu thế (lên / xuống / ổn định / chưa rõ), không đoán khi thiếu số đo',
+  (ov.rivers || []).every((r) => ['Đang lên', 'Đang xuống', 'Ổn định', 'Chưa rõ'].includes(r.trend_label) && (r.trend_label !== 'Chưa rõ' || r.trend_3h == null) && !('prev_value' in r)));
 check('Tổng quan công khai: SOS chỉ là số liệu tổng hợp theo xã', ov.sos_by_commune.every((s) => Object.keys(s).sort().join() === 'code,da_xu_ly_24h,dang_xu_ly,name'));
 // Trạm mưa trên bản đồ công khai tô theo tổng mưa 24 giờ (rain_24h), cùng cách tính với ô Mưa của tổng quan — không theo
 // số đo mới nhất (cường độ một giờ). Hai bản cache tính lệch nhau tối đa 30 giây → cho sai số nhỏ

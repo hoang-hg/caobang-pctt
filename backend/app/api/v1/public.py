@@ -27,7 +27,7 @@ from app.services.broadcast import active_alert_sql, valid_until_sql
 from app.services.data_import.engine import xom_sort_key
 from app.services.landslides import get_landslides_overview
 from app.services.lite import NATIONAL_HOTLINES, RISK_ADVICE, province_hotlines
-from app.services.readings import LATEST_COLS, LATEST_JOIN
+from app.services.readings import LATEST_COLS, LATEST_JOIN, TREND_JOIN, river_trend
 from app.services.reports import (
     CATEGORY,
     PUBLIC_APPROX_M,
@@ -77,12 +77,13 @@ async def overview():
             )
         )[0]
         rivers = await fetch_all(
-            f"""SELECT s.name, s.river, s.alarm_thresholds AS thr, {LATEST_COLS}
-                  FROM iot_telemetry.monitoring_stations s {LATEST_JOIN}
+            f"""SELECT s.name, s.river, s.alarm_thresholds AS thr, {LATEST_COLS}, p.prev_value
+                  FROM iot_telemetry.monitoring_stations s {LATEST_JOIN} {TREND_JOIN}
                  WHERE s.type = 'muc_nuoc' ORDER BY s.id"""
         )
         for r in rivers:
             r["level"], r["level_label"] = river_level(r["value"], r["stale"], r.pop("thr") or {})
+            r["trend_3h"], r["trend_label"] = river_trend(r["value"], r.pop("prev_value"), r["stale"])
         sos = await fetch_all(
             """SELECT u.code, u.name, count(*) FILTER (WHERE t.status <> 'hoan_thanh') AS dang_xu_ly,
                       count(*) FILTER (WHERE t.status = 'hoan_thanh' AND t.resolved_at > now() - interval '24 hours') AS da_xu_ly_24h

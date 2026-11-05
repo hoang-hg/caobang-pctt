@@ -21,16 +21,18 @@ export default function FilterPanel({ fields, filters, counts, onFilter, sorts, 
       </div>
       {fields.map((f) => {
         const n = (v) => (counts?.[f.key] ? counts[f.key][v] ?? 0 : null);
+        // hideEmpty: bỏ lựa chọn không có bản ghi nào (VD "Cấp cụm" — địa bàn huyện cũ, dữ liệu hiện hành không dùng), trừ khi đang chọn
+        const options = f.hideEmpty && counts?.[f.key] ? f.options.filter(([v]) => n(v) > 0 || filters[f.key] === v) : f.options;
         const id = `loc-${f.key}`;
         return (
           <div key={f.key} className="flex flex-col gap-1.5" role="group" aria-labelledby={id}>
             <div id={id} className="text-xs font-bold text-ink-2">{f.label}</div>
-            {f.options.length <= 4 ? (
+            {options.length <= 4 ? (
               <>
                 <button type="button" aria-pressed={!filters[f.key]} className={btn(!filters[f.key])} onClick={() => onFilter(f.key, '')}>
                   {f.all}
                 </button>
-                {f.options.map(([value, label]) => (
+                {options.map(([value, label]) => (
                   <button key={value} type="button" aria-pressed={filters[f.key] === value} className={btn(filters[f.key] === value)} onClick={() => onFilter(f.key, filters[f.key] === value ? '' : value)}>
                     <span className="min-w-0 truncate">{label}{n(value) != null && <span className="num font-normal text-muted"> ({n(value)})</span>}</span>
                   </button>
@@ -44,7 +46,7 @@ export default function FilterPanel({ fields, filters, counts, onFilter, sorts, 
                 aria-label={f.label}
               >
                 <option value="">{f.all}</option>
-                {f.options.map(([value, label]) => (
+                {options.map(([value, label]) => (
                   <option key={value} value={value}>{label}{n(value) != null ? ` (${n(value)})` : ''}</option>
                 ))}
               </select>

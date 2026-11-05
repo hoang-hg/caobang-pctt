@@ -27,3 +27,24 @@ LATEST_JOIN = """LEFT JOIN LATERAL (
 LATEST_COLS = (
     f"l.value, l.time, coalesce(l.time < now() - interval '{STALE_MINUTES} minutes', false) AS stale"
 )
+
+
+# Xu thế mực nước cho người dân: so số đo mới nhất với số đo gần mốc 3 giờ trước nhất (trong khoảng 2–4 giờ trước). Không có
+# số đo cũ đủ gần, hoặc trạm mất tín hiệu → không nói xu thế (không đoán "ổn định")
+TREND_HOURS = 3
+TREND_FLAT_M = 0.05  # chênh dưới 5 cm / 3 giờ coi là ổn định
+TREND_JOIN = f"""LEFT JOIN LATERAL (
+    SELECT r.value AS prev_value FROM iot_telemetry.sensor_readings r
+     WHERE r.station_id = s.id AND r.time BETWEEN l.time - interval '{TREND_HOURS + 1} hours'
+                                             AND l.time - interval '{TREND_HOURS - 1} hours'
+     ORDER BY abs(extract(epoch FROM r.time - (l.time - interval '{TREND_HOURS} hours'))) LIMIT 1) p ON TRUE"""
+
+
+def river_trend(value: float | None, prev: float | None, stale: bool) -> tuple[float | None, str]:
+    """(chênh lệch m trong ~3 giờ, nhãn) — "Đang lên" / "Đang xuống" / "Ổn định"; thiếu số liệu → (None, "Chưa rõ")."""
+    if value is None or prev is None or stale:
+        return None, "Chưa rõ"
+    delta = round(value - prev, 2)
+    if abs(delta) < TREND_FLAT_M:
+        return delta, "Ổn định"
+    return delta, "Đang lên" if delta > 0 else "Đang xuống"

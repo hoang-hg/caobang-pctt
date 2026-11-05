@@ -234,6 +234,17 @@ def test_river_level_never_claims_safe_without_fresh_data():
     assert river_level(179.0, False, thr) == (0, "Dưới báo động I")
 
 
+def test_river_trend_says_nothing_without_two_fresh_readings():
+    from app.services.readings import river_trend
+
+    assert river_trend(None, 180.0, False) == (None, "Chưa rõ")
+    assert river_trend(181.0, None, False) == (None, "Chưa rõ")  # không có số đo ~3 giờ trước
+    assert river_trend(181.0, 180.0, True) == (None, "Chưa rõ")  # mất tín hiệu → không nói xu thế
+    assert river_trend(181.3, 180.9, False) == (0.4, "Đang lên")
+    assert river_trend(180.5, 181.0, False) == (-0.5, "Đang xuống")
+    assert river_trend(180.52, 180.5, False) == (0.02, "Ổn định")
+
+
 def test_track_items_never_include_address_or_description():
     """Tra cứu công khai: kể cả đúng mã + SĐT cũng không trả địa chỉ / nội dung — lỡ bị dò trúng không lộ nơi người
     đang mắc kẹt (người gửi đã biết địa chỉ của mình)."""
