@@ -1893,6 +1893,12 @@ Kết quả đo 27/09/2026 trên máy thử: 8 CPU / 8 GB **dùng chung** cho CS
 | Cổng công khai — tải lần đầu (gzip) | 680 KB | **218 KB** |
 | 500 người dân **+** 60 cán bộ **cùng lúc** | tệp tĩnh p95 8 s, API công khai 6 s, tra cứu vị trí 31 s, dashboard 27 s | tệp tĩnh 50 ms, API công khai 55 ms; tra cứu vị trí và dashboard p95 ~7 s |
 
+Đo lại 05/11/2026 sau đợt làm giao diện theo bản vẽ desktop (máy thử 4 CPU, dùng chung như trên; kịch bản bỏ
+`/public/reservoirs` — hồ chứa đã bỏ khỏi hệ thống): 500 người dân — API công khai p95 **2,6 ms**, tra cứu vị trí **25 ms**,
+tệp tĩnh **1,3 ms**, ~417 yêu cầu/s, lỗi 0%; 60 cán bộ — p95 **189 ms**, lỗi 0%. Gói tải lần đầu của cổng ở 1440 px (đo theo
+mọi JS / CSS trình duyệt tải khi mở `/`, kể cả chunk bản đồ): **287 KB** gzip (ngày 30/10 là 273 KB) — vượt mốc ~220 KB, cần
+xem lại (chunk bản đồ 67 KB, vendor 65 KB, trang cổng 44 KB).
+
 Lượt đo "trước" dùng kịch bản cũ, có một phần yêu cầu bị 403/422 do chính kịch bản (tài khoản không có quyền,
 toạ độ ngoài tỉnh) nên không so tỉ lệ lỗi. Hàng cuối: backend cần ~3,7 lõi cho cả hai nhóm (người dân ~2 lõi, cán bộ ~1,7 lõi). Trên máy thử, 8 CPU phải chia cho
 CSDL, nginx và k6 nên bị nghẽn CPU; tăng lên 6 tiến trình API không giúp được (còn gây "too many clients" với pool cũ
