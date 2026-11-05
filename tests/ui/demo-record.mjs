@@ -6,7 +6,7 @@
 //   1. Dựng sẵn tình huống bằng API: mở đợt thiên tai, xã Cô Ba xin tỉnh chi viện, xã nhận tin sạt lở → tỉnh điều đội,
 //      xã cập nhật sơ tán, xã gửi hồ sơ dữ liệu chờ duyệt, người dân gửi phản ánh.
 //   2. Mở từng trang bằng trình duyệt với tài khoản tỉnh (chihuy) và xã (admin.coba), bấm qua các thẻ.
-//   3. Lưu mọi phản hồi GET /api/v1 (trừ /public) → frontend/src/api/demo/fixtures.json.
+//   3. Lưu mọi phản hồi GET /api/v1 (trừ /public) → tests/du-lieu-gia-lap/giao-dien/fixtures.json.
 //
 // CHỈ chạy với backend localhost vừa seed mới (docker compose down -v rồi up): bước 1 ghi dữ liệu vào máy chủ đó.
 //   API=http://localhost:8000 UI=http://localhost:5173 node demo-record.mjs
@@ -24,7 +24,7 @@ for (const u of [API, UI]) {
     process.exit(1);
   }
 }
-const OUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../frontend/src/api/demo/fixtures.json');
+const OUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../du-lieu-gia-lap/giao-dien/fixtures.json');
 const SUPPORT_TAG = '[Xã xin chi viện]'; // = COMMUNE_SUPPORT_TAG (frontend/src/components/rescue/rescueFacts.js)
 const ACCOUNTS = { tinh: ['chihuy', 'chihuy123'], xa: ['admin.coba', 'admincoba123'] };
 const COMMUNE = 'CB-COBA';

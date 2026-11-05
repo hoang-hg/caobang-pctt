@@ -159,7 +159,10 @@ services:
         condition: service_started
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      additional_contexts:
+        gia_lap: ./tests/du-lieu-gia-lap/giao-dien  # dữ liệu chế độ giả lập, xem frontend/Dockerfile
     image: caobang-pctt-frontend  # tên cố định như backend — đóng gói chép lên máy chủ: docker save caobang-pctt-frontend
     container_name: caobang-pctt-frontend
     ports:

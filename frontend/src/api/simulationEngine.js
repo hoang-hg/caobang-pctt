@@ -1,12 +1,12 @@
 // CHẾ ĐỘ GIẢ LẬP — chỉ máy dev, bật chủ động (app/store.js); nạp qua import động trong nhánh import.meta.env.DEV của
 // api/client.js nên không có trong bản build chạy thật.
 //
-// Dữ liệu: phản hồi API đã ghi từ backend chạy seed demo (demo/fixtures.json, ghi bằng tests/ui/demo-record.mjs — tên giả
+// Dữ liệu: phản hồi API đã ghi từ backend chạy seed demo (tests/du-lieu-gia-lap/giao-dien/fixtures.json, ghi bằng tests/ui/demo-record.mjs — tên giả
 // định, SĐT đầu số 0999) nên đúng định dạng API thật; mốc thời gian dời về lúc mở. Hai bộ: toàn tỉnh (tài khoản cấp tỉnh)
 // và xã Cô Ba (tài khoản cấp xã, hoặc cấp tỉnh đang lọc đúng xã Cô Ba). Trên đó là lớp thay đổi trong phiên — phiếu SOS
 // mới, điều động, cập nhật, hoàn thành, kịch bản thiên tai (SimulationBar) — chỉ nằm trong bộ nhớ trình duyệt, tải lại
 // trang là về dữ liệu đã ghi. Đường dẫn / thao tác chưa giả lập → lỗi 501 nói rõ (trang hiện trạng thái lỗi, không vỡ).
-import fixtures from './demo/fixtures.json';
+import fixtures from '@du-lieu-gia-lap/fixtures.json';
 import { DEMO_TOKEN, useStore } from '../app/store';
 import { ApiError } from './client';
 import { demoAuth } from './demoUsers';

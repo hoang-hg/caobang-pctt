@@ -84,7 +84,7 @@ frontend/                  React 18, Vite 6, Tailwind 3, TanStack Query 5, Zusta
   src/sw.js                service worker cổng công khai (chỉ đăng ký ở bản build — main.jsx), README §9.4
   src/App.jsx              route + Guard(obj, act), mỗi trang `lazy()`; trang công khai /, /cong-khai, /dang-nhap…
   src/api/                 client.js (api(), useAreaParams) · hooks.js (useAreaQuery, useUnits…) · useSocket.js ·
-                           chế độ giả lập (trên trình duyệt, README §4.7): simulationEngine.js, demoUsers.js, demo/fixtures.json
+                           chế độ giả lập (trên trình duyệt, README §4.7): simulationEngine.js, demoUsers.js (dữ liệu: tests/du-lieu-gia-lap/giao-dien/fixtures.json)
   src/app/store.js         Zustand: theme, filter, focus, alertDraft, gps, auth, wsStatus, soundOn, sidebar, savedAt, toasts
   src/rbac/                permissions.js (khớp domain) · usePermission.js (usePermission, useCanAll, useAllowedCodes,
                            useIsCommuneUser, useGuideRole, Can)
@@ -320,7 +320,7 @@ chỉ khi `DEMO_MODE`; `DEMO_MODE=false` xoá đoạn `so_do` còn sót mỗi l�
   trang đăng nhập / thanh trên. Bản chạy thật: nút "Dữ liệu giả lập" ở Nguồn dữ liệu (quyền integration.manage), chỉ thẻ trình
   duyệt đó (sessionStorage), dải vàng luôn hiện, hỏi xác nhận (không nhận SOS thật). Mã + dữ liệu mẫu là chunk riêng
   (`lazy` / `import()` động, `api/simulationSwitch.js`) — chỉ tải khi bật. Không bao giờ "máy chủ lỗi thì trả dữ liệu giả";
-  `/public/*` luôn gọi máy chủ thật. Dữ liệu = phản hồi API thật đã ghi (`tests/ui/demo-record.mjs` → `api/demo/fixtures.json`)
+  `/public/*` luôn gọi máy chủ thật. Dữ liệu = phản hồi API thật đã ghi (`tests/ui/demo-record.mjs` → `tests/du-lieu-gia-lap/giao-dien/fixtures.json`)
   — API đổi định dạng thì ghi lại, không sửa tay tệp ghi.
 - **Khung trang điều hành**: lề / khoảng cách `PAGE` (`components/layout/page.js`; dải khẩn tràn mép theo `EDGE`), đầu trang
   `PageHeader` (tiêu đề · địa bàn · giờ số liệu · thao tác): nhiều nhất 1 nút chính tô màu, xuất / in gom vào menu "Xuất"

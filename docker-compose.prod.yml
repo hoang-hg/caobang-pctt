@@ -240,7 +240,10 @@ services:
         limits:
           memory: 512m
     image: ${FRONTEND_IMAGE:-caobang-pctt-frontend:local}
-    build: ./frontend
+    build:
+      context: ./frontend
+      additional_contexts:
+        gia_lap: ./tests/du-lieu-gia-lap/giao-dien  # dữ liệu chế độ giả lập, xem frontend/Dockerfile
     restart: unless-stopped
     ports:
       # Mặc định chỉ nghe trên máy chủ (Caddy hoặc proxy cùng máy). Proxy của trung tâm dữ liệu ở máy khác:
