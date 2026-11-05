@@ -72,7 +72,7 @@ export function citizen() {
     // người mới vào: tải JS/CSS ban đầu (người cũ đã có trong cache trình duyệt)
     http.batch(assets.map((a) => ['GET', `${BASE}${a}`, null, { headers: h, tags: { kind: 'static' } }]));
   }
-  const api = ['overview', 'map', 'alerts', 'hotlines', 'forecast/areas?hours=24', 'reservoirs', 'landslides', 'reports', 'config'];
+  const api = ['overview', 'map', 'alerts', 'hotlines', 'forecast/areas?hours=24', 'landslides', 'reports', 'config'];
   const res = http.batch(api.map((p) => ['GET', `${BASE}/api/v1/public/${p}`, null, { headers: h, tags: { kind: 'api' } }]));
   check(res[0], { 'overview 200': (r) => r.status === 200 });
   const [clat, clon] = CENTERS[Math.floor(Math.random() * CENTERS.length)];

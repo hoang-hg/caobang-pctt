@@ -42,6 +42,20 @@ const GROUPS = [
   { id: 'tra-cuu', label: 'Tra cứu phiếu', icon: Search, tabs: ['tracuu'] },
 ];
 const MAP_VIEWS = ['dubao', 'phananh']; // màn con của "Bản đồ cảnh báo" — chỉ máy tính ≥ 1280 px (khung N17, N18)
+// Xu thế mực nước ~3 giờ (máy chủ so số đo mới nhất với số đo gần mốc 3 giờ trước): thiếu số đo / mất tín hiệu → "Chưa rõ", không đoán
+// "ổn định". Không tô màu mức rủi ro — mức báo động đã ở cột "Mức"
+const TREND_ICON = { 'Đang lên': '↑', 'Đang xuống': '↓', 'Ổn định': '→' };
+function RiverTrend({ r }) {
+  if (!r.trend_label || r.trend_label === 'Chưa rõ') return <span className="text-muted">Chưa rõ xu thế</span>;
+  const d = r.trend_3h;
+  return (
+    <span>
+      <span aria-hidden="true">{TREND_ICON[r.trend_label]} </span>{r.trend_label}
+      {d != null && <span className="num text-muted"> ({d > 0 ? '+' : ''}{d.toLocaleString('vi-VN')} m)</span>}
+    </span>
+  );
+}
+
 const SUB_LABEL = { muanuoc: 'Mực nước sông suối', sotan: 'Điểm sơ tán an toàn', hotlines: 'Đường dây nóng' };
 const SOURCE_TAB_LABEL = { satlo: 'Quay lại Sạt lở, lũ quét', sotan: 'Quay lại Điểm sơ tán' };
 const REFRESH = 60_000;
@@ -1952,6 +1966,7 @@ export default function PublicPortal() {
                       <th className="px-3 py-2 font-bold">Trạm</th>
                       <th className="px-3 py-2 font-bold">Mực nước</th>
                       <th className="px-3 py-2 font-bold">Mức</th>
+                      <th className="px-3 py-2 font-bold">Xu thế 3 giờ</th>
                       <th className="px-3 py-2 font-bold">Số đo lúc</th>
                     </tr>
                   </thead>
@@ -1961,6 +1976,7 @@ export default function PublicPortal() {
                         <td className="px-3 py-2.5"><b className="block text-ink">{r.name.replace(/\s*\(sông[^)]*\)/i, '')}</b><span className="text-xs text-muted">Sông {r.river}</span></td>
                         <td className={clsx('num px-3 py-2.5', r.stale && 'text-muted')}>{r.value != null ? `${r.value} m` : '—'}</td>
                         <td className="px-3 py-2.5"><span className={clsx('chip whitespace-nowrap text-xs font-bold', riskStyle(r.level).chip)}>{r.level_label}</span></td>
+                        <td className="whitespace-nowrap px-3 py-2.5 text-[13px] text-ink-2"><RiverTrend r={r} /></td>
                         <td className={clsx('px-3 py-2.5 text-[13px]', r.stale ? 'text-serious' : 'text-ink-2')}>{r.time ? dateTime(r.time) : 'Chưa có số đo'}</td>
                       </tr>
                     ))}
@@ -2002,6 +2018,7 @@ export default function PublicPortal() {
                       <span className={clsx('font-mono text-2xl font-bold', r.stale ? 'text-muted' : 'text-ink')}>{r.value ?? '–'}</span>
                       {r.value != null && <span className="text-xs text-muted">mét</span>}
                     </div>
+                    <div className="text-xs text-ink-2"><RiverTrend r={r} /></div>
                     <div className="text-xs text-muted mt-2 border-t border-line/60 pt-2 flex justify-between gap-2">
                       <span>Trạm quan trắc: {r.name}</span>
                       <span className={r.stale ? 'text-serious' : 'text-ink-2'}>{r.time ? `Số đo lúc ${dateTime(r.time)}` : 'Chưa có số đo'}</span>

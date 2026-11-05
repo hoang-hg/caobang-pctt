@@ -76,7 +76,7 @@ export default function FilterToolbar({
   const selects = fields.map((f) => (
     <select key={f.key} className={selCls(filters[f.key])} value={filters[f.key]} onChange={(e) => onFilter(f.key, e.target.value)} aria-label={f.label}>
       <option value="">{f.all}</option>
-      {f.options.map(([value, label]) => (
+      {(f.hideEmpty && counts?.[f.key] ? f.options.filter(([v]) => (counts[f.key][v] ?? 0) > 0 || filters[f.key] === v) : f.options).map(([value, label]) => (
         <option key={value} value={value}>{label}{counts?.[f.key] ? ` (${counts[f.key][value] ?? 0})` : ''}</option>
       ))}
     </select>

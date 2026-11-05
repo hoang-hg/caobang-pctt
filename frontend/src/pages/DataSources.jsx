@@ -720,6 +720,19 @@ function DevicesTab({ devices }) {
   );
 }
 
+/** 12 cột nhỏ: số đo nhận được mỗi giờ (cũ → mới). Giờ không có số đo = vạch xám thấp, không phải "an toàn". */
+function HourlyBars({ counts }) {
+  const max = Math.max(1, ...counts);
+  const total = counts.reduce((a, b) => a + b, 0);
+  return (
+    <span className="inline-flex h-6 items-end gap-0.5" role="img" aria-label={`${total} số đo trong 12 giờ qua, ${counts.filter((n) => n === 0).length} giờ không có số đo`}>
+      {counts.map((n, i) => (
+        <span key={i} className={clsx('w-1.5 rounded-sm', n ? 'bg-accent' : 'bg-line')} style={{ height: n ? `${Math.max(25, (100 * n) / max)}%` : '12%' }} title={`${n} số đo`} />
+      ))}
+    </span>
+  );
+}
+
 function MonitorTab({ sources, devices }) {
   const desk = useMediaQuery('(min-width: 1280px)');
   const { data, isError, refetch } = useQuery({ queryKey: ['int-monitor'], queryFn: () => api('/integrations/monitor'), refetchInterval: 10_000 });
@@ -751,12 +764,13 @@ function MonitorTab({ sources, devices }) {
       text: data.last24.errors ? `${int(data.last24.errors)} lần lấy số liệu bị lỗi trong 24 giờ — xem thẻ "Nguồn số liệu".` : 'Không có lần lấy số liệu nào bị lỗi trong 24 giờ.',
     },
   ];
-  // Máy tính ≥ 1280 px (bản vẽ khung I8): đếm theo trạng thái + bảng nguồn / thiết bị + nhật ký cột phải. Không có cột "12 giờ
-  // qua" vì máy chủ chưa trả chuỗi số đo theo giờ; không số đo thì nói rõ, không bao giờ hiện là an toàn
+  // Máy tính ≥ 1280 px (bản vẽ khung I8): đếm theo trạng thái + bảng nguồn / thiết bị + nhật ký cột phải. Cột "12 giờ qua" =
+  // số đo trạm của thiết bị nhận được mỗi giờ (GET /integrations/devices → hourly_12h); không số đo thì nói rõ, không bao giờ
+  // hiện là an toàn
   if (desk) {
     const rows = [
       ...sources.map((s) => { const st = sourceState(s, devices); return { key: `s-${s.id}`, name: nameOfSource(s), sub: PULL.includes(s.type) ? `Hệ thống tự lấy · mỗi ${every(s.poll_interval_s)}` : 'Cổng nhận số đo', last: s.last_success_at, level: st.level, chip: st.chip, enabled: s.enabled }; }),
-      ...devices.map((d) => { const st = deviceState(d); return { key: `d-${d.id}`, name: d.name, sub: PROTOCOL_SHORT[d.protocol] || d.protocol, last: d.last_seen_at, level: st.level, chip: !d.enabled ? 'Đã tắt' : d.status === 'truc_tuyen' ? 'Đang gửi' : d.status === 'mat_tin_hieu' ? 'Mất tín hiệu' : 'Chưa gửi', enabled: d.enabled }; }),
+      ...devices.map((d) => { const st = deviceState(d); return { key: `d-${d.id}`, name: d.name, sub: PROTOCOL_SHORT[d.protocol] || d.protocol, last: d.last_seen_at, level: st.level, chip: !d.enabled ? 'Đã tắt' : d.status === 'truc_tuyen' ? 'Đang gửi' : d.status === 'mat_tin_hieu' ? 'Mất tín hiệu' : 'Chưa gửi', enabled: d.enabled, hourly: d.hourly_12h }; }),
     ];
     const pill = 'inline-flex items-center gap-2 rounded-full border border-line bg-panel px-3.5 py-2 text-sm text-ink';
     const count = (fn) => rows.filter(fn).length;
@@ -774,6 +788,7 @@ function MonitorTab({ sources, devices }) {
                 <tr className="text-left text-xs font-bold text-ink-2">
                   <th className="px-3 py-2 font-bold">Nguồn / thiết bị</th>
                   <th className="px-3 py-2 font-bold">Lần cuối</th>
+                  <th className="px-3 py-2 font-bold">12 giờ qua</th>
                   <th className="px-3 py-2 font-bold">Tình trạng</th>
                 </tr>
               </thead>
@@ -782,6 +797,7 @@ function MonitorTab({ sources, devices }) {
                   <tr key={r.key} className="border-t border-line">
                     <td className="px-3 py-2.5"><b className="block text-ink">{r.name}</b><span className="text-xs text-muted">{r.sub}</span></td>
                     <td className="px-3 py-2.5 text-ink-2">{r.last ? ago(r.last) : '—'}</td>
+                    <td className="px-3 py-2.5">{r.hourly ? <HourlyBars counts={r.hourly} /> : <span className="text-muted">—</span>}</td>
                     <td className="px-3 py-2.5"><span className={clsx('chip whitespace-nowrap text-xs font-semibold', r.level == null ? 'bg-panel2 text-ink-2' : risk(r.level).chip)}>{r.chip}</span></td>
                   </tr>
                 ))}

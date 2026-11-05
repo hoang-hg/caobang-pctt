@@ -833,12 +833,12 @@ async def evacuation_history(
     codes: list[str] = Depends(area_scope("monitoring", "view")),
 ):
     """Diễn biến sơ tán của một xã (DB8, trigger migration 0024): mỗi lần số kế hoạch / đã sơ tán đổi là một dòng, kèm người
-    cập nhật. Xã ngoài phạm vi được giao → 404 (không lộ có hay không)."""
+    cập nhật và nguồn báo (migration 0030). Xã ngoài phạm vi được giao → 404 (không lộ có hay không)."""
     if codes and code not in codes:
         raise HTTPException(404, "Không tìm thấy xã/phường")
     return await fetch_all(
         """SELECT h.time, h.planned_households, h.evacuated_households, h.planned_persons, h.evacuated_persons,
-                  us.full_name AS actor_name
+                  h.source, us.full_name AS actor_name
              FROM operations.evacuation_history h
              JOIN spatial_admin.administrative_units u ON u.id = h.admin_unit_id
              LEFT JOIN communications.users us ON us.id = h.actor_id
@@ -897,9 +897,8 @@ async def update_evacuation(
     if problem := evacuation_problem(body, unit["households"], unit["population"]):
         raise HTTPException(422, problem)
     async with transaction() as conn:
-        await ledger_context(
-            conn, actor_id=user["id"]
-        )  # lịch sử sơ tán ghi người cập nhật (trigger, migration 0024)
+        # lịch sử sơ tán ghi người cập nhật (trigger, migration 0024) và nguồn báo (migration 0030)
+        await ledger_context(conn, actor_id=user["id"], note=(body.source or "").strip() or None)
         row = await fetch_one(
             """INSERT INTO operations.evacuation_progress
                   (admin_unit_id, planned_households, evacuated_households, planned_persons, evacuated_persons)

@@ -126,12 +126,27 @@ DEVICE_COLS = """d.id, d.name, d.vendor, d.protocol, d.station_id, s.name AS sta
                  d.status, d.last_seen_at, d.last_value, d.created_at, (d.api_key_hash IS NOT NULL) AS has_key"""
 
 
+# Số đo trạm của thiết bị nhận được mỗi giờ, 12 giờ qua (cũ → mới, giờ hiện tại là ô cuối) — cột "12 giờ qua" ở Tình trạng nhận
+# số liệu: thấy thiết bị gửi đều hay ngắt quãng mà không cần mở từng trạm. Đếm theo trạm (số đo không lưu theo thiết bị)
+HOURLY_12H_SQL = """WITH b AS (SELECT generate_series(date_trunc('hour', now()) - interval '11 hours', date_trunc('hour', now()),
+                                              interval '1 hour') AS h)
+SELECT d.id, array_agg(COALESCE(c.n, 0) ORDER BY b.h) AS hourly_12h
+  FROM integrations.devices d CROSS JOIN b
+  LEFT JOIN LATERAL (SELECT count(*)::int AS n FROM iot_telemetry.sensor_readings r
+                      WHERE r.station_id = d.station_id AND r.time >= b.h AND r.time < b.h + interval '1 hour') c ON TRUE
+ GROUP BY d.id"""
+
+
 @router.get("/devices")
 async def devices(_: dict = Depends(VIEW)):
-    return await fetch_all(
+    rows = await fetch_all(
         f"""SELECT {DEVICE_COLS} FROM integrations.devices d
               JOIN iot_telemetry.monitoring_stations s ON s.id = d.station_id ORDER BY d.created_at"""
     )
+    hourly = {r["id"]: r["hourly_12h"] for r in await fetch_all(HOURLY_12H_SQL)}
+    for r in rows:
+        r["hourly_12h"] = hourly.get(r["id"], [0] * 12)
+    return rows
 
 
 class DeviceIn(BaseModel):
