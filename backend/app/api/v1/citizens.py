@@ -39,19 +39,28 @@ def _temp_password() -> str:
 async def list_citizens(
     q: str = Query("", max_length=60, description="Số điện thoại (một phần) hoặc họ tên"),
     limit: int = Query(50, ge=1, le=200),
+    admin_code: str = Query(
+        "", max_length=40, description='Xã / phường người dân khai; "none" = chưa khai xã'
+    ),
     _: dict = Depends(require_permission("citizen", "view")),
 ):
     term = q.strip()
     digits = "".join(ch for ch in term if ch.isdigit())
     if digits.startswith("84") and len(digits) >= 11:
         digits = "0" + digits[2:]
-    where, params = "", {"limit": limit}
+    conds, params = [], {"limit": limit}
     if digits and len(digits) >= 3:
-        where = "WHERE c.phone LIKE :p"
+        conds.append("c.phone LIKE :p")
         params["p"] = f"%{digits}%"
     elif term:
-        where = "WHERE c.full_name ILIKE :n"
+        conds.append("c.full_name ILIKE :n")
         params["n"] = f"%{term}%"
+    if admin_code == "none":
+        conds.append("c.admin_unit_id IS NULL")
+    elif admin_code:
+        conds.append("u.code = :c")
+        params["c"] = admin_code
+    where = ("WHERE " + " AND ".join(conds)) if conds else ""
     rows = await fetch_all(f"{LIST_SELECT} {where} ORDER BY c.created_at DESC LIMIT :limit", params)
     total = await fetch_one("SELECT count(*) AS n FROM community.citizen_accounts")
     return {"items": rows, "total": total["n"]}

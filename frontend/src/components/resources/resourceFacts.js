@@ -39,12 +39,12 @@ export const depotPct = (d) => (d.capacity_l > 0 ? (100 * ((d.gasoline_l || 0) +
  */
 export const FILTERS = {
   luc_luong: [
-    { key: 'cap', label: 'Cấp quản lý', all: 'Mọi cấp quản lý', options: Object.entries(FORCE_LEVEL) },
+    { key: 'cap', label: 'Cấp quản lý', all: 'Mọi cấp quản lý', options: Object.entries(FORCE_LEVEL), hideEmpty: true },
     { key: 'tt', label: 'Tình trạng', all: 'Mọi tình trạng', options: Object.entries(RES_STATUS).map(([k, v]) => [k, v.label]) },
     { key: 'kn', label: 'Kỹ năng', all: 'Mọi kỹ năng', options: Object.entries(SKILL) },
   ],
   vat_tu: [
-    { key: 'cap', label: 'Cấp kho', all: 'Mọi cấp kho', options: Object.entries(WAREHOUSE_LEVEL) },
+    { key: 'cap', label: 'Cấp kho', all: 'Mọi cấp kho', options: Object.entries(WAREHOUSE_LEVEL), hideEmpty: true },
     {
       key: 'tt',
       label: 'Mức dự trữ',

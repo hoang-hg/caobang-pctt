@@ -81,7 +81,7 @@ export default function Header() {
 
       {/* Tìm kiếm toàn năng: từ 768 px là ô tìm; điện thoại là nút kính lúp (mở hộp tìm toàn màn) đứng cạnh cụm nút bên phải —
           trước đây điện thoại không tìm được gì */}
-      <div className="ml-auto min-w-0 flex-none md:ml-0 md:max-w-sm md:flex-1 lg:w-40 lg:flex-none xl:w-44 2xl:w-72">
+      <div className="ml-auto min-w-0 flex-none md:ml-0 md:max-w-sm md:flex-1 lg:w-40 lg:flex-none 2xl:w-72">
         <OmniSearch />
       </div>
 

@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { Copy, KeyRound, Lock, Search, Unlock } from 'lucide-react';
 import { api } from '../api/client';
+import { useUnits } from '../api/hooks';
 import { useStore } from '../app/store';
 import { EmptyState, ErrorState, Modal, Skeleton } from '../components/common/ui';
 import { usePermission } from '../rbac/usePermission';
@@ -21,7 +22,9 @@ export default function CitizenAccountsTab() {
   const qc = useQueryClient();
   const [q, setQ] = useState('');
   const term = useDebounced(q.trim(), 300);
-  const list = useQuery({ queryKey: ['citizens', term], queryFn: () => api('/citizens', { params: { q: term || undefined } }) });
+  const [xa, setXa] = useState(''); // lọc theo xã người dân khai khi đăng ký; "none" = chưa khai
+  const units = useUnits();
+  const list = useQuery({ queryKey: ['citizens', term, xa], queryFn: () => api('/citizens', { params: { q: term || undefined, admin_code: xa || undefined } }) });
   const [lock, setLock] = useState(null); // tài khoản đang khoá → hỏi lý do
   const [reason, setReason] = useState('');
   const [temp, setTemp] = useState(null); // { name, phone, password } — hiện một lần
@@ -66,6 +69,11 @@ export default function CitizenAccountsTab() {
             aria-label="Tìm tài khoản người dân theo số điện thoại hoặc họ tên"
           />
         </label>
+        <select className="input tap w-auto max-w-[14rem]" value={xa} onChange={(e) => setXa(e.target.value)} aria-label="Lọc theo xã / phường người dân khai">
+          <option value="">Mọi xã / phường</option>
+          <option value="none">Chưa khai xã</option>
+          {(units.data || []).map((u) => <option key={u.code} value={u.code}>{u.unit_type === 'phuong' ? 'Phường' : 'Xã'} {u.name}</option>)}
+        </select>
         {list.data && <span className="text-xs text-muted">Tổng {list.data.total} tài khoản người dân</span>}
       </div>
       <p className="text-xs text-muted">

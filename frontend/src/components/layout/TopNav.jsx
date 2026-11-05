@@ -9,7 +9,9 @@ import { useClickOutside } from '../../utils/useClickOutside';
 import { NAV_GROUPS } from './nav';
 import { useNavBadges } from './Sidebar';
 
-const MORE_W = 84; // bề rộng nút "Thêm" (đo xấp xỉ) — luôn chừa chỗ khi có mục phải dồn vào
+// Bề rộng nút "Thêm" (đo xấp xỉ) — luôn chừa chỗ khi có mục phải dồn vào. Mục menu px-3 tới 1535 px: 1440 px vừa đủ 5 mục
+// nhóm Điều hành như bản vẽ (trước đây "Vật tư" bị dồn vào "Thêm")
+const MORE_W = 80;
 const GAP = 4;
 
 const allowed = (perms) => (n) => !n.perm || hasPermission(perms, ...n.perm) || (n.alt && hasPermission(perms, ...n.alt));
@@ -78,7 +80,7 @@ export default function TopNav() {
       to={it.to}
       onClick={() => setOpen(false)}
       className={({ isActive }) => clsx(
-        'tap flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[10px] px-3.5 py-2 text-sm font-medium transition-colors',
+        'tap flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[10px] px-3 py-2 text-sm font-medium transition-colors 2xl:px-3.5',
         isActive ? 'bg-accent/10 font-semibold text-accent' : 'text-ink-2 hover:bg-panel2 hover:text-ink',
         inMenu && 'w-full',
       )}
@@ -98,7 +100,7 @@ export default function TopNav() {
       {/* Hàng đo (ẩn): bề rộng thật của từng mục để biết bao nhiêu mục vừa chỗ */}
       <div ref={measure} aria-hidden="true" className="pointer-events-none invisible absolute left-0 top-0 flex gap-1">
         {primary.map((it) => (
-          <span key={it.to} className="flex shrink-0 items-center gap-1.5 whitespace-nowrap px-3.5 py-2 text-sm font-semibold">
+          <span key={it.to} className="flex shrink-0 items-center gap-1.5 whitespace-nowrap px-3 py-2 text-sm font-semibold 2xl:px-3.5">
             {it.short || it.label}
           </span>
         ))}
@@ -112,7 +114,7 @@ export default function TopNav() {
             aria-expanded={open}
             aria-haspopup="true"
             className={clsx(
-              'tap flex items-center gap-1 whitespace-nowrap rounded-[10px] px-3.5 py-2 text-sm font-medium transition-colors',
+              'tap flex items-center gap-1 whitespace-nowrap rounded-[10px] px-3 py-2 text-sm font-medium transition-colors 2xl:px-3.5',
               moreActive ? 'bg-accent/10 text-accent' : 'text-ink-2 hover:bg-panel2 hover:text-ink',
             )}
           >

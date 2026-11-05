@@ -223,7 +223,7 @@ function EvacuationRow({ r, online, onEdit }) {
 /** Dòng bảng tiến độ sơ tán (màn Sơ tán máy tính — khung C9). Thanh tiến độ màu trung tính (cao = tốt). */
 /**
  * Diễn biến sơ tán của một xã (bản vẽ khung C15): biểu đồ hộ đã sơ tán so với kế hoạch + bảng từng lần số thay đổi, Xuất Excel.
- * Lấy từ GET /evacuation/{code}/history (72 giờ). Máy chủ chưa lưu nguồn báo của từng lần nên bảng không có cột đó.
+ * Lấy từ GET /evacuation/{code}/history (72 giờ), kèm nguồn báo của từng lần (migration 0030 — lần cập nhật trước đó để trống).
  */
 function EvacuationHistoryModal({ row, onClose }) {
   const c = useChartTheme();
@@ -237,7 +237,7 @@ function EvacuationHistoryModal({ row, onClose }) {
       await exportExcel(
         rows.map((h) => ({
           Lúc: dateTime(h.time), 'Hộ đã sơ tán': h.evacuated_households, 'Hộ kế hoạch': h.planned_households,
-          'Nhân khẩu đã sơ tán': h.evacuated_persons, 'Nhân khẩu kế hoạch': h.planned_persons, 'Người ghi': h.actor_name || '',
+          'Nhân khẩu đã sơ tán': h.evacuated_persons, 'Nhân khẩu kế hoạch': h.planned_persons, 'Nguồn báo': h.source || '', 'Người ghi': h.actor_name || '',
         })),
         { sheet: 'Dien bien so tan', filename: `dien-bien-so-tan-${row.code}-${vnFileStamp(new Date(), true)}.xlsx` },
       );
@@ -282,6 +282,7 @@ function EvacuationHistoryModal({ row, onClose }) {
                       <th className="px-3 py-2 font-bold">Lúc</th>
                       <th className="px-3 py-2 font-bold">Hộ đã / kế hoạch</th>
                       <th className="px-3 py-2 font-bold">Nhân khẩu</th>
+                      <th className="px-3 py-2 font-bold">Nguồn báo</th>
                       <th className="px-3 py-2 font-bold">Người ghi</th>
                     </tr>
                   </thead>
@@ -291,6 +292,7 @@ function EvacuationHistoryModal({ row, onClose }) {
                         <td className="whitespace-nowrap px-3 py-2">{dateTime(h.time)}</td>
                         <td className="num px-3 py-2">{int(h.evacuated_households)}/{int(h.planned_households)} hộ</td>
                         <td className="num px-3 py-2">{int(h.evacuated_persons)}/{int(h.planned_persons)} người</td>
+                        <td className="px-3 py-2 text-ink-2">{h.source || <span className="text-muted">—</span>}</td>
                         <td className="px-3 py-2 text-ink-2">{h.actor_name || 'Hệ thống'}</td>
                       </tr>
                     ))}

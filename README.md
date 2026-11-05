@@ -1112,7 +1112,7 @@ hành). Yêu cầu ở phạm vi toàn tỉnh không khớp quyền cấp xã.
 | `audit.view` | toàn tỉnh | Nhật ký pháp lý (`GET /api/v1/alerts/audit?since=&until=&limit=` — khoảng thời gian ISO 8601, tối đa 5.000 dòng / lần) |
 | `user.view` / `user.manage` | ✓ | Xem / tạo tài khoản cấp dưới, đổi cấp – phạm vi, đặt lại mật khẩu / PIN / 2 lớp, khoá |
 | `report.view` / `report.moderate` | ✓ | Xem (kể cả SĐT người gửi) / duyệt – từ chối – chuyển SOS phản ánh |
-| `citizen.view` / `citizen.manage` | — | Tài khoản người dân của cổng: tìm theo số điện thoại / khoá – mở khoá, đặt mật khẩu tạm khi người dân gọi đường dây nóng (`GET /citizens`, `PATCH /citizens/{id}`, `POST /citizens/{id}/reset-password`; ghi nhật ký pháp lý) |
+| `citizen.view` / `citizen.manage` | — | Tài khoản người dân của cổng: tìm theo số điện thoại / họ tên, lọc theo xã người dân khai (`?admin_code=`, `none` = chưa khai) / khoá – mở khoá, đặt mật khẩu tạm khi người dân gọi đường dây nóng (`GET /citizens`, `PATCH /citizens/{id}`, `POST /citizens/{id}/reset-password`; ghi nhật ký pháp lý) |
 | `integration.view` / `integration.manage` | toàn tỉnh | Xem / cấu hình nguồn dữ liệu, thiết bị IoT, cấp khoá, bật dữ liệu giả lập trên trình duyệt — **chỉ Cấp 1** |
 | `data.import` | toàn tỉnh | Nhập dữ liệu chính thức từ tệp; phê duyệt / từ chối hồ sơ xã gửi ([2.4](#nhap-du-lieu)) |
 | `data.submit` | ✓ | Gửi dữ liệu của xã mình chờ cấp tỉnh phê duyệt ([2.4](#nhap-du-lieu)) |
@@ -1189,7 +1189,7 @@ cùng lúc trước đây là bị 429).
 
 | Endpoint | Mô tả | Cache Redis |
 |---|---|---|
-| `GET /overview` | Mưa, sông, cảnh báo, SOS **chỉ đếm theo xã** | 30 s |
+| `GET /overview` | Mưa, sông (kèm xu thế ~3 giờ `trend_3h` / `trend_label`: Đang lên · Đang xuống · Ổn định · Chưa rõ — thiếu số đo ~3 giờ trước hoặc mất tín hiệu thì "Chưa rõ", không đoán), cảnh báo, SOS **chỉ đếm theo xã** | 30 s |
 | `GET /map` | GeoJSON vùng nguy hiểm, đường chia cắt, trạm, điểm sơ tán (kèm số trực `hotline`) | 30 s |
 | `GET /alerts`, `/alerts/{code}/share` | Cảnh báo đang / đã phát; trang chia sẻ Open Graph | 30 s / – |
 | `GET /forecast/areas?hours=24\|72`, `/forecast/areas/{code}` | Dự báo mưa theo xã P10/P50/P90 | 5 phút |
