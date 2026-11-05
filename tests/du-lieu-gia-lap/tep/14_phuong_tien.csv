@@ -1,0 +1,38 @@
+﻿ma,ten,loai,nhom,ma_luc_luong,suc_cho,trang_thai,nhien_lieu,vi_do,kinh_do
+CB-X01,Xuồng cao tốc X01,xuong,duong_thuy,F-QS-01,8,san_sang,80,22.66979,106.15046
+CB-X02,Xuồng cao tốc X02,xuong,duong_thuy,F-QS-01,8,san_sang,35,22.67278,106.14907
+CB-X03,Xuồng cao tốc X03,xuong,duong_thuy,F-CA-01,8,san_sang,100,22.673,106.25114
+CB-X04,Xuồng cao tốc X04,xuong,duong_thuy,F-DQ-01,6,bao_duong,80,22.60962,106.22749
+CB-X05,Xuồng cao tốc X05,xuong,duong_thuy,F-DQ-02,6,san_sang,70,22.77114,106.19684
+CB-X06,Xuồng composite X06,xuong,duong_thuy,F-BP-03,6,san_sang,100,22.52346,106.56632
+CB-X07,Xuồng cao tốc X07,xuong,duong_thuy,F-KV-03,6,san_sang,70,22.83405,106.50991
+CB-X08,Xuồng cao tốc X08,xuong,duong_thuy,F-DQ-05,6,san_sang,100,22.73139,106.42938
+CB-CN01,Ca nô Biên phòng CN01,ca_no,duong_thuy,F-BP-01,12,san_sang,100,22.88005,106.67838
+CB-G01,Ghe dân sự đăng ký dự phòng G01,ghe,duong_thuy,F-DQ-02,5,san_sang,80,22.76842,106.19876
+CB-LN01,Xe lội nước LN01,xe_loi_nuoc,duong_bo,F-QS-01,12,san_sang,,22.67036,106.1485
+CB-LN02,Xe lội nước LN02,xe_loi_nuoc,duong_bo,F-CA-01,12,san_sang,80,22.67472,106.25152
+CB-BT01,Xe bọc thép BTR-152,xe_boc_thep,duong_bo,F-QS-01,10,san_sang,15,22.67018,106.15039
+CB-T01,Xe tải gầm cao T01,xe_tai,duong_bo,F-QS-01,20,san_sang,100,22.67171,106.14731
+CB-T02,Xe tải gầm cao T02,xe_tai,duong_bo,F-KV-01,20,san_sang,100,22.9226,105.64533
+CB-T03,Xe tải gầm cao T03,xe_tai,duong_bo,F-KV-02,20,san_sang,70,22.64481,105.92428
+CB-T04,Xe tải gầm cao T04,xe_tai,duong_bo,F-KV-04,20,san_sang,35,22.38175,106.3883
+CB-T05,Xe tải cứu trợ T05,xe_tai,duong_bo,F-TN-01,16,san_sang,70,22.57781,106.27334
+CB-MX01,Máy xúc bánh xích MX01,may_xuc,duong_bo,F-KV-01,,san_sang,100,22.92102,105.64287
+CB-MX02,Máy xúc MX02,may_xuc,duong_bo,F-KV-02,,san_sang,100,22.64607,105.9237
+CB-MX03,Máy xúc MX03,may_xuc,duong_bo,F-CA-01,,bao_duong,80,22.67447,106.25194
+CB-MX04,Máy xúc MX04,may_xuc,duong_bo,F-DQ-04,,san_sang,,22.77555,105.46797
+CB-MU01,Máy ủi MU01,may_ui,duong_bo,F-KV-04,,san_sang,100,22.3808,106.38824
+CB-CT01,Xe cứu thương 115-01,xe_cuu_thuong,duong_bo,F-YT-01,2,san_sang,90,22.6492,106.22683
+CB-CT02,Xe cứu thương 115-02,xe_cuu_thuong,duong_bo,F-YT-01,2,san_sang,70,22.64924,106.22817
+CB-CT03,Xe cứu thương Bảo Lạc,xe_cuu_thuong,duong_bo,F-YT-02,2,san_sang,15,22.92787,105.66626
+CB-PD01,Máy phát điện 50 kVA,may_phat_dien,thiet_bi,F-QS-01,,san_sang,70,22.671,106.14684
+CB-PD02,Máy phát điện 30 kVA,may_phat_dien,thiet_bi,F-KV-02,,san_sang,35,22.64782,105.92303
+CB-MC01,Máy cưa cắt chuyên dụng,may_cua,thiet_bi,F-CA-01,,san_sang,90,22.67494,106.2485
+CB-FC01,Flycam dò tìm FC01,flycam,thiet_bi,F-CA-01,,san_sang,70,22.6735,106.24958
+CB-FC02,Flycam nhiệt FC02,flycam,thiet_bi,F-KV-01,,san_sang,100,22.92434,105.64255
+CB-FC03,Flycam FC03,flycam,thiet_bi,F-BP-04,,bao_duong,55,23.03418,105.56668
+CB-BTS01,Trạm BTS lưu động Viettel,bts_luu_dong,thiet_bi,F-QS-01,,san_sang,,22.67006,106.14949
+CB-BTS02,Trạm BTS lưu động VNPT,bts_luu_dong,thiet_bi,F-KV-01,,san_sang,100,22.92437,105.64368
+CB-GL-COBA,Xe tải Cô Ba (giả định),xe_tai,duong_bo,F-XA-COBA,8,san_sang,35,22.95896,105.68911
+CB-GL-CATHANH,Xe tải Ca Thành (giả định),xe_tai,duong_bo,F-XA-CATHANH,8,san_sang,100,22.71669,105.80889
+CB-GL-TRUONGHA,Xe tải Trường Hà (giả định),xe_tai,duong_bo,F-XA-TRUONGHA,8,san_sang,35,22.91847,105.99189

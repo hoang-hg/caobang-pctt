@@ -1,0 +1,185 @@
+﻿ma,ma_cap_tren,cap,co_quan,ho_ten,chuc_vu,sdt,tan_so_vo_tuyen,trang_thai,thu_tu,ma_xa
+CB-DB-0001,,tinh,BCH PCTT & TKCN tỉnh,Lê Quang Minh,Trưởng ban – Chủ tịch UBND tỉnh,0999 100 001,146.025 MHz,truc,0,
+CB-DB-0002,CB-DB-0001,tinh,BCH PCTT & TKCN tỉnh,Hoàng Đức Chỉ,Phó Trưởng ban Thường trực,0999 100 002,146.050 MHz,truc,1,
+CB-DB-0003,CB-DB-0001,tinh,Bộ CHQS tỉnh,Nông Văn Hòa,Phó Trưởng ban,0999 100 003,146.075 MHz,truc,2,
+CB-DB-0004,CB-DB-0001,tinh,Công an tỉnh,Triệu Minh Quân,Phó Trưởng ban,0999 100 004,146.100 MHz,san_sang,3,
+CB-DB-0005,CB-DB-0001,tinh,BĐBP tỉnh,Bế Văn Lực,Thành viên,0999 100 005,146.125 MHz,truc,4,
+CB-DB-0006,CB-DB-0001,tinh,Sở Y tế,Hà Thị Thu,Thành viên,0999 100 006,146.150 MHz,truc,5,
+CB-DB-0007,CB-DB-0001,tinh,Đài KTTV tỉnh,Đàm Văn Tân,Trưởng phòng Dự báo,0999 100 007,146.175 MHz,san_sang,6,
+CB-DB-0008,CB-DB-0001,tinh,Văn phòng thường trực BCH,Nông Văn Trực,Cán bộ trực ban 24/7,0999 100 008,146.200 MHz,truc,7,
+CB-DB-0009,CB-DB-0001,xa,UBND phường Thục Phán,Nông Văn Hùng,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 009,146.225 MHz,vang,0,CB-THUCPHAN
+CB-DB-0010,CB-DB-0009,xa,Công an Thục Phán,Lương Văn Tuấn,Trưởng Công an xã,0999 100 010,146.250 MHz,truc,1,CB-THUCPHAN
+CB-DB-0011,CB-DB-0009,xa,Ban CHQS Thục Phán,Lục Văn Sơn,Chỉ huy trưởng Ban CHQS xã,0999 100 011,146.275 MHz,san_sang,2,CB-THUCPHAN
+CB-DB-0012,CB-DB-0009,thon,Tổ dân phố Hợp Giang,Lâm Văn Thắng,Trưởng thôn / Tổ trưởng,0999 100 012,,truc,3,CB-THUCPHAN
+CB-DB-0013,CB-DB-0001,xa,UBND phường Nùng Trí Cao,Hoàng Thị Lan,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 013,146.325 MHz,truc,1,CB-NUNGTRICAO
+CB-DB-0014,CB-DB-0013,xa,Công an Nùng Trí Cao,Đàm Thị Hoa,Trưởng Công an xã,0999 100 014,146.350 MHz,truc,1,CB-NUNGTRICAO
+CB-DB-0015,CB-DB-0013,xa,Ban CHQS Nùng Trí Cao,Ma Quốc Bảo,Chỉ huy trưởng Ban CHQS xã,0999 100 015,146.375 MHz,san_sang,2,CB-NUNGTRICAO
+CB-DB-0016,CB-DB-0013,thon,Tổ dân phố Sông Bằng,Mông Đức Anh,Trưởng thôn / Tổ trưởng,0999 100 016,,truc,3,CB-NUNGTRICAO
+CB-DB-0017,CB-DB-0001,xa,UBND phường Tân Giang,Bế Văn Thắng,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 017,146.425 MHz,truc,2,CB-TANGIANG
+CB-DB-0018,CB-DB-0017,xa,Công an Tân Giang,Triệu Minh Khang,Trưởng Công an xã,0999 100 018,146.450 MHz,truc,1,CB-TANGIANG
+CB-DB-0019,CB-DB-0017,xa,Ban CHQS Tân Giang,Hà Văn Phúc,Chỉ huy trưởng Ban CHQS xã,0999 100 019,146.475 MHz,san_sang,2,CB-TANGIANG
+CB-DB-0020,CB-DB-0001,xa,UBND xã Hòa An,Lương Đức Anh,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 020,146.500 MHz,truc,3,CB-HOAAN
+CB-DB-0021,CB-DB-0020,xa,Công an Hòa An,Lục Văn Sơn,Trưởng Công an xã,0999 100 021,146.525 MHz,truc,1,CB-HOAAN
+CB-DB-0022,CB-DB-0020,xa,Ban CHQS Hòa An,Lâm Văn Hùng,Chỉ huy trưởng Ban CHQS xã,0999 100 022,146.550 MHz,san_sang,2,CB-HOAAN
+CB-DB-0023,CB-DB-0020,thon,Thôn Bản Ngắn,Vi Thị Hoa,Trưởng thôn / Tổ trưởng,0999 100 023,,truc,3,CB-HOAAN
+CB-DB-0024,CB-DB-0001,xa,UBND xã Nam Tuấn,Đàm Văn Tuấn,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 024,146.600 MHz,vang,4,CB-NAMTUAN
+CB-DB-0025,CB-DB-0024,xa,Công an Nam Tuấn,Ma Quốc Bảo,Trưởng Công an xã,0999 100 025,146.625 MHz,truc,1,CB-NAMTUAN
+CB-DB-0026,CB-DB-0024,xa,Ban CHQS Nam Tuấn,Mông Thị Lan,Chỉ huy trưởng Ban CHQS xã,0999 100 026,146.650 MHz,san_sang,2,CB-NAMTUAN
+CB-DB-0027,CB-DB-0001,xa,UBND xã Bạch Đằng,Triệu Thị Hoa,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 027,146.675 MHz,san_sang,5,CB-BACHDANG
+CB-DB-0028,CB-DB-0027,xa,Công an Bạch Đằng,Hà Văn Phúc,Trưởng Công an xã,0999 100 028,146.700 MHz,truc,1,CB-BACHDANG
+CB-DB-0029,CB-DB-0027,xa,Ban CHQS Bạch Đằng,Sầm Văn Thắng,Chỉ huy trưởng Ban CHQS xã,0999 100 029,146.725 MHz,san_sang,2,CB-BACHDANG
+CB-DB-0030,CB-DB-0001,xa,UBND xã Nguyễn Huệ,Lục Minh Khang,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 030,146.750 MHz,san_sang,6,CB-NGUYENHUE
+CB-DB-0031,CB-DB-0030,xa,Công an Nguyễn Huệ,Lâm Văn Hùng,Trưởng Công an xã,0999 100 031,146.775 MHz,truc,1,CB-NGUYENHUE
+CB-DB-0032,CB-DB-0030,xa,Ban CHQS Nguyễn Huệ,Vi Đức Anh,Chỉ huy trưởng Ban CHQS xã,0999 100 032,146.800 MHz,san_sang,2,CB-NGUYENHUE
+CB-DB-0033,CB-DB-0001,xa,UBND xã Minh Khai,Ma Văn Sơn,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 033,146.825 MHz,san_sang,7,CB-MINHKHAI
+CB-DB-0034,CB-DB-0033,xa,Công an Minh Khai,Mông Thị Lan,Trưởng Công an xã,0999 100 034,146.850 MHz,truc,1,CB-MINHKHAI
+CB-DB-0035,CB-DB-0033,xa,Ban CHQS Minh Khai,Lý Văn Tuấn,Chỉ huy trưởng Ban CHQS xã,0999 100 035,146.875 MHz,san_sang,2,CB-MINHKHAI
+CB-DB-0036,CB-DB-0001,xa,UBND xã Canh Tân,Hà Quốc Bảo,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 036,146.900 MHz,san_sang,8,CB-CANHTAN
+CB-DB-0037,CB-DB-0036,xa,Công an Canh Tân,Sầm Văn Thắng,Trưởng Công an xã,0999 100 037,146.925 MHz,truc,1,CB-CANHTAN
+CB-DB-0038,CB-DB-0036,xa,Ban CHQS Canh Tân,Nông Thị Hoa,Chỉ huy trưởng Ban CHQS xã,0999 100 038,146.950 MHz,san_sang,2,CB-CANHTAN
+CB-DB-0039,CB-DB-0001,xa,UBND xã Kim Đồng,Lâm Văn Phúc,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 039,146.975 MHz,vang,9,CB-KIMDONG
+CB-DB-0040,CB-DB-0039,xa,Công an Kim Đồng,Vi Đức Anh,Trưởng Công an xã,0999 100 040,146.000 MHz,truc,1,CB-KIMDONG
+CB-DB-0041,CB-DB-0039,xa,Ban CHQS Kim Đồng,Hoàng Minh Khang,Chỉ huy trưởng Ban CHQS xã,0999 100 041,146.025 MHz,san_sang,2,CB-KIMDONG
+CB-DB-0042,CB-DB-0001,xa,UBND xã Thạch An,Mông Văn Hùng,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 042,146.050 MHz,san_sang,10,CB-THACHAN
+CB-DB-0043,CB-DB-0042,xa,Công an Thạch An,Lý Văn Tuấn,Trưởng Công an xã,0999 100 043,146.075 MHz,truc,1,CB-THACHAN
+CB-DB-0044,CB-DB-0042,xa,Ban CHQS Thạch An,Bế Văn Sơn,Chỉ huy trưởng Ban CHQS xã,0999 100 044,146.100 MHz,san_sang,2,CB-THACHAN
+CB-DB-0045,CB-DB-0001,xa,UBND xã Đông Khê,Sầm Thị Lan,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 045,146.125 MHz,vang,11,CB-DONGKHE
+CB-DB-0046,CB-DB-0045,xa,Công an Đông Khê,Nông Thị Hoa,Trưởng Công an xã,0999 100 046,146.150 MHz,truc,1,CB-DONGKHE
+CB-DB-0047,CB-DB-0045,xa,Ban CHQS Đông Khê,Lương Quốc Bảo,Chỉ huy trưởng Ban CHQS xã,0999 100 047,146.175 MHz,san_sang,2,CB-DONGKHE
+CB-DB-0048,CB-DB-0001,xa,UBND xã Đức Long,Vi Văn Thắng,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 048,146.200 MHz,san_sang,12,CB-DUCLONG
+CB-DB-0049,CB-DB-0048,xa,Công an Đức Long,Hoàng Minh Khang,Trưởng Công an xã,0999 100 049,146.225 MHz,truc,1,CB-DUCLONG
+CB-DB-0050,CB-DB-0048,xa,Ban CHQS Đức Long,Đàm Văn Phúc,Chỉ huy trưởng Ban CHQS xã,0999 100 050,146.250 MHz,san_sang,2,CB-DUCLONG
+CB-DB-0051,CB-DB-0001,xa,UBND xã Phục Hòa,Lý Đức Anh,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 051,146.275 MHz,san_sang,13,CB-PHUCHOA
+CB-DB-0052,CB-DB-0051,xa,Công an Phục Hòa,Bế Văn Sơn,Trưởng Công an xã,0999 100 052,146.300 MHz,truc,1,CB-PHUCHOA
+CB-DB-0053,CB-DB-0051,xa,Ban CHQS Phục Hòa,Triệu Văn Hùng,Chỉ huy trưởng Ban CHQS xã,0999 100 053,146.325 MHz,san_sang,2,CB-PHUCHOA
+CB-DB-0054,CB-DB-0051,thon,Thôn Nà Pò,Hà Thị Hoa,Trưởng thôn / Tổ trưởng,0999 100 054,,truc,3,CB-PHUCHOA
+CB-DB-0055,CB-DB-0001,xa,UBND xã Bế Văn Đàn,Nông Văn Tuấn,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 055,146.375 MHz,truc,14,CB-BEVANDAN
+CB-DB-0056,CB-DB-0055,xa,Công an Bế Văn Đàn,Lương Quốc Bảo,Trưởng Công an xã,0999 100 056,146.400 MHz,truc,1,CB-BEVANDAN
+CB-DB-0057,CB-DB-0055,xa,Ban CHQS Bế Văn Đàn,Lục Thị Lan,Chỉ huy trưởng Ban CHQS xã,0999 100 057,146.425 MHz,san_sang,2,CB-BEVANDAN
+CB-DB-0058,CB-DB-0001,xa,UBND xã Quảng Uyên,Hoàng Thị Hoa,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 058,146.450 MHz,vang,15,CB-QUANGUYEN
+CB-DB-0059,CB-DB-0058,xa,Công an Quảng Uyên,Đàm Văn Phúc,Trưởng Công an xã,0999 100 059,146.475 MHz,truc,1,CB-QUANGUYEN
+CB-DB-0060,CB-DB-0058,xa,Ban CHQS Quảng Uyên,Ma Văn Thắng,Chỉ huy trưởng Ban CHQS xã,0999 100 060,146.500 MHz,san_sang,2,CB-QUANGUYEN
+CB-DB-0061,CB-DB-0001,xa,UBND xã Độc Lập,Bế Minh Khang,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 061,146.525 MHz,truc,16,CB-DOCLAP
+CB-DB-0062,CB-DB-0061,xa,Công an Độc Lập,Triệu Văn Hùng,Trưởng Công an xã,0999 100 062,146.550 MHz,truc,1,CB-DOCLAP
+CB-DB-0063,CB-DB-0061,xa,Ban CHQS Độc Lập,Hà Đức Anh,Chỉ huy trưởng Ban CHQS xã,0999 100 063,146.575 MHz,san_sang,2,CB-DOCLAP
+CB-DB-0064,CB-DB-0001,xa,UBND xã Hạnh Phúc,Lương Văn Sơn,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 064,146.600 MHz,truc,17,CB-HANHPHUC
+CB-DB-0065,CB-DB-0064,xa,Công an Hạnh Phúc,Lục Thị Lan,Trưởng Công an xã,0999 100 065,146.625 MHz,truc,1,CB-HANHPHUC
+CB-DB-0066,CB-DB-0064,xa,Ban CHQS Hạnh Phúc,Lâm Văn Tuấn,Chỉ huy trưởng Ban CHQS xã,0999 100 066,146.650 MHz,san_sang,2,CB-HANHPHUC
+CB-DB-0067,CB-DB-0001,xa,UBND xã Quang Hán,Đàm Quốc Bảo,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 067,146.675 MHz,vang,18,CB-QUANGHAN
+CB-DB-0068,CB-DB-0067,xa,Công an Quang Hán,Ma Văn Thắng,Trưởng Công an xã,0999 100 068,146.700 MHz,truc,1,CB-QUANGHAN
+CB-DB-0069,CB-DB-0067,xa,Ban CHQS Quang Hán,Mông Thị Hoa,Chỉ huy trưởng Ban CHQS xã,0999 100 069,146.725 MHz,san_sang,2,CB-QUANGHAN
+CB-DB-0070,CB-DB-0001,xa,UBND xã Trà Lĩnh,Triệu Văn Phúc,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 070,146.750 MHz,san_sang,19,CB-TRALINH
+CB-DB-0071,CB-DB-0070,xa,Công an Trà Lĩnh,Hà Đức Anh,Trưởng Công an xã,0999 100 071,146.775 MHz,truc,1,CB-TRALINH
+CB-DB-0072,CB-DB-0070,xa,Ban CHQS Trà Lĩnh,Sầm Minh Khang,Chỉ huy trưởng Ban CHQS xã,0999 100 072,146.800 MHz,san_sang,2,CB-TRALINH
+CB-DB-0073,CB-DB-0001,xa,UBND xã Quang Trung,Lục Văn Hùng,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 073,146.825 MHz,san_sang,20,CB-QUANGTRUNG
+CB-DB-0074,CB-DB-0073,xa,Công an Quang Trung,Lâm Văn Tuấn,Trưởng Công an xã,0999 100 074,146.850 MHz,truc,1,CB-QUANGTRUNG
+CB-DB-0075,CB-DB-0073,xa,Ban CHQS Quang Trung,Vi Văn Sơn,Chỉ huy trưởng Ban CHQS xã,0999 100 075,146.875 MHz,san_sang,2,CB-QUANGTRUNG
+CB-DB-0076,CB-DB-0001,xa,UBND xã Trùng Khánh,Ma Thị Lan,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 076,146.900 MHz,vang,21,CB-TRUNGKHANH
+CB-DB-0077,CB-DB-0076,xa,Công an Trùng Khánh,Mông Thị Hoa,Trưởng Công an xã,0999 100 077,146.925 MHz,truc,1,CB-TRUNGKHANH
+CB-DB-0078,CB-DB-0076,xa,Ban CHQS Trùng Khánh,Lý Quốc Bảo,Chỉ huy trưởng Ban CHQS xã,0999 100 078,146.950 MHz,san_sang,2,CB-TRUNGKHANH
+CB-DB-0079,CB-DB-0001,xa,UBND xã Đoài Dương,Hà Văn Thắng,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 079,146.975 MHz,truc,22,CB-DOAIDUONG
+CB-DB-0080,CB-DB-0079,xa,Công an Đoài Dương,Sầm Minh Khang,Trưởng Công an xã,0999 100 080,146.000 MHz,truc,1,CB-DOAIDUONG
+CB-DB-0081,CB-DB-0079,xa,Ban CHQS Đoài Dương,Nông Văn Phúc,Chỉ huy trưởng Ban CHQS xã,0999 100 081,146.025 MHz,san_sang,2,CB-DOAIDUONG
+CB-DB-0082,CB-DB-0001,xa,UBND xã Đàm Thủy,Lâm Đức Anh,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 082,146.050 MHz,san_sang,23,CB-DAMTHUY
+CB-DB-0083,CB-DB-0082,xa,Công an Đàm Thủy,Vi Văn Sơn,Trưởng Công an xã,0999 100 083,146.075 MHz,truc,1,CB-DAMTHUY
+CB-DB-0084,CB-DB-0082,xa,Ban CHQS Đàm Thủy,Hoàng Văn Hùng,Chỉ huy trưởng Ban CHQS xã,0999 100 084,146.100 MHz,san_sang,2,CB-DAMTHUY
+CB-DB-0085,CB-DB-0001,xa,UBND xã Đình Phong,Mông Văn Tuấn,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 085,146.125 MHz,san_sang,24,CB-DINHPHONG
+CB-DB-0086,CB-DB-0085,xa,Công an Đình Phong,Lý Quốc Bảo,Trưởng Công an xã,0999 100 086,146.150 MHz,truc,1,CB-DINHPHONG
+CB-DB-0087,CB-DB-0085,xa,Ban CHQS Đình Phong,Bế Thị Lan,Chỉ huy trưởng Ban CHQS xã,0999 100 087,146.175 MHz,san_sang,2,CB-DINHPHONG
+CB-DB-0088,CB-DB-0001,xa,UBND xã Hạ Lang,Sầm Thị Hoa,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 088,146.200 MHz,vang,25,CB-HALANG
+CB-DB-0089,CB-DB-0088,xa,Công an Hạ Lang,Nông Văn Phúc,Trưởng Công an xã,0999 100 089,146.225 MHz,truc,1,CB-HALANG
+CB-DB-0090,CB-DB-0088,xa,Ban CHQS Hạ Lang,Lương Văn Thắng,Chỉ huy trưởng Ban CHQS xã,0999 100 090,146.250 MHz,san_sang,2,CB-HALANG
+CB-DB-0091,CB-DB-0001,xa,UBND xã Lý Quốc,Vi Minh Khang,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 091,146.275 MHz,san_sang,26,CB-LYQUOC
+CB-DB-0092,CB-DB-0091,xa,Công an Lý Quốc,Hoàng Văn Hùng,Trưởng Công an xã,0999 100 092,146.300 MHz,truc,1,CB-LYQUOC
+CB-DB-0093,CB-DB-0091,xa,Ban CHQS Lý Quốc,Đàm Đức Anh,Chỉ huy trưởng Ban CHQS xã,0999 100 093,146.325 MHz,san_sang,2,CB-LYQUOC
+CB-DB-0094,CB-DB-0001,xa,UBND xã Vinh Quý,Lý Văn Sơn,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 094,146.350 MHz,truc,27,CB-VINHQUY
+CB-DB-0095,CB-DB-0094,xa,Công an Vinh Quý,Bế Thị Lan,Trưởng Công an xã,0999 100 095,146.375 MHz,truc,1,CB-VINHQUY
+CB-DB-0096,CB-DB-0094,xa,Ban CHQS Vinh Quý,Triệu Văn Tuấn,Chỉ huy trưởng Ban CHQS xã,0999 100 096,146.400 MHz,san_sang,2,CB-VINHQUY
+CB-DB-0097,CB-DB-0001,xa,UBND xã Quang Long,Nông Quốc Bảo,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 097,146.425 MHz,truc,28,CB-QUANGLONG
+CB-DB-0098,CB-DB-0097,xa,Công an Quang Long,Lương Văn Thắng,Trưởng Công an xã,0999 100 098,146.450 MHz,truc,1,CB-QUANGLONG
+CB-DB-0099,CB-DB-0097,xa,Ban CHQS Quang Long,Lục Thị Hoa,Chỉ huy trưởng Ban CHQS xã,0999 100 099,146.475 MHz,san_sang,2,CB-QUANGLONG
+CB-DB-0100,CB-DB-0001,xa,UBND xã Thông Nông,Hoàng Văn Phúc,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 100,146.500 MHz,vang,29,CB-THONGNONG
+CB-DB-0101,CB-DB-0100,xa,Công an Thông Nông,Đàm Đức Anh,Trưởng Công an xã,0999 100 101,146.525 MHz,truc,1,CB-THONGNONG
+CB-DB-0102,CB-DB-0100,xa,Ban CHQS Thông Nông,Ma Minh Khang,Chỉ huy trưởng Ban CHQS xã,0999 100 102,146.550 MHz,san_sang,2,CB-THONGNONG
+CB-DB-0103,CB-DB-0001,xa,UBND xã Cần Yên,Bế Văn Hùng,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 103,146.575 MHz,truc,30,CB-CANYEN
+CB-DB-0104,CB-DB-0103,xa,Công an Cần Yên,Triệu Văn Tuấn,Trưởng Công an xã,0999 100 104,146.600 MHz,truc,1,CB-CANYEN
+CB-DB-0105,CB-DB-0103,xa,Ban CHQS Cần Yên,Hà Văn Sơn,Chỉ huy trưởng Ban CHQS xã,0999 100 105,146.625 MHz,san_sang,2,CB-CANYEN
+CB-DB-0106,CB-DB-0001,xa,UBND xã Thanh Long,Lương Thị Lan,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 106,146.650 MHz,san_sang,31,CB-THANHLONG
+CB-DB-0107,CB-DB-0106,xa,Công an Thanh Long,Lục Thị Hoa,Trưởng Công an xã,0999 100 107,146.675 MHz,truc,1,CB-THANHLONG
+CB-DB-0108,CB-DB-0106,xa,Ban CHQS Thanh Long,Lâm Quốc Bảo,Chỉ huy trưởng Ban CHQS xã,0999 100 108,146.700 MHz,san_sang,2,CB-THANHLONG
+CB-DB-0109,CB-DB-0001,xa,UBND xã Hà Quảng,Đàm Văn Thắng,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 109,146.725 MHz,vang,32,CB-HAQUANG
+CB-DB-0110,CB-DB-0109,xa,Công an Hà Quảng,Ma Minh Khang,Trưởng Công an xã,0999 100 110,146.750 MHz,truc,1,CB-HAQUANG
+CB-DB-0111,CB-DB-0109,xa,Ban CHQS Hà Quảng,Mông Văn Phúc,Chỉ huy trưởng Ban CHQS xã,0999 100 111,146.775 MHz,san_sang,2,CB-HAQUANG
+CB-DB-0112,CB-DB-0001,xa,UBND xã Trường Hà,Triệu Đức Anh,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 112,146.800 MHz,truc,33,CB-TRUONGHA
+CB-DB-0113,CB-DB-0112,xa,Công an Trường Hà,Hà Văn Sơn,Trưởng Công an xã,0999 100 113,146.825 MHz,truc,1,CB-TRUONGHA
+CB-DB-0114,CB-DB-0112,xa,Ban CHQS Trường Hà,Sầm Văn Hùng,Chỉ huy trưởng Ban CHQS xã,0999 100 114,146.850 MHz,san_sang,2,CB-TRUONGHA
+CB-DB-0115,CB-DB-0001,xa,UBND xã Lũng Nặm,Lục Văn Tuấn,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 115,146.875 MHz,san_sang,34,CB-LUNGNAM
+CB-DB-0116,CB-DB-0115,xa,Công an Lũng Nặm,Lâm Quốc Bảo,Trưởng Công an xã,0999 100 116,146.900 MHz,truc,1,CB-LUNGNAM
+CB-DB-0117,CB-DB-0115,xa,Ban CHQS Lũng Nặm,Vi Thị Lan,Chỉ huy trưởng Ban CHQS xã,0999 100 117,146.925 MHz,san_sang,2,CB-LUNGNAM
+CB-DB-0118,CB-DB-0001,xa,UBND xã Tổng Cọt,Ma Thị Hoa,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 118,146.950 MHz,vang,35,CB-TONGCOT
+CB-DB-0119,CB-DB-0118,xa,Công an Tổng Cọt,Mông Văn Phúc,Trưởng Công an xã,0999 100 119,146.975 MHz,truc,1,CB-TONGCOT
+CB-DB-0120,CB-DB-0118,xa,Ban CHQS Tổng Cọt,Lý Văn Thắng,Chỉ huy trưởng Ban CHQS xã,0999 100 120,146.000 MHz,san_sang,2,CB-TONGCOT
+CB-DB-0121,CB-DB-0001,xa,UBND xã Nguyên Bình,Hà Minh Khang,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 121,146.025 MHz,san_sang,36,CB-NGUYENBINH
+CB-DB-0122,CB-DB-0121,xa,Công an Nguyên Bình,Sầm Văn Hùng,Trưởng Công an xã,0999 100 122,146.050 MHz,truc,1,CB-NGUYENBINH
+CB-DB-0123,CB-DB-0121,xa,Ban CHQS Nguyên Bình,Nông Đức Anh,Chỉ huy trưởng Ban CHQS xã,0999 100 123,146.075 MHz,san_sang,2,CB-NGUYENBINH
+CB-DB-0124,CB-DB-0001,xa,UBND xã Tĩnh Túc,Lâm Văn Sơn,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 124,146.100 MHz,san_sang,37,CB-TINHTUC
+CB-DB-0125,CB-DB-0124,xa,Công an Tĩnh Túc,Vi Thị Lan,Trưởng Công an xã,0999 100 125,146.125 MHz,truc,1,CB-TINHTUC
+CB-DB-0126,CB-DB-0124,xa,Ban CHQS Tĩnh Túc,Hoàng Văn Tuấn,Chỉ huy trưởng Ban CHQS xã,0999 100 126,146.150 MHz,san_sang,2,CB-TINHTUC
+CB-DB-0127,CB-DB-0124,thon,Thôn Pác Rà,Đàm Văn Phúc,Trưởng thôn / Tổ trưởng,0999 100 127,,truc,3,CB-TINHTUC
+CB-DB-0128,CB-DB-0001,xa,UBND xã Minh Tâm,Mông Quốc Bảo,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 128,146.200 MHz,san_sang,38,CB-MINHTAM
+CB-DB-0129,CB-DB-0128,xa,Công an Minh Tâm,Lý Văn Thắng,Trưởng Công an xã,0999 100 129,146.225 MHz,truc,1,CB-MINHTAM
+CB-DB-0130,CB-DB-0128,xa,Ban CHQS Minh Tâm,Bế Thị Hoa,Chỉ huy trưởng Ban CHQS xã,0999 100 130,146.250 MHz,san_sang,2,CB-MINHTAM
+CB-DB-0131,CB-DB-0001,xa,UBND xã Phan Thanh,Sầm Văn Phúc,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 131,146.275 MHz,truc,39,CB-PHANTHANH
+CB-DB-0132,CB-DB-0131,xa,Công an Phan Thanh,Nông Đức Anh,Trưởng Công an xã,0999 100 132,146.300 MHz,truc,1,CB-PHANTHANH
+CB-DB-0133,CB-DB-0131,xa,Ban CHQS Phan Thanh,Lương Minh Khang,Chỉ huy trưởng Ban CHQS xã,0999 100 133,146.325 MHz,san_sang,2,CB-PHANTHANH
+CB-DB-0134,CB-DB-0001,xa,UBND xã Thành Công,Vi Văn Hùng,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 134,146.350 MHz,truc,40,CB-THANHCONG
+CB-DB-0135,CB-DB-0134,xa,Công an Thành Công,Hoàng Văn Tuấn,Trưởng Công an xã,0999 100 135,146.375 MHz,truc,1,CB-THANHCONG
+CB-DB-0136,CB-DB-0134,xa,Ban CHQS Thành Công,Đàm Văn Sơn,Chỉ huy trưởng Ban CHQS xã,0999 100 136,146.400 MHz,san_sang,2,CB-THANHCONG
+CB-DB-0137,CB-DB-0001,xa,UBND xã Tam Kim,Lý Thị Lan,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 137,146.425 MHz,truc,41,CB-TAMKIM
+CB-DB-0138,CB-DB-0137,xa,Công an Tam Kim,Bế Thị Hoa,Trưởng Công an xã,0999 100 138,146.450 MHz,truc,1,CB-TAMKIM
+CB-DB-0139,CB-DB-0137,xa,Ban CHQS Tam Kim,Triệu Quốc Bảo,Chỉ huy trưởng Ban CHQS xã,0999 100 139,146.475 MHz,san_sang,2,CB-TAMKIM
+CB-DB-0140,CB-DB-0001,xa,UBND xã Ca Thành,Nông Văn Thắng,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 140,146.500 MHz,san_sang,42,CB-CATHANH
+CB-DB-0141,CB-DB-0140,xa,Công an Ca Thành,Lương Minh Khang,Trưởng Công an xã,0999 100 141,146.525 MHz,truc,1,CB-CATHANH
+CB-DB-0142,CB-DB-0140,xa,Ban CHQS Ca Thành,Lục Văn Phúc,Chỉ huy trưởng Ban CHQS xã,0999 100 142,146.550 MHz,san_sang,2,CB-CATHANH
+CB-DB-0143,CB-DB-0001,xa,UBND xã Bảo Lạc,Hoàng Đức Anh,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 143,146.575 MHz,vang,43,CB-BAOLAC
+CB-DB-0144,CB-DB-0143,xa,Công an Bảo Lạc,Đàm Văn Sơn,Trưởng Công an xã,0999 100 144,146.600 MHz,truc,1,CB-BAOLAC
+CB-DB-0145,CB-DB-0143,xa,Ban CHQS Bảo Lạc,Ma Văn Hùng,Chỉ huy trưởng Ban CHQS xã,0999 100 145,146.625 MHz,san_sang,2,CB-BAOLAC
+CB-DB-0146,CB-DB-0001,xa,UBND xã Hưng Đạo,Bế Văn Tuấn,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 146,146.650 MHz,truc,44,CB-HUNGDAO
+CB-DB-0147,CB-DB-0146,xa,Công an Hưng Đạo,Triệu Quốc Bảo,Trưởng Công an xã,0999 100 147,146.675 MHz,truc,1,CB-HUNGDAO
+CB-DB-0148,CB-DB-0146,xa,Ban CHQS Hưng Đạo,Hà Thị Lan,Chỉ huy trưởng Ban CHQS xã,0999 100 148,146.700 MHz,san_sang,2,CB-HUNGDAO
+CB-DB-0149,CB-DB-0001,xa,UBND xã Cốc Pàng,Lương Thị Hoa,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 149,146.725 MHz,truc,45,CB-COCPANG
+CB-DB-0150,CB-DB-0149,xa,Công an Cốc Pàng,Lục Văn Phúc,Trưởng Công an xã,0999 100 150,146.750 MHz,truc,1,CB-COCPANG
+CB-DB-0151,CB-DB-0149,xa,Ban CHQS Cốc Pàng,Lâm Văn Thắng,Chỉ huy trưởng Ban CHQS xã,0999 100 151,146.775 MHz,san_sang,2,CB-COCPANG
+CB-DB-0152,CB-DB-0001,xa,UBND xã Cô Ba,Đàm Minh Khang,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 152,146.800 MHz,truc,46,CB-COBA
+CB-DB-0153,CB-DB-0152,xa,Công an Cô Ba,Ma Văn Hùng,Trưởng Công an xã,0999 100 153,146.825 MHz,truc,1,CB-COBA
+CB-DB-0154,CB-DB-0152,xa,Ban CHQS Cô Ba,Mông Đức Anh,Chỉ huy trưởng Ban CHQS xã,0999 100 154,146.850 MHz,san_sang,2,CB-COBA
+CB-DB-0155,CB-DB-0001,xa,UBND xã Khánh Xuân,Triệu Văn Sơn,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 155,146.875 MHz,vang,47,CB-KHANHXUAN
+CB-DB-0156,CB-DB-0155,xa,Công an Khánh Xuân,Hà Thị Lan,Trưởng Công an xã,0999 100 156,146.900 MHz,truc,1,CB-KHANHXUAN
+CB-DB-0157,CB-DB-0155,xa,Ban CHQS Khánh Xuân,Sầm Văn Tuấn,Chỉ huy trưởng Ban CHQS xã,0999 100 157,146.925 MHz,san_sang,2,CB-KHANHXUAN
+CB-DB-0158,CB-DB-0155,thon,Thôn Khuổi Kỉn,Nông Văn Phúc,Trưởng thôn / Tổ trưởng,0999 100 158,,truc,3,CB-KHANHXUAN
+CB-DB-0159,CB-DB-0001,xa,UBND xã Xuân Trường,Lục Quốc Bảo,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 159,146.975 MHz,truc,48,CB-XUANTRUONG
+CB-DB-0160,CB-DB-0159,xa,Công an Xuân Trường,Lâm Văn Thắng,Trưởng Công an xã,0999 100 160,146.000 MHz,truc,1,CB-XUANTRUONG
+CB-DB-0161,CB-DB-0159,xa,Ban CHQS Xuân Trường,Vi Thị Hoa,Chỉ huy trưởng Ban CHQS xã,0999 100 161,146.025 MHz,san_sang,2,CB-XUANTRUONG
+CB-DB-0162,CB-DB-0001,xa,UBND xã Huy Giáp,Ma Văn Phúc,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 162,146.050 MHz,truc,49,CB-HUYGIAP
+CB-DB-0163,CB-DB-0162,xa,Công an Huy Giáp,Mông Đức Anh,Trưởng Công an xã,0999 100 163,146.075 MHz,truc,1,CB-HUYGIAP
+CB-DB-0164,CB-DB-0162,xa,Ban CHQS Huy Giáp,Lý Minh Khang,Chỉ huy trưởng Ban CHQS xã,0999 100 164,146.100 MHz,san_sang,2,CB-HUYGIAP
+CB-DB-0165,CB-DB-0001,xa,UBND xã Bảo Lâm,Hà Văn Hùng,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 165,146.125 MHz,vang,50,CB-BAOLAM
+CB-DB-0166,CB-DB-0165,xa,Công an Bảo Lâm,Sầm Văn Tuấn,Trưởng Công an xã,0999 100 166,146.150 MHz,truc,1,CB-BAOLAM
+CB-DB-0167,CB-DB-0165,xa,Ban CHQS Bảo Lâm,Nông Văn Sơn,Chỉ huy trưởng Ban CHQS xã,0999 100 167,146.175 MHz,san_sang,2,CB-BAOLAM
+CB-DB-0168,CB-DB-0165,thon,Thôn Nà Pồng,Lương Văn Thắng,Trưởng thôn / Tổ trưởng,0999 100 168,,truc,3,CB-BAOLAM
+CB-DB-0169,CB-DB-0001,xa,UBND xã Lý Bôn,Lâm Thị Lan,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 169,146.225 MHz,truc,51,CB-LYBON
+CB-DB-0170,CB-DB-0169,xa,Công an Lý Bôn,Vi Thị Hoa,Trưởng Công an xã,0999 100 170,146.250 MHz,truc,1,CB-LYBON
+CB-DB-0171,CB-DB-0169,xa,Ban CHQS Lý Bôn,Hoàng Quốc Bảo,Chỉ huy trưởng Ban CHQS xã,0999 100 171,146.275 MHz,san_sang,2,CB-LYBON
+CB-DB-0172,CB-DB-0001,xa,UBND xã Nam Quang,Mông Văn Thắng,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 172,146.300 MHz,truc,52,CB-NAMQUANG
+CB-DB-0173,CB-DB-0172,xa,Công an Nam Quang,Lý Minh Khang,Trưởng Công an xã,0999 100 173,146.325 MHz,truc,1,CB-NAMQUANG
+CB-DB-0174,CB-DB-0172,xa,Ban CHQS Nam Quang,Bế Văn Phúc,Chỉ huy trưởng Ban CHQS xã,0999 100 174,146.350 MHz,san_sang,2,CB-NAMQUANG
+CB-DB-0175,CB-DB-0172,thon,Thôn Nà Luông,Triệu Văn Tuấn,Trưởng thôn / Tổ trưởng,0999 100 175,,truc,3,CB-NAMQUANG
+CB-DB-0176,CB-DB-0001,xa,UBND xã Quảng Lâm,Sầm Đức Anh,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 176,146.400 MHz,san_sang,53,CB-QUANGLAM
+CB-DB-0177,CB-DB-0176,xa,Công an Quảng Lâm,Nông Văn Sơn,Trưởng Công an xã,0999 100 177,146.425 MHz,truc,1,CB-QUANGLAM
+CB-DB-0178,CB-DB-0176,xa,Ban CHQS Quảng Lâm,Lương Văn Hùng,Chỉ huy trưởng Ban CHQS xã,0999 100 178,146.450 MHz,san_sang,2,CB-QUANGLAM
+CB-DB-0179,CB-DB-0001,xa,UBND xã Yên Thổ,Vi Văn Tuấn,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 179,146.475 MHz,vang,54,CB-YENTHO
+CB-DB-0180,CB-DB-0179,xa,Công an Yên Thổ,Hoàng Quốc Bảo,Trưởng Công an xã,0999 100 180,146.500 MHz,truc,1,CB-YENTHO
+CB-DB-0181,CB-DB-0179,xa,Ban CHQS Yên Thổ,Đàm Thị Lan,Chỉ huy trưởng Ban CHQS xã,0999 100 181,146.525 MHz,san_sang,2,CB-YENTHO
+CB-DB-0182,CB-DB-0001,xa,UBND xã Sơn Lộ,Lý Thị Hoa,Chủ tịch UBND – Trưởng BCH PCTT cấp xã,0999 100 182,146.550 MHz,truc,55,CB-SONLO
+CB-DB-0183,CB-DB-0182,xa,Công an Sơn Lộ,Bế Văn Phúc,Trưởng Công an xã,0999 100 183,146.575 MHz,truc,1,CB-SONLO
+CB-DB-0184,CB-DB-0182,xa,Ban CHQS Sơn Lộ,Triệu Văn Thắng,Chỉ huy trưởng Ban CHQS xã,0999 100 184,146.600 MHz,san_sang,2,CB-SONLO

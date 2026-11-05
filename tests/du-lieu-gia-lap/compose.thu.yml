@@ -1,0 +1,33 @@
+# Stack thử cho bộ dữ liệu giả lập, chạy song song được với stack dev — xem README cùng thư mục.
+# Bỏ tên container và cổng cố định của docker-compose.yml; backend ở :8100. Dữ liệu nằm trong volume riêng theo `-p pctt-sim`.
+services:
+  db:
+    container_name: !reset null
+    ports: !reset []
+  redis:
+    container_name: !reset null
+  minio:
+    container_name: !reset null
+    ports: !reset []
+  mailpit:
+    container_name: !reset null
+    ports: !reset []
+  mqtt:
+    container_name: !reset null
+    ports: !reset []
+  backend:
+    container_name: !reset null
+    ports: !override ["8100:8000"]
+    environment:
+      DEMO_MODE: "false"
+      SIMULATOR: "false"
+      TOTP_REQUIRED_ROLES: ""
+  worker:
+    container_name: !reset null
+    environment:
+      DEMO_MODE: "false"
+      SIMULATOR: "false"
+      TOTP_REQUIRED_ROLES: ""
+  frontend:
+    container_name: !reset null
+    ports: !reset []

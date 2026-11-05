@@ -1,0 +1,80 @@
+{
+  "ngay_goc": "2026-11-05",
+  "tep": [
+    {
+      "loai": "ranh_gioi_xa",
+      "tep": "01_ranh_gioi_xa.geojson",
+      "so_dong": 56
+    },
+    {
+      "loai": "xom",
+      "tep": "02_xom.csv",
+      "so_dong": 176
+    },
+    {
+      "loai": "nhom_loc_nhanh",
+      "tep": "03_nhom_loc_nhanh.csv",
+      "so_dong": 3
+    },
+    {
+      "loai": "tram_quan_trac",
+      "tep": "04_tram_quan_trac.csv",
+      "so_dong": 21
+    },
+    {
+      "loai": "ngap_kich_ban",
+      "tep": "05_ngap_kich_ban.geojson",
+      "so_dong": 4
+    },
+    {
+      "loai": "vung_nguy_hiem",
+      "tep": "06_vung_nguy_hiem.geojson",
+      "so_dong": 7
+    },
+    {
+      "loai": "diem_nguy_hiem",
+      "tep": "07_diem_nguy_hiem.csv",
+      "so_dong": 11
+    },
+    {
+      "loai": "diem_den_sat_lo",
+      "tep": "08_diem_den_sat_lo.csv",
+      "so_dong": 12
+    },
+    {
+      "loai": "diem_so_tan",
+      "tep": "09_diem_so_tan.csv",
+      "so_dong": 59
+    },
+    {
+      "loai": "danh_ba",
+      "tep": "10_danh_ba.csv",
+      "so_dong": 184
+    },
+    {
+      "loai": "kho",
+      "tep": "11_kho.csv",
+      "so_dong": 17
+    },
+    {
+      "loai": "ton_kho",
+      "tep": "12_ton_kho.csv",
+      "so_dong": 204
+    },
+    {
+      "loai": "luc_luong",
+      "tep": "13_luc_luong.csv",
+      "so_dong": 21
+    },
+    {
+      "loai": "phuong_tien",
+      "tep": "14_phuong_tien.csv",
+      "so_dong": 37
+    },
+    {
+      "loai": "cay_xang",
+      "tep": "15_cay_xang.csv",
+      "so_dong": 6
+    }
+  ]
+}
