@@ -9,7 +9,8 @@ Mọi dữ liệu giả lập của hệ thống nằm trong thư mục này. C�
 
 > **Không nạp vào hệ thống thật.** Tên người, số điện thoại (đầu `0999`), quân số, tồn kho, ngưỡng báo động đều là giả định.
 > Cổng công khai sẽ chỉ người dân tới các điểm sơ tán này. `nap.mjs` và `dien-tap.mjs` từ chối chạy nếu máy chủ không phải
-> `localhost` / `127.0.0.1`. Lỡ nạp nhầm: xem `scripts/maintenance/clean-simulated-data.mjs`.
+> `localhost` / `127.0.0.1`, trừ khi khai rõ máy thử (xem mục dưới). Lỡ nạp nhầm trên máy dev: xem
+> `scripts/maintenance/clean-simulated-data.mjs`. Kiểm tra Go-Live báo LỖI khi còn số `0999` hoặc mã mẫu.
 
 ## Có gì trong thư mục
 
@@ -54,6 +55,33 @@ Tài khoản trên stack này, chỉ dùng để thử:
 
 Hai tài khoản sau do `dien-tap.mjs` tạo. Script không cài được xác thực 2 lớp, nên stack thử không đặt `TOTP_REQUIRED_ROLES`.
 
+## Nạp lên máy thử cho chuyên gia
+
+Dùng khi chuyên gia cần thử cả cổng người dân, duyệt cảnh báo, nhập dữ liệu, phối hợp tỉnh – xã trên cùng một hệ thống. Chế độ
+giả lập trên trình duyệt không làm được các việc này.
+
+**Chỉ làm trên máy không phục vụ người dân.** Không công bố địa chỉ máy thử cho người dân.
+
+1. Cập nhật máy chủ bằng `deploy/update.sh`. Ghi lại tên bản sao lưu nó vừa tạo trong `backups/db/`: đây là điểm quay lại.
+2. Từ máy của bạn, trong thư mục repo, chạy ngay khi ứng dụng xác thực vừa đổi mã (mỗi mã chỉ dùng được một lần):
+
+   ```powershell
+   $env:ADMIN_USER = "<tài khoản quản trị>"; $env:ADMIN_PASS = "<mật khẩu>"; $env:ADMIN_OTP = "<mã 6 số>"
+   node tests/du-lieu-gia-lap/nap.mjs https://<tên-máy-thử> --may-thu=<tên-máy-thử> --kem-so-do
+   Remove-Item Env:ADMIN_PASS, Env:ADMIN_OTP
+   ```
+
+3. Tạo tài khoản cho chuyên gia ở trang Phân quyền: ít nhất một Cấp 2 có PIN để duyệt cảnh báo, một Cấp 3 ở một xã.
+4. Số đo cũ dần sau vài giờ. Muốn làm mới, chạy lại với `--chi-so-do` thay cho `--kem-so-do`.
+
+Số đo mẫu có trạm vượt báo động II, nên hệ thống tự tạo vùng nguy cơ, phiếu nguồn cảm biến và nháp cảnh báo chờ duyệt. Kênh gửi tin
+chưa tích hợp nên duyệt cảnh báo không gửi tin tới ai.
+
+**Trước khi dùng máy này cho hệ thống thật:** phải bỏ hết dữ liệu giả, không xoá tay. Khôi phục bản sao lưu ở bước 1 theo README
+mục 10.5, hoặc cài lại với CSDL mới; rồi chạy `deploy/golive-check.sh` để xác nhận.
+
+`dien-tap.mjs` chỉ chạy trên máy này: nó tạo tài khoản không có 2 lớp nên không dùng được trên bản chạy thật.
+
 ## Dữ liệu gồm những gì
 
 Nhập theo đúng thứ tự dưới đây, bảng được tham chiếu đứng trước.
@@ -79,7 +107,7 @@ Nhập theo đúng thứ tự dưới đây, bảng được tham chiếu đứn
 Có sẵn các trường hợp cho bộ lọc: kho cạn kiệt, hàng sắp hết hạn, phương tiện bảo dưỡng, nhiên liệu dưới 20% và chưa báo.
 `nap.mjs` dời hạn sử dụng theo ngày chạy, nên "sắp hết hạn" luôn có dữ liệu.
 
-**Không có trong bộ này:** số đo cảm biến (`dien-tap.mjs` gửi qua API thiết bị), bản tin dự báo, mạng đường. Hệ thống không có
+**Không có trong `tep/`:** số đo cảm biến (`nap.mjs --kem-so-do` và `dien-tap.mjs` gửi qua API thiết bị), bản tin dự báo, mạng đường. Hệ thống không có
 loại nhập cho mạng đường, nên trên stack này chỉ đường là hướng chim bay, giống bản chạy thật hiện nay.
 
 ## Diễn tập làm những gì

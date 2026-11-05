@@ -202,6 +202,13 @@ jobs:
         run: node tests/du-lieu-gia-lap/nap.mjs --lan-hai
       - name: Diễn tập một đợt mưa lũ
         run: node tests/du-lieu-gia-lap/dien-tap.mjs
+      - name: Gửi số đo mẫu cho mọi trạm
+        run: node tests/du-lieu-gia-lap/nap.mjs --chi-so-do
+      - name: Từ chối nạp vào máy khác nếu không khai máy thử
+        run: |
+          if node tests/du-lieu-gia-lap/nap.mjs https://vi-du.invalid; then echo "Phải từ chối"; exit 1; fi
+          if node tests/du-lieu-gia-lap/nap.mjs https://vi-du.invalid --may-thu=may-khac.invalid; then echo "Phải từ chối"; exit 1; fi
+          if node tests/du-lieu-gia-lap/nap.mjs https://vi-du.invalid --may-thu=vi-du.invalid; then echo "Phải đòi mật khẩu"; exit 1; fi
       - name: Log khi lỗi
         if: failure()
         run: docker compose logs --tail=80 backend worker
