@@ -224,6 +224,9 @@ async def create_user(actor, username, full_name, position, password, pin, role,
     return await get_user(str(row["id"]))
 
 
+MIN_LOCK_REASON = 3
+
+
 async def update_user(
     actor,
     user_id,
@@ -248,6 +251,9 @@ async def update_user(
         raise HTTPException(409, "Email đã được dùng cho tài khoản khác")
     if is_active is False and target["id"] == actor["id"]:
         raise HTTPException(400, "Không tự khoá tài khoản của mình")
+    reason = (lock_reason or "").strip()
+    if is_active is False and len(reason) < MIN_LOCK_REASON:
+        raise HTTPException(422, "Ghi lý do khoá tài khoản (VD mất máy, nghỉ việc, chuyển công tác)")
     # Cấp trên đặt lại mật khẩu → người dùng phải đổi ở lần đăng nhập tới; Superadmin tự đặt cho mình thì không
     must_change = None if not password else str(target["id"]) != str(actor["id"])
     await execute(
@@ -285,7 +291,7 @@ async def update_user(
         if v is not None
     ]
     details = {"changed": changed, "is_active": is_active}
-    if is_active is False and (reason := (lock_reason or "").strip()):
+    if is_active is False:
         details["lock_reason"] = reason
     await rbac_audit(actor, "user.update", target["username"], details=details)
     return await get_user(user_id)

@@ -860,6 +860,11 @@ async function staff(ctx, trackCode) {
     const dialog = page.getByRole('dialog', { name: /^Khoá tài khoản của / });
     await dialog.waitFor();
     if (!/đăng xuất ngay trên mọi máy/.test(await dialog.innerText())) throw new Error('hộp hỏi lại không nói rõ hậu quả');
+    // Khoá phải ghi lý do (máy chủ cũng trả 422 nếu thiếu — tests/e2e/rbac-test.mjs)
+    const confirmLock = dialog.getByRole('button', { name: 'Khoá tài khoản', exact: true });
+    if (await confirmLock.isEnabled()) throw new Error('chưa ghi lý do mà nút khoá đã bấm được');
+    await dialog.getByRole('group', { name: 'Lý do hay gặp' }).getByRole('button', { name: 'Mất máy' }).click();
+    if (!(await confirmLock.isEnabled())) throw new Error('đã chọn lý do mà nút khoá vẫn tắt');
     await dialog.getByRole('button', { name: 'Huỷ' }).click();
     await dialog.waitFor({ state: 'detached' });
     return 'hỏi lại trước khi khoá';
@@ -3403,6 +3408,261 @@ async function guidePage(ctx) {
   });
 }
 
+// ================================================================ Các màn theo bản vẽ desktop (11/2026) — laptop 1366 px
+// Mã 2 lớp 6 ô, ngăn nhật ký, gửi báo cáo nhanh, Điều động nhanh, bảng chi viện, Tìm đường trong popup: giả lập API ở chỗ có ghi
+// dữ liệu (không tạo phiếu, lệnh thật — chạy được với UI_READONLY); chỉ "Sửa thiết bị" ghi thật rồi xoá, bỏ qua khi UI_READONLY.
+async function desktopFlows(ctx) {
+  const { page } = ctx;
+  const json = (body, status = 200) => ({ status, contentType: 'application/json', body: JSON.stringify(body) });
+
+  await step(ctx, 'Mã 2 lớp 6 ô: chỉ nhận số, tối đa 6, nút khoá khi thiếu; sai mã báo lỗi; chuyển được sang mã khôi phục', async () => {
+    await page.route('**/api/v1/auth/login', safeRoute((route) => route.fulfill(json({ mfa: 'verify', challenge: 'thu' }))));
+    await page.route('**/api/v1/auth/mfa/verify', safeRoute((route) => route.fulfill(json({ detail: 'Mã không đúng' }, 400))));
+    try {
+      await page.goto(`${ROOT}/dang-nhap`);
+      await page.getByPlaceholder('Nhập tên đăng nhập hoặc email...').fill('thu');
+      await page.getByPlaceholder('••••••••').fill('thu');
+      await page.locator('button[type="submit"]').click();
+      const box = page.getByLabel('Mã 6 số trong ứng dụng xác thực');
+      await box.waitFor();
+      if (!(await box.evaluate((el) => el === document.activeElement))) throw new Error('ô mã không nhận tiêu điểm khi mở');
+      const cells = page.locator('form div.grid-cols-6 > span');
+      if ((await cells.count()) !== 6) throw new Error(`có ${await cells.count()} ô (cần 6)`);
+      const send = page.getByRole('button', { name: 'Xác nhận', exact: true });
+      await page.keyboard.type('12a3');
+      if ((await box.inputValue()) !== '123') throw new Error(`ô nhận cả chữ: "${await box.inputValue()}"`);
+      if ((await cells.nth(2).innerText()) !== '3' || (await cells.nth(3).innerText()) !== '') throw new Error('ô không hiện đúng số đã gõ');
+      if (await send.isEnabled()) throw new Error('chưa đủ 6 số mà nút đã bấm được');
+      await page.keyboard.press('Backspace');
+      if ((await box.inputValue()) !== '12') throw new Error('phím xoá lùi không chạy');
+      await page.keyboard.type('98765432');
+      if ((await box.inputValue()) !== '129876') throw new Error(`nhận quá 6 số: "${await box.inputValue()}"`);
+      await box.fill('654321'); // dán cả mã / tự điền từ ứng dụng
+      if ((await cells.nth(5).innerText()) !== '1') throw new Error('dán cả mã không hiện đủ 6 ô');
+      await send.click();
+      await page.getByText('Mã không đúng').waitFor({ timeout: 5_000 });
+      await page.getByRole('button', { name: /Dùng mã khôi phục/ }).click();
+      await page.getByLabel('Mã khôi phục').waitFor();
+    } finally {
+      await page.unroute('**/api/v1/auth/login');
+      await page.unroute('**/api/v1/auth/mfa/verify');
+    }
+  });
+
+  await step(ctx, 'Đăng nhập cán bộ', async () => {
+    await loginAs(page, STAFF);
+  });
+
+  await step(ctx, 'Ngăn nhật ký đầy đủ: mở từ "Xem đầy đủ", lọc thời gian, tìm, Xuất Excel; Esc đóng', async () => {
+    await page.goto(`${ROOT}/dashboard`);
+    await waitMain(page);
+    await page.getByRole('button', { name: 'Xem đầy đủ' }).click();
+    const panel = page.getByRole('dialog', { name: 'Nhật ký sự kiện' });
+    await panel.waitFor();
+    await panel.getByRole('group', { name: 'Lọc nhật ký theo loại' }).waitFor();
+    const range = panel.getByLabel('Khoảng thời gian');
+    await range.selectOption('tat_ca');
+    await panel.getByLabel('Tìm trong nhật ký').fill('zzz-khong-co-su-kien');
+    await panel.getByLabel('Tìm trong nhật ký').fill('');
+    const excel = panel.getByRole('button', { name: 'Xuất Excel' });
+    let note = 'chưa có sự kiện để xuất';
+    if (await excel.isEnabled()) {
+      const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 20_000 }), excel.click()]);
+      if (!/^nhat-ky-su-kien-.*\.xlsx$/.test(dl.suggestedFilename())) throw new Error(`tên tệp: ${dl.suggestedFilename()}`);
+      note = dl.suggestedFilename();
+    }
+    await expectNoOverflow(ctx, 'ngăn nhật ký', panel);
+    await page.keyboard.press('Escape');
+    await panel.waitFor({ state: 'detached', timeout: 3_000 });
+    return note;
+  });
+
+  await step(ctx, 'Gửi báo cáo nhanh: thiếu ô báo lỗi; mất mạng giữ biểu mẫu, Gửi lại dùng cùng mã tin (không tạo phiếu trùng)', async () => {
+    const posts = [];
+    await page.route('**/api/v1/sos', safeRoute(async (route, request) => {
+      if (request.method() !== 'POST') return route.continue();
+      posts.push(request.postDataJSON());
+      if (posts.length === 1) return route.abort('internetdisconnected');
+      return route.fulfill(json({ id: 'thu', code: 'SOS-THU', incident_type: 'sat_lo', address: 'thử' }));
+    }));
+    try {
+      await page.goto(`${ROOT}/dashboard`);
+      await waitMain(page);
+      await visible(page.getByRole('button', { name: 'Báo cáo nhanh', exact: true })).click();
+      const dialog = page.getByRole('dialog', { name: /Báo cáo nhanh hiện trường/ });
+      await dialog.waitFor();
+      await dialog.getByRole('button', { name: 'Sạt lở', exact: true }).click();
+      await dialog.getByRole('button', { name: /^Tiếp:/ }).click();
+      await dialog.getByRole('button', { name: /^Tiếp:/ }).click();
+      await dialog.getByText(/Chọn xã \/ phường nơi xảy ra/).waitFor({ timeout: 3_000 });
+      await dialog.locator('select').first().selectOption({ index: 1 });
+      await dialog.getByRole('button', { name: /^Tiếp:/ }).click();
+      await dialog.getByRole('button', { name: 'Tạo phiếu SOS' }).click();
+      await dialog.getByText('Chọn mức ưu tiên').waitFor({ timeout: 3_000 });
+      if (posts.length) throw new Error('chưa chọn mức mà đã gửi');
+      await dialog.getByRole('button', { name: /Khẩn cấp sinh tử/ }).click();
+      await dialog.getByRole('button', { name: 'Tạo phiếu SOS' }).click();
+      await dialog.getByText(/CHƯA gửi được phiếu SOS/).waitFor({ timeout: 8_000 });
+      await dialog.getByRole('button', { name: 'Sao chép nội dung báo cáo' }).waitFor();
+      await dialog.getByRole('button', { name: 'Gửi lại' }).click();
+      await dialog.waitFor({ state: 'detached', timeout: 8_000 });
+      const [first, second] = posts;
+      if (!first?.external_id || first.external_id !== second?.external_id) throw new Error('gửi lại không dùng cùng mã tin — có thể tạo phiếu trùng');
+      if (second.source !== 'CAN_BO' || second.incident_type !== 'sat_lo' || second.priority !== 1) throw new Error(`nội dung gửi sai: ${JSON.stringify(second).slice(0, 120)}`);
+    } finally {
+      await page.unroute('**/api/v1/sos');
+    }
+    return 'gửi lại cùng mã tin';
+  });
+
+  await step(ctx, 'Điều động nhanh: chạm dòng chỉ đổi chọn; "Điều động tới" mở lệnh, đội đã chọn được chọn sẵn kể cả ngoài bán kính tìm (không phát lệnh)', async () => {
+    await page.goto(`${ROOT}/nguon-luc?tab=luc_luong`);
+    const quick = visible(page.getByRole('button', { name: 'Điều động nhanh', exact: true }));
+    if (!(await quick.waitFor({ timeout: 15_000 }).then(() => true, () => false))) return 'bỏ qua: không có đội điều động được';
+    await quick.click();
+    const pick = page.getByRole('dialog', { name: /^Điều động nhanh — / });
+    await pick.waitFor();
+    const forceName = (await pick.getByRole('heading').first().innerText()).replace(/^Điều động nhanh — /, '');
+    const rows = pick.getByRole('radiogroup', { name: 'Phiếu cứu hộ cần đến' }).getByRole('radio');
+    if (!(await rows.first().waitFor({ timeout: 10_000 }).then(() => true, () => false))) return 'bỏ qua: không có phiếu chờ đội';
+    if ((await rows.first().getAttribute('aria-checked')) !== 'true') throw new Error('phiếu đầu không được chọn sẵn');
+    const target = rows.nth((await rows.count()) > 1 ? 1 : 0);
+    await target.click();
+    if (!(await pick.isVisible())) throw new Error('chạm dòng đã mở lệnh ngay');
+    const code = (await target.innerText()).match(/SOS-\d+/)[0];
+    await pick.getByRole('button', { name: new RegExp(`^Điều động tới ${code}`) }).click();
+    const order = page.getByRole('dialog', { name: new RegExp(`Điều đội cho ${code}`) });
+    await order.waitFor();
+    const chosen = order.getByRole('radiogroup', { name: 'Đội cứu hộ' }).locator('label', { has: page.locator('input:checked') });
+    await chosen.waitFor({ timeout: 10_000 });
+    if (!(await chosen.innerText()).includes(forceName)) throw new Error(`đội chọn sẵn sai: "${(await chosen.innerText()).slice(0, 60)}" (cần ${forceName})`);
+    await order.getByRole('button', { name: /^Huỷ/ }).click();
+    return `${forceName} → ${code}`;
+  });
+
+  await step(ctx, 'Bảng xã xin chi viện: lọc đúng tình huống hiện bảng "Từ · Cần · Mô tả · Chờ", Điều đội mở lệnh (không phát lệnh)', async () => {
+    let code = null;
+    await page.route(/\/api\/v1\/sos(\?.*)?$/, safeRoute(async (route, request) => {
+      if (request.method() !== 'GET') return route.continue();
+      const res = await route.fetch();
+      const list = await res.json();
+      const t = list.find?.((x) => x.status === 'moi' || x.status === 'dieu_phoi') || list[0];
+      if (t) {
+        code = t.code;
+        Object.assign(t, { status: 'moi', source: 'CAN_BO', raw_message: '[Xã xin chi viện] Lũ quét tại xóm thử. Cần: Xuồng / ca nô, Y tế. (Yêu cầu chi viện của cán bộ thử)' });
+      }
+      return route.fulfill({ response: res, json: list });
+    }));
+    try {
+      await page.goto(`${ROOT}/cuu-ho?th=xa_chi_vien`);
+      const table = page.getByRole('region', { name: 'Xã xin chi viện' });
+      await table.waitFor({ timeout: 15_000 });
+      if (!code) return 'bỏ qua: chưa có phiếu nào';
+      const row = table.getByRole('row').filter({ hasText: code });
+      await row.waitFor({ timeout: 10_000 });
+      const text = await row.innerText();
+      if (!/Xuồng \/ ca nô, Y tế/.test(text) || !/Lũ quét tại xóm thử/.test(text)) throw new Error(`dòng thiếu nhu cầu / mô tả: ${text.slice(0, 100)}`);
+      if (/\[Xã xin chi viện\]|Yêu cầu chi viện của/.test(text)) throw new Error('dòng còn thẻ kỹ thuật, câu ký tên');
+      await expectNoOverflow(ctx, 'bảng xã xin chi viện');
+      await row.getByRole('button', { name: 'Điều đội' }).click();
+      const order = page.getByRole('dialog', { name: new RegExp(`Điều đội cho ${code}`) });
+      await order.waitFor();
+      await order.getByRole('button', { name: /^Huỷ/ }).click();
+      await page.goto(`${ROOT}/cuu-ho?th=chi_vien`);
+      await page.getByRole('region', { name: 'Đội cần chi viện' }).waitFor({ timeout: 15_000 });
+      return code;
+    } finally {
+      await page.unroute(/\/api\/v1\/sos(\?.*)?$/);
+    }
+  });
+
+  await step(ctx, 'Diễn biến sơ tán của xã: mở từ bảng tiến độ, có bảng hoặc nói rõ chưa có; Đóng', async () => {
+    await page.goto(`${ROOT}/cuu-ho?xem=so_tan`);
+    const open = page.getByRole('button', { name: /^Diễn biến sơ tán / }).first();
+    if (!(await open.waitFor({ timeout: 15_000 }).then(() => true, () => false))) return 'bỏ qua: chưa có xã báo tiến độ';
+    await open.click();
+    const dialog = page.getByRole('dialog', { name: /^Diễn biến sơ tán — / });
+    await dialog.waitFor();
+    await dialog.getByRole('table').or(dialog.getByText('Xã chưa có lần cập nhật nào trong 72 giờ qua')).first().waitFor({ timeout: 10_000 });
+    await dialog.getByRole('button', { name: 'Đóng', exact: true }).last().click();
+  });
+
+  await step(ctx, 'Tìm đường trong popup SOS: Mở phiếu đúng mã; Tìm đường đóng popup, điểm B là phiếu, chạm điểm A ra lộ trình', async () => {
+    const asked = [];
+    await page.route('**/api/v1/map/route', safeRoute(async (route, request) => {
+      asked.push(request.postDataJSON());
+      await route.fulfill(json({
+        distance_km: 9.9, duration_min: 20, safe: true, hazards: [], warnings: [], roads: ['Đường thử'], offroad_km: 0,
+        geometry: { type: 'LineString', coordinates: [[105.4, 22.8], [105.5, 22.9]] },
+      }));
+    }));
+    try {
+      await page.goto(`${ROOT}/ban-do`);
+      await page.locator('.leaflet-marker-icon').first().waitFor({ timeout: 20_000 });
+      await page.waitForTimeout(1_500);
+      const icons = page.locator('.leaflet-marker-icon');
+      const popup = page.locator('.leaflet-popup-content', { has: page.getByRole('link', { name: 'Mở phiếu' }) }).first(); // popup cũ còn lại trong lúc đóng
+      let found = null;
+      for (let i = 0, n = Math.min(await icons.count(), 200); i < n && !found; i += 1) {
+        await icons.nth(i).dispatchEvent('click').catch(() => {});
+        await page.waitForTimeout(60);
+        if (await popup.count()) found = (await popup.innerText()).match(/SOS-\d+/)?.[0];
+      }
+      if (!found) return 'bỏ qua: không có điểm SOS trên bản đồ';
+      if (!(await popup.getByRole('link', { name: 'Mở phiếu' }).getAttribute('href')).includes(found)) throw new Error('"Mở phiếu" trỏ sai phiếu');
+      await popup.getByRole('button', { name: 'Tìm đường' }).dispatchEvent('click');
+      await popup.waitFor({ state: 'detached', timeout: 3_000 });
+      const hint = visible(page.locator('[role="status"]').filter({ hasText: 'Đang dùng: Dò đường an toàn' }));
+      await hint.getByText(new RegExp(`điểm B là ${found}`)).waitFor({ timeout: 3_000 });
+      await page.addStyleTag({ content: '.leaflet-marker-icon { pointer-events: none !important; }' });
+      const map = await page.locator('.leaflet-container').boundingBox();
+      await page.mouse.click(map.x + map.width * 0.55, map.y + map.height * 0.62);
+      await hint.getByText('Lộ trình:').waitFor({ timeout: 8_000 });
+      if (asked.length !== 1 || asked[0].to_lat == null) throw new Error(`gọi tìm đường sai: ${JSON.stringify(asked).slice(0, 120)}`);
+      return found;
+    } finally {
+      await page.unroute('**/api/v1/map/route');
+    }
+  });
+
+  if (!READONLY) {
+    await step(ctx, 'Sửa thiết bị đo: đăng ký, sửa tên + tạm tắt, chu kỳ sai không lưu được, xoá qua hộp Sửa', async () => {
+      await page.goto(`${ROOT}/nguon-du-lieu`);
+      await waitMain(page);
+      await page.getByRole('button', { name: /^Thiết bị đo/ }).first().click();
+      await page.getByRole('button', { name: 'Đăng ký thiết bị đo' }).click();
+      const reg = page.getByRole('dialog', { name: 'Đăng ký thiết bị đo' });
+      await reg.waitFor();
+      const id = `KT-UI-${Date.now() % 1_000_000}`;
+      await reg.getByLabel('Tên thiết bị').fill('Thiết bị kiểm thử');
+      await reg.getByLabel('Gắn với trạm đo').selectOption({ index: 1 });
+      await reg.getByLabel(/^Mã thiết bị/).fill(id);
+      await reg.getByRole('button', { name: /Đăng ký/ }).click();
+      await page.getByRole('button', { name: 'Đã lưu lại' }).click();
+      const row = page.getByRole('row').filter({ hasText: id });
+      await row.waitFor({ timeout: 10_000 });
+      await row.getByRole('button', { name: 'Sửa…' }).click();
+      const edit = page.getByRole('dialog', { name: 'Sửa thiết bị đo' });
+      await edit.waitFor();
+      await edit.getByLabel('Tên', { exact: true }).fill('Thiết bị kiểm thử đã sửa');
+      await edit.getByLabel('Tạm tắt nhận số đo từ thiết bị này').check();
+      await edit.getByLabel('Chu kỳ gửi (giây)').fill('10');
+      if (await edit.getByRole('button', { name: 'Lưu', exact: true }).isEnabled()) throw new Error('chu kỳ 10 giây mà vẫn lưu được');
+      await edit.getByLabel('Chu kỳ gửi (giây)').fill('600');
+      await expectNoOverflow(ctx, 'hộp sửa thiết bị', edit);
+      await edit.getByRole('button', { name: 'Lưu', exact: true }).click();
+      await edit.waitFor({ state: 'detached', timeout: 8_000 });
+      await row.getByText('Thiết bị kiểm thử đã sửa').waitFor({ timeout: 8_000 });
+      await row.getByText(/^Đã tắt/).waitFor({ timeout: 8_000 });
+      await row.getByRole('button', { name: 'Sửa…' }).click();
+      await edit.getByRole('button', { name: 'Xoá thiết bị…' }).click();
+      await page.getByRole('button', { name: 'Xoá thiết bị', exact: true }).click();
+      await row.waitFor({ state: 'detached', timeout: 8_000 });
+      return id;
+    });
+  }
+}
+
 // ================================================================
 console.log(`Kiểm thử giao diện: ${ROOT}${READONLY ? ' (chỉ xem)' : ''}`);
 const browser = await chromium.launch();
@@ -3551,6 +3811,13 @@ try {
       await resourcesWard({ page: wPage, vp: vpR, problems: watch(wPage) });
       await wctx.close();
     }
+  }
+  {
+    const dctx = await browser.newContext({ viewport: { width: 1366, height: 768 }, locale: 'vi-VN', acceptDownloads: true });
+    dctx.setDefaultTimeout(15_000);
+    const dPage = await dctx.newPage();
+    await desktopFlows({ page: dPage, vp: { name: 'Màn theo bản vẽ · Laptop 1366×768', mobile: false }, problems: watch(dPage) });
+    await dctx.close();
   }
   // Đợt thiên tai — chạy cuối: đợt mở thử (laptop, điện thoại) chỉ ở 1 phường và kết thúc ngay; đặt cuối để bước lỗi giữa
   // chừng (đợt còn mở) không gắn phiếu / dòng sổ kho của các bước khác vào đợt
