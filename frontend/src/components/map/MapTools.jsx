@@ -551,7 +551,8 @@ export function toolError(e) {
  * Tìm đường an toàn: chọn điểm A (lực lượng) và B (cần cứu hộ). `onResult`: null (chưa đủ 2 điểm) | { loading } |
  * { error, retry } | lộ trình. Chọn lại điểm A hoặc tắt công cụ khi đang tìm → bỏ kết quả của lượt cũ.
  */
-export function RouteTool({ active, onResult }) {
+/** `dest`: điểm B chọn sẵn (Tìm đường từ popup phiếu SOS) — chỉ cần chạm điểm A. */
+export function RouteTool({ active, onResult, dest }) {
   const [a, setA] = useState(null);
   const [b, setB] = useState(null);
   const [route, setRoute] = useState(null);
@@ -564,6 +565,13 @@ export function RouteTool({ active, onResult }) {
       setRoute(null);
     }
   }, [active]);
+  useEffect(() => {
+    if (active && dest) {
+      setA(null);
+      setRoute(null);
+      setB(dest);
+    }
+  }, [active, dest]);
   const find = async (from, to) => {
     const n = ++seq.current;
     setRoute(null);
@@ -580,6 +588,12 @@ export function RouteTool({ active, onResult }) {
   useMapEvents({
     click(e) {
       if (!active) return;
+      if (dest) {
+        setA(e.latlng);
+        setB(dest);
+        find(e.latlng, dest);
+        return;
+      }
       if (!a || (a && b)) {
         seq.current += 1;
         setA(e.latlng);

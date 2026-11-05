@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Circle, CircleMarker, GeoJSON, Marker, Polyline, Popup, Tooltip, useMap } from 'react-leaflet';
 import { Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, YAxis } from 'recharts';
-import { Phone, Send, Video, PackageMinus, Users } from 'lucide-react';
+import { Navigation, Phone, Send, Video, PackageMinus, Users } from 'lucide-react';
 import clsx from 'clsx';
-import { Segmented } from '../common/ui';
+import { Confirm, Segmented } from '../common/ui';
 import { api } from '../../api/client';
 import { useStore } from '../../app/store';
 import Hydrograph from '../charts/Hydrograph';
@@ -136,7 +136,8 @@ function WarehousePopup({ p, onIssue }) {
   );
 }
 
-function SosPopup({ p, onDispatch }) {
+function SosPopup({ p, lat, lon, onDispatch, onRoute }) {
+  const map = useMap();
   const pr = PRIORITY[p.priority] || PRIORITY[2];
   return (
     <div className={POP_W}>
@@ -148,11 +149,21 @@ function SosPopup({ p, onDispatch }) {
       <div className="mt-1 text-sm font-medium">{INCIDENT[p.incident_type] || p.incident_type} · {p.trapped_count} người</div>
       <div className="text-xs text-muted">{p.address} · {SOURCE[p.source]} · {ago(p.received_at)}</div>
       {p.raw_message && <p className="mt-1 text-xs italic">“{p.raw_message}”</p>}
-      {p.status !== 'thuc_thi' && (
-        <Can I="dispatch" a="create" scope={p.admin_code}>
-          <button className="btn-danger mt-2 px-2 py-1 text-xs" onClick={() => onDispatch(p)}><Send size={12} /> Điều đội</button>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {p.status !== 'thuc_thi' && (
+          <Can I="dispatch" a="create" scope={p.admin_code}>
+            <button type="button" className="btn-primary px-2.5 py-1 text-xs" onClick={() => onDispatch(p)}><Send size={12} aria-hidden="true" /> Điều đội</button>
+          </Can>
+        )}
+        <Can I="sos" a="view" scope={p.admin_code}>
+          <Link to={`/cuu-ho?phieu=${encodeURIComponent(p.code)}`} className="btn-secondary px-2.5 py-1 text-xs">Mở phiếu</Link>
         </Can>
-      )}
+        {onRoute && (
+          <button type="button" className="btn-secondary px-2.5 py-1 text-xs" onClick={() => { map.closePopup(); onRoute({ lat, lng: lon, label: p.code }); }}>
+            <Navigation size={12} aria-hidden="true" /> Tìm đường
+          </button>
+        )}
+      </div>
       <p className="mt-1 text-[11px] text-muted">Mẹo: kéo biểu tượng đội cứu hộ thả vào điểm cầu cứu này để điều động nhanh.</p>
     </div>
   );
@@ -165,14 +176,19 @@ function HazardPopup({ p }) {
   const qc = useQueryClient();
   const toast = useStore((s) => s.toast);
   const canClose = usePermission('incident', 'update', p.admin_code) && p.source !== 'import';
+  const [asking, setAsking] = useState(false);
+  const [busy, setBusy] = useState(false);
   const close = async () => {
-    if (!window.confirm(`Kết thúc sự cố "${p.name}"? Điểm sẽ ẩn khỏi bản đồ và cổng công khai.`)) return;
+    setBusy(true);
     try {
       await api(`/map/incidents/${p.id}/close`, { method: 'POST' });
       toast({ tone: 'good', title: 'Đã kết thúc sự cố', body: p.name });
+      setAsking(false);
       qc.invalidateQueries({ queryKey: ['map-layers'] });
     } catch (e) {
       toast({ tone: 'danger', title: 'Không kết thúc được', body: e.message });
+    } finally {
+      setBusy(false);
     }
   };
   return (
@@ -181,7 +197,17 @@ function HazardPopup({ p }) {
       <div className="text-xs text-muted">{INCIDENT_TYPE[p.type] || p.type} · {ago(p.reported_at)} · {POINT_SOURCE[p.source] || p.source}</div>
       {p.description && <p className="text-xs">{p.description}</p>}
       {p.expires_at && <div className="text-[11px] text-muted">Tự ẩn lúc {fmtVn(p.expires_at)}</div>}
-      {canClose && <button className="btn-ghost mt-1 px-2 py-1 text-xs" onClick={close}>Kết thúc sự cố</button>}
+      {canClose && <button type="button" className="btn-secondary mt-1.5 px-2.5 py-1 text-xs" onClick={() => setAsking(true)}>Kết thúc sự cố…</button>}
+      {/* Bản vẽ khung B10: hộp xác nhận thay cho hộp thoại của trình duyệt */}
+      {asking && (
+        <Confirm title="Kết thúc sự cố này?" subtitle="Điểm nguy hiểm đang hiệu lực" confirmLabel="Đóng điểm sự cố" busy={busy} onConfirm={close} onClose={() => setAsking(false)}>
+          <p className="rounded-[14px] bg-panel2 p-3 text-ink">
+            <b>{p.name}</b> · {INCIDENT_TYPE[p.type] || p.type}{LEVEL[p.level] ? ` · ${LEVEL[p.level].label}` : ''} · {POINT_SOURCE[p.source] || p.source}{p.expires_at ? ` · tự hết hạn ${fmtVn(p.expires_at)}` : ''}
+          </p>
+          <p>Đã thông đường hoặc đã khắc phục? Điểm biến khỏi bản đồ điều hành <b className="text-ink">và cổng người dân</b>, tuyến đường tính lại. Ghi nhật ký.</p>
+          <p className="rounded-[14px] border border-dashed border-line p-3 text-[13px]">Chỉ đóng được điểm cán bộ đánh dấu hoặc từ phản ánh. Điểm thuộc danh mục điểm nguy hiểm chính thức (nhập từ tệp) sửa ở Nhập dữ liệu.</p>
+        </Confirm>
+      )}
     </div>
   );
 }
@@ -328,7 +354,7 @@ const ROMAN = { 1: 'I', 2: 'II', 3: 'III' };
  * cụ, bảng cảnh báo, thanh thời gian, nút góc phải), không để đầu popup bị che.
  */
 export default function MapLayers({
-  data, layers, timeline, blackspots, popupPad, onDispatch, onCamera, onIssue, onIncident, onOccupancy,
+  data, layers, timeline, blackspots, popupPad, onDispatch, onCamera, onIssue, onIncident, onOccupancy, onRoute,
 }) {
   const pad = popupPad || {};
   const map = useMap();
@@ -537,7 +563,7 @@ export default function MapLayers({
           const p = f.properties;
           return (
             <Marker key={p.id} position={ll(f)} icon={sosIcon(p.priority, p.status)} zIndexOffset={1000}>
-              <Popup {...pad}><SosPopup p={p} onDispatch={(t) => onDispatch(t)} /></Popup>
+              <Popup {...pad}><SosPopup p={p} lat={f.geometry.coordinates[1]} lon={f.geometry.coordinates[0]} onDispatch={(t) => onDispatch(t)} onRoute={onRoute} /></Popup>
             </Marker>
           );
         })}
