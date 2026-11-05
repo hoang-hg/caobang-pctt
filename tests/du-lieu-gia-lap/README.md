@@ -1,7 +1,11 @@
 # Bộ dữ liệu giả lập
 
-Dùng để thử toàn hệ thống trên **CSDL trống** trước khi triển khai: nạp đủ 15 loại dữ liệu qua đúng công cụ nhập mà cán bộ sẽ
-dùng, rồi diễn tập trọn một đợt mưa lũ.
+Mọi dữ liệu giả lập của hệ thống nằm trong thư mục này. Có hai cách dùng:
+
+| Cách dùng | Dữ liệu | Có ghi vào CSDL không |
+|---|---|---|
+| **Nạp vào stack thử**: thử toàn hệ thống trên CSDL trống, gồm cả cổng công khai và phối hợp nhiều người | `tep/` | Có |
+| **Chế độ giả lập trên trình duyệt**: quản trị viên bật lúc vận hành, xem [README §4.7](../../README.md) | `giao-dien/fixtures.json` | Không |
 
 > **Không nạp vào hệ thống thật.** Tên người, số điện thoại (đầu `0999`), quân số, tồn kho, ngưỡng báo động đều là giả định.
 > Cổng công khai sẽ chỉ người dân tới các điểm sơ tán này. `nap.mjs` và `dien-tap.mjs` từ chối chạy nếu máy chủ không phải
@@ -12,6 +16,7 @@ dùng, rồi diễn tập trọn một đợt mưa lũ.
 | Tệp | Dùng để |
 |---|---|
 | `tep/` | 15 tệp nhập (CSV, GeoJSON) và `muc_luc.json` (thứ tự nhập, số dòng) |
+| `giao-dien/fixtures.json` | Phản hồi API đã ghi cho chế độ giả lập, đóng gói vào bản build frontend |
 | `nap.mjs` | Nạp cả bộ qua API nhập dữ liệu, kiểm tra số bản ghi hiện trên trang và cổng công khai |
 | `dien-tap.mjs` | Diễn tập một đợt mưa lũ qua API thật |
 | `compose.thu.yml` | Stack thử riêng, chạy song song được với stack dev |
@@ -92,9 +97,16 @@ loại nhập cho mạng đường, nên trên stack này chỉ đường là h�
 
 Phiếu sạt lở, phiếu xin chi viện của xã và phiếu cảm biến cố ý để lại, để các trang còn việc đang chờ khi mở xem.
 
+## Nằm ngoài thư mục này
+
+`backend/app/seed_data.py` là nguồn gốc của `tep/` và của dữ liệu mẫu `DEMO_MODE=true`, nhưng phải ở trong backend: tệp còn chứa
+danh sách 56 xã là dữ liệu nền của hệ thống thật, và kiểm tra Go-Live dùng nó để dò tài khoản demo.
+
 ## Khi đổi dữ liệu
 
-Sửa `backend/app/seed_data.py` rồi sinh lại, không sửa tay trong `tep/`:
+**Dữ liệu chế độ giả lập:** ghi lại bằng `tests/ui/demo-record.mjs` (cách chạy ở README §4.7), không sửa tay `giao-dien/fixtures.json`.
+
+**Tệp nhập:** sửa `backend/app/seed_data.py` rồi sinh lại, không sửa tay trong `tep/`:
 
 ```bash
 python tests/du-lieu-gia-lap/tao_bo_du_lieu.py

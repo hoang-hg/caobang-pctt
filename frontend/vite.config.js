@@ -1,9 +1,11 @@
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 const API = process.env.VITE_PROXY_TARGET || 'http://127.0.0.1:8000';
+const GIA_LAP = fileURLToPath(new URL('../tests/du-lieu-gia-lap/giao-dien', import.meta.url));
 
 /**
  * Xuất dist/sw.js từ src/sw.js (README 9.4): danh sách lưu sẵn = index.html + tệp tĩnh ở public/ + chunk cổng công
@@ -76,8 +78,11 @@ function cspInlineScripts() {
 
 export default defineConfig({
   plugins: [react(), serviceWorker(), cspInlineScripts()],
+  // Mọi dữ liệu giả lập nằm chung một thư mục, ngoài frontend (tests/du-lieu-gia-lap/README.md)
+  resolve: { alias: { '@du-lieu-gia-lap': GIA_LAP } },
   server: {
     port: 5173,
+    fs: { allow: ['.', GIA_LAP] },
     proxy: {
       '/api': API,
       '/health': API,

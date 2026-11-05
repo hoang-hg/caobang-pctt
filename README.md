@@ -315,7 +315,7 @@ backend/            API + worker (Python, FastAPI) — app/ (api/v1, rbac, servi
 frontend/           giao diện (React, Vite) — src/ (pages, components, api, rbac, app), nginx.conf + nginx/ (snippet),
                     scripts/compress.mjs (nén sẵn khi build), Dockerfile
 tests/e2e/          kiểm thử API qua HTTP (Node) — cần stack dev chạy với DEMO_MODE=true
-tests/du-lieu-gia-lap/  bộ tệp nhập giả lập + diễn tập trên CSDL trống (chỉ stack thử, xem README trong thư mục)
+tests/du-lieu-gia-lap/  mọi dữ liệu giả lập: tệp nhập + diễn tập trên CSDL trống, dữ liệu chế độ giả lập trên trình duyệt (xem README trong thư mục)
 tests/ui/           kiểm thử giao diện bằng trình duyệt thật (Playwright) — máy tính, máy tính bảng, điện thoại
 tests/load/         kiểm thử tải (k6)
 scripts/maintenance/  script bảo trì CSDL máy dev (có chặn production)
@@ -443,7 +443,7 @@ Cô Ba, quản trị hệ thống — số liệu như cấp tỉnh, khác ở h
   giả lập" (tài khoản quản lý nguồn dữ liệu; hỏi xác nhận). Chỉ thẻ trình duyệt đó, đóng thẻ là hết; dải vàng luôn hiện, không
   ẩn được; trình duyệt đó **không nhận SOS thật** tới khi tắt — máy trực ban không bật. "Tắt giả lập" về lại tài khoản thật.
   Mã + dữ liệu mẫu (~1 MB) là phần tải riêng, chỉ tải khi bật.
-- Dữ liệu: phản hồi API ghi từ backend seed demo (`frontend/src/api/demo/fixtures.json` — tên giả định, SĐT đầu số 0999),
+- Dữ liệu: phản hồi API ghi từ backend seed demo (`tests/du-lieu-gia-lap/giao-dien/fixtures.json` — tên giả định, SĐT đầu số 0999),
   giờ dời về lúc mở. Tạo phiếu SOS, điều động, cập nhật, hoàn thành chạy trên trình duyệt (còn khi tải lại trang, mất khi
   tắt giả lập); thao tác khác báo "không thực hiện trong chế độ giả lập". Thanh trên cùng: đổi vai trò, chọn kịch bản (lũ
   sông Bằng Giang vượt BĐ III, sạt lở Tĩnh Túc, thủy điện Bạch Đằng xả lũ lớn).

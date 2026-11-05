@@ -3,11 +3,11 @@
  * admin_tinh (cấp tỉnh, có / không PIN duyệt cảnh báo), admin_xa (xã Cô Ba) và super_admin (Quản trị hệ thống — dùng
  * /auth/me của cấp tỉnh, chỉ thay vai trò: hai vai trò cùng toàn quyền dữ liệu toàn tỉnh, khác ở hướng dẫn xử lý và quyền
  * quản lý tài khoản Cấp 2). Vai trò, phạm vi, danh sách quyền lấy
- * nguyên từ GET /auth/me đã ghi của tài khoản seed (demo/fixtures.json) — giao diện ẩn / hiện đúng như tài khoản thật;
+ * nguyên từ GET /auth/me đã ghi của tài khoản seed (tests/du-lieu-gia-lap/giao-dien/fixtures.json) — giao diện ẩn / hiện đúng như tài khoản thật;
  * tên là nhãn vai trò, không đặt họ tên giả gắn với chức danh lãnh đạo thật. Chỉ nạp qua import động trong nhánh
  * import.meta.env.DEV → không có trong bản build chạy thật.
  */
-import fixtures from './demo/fixtures.json';
+import fixtures from '@du-lieu-gia-lap/fixtures.json';
 import { DEMO_TOKEN } from '../app/store';
 
 const recordedMe = (scope) => fixtures.bodies[fixtures[scope]['/auth/me']];
