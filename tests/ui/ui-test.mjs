@@ -4123,7 +4123,8 @@ try {
     const dPage = await dctx.newPage();
     await desktopFlows({ page: dPage, vp: { name: 'Màn theo bản vẽ · Laptop 1366×768', mobile: false }, problems: watch(dPage) });
     await dctx.close();
-    const wctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'vi-VN' });
+    // Chặn service worker: bản build đăng ký sw.js, nó nhận quyền điều khiển trang giữa chừng và yêu cầu sau đó không qua page.route
+    const wctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'vi-VN', serviceWorkers: 'block' });
     wctx.setDefaultTimeout(15_000);
     const wPage = await wctx.newPage();
     await wideFlows({ page: wPage, vp: { name: 'Màn rộng ≥ 1440', mobile: false }, problems: watch(wPage) });
