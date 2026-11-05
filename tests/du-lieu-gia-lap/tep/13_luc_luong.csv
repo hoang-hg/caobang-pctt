@@ -1,0 +1,22 @@
+﻿ma,ten,loai,cap,noi_dong_quan,chi_huy,sdt,tan_so_vo_tuyen,quan_so,san_sang,ky_nang,vi_do,kinh_do,ma_xa
+F-QS-01,Đại đội TKCN – Bộ CHQS tỉnh,quan_su,tinh,Trụ sở tại Thục Phán,Thiếu tá Hoàng Minh Đức,0999 100 200,142.000 MHz,120,116,lai_xuong;boi_lan;cuu_ho_sat_lo;so_cuu;cuu_ho_vung_nui,22.67135,106.14866,CB-THUCPHAN
+F-CA-01,Phòng Cảnh sát PCCC & CNCH – Công an tỉnh,cong_an,tinh,Trụ sở tại Nùng Trí Cao,Trung tá Nông Văn Toàn,0999 100 201,142.125 MHz,85,81,lan;lai_xuong;cuu_ho_sat_lo;cho_nghiep_vu;so_cuu,22.67377,106.25004,CB-NUNGTRICAO
+F-BP-01,Đồn Biên phòng Đàm Thủy,bien_phong,xa,Trụ sở tại Đàm Thủy,Thiếu tá Lương Văn Hải,0999 100 202,142.250 MHz,38,34,cuu_ho_vung_nui;lai_xuong;so_cuu,22.87963,106.67965,CB-DAMTHUY
+F-BP-02,Đồn Biên phòng Trà Lĩnh,bien_phong,xa,Trụ sở tại Trà Lĩnh,Thiếu tá Đàm Quốc Việt,0999 100 203,142.375 MHz,36,34,cuu_ho_vung_nui;so_cuu,22.78707,106.35968,CB-TRALINH
+F-BP-03,Đồn Biên phòng Tà Lùng,bien_phong,xa,Trụ sở tại Phục Hòa,Thiếu tá Bế Thanh Sơn,0999 100 204,142.500 MHz,35,35,lai_xuong;boi_lan,22.52513,106.56525,CB-PHUCHOA
+F-BP-04,Đồn Biên phòng Cốc Pàng,bien_phong,xa,Trụ sở tại Cốc Pàng,Đại úy Triệu Văn Nam,0999 100 205,142.625 MHz,30,28,cuu_ho_vung_nui;cuu_ho_sat_lo,23.03531,105.56837,CB-COCPANG
+F-KV-01,Ban CHQS khu vực Bảo Lạc – Bảo Lâm,quan_su,tinh,Trụ sở tại Bảo Lạc,Trung tá Ma Văn Thành,0999 100 206,142.750 MHz,60,60,cuu_ho_sat_lo;cuu_ho_vung_nui;lai_xuong,22.92253,105.64352,CB-BAOLAC
+F-KV-02,Ban CHQS khu vực Nguyên Bình,quan_su,tinh,Trụ sở tại Nguyên Bình,Thiếu tá Hà Đức Lợi,0999 100 207,142.875 MHz,45,42,cuu_ho_sat_lo;cuu_ho_vung_nui,22.64637,105.92385,CB-NGUYENBINH
+F-KV-03,Ban CHQS khu vực Trùng Khánh – Hạ Lang,quan_su,tinh,Trụ sở tại Trùng Khánh,Thiếu tá Lục Văn Kiên,0999 100 208,143.000 MHz,45,44,lai_xuong;boi_lan;cuu_ho_vung_nui,22.83477,106.50848,CB-TRUNGKHANH
+F-KV-04,Ban CHQS khu vực Thạch An – Quảng Hòa,quan_su,tinh,Trụ sở tại Đông Khê,Thiếu tá Nông Đức Thắng,0999 100 209,143.125 MHz,42,42,cuu_ho_sat_lo;lai_xuong,22.38008,106.3879,CB-DONGKHE
+F-DQ-01,Trung đội dân quân cơ động phường Tân Giang,dan_quan,xa,Trụ sở tại Tân Giang,Xã đội trưởng Lý Văn Hùng,0999 100 210,143.250 MHz,25,22,lai_xuong;boi_lan,22.60848,106.22671,CB-TANGIANG
+F-DQ-02,Dân quân thường trực xã Hòa An,dan_quan,xa,Trụ sở tại Hòa An,Xã đội trưởng Hoàng Văn Chiến,0999 100 211,143.375 MHz,20,18,lai_xuong;boi_lan,22.76941,106.19854,CB-HOAAN
+F-DQ-03,Dân quân thường trực xã Tĩnh Túc,dan_quan,xa,Trụ sở tại Tĩnh Túc,Xã đội trưởng Triệu Tài Phú,0999 100 212,143.500 MHz,18,17,cuu_ho_sat_lo,22.6578,105.84979,CB-TINHTUC
+F-DQ-04,Dân quân thường trực xã Bảo Lâm,dan_quan,xa,Trụ sở tại Bảo Lâm,Xã đội trưởng Sầm Văn Quý,0999 100 213,143.625 MHz,18,18,cuu_ho_sat_lo;cuu_ho_vung_nui,22.77407,105.466,CB-BAOLAM
+F-DQ-05,Dân quân thường trực xã Quảng Uyên,dan_quan,xa,Trụ sở tại Quảng Uyên,Xã đội trưởng Mông Văn Tiến,0999 100 214,143.750 MHz,18,18,lai_xuong,22.73108,106.43044,CB-QUANGUYEN
+F-YT-01,Trung tâm Cấp cứu 115 Cao Bằng,y_te,tinh,Trụ sở tại Thục Phán,BSCKII Nông Thị Hạnh,0999 100 215,143.875 MHz,30,30,so_cuu;y_te,22.64969,106.22877,CB-THUCPHAN
+F-YT-02,Đội cơ động y tế Bảo Lạc,y_te,xa,Trụ sở tại Bảo Lạc,BS Lâm Văn Tuấn,0999 100 216,144.000 MHz,12,12,so_cuu;y_te,22.92887,105.66634,CB-BAOLAC
+F-TN-01,Đội tình nguyện CNCH – Hội Chữ thập đỏ tỉnh,tinh_nguyen,tinh,Trụ sở tại Tân Giang,Ông Đinh Văn Khánh,0999 100 217,144.125 MHz,40,37,so_cuu;boi_lan,22.57702,106.27243,CB-TANGIANG
+F-XA-COBA,Tiểu đội dân quân xã Cô Ba (giả định),dan_quan,xa,Trụ sở tại Cô Ba,Nông Văn Hùng,0999 100 218,144.250 MHz,12,12,so_cuu;cuu_ho_sat_lo,22.95826,105.68896,CB-COBA
+F-XA-CATHANH,Tiểu đội dân quân xã Ca Thành (giả định),dan_quan,xa,Trụ sở tại Ca Thành,Đàm Văn Tuấn,0999 100 219,144.375 MHz,12,12,so_cuu;cuu_ho_sat_lo,22.71622,105.80973,CB-CATHANH
+F-XA-TRUONGHA,Tiểu đội dân quân xã Trường Hà (giả định),dan_quan,xa,Trụ sở tại Trường Hà,Triệu Thị Hoa,0999 100 220,144.500 MHz,12,12,so_cuu;cuu_ho_sat_lo,22.91697,105.99297,CB-TRUONGHA

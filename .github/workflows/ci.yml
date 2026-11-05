@@ -41,6 +41,8 @@ jobs:
         run: ruff check app tests alembic
       - name: Pytest
         run: pytest -q
+      - name: Bộ dữ liệu giả lập khớp seed_data.py
+        run: python ../tests/du-lieu-gia-lap/tao_bo_du_lieu.py --check
 
   frontend:
     name: Frontend – lint + build
@@ -171,6 +173,38 @@ jobs:
       - name: Log khi lỗi
         if: failure()
         run: docker compose logs --tail=300 backend worker frontend
+      - name: Dọn dẹp
+        if: always()
+        run: docker compose down -v
+
+  du-lieu-gia-lap:
+    name: Bộ dữ liệu giả lập – nạp vào CSDL trống + diễn tập
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    timeout-minutes: 20
+    env:
+      JWT_SECRET: ci-jwt-secret-${{ github.run_id }}
+      SECRET_KEY: ci-secret-key-${{ github.run_id }}
+      DEMO_MODE: "false"
+      SIMULATOR: "false"
+      OPEN_METEO_ENABLED: "false"
+      IGE_TRUOTLO_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Build & khởi động stack (CSDL trống)
+        run: docker compose up -d --build --wait --wait-timeout 600 db redis minio mailpit mqtt backend worker
+      - name: Nạp cả bộ
+        run: node tests/du-lieu-gia-lap/nap.mjs
+      - name: Nạp lại — không nhân đôi
+        run: node tests/du-lieu-gia-lap/nap.mjs --lan-hai
+      - name: Diễn tập một đợt mưa lũ
+        run: node tests/du-lieu-gia-lap/dien-tap.mjs
+      - name: Log khi lỗi
+        if: failure()
+        run: docker compose logs --tail=80 backend worker
       - name: Dọn dẹp
         if: always()
         run: docker compose down -v
